@@ -1,10 +1,14 @@
 """
 Unified Payable Service
-Aggregates every outgoing-money obligation into one queue:
-  salary | vendor_settlement | commission | expense_claim | credit_refund
+Aggregates every outgoing-money obligation into one queue and provides
+authoritative execute paths that respect the model state machines.
 
-Each item exposes a standard shape so the frontend only needs one view.
-Execute paths delegate to the authoritative posting services.
+Payable types:
+  salary            — SalarySheet (APPROVED needs accrual post first, then payment)
+  vendor_settlement — VendorSettlement (DRAFT → POSTED via post_vendor_settlement)
+  commission        — Commission (PENDING → SETTLED + journals partner payable)
+  expense_claim     — EmployeeExpenseClaim (APPROVED → POSTED accrual → PAID)
+  credit_refund     — CustomerRefund (APPROVED/PENDING → DISBURSED + journal)
 """
 from __future__ import annotations
 
@@ -24,18 +28,31 @@ def _money(v) -> str:
         return "0.00"
 
 
+def _dec(v) -> Decimal:
+    return Decimal(str(v or 0)).quantize(Decimal("0.01"))
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # READ — list all pending payables
 # ──────────────────────────────────────────────────────────────────────────────
 
 def _salary_payables() -> list[dict[str, Any]]:
+    """
+    Include APPROVED sheets (need accrual posting first) and
+    POSTED/PAID_PARTIAL sheets (ready for direct payment).
+    Both show up so admin can pay in one click.
+    """
     from accounting.models import SalarySheet, SalarySheetStatus, SalaryPayment
     from django.db.models import Sum
 
     sheets = (
         SalarySheet.objects
         .select_related("employee", "employee__user")
-        .filter(status__in=[SalarySheetStatus.POSTED, SalarySheetStatus.PAID_PARTIAL])
+        .filter(status__in=[
+            SalarySheetStatus.APPROVED,
+            SalarySheetStatus.POSTED,
+            SalarySheetStatus.PAID_PARTIAL,
+        ])
         .order_by("-year", "-month", "-id")
     )
     rows = []
@@ -45,10 +62,11 @@ def _salary_payables() -> list[dict[str, Any]]:
             .filter(salary_sheet_id=sheet.id)
             .aggregate(total=Sum("amount"))["total"] or MONEY_ZERO
         )
-        outstanding = Decimal(str(sheet.net_amount or 0)) - Decimal(str(paid))
+        outstanding = _dec(sheet.net_amount) - _dec(paid)
         if outstanding <= MONEY_ZERO:
             continue
         emp = sheet.employee
+        needs_posting = sheet.status == SalarySheetStatus.APPROVED
         rows.append({
             "id": f"salary:{sheet.id}",
             "payable_type": "salary",
@@ -60,6 +78,7 @@ def _salary_payables() -> list[dict[str, Any]]:
             "amount": _money(sheet.net_amount),
             "outstanding": _money(outstanding),
             "status": sheet.status,
+            "needs_posting": needs_posting,
             "date": None,
             "journal_posted": sheet.posted_journal_entry_id is not None,
             "notes": f"Gross {_money(sheet.gross_amount)} | Deductions {_money(sheet.deductions_amount)}",
@@ -76,9 +95,8 @@ def _vendor_settlement_payables() -> list[dict[str, Any]]:
         .filter(status=VendorSettlementStatus.DRAFT)
         .order_by("-settlement_date", "-id")
     )
-    rows = []
-    for s in qs:
-        rows.append({
+    return [
+        {
             "id": f"vendor_settlement:{s.id}",
             "payable_type": "vendor_settlement",
             "payable_type_label": "Vendor Settlement",
@@ -89,11 +107,13 @@ def _vendor_settlement_payables() -> list[dict[str, Any]]:
             "amount": _money(s.amount),
             "outstanding": _money(s.amount),
             "status": s.status,
+            "needs_posting": False,
             "date": str(s.settlement_date),
             "journal_posted": s.posted_journal_entry_id is not None,
             "notes": s.notes or "",
-        })
-    return rows
+        }
+        for s in qs
+    ]
 
 
 def _commission_payables() -> list[dict[str, Any]]:
@@ -122,6 +142,7 @@ def _commission_payables() -> list[dict[str, Any]]:
             "amount": _money(getattr(c, "amount", 0)),
             "outstanding": _money(getattr(c, "amount", 0)),
             "status": c.status,
+            "needs_posting": False,
             "date": str(getattr(c, "created_at", "")).split("T")[0],
             "journal_posted": False,
             "notes": "",
@@ -136,7 +157,11 @@ def _expense_claim_payables() -> list[dict[str, Any]]:
     qs = (
         EmployeeExpenseClaim.objects
         .select_related("employee")
-        .filter(status__in=[ExpenseClaimStatus.APPROVED, ExpenseClaimStatus.POSTED, ExpenseClaimStatus.PAID_PARTIAL])
+        .filter(status__in=[
+            ExpenseClaimStatus.APPROVED,
+            ExpenseClaimStatus.POSTED,
+            ExpenseClaimStatus.PAID_PARTIAL,
+        ])
         .order_by("-expense_date", "-id")
     )
     rows = []
@@ -146,7 +171,7 @@ def _expense_claim_payables() -> list[dict[str, Any]]:
             .filter(expense_claim_id=claim.id)
             .aggregate(total=Sum("amount"))["total"] or MONEY_ZERO
         )
-        outstanding = Decimal(str(claim.approved_amount or 0)) - Decimal(str(paid))
+        outstanding = _dec(claim.approved_amount) - _dec(paid)
         if outstanding <= MONEY_ZERO:
             continue
         emp = claim.employee
@@ -161,6 +186,7 @@ def _expense_claim_payables() -> list[dict[str, Any]]:
             "amount": _money(claim.approved_amount),
             "outstanding": _money(outstanding),
             "status": claim.status,
+            "needs_posting": claim.status == ExpenseClaimStatus.APPROVED,
             "date": str(claim.expense_date),
             "journal_posted": claim.posted_journal_entry_id is not None,
             "notes": claim.notes or "",
@@ -169,13 +195,9 @@ def _expense_claim_payables() -> list[dict[str, Any]]:
 
 
 def _credit_refund_payables() -> list[dict[str, Any]]:
-    try:
-        from billing.models import CustomerRefund
-    except ImportError:
-        return []
-
     rows = []
     try:
+        from billing.models import CustomerRefund
         qs = (
             CustomerRefund.objects
             .select_related("customer")
@@ -195,6 +217,7 @@ def _credit_refund_payables() -> list[dict[str, Any]]:
                 "amount": _money(getattr(r, "amount", 0)),
                 "outstanding": _money(getattr(r, "amount", 0)),
                 "status": r.status,
+                "needs_posting": False,
                 "date": str(getattr(r, "created_at", "")).split("T")[0],
                 "journal_posted": False,
                 "notes": getattr(r, "reason", "") or "",
@@ -204,7 +227,11 @@ def _credit_refund_payables() -> list[dict[str, Any]]:
     return rows
 
 
-def build_unified_payable_list(*, payable_type: str | None = None, search: str | None = None) -> dict[str, Any]:
+def build_unified_payable_list(
+    *,
+    payable_type: str | None = None,
+    search: str | None = None,
+) -> dict[str, Any]:
     collectors = {
         "salary": _salary_payables,
         "vendor_settlement": _vendor_settlement_payables,
@@ -232,18 +259,21 @@ def build_unified_payable_list(*, payable_type: str | None = None, search: str |
             or q in r["payable_type_label"].lower()
         ]
 
-    total_outstanding = sum(Decimal(r["outstanding"]) for r in all_rows)
+    total_outstanding = sum(_dec(r["outstanding"]) for r in all_rows)
+    needs_posting_count = sum(1 for r in all_rows if r.get("needs_posting"))
+
     type_summary: dict[str, dict] = {}
     for r in all_rows:
         t = r["payable_type"]
         if t not in type_summary:
-            type_summary[t] = {"label": r["payable_type_label"], "count": 0, "total": Decimal("0.00")}
+            type_summary[t] = {"label": r["payable_type_label"], "count": 0, "total": MONEY_ZERO}
         type_summary[t]["count"] += 1
-        type_summary[t]["total"] += Decimal(r["outstanding"])
+        type_summary[t]["total"] += _dec(r["outstanding"])
 
     return {
         "total_items": len(all_rows),
         "total_outstanding": _money(total_outstanding),
+        "needs_posting_count": needs_posting_count,
         "type_summary": [
             {
                 "payable_type": k,
@@ -266,7 +296,7 @@ def execute_payable_payment(
     *,
     payable_type: str,
     payable_id: int,
-    finance_account_id: int,
+    finance_account_id: int | None,
     amount,
     payment_date=None,
     reference_no: str = "",
@@ -274,190 +304,271 @@ def execute_payable_payment(
     executed_by=None,
 ) -> dict[str, Any]:
     date = payment_date or timezone.localdate()
-    amt = Decimal(str(amount or 0)).quantize(Decimal("0.01"))
+    amt = _dec(amount)
     if amt <= MONEY_ZERO:
         raise ValueError("Payment amount must be greater than zero.")
 
-    if payable_type == "salary":
-        return _execute_salary(
-            salary_sheet_id=payable_id,
-            finance_account_id=finance_account_id,
-            amount=amt,
-            payment_date=date,
-            reference_no=reference_no,
-            posted_by=executed_by,
-        )
+    dispatch = {
+        "salary": _execute_salary,
+        "vendor_settlement": _execute_vendor_settlement,
+        "commission": _execute_commission,
+        "expense_claim": _execute_expense_claim,
+        "credit_refund": _execute_credit_refund,
+    }
+    fn = dispatch.get(payable_type)
+    if fn is None:
+        raise ValueError(f"Unknown payable_type: {payable_type!r}")
 
-    if payable_type == "vendor_settlement":
-        return _execute_vendor_settlement(
-            vendor_settlement_id=payable_id,
-            finance_account_id=finance_account_id,
-            amount=amt,
-            payment_date=date,
-            reference_no=reference_no,
-            posted_by=executed_by,
-        )
-
-    if payable_type == "commission":
-        return _execute_commission(
-            commission_id=payable_id,
-            settled_by=executed_by,
-            payment_date=date,
-            reference_no=reference_no,
-        )
-
-    if payable_type == "expense_claim":
-        return _execute_expense_claim(
-            expense_claim_id=payable_id,
-            finance_account_id=finance_account_id,
-            amount=amt,
-            payment_date=date,
-            reference_no=reference_no,
-            notes=notes,
-            posted_by=executed_by,
-        )
-
-    if payable_type == "credit_refund":
-        return _execute_credit_refund(
-            refund_id=payable_id,
-            finance_account_id=finance_account_id,
-            amount=amt,
-            payment_date=date,
-            reference_no=reference_no,
-            notes=notes,
-        )
-
-    raise ValueError(f"Unknown payable_type: {payable_type!r}")
+    return fn(
+        payable_id=payable_id,
+        finance_account_id=finance_account_id,
+        amount=amt,
+        payment_date=date,
+        reference_no=reference_no,
+        notes=notes,
+        executed_by=executed_by,
+    )
 
 
-def _execute_salary(*, salary_sheet_id, finance_account_id, amount, payment_date, reference_no, posted_by):
-    from accounting.services.salary_posting_service import post_salary_payment
+# ── Salary ────────────────────────────────────────────────────────────────────
+
+def _execute_salary(*, payable_id, finance_account_id, amount, payment_date, reference_no, notes, executed_by):
+    from accounting.models import SalarySheet, SalarySheetStatus
+    from accounting.services.salary_posting_service import (
+        post_salary_sheet,
+        post_salary_payment,
+    )
+
+    # Auto-post accrual journal if sheet is still APPROVED
+    sheet = SalarySheet.objects.select_related("employee").get(pk=payable_id)
+    if sheet.status == SalarySheetStatus.APPROVED:
+        sheet, _ = post_salary_sheet(salary_sheet_id=payable_id, posted_by=executed_by)
+
     salary_payment = post_salary_payment(
-        salary_sheet_id=salary_sheet_id,
+        salary_sheet_id=payable_id,
         payment_date=payment_date,
         amount=amount,
         finance_account_id=finance_account_id,
         reference_no=reference_no,
-        posted_by=posted_by,
+        posted_by=executed_by,
     )
-    journal_id = getattr(salary_payment, "posted_journal_entry_id", None)
     return {
         "success": True,
         "payable_type": "salary",
-        "payable_id": salary_sheet_id,
+        "payable_id": payable_id,
         "amount_paid": _money(amount),
-        "journal_entry_id": journal_id,
-        "message": f"Salary payment of ₹{amount:.2f} posted.",
+        "journal_entry_id": getattr(salary_payment, "posted_journal_entry_id", None),
+        "accrual_journal_posted": True,
+        "message": f"Salary payment ₹{amount:.2f} posted. Journal entry created for both accrual and payment.",
     }
 
 
-def _execute_vendor_settlement(*, vendor_settlement_id, finance_account_id, amount, payment_date, reference_no, posted_by):
+# ── Vendor Settlement ─────────────────────────────────────────────────────────
+
+def _execute_vendor_settlement(*, payable_id, finance_account_id, amount, payment_date, reference_no, notes, executed_by):
     from accounting.models import VendorSettlement
     from accounting.services.vendor_settlement_service import post_vendor_settlement
 
-    # update finance_account if user changed it in the form
-    settlement = VendorSettlement.objects.select_for_update().get(pk=vendor_settlement_id)
-    settlement.finance_account_id = finance_account_id
-    settlement.amount = amount
-    if reference_no:
-        settlement.reference_no = reference_no
-    settlement.settlement_date = payment_date
-    # bypass immutability guard — save only mutable fields before posting
-    VendorSettlement.objects.filter(pk=vendor_settlement_id).update(
+    # Update mutable fields before posting (inside the same transaction lock)
+    VendorSettlement.objects.filter(pk=payable_id, status="DRAFT").update(
         finance_account_id=finance_account_id,
         amount=amount,
-        reference_no=reference_no or settlement.reference_no,
+        reference_no=reference_no or "",
         settlement_date=payment_date,
     )
-
-    settlement_obj, created = post_vendor_settlement(
-        vendor_settlement_id=vendor_settlement_id,
-        posted_by=posted_by,
+    settlement, _ = post_vendor_settlement(
+        vendor_settlement_id=payable_id,
+        posted_by=executed_by,
     )
     return {
         "success": True,
         "payable_type": "vendor_settlement",
-        "payable_id": vendor_settlement_id,
+        "payable_id": payable_id,
         "amount_paid": _money(amount),
-        "journal_entry_id": settlement_obj.posted_journal_entry_id,
-        "message": f"Vendor settlement ₹{amount:.2f} posted.",
+        "journal_entry_id": settlement.posted_journal_entry_id,
+        "message": f"Vendor settlement ₹{amount:.2f} posted. AP account debited, finance account credited.",
     }
 
 
-def _execute_commission(*, commission_id, settled_by, payment_date, reference_no):
+# ── Commission ────────────────────────────────────────────────────────────────
+
+def _execute_commission(*, payable_id, finance_account_id, amount, payment_date, reference_no, notes, executed_by):
+    """
+    Marks commission settled and posts the journal:
+      DR  Partner Commission Payable (liability cleared)
+      CR  Finance Account (cash/bank/UPI paid out)
+    If no finance_account provided the commission is just marked settled (no accounting entry).
+    """
     from subscriptions.services.commission_service import settle_commission
+    from subscriptions.models import Commission
+
     result = settle_commission(
-        commission_id=commission_id,
-        settled_by=settled_by,
+        commission_id=payable_id,
+        settled_by=executed_by,
         settlement_date=payment_date,
-        settlement_metadata={"reference_no": reference_no} if reference_no else None,
+        settlement_metadata={"reference_no": reference_no, "notes": notes},
     )
-    commission = result.get("commission")
+    commission = result.get("commission") or Commission.objects.get(pk=payable_id)
+    commission_amount = _dec(getattr(commission, "amount", amount))
+
+    journal_id = None
+    if finance_account_id:
+        from accounting.models import FinanceAccount
+        from accounting.services.bridge_posting_service import post_bridge_entry
+        from accounting.services.operational_accounts_service import ensure_phase3_system_accounts
+
+        finance_account = FinanceAccount.objects.select_related("chart_account").get(pk=finance_account_id)
+        accounts = ensure_phase3_system_accounts()
+        posted_journal, _ = post_bridge_entry(
+            source_instance=commission,
+            purpose="COMMISSION_PAYOUT",
+            entry_date=payment_date,
+            memo=f"Commission payout #{payable_id}",
+            voucher_type="COMMISSION_PAYOUT",
+            source_type="COMMISSION_PAYOUT",
+            source_reference=reference_no or f"COMPAY-{payable_id}",
+            trace_metadata={
+                "commission_id": payable_id,
+                "amount": f"{commission_amount:.2f}",
+                "reference_no": reference_no,
+            },
+            lines=[
+                {
+                    "chart_account": accounts["PARTNER_COMMISSION_PAYABLE"],
+                    "description": f"Commission #{payable_id} settled",
+                    "debit_amount": commission_amount,
+                    "credit_amount": MONEY_ZERO,
+                },
+                {
+                    "chart_account": finance_account.chart_account,
+                    "description": reference_no or f"Commission payout {payable_id}",
+                    "debit_amount": MONEY_ZERO,
+                    "credit_amount": commission_amount,
+                },
+            ],
+        )
+        journal_id = posted_journal.id
+
     return {
         "success": True,
         "payable_type": "commission",
-        "payable_id": commission_id,
-        "amount_paid": _money(getattr(commission, "amount", 0)),
-        "journal_entry_id": None,
-        "message": "Commission marked as settled.",
+        "payable_id": payable_id,
+        "amount_paid": _money(commission_amount),
+        "journal_entry_id": journal_id,
+        "message": f"Commission ₹{commission_amount:.2f} settled."
+        + (" Journal: DR Partner Commission Payable / CR Finance Account." if journal_id else " (No journal — no finance account selected.)"),
     }
 
 
-def _execute_expense_claim(*, expense_claim_id, finance_account_id, amount, payment_date, reference_no, notes, posted_by):
+# ── Expense Claim ─────────────────────────────────────────────────────────────
+
+def _execute_expense_claim(*, payable_id, finance_account_id, amount, payment_date, reference_no, notes, executed_by):
+    """
+    Correct two-step flow:
+      Step 1 (if APPROVED): accrual journal DR Expense / CR Accounts Payable
+                            → claim.posted_journal_entry set, status APPROVED→POSTED
+      Step 2: payment journal DR Accounts Payable / CR Finance Account
+              → EmployeeExpenseClaimPayment created, claim status POSTED→PAID/PAID_PARTIAL
+    """
     from accounting.models import (
-        EmployeeExpenseClaim, EmployeeExpenseClaimPayment,
-        ExpenseClaimStatus, FinanceAccount,
+        EmployeeExpenseClaim,
+        EmployeeExpenseClaimPayment,
+        ExpenseClaimStatus,
+        FinanceAccount,
     )
     from accounting.services.bridge_posting_service import post_bridge_entry
     from accounting.services.operational_accounts_service import ensure_phase3_system_accounts
+    from django.db.models import Sum as DSum
 
-    claim = EmployeeExpenseClaim.objects.select_for_update().select_related(
-        "employee", "expense_account",
-    ).get(pk=expense_claim_id)
+    claim = (
+        EmployeeExpenseClaim.objects
+        .select_for_update()
+        .select_related("employee", "expense_account", "branch")
+        .get(pk=payable_id)
+    )
     finance_account = FinanceAccount.objects.select_related("chart_account").get(pk=finance_account_id)
+    accounts = ensure_phase3_system_accounts()
 
-    if claim.status == ExpenseClaimStatus.DRAFT:
-        raise ValueError("Expense claim must be approved before payment.")
     if claim.status in {ExpenseClaimStatus.PAID, ExpenseClaimStatus.REJECTED, ExpenseClaimStatus.CANCELLED}:
         raise ValueError(f"Cannot pay an expense claim in status {claim.status}.")
+    if claim.status == ExpenseClaimStatus.DRAFT:
+        raise ValueError("Expense claim must be approved before payment.")
 
-    from django.db.models import Sum as DSum
+    # Outstanding check
     paid_so_far = (
         EmployeeExpenseClaimPayment.objects
         .filter(expense_claim_id=claim.id)
         .aggregate(total=DSum("amount"))["total"] or MONEY_ZERO
     )
-    outstanding = Decimal(str(claim.approved_amount or 0)) - Decimal(str(paid_so_far))
+    outstanding = _dec(claim.approved_amount) - _dec(paid_so_far)
     if amount > outstanding + Decimal("0.01"):
         raise ValueError(f"Payment ₹{amount:.2f} exceeds outstanding ₹{outstanding:.2f}.")
 
+    # ── Step 1: Accrual (APPROVED → POSTED) ──────────────────────────────────
+    if claim.status == ExpenseClaimStatus.APPROVED:
+        accrual_journal, _ = post_bridge_entry(
+            source_instance=claim,
+            purpose="EXPENSE_CLAIM_ACCRUAL",
+            entry_date=claim.expense_date,
+            memo=f"Expense claim {claim.claim_no} accrual — {claim.employee.name}",
+            voucher_type="EXPENSE_CLAIM_ACCRUAL",
+            source_type="EXPENSE_CLAIM_ACCRUAL",
+            source_reference=claim.claim_no,
+            trace_metadata={
+                "expense_claim_id": claim.id,
+                "employee_id": claim.employee_id,
+                "approved_amount": f"{_dec(claim.approved_amount):.2f}",
+            },
+            lines=[
+                {
+                    "chart_account": claim.expense_account,
+                    "description": f"{claim.claim_no} — {claim.category or 'expense'}",
+                    "debit_amount": _dec(claim.approved_amount),
+                    "credit_amount": MONEY_ZERO,
+                },
+                {
+                    "chart_account": accounts["ACCOUNTS_PAYABLE"],
+                    "description": claim.employee.name,
+                    "debit_amount": MONEY_ZERO,
+                    "credit_amount": _dec(claim.approved_amount),
+                },
+            ],
+        )
+        # APPROVED → POSTED: this is an allowed transition
+        EmployeeExpenseClaim.objects.filter(pk=claim.id).update(
+            status=ExpenseClaimStatus.POSTED,
+            posted_journal_entry_id=accrual_journal.id,
+        )
+        claim.status = ExpenseClaimStatus.POSTED
+        claim.posted_journal_entry_id = accrual_journal.id
+
+    # ── Step 2: Payment (POSTED → PAID / PAID_PARTIAL) ───────────────────────
     payment = EmployeeExpenseClaimPayment.objects.create(
         expense_claim=claim,
         payment_date=payment_date,
         amount=amount,
         finance_account=finance_account,
         reference_no=reference_no or None,
-        branch=getattr(claim, "branch", None),
+        branch=claim.branch,
     )
 
-    accounts = ensure_phase3_system_accounts()
-    posted_journal, _ = post_bridge_entry(
+    payment_journal, _ = post_bridge_entry(
         source_instance=payment,
         purpose="EXPENSE_CLAIM_PAYMENT",
         entry_date=payment_date,
-        memo=f"Expense claim {claim.claim_no} — {claim.employee.name}",
+        memo=f"Expense claim {claim.claim_no} payment — {claim.employee.name}",
         voucher_type="EXPENSE_CLAIM_PAYMENT",
         source_type="EXPENSE_CLAIM_PAYMENT",
         source_reference=reference_no or f"EXPPAY-{payment.id}",
         trace_metadata={
             "expense_claim_id": claim.id,
             "employee_id": claim.employee_id,
-            "amount": f"{amount:.2f}",
+            "payment_amount": f"{amount:.2f}",
         },
         lines=[
             {
-                "chart_account": claim.expense_account,
-                "description": claim.claim_no,
+                "chart_account": accounts["ACCOUNTS_PAYABLE"],
+                "description": f"{claim.claim_no} — {claim.employee.name}",
                 "debit_amount": amount,
                 "credit_amount": MONEY_ZERO,
             },
@@ -469,40 +580,92 @@ def _execute_expense_claim(*, expense_claim_id, finance_account_id, amount, paym
             },
         ],
     )
+    EmployeeExpenseClaimPayment.objects.filter(pk=payment.id).update(
+        posted_journal_entry_id=payment_journal.id
+    )
 
-    payment.posted_journal_entry = posted_journal
-    payment.save(update_fields=["posted_journal_entry"])
-
-    new_paid = Decimal(str(paid_so_far)) + amount
-    net = Decimal(str(claim.approved_amount or 0))
-    if new_paid >= net:
-        EmployeeExpenseClaim.objects.filter(pk=claim.id).update(status=ExpenseClaimStatus.PAID)
-    else:
-        EmployeeExpenseClaim.objects.filter(pk=claim.id).update(status=ExpenseClaimStatus.PAID_PARTIAL)
+    # Status transition: POSTED → PAID or PAID_PARTIAL
+    new_total_paid = _dec(paid_so_far) + amount
+    final_status = (
+        ExpenseClaimStatus.PAID
+        if new_total_paid >= _dec(claim.approved_amount)
+        else ExpenseClaimStatus.PAID_PARTIAL
+    )
+    EmployeeExpenseClaim.objects.filter(pk=claim.id).update(status=final_status)
 
     return {
         "success": True,
         "payable_type": "expense_claim",
-        "payable_id": expense_claim_id,
+        "payable_id": payable_id,
         "amount_paid": _money(amount),
-        "journal_entry_id": posted_journal.id if posted_journal else None,
-        "message": f"Expense claim payment ₹{amount:.2f} posted.",
+        "journal_entry_id": payment_journal.id,
+        "message": (
+            f"Expense claim ₹{amount:.2f} paid. "
+            "Accrual (DR Expense/CR AP) + Payment (DR AP/CR Finance Account) journals posted."
+        ),
     }
 
 
-def _execute_credit_refund(*, refund_id, finance_account_id, amount, payment_date, reference_no, notes):
+# ── Credit Refund ─────────────────────────────────────────────────────────────
+
+def _execute_credit_refund(*, payable_id, finance_account_id, amount, payment_date, reference_no, notes, executed_by):
+    """
+    Disburses a customer refund and posts journal:
+      DR  Customer Advance / AR (liability cleared)
+      CR  Finance Account (cash/bank/UPI paid out)
+    """
     try:
         from billing.models import CustomerRefund
-        CustomerRefund.objects.filter(pk=refund_id, status__in=["APPROVED", "PENDING"]).update(
-            status="DISBURSED",
-        )
+        refund = CustomerRefund.objects.get(pk=payable_id)
+        refund_amount = _dec(getattr(refund, "amount", amount))
     except Exception as exc:
-        raise ValueError(f"Refund disbursement failed: {exc}") from exc
+        raise ValueError(f"Refund not found: {exc}") from exc
+
+    journal_id = None
+    if finance_account_id:
+        from accounting.models import FinanceAccount
+        from accounting.services.bridge_posting_service import post_bridge_entry
+        from accounting.services.operational_accounts_service import ensure_phase3_system_accounts
+
+        finance_account = FinanceAccount.objects.select_related("chart_account").get(pk=finance_account_id)
+        accounts = ensure_phase3_system_accounts()
+        posted_journal, _ = post_bridge_entry(
+            source_instance=refund,
+            purpose="CUSTOMER_REFUND_DISBURSEMENT",
+            entry_date=payment_date,
+            memo=f"Customer refund disbursement #{payable_id}",
+            voucher_type="CUSTOMER_REFUND",
+            source_type="CUSTOMER_REFUND",
+            source_reference=reference_no or f"REFUND-{payable_id}",
+            trace_metadata={
+                "refund_id": payable_id,
+                "amount": f"{refund_amount:.2f}",
+                "reference_no": reference_no,
+            },
+            lines=[
+                {
+                    "chart_account": accounts["CUSTOMER_RECEIVABLE"],
+                    "description": f"Refund #{payable_id} — customer credit cleared",
+                    "debit_amount": refund_amount,
+                    "credit_amount": MONEY_ZERO,
+                },
+                {
+                    "chart_account": finance_account.chart_account,
+                    "description": reference_no or f"Refund disbursement {payable_id}",
+                    "debit_amount": MONEY_ZERO,
+                    "credit_amount": refund_amount,
+                },
+            ],
+        )
+        journal_id = posted_journal.id
+
+    CustomerRefund.objects.filter(pk=payable_id).update(status="DISBURSED")
     return {
         "success": True,
         "payable_type": "credit_refund",
-        "payable_id": refund_id,
-        "amount_paid": _money(amount),
-        "journal_entry_id": None,
-        "message": f"Customer refund ₹{amount:.2f} marked as disbursed.",
+        "payable_id": payable_id,
+        "amount_paid": _money(refund_amount),
+        "journal_entry_id": journal_id,
+        "message": f"Customer refund ₹{refund_amount:.2f} disbursed."
+        + (" Journal: DR Customer Receivable / CR Finance Account." if journal_id else ""),
     }

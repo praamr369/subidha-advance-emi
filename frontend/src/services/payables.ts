@@ -20,6 +20,7 @@ export interface PayableItem {
   status: string;
   date: string | null;
   journal_posted: boolean;
+  needs_posting: boolean;
   notes: string;
 }
 
@@ -33,6 +34,7 @@ export interface TypeSummary {
 export interface UnifiedPayableData {
   total_items: number;
   total_outstanding: string;
+  needs_posting_count: number;
   type_summary: TypeSummary[];
   items: PayableItem[];
 }
