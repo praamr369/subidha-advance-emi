@@ -10,6 +10,14 @@ from api.v1.views.admin_unified_payable import (
     AdminPayableFinanceAccountsView,
     AdminPayableExecuteView,
 )
+from api.v1.views.admin_finance_gaps import (
+    AdminPaymentReversalsView,
+    AdminPaymentReversalActionView,
+    AdminReconciliationSignOffListView,
+    AdminReconciliationSignOffActionView,
+    AdminForfeitureInvoiceListView,
+    AdminForfeitureInvoiceIssueView,
+)
 from api.v1.views.admin_business_setup import (
     AdminLocalSandboxResetView,
     AdminLocalSandboxSeedView,
@@ -1313,4 +1321,18 @@ urlpatterns = [
     path("payables/", AdminUnifiedPayableListView.as_view()),
     path("payables/finance-accounts/", AdminPayableFinanceAccountsView.as_view()),
     path("payables/execute/", AdminPayableExecuteView.as_view()),
+
+    # ── Payment reversal queue ────────────────────────────────────────────────
+    path("payments/reversals/", AdminPaymentReversalsView.as_view()),
+    path("payments/reversals/<int:pk>/approve/", AdminPaymentReversalActionView.as_view(), kwargs={"action": "approve"}),
+    path("payments/reversals/<int:pk>/reject/", AdminPaymentReversalActionView.as_view(), kwargs={"action": "reject"}),
+
+    # ── Reconciliation sign-offs ──────────────────────────────────────────────
+    path("finance/reconciliation-signoffs/", AdminReconciliationSignOffListView.as_view()),
+    path("finance/reconciliation-signoffs/<int:pk>/sign-off/", AdminReconciliationSignOffActionView.as_view(), kwargs={"action": "sign-off"}),
+    path("finance/reconciliation-signoffs/<int:pk>/revoke/", AdminReconciliationSignOffActionView.as_view(), kwargs={"action": "revoke"}),
+
+    # ── Deposit forfeiture invoices ───────────────────────────────────────────
+    path("finance/forfeiture-invoices/", AdminForfeitureInvoiceListView.as_view()),
+    path("finance/forfeiture-invoices/<int:pk>/issue/", AdminForfeitureInvoiceIssueView.as_view()),
 ]

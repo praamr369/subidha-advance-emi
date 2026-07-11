@@ -31,7 +31,7 @@ export default function PaymentReversalsPage() {
   const [processing, setProcessing] = useState<number | null>(null);
 
   useEffect(() => {
-    apiFetch("/api/v1/payments/reversals/")
+    apiFetch("/admin/payments/reversals/")
       .then((d) => setReversals(Array.isArray(d) ? d as Reversal[] : ((d as { results?: Reversal[] })?.results ?? [])))
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -40,7 +40,7 @@ export default function PaymentReversalsPage() {
   const handleAction = async (id: number, action: "approve" | "reject") => {
     setProcessing(id);
     try {
-      await apiFetch(`/api/v1/payments/reversals/${id}/${action}/`, { method: "POST" });
+      await apiFetch(`/admin/payments/reversals/${id}/${action}/`, { method: "POST" });
       setReversals((prev) =>
         prev.map((r) => r.id === id ? { ...r, status: action === "approve" ? "APPROVED" : "REJECTED" } : r)
       );

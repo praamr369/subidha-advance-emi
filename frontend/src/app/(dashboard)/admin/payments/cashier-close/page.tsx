@@ -1,147 +1,216 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { apiFetch } from "@/lib/api";
 
-type DaySummary = {
-  date: string;
-  cash_total: number;
-  upi_total: number;
-  bank_total: number;
-  card_total: number;
-  total_collected: number;
-  total_transactions: number;
-  pending_reversals: number;
-  is_closed: boolean;
-  closed_by: string | null;
-  closed_at: string | null;
+type DayClose = {
+  id: number;
+  business_date: string;
+  status: string;
+  submitted_at: string | null;
+  approved_at: string | null;
+  cashier_username?: string | null;
+  branch_name?: string | null;
+  cash_counter_name?: string | null;
+  system_cash_total?: string | number | null;
+  cashier_declared_cash?: string | number | null;
+  variance?: string | number | null;
+  notes?: string | null;
 };
 
-export default function CashierClosePage() {
-  const [summary, setSummary] = useState<DaySummary | null>(null);
+const STATUS_COLOR: Record<string, string> = {
+  DRAFT: "bg-gray-100 text-gray-700",
+  SUBMITTED: "bg-yellow-100 text-yellow-700",
+  APPROVED: "bg-green-100 text-green-700",
+  REJECTED: "bg-red-100 text-red-700",
+  VOIDED: "bg-gray-100 text-gray-400",
+};
+
+function rupee(v: string | number | null | undefined) {
+  const n = parseFloat(String(v ?? "0")) || 0;
+  return `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
+}
+
+export default function AdminCashierClosePage() {
+  const [closes, setCloses] = useState<DayClose[]>([]);
   const [loading, setLoading] = useState(true);
-  const [closing, setClosing] = useState(false);
-  const [notes, setNotes] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [processing, setProcessing] = useState<number | null>(null);
+  const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
 
-  useEffect(() => {
-    const today = new Date().toISOString().split("T")[0];
-    apiFetch(`/api/v1/payments/day-summary/?date=${today}`)
-      .then((d) => setSummary(d as DaySummary))
-      .catch(() => {})
+  const today = new Date().toISOString().split("T")[0];
+
+  const showToast = (msg: string, ok = true) => {
+    setToast({ msg, ok });
+    setTimeout(() => setToast(null), 4000);
+  };
+
+  const load = () => {
+    setLoading(true);
+    apiFetch(`/settlements/cashier-day-closes/?date=${today}`)
+      .then((d) => {
+        const arr = Array.isArray(d) ? d : ((d as { results?: DayClose[] })?.results ?? []);
+        setCloses(arr as DayClose[]);
+      })
+      .catch(() => setCloses([]))
       .finally(() => setLoading(false));
-  }, [success]);
+  };
 
-  const handleClose = async () => {
-    if (!confirm("Close the cashier for today? This action cannot be undone.")) return;
-    setClosing(true);
-    setError(null);
+  useEffect(() => { load(); }, []);
+
+  const handleAction = async (id: number, action: "approve" | "reject") => {
+    if (!confirm(`${action === "approve" ? "Approve" : "Reject"} this day close?`)) return;
+    setProcessing(id);
     try {
-      await apiFetch("/api/v1/payments/cashier-close/", {
-        method: "POST",
-        body: JSON.stringify({ notes }),
-      });
-      setSuccess(true);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Close failed.");
+      await apiFetch(`/settlements/cashier-day-closes/${id}/${action}/`, { method: "POST" });
+      showToast(`Day close ${action}d successfully.`);
+      load();
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : `${action} failed.`, false);
     } finally {
-      setClosing(false);
+      setProcessing(null);
     }
   };
 
-  const today = new Date().toLocaleDateString("en-IN", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+  const pending = closes.filter((c) => c.status === "SUBMITTED");
+  const approved = closes.filter((c) => c.status === "APPROVED");
+
+  const todayLabel = new Date().toLocaleDateString("en-IN", {
+    weekday: "long", year: "numeric", month: "long", day: "numeric",
+  });
 
   return (
     <ERPPageShell
-      title="Cashier Day Close"
-      subtitle={today}
+      title="Cashier Day Close — Admin Approval"
+      subtitle={todayLabel}
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
         { label: "Payments", href: "/admin/payments" },
         { label: "Day Close" },
       ]}
     >
-      <div className="max-w-2xl mx-auto space-y-6">
-        {loading && <div className="py-8 text-center text-gray-500">Loading day summary...</div>}
+      {toast && (
+        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium ${toast.ok ? "bg-green-600 text-white" : "bg-red-600 text-white"}`}>
+          {toast.msg}
+        </div>
+      )}
 
-        {summary?.is_closed && (
-          <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-300 rounded-xl">
-            <div className="font-bold text-green-800 dark:text-green-200">✅ Day Already Closed</div>
-            <div className="text-sm text-green-700 mt-1">
-              Closed by {summary.closed_by} at {summary.closed_at ? new Date(summary.closed_at).toLocaleTimeString("en-IN") : "—"}
+      <div className="max-w-3xl mx-auto space-y-6">
+        {/* Info banner */}
+        <div className="rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 px-4 py-3 text-sm text-blue-700 dark:text-blue-300">
+          Cashiers submit their day-close from the Cashier portal. As admin you can <strong>approve</strong> or <strong>reject</strong> submitted sessions here.
+          To view the detailed settlement, go to{" "}
+          <Link href="/admin/settlements/cashier-day-closes" className="underline font-medium">
+            Settlements → Cashier Day Closes →
+          </Link>
+        </div>
+
+        {/* KPI tiles */}
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            { label: "Pending approval", count: pending.length, color: "yellow" },
+            { label: "Approved today", count: approved.length, color: "green" },
+            { label: "Total sessions", count: closes.length, color: "gray" },
+          ].map((s) => (
+            <div key={s.label} className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 shadow-sm">
+              <div className="text-2xl font-bold text-gray-900 dark:text-white">{s.count}</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">{s.label}</div>
             </div>
-          </div>
-        )}
+          ))}
+        </div>
 
-        {summary && (
-          <WorkspaceSection title="Today's Collection Summary">
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                { label: "Cash", value: summary.cash_total, color: "green" },
-                { label: "UPI", value: summary.upi_total, color: "purple" },
-                { label: "Bank Transfer", value: summary.bank_total, color: "blue" },
-                { label: "Card", value: summary.card_total, color: "orange" },
-              ].map((item) => (
-                <div key={item.label} className="p-3 border rounded-lg">
-                  <div className="text-xs text-gray-500">{item.label}</div>
-                  <div className="text-xl font-bold mt-1">₹{item.value.toLocaleString("en-IN")}</div>
+        {/* Sessions list */}
+        <WorkspaceSection title={`Today's Sessions — ${today}`}>
+          {loading && <div className="py-8 text-center text-gray-400">Loading sessions…</div>}
+
+          {!loading && closes.length === 0 && (
+            <div className="py-12 text-center text-gray-400">
+              <div className="text-4xl mb-3">📋</div>
+              <p className="font-medium">No cashier sessions for today yet</p>
+              <p className="text-sm mt-1">Sessions appear here once a cashier submits a day close.</p>
+            </div>
+          )}
+
+          <div className="space-y-3">
+            {closes.map((c) => (
+              <div key={c.id} className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-gray-900 dark:text-white">
+                        {c.cashier_username ?? `Session #${c.id}`}
+                      </span>
+                      {c.branch_name && (
+                        <span className="text-xs text-gray-400">{c.branch_name}</span>
+                      )}
+                      {c.cash_counter_name && (
+                        <span className="text-xs text-gray-400">· {c.cash_counter_name}</span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-3 gap-4 text-sm mt-2">
+                      <div>
+                        <div className="text-xs text-gray-500">System total</div>
+                        <div className="font-medium">{rupee(c.system_cash_total)}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500">Declared cash</div>
+                        <div className="font-medium">{rupee(c.cashier_declared_cash)}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500">Variance</div>
+                        <div className={`font-medium ${parseFloat(String(c.variance ?? 0)) !== 0 ? "text-red-600" : "text-green-600"}`}>
+                          {rupee(c.variance)}
+                        </div>
+                      </div>
+                    </div>
+                    {c.notes && (
+                      <div className="text-xs text-gray-500 mt-1 italic">{c.notes}</div>
+                    )}
+                  </div>
+                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap ${STATUS_COLOR[c.status] ?? "bg-gray-100 text-gray-600"}`}>
+                    {c.status}
+                  </span>
                 </div>
-              ))}
-            </div>
 
-            <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 flex items-center justify-between">
-              <div>
-                <div className="text-xs text-blue-600">Total Collected</div>
-                <div className="text-2xl font-bold text-blue-800 dark:text-blue-200">₹{summary.total_collected.toLocaleString("en-IN")}</div>
+                {c.status === "SUBMITTED" && (
+                  <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+                    <button
+                      onClick={() => handleAction(c.id, "approve")}
+                      disabled={processing === c.id}
+                      className="flex-1 py-1.5 bg-green-600 text-white text-sm rounded-lg font-medium hover:bg-green-700 disabled:opacity-50"
+                    >
+                      {processing === c.id ? "Processing…" : "Approve"}
+                    </button>
+                    <button
+                      onClick={() => handleAction(c.id, "reject")}
+                      disabled={processing === c.id}
+                      className="flex-1 py-1.5 bg-red-600 text-white text-sm rounded-lg font-medium hover:bg-red-700 disabled:opacity-50"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                )}
+
+                {c.status === "APPROVED" && c.approved_at && (
+                  <div className="mt-2 text-xs text-green-600 dark:text-green-400">
+                    ✓ Approved {new Date(c.approved_at).toLocaleString("en-IN")}
+                  </div>
+                )}
               </div>
-              <div className="text-right">
-                <div className="text-xs text-gray-500">Transactions</div>
-                <div className="text-xl font-bold">{summary.total_transactions}</div>
-              </div>
-            </div>
+            ))}
+          </div>
+        </WorkspaceSection>
 
-            {summary.pending_reversals > 0 && (
-              <div className="mt-3 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 text-sm text-orange-700">
-                ⚠️ {summary.pending_reversals} pending reversal(s) — resolve before closing
-              </div>
-            )}
-          </WorkspaceSection>
-        )}
-
-        {summary && !summary.is_closed && (
-          <WorkspaceSection title="Close Day">
-            <div className="space-y-4">
-              {error && <div className="p-3 bg-red-50 text-red-700 rounded-lg text-sm">{error}</div>}
-              {success && <div className="p-3 bg-green-50 text-green-700 rounded-lg text-sm">✅ Day closed successfully.</div>}
-
-              <div>
-                <label className="block text-sm font-medium mb-1">Closing Notes (optional)</label>
-                <textarea
-                  className="w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600 resize-none"
-                  rows={3}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Any discrepancies, notes, or handover instructions..."
-                />
-              </div>
-
-              <button
-                onClick={handleClose}
-                disabled={closing || success || (summary.pending_reversals > 0)}
-                className="w-full py-2 px-4 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 disabled:opacity-50"
-              >
-                {closing ? "Closing..." : "Close Cashier for Today"}
-              </button>
-
-              {summary.pending_reversals > 0 && (
-                <p className="text-xs text-orange-600 text-center">Resolve pending reversals before closing</p>
-              )}
-            </div>
-          </WorkspaceSection>
-        )}
+        <div className="text-center">
+          <Link
+            href="/admin/settlements/cashier-day-closes"
+            className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+          >
+            View full settlement history →
+          </Link>
+        </div>
       </div>
     </ERPPageShell>
   );

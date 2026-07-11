@@ -191,16 +191,10 @@ export interface PaymentRegisterRow {
 }
 
 export interface PaymentRegisterSummary {
-  total?: string | number | null
-  cash?: string | number | null
-  upi?: string | number | null
-  bank?: string | number | null
-  card?: string | number | null
-  count?: string | number | null
-  net_collected_amount?: string | number | null
-  gross_amount?: string | number | null
-  active_amount?: string | number | null
-  reversed_amount?: string | number | null
+  gross_amount: string | number
+  net_collected_amount: string | number
+  active_amount: string | number
+  reversed_amount: string | number
   active_payments: number
   visible_payments: number
   reversed_payments: number
@@ -264,7 +258,7 @@ export async function searchAdminSubscriptionsForCollection(
 }
 
 export async function collectPayment(data: PaymentCollectionPayload): Promise<PaymentCollectionResult> {
-  return apiFetch('/api/v1/payments/collect-emi/', {
+  return apiFetch('/admin/payments/collect/', {
     method: 'POST',
     body: JSON.stringify(data),
   }) as Promise<PaymentCollectionResult>
@@ -274,18 +268,18 @@ export async function reversePayment(
   paymentId: number | string,
   payload: PaymentReversePayload
 ): Promise<PaymentReverseResponse> {
-  return apiFetch(`/api/v1/payments/${paymentId}/reverse/`, {
+  return apiFetch(`/admin/payments/${paymentId}/reverse/`, {
     method: 'POST',
     body: JSON.stringify(payload),
   }) as Promise<PaymentReverseResponse>
 }
 
 export async function getPayment(id: number | string): Promise<PaymentRecord> {
-  return apiFetch(`/api/v1/payments/${id}/`) as Promise<PaymentRecord>
+  return apiFetch(`/admin/payments/${id}/`) as Promise<PaymentRecord>
 }
 
 export async function getPaymentTimeline(id: number | string): Promise<PaymentTimelineResponse> {
-  return apiFetch(`/api/v1/payments/${id}/timeline/`) as Promise<PaymentTimelineResponse>
+  return apiFetch(`/admin/payments/${id}/timeline/`) as Promise<PaymentTimelineResponse>
 }
 
 export async function getAdminPaymentRegister(
@@ -303,7 +297,7 @@ export async function getAdminPaymentRegister(
     if (v !== undefined && v !== null && v !== '') filtered[k] = String(v)
   }
   const query = new URLSearchParams(filtered).toString()
-  const d = await apiFetch(`/api/v1/payments/register/${query ? `?${query}` : ''}`)
+  const d = await apiFetch(`/admin/payments/${query ? `?${query}` : ''}`)
   return d as {
     count: number
     results: PaymentRegisterRow[]
@@ -319,16 +313,16 @@ export async function listPayments(
 ): Promise<{ count: number; results: PaymentRecord[] }> {
   let url: string
   if (typeof paramsOrId === 'number' || typeof paramsOrId === 'string') {
-    url = `/api/v1/payments/?subscription=${paramsOrId}`
+    url = `/admin/payments/?subscription=${paramsOrId}`
   } else if (paramsOrId && typeof paramsOrId === 'object') {
     const filtered: Record<string, string> = {}
     for (const [k, v] of Object.entries(paramsOrId)) {
       if (v !== undefined && v !== null && v !== '') filtered[k] = String(v)
     }
     const query = new URLSearchParams(filtered).toString()
-    url = `/api/v1/payments/${query ? `?${query}` : ''}`
+    url = `/admin/payments/${query ? `?${query}` : ''}`
   } else {
-    url = '/api/v1/payments/'
+    url = '/admin/payments/'
   }
   const d = await apiFetch(url)
   if (Array.isArray(d)) {
