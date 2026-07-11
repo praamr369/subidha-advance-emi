@@ -84,6 +84,7 @@ urlpatterns = [
     path("admin/", include("api.v1.routes.admin")),
     path("admin/", include("api.v1.routes.setup_readiness")),
     path("admin/", include("api.v1.routes.admin_migration_center")),
+    path("admin/", include("api.v1.routes.admin_documents")),
     path("admin/", include("api.v1.routes.admin_customer_risk")),
     path("admin/", include("api.v1.routes.admin_customer_timeline")),
     path("admin/", include("api.v1.routes.admin_financial_intelligence")),
