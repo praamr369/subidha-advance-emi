@@ -33,3 +33,34 @@ class InternalReview(models.Model):
 
     def __str__(self):
         return f"{self.reviewer_name} ({self.rating}★) — {self.get_status_display()}"
+
+
+class ReviewPlatformConfig(models.Model):
+    """Singleton store for external review platform credentials.
+
+    Managed from the admin Brand Data Center UI. Values here take priority
+    over environment variables; blank fields fall back to the .env values.
+    """
+
+    google_places_api_key = models.CharField(max_length=255, blank=True)
+    google_place_id = models.CharField(max_length=255, blank=True)
+    facebook_page_id = models.CharField(max_length=255, blank=True)
+    facebook_page_access_token = models.TextField(blank=True)
+    youtube_api_key = models.CharField(max_length=255, blank=True)
+    youtube_channel_id = models.CharField(max_length=255, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Review platform configuration"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1  # enforce singleton
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def load(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def __str__(self):
+        return "Review platform configuration"

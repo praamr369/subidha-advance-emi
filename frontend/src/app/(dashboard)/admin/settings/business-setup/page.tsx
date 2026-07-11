@@ -72,6 +72,7 @@ const primaryActions = [
   { label: "CRM Parties", href: ROUTES.admin.crmParties },
   { label: "Document Numbering", href: ROUTES.admin.settingsBusinessSetupDocumentNumbering },
   { label: "Print Branding", href: ROUTES.admin.settingsBusinessSetupPrintBranding },
+  { label: "Brand Data Center (Reviews)", href: ROUTES.admin.settingsBusinessSetupBrandDataCenter },
 ];
 
 function statusClass(status: string) {

@@ -4,14 +4,17 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 
+import os
+
 from api.v1.permissions import IsAdmin
-from reviews.models import InternalReview
+from reviews.models import InternalReview, ReviewPlatformConfig
 from reviews.services import (
     get_combined_reviews,
     fetch_google_reviews,
     fetch_facebook_reviews,
     fetch_youtube_comments,
     get_review_links,
+    invalidate_config_cache,
 )
 
 
@@ -126,6 +129,86 @@ class AdminReviewRefreshCacheView(APIView):
             "google": {"fetched": len(g.get("reviews", [])), "error": g.get("error")},
             "facebook": {"fetched": len(f.get("reviews", [])), "error": f.get("error")},
             "youtube": {"fetched": len(y.get("reviews", [])), "error": y.get("error")},
+        })
+
+
+CONFIG_FIELDS = (
+    "google_places_api_key",
+    "google_place_id",
+    "facebook_page_id",
+    "facebook_page_access_token",
+    "youtube_api_key",
+    "youtube_channel_id",
+)
+SECRET_FIELDS = {
+    "google_places_api_key",
+    "facebook_page_access_token",
+    "youtube_api_key",
+}
+ENV_FALLBACKS = {
+    "google_places_api_key": "GOOGLE_PLACES_API_KEY",
+    "google_place_id": "GOOGLE_PLACE_ID",
+    "facebook_page_id": "FACEBOOK_PAGE_ID",
+    "facebook_page_access_token": "FACEBOOK_PAGE_ACCESS_TOKEN",
+    "youtube_api_key": "YOUTUBE_API_KEY",
+    "youtube_channel_id": "YOUTUBE_CHANNEL_ID",
+}
+
+
+def _mask(value):
+    if not value:
+        return ""
+    if len(value) <= 8:
+        return "•" * len(value)
+    return value[:4] + "•" * 6 + value[-2:]
+
+
+class AdminReviewPlatformConfigView(APIView):
+    """Brand Data Center: manage Google / Facebook / YouTube review credentials."""
+
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        obj = ReviewPlatformConfig.load()
+        fields = {}
+        for name in CONFIG_FIELDS:
+            db_value = getattr(obj, name)
+            env_value = os.getenv(ENV_FALLBACKS[name], "")
+            effective = db_value or env_value
+            fields[name] = {
+                "value": (
+                    _mask(effective) if name in SECRET_FIELDS else effective
+                ),
+                "configured": bool(effective),
+                "source": "db" if db_value else ("env" if env_value else "none"),
+            }
+        return Response({
+            "fields": fields,
+            "links": get_review_links(),
+            "updated_at": obj.updated_at.strftime("%d %b %Y %H:%M"),
+        })
+
+    def put(self, request):
+        obj = ReviewPlatformConfig.load()
+        changed = []
+        for name in CONFIG_FIELDS:
+            if name not in request.data:
+                continue
+            value = (request.data.get(name) or "").strip()
+            # Ignore masked round-trips so an untouched secret field is not clobbered
+            if name in SECRET_FIELDS and "•" in value:
+                continue
+            setattr(obj, name, value)
+            changed.append(name)
+        if changed:
+            obj.save()
+            invalidate_config_cache()
+        return Response({
+            "message": (
+                f"Saved {len(changed)} field(s). Caches cleared."
+                if changed else "No changes."
+            ),
+            "changed": changed,
         })
 
 

@@ -123,7 +123,12 @@ export default function AdminReviewsPage() {
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Reviews Manager</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Moderate website reviews and monitor Google, Facebook, and YouTube.</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Moderate website reviews and monitor Google, Facebook, and YouTube.{" "}
+            <a href="/admin/settings/business-setup/brand-data-center" className="text-blue-600 hover:underline font-medium">
+              Configure platforms →
+            </a>
+          </p>
         </div>
         <div className="flex gap-2 flex-wrap items-center">
           <PlatformLink href={links?.google_write_url ?? null}

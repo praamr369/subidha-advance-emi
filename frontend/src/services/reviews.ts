@@ -109,6 +109,42 @@ export async function refreshReviewCache(): Promise<{
   return apiFetch("/admin/reviews/refresh-cache/", { method: "POST" });
 }
 
+// ── Brand Data Center: platform credentials ──────────────────────────────────
+
+export interface PlatformConfigField {
+  value: string;
+  configured: boolean;
+  source: "db" | "env" | "none";
+}
+
+export type PlatformConfigFieldName =
+  | "google_places_api_key"
+  | "google_place_id"
+  | "facebook_page_id"
+  | "facebook_page_access_token"
+  | "youtube_api_key"
+  | "youtube_channel_id";
+
+export interface ReviewPlatformConfig {
+  fields: Record<PlatformConfigFieldName, PlatformConfigField>;
+  links: ReviewLinks;
+  updated_at: string;
+}
+
+export async function getReviewPlatformConfig(): Promise<ReviewPlatformConfig> {
+  return apiFetch<ReviewPlatformConfig>("/admin/reviews/platform-config/");
+}
+
+export async function updateReviewPlatformConfig(
+  data: Partial<Record<PlatformConfigFieldName, string>>
+): Promise<{ message: string; changed: string[] }> {
+  return apiFetch("/admin/reviews/platform-config/", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 export function formatStars(rating: number): string {

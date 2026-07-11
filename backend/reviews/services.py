@@ -16,24 +16,59 @@ CACHE_TTL = 60 * 30  # 30 minutes
 
 
 # ── credential helpers ────────────────────────────────────────────────────────
+# DB config (set from the admin Brand Data Center) wins; .env is the fallback.
+
+CONFIG_CACHE_KEY = "reviews:platform-config"
+
+
+def _config():
+    cached = cache.get(CONFIG_CACHE_KEY)
+    if cached is not None:
+        return cached
+    try:
+        from reviews.models import ReviewPlatformConfig
+        obj = ReviewPlatformConfig.load()
+        values = {
+            "google_places_api_key": obj.google_places_api_key,
+            "google_place_id": obj.google_place_id,
+            "facebook_page_id": obj.facebook_page_id,
+            "facebook_page_access_token": obj.facebook_page_access_token,
+            "youtube_api_key": obj.youtube_api_key,
+            "youtube_channel_id": obj.youtube_channel_id,
+        }
+    except Exception:  # table missing during migrate, etc.
+        values = {}
+    cache.set(CONFIG_CACHE_KEY, values, 60)
+    return values
+
+
+def invalidate_config_cache():
+    cache.delete(CONFIG_CACHE_KEY)
+    cache.delete(GOOGLE_CACHE_KEY)
+    cache.delete(FACEBOOK_CACHE_KEY)
+    cache.delete(YOUTUBE_CACHE_KEY)
+
+
+def _cred(db_field, env_var):
+    return _config().get(db_field) or os.getenv(env_var, "")
 
 def _google_api_key():
-    return os.getenv("GOOGLE_PLACES_API_KEY", "")
+    return _cred("google_places_api_key", "GOOGLE_PLACES_API_KEY")
 
 def _google_place_id():
-    return os.getenv("GOOGLE_PLACE_ID", "")
+    return _cred("google_place_id", "GOOGLE_PLACE_ID")
 
 def _facebook_page_id():
-    return os.getenv("FACEBOOK_PAGE_ID", "")
+    return _cred("facebook_page_id", "FACEBOOK_PAGE_ID")
 
 def _facebook_access_token():
-    return os.getenv("FACEBOOK_PAGE_ACCESS_TOKEN", "")
+    return _cred("facebook_page_access_token", "FACEBOOK_PAGE_ACCESS_TOKEN")
 
 def _youtube_api_key():
-    return os.getenv("YOUTUBE_API_KEY", "")
+    return _cred("youtube_api_key", "YOUTUBE_API_KEY")
 
 def _youtube_channel_id():
-    return os.getenv("YOUTUBE_CHANNEL_ID", "")
+    return _cred("youtube_channel_id", "YOUTUBE_CHANNEL_ID")
 
 
 # ── public URL helpers ────────────────────────────────────────────────────────

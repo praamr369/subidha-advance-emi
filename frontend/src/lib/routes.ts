@@ -136,6 +136,8 @@ export const ROUTES = {
     settingsBusinessSetupFinanceAccounts: "/admin/settings/business-setup/finance-accounts",
     settingsBusinessSetupDocumentNumbering: "/admin/settings/business-setup/document-numbering",
     settingsBusinessSetupPublicSite: "/admin/settings/business-setup/public-site",
+    settingsBusinessSetupBrandDataCenter: "/admin/settings/business-setup/brand-data-center",
+    reviews: "/admin/reviews",
     settingsBusinessSetupDryRuns: "/admin/settings/business-setup/dry-runs",
     settingsBusinessSetupReset: "/admin/settings/business-setup/reset",
     settingsBusinessSetupOpeningBalances: "/admin/settings/business-setup/opening-balances",
