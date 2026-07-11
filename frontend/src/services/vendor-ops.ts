@@ -67,6 +67,17 @@ export async function getAdminVendorOutstanding(id: number): Promise<ApiObject> 
   return apiFetch(`/admin/vendors/${id}/outstanding/`);
 }
 
+export type VendorOpeningBalanceRow = {
+  id: number;
+  name: string;
+  phone: string;
+  opening_balance: string;
+};
+
+export async function listVendorOpeningBalances(): Promise<{ count: number; results: VendorOpeningBalanceRow[] }> {
+  return apiFetch("/admin/opening-balances/vendors/");
+}
+
 export async function listAdminVendorPurchases(id: number): Promise<ApiListResponse> {
   return apiFetch(`/admin/vendors/${id}/purchases/`);
 }

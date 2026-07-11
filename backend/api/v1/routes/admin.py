@@ -632,6 +632,7 @@ from api.v1.views.vendor_ops import (
     AdminVendorSourcingRequestQuotesView,
     AdminVendorSourcingSuggestView,
     AdminVendorViewSet,
+    AdminVendorOpeningBalanceListView,
 )
 from api.v1.views.username_change import AdminUserUsernameChangeView
 from api.v1.views.admin_settlements import (
@@ -1118,6 +1119,7 @@ urlpatterns = [
     path("opening-balances/customers/", AdminCustomerOpeningOutstandingView.as_view()),
     path("opening-balances/customers/<int:pk>/", AdminCustomerOpeningOutstandingDetailView.as_view()),
     path("opening-balances/finance-accounts/<int:pk>/", AdminFinanceOpeningBalanceView.as_view()),
+    path("opening-balances/vendors/", AdminVendorOpeningBalanceListView.as_view()),
     path("vendors/<int:pk>/products/", AdminVendorProductsView.as_view()),
     path("vendors/<int:pk>/purchases/", AdminVendorPurchasesView.as_view()),
     path("vendors/<int:pk>/purchase-returns/", AdminVendorPurchaseReturnsView.as_view()),

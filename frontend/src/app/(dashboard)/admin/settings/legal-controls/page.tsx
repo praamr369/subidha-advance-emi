@@ -1,15 +1,28 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
+import { fetchComplianceDocumentEvidence } from "@/services/business-compliance-evidence";
 import { getBusinessRulePolicy, updateBusinessRulePolicy } from "@/services/compliance";
+import { createComplianceDocument, listComplianceDocuments } from "@/services/policies";
 import { getWaiverClassificationMatrix } from "@/services/waiver-classification";
+import type { ComplianceDocument } from "@/services/policies";
 import type { BusinessRulePolicyPayload, BusinessRulePolicyReadiness, LegalRiskStatus } from "@/types/compliance";
 import type { WaiverClassificationMatrixRow } from "@/services/waiver-classification";
+
+const LEGAL_DOC_TYPES: { value: string; label: string }[] = [
+  { value: "CA_OPINION", label: "CA Written Opinion" },
+  { value: "ADVOCATE_OPINION", label: "Advocate Legal Opinion" },
+  { value: "SCHEME_APPROVAL_LETTER", label: "Scheme Approval Letter" },
+  { value: "LEGAL_AGREEMENT", label: "Signed Legal Agreement / Contract" },
+  { value: "LEGAL_NOTICE", label: "Legal Notice" },
+  { value: "COURT_ORDER", label: "Court Order / Judgment" },
+  { value: "OTHER", label: "Other" },
+];
 
 const riskOptions: { value: LegalRiskStatus; label: string }[] = [
   { value: "DRAFT", label: "Draft" },
@@ -101,13 +114,28 @@ export default function AdminLegalControlsPage() {
   const [lateEnabled, setLateEnabled] = useState(false);
   const [notes, setNotes] = useState("");
 
+  // Legal documents
+  const [legalDocs, setLegalDocs] = useState<ComplianceDocument[]>([]);
+  const [docType, setDocType] = useState("CA_OPINION");
+  const [docTitle, setDocTitle] = useState("");
+  const [docNotes, setDocNotes] = useState("");
+  const [docFile, setDocFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadMessage, setUploadMessage] = useState<string | null>(null);
+  const [openingDoc, setOpeningDoc] = useState<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const LEGAL_DOC_TYPE_VALUES = new Set(LEGAL_DOC_TYPES.map((t) => t.value));
+
   async function load() {
     setLoading(true);
     setError(null);
     try {
-      const [next, matrixData] = await Promise.all([
+      const [next, matrixData, docsData] = await Promise.all([
         getBusinessRulePolicy(),
         getWaiverClassificationMatrix().catch(() => ({ matrix: [] })),
+        listComplianceDocuments().catch(() => ({ count: 0, results: [] })),
       ]);
       setPayload(next);
       setMatrix(matrixData.matrix);
@@ -116,10 +144,51 @@ export default function AdminLegalControlsPage() {
       setLateConfigured(next.policy.late_payment_charge_configured);
       setLateEnabled(next.policy.late_payment_charge_enabled);
       setNotes(next.policy.notes || "");
+      setLegalDocs(docsData.results.filter((d: ComplianceDocument) => LEGAL_DOC_TYPE_VALUES.has(d.document_type)));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load legal controls.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function uploadLegalDoc(e: React.FormEvent) {
+    e.preventDefault();
+    if (!docFile) { setUploadError("Please select a file."); return; }
+    setUploading(true);
+    setUploadError(null);
+    setUploadMessage(null);
+    try {
+      const form = new FormData();
+      form.append("document_type", docType);
+      form.append("title", docTitle.trim() || (LEGAL_DOC_TYPES.find((t) => t.value === docType)?.label ?? docType));
+      form.append("notes", docNotes.trim());
+      form.append("file", docFile);
+      const created = await createComplianceDocument(form);
+      setLegalDocs((prev) => [created, ...prev]);
+      setDocTitle("");
+      setDocNotes("");
+      setDocFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      setUploadMessage("Document uploaded successfully.");
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Upload failed.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function openDocEvidence(id: number) {
+    setOpeningDoc(id);
+    try {
+      const blob = await fetchComplianceDocumentEvidence(id);
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch {
+      // ignore — file may not exist
+    } finally {
+      setOpeningDoc(null);
     }
   }
 
@@ -238,6 +307,113 @@ export default function AdminLegalControlsPage() {
                   <p className="mt-2 text-sm text-muted-foreground">No warnings.</p>
                 )}
               </div>
+            </div>
+          </WorkspaceSection>
+
+          {/* ── Admin action guide ── */}
+          <WorkspaceSection title="Admin Action Guide" description="Step-by-step instructions to clear every blocker and warning above.">
+            <div className="space-y-3">
+
+              {/* Blocker 1 — Waiver launch blocked */}
+              <div className="rounded border border-red-200 bg-red-50 p-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded">BLOCKER</span>
+                  <span className="text-sm font-semibold text-red-900">Lucky Plan waiver public launch blocked</span>
+                  <span className={cx("ml-auto text-xs font-semibold px-2 py-0.5 rounded", payload.derived.waiver_public_launch_blocked ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700")}>
+                    {payload.derived.waiver_public_launch_blocked ? "Not cleared" : "Cleared ✓"}
+                  </span>
+                </div>
+                <p className="text-xs text-red-800 mb-2">
+                  <strong>Why:</strong> The waiver status is set to &quot;<em>{payload.policy.risk_status.replace(/_/g, " ")}</em>&quot;. The system requires &quot;Approved for Public Launch&quot; before the Lucky Draw can go live.
+                </p>
+                <p className="text-xs text-red-800">
+                  <strong>How to fix:</strong> Get your advocate or CA to review the Lucky Plan contract wording and EMI scheme classification.
+                  Once approved, scroll down to <strong>Policy Controls → Waiver launch status</strong>, change it to <strong>&quot;Approved for Public Launch&quot;</strong>, and click <strong>Save Controls</strong>.
+                  This is a one-time legal gate — do not set it without actual advocate/CA sign-off.
+                </p>
+              </div>
+
+              {/* Blocker 2 — GST UNREGISTERED */}
+              <div className={cx("rounded border p-3", payload.derived.gst_status === "GST_UNREGISTERED" ? "border-red-200 bg-red-50" : "border-emerald-200 bg-emerald-50")}>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded">BLOCKER</span>
+                  <span className="text-sm font-semibold text-red-900">GST features blocked while UNREGISTERED</span>
+                  <span className={cx("ml-auto text-xs font-semibold px-2 py-0.5 rounded", payload.derived.gst_status === "GST_UNREGISTERED" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700")}>
+                    {payload.derived.gst_status === "GST_UNREGISTERED" ? "Expected — pre-GST stage" : "Cleared ✓"}
+                  </span>
+                </div>
+                <p className="text-xs text-red-800 mb-2">
+                  <strong>Why:</strong> Your business is currently operating as a non-GST registered supplier. This is correct if your annual turnover is below the GST threshold (₹40 lakh for goods, ₹20 lakh for mixed).
+                  The system intentionally blocks GST invoice, credit note, debit note, and ITC features to prevent incorrect tax collection.
+                </p>
+                <p className="text-xs text-red-800 mb-1">
+                  <strong>This is NOT a bug</strong> — it is correct protection. Bills and receipts continue to work normally as non-GST bills.
+                </p>
+                <p className="text-xs text-red-800">
+                  <strong>How to fix (when GST registration is issued):</strong> Go to <strong>Compliance → Tax Profile</strong>, update GST mode to <strong>GST_REGULAR</strong> or <strong>GST_COMPOSITION</strong>,
+                  and upload your GST Registration Certificate. This blocker will clear automatically.
+                </p>
+              </div>
+
+              {/* Warning — Late payment charges */}
+              <div className={cx("rounded border p-3", payload.derived.late_payment_charge_application_enabled ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50")}>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded">WARNING</span>
+                  <span className="text-sm font-semibold text-amber-900">Late payment charges disabled</span>
+                  <span className={cx("ml-auto text-xs font-semibold px-2 py-0.5 rounded", payload.derived.late_payment_charge_application_enabled ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>
+                    {payload.derived.late_payment_charge_application_enabled ? "Cleared ✓" : "Not cleared"}
+                  </span>
+                </div>
+                <p className="text-xs text-amber-900 mb-2">
+                  <strong>Why:</strong> Late payment charges are not yet configured or enabled. No late charge can be applied to overdue EMIs or rent payments.
+                </p>
+                <p className="text-xs text-amber-900">
+                  <strong>How to fix:</strong> Scroll down to <strong>Policy Controls</strong> → tick <strong>&quot;Late payment charge policy configured&quot;</strong> (confirm you have documented the charge rate and terms)
+                  → tick <strong>&quot;Late payment charge enabled&quot;</strong> → click <strong>Save Controls</strong>.
+                  Use wording &quot;Late Payment Charge&quot; — not &quot;penalty&quot;, &quot;fine&quot;, or &quot;punishment&quot;.
+                </p>
+              </div>
+
+              {/* Warning — Legal/CA review */}
+              <div className={cx("rounded border p-3", payload.policy.risk_status === "APPROVED_FOR_PUBLIC_LAUNCH" ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50")}>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded">WARNING</span>
+                  <span className="text-sm font-semibold text-amber-900">Legal/CA review pending</span>
+                  <span className={cx("ml-auto text-xs font-semibold px-2 py-0.5 rounded", payload.policy.risk_status === "APPROVED_FOR_PUBLIC_LAUNCH" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>
+                    {payload.policy.risk_status === "APPROVED_FOR_PUBLIC_LAUNCH" ? "Cleared ✓" : "Pending"}
+                  </span>
+                </div>
+                <p className="text-xs text-amber-900 mb-2">
+                  <strong>Why:</strong> The waiver status is below &quot;Approved for Public Launch&quot;. The frontend Lucky Plan wording and policy pages must not be treated as legally final until advocate/CA sign-off.
+                </p>
+                <p className="text-xs text-amber-900">
+                  <strong>How to fix:</strong> Same action as Blocker 1 — get advocate/CA review, then set status to &quot;Approved for Public Launch&quot;.
+                  While in review, use the <strong>Governance notes</strong> field below to record review dates, reviewer names, and approval status.
+                </p>
+              </div>
+
+              {/* HSN/SAC warning */}
+              <div className={cx("rounded border p-3", payload.derived.gst_status !== "GST_UNREGISTERED" ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50")}>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded">WARNING</span>
+                  <span className="text-sm font-semibold text-amber-900">HSN/SAC for internal readiness only</span>
+                  <span className={cx("ml-auto text-xs font-semibold px-2 py-0.5 rounded", payload.derived.gst_status !== "GST_UNREGISTERED" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>
+                    {payload.derived.gst_status !== "GST_UNREGISTERED" ? "Cleared ✓" : "GST not registered"}
+                  </span>
+                </div>
+                <p className="text-xs text-amber-900 mb-2">
+                  <strong>Why:</strong> You can maintain HSN/SAC codes in your product catalogue while not GST registered, but these must not appear on customer bills as &quot;tax charged&quot; until GST registration is active.
+                </p>
+                <p className="text-xs text-amber-900">
+                  <strong>How to fix:</strong> No immediate action needed. When GST is registered and mode is updated in Tax Profile, HSN/SAC codes will automatically become active on tax invoices. This warning clears with the GST blocker.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 rounded border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
+              <strong>Summary for pre-launch stage:</strong> The two blockers (waiver status + GST) are <em>expected</em> at this stage. The system is working correctly.
+              Blocker 1 clears after advocate/CA approval and setting waiver status to &quot;Approved for Public Launch&quot;.
+              Blocker 2 clears after GST registration and updating the Tax Profile. You can operate normally on non-GST bills in the meantime.
             </div>
           </WorkspaceSection>
 
@@ -440,6 +616,127 @@ export default function AdminLegalControlsPage() {
             <p className="mt-2 text-xs text-muted-foreground">
               Masked Aadhaar, masked PAN, and masked document IDs only in all customer-facing views. Document access is audit-logged.
             </p>
+          </WorkspaceSection>
+
+          {/* ── Legal advisor documents ── */}
+          <WorkspaceSection title="Legal Advisor Documents — Internal Records" description="Upload CA opinions, advocate letters, court orders, and signed agreements. All files are private and admin-only. Not visible on public policy pages.">
+            {/* Upload form */}
+            <form className="grid gap-3 md:grid-cols-2 mb-5" onSubmit={(e) => void uploadLegalDoc(e)}>
+              <label className="grid gap-1 text-sm">
+                <span className="font-medium">Document type</span>
+                <select
+                  className="h-10 rounded border border-border bg-background px-3 text-sm"
+                  value={docType}
+                  onChange={(e) => setDocType(e.target.value)}
+                >
+                  {LEGAL_DOC_TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="grid gap-1 text-sm">
+                <span className="font-medium">Title / reference <span className="font-normal text-muted-foreground">(optional)</span></span>
+                <input
+                  className="h-10 rounded border border-border bg-background px-3 text-sm"
+                  placeholder="e.g. CA opinion on Lucky Plan — July 2026"
+                  value={docTitle}
+                  onChange={(e) => setDocTitle(e.target.value)}
+                />
+              </label>
+
+              <label className="grid gap-1 text-sm md:col-span-2">
+                <span className="font-medium">Internal notes <span className="font-normal text-muted-foreground">(optional)</span></span>
+                <textarea
+                  className="min-h-16 rounded border border-border bg-background px-3 py-2 text-sm"
+                  placeholder="Reviewer name, date of advice, scope of opinion..."
+                  value={docNotes}
+                  onChange={(e) => setDocNotes(e.target.value)}
+                />
+              </label>
+
+              <label className="grid gap-1 text-sm md:col-span-2">
+                <span className="font-medium">File <span className="text-red-600">*</span></span>
+                <input
+                  ref={fileInputRef}
+                  className="rounded border border-border bg-background px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-muted file:px-3 file:py-1 file:text-xs file:font-medium"
+                  type="file"
+                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                  onChange={(e) => setDocFile(e.target.files?.[0] ?? null)}
+                />
+                <span className="text-xs text-muted-foreground">Accepted: PDF, DOC, DOCX, JPG, PNG. Keep originals; this is your internal legal record.</span>
+              </label>
+
+              {uploadError && <p className="md:col-span-2 rounded border border-red-200 bg-red-50 px-3 py-1.5 text-xs text-red-800">{uploadError}</p>}
+              {uploadMessage && <p className="md:col-span-2 rounded border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs text-emerald-800">{uploadMessage}</p>}
+
+              <div className="md:col-span-2">
+                <button
+                  className="h-9 rounded bg-primary px-5 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+                  disabled={uploading || !docFile}
+                  type="submit"
+                >
+                  {uploading ? "Uploading..." : "Upload Document"}
+                </button>
+              </div>
+            </form>
+
+            {/* Document list */}
+            {legalDocs.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No legal advisor documents uploaded yet.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[560px] text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                      <th className="pb-2 pr-4">Type</th>
+                      <th className="pb-2 pr-4">Title</th>
+                      <th className="pb-2 pr-4">Uploaded</th>
+                      <th className="pb-2 pr-4">Status</th>
+                      <th className="pb-2">File</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {legalDocs.map((doc) => (
+                      <tr key={doc.id}>
+                        <td className="py-2 pr-4 font-mono text-xs text-muted-foreground whitespace-nowrap">
+                          {LEGAL_DOC_TYPES.find((t) => t.value === doc.document_type)?.label ?? doc.document_type}
+                        </td>
+                        <td className="py-2 pr-4 text-foreground max-w-[200px] truncate" title={doc.title || undefined}>
+                          {doc.title || <span className="text-muted-foreground italic">Untitled</span>}
+                          {doc.notes ? <p className="text-xs text-muted-foreground truncate">{doc.notes}</p> : null}
+                        </td>
+                        <td className="py-2 pr-4 text-xs text-muted-foreground whitespace-nowrap">
+                          {doc.created_at ? new Date(doc.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
+                        </td>
+                        <td className="py-2 pr-4">
+                          <span className={cx("rounded px-1.5 py-0.5 text-[11px] font-semibold",
+                            doc.verification_status === "VERIFIED" ? "bg-emerald-100 text-emerald-800" :
+                            doc.verification_status === "REJECTED" ? "bg-red-100 text-red-800" :
+                            "bg-amber-100 text-amber-800"
+                          )}>
+                            {(doc.verification_status || "PENDING").replace(/_/g, " ")}
+                          </span>
+                        </td>
+                        <td className="py-2">
+                          {doc.has_file ? (
+                            <button
+                              className="text-xs text-primary underline disabled:opacity-50"
+                              disabled={openingDoc === doc.id}
+                              onClick={() => void openDocEvidence(doc.id)}
+                            >
+                              {openingDoc === doc.id ? "Opening…" : "Open"}
+                            </button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">No file</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </WorkspaceSection>
 
           {/* ── Policy controls (editable) ── */}

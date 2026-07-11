@@ -125,7 +125,12 @@ export default function CustomerReferralsPage() {
   ];
 
   return (
-    <ERPPageShell title="Referrals">
+    <ERPPageShell
+      title="Subscription Referrals"
+      subtitle="Refer someone to subscribe to Advance EMI or Lucky Plan and earn a commission when their first instalment is received."
+      breadcrumbs={[{ label: "Dashboard", href: "/customer" }, { label: "Referrals" }]}
+      headerMode="erp"
+    >
       <div className="space-y-6">
         {/* Commission Summary Cards */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -162,7 +167,7 @@ export default function CustomerReferralsPage() {
               <div>
                 <h3 className="text-lg font-semibold">Referral History</h3>
                 <p className="text-sm text-muted-foreground">
-                  Manage your referrals and track commission status
+                  People you referred who subscribed to Advance EMI or Lucky Plan
                 </p>
               </div>
               <ActionButton
@@ -171,7 +176,7 @@ export default function CustomerReferralsPage() {
                 }}
                 leftIcon={<Plus className="h-4 w-4" />}
               >
-                New Referral
+                Refer Someone
               </ActionButton>
             </div>
 
@@ -202,10 +207,13 @@ export default function CustomerReferralsPage() {
         </ERPSectionShell>
 
         {/* Info Note */}
-        <ERPAuditNote title="Commission Policy">
-          Commissions are earned when you refer a new customer. Commission
-          approval depends on the customer&apos;s subscription status and payment
-          history.
+        <ERPAuditNote title="Subscription Referral Commission Policy">
+          You earn a commission when someone you refer subscribes to Advance EMI or Lucky Plan
+          and their first instalment is received and confirmed. Commission is transaction-linked —
+          it is paid once per confirmed subscription, not for recruitment or repeat referrals.
+          No franchise, downline, or multi-level arrangement applies.
+          Commission approval is at the sole discretion of Subidha Furniture and subject to the
+          referred customer&apos;s subscription remaining active at the time of approval.
         </ERPAuditNote>
       </div>
     </ERPPageShell>

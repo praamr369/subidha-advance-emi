@@ -60,7 +60,12 @@ export default function CreateReferralPage() {
   };
 
   return (
-    <ERPPageShell title="Create New Referral">
+    <ERPPageShell
+      title="Refer Someone to Subscribe"
+      subtitle="Refer a friend or family member to sign up for Advance EMI or Lucky Plan. You earn a commission after their first confirmed instalment."
+      breadcrumbs={[{ label: "Dashboard", href: "/customer" }, { label: "Referrals", href: "/customer/referrals" }, { label: "New Referral" }]}
+      headerMode="erp"
+    >
       <div className="space-y-6">
         <button
           onClick={() => router.back()}
@@ -138,11 +143,12 @@ export default function CreateReferralPage() {
           </form>
         </ERPSectionShell>
 
-        <ERPAuditNote title="How Referrals Work">
-          When you refer a customer, they can place an order using your referral.
-          Once their order is confirmed and payment is received, you&apos;ll be
-          eligible to earn commission. Commission amounts vary based on the order
-          value.
+        <ERPAuditNote title="How Subscription Referral Commission Works">
+          Refer someone to subscribe to Advance EMI or Lucky Plan at Subidha Furniture.
+          Your commission is credited once their subscription is confirmed and first
+          instalment payment is received. Commission is a one-time, per-subscription reward —
+          not linked to recruitment, ongoing payments, or any multi-level arrangement.
+          Commission rate is as agreed with Subidha Furniture and visible in your referral history.
         </ERPAuditNote>
       </div>
     </ERPPageShell>

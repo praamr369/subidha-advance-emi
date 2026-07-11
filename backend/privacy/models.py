@@ -2,7 +2,16 @@
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
-from datetime import timedelta
+
+from privacy.dpdp_compliance_models import (  # noqa: F401  re-export for migrations
+    DataErasureGuard,
+    ErasureRequestStatus,
+    BreachNotification,
+    BreachNotificationStatus,
+    BreachSeverity,
+    DataRetentionSchedule,
+    PurgeJobStatus,
+)
 
 
 class ConsentType(models.TextChoices):
@@ -24,11 +33,11 @@ class ConsentStatus(models.TextChoices):
 
 
 class DataRequestType(models.TextChoices):
-    ACCESS = "ACCESS", "Right to Access"
-    CORRECTION = "CORRECTION", "Right to Correction"
-    ERASURE = "ERASURE", "Right to Erasure"
-    PORTABILITY = "PORTABILITY", "Right to Portability"
-    RESTRICT = "RESTRICT", "Right to Restrict Processing"
+    # DPDP 2023 ss.11–14 — four rights only. PORTABILITY and RESTRICT are GDPR; not in DPDP.
+    INFORMATION = "INFORMATION", "Right to Information / Access (s.11)"
+    CORRECTION = "CORRECTION", "Right to Correction / Erasure (s.12)"
+    GRIEVANCE = "GRIEVANCE", "Right to Grievance Redressal (s.13)"
+    NOMINATION = "NOMINATION", "Right to Nominate (s.14)"
 
 
 class DataRequestStatus(models.TextChoices):
@@ -49,7 +58,7 @@ class TimeStampedModel(models.Model):
 
 
 class CustomerConsent(TimeStampedModel):
-    """Track customer consent for data processing (DPDP 2023 Article 4)"""
+    """Track customer consent for data processing (DPDP 2023 s.6)"""
 
     customer = models.ForeignKey(
         'subscriptions.Customer',
@@ -70,12 +79,29 @@ class CustomerConsent(TimeStampedModel):
         db_index=True,
     )
 
+    # CTRL-DPDP-1: notice version links this consent to a specific privacy-notice revision
+    # so the fiduciary can prove the exact notice the principal agreed to (DPDP 2023 s.5).
+    notice_version = models.CharField(
+        max_length=40,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="Version identifier of the privacy notice shown at consent time (e.g. 'v2.1').",
+    )
+    # Bilingual support: store the language in which consent was captured.
+    language_code = models.CharField(
+        max_length=10,
+        blank=True,
+        default="en",
+        help_text="ISO 639-1 language code of the notice presented (e.g. 'en', 'hi', 'ta').",
+    )
+
     # Consent details
     purpose_text = models.TextField(help_text="Clear statement of purpose")
     given_at = models.DateTimeField(null=True, blank=True)
-    given_by_ip = models.CharField(max_length=45, blank=True)  # IPv4 or IPv6
+    given_by_ip = models.CharField(max_length=45, blank=True)
     withdrawn_at = models.DateTimeField(null=True, blank=True)
-    expires_at = models.DateTimeField(null=True, blank=True)  # Auto-refresh after period
+    expires_at = models.DateTimeField(null=True, blank=True)
 
     # Audit trail
     given_via = models.CharField(
@@ -114,7 +140,7 @@ class CustomerConsent(TimeStampedModel):
 
 
 class DataAccessRequest(TimeStampedModel):
-    """Customer data access requests (DPDP 2023 Article 5)"""
+    """Customer data principal rights requests (DPDP 2023 ss.11–14)"""
 
     from subscriptions.models import Customer
 

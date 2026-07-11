@@ -20,6 +20,7 @@ from subscriptions.models import (
     SubscriptionStatus,
 )
 from subscriptions.services.business_event_service import append_business_event
+from subscriptions.services.business_rule_policy_service import assert_waiver_launch_permitted
 from subscriptions.services.winner_state_service import (
     WAIVER_SCOPE_FUTURE_ONLY,
     apply_winner_state,
@@ -209,6 +210,8 @@ def reveal_and_execute_draw(draw_id: int, revealed_seed: str, performed_by=None)
 
     if not revealed_seed or not revealed_seed.strip():
         raise ValidationError("Reveal seed is required.")
+
+    assert_waiver_launch_permitted()
 
     expected_hash = hashlib.sha256(revealed_seed.strip().encode()).hexdigest()
     if expected_hash != draw.committed_hash:

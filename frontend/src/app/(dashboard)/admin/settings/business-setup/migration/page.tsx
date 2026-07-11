@@ -169,7 +169,7 @@ function OverviewTab({ overview, onStartImport, onOpenWorkbench, onOpenDataset }
       <div className="rounded-2xl border border-border bg-card p-5">
         <div className="mb-1 text-sm font-semibold text-foreground">Opening balances & setup</div>
         <p className="mb-3 text-xs text-muted-foreground">
-          Enter all opening balances here in the Migration Center — cash, bank, UPI, customer receivables, vendor payables, and stock — using the online workbench (validated against your live Finance Accounts, Chart of Accounts, and Branches). This unifies the standalone <Link href="/admin/settings/business-setup/opening-balances" className="underline hover:text-foreground">Opening Balances</Link> setup into one auditable, reversible flow.
+          Enter opening balances in bulk here using the Data Workbench — cash, bank, UPI, customer receivables, vendor payables, and stock. All imports are staged, validated against live Finance Accounts and master data, and fully reversible. For small one-off entries, use the standalone <Link href="/admin/settings/business-setup/opening-balances" className="underline hover:text-foreground">Opening Balances</Link> page instead.
         </p>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {OPENING_BALANCE_SHORTCUTS.map((item) => (
@@ -642,7 +642,22 @@ function WorkbenchTab({ overview, handoffBatch, clearHandoff, preselectDataset, 
       {!batch && (
         <div className="rounded-2xl border border-border bg-card p-5">
           <div className="mb-1 text-sm font-semibold text-foreground">Data Workbench</div>
-          <p className="mb-4 text-xs text-muted-foreground">Build migration data online — customers, vendors, products, inventory, outstanding, and all opening balances. Add, edit, and delete rows in the grid, validate against your live Business Setup (COA, finance accounts, branches, products), then import. No third-party spreadsheet needed.</p>
+          <p className="mb-3 text-xs text-muted-foreground">Build migration data online — customers, vendors, products, inventory, outstanding, and all opening balances. Add, edit, and delete rows in the grid, validate against your live Business Setup (COA, finance accounts, branches, products), then import. No third-party spreadsheet needed.</p>
+          {(datasetKey === "cash_opening_balance" || datasetKey === "bank_opening_balance" || datasetKey === "upi_opening_balance") && (
+            <div className="mb-3 rounded-xl border border-sky-500/30 bg-sky-500/5 px-3 py-2 text-xs text-foreground">
+              <strong>Finance account opening balance:</strong> In the <em>account</em> field, enter the exact name of your {datasetKey === "cash_opening_balance" ? "Cash" : datasetKey === "bank_opening_balance" ? "Bank" : "UPI"} finance account as set up in Business Setup → Finance Accounts. One row per account.
+            </div>
+          )}
+          {datasetKey === "vendor_outstanding" && (
+            <div className="mb-3 rounded-xl border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-foreground">
+              <strong>Vendor outstanding:</strong> In the <em>vendor</em> field, enter the exact vendor name as registered in your Vendor list. Unrecognised vendor names will produce a validation warning; create the vendor first if needed.
+            </div>
+          )}
+          {datasetKey === "customer_outstanding" && (
+            <div className="mb-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-xs text-foreground">
+              <strong>Customer outstanding:</strong> Enter the customer name and outstanding amount. These are legacy receivables — use Finance Collection to mark them as paid when the customer settles.
+            </div>
+          )}
           <div className="flex flex-wrap items-end gap-3">
             <label className="block text-sm">
               <span className="mb-1 block font-medium text-foreground">Dataset</span>

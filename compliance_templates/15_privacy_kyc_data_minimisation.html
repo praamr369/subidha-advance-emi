@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Privacy / KYC Data Minimisation — Subidha Furniture</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Arial, Helvetica, sans-serif; font-size: 12pt; color: #111; background: #fff; padding: 30px 40px; max-width: 800px; margin: auto; }
+h1 { font-size: 16pt; border-bottom: 2px solid #111; padding-bottom: 6px; margin-bottom: 4px; }
+h2 { font-size: 13pt; margin-top: 18px; margin-bottom: 6px; }
+p { margin-bottom: 8px; line-height: 1.5; }
+ul, ol { margin-left: 20px; margin-bottom: 8px; }
+li { margin-bottom: 4px; line-height: 1.5; }
+.meta { font-size: 10pt; color: #555; margin-top: 6px; margin-bottom: 20px; }
+.section { margin-bottom: 16px; }
+.sign-block { margin-top: 40px; display: flex; gap: 60px; }
+.sign-box { flex: 1; border-top: 1px solid #111; padding-top: 6px; font-size: 10pt; }
+table { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 11pt; }
+th { background: #eee; border: 1px solid #bbb; padding: 6px 8px; text-align: left; }
+td { border: 1px solid #bbb; padding: 5px 8px; }
+.allowed { color: #2e7d32; font-weight: bold; }
+.prohibited { color: #c62828; font-weight: bold; }
+.highlight { background: #e8f5e9; border-left: 4px solid #4caf50; padding: 8px 12px; margin-bottom: 10px; }
+.warn { background: #fce4ec; border-left: 4px solid #e91e63; padding: 8px 12px; margin-bottom: 10px; }
+@media print { body { padding: 15px 20px; } }
+</style>
+</head>
+<body>
+
+<h1>Privacy / KYC Data Minimisation</h1>
+<div class="meta">
+  Business: Subidha Furniture &nbsp;|&nbsp; Document ref: SF-LEGAL-PRIV-001 &nbsp;|&nbsp; Version: 1.0 &nbsp;|&nbsp; Date: July 2026 &nbsp;|&nbsp; Classification: PRIVATE — Internal compliance record
+</div>
+
+<div class="section">
+  <h2>1. Purpose</h2>
+  <p>This document describes Subidha Furniture's approach to personal data collection, storage, and minimisation — covering customer KYC data (Aadhaar, PAN, mobile), transaction records, and how data is handled in compliance with the Digital Personal Data Protection Act 2023 (DPDP Act) and UIDAI Aadhaar usage guidelines.</p>
+</div>
+
+<div class="section">
+  <h2>2. Data Collected and Why</h2>
+  <table>
+    <tr><th>Data Field</th><th>Purpose</th><th>Legal Basis</th><th>Stored How</th></tr>
+    <tr><td>Customer name</td><td>Agreement identification</td><td>Contractual necessity</td><td>Plain text in system</td></tr>
+    <tr><td>Mobile number</td><td>Contact, OTP verification, reminders</td><td>Contractual necessity + consent</td><td>Plain text in system</td></tr>
+    <tr><td>Address</td><td>Delivery, agreement</td><td>Contractual necessity</td><td>Plain text in system</td></tr>
+    <tr><td>Aadhaar number (if collected)</td><td>Identity verification</td><td>Consent — explicit, purpose-limited</td><td class="allowed">MASKED — last 4 digits only stored. Full number never stored.</td></tr>
+    <tr><td>PAN number (if collected)</td><td>Tax/identity verification for high-value sales</td><td>Legal obligation (IT Act)</td><td class="allowed">MASKED — stored as ABCDE1234F → XXXXX1234F in system</td></tr>
+    <tr><td>Bank account details</td><td>Refund processing only</td><td>Contractual necessity</td><td class="allowed">Stored only if needed for refund; deleted after refund processed</td></tr>
+    <tr><td>Transaction history</td><td>EMI/Lucky Plan management, audit</td><td>Legal obligation + contractual</td><td>Retained 7 years per accounting rules</td></tr>
+    <tr><td>Photos / biometrics</td><td class="prohibited">NOT COLLECTED</td><td>N/A</td><td class="prohibited">Never stored — no biometric collection</td></tr>
+  </table>
+</div>
+
+<div class="section">
+  <h2>3. Aadhaar Handling Policy</h2>
+  <div class="warn">
+    <strong>Critical rule:</strong> Full 12-digit Aadhaar numbers are never stored in the system database or in any file. If Aadhaar is used for identity verification, only the last 4 digits are stored as a reference. Aadhaar XML / offline eKYC documents are used for verification only and are not retained after the verification step.
+  </div>
+  <ul>
+    <li>Aadhaar is not mandatory for any Subidha Furniture transaction. Customers may verify identity using PAN, Voter ID, or other government ID.</li>
+    <li>Aadhaar is used only for identity verification, not for credit scoring or any other purpose.</li>
+    <li>No Aadhaar biometric (fingerprint, iris) authentication is used. Only offline/XML-based or number-based verification where strictly necessary.</li>
+    <li>Aadhaar collection and usage complies with UIDAI guidelines and Section 7/8 of the Aadhaar Act 2016.</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h2>4. PAN Handling Policy</h2>
+  <ul>
+    <li>PAN is collected only for transactions where it is legally required (e.g., cash transactions above ₹2 lakhs under Income Tax Rule 114B).</li>
+    <li>PAN is stored in masked form in the system (first 5 characters replaced with 'X').</li>
+    <li>The original PAN card copy, if scanned, is stored in the private compliance archive and not in the customer-facing system.</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h2>5. Data Retention</h2>
+  <table>
+    <tr><th>Data Category</th><th>Retention Period</th><th>Deletion Method</th></tr>
+    <tr><td>Customer transaction records</td><td>7 years</td><td>Soft-delete then archive purge</td></tr>
+    <tr><td>Agreement scans (physical)</td><td>7 years after last transaction</td><td>Physical destruction + record</td></tr>
+    <tr><td>Complaint records</td><td>3 years</td><td>System deletion</td></tr>
+    <tr><td>Marketing opt-in records</td><td>Until opt-out + 1 year</td><td>Immediate on opt-out request</td></tr>
+    <tr><td>Aadhaar verification session</td><td>Not retained after verification</td><td>Never written to storage</td></tr>
+  </table>
+</div>
+
+<div class="section">
+  <h2>6. Data Principal Rights (DPDP Act 2023)</h2>
+  <p>Customers (Data Principals) have the following rights under the DPDP Act 2023, honoured by Subidha Furniture:</p>
+  <ul>
+    <li><strong>Right to access:</strong> Customer may request a summary of what data is held about them.</li>
+    <li><strong>Right to correction:</strong> Incorrect data will be corrected within 7 working days of a written request.</li>
+    <li><strong>Right to erasure:</strong> On completion of contractual obligations, personal data will be deleted within 30 days of a written request, subject to legal retention requirements.</li>
+    <li><strong>Right to grievance:</strong> Complaints about data handling are directed to the Grievance Officer (see SF-LEGAL-GRV-001).</li>
+  </ul>
+</div>
+
+<div class="section">
+  <div class="highlight">
+    <strong>DPDP Readiness statement:</strong> Subidha Furniture does not store raw biometric data, does not collect Aadhaar numbers in full, masks PAN in storage, and limits data collection to what is necessary for the specific transaction or legal obligation. This architecture is designed to be DPDP Act 2023-ready.
+  </div>
+</div>
+
+<div class="sign-block">
+  <div class="sign-box">Proprietor Signature<br><br>Name: ___________________<br>Date: ___________________</div>
+  <div class="sign-box">Reviewed by (CA / Advocate)<br><br>Name: ___________________<br>Date: ___________________</div>
+</div>
+
+</body>
+</html>

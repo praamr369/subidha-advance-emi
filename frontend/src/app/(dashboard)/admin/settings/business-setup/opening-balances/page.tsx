@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import BusinessSetupLinks from "@/components/admin/business-setup/BusinessSetupLinks";
 import ERPPageShell from "@/components/erp/ERPPageShell";
@@ -9,16 +9,14 @@ import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import { listFinanceAccounts, type FinanceAccount } from "@/services/accounting";
 import {
-  listAdminVendors,
-  getAdminVendorOutstanding,
-  setVendorOpeningBalance,
-  setFinanceOpeningBalance,
   listCustomerOpeningOutstandings,
   createCustomerOpeningOutstanding,
+  listVendorOpeningBalances,
+  setVendorOpeningBalance,
+  setFinanceOpeningBalance,
   type CustomerOpeningOutstanding,
+  type VendorOpeningBalanceRow,
 } from "@/services/vendor-ops";
-
-type Vendor = { id: number; name: string; phone?: string };
 
 function toErr(e: unknown) {
   return e instanceof Error ? e.message : typeof e === "object" && e !== null && "message" in e ? String((e as { message: unknown }).message) : "Request failed.";
@@ -58,17 +56,17 @@ function FinanceOpeningSection() {
       await setFinanceOpeningBalance(account.id, amount, entryDate);
       setAccounts((prev) => prev.map((a) => a.id === account.id ? { ...a, opening_balance: amount } : a));
       setNotice(`${account.name} opening balance saved.`);
+      setEditing((prev) => { const n = { ...prev }; delete n[account.id]; return n; });
     } catch (e) { setError(toErr(e)); }
     finally { setBusy(null); }
   }
 
   const cashAccounts = accounts.filter((a) => a.kind === "CASH");
-  // Bank and UPI share the same physical money — show them together
   const bankAndUpiAccounts = accounts.filter((a) => a.kind === "BANK" || a.kind === "UPI");
 
   function AccountRow({ account }: { account: FinanceAccount }) {
     const value = editing[account.id] ?? account.opening_balance;
-    const changed = value !== account.opening_balance;
+    const changed = String(value) !== String(account.opening_balance);
     return (
       <div className="flex items-center gap-3 rounded-xl border border-border bg-background px-4 py-3">
         <div className="flex-1">
@@ -97,39 +95,35 @@ function FinanceOpeningSection() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
-        Enter balances as of the system cutover date. Saving posts a separate balanced journal against Retained Earnings / Opening Balance Adjustment; it does not create receipts or rewrite old transactions.
+      <div className="rounded-xl border border-sky-500/30 bg-sky-500/5 px-4 py-3 text-sm text-foreground">
+        Enter balances as of the system cutover date. Each save posts a balanced journal against the Opening Balance Adjustment account — it does not create receipts or rewrite old transactions.
       </div>
       <label className="block max-w-xs text-xs font-medium text-muted-foreground">Migration / cutover date
-        <input type="date" className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" value={entryDate} onChange={(event) => setEntryDate(event.target.value)} />
+        <input type="date" className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} />
       </label>
-      {error ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">{error}</div> : null}
-      {notice ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{notice}</div> : null}
+      {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-300">{error}</div>}
+      {notice && <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-900/10 dark:text-emerald-300">{notice}</div>}
 
-      {cashAccounts.length > 0 ? (
+      {cashAccounts.length > 0 && (
         <div>
           <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cash in Hand</div>
           <div className="space-y-2">{cashAccounts.map((a) => <AccountRow key={a.id} account={a} />)}</div>
         </div>
-      ) : null}
+      )}
 
-      {bankAndUpiAccounts.length > 0 ? (
+      {bankAndUpiAccounts.length > 0 && (
         <div>
           <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Bank & UPI</div>
           <div className="mb-2 text-xs text-muted-foreground">UPI payments settle into your bank account — they are the same physical money. Enter the combined balance once on your bank account; set UPI to 0.</div>
           <div className="space-y-2">{bankAndUpiAccounts.map((a) => <AccountRow key={a.id} account={a} />)}</div>
         </div>
-      ) : null}
+      )}
 
-      {accounts.length === 0 ? (
+      {accounts.length === 0 && (
         <div className="rounded-xl border border-dashed border-border bg-muted/20 px-5 py-6 text-sm text-muted-foreground">
           No finance accounts found. <Link href={ROUTES.admin.settingsBusinessSetupFinanceAccounts} className="font-semibold text-primary underline">Set up finance accounts first →</Link>
         </div>
-      ) : null}
-
-      <div className="text-xs text-muted-foreground">
-        Tip: UPI and Bank share the same physical balance — enter the total on the Bank account; leave UPI account at 0 to avoid double-counting.
-      </div>
+      )}
     </div>
   );
 }
@@ -137,68 +131,77 @@ function FinanceOpeningSection() {
 // ── 2. Vendor Opening Outstandings ───────────────────────────────────────────
 
 function VendorOpeningSection() {
-  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [vendors, setVendors] = useState<VendorOpeningBalanceRow[]>([]);
   const [amounts, setAmounts] = useState<Record<number, string>>({});
-  const [existingBalances, setExistingBalances] = useState<Record<number, string>>({});
   const [busy, setBusy] = useState<number | null>(null);
   const [saved, setSaved] = useState<Record<number, boolean>>({});
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [entryDate, setEntryDate] = useState(today());
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    void listAdminVendors().then((res) => {
-      const rows = (res.results ?? []) as Vendor[];
-      setVendors(rows);
-      // Load existing opening balances for each vendor
-      rows.forEach((v) => {
-        void getAdminVendorOutstanding(v.id).then((data) => {
-          const ob = String((data as { opening_balance?: string }).opening_balance ?? "0.00");
-          if (Number(ob) > 0) {
-            setExistingBalances((prev) => ({ ...prev, [v.id]: ob }));
-            setAmounts((prev) => ({ ...prev, [v.id]: ob }));
-          }
-        }).catch(() => null);
+  const load = useCallback(async () => {
+    try {
+      const res = await listVendorOpeningBalances();
+      setVendors(res.results);
+      // Pre-fill amounts for vendors that already have an opening balance
+      const initial: Record<number, string> = {};
+      res.results.forEach((v) => {
+        if (Number(v.opening_balance) > 0) initial[v.id] = v.opening_balance;
       });
-    });
+      setAmounts(initial);
+    } catch (e) { setError(toErr(e)); }
+    finally { setLoading(false); }
   }, []);
 
-  async function save(vendorId: number, vendorName: string) {
-    const amount = amounts[vendorId] ?? "0";
-    setBusy(vendorId);
+  useEffect(() => { void load(); }, [load]);
+
+  async function save(vendor: VendorOpeningBalanceRow) {
+    const amount = amounts[vendor.id] ?? "0";
+    setBusy(vendor.id);
     setError(null);
     try {
-      await setVendorOpeningBalance(vendorId, amount, entryDate);
-      setExistingBalances((prev) => ({ ...prev, [vendorId]: amount }));
-      setSaved((prev) => ({ ...prev, [vendorId]: true }));
+      await setVendorOpeningBalance(vendor.id, amount, entryDate);
+      setVendors((prev) => prev.map((v) => v.id === vendor.id ? { ...v, opening_balance: amount } : v));
+      setSaved((prev) => ({ ...prev, [vendor.id]: true }));
+      setNotice(`${vendor.name} opening balance saved.`);
     } catch (e) { setError(toErr(e)); }
     finally { setBusy(null); }
   }
 
-  if (!vendors.length) return (
+  if (loading) return <div className="py-8 text-center text-sm text-muted-foreground">Loading vendors…</div>;
+
+  if (vendors.length === 0) return (
     <div className="rounded-xl border border-dashed border-border bg-muted/20 px-5 py-6 text-sm text-muted-foreground">
       No vendors found. <Link href={ROUTES.admin.vendors} className="font-semibold text-primary underline">Add vendors first →</Link>
     </div>
   );
 
+  const withBalance = vendors.filter((v) => Number(v.opening_balance) > 0);
+
   return (
     <div className="space-y-4">
-      {error ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">{error}</div> : null}
-      <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+      {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-300">{error}</div>}
+      {notice && <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-900/10 dark:text-emerald-300">{notice}</div>}
+      <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-foreground">
         Enter what you owed each vendor at cutover. Each save retains prior ledger rows and posts Accounts Payable against the opening-balance adjustment account.
+        {withBalance.length > 0 && <span className="ml-1 font-medium text-amber-700 dark:text-amber-400">{withBalance.length} vendor{withBalance.length !== 1 ? "s" : ""} already have an opening balance set.</span>}
       </div>
       <label className="block max-w-xs text-xs font-medium text-muted-foreground">Migration / cutover date
-        <input type="date" className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" value={entryDate} onChange={(event) => setEntryDate(event.target.value)} />
+        <input type="date" className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} />
       </label>
       <div className="space-y-2">
         {vendors.map((vendor) => {
-          const amount = amounts[vendor.id] ?? existingBalances[vendor.id] ?? "0.00";
-          const existing = existingBalances[vendor.id];
-          const changed = amount !== (existing ?? "0.00") && amount !== (existing ?? "");
+          const amount = amounts[vendor.id] ?? vendor.opening_balance ?? "0.00";
+          const existing = vendor.opening_balance;
+          const changed = String(amount) !== String(existing);
           return (
             <div key={vendor.id} className="flex items-center gap-3 rounded-xl border border-border bg-background px-4 py-3">
               <div className="flex-1">
                 <div className="text-sm font-semibold text-foreground">{vendor.name}</div>
-                {existing && Number(existing) > 0 ? <div className="text-xs text-emerald-700">Opening balance: {formatRupee(existing)}</div> : <div className="text-xs text-muted-foreground">No opening balance set</div>}
+                {Number(existing) > 0
+                  ? <div className="text-xs text-emerald-700 dark:text-emerald-400">Opening balance: {formatRupee(existing)}</div>
+                  : <div className="text-xs text-muted-foreground">No opening balance set</div>}
               </div>
               <input
                 type="number"
@@ -206,14 +209,14 @@ function VendorOpeningSection() {
                 step="0.01"
                 placeholder="0.00"
                 className="w-36 rounded-lg border border-input bg-background px-3 py-2 text-right text-sm tabular-nums"
-                value={amounts[vendor.id] ?? existing ?? ""}
+                value={amounts[vendor.id] ?? (Number(existing) > 0 ? existing : "")}
                 onChange={(e) => setAmounts((prev) => ({ ...prev, [vendor.id]: e.target.value }))}
               />
               <button
                 type="button"
                 disabled={busy === vendor.id}
-                onClick={() => void save(vendor.id, vendor.name)}
-                className={`rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-40 ${saved[vendor.id] && !changed ? "border border-emerald-200 bg-emerald-50 text-emerald-900" : "bg-foreground text-background"}`}
+                onClick={() => void save(vendor)}
+                className={`rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-40 ${saved[vendor.id] && !changed ? "border border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-900/10 dark:text-emerald-300" : "bg-foreground text-background"}`}
               >
                 {busy === vendor.id ? "Saving…" : saved[vendor.id] && !changed ? "Saved ✓" : "Save"}
               </button>
@@ -229,21 +232,28 @@ function VendorOpeningSection() {
 
 function CustomerOpeningSection() {
   const [rows, setRows] = useState<CustomerOpeningOutstanding[]>([]);
+  const [settledRows, setSettledRows] = useState<CustomerOpeningOutstanding[]>([]);
   const [total, setTotal] = useState("0.00");
+  const [showSettled, setShowSettled] = useState(false);
   const [form, setForm] = useState({ customer_name: "", phone: "", outstanding_amount: "", entry_date: today(), notes: "" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
-  async function load() {
+  const load = useCallback(async () => {
     try {
-      const res = await listCustomerOpeningOutstandings(false);
-      setRows(res.results);
-      setTotal(res.total_outstanding);
+      const [pending, settled] = await Promise.all([
+        listCustomerOpeningOutstandings(false),
+        listCustomerOpeningOutstandings(true),
+      ]);
+      setRows(pending.results);
+      setSettledRows(settled.results);
+      setTotal(pending.total_outstanding);
     } catch (e) { setError(toErr(e)); }
-  }
+  }, []);
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load(); }, [load]);
 
   async function add() {
     if (!form.customer_name.trim()) { setError("Customer name is required."); return; }
@@ -258,17 +268,23 @@ function CustomerOpeningSection() {
     finally { setBusy(false); }
   }
 
+  const displayRows = showSettled ? settledRows : rows;
+  const filtered = search.trim()
+    ? displayRows.filter((r) => r.customer_name.toLowerCase().includes(search.toLowerCase()) || r.phone?.includes(search))
+    : displayRows;
+
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-950">
-        Enter each old customer receivable separately. Saving posts Accounts Receivable against Retained Earnings / Opening Balance Adjustment. Later payments must use the real collection workflow; this page cannot mark money as received.
+      <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-sm text-foreground">
+        Enter each old customer receivable separately. Saving posts Accounts Receivable against Opening Balance Adjustment.
+        To collect payment from a customer, use the <Link href={ROUTES.admin.financeCollect} className="font-semibold text-primary underline">Finance Collection</Link> workflow — this page cannot mark money as received.
       </div>
-      {error ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">{error}</div> : null}
-      {notice ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{notice}</div> : null}
+      {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-300">{error}</div>}
+      {notice && <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-900/10 dark:text-emerald-300">{notice}</div>}
 
       {/* Add form */}
       <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-        <div className="text-sm font-semibold text-foreground mb-3">Add customer outstanding</div>
+        <div className="mb-3 text-sm font-semibold text-foreground">Add customer outstanding</div>
         <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
           <div>
             <label className="text-xs font-medium text-muted-foreground">Customer name *</label>
@@ -298,29 +314,57 @@ function CustomerOpeningSection() {
         </div>
       </div>
 
-      {/* List */}
-      {rows.length > 0 ? (
+      {/* List header + search + toggle */}
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          className="flex-1 min-w-[160px] rounded-lg border border-input bg-background px-3 py-1.5 text-sm"
+          placeholder="Search by name or phone…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <div className="flex rounded-lg border border-border overflow-hidden text-xs font-medium">
+          <button onClick={() => setShowSettled(false)} className={`px-3 py-1.5 transition ${!showSettled ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"}`}>
+            Pending ({rows.length})
+          </button>
+          <button onClick={() => setShowSettled(true)} className={`px-3 py-1.5 transition ${showSettled ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"}`}>
+            Settled ({settledRows.length})
+          </button>
+        </div>
+      </div>
+
+      {!showSettled && rows.length > 0 && (
+        <div className="rounded-lg border border-border bg-muted/40 px-4 py-2 text-sm font-semibold text-foreground">
+          Total pending: {formatRupee(total)}
+        </div>
+      )}
+
+      {filtered.length > 0 ? (
         <div className="rounded-xl border border-border bg-card shadow-sm">
-          <div className="flex items-center justify-between border-b border-border px-4 py-3">
-            <div className="text-sm font-semibold text-foreground">Pending outstandings ({rows.length})</div>
-            <div className="text-sm font-semibold text-foreground">Total: {formatRupee(total)}</div>
-          </div>
           <div className="divide-y divide-border">
-            {rows.map((row) => (
+            {filtered.map((row) => (
               <div key={row.id} className="flex items-center gap-3 px-4 py-3">
-                <div className="flex-1">
-                  <div className="text-sm font-semibold text-foreground">{row.customer_name}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-foreground truncate">{row.customer_name}</div>
                   <div className="text-xs text-muted-foreground">{row.phone ? `${row.phone} · ` : ""}{row.entry_date}{row.notes ? ` · ${row.notes}` : ""}</div>
+                  {row.is_settled && row.settled_at && (
+                    <div className="text-xs text-emerald-600 dark:text-emerald-400">Settled {new Date(row.settled_at).toLocaleDateString()}</div>
+                  )}
                 </div>
-                <div className="text-sm font-semibold tabular-nums text-foreground">{formatRupee(row.outstanding_amount)}</div>
-                <Link href={ROUTES.admin.financeCollect} className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-900 hover:bg-emerald-100">Collect payment</Link>
+                <div className={`text-sm font-semibold tabular-nums ${row.is_settled ? "text-muted-foreground line-through" : "text-foreground"}`}>
+                  {formatRupee(row.outstanding_amount)}
+                </div>
+                {!row.is_settled && (
+                  <Link href={ROUTES.admin.financeCollect} className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-500/20 dark:text-emerald-300">
+                    Collect
+                  </Link>
+                )}
               </div>
             ))}
           </div>
         </div>
       ) : (
         <div className="rounded-xl border border-dashed border-border bg-muted/20 px-5 py-6 text-center text-sm text-muted-foreground">
-          No pending customer outstandings. Add your first one above.
+          {search ? "No results match your search." : showSettled ? "No settled customer outstandings yet." : "No pending customer outstandings. Add your first one above."}
         </div>
       )}
     </div>
@@ -343,7 +387,7 @@ export default function OpeningBalancesPage() {
     <ERPPageShell
       eyebrow="Setup"
       title="Opening Balances"
-      subtitle="Enter your real opening data from BillBook — cash & bank balances, customer receivables, and vendor payables."
+      subtitle="Enter opening cash & bank balances, customer receivables, and vendor payables as of your system cutover date."
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.root },
         { label: "Business Setup", href: ROUTES.admin.settingsBusinessSetup },
@@ -358,13 +402,14 @@ export default function OpeningBalancesPage() {
         <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
           <div className="text-sm font-semibold text-foreground">How to use this page</div>
           <div className="mt-2 grid gap-3 text-sm text-muted-foreground sm:grid-cols-3">
-            <div><span className="font-semibold text-foreground">1. Cash & Bank</span><br />Set your opening cash balance and bank/UPI balance. Bank and UPI are the same physical money — enter the combined amount on the Bank account and leave UPI at 0.</div>
-            <div><span className="font-semibold text-foreground">2. Customer Outstandings</span><br />People who owe you money from old billbook records. Add each customer name + amount. Mark them settled when they pay.</div>
-            <div><span className="font-semibold text-foreground">3. Vendor Outstandings</span><br />Suppliers you owe money to. Find them from your vendor list and enter the amount you owed on day 1.</div>
+            <div><span className="font-semibold text-foreground">1. Cash & Bank</span><br />Set your opening cash balance and bank/UPI balance as of day 1. Bank and UPI share the same physical money — enter the combined amount on the Bank account and leave UPI at 0.</div>
+            <div><span className="font-semibold text-foreground">2. Customer Outstandings</span><br />People who owe you money from your old records. Add each customer name and amount. They are marked settled when you collect payment through Finance Collection.</div>
+            <div><span className="font-semibold text-foreground">3. Vendor Outstandings</span><br />Suppliers you owed money to on day 1. Select the vendor and enter the amount. All saves are journaled and reversible.</div>
           </div>
-          <div className="mt-3 flex flex-wrap gap-2 text-sm">
+          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm">
             <Link href={ROUTES.admin.inventoryOpeningStock} className="font-semibold text-primary underline-offset-2 hover:underline">Opening stock (inventory) →</Link>
             <Link href={ROUTES.admin.hrStaff} className="font-semibold text-primary underline-offset-2 hover:underline">Staff data →</Link>
+            <Link href={ROUTES.admin.settingsBusinessSetupMigration} className="font-semibold text-primary underline-offset-2 hover:underline">Bulk import via Migration Center →</Link>
           </div>
         </div>
 
@@ -387,7 +432,7 @@ export default function OpeningBalancesPage() {
             <FinanceOpeningSection />
           </WorkspaceSection>
         ) : tab === "customers" ? (
-          <WorkspaceSection title="Customer Opening Outstandings" description="Receivables from your old billbook — people who owe you money.">
+          <WorkspaceSection title="Customer Opening Outstandings" description="Receivables from your old records — people who owe you money.">
             <CustomerOpeningSection />
           </WorkspaceSection>
         ) : (

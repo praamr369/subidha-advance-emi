@@ -12,6 +12,12 @@ export type ComplianceDocumentType =
   | "SHOP_LICENSE"
   | "BANK_PROOF"
   | "PAN_OR_TAX_PROOF"
+  | "CA_OPINION"
+  | "ADVOCATE_OPINION"
+  | "LEGAL_NOTICE"
+  | "COURT_ORDER"
+  | "LEGAL_AGREEMENT"
+  | "SCHEME_APPROVAL_LETTER"
   | "OTHER";
 export type ComplianceVisibility = "PRIVATE" | "PUBLIC_SUMMARY_ONLY";
 export type ComplianceVerificationStatus = "PENDING" | "VERIFIED" | "REJECTED" | "NOT_PROVIDED";
@@ -216,6 +222,7 @@ export type ComplianceReadiness = {
   warnings: string[];
   route_hint: string;
   missing_required_count: number;
+  pending_required_count: number;
   pending_review_count: number;
   approved_required_count: number;
   required_count: number;

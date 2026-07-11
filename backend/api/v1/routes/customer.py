@@ -24,6 +24,7 @@ from api.v1.views.customer import (
 )
 from api.v1.views.customer_finance import (
     CustomerAccountStatementView,
+    CustomerArchiveView,
     CustomerDirectSaleDetailView,
     CustomerDirectSaleListView,
     CustomerDirectSaleSummaryView,
@@ -104,6 +105,7 @@ urlpatterns = [
     path("receipts/", CustomerReceiptListView.as_view()),
     path("receipts/<int:pk>/pdf/", CustomerReceiptPdfView.as_view()),
     path("documents/", CustomerDocumentListView.as_view()),
+    path("archive/", CustomerArchiveView.as_view()),
     path("payment-schedule/", CustomerPaymentScheduleView.as_view()),
     path("account-statement/", CustomerAccountStatementView.as_view()),
     path("support/tickets/", CustomerSupportTicketListCreateView.as_view()),

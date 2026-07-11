@@ -31,6 +31,7 @@ from subscriptions.models import (
     SubscriptionStatus,
 )
 from subscriptions.services.business_event_service import append_business_event
+from subscriptions.services.business_rule_policy_service import assert_waiver_launch_permitted
 
 finance_logger = logging.getLogger("finance.events")
 
@@ -552,6 +553,7 @@ def execute_batch_draw(*, batch: Batch, revealed_seed: str, performed_by=None) -
     if batch.status != BatchStatus.DRAW_COMMITTED and not draw.is_revealed:
         raise ValidationError("Batch must be DRAW_COMMITTED before execute-draw.")
 
+    assert_waiver_launch_permitted()
     assert_waiver_finance_ready()
 
     from subscriptions.services.lucky_draw_service import reveal_and_execute_draw

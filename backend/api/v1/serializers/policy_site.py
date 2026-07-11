@@ -377,39 +377,45 @@ class BusinessComplianceDocumentAdminSerializer(serializers.ModelSerializer):
             "updated_at",
         )
 
+    def _state(self, obj: BusinessComplianceDocument):
+        # Use prefetched relation if available (avoids N+1 when select_related is used).
+        if hasattr(obj, "review_state"):
+            return obj.review_state
+        return get_review_state(obj)
+
     def get_status(self, obj: BusinessComplianceDocument) -> str:
         return compliance_status_for_document(obj)
 
     def get_review_status(self, obj: BusinessComplianceDocument) -> str:
-        return get_review_state(obj).review_status
+        return self._state(obj).review_status
 
     def get_reviewed_at(self, obj: BusinessComplianceDocument):
-        return get_review_state(obj).reviewed_at
+        return self._state(obj).reviewed_at
 
     def get_rejected_reason(self, obj: BusinessComplianceDocument) -> str:
-        return get_review_state(obj).rejected_reason
+        return self._state(obj).rejected_reason
 
     def get_expires_at(self, obj: BusinessComplianceDocument):
-        return get_review_state(obj).expires_at
+        return self._state(obj).expires_at
 
     def get_source_template_key(self, obj: BusinessComplianceDocument) -> str:
-        return get_review_state(obj).source_template_key
+        return self._state(obj).source_template_key
 
     def get_evidence_uploaded_at(self, obj: BusinessComplianceDocument):
-        return get_review_state(obj).evidence_uploaded_at
+        return self._state(obj).evidence_uploaded_at
 
     def get_approved_public_summary(self, obj: BusinessComplianceDocument) -> bool:
-        return get_review_state(obj).approved_public_summary
+        return self._state(obj).approved_public_summary
 
     def get_public_summary_approved_at(self, obj: BusinessComplianceDocument):
-        return get_review_state(obj).public_summary_approved_at
+        return self._state(obj).public_summary_approved_at
 
     def get_public_summary_approved_by_username(self, obj: BusinessComplianceDocument) -> str:
-        user = get_review_state(obj).public_summary_approved_by
+        user = self._state(obj).public_summary_approved_by
         return getattr(user, "username", "") if user else ""
 
     def get_last_action_reason(self, obj: BusinessComplianceDocument) -> str:
-        return get_review_state(obj).last_action_reason
+        return self._state(obj).last_action_reason
 
     def get_is_publicly_downloadable(self, obj: BusinessComplianceDocument) -> bool:
         return is_publicly_downloadable(obj)

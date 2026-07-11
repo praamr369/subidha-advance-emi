@@ -1,179 +1,67 @@
-/**
- * Warranty & Service management API
- */
+import { apiFetch } from '@/lib/api'
 
 export interface WarrantyClaim {
-  id: number;
-  service_case_id: number;
-  product_id: number;
-  product_name: string;
-  warranty_type: string;
-  warranty_end_date: string;
-  is_in_warranty: boolean;
-  defect_description: string;
-  defect_classification: string;
-  claim_status: string;
-  claim_submitted_at: string;
-  recommended_remedy: string;
-  total_cost: string;
+  id: string
+  product_id: string
+  subscription_id: string
+  status: 'FILED' | 'ASSESSING' | 'APPROVED' | 'REJECTED' | 'SCHEDULED' | 'COMPLETED'
+  defect_description: string
+  defect_type: 'MECHANICAL' | 'ELECTRICAL' | 'COSMETIC'
+  filed_at: string
+  assessment_result?: string
+  service_appointment?: {
+    date: string
+    time: string
+    technician: string
+  }
 }
 
-export interface WarrantyEligibility {
-  is_in_warranty: boolean;
-  warranty_end_date: string | null;
-  days_to_deadline: number;
-  is_claim_eligible: boolean;
-  status: string;
+export interface WarrantyStatus {
+  product_id: string
+  manufacturing_days_remaining: number
+  structural_days_remaining: number
+  extended_enrolled: boolean
+  extended_expiry?: string
 }
 
-export interface ServicePricing {
-  product_id: number;
-  product_name: string;
-  warranty_labor_cost: number;
-  out_of_warranty_labor_cost: number;
-  home_service_charge: number;
-  travel_charge_beyond_5km: number;
-  home_visit_days: number;
-  service_completion_days: number;
+class WarrantyService {
+  async checkWarranty(productId: string): Promise<WarrantyStatus> {
+    return apiFetch(`/api/v1/warranty/check/${productId}/`) as Promise<WarrantyStatus>
+  }
+
+  async fileClaim(
+    productId: string,
+    defectDescription: string,
+    defectType: string,
+    photos: File[]
+  ): Promise<unknown> {
+    const formData = new FormData()
+    formData.append('product_id', productId)
+    formData.append('defect_description', defectDescription)
+    formData.append('defect_type', defectType)
+    photos.forEach((photo) => formData.append('photos', photo))
+    return fetch('/api/v1/warranty/claim/', {
+      method: 'POST',
+      body: formData,
+      credentials: 'include',
+    }).then((r) => r.json())
+  }
+
+  async getClaimStatus(claimId: string): Promise<WarrantyClaim> {
+    return apiFetch(`/api/v1/warranty/claim-status/${claimId}/`) as Promise<WarrantyClaim>
+  }
+
+  async getServiceHistory(limit = 20, offset = 0): Promise<{ count: number; results: unknown[] }> {
+    const d = await apiFetch(`/api/v1/warranty/service-history/?limit=${limit}&offset=${offset}`)
+    return d as { count: number; results: unknown[] }
+  }
+
+  async enrollExtendedWarranty(productId: string, planType: string): Promise<unknown> {
+    return apiFetch('/api/v1/warranty/enroll-extended/', {
+      method: 'POST',
+      body: JSON.stringify({ product_id: productId, plan_type: planType }),
+    })
+  }
 }
 
-export interface ExtendedWarrantyPlan {
-  id: number;
-  subscription_id: number;
-  product_id: number;
-  product_name: string;
-  plan_duration_months: number;
-  plan_cost: string;
-  coverage_start_date: string;
-  coverage_end_date: string;
-  payment_status: string;
-  is_active: boolean;
-}
-
-export async function listWarrantyClaims(filters?: {
-  status?: string;
-  product_id?: number;
-  in_warranty?: boolean;
-}): Promise<{ count: number; results: WarrantyClaim[] }> {
-  const params = new URLSearchParams();
-  if (filters?.status) params.set('status', filters.status);
-  if (filters?.product_id) params.set('product_id', String(filters.product_id));
-  if (filters?.in_warranty !== undefined) params.set('in_warranty', String(filters.in_warranty));
-
-  const response = await fetch(`/api/v1/admin/warranty-claims/?${params}`, {
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-  });
-  if (!response.ok) throw new Error('Failed to list warranty claims');
-  return response.json();
-}
-
-export async function getWarrantyClaimDetail(claimId: number): Promise<WarrantyClaim & { eligibility: WarrantyEligibility }> {
-  const response = await fetch(`/api/v1/admin/warranty-claims/${claimId}/`, {
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-  });
-  if (!response.ok) throw new Error('Failed to fetch warranty claim');
-  return response.json();
-}
-
-export async function assessWarrantyClaim(
-  claimId: number,
-  classification: string,
-  assessment_notes: string
-): Promise<WarrantyClaim> {
-  const response = await fetch(`/api/v1/admin/warranty-claims/${claimId}/assess/`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ classification, assessment_notes }),
-  });
-  if (!response.ok) throw new Error('Failed to assess claim');
-  return response.json();
-}
-
-export async function approveWarrantyClaim(
-  claimId: number,
-  remedy: string,
-  cost_labor: number,
-  cost_parts: number,
-  cost_travel: number = 0
-): Promise<WarrantyClaim> {
-  const response = await fetch(`/api/v1/admin/warranty-claims/${claimId}/approve/`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ remedy, cost_labor, cost_parts, cost_travel }),
-  });
-  if (!response.ok) throw new Error('Failed to approve claim');
-  return response.json();
-}
-
-export async function rejectWarrantyClaim(
-  claimId: number,
-  rejection_reason: string
-): Promise<{ status: string }> {
-  const response = await fetch(`/api/v1/admin/warranty-claims/${claimId}/reject/`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ rejection_reason }),
-  });
-  if (!response.ok) throw new Error('Failed to reject claim');
-  return response.json();
-}
-
-export async function resolveWarrantyClaim(claimId: number): Promise<{ status: string }> {
-  const response = await fetch(`/api/v1/admin/warranty-claims/${claimId}/resolve/`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-  });
-  if (!response.ok) throw new Error('Failed to resolve claim');
-  return response.json();
-}
-
-export async function getServicePricing(productId: number): Promise<ServicePricing> {
-  const response = await fetch(`/api/v1/admin/service-pricing/${productId}/`, {
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-  });
-  if (!response.ok) throw new Error('Failed to fetch service pricing');
-  return response.json();
-}
-
-export async function listExtendedWarranties(subscriptionId?: number): Promise<{ count: number; results: ExtendedWarrantyPlan[] }> {
-  const params = new URLSearchParams();
-  if (subscriptionId) params.set('subscription_id', String(subscriptionId));
-
-  const response = await fetch(`/api/v1/admin/extended-warranty/?${params}`, {
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-  });
-  if (!response.ok) throw new Error('Failed to list warranty plans');
-  return response.json();
-}
-
-export async function enrollExtendedWarranty(
-  subscriptionId: number,
-  productId: number
-): Promise<ExtendedWarrantyPlan> {
-  const response = await fetch('/api/v1/admin/extended-warranty/', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ subscription_id: subscriptionId, product_id: productId }),
-  });
-  if (!response.ok) throw new Error('Failed to enroll in extended warranty');
-  return response.json();
-}
-
-export async function markWarrantyPlanPaid(planId: number): Promise<{ id: number; payment_status: string; paid_at: string }> {
-  const response = await fetch(`/api/v1/admin/extended-warranty/${planId}/mark-paid/`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-  });
-  if (!response.ok) throw new Error('Failed to mark plan as paid');
-  return response.json();
-}
+export const warrantyService = new WarrantyService()

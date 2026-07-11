@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Certificate Validation &amp; Timestamping — Subidha Furniture</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Arial, Helvetica, sans-serif; font-size: 12pt; color: #111; background: #fff; padding: 30px 40px; max-width: 800px; margin: auto; }
+h1 { font-size: 16pt; border-bottom: 2px solid #111; padding-bottom: 6px; margin-bottom: 4px; }
+h2 { font-size: 13pt; margin-top: 18px; margin-bottom: 6px; }
+p { margin-bottom: 8px; line-height: 1.5; }
+ul, ol { margin-left: 20px; margin-bottom: 8px; }
+li { margin-bottom: 4px; line-height: 1.5; }
+.meta { font-size: 10pt; color: #555; margin-top: 6px; margin-bottom: 20px; }
+.section { margin-bottom: 16px; }
+.sign-block { margin-top: 40px; display: flex; gap: 60px; }
+.sign-box { flex: 1; border-top: 1px solid #111; padding-top: 6px; font-size: 10pt; }
+table { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 11pt; }
+th { background: #eee; border: 1px solid #bbb; padding: 6px 8px; text-align: left; }
+td { border: 1px solid #bbb; padding: 5px 8px; }
+.status-banner { background: #fff8e1; border: 2px solid #f59e0b; border-radius: 6px; padding: 14px 18px; margin-bottom: 18px; }
+.status-banner strong { display: block; font-size: 13pt; margin-bottom: 6px; }
+.highlight { background: #e3f2fd; border-left: 4px solid #1976d2; padding: 8px 12px; margin-bottom: 10px; }
+@media print { body { padding: 15px 20px; } }
+</style>
+</head>
+<body>
+
+<h1>Certificate Validation &amp; Timestamping</h1>
+<div class="meta">
+  Business: Subidha Furniture &nbsp;|&nbsp; Document ref: SF-LEGAL-CERT-001 &nbsp;|&nbsp; Version: 1.0 &nbsp;|&nbsp; Date: July 2026 &nbsp;|&nbsp; Classification: PRIVATE — Internal compliance record
+</div>
+
+<div class="status-banner">
+  <strong>Current Status: READY — Not Yet Activated</strong>
+  Subidha Furniture has prepared this policy in readiness for digital eSign. Digital eSign (DSC / Aadhaar eSign) is <strong>not currently active</strong>. All high-assurance contracts currently use physical wet-ink signatures (Tier A per SF-LEGAL-SIG-001). This document will become operative when a CCA-accredited eSign provider subscription is obtained and activated.
+</div>
+
+<div class="section">
+  <h2>1. Purpose</h2>
+  <p>When digital eSign is activated, this document governs how Subidha Furniture validates certificate chains, checks certificate revocation status, and captures RFC 3161-compliant timestamps on all digitally signed documents. This ensures that digitally signed agreements are legally valid under the IT Act 2000 and the Information Technology (Certifying Authorities) Rules 2000.</p>
+</div>
+
+<div class="section">
+  <h2>2. Planned eSign Provider Requirements</h2>
+  <p>When a provider is selected, it must meet all of the following before activation:</p>
+  <ul>
+    <li>Licensed / accredited by the Controller of Certifying Authorities (CCA), India</li>
+    <li>Supports Aadhaar-based eSign (offline XML / OTP) or DSC-based signing</li>
+    <li>Provides RFC 3161 compliant timestamp tokens with each signed document</li>
+    <li>Provides an OCSP (Online Certificate Status Protocol) or CRL (Certificate Revocation List) endpoint for real-time certificate validation</li>
+    <li>Returns certificate serial number, issuing CA name, validity window, and signature hash in the signing receipt</li>
+    <li>Provides sandbox / staging environment for pre-production testing</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h2>3. Certificate Validation Controls (On Activation)</h2>
+  <table>
+    <tr><th>Control</th><th>Mechanism</th><th>When</th></tr>
+    <tr><td>Certificate chain validation</td><td>Verify to CCA Root CA</td><td>At signing time</td></tr>
+    <tr><td>Revocation check</td><td>OCSP query or CRL download</td><td>At signing time</td></tr>
+    <tr><td>Certificate serial capture</td><td>Store in audit log per document</td><td>At signing time</td></tr>
+    <tr><td>Validity window check</td><td>Confirm cert not expired or future-dated</td><td>At signing time</td></tr>
+    <tr><td>RFC 3161 timestamp</td><td>TSA token from accredited TSA</td><td>Immediately after signing</td></tr>
+    <tr><td>Signature hash</td><td>SHA-256 of signed document stored in audit log</td><td>At signing time</td></tr>
+  </table>
+</div>
+
+<div class="section">
+  <h2>4. Pre-Activation Checklist</h2>
+  <p>Before digital eSign is used on any live customer agreement, all of the following must be completed:</p>
+  <ol>
+    <li>Select and subscribe to a CCA-accredited eSign provider</li>
+    <li>Complete sandbox integration and test with at least 5 test signings</li>
+    <li>Verify OCSP/CRL endpoint is responsive and returns correct status</li>
+    <li>Verify RFC 3161 timestamp token is attached to each test document</li>
+    <li>Confirm audit log captures all fields in the table above</li>
+    <li>Update the Signature Tiering Policy (SF-LEGAL-SIG-001) to add Tier A-Digital</li>
+    <li>Update this document with the provider name, sandbox logs, and activation date</li>
+    <li>Obtain CA/advocate sign-off on the updated document</li>
+    <li>Upload updated document to the compliance system and re-approve</li>
+  </ol>
+</div>
+
+<div class="section">
+  <h2>5. Providers Under Consideration (No Subscription Yet)</h2>
+  <table>
+    <tr><th>Provider</th><th>Type</th><th>Status</th></tr>
+    <tr><td>eMudhra</td><td>CCA-accredited DSC + Aadhaar eSign</td><td>Under evaluation — no subscription</td></tr>
+    <tr><td>NSDL e-Gov</td><td>Aadhaar eSign (OTP-based)</td><td>Under evaluation — no subscription</td></tr>
+    <tr><td>Signzy / DigiLocker integrations</td><td>Aadhaar offline eKYC + sign</td><td>Under evaluation — no subscription</td></tr>
+  </table>
+  <p>This list will be updated when a provider is selected. No provider is active or integrated as of the document date.</p>
+</div>
+
+<div class="section">
+  <div class="highlight">
+    <strong>Compliance note:</strong> Until digital eSign is activated and this checklist is completed, no agreement may be executed using digital signatures. Physical wet-ink signature (Tier A) remains the only approved method for high-assurance contracts.
+  </div>
+</div>
+
+<div class="sign-block">
+  <div class="sign-box">Proprietor Signature<br><br>Name: ___________________<br>Date: ___________________</div>
+  <div class="sign-box">Reviewed by (CA / Advocate)<br><br>Name: ___________________<br>Date: ___________________</div>
+</div>
+
+</body>
+</html>

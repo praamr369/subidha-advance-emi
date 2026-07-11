@@ -1,0 +1,20 @@
+/* Shared print styles — included inline in each template */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Arial, Helvetica, sans-serif; font-size: 12pt; color: #111; background: #fff; padding: 30px 40px; max-width: 800px; margin: auto; }
+h1 { font-size: 16pt; border-bottom: 2px solid #111; padding-bottom: 6px; margin-bottom: 4px; }
+h2 { font-size: 13pt; margin-top: 18px; margin-bottom: 6px; }
+h3 { font-size: 11pt; margin-top: 12px; margin-bottom: 4px; }
+p { margin-bottom: 8px; line-height: 1.5; }
+ul, ol { margin-left: 20px; margin-bottom: 8px; }
+li { margin-bottom: 4px; line-height: 1.5; }
+.header { margin-bottom: 20px; }
+.header .meta { font-size: 10pt; color: #555; margin-top: 6px; }
+.section { margin-bottom: 16px; }
+.sign-block { margin-top: 40px; display: flex; gap: 60px; }
+.sign-box { flex: 1; border-top: 1px solid #111; padding-top: 6px; font-size: 10pt; }
+.badge { display: inline-block; background: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; padding: 2px 8px; font-size: 10pt; margin-bottom: 10px; }
+table { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 11pt; }
+th { background: #eee; border: 1px solid #bbb; padding: 6px 8px; text-align: left; }
+td { border: 1px solid #bbb; padding: 5px 8px; }
+.highlight { background: #fff8e1; border-left: 4px solid #f59e0b; padding: 8px 12px; margin-bottom: 10px; }
+@media print { body { padding: 15px 20px; } }

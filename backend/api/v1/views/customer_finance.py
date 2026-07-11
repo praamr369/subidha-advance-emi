@@ -25,6 +25,7 @@ from subscriptions.models import (
 from subscriptions.services.phase4_finance_service import (
     FinanceFilter,
     customer_account_statement,
+    customer_archive,
     customer_document_list,
     customer_finance_summary,
     customer_invoice_list,
@@ -231,6 +232,18 @@ class CustomerDocumentListView(APIView):
         if customer is None:
             return _customer_missing_response()
         return Response(customer_document_list(customer=customer))
+
+
+class CustomerArchiveView(APIView):
+    """GET /api/v1/customer/archive/ — unified signed-document archive."""
+
+    permission_classes = [IsCustomer]
+
+    def get(self, request):
+        customer = _customer_or_404(request)
+        if customer is None:
+            return _customer_missing_response()
+        return Response(customer_archive(customer=customer))
 
 
 class CustomerPaymentScheduleView(APIView):

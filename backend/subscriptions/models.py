@@ -190,6 +190,7 @@ class LuckyIdStatus(models.TextChoices):
 
 class EmiStatus(models.TextChoices):
     PENDING = "PENDING", "Pending"
+    OVERDUE = "OVERDUE", "Overdue"
     PAID = "PAID", "Paid"
     WAIVED = "WAIVED", "Waived"
     CANCELLED = "CANCELLED", "Cancelled"
@@ -1366,6 +1367,20 @@ class Subscription(TimeStampedModel):
     advance_delivery_unlocked = models.BooleanField(default=False, db_index=True)
     prepayment_amount = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
     prepayment_date = models.DateTimeField(null=True, blank=True)
+    # CTRL-RENT-3 — SHA-256 hash of the signed rental/lease agreement PDF.
+    # Set once when contract PDF is sealed; immutable thereafter.
+    agreement_pdf_hash = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="SHA-256 hex digest of the signed contract PDF (CTRL-RENT-3).",
+    )
+    agreement_pdf_sealed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Timestamp when the agreement PDF hash was committed.",
+    )
 
     class Meta:
         db_table = "subscriptions"
@@ -1456,6 +1471,18 @@ class Subscription(TimeStampedModel):
             if (not self.pk or lucky_id_changed) and self.lucky_id.status != LuckyIdStatus.AVAILABLE:
                 raise ValidationError({"lucky_id": "Selected Lucky ID is not available."})
 
+            # CTRL-LP-5 — once the batch is LOCKED or beyond, no new subscriptions
+            # may be enrolled; the eligible-pool snapshot is frozen at lock time.
+            if not self.pk and self.batch_id:
+                locked_statuses = {BatchStatus.LOCKED, BatchStatus.COMPLETED, BatchStatus.CLOSED}
+                batch_status = self.batch.status if hasattr(self, '_batch_cache') else (
+                    Batch.objects.filter(pk=self.batch_id).values_list("status", flat=True).first()
+                )
+                if batch_status in locked_statuses:
+                    raise ValidationError(
+                        {"batch": f"Batch is {batch_status} — new subscriptions cannot be enrolled after the eligible-pool snapshot is frozen (CTRL-LP-5)."}
+                    )
+
         else:
             if self.batch_id or self.lucky_id_id:
                 raise ValidationError(
@@ -1492,6 +1519,18 @@ class Subscription(TimeStampedModel):
 
         if self.branch_id is None:
             self.branch = _default_branch()
+
+        # CTRL-RENT-3 — once agreement_pdf_hash is set it is immutable.
+        if self.pk and self.agreement_pdf_hash:
+            existing_hash = (
+                Subscription.objects.filter(pk=self.pk)
+                .values_list("agreement_pdf_hash", flat=True)
+                .first()
+            )
+            if existing_hash and existing_hash != self.agreement_pdf_hash:
+                raise ValidationError(
+                    {"agreement_pdf_hash": "Agreement PDF hash is immutable once committed."}
+                )
 
         self.full_clean()
 
@@ -2836,6 +2875,14 @@ class Payment(TimeStampedModel):
         blank=True,
         related_name="verified_payments",
     )
+    # CTRL-PAY-1 — idempotency key prevents duplicate submissions.
+    idempotency_key = models.CharField(
+        max_length=160,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="Caller-supplied idempotency key; duplicate submissions with the same key are rejected.",
+    )
 
     class Meta:
         db_table = "payments"
@@ -2855,6 +2902,18 @@ class Payment(TimeStampedModel):
                 fields=["reference_no"],
                 condition=Q(reference_no__isnull=False),
                 name="uq_payment_reference_no",
+            ),
+            models.UniqueConstraint(
+                fields=["idempotency_key"],
+                condition=~Q(idempotency_key=""),
+                name="uq_payment_idempotency_key",
+            ),
+            # CTRL-LP-8 — Lucky-ID payment truth link: one payment record per EMI
+            # ensures a clean audit trail from payment → EMI → Subscription → LuckyId.
+            models.UniqueConstraint(
+                fields=["emi"],
+                condition=Q(emi__isnull=False),
+                name="uq_payment_per_emi",
             ),
             models.CheckConstraint(
                 condition=Q(amount__gt=0),
@@ -2894,8 +2953,21 @@ class Payment(TimeStampedModel):
         if self.reference_no is not None:
             self.reference_no = self.reference_no.strip() or None
 
+        # Income Tax Act 1961, s.269ST — cash receipts ≥ ₹2,00,000 are prohibited.
+        if self.method == PaymentMethod.CASH and self.amount and self.amount >= Decimal("200000.00"):
+            errors["amount"] = (
+                "Cash payment of ₹2,00,000 or more is prohibited under Income Tax Act s.269ST. "
+                "Use UPI, bank transfer, or card."
+            )
+
         if errors:
             raise ValidationError(errors)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError(
+            "Payment records are permanent financial evidence and cannot be deleted. "
+            "Use a reversal entry to correct errors."
+        )
 
     def save(self, *args, **kwargs):
         self.reference_no = (self.reference_no or "").strip() or None
@@ -5625,7 +5697,13 @@ class SubscriptionGuarantor(TimeStampedModel):
     def clean(self):
         self.name = (self.name or "").strip()
         self.phone = (self.phone or "").strip()
-        self.aadhaar_no = (self.aadhaar_no or "").strip()
+        raw = (self.aadhaar_no or "").strip()
+        if raw:
+            digits = "".join(c for c in raw if c.isdigit())
+            # DPDP 2023 s.8 — store only last 4 digits; mask remainder.
+            self.aadhaar_no = "XXXX-XXXX-" + digits[-4:] if len(digits) >= 4 else raw
+        else:
+            self.aadhaar_no = raw
         if not self.name:
             raise ValidationError({"name": "Guarantor name is required."})
         if not self.phone:
@@ -5930,6 +6008,19 @@ class Delivery(models.Model):
         db_table = "subscriptions_delivery"
         ordering = ["-created_at"]
 
+    def clean(self):
+        # CTRL-RENT-2 — handover photo evidence mandatory before marking DELIVERED.
+        if self.status == DeliveryOrderStatus.DELIVERED and self.pk:
+            has_proof = ProofOfDelivery.objects.filter(delivery_id=self.pk).exists()
+            if not has_proof:
+                raise ValidationError(
+                    {"status": "Delivery cannot be marked DELIVERED without a Proof of Delivery record (CTRL-RENT-2)."}
+                )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"Delivery for subscription {self.subscription_id} ({self.status})"
 
@@ -6090,3 +6181,632 @@ class CustomerDispute(TimeStampedModel):
     def days_since_creation(self) -> int:
         """Days elapsed since dispute was created."""
         return (timezone.now() - self.created_at).days if self.created_at else 0
+
+
+# =====================================================
+# PHASE 2 COMPLIANCE MODELS
+# =====================================================
+
+# ---------------------------------------------------------------------------
+# CTRL-LP-1 — DrawAuthorisation
+# Every LuckyDraw must be preceded by an explicit sign-off from an authorised
+# officer before the cryptographic seed is committed. This creates an immutable
+# pre-draw authorisation trail independent of the draw record itself.
+# ---------------------------------------------------------------------------
+
+class DrawAuthorisationStatus(models.TextChoices):
+    PENDING = "PENDING", "Pending"
+    AUTHORISED = "AUTHORISED", "Authorised"
+    REJECTED = "REJECTED", "Rejected"
+    REVOKED = "REVOKED", "Revoked"
+
+
+class DrawAuthorisation(TimeStampedModel):
+    batch = models.ForeignKey(
+        Batch,
+        on_delete=models.PROTECT,
+        related_name="draw_authorisations",
+    )
+    draw_month = models.PositiveIntegerField()
+    status = models.CharField(
+        max_length=20,
+        choices=DrawAuthorisationStatus.choices,
+        default=DrawAuthorisationStatus.PENDING,
+        db_index=True,
+    )
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="requested_draw_authorisations",
+    )
+    authorised_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="authorised_draws",
+    )
+    authorised_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    rejection_reason = models.TextField(blank=True, default="")
+    revocation_reason = models.TextField(blank=True, default="")
+    snapshot = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Eligible-pool snapshot at time of authorisation request.",
+    )
+
+    class Meta:
+        db_table = "draw_authorisations"
+        unique_together = ("batch", "draw_month")
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["batch", "status"]),
+            models.Index(fields=["authorised_at"]),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(draw_month__gt=0),
+                name="chk_draw_auth_month_positive",
+            ),
+        ]
+
+    def clean(self):
+        errors = {}
+        if self.draw_month <= 0:
+            errors["draw_month"] = "Draw month must be a positive integer."
+        if self.status == DrawAuthorisationStatus.AUTHORISED:
+            if not self.authorised_by_id:
+                errors["authorised_by"] = "Authorised-by officer is required when status is AUTHORISED."
+            if not self.authorised_at:
+                errors["authorised_at"] = "Authorisation timestamp is required when status is AUTHORISED."
+        if self.status == DrawAuthorisationStatus.REJECTED and not self.rejection_reason:
+            errors["rejection_reason"] = "Rejection reason is required when status is REJECTED."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"DrawAuth batch={self.batch_id} month={self.draw_month} [{self.status}]"
+
+
+# ---------------------------------------------------------------------------
+# CTRL-LP-4 — EmiWaiverSettlement
+# An immutable record created before any EMI waiver is applied as a Lucky Plan
+# win benefit. Provides a double-entry evidence trail separate from FinancialLedger.
+# ---------------------------------------------------------------------------
+
+class EmiWaiverSettlement(TimeStampedModel):
+    lucky_draw = models.ForeignKey(
+        LuckyDraw,
+        on_delete=models.PROTECT,
+        related_name="waiver_settlements",
+    )
+    subscription = models.ForeignKey(
+        Subscription,
+        on_delete=models.PROTECT,
+        related_name="waiver_settlements",
+    )
+    emi = models.ForeignKey(
+        Emi,
+        on_delete=models.PROTECT,
+        related_name="waiver_settlements",
+    )
+    waived_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    settlement_date = models.DateField(db_index=True)
+    settled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="emi_waiver_settlements",
+    )
+    notes = models.TextField(blank=True, default="")
+
+    IMMUTABLE_FIELDS = (
+        "lucky_draw_id",
+        "subscription_id",
+        "emi_id",
+        "waived_amount",
+        "settlement_date",
+        "settled_by_id",
+    )
+
+    class Meta:
+        db_table = "emi_waiver_settlements"
+        unique_together = ("lucky_draw", "emi")
+        ordering = ["-settlement_date", "-id"]
+        indexes = [
+            models.Index(fields=["subscription", "settlement_date"]),
+            models.Index(fields=["lucky_draw"]),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(waived_amount__gt=0),
+                name="chk_emi_waiver_settlement_amount_positive",
+            ),
+        ]
+
+    def clean(self):
+        errors = {}
+        if self.waived_amount is not None and self.waived_amount <= MONEY_ZERO:
+            errors["waived_amount"] = "Waived amount must be greater than zero."
+        if self.emi_id and self.subscription_id:
+            if self.emi.subscription_id != self.subscription_id:
+                errors["emi"] = "EMI must belong to the given subscription."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            existing = EmiWaiverSettlement.objects.filter(pk=self.pk).values(*self.IMMUTABLE_FIELDS).first()
+            if existing:
+                for field in self.IMMUTABLE_FIELDS:
+                    if getattr(self, field) != existing[field]:
+                        raise ValidationError(
+                            {field: f"EmiWaiverSettlement.{field} is immutable once created."}
+                        )
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"WaiverSettlement draw={self.lucky_draw_id} emi={self.emi_id} ₹{self.waived_amount}"
+
+
+# ---------------------------------------------------------------------------
+# CTRL-LP-7 — grace_days on Batch
+# Grace period (days after due_date before EMI flips to OVERDUE) is defined per
+# batch so it is set at product inception, not silently defaulted.
+# ---------------------------------------------------------------------------
+# NOTE: grace_days is added to the Batch model via migration (field added below
+# as a mixin approach is not available); patched onto the class here.
+
+Batch.add_to_class(
+    "grace_days",
+    models.PositiveSmallIntegerField(
+        default=7,
+        help_text="Days after EMI due_date before status flips to OVERDUE (CTRL-LP-7).",
+    ),
+)
+
+
+# ---------------------------------------------------------------------------
+# CTRL-RENT-8 — Repossession
+# Written-notice-first repossession workflow for rent/lease contracts.
+# ---------------------------------------------------------------------------
+
+class RepossessionStatus(models.TextChoices):
+    NOTICE_ISSUED = "NOTICE_ISSUED", "Notice Issued"
+    IN_PROGRESS = "IN_PROGRESS", "In Progress"
+    COMPLETED = "COMPLETED", "Completed"
+    CANCELLED = "CANCELLED", "Cancelled"
+
+
+class Repossession(TimeStampedModel):
+    subscription = models.OneToOneField(
+        Subscription,
+        on_delete=models.PROTECT,
+        related_name="repossession",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=RepossessionStatus.choices,
+        default=RepossessionStatus.NOTICE_ISSUED,
+        db_index=True,
+    )
+    # Written notice is mandatory before any physical repossession step.
+    notice_issued_at = models.DateTimeField(db_index=True)
+    notice_issued_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="issued_repossession_notices",
+    )
+    notice_reference = models.CharField(max_length=100, blank=True, default="")
+    notice_document = models.FileField(
+        upload_to="repossession/notices/",
+        null=True,
+        blank=True,
+    )
+    # Response window — legal minimum before physical collection.
+    response_deadline = models.DateField(db_index=True)
+    initiated_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    initiated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="initiated_repossessions",
+    )
+    completed_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    completed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="completed_repossessions",
+    )
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    cancellation_reason = models.TextField(blank=True, default="")
+    asset_condition_on_return = models.CharField(
+        max_length=20,
+        choices=ContractReturnConditionStatus.choices,
+        default=ContractReturnConditionStatus.NOT_ASSESSED,
+    )
+    recovery_notes = models.TextField(blank=True, default="")
+    outstanding_balance_at_repossession = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        db_table = "repossessions"
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["status"]),
+            models.Index(fields=["notice_issued_at"]),
+            models.Index(fields=["response_deadline"]),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(outstanding_balance_at_repossession__gte=0)
+                | Q(outstanding_balance_at_repossession__isnull=True),
+                name="chk_repossession_balance_non_negative",
+            ),
+        ]
+
+    def clean(self):
+        errors = {}
+        if not self.notice_issued_at:
+            errors["notice_issued_at"] = "Notice issued timestamp is required — written notice must precede any repossession action."
+        if not self.notice_issued_by_id:
+            errors["notice_issued_by"] = "The officer who issued the notice is required."
+        if not self.response_deadline:
+            errors["response_deadline"] = "A response deadline is required before physical repossession can proceed."
+        if self.status in {RepossessionStatus.IN_PROGRESS, RepossessionStatus.COMPLETED}:
+            if not self.initiated_at:
+                errors["initiated_at"] = "Initiation timestamp is required when repossession is in progress."
+            if not self.initiated_by_id:
+                errors["initiated_by"] = "Initiating officer is required when repossession is in progress."
+        if self.status == RepossessionStatus.COMPLETED and not self.completed_at:
+            errors["completed_at"] = "Completion timestamp is required when repossession is completed."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Repossession sub={self.subscription_id} [{self.status}]"
+
+
+# ---------------------------------------------------------------------------
+# CTRL-CONS-1/2/3 — Consumer return window + defect classification + refund SLA
+# CPA 2019 s.2(47) defect + Subidha's 7-day return window + refund SLA timer.
+# ---------------------------------------------------------------------------
+
+class DefectSeverity(models.TextChoices):
+    MINOR = "MINOR", "Minor"
+    MAJOR = "MAJOR", "Major"
+    SAFETY_CRITICAL = "SAFETY_CRITICAL", "Safety Critical"
+
+
+class DefectClaimStatus(models.TextChoices):
+    OPEN = "OPEN", "Open"
+    UNDER_REVIEW = "UNDER_REVIEW", "Under Review"
+    ACCEPTED = "ACCEPTED", "Accepted"
+    REJECTED = "REJECTED", "Rejected"
+    RESOLVED = "RESOLVED", "Resolved"
+
+
+class DefectClaim(TimeStampedModel):
+    """
+    CPA 2019 s.2(47) defect classification. Tracks product defects reported
+    within the return/exchange window with mandatory severity grading and SLA.
+    """
+    subscription = models.ForeignKey(
+        Subscription,
+        on_delete=models.PROTECT,
+        related_name="defect_claims",
+    )
+    reported_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="filed_defect_claims",
+    )
+    severity = models.CharField(
+        max_length=20,
+        choices=DefectSeverity.choices,
+        default=DefectSeverity.MINOR,
+        db_index=True,
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=DefectClaimStatus.choices,
+        default=DefectClaimStatus.OPEN,
+        db_index=True,
+    )
+    description = models.TextField()
+    reported_at = models.DateTimeField(default=timezone.now, db_index=True)
+    # CPA override: admin can flag a defect that mandates acceptance regardless
+    # of the return window expiry (e.g. safety-critical issues).
+    cpa_override = models.BooleanField(
+        default=False,
+        help_text="Set by admin to allow refund/exchange outside normal return window under CPA 2019.",
+    )
+    cpa_override_reason = models.TextField(blank=True, default="")
+    cpa_override_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="cpa_overridden_defect_claims",
+    )
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    resolved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="resolved_defect_claims",
+    )
+    resolution_notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "defect_claims"
+        ordering = ["-reported_at", "-id"]
+        indexes = [
+            models.Index(fields=["subscription", "status"]),
+            models.Index(fields=["severity", "status"]),
+            models.Index(fields=["reported_at"]),
+        ]
+
+    def clean(self):
+        errors = {}
+        if not self.description:
+            errors["description"] = "Defect description is required."
+        if self.cpa_override and not self.cpa_override_reason:
+            errors["cpa_override_reason"] = "CPA override reason is required when override is set."
+        if self.cpa_override and not self.cpa_override_by_id:
+            errors["cpa_override_by"] = "CPA override must be authorised by an admin officer."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"DefectClaim sub={self.subscription_id} [{self.severity}/{self.status}]"
+
+
+class ReturnRequestStatus(models.TextChoices):
+    OPEN = "OPEN", "Open"
+    WITHIN_WINDOW = "WITHIN_WINDOW", "Within Return Window"
+    OUTSIDE_WINDOW = "OUTSIDE_WINDOW", "Outside Return Window"
+    CPA_OVERRIDE = "CPA_OVERRIDE", "CPA Override Accepted"
+    APPROVED = "APPROVED", "Approved"
+    REJECTED = "REJECTED", "Rejected"
+    COMPLETED = "COMPLETED", "Completed"
+
+
+class ConsumerReturnRequest(TimeStampedModel):
+    """
+    CTRL-CONS-1 — enforces Subidha's 7-day return window and links to a
+    DefectClaim so CPA 2019 defect override paths are fully audited.
+    """
+
+    RETURN_WINDOW_DAYS = 7
+
+    subscription = models.ForeignKey(
+        Subscription,
+        on_delete=models.PROTECT,
+        related_name="return_requests",
+    )
+    defect_claim = models.ForeignKey(
+        DefectClaim,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="return_requests",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=ReturnRequestStatus.choices,
+        default=ReturnRequestStatus.OPEN,
+        db_index=True,
+    )
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="filed_return_requests",
+    )
+    reason = models.TextField()
+    requested_at = models.DateTimeField(default=timezone.now, db_index=True)
+    delivery_date = models.DateField(
+        help_text="Date the product was delivered — used to calculate the return window.",
+    )
+    # CTRL-CONS-3: refund_deadline is set on approval for SLA tracking.
+    refund_deadline = models.DateField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Latest date by which refund must be processed after return approval.",
+    )
+    approved_at = models.DateTimeField(null=True, blank=True)
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="approved_return_requests",
+    )
+    rejection_reason = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "consumer_return_requests"
+        ordering = ["-requested_at", "-id"]
+        indexes = [
+            models.Index(fields=["subscription", "status"]),
+            models.Index(fields=["refund_deadline"]),
+            models.Index(fields=["delivery_date"]),
+        ]
+
+    @property
+    def is_within_window(self) -> bool:
+        from datetime import date
+        return (date.today() - self.delivery_date).days <= self.RETURN_WINDOW_DAYS
+
+    def clean(self):
+        from datetime import date, timedelta
+        errors = {}
+        if not self.reason:
+            errors["reason"] = "Return reason is required."
+        if not self.delivery_date:
+            errors["delivery_date"] = "Delivery date is required to evaluate the return window."
+        if self.status == ReturnRequestStatus.APPROVED and not self.approved_by_id:
+            errors["approved_by"] = "Approving officer is required when status is APPROVED."
+        if self.status == ReturnRequestStatus.REJECTED and not self.rejection_reason:
+            errors["rejection_reason"] = "Rejection reason is required when status is REJECTED."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        from datetime import date, timedelta
+        if self.delivery_date and not self.pk:
+            days_since = (date.today() - self.delivery_date).days
+            has_cpa_override = (
+                self.defect_claim_id
+                and DefectClaim.objects.filter(pk=self.defect_claim_id, cpa_override=True).exists()
+            )
+            if days_since > self.RETURN_WINDOW_DAYS and not has_cpa_override:
+                self.status = ReturnRequestStatus.OUTSIDE_WINDOW
+            elif has_cpa_override:
+                self.status = ReturnRequestStatus.CPA_OVERRIDE
+            else:
+                self.status = ReturnRequestStatus.WITHIN_WINDOW
+        # Set refund SLA deadline (7 days from approval) — CTRL-CONS-3.
+        if self.status == ReturnRequestStatus.APPROVED and not self.refund_deadline:
+            from datetime import date, timedelta
+            self.refund_deadline = date.today() + timedelta(days=7)
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"ReturnRequest sub={self.subscription_id} [{self.status}]"
+
+
+# ---------------------------------------------------------------------------
+# CTRL-RENT-5 — DepositForfeitureTaxInvoice
+# When a security deposit is forfeited (tenant default / damage beyond wear),
+# GST output tax must be raised on the forfeited amount.
+# ---------------------------------------------------------------------------
+
+class DepositForfeitureStatus(models.TextChoices):
+    DRAFT = "DRAFT", "Draft"
+    ISSUED = "ISSUED", "Issued"
+    CANCELLED = "CANCELLED", "Cancelled"
+
+
+class DepositForfeitureTaxInvoice(TimeStampedModel):
+    """
+    CTRL-RENT-5: Tax invoice raised when a rental/lease security deposit
+    is forfeited, capturing output GST liability on the forfeited amount.
+    """
+    subscription = models.ForeignKey(
+        Subscription,
+        on_delete=models.PROTECT,
+        related_name="deposit_forfeiture_invoices",
+    )
+    invoice_number = models.CharField(max_length=40, unique=True, db_index=True)
+    invoice_date = models.DateField(db_index=True)
+    status = models.CharField(
+        max_length=20,
+        choices=DepositForfeitureStatus.choices,
+        default=DepositForfeitureStatus.DRAFT,
+        db_index=True,
+    )
+    forfeited_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    gst_rate = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("18.00"),
+        help_text="GST rate applicable on the forfeited deposit (%).",
+    )
+    cgst_amount = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    sgst_amount = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    igst_amount = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    total_tax_amount = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    total_invoice_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    forfeiture_reason = models.TextField()
+    issued_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="issued_forfeiture_invoices",
+    )
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    cancelled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="cancelled_forfeiture_invoices",
+    )
+    cancel_reason = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "deposit_forfeiture_tax_invoices"
+        ordering = ["-invoice_date", "-id"]
+        indexes = [
+            models.Index(fields=["subscription", "status"]),
+            models.Index(fields=["invoice_date"]),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(forfeited_amount__gt=0),
+                name="chk_forfeiture_amount_positive",
+            ),
+            models.CheckConstraint(
+                condition=Q(total_invoice_amount__gt=0),
+                name="chk_forfeiture_total_positive",
+            ),
+        ]
+
+    def clean(self):
+        errors = {}
+        if not self.forfeiture_reason:
+            errors["forfeiture_reason"] = "Forfeiture reason is required."
+        if self.subscription_id and self.subscription.plan_type not in {PlanType.RENT, PlanType.LEASE}:
+            errors["subscription"] = "Deposit forfeiture invoices apply only to RENT or LEASE contracts."
+        if self.status == DepositForfeitureStatus.CANCELLED and not self.cancel_reason:
+            errors["cancel_reason"] = "Cancellation reason is required."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        # Auto-compute GST split on draft creation.
+        if self.forfeited_amount and self.gst_rate:
+            tax = (self.forfeited_amount * self.gst_rate / Decimal("100")).quantize(Decimal("0.01"))
+            half = (tax / 2).quantize(Decimal("0.01"))
+            # Intra-state: CGST + SGST; inter-state: IGST only.
+            if self.igst_amount and self.igst_amount > MONEY_ZERO:
+                self.igst_amount = tax
+                self.cgst_amount = MONEY_ZERO
+                self.sgst_amount = MONEY_ZERO
+            else:
+                self.cgst_amount = half
+                self.sgst_amount = tax - half
+                self.igst_amount = MONEY_ZERO
+            self.total_tax_amount = tax
+            self.total_invoice_amount = self.forfeited_amount + tax
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"ForfeitureInv {self.invoice_number} sub={self.subscription_id} [{self.status}]"

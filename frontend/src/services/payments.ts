@@ -1,691 +1,338 @@
-import { request } from "@/services/api";
+import { apiFetch } from '@/lib/api'
 
-export type PaymentMethod = "CASH" | "UPI" | "BANK" | "CARD";
+export interface Payment {
+  id: string
+  subscription_id: string
+  amount: number
+  method: 'CASH' | 'UPI' | 'BANK' | 'CARD'
+  status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED'
+  reference_id?: string
+  created_at: string
+  completed_at?: string
+}
+
+export interface Receipt {
+  id: string
+  payment_id: string
+  amount: number
+  date: string
+  method: string
+  reference_id: string
+  customer_name: string
+  customer_email: string
+  customer_phone: string
+  subscription_id: string
+}
+
+// ── EMI Collection types ───────────────────────────────────────────────────────
+export type PaymentMethod = 'CASH' | 'UPI' | 'BANK' | 'CARD'
+
+export interface AdminSubscriptionCollectionCandidate {
+  id: number
+  subscription_number: string
+  customer_name: string
+  customer_phone?: string | null
+  product_name?: string | null
+  status?: string
+  outstanding_amount?: string | number | null
+  batch_code?: string | null
+  monthly_amount?: string | number | null
+  tenure_months?: number | null
+}
+
+export interface AdminEmiCollectionCandidate {
+  id: number
+  status: string
+  due_date?: string
+  amount?: string | number | null
+  outstanding_amount?: string | number | null
+  paid_amount?: string | number | null
+  installment_number?: number | null
+  total_installments?: number | null
+  installment_no?: number | null
+  month_no?: number | null
+  waived_amount?: string | number | null
+  installment_label?: string | null
+}
+
+export interface PaymentCollectionResult {
+  payment: {
+    id: number
+    amount: string | number
+    method?: string
+    payment_method?: string
+    status?: string
+  }
+  emi: {
+    id: number
+    status?: string
+    outstanding_amount?: string | number | null
+  }
+  receipt?: { id: number; receipt_no?: string } | null
+  subscription?: { id?: number; status?: string } | null
+  finance_account?: { id?: number; name?: string; kind?: string } | null
+  reconciliation_status?: string | null
+}
 
 export type PaymentCollectionPayload = {
-  emi: number;
-  amount: string;
-  payment_method: PaymentMethod;
-  payment_date: string;
-  finance_account_id: number;
-  branch_id?: number;
-  cash_counter_id?: number;
-  reference_no?: string;
-  notes?: string;
-  idempotency_key?: string;
-};
-
-export type PaymentCollectPayload = PaymentCollectionPayload;
-
-export type PaymentCollectionResult = {
-  message?: string;
-  created?: boolean;
-  payment: {
-    id: number;
-    amount: string;
-    method?: PaymentMethod;
-    payment_method?: PaymentMethod;
-    branch_id?: number | null;
-    branch_code?: string | null;
-    branch_name?: string | null;
-    cash_counter_id?: number | null;
-    cash_counter_code?: string | null;
-    cash_counter_name?: string | null;
-    payment_date: string;
-    reference_no?: string | null;
-    notes?: string | null;
-    is_reversed?: boolean;
-    reversal_metadata?: Record<string, unknown> | null;
-  };
-  emi: {
-    id: number;
-    status: string;
-    amount?: string;
-    paid_amount?: string;
-    outstanding_amount: string;
-    due_date?: string;
-    subscription?: number;
-  };
-  subscription?: {
-    id: number;
-    subscription_number?: string;
-    status?: string;
-  };
-  finance_account?: {
-    id: number;
-    name: string;
-    kind: "CASH" | "BANK" | "UPI";
-    chart_account_id?: number | null;
-    chart_account_code?: string | null;
-  } | null;
-  reconciliation_status?: string | null;
-  receipt_created?: boolean;
-  receipt?: {
-    id: number;
-    receipt_no?: string | null;
-    status?: string;
-    receipt_date?: string;
-    amount?: string;
-    payment?: number | null;
-    posted_journal_entry?: number | null;
-    posted_journal_entry_no?: string | null;
-  };
-  detail?: string;
-};
-
-export type PaymentRegisterResponse = PaymentCollectionResult;
-
-export type AdminSubscriptionCollectionCandidate = {
-  id: number;
-  subscription_number?: string;
-  customer?: number;
-  customer_name?: string;
-  customer_phone?: string;
-  batch?: number | null;
-  batch_code?: string | null;
-  lucky_id?: number | null;
-  lucky_number?: string | number | null;
-  product?: number | null;
-  product_name?: string | null;
-  monthly_amount?: string;
-  total_amount?: string;
-  tenure_months?: number;
-  status?: string;
-  plan_type?: string;
-};
-
-export type AdminEmiCollectionCandidate = {
-  id: number;
-  subscription: number;
-  installment_no?: number;
-  month_no?: number;
-  total_installments?: number;
-  installment_label?: string;
-  display_label?: string;
-  due_date?: string;
-  amount: string;
-  paid_amount?: string;
-  outstanding_amount?: string;
-  waived_amount?: string;
-  status: string;
-};
-
-export type PaymentRegisterRow = {
-  id: number;
-  amount: string;
-  branch_id?: number | null;
-  branch_code?: string | null;
-  branch_name?: string | null;
-  cash_counter_id?: number | null;
-  cash_counter_code?: string | null;
-  cash_counter_name?: string | null;
-  method?: string;
-  reference_no?: string | null;
-  payment_date?: string;
-  customer_name?: string;
-  customer_phone?: string;
-  subscription?: number | null;
-  subscription_number?: string;
-  batch_code?: string | null;
-  lucky_number?: number | null;
-  emi?: number | null;
-  collected_by_username?: string | null;
-  verified_by_username?: string | null;
-  is_reversed: boolean;
-};
-
-export type PaymentRegisterSummary = {
-  visible_payments: number;
-  gross_amount: string;
-  active_payments: number;
-  active_amount: string;
-  reversed_payments: number;
-  reversed_amount: string;
-  net_collected_amount: string;
-};
-
-export type PaymentRegisterListResponse = {
-  results: PaymentRegisterRow[];
-  summary: PaymentRegisterSummary;
-  count: number;
-  page: number;
-  num_pages: number;
-  has_next: boolean;
-  has_previous: boolean;
-};
-
-export type PaymentRecord = {
-  id: number;
-  customer?: number;
-  customer_name?: string;
-  customer_phone?: string;
-  subscription: number;
-  subscription_status?: string;
-  subscription_number?: string;
-  emi?: number | null;
-  emi_month_no?: number | null;
-  batch?: number | null;
-  batch_code?: string | null;
-  branch_id?: number | null;
-  branch_code?: string | null;
-  branch_name?: string | null;
-  cash_counter_id?: number | null;
-  cash_counter_code?: string | null;
-  cash_counter_name?: string | null;
-  lucky_number?: number | null;
-  amount: string;
-  method: string;
-  reference_no?: string | null;
-  payment_date: string;
-  paid_at?: string;
-  collected_by?: number | null;
-  collected_by_username?: string | null;
-  verified_by?: number | null;
-  verified_by_username?: string | null;
-  created_at?: string;
-  allocation_metadata?: Record<string, unknown> | null;
-  is_reversed?: boolean;
-};
-
-export type PaymentListResponse = {
-  count: number;
-  next?: string | null;
-  previous?: string | null;
-  results: PaymentRecord[];
-  total_paid_amount?: string | number;
-};
+  emi: number
+  amount: string | number
+  payment_method: PaymentMethod
+  payment_date: string
+  finance_account_id?: number
+  branch_id?: number
+  cash_counter_id?: number
+  reference_no?: string
+  notes?: string
+}
 
 export type PaymentReversePayload = {
-  reason: string;
-};
+  reason: string
+  notes?: string
+}
 
 export type PaymentReverseResponse = {
-  detail: string;
-  payment_id: number;
-  emi?: {
-    id: number;
-    status: string;
-  };
-  subscription?: {
-    id: number;
-    status: string;
-  };
-};
+  detail?: string
+  payment_id?: number
+  id?: number
+  payment?: { id?: number; status?: string } | null
+  emi?: { id?: number; status?: string } | null
+  subscription?: { id?: number; status?: string } | null
+  status?: string
+}
 
+// ── Payment timeline types ─────────────────────────────────────────────────────
 export type PaymentTimelineLedgerEntry = {
-  id: number;
-  emi_id?: number | null;
-  amount?: string;
-  entry_type?: string;
-  entry_direction?: string;
-  allocation_context?: Record<string, unknown>;
-  created_at: string;
-};
+  id: number
+  emi_id: number | null
+  amount: string
+  entry_type: string
+  entry_direction: string
+  allocation_context?: Record<string, unknown>
+  created_at: string
+}
 
 export type PaymentTimelineAuditEntry = {
-  id: number;
-  action_type?: string;
-  performed_by?: string | null;
-  metadata?: Record<string, unknown>;
-  created_at: string;
-};
+  id: number
+  action_type: string
+  performed_by: string | null
+  metadata?: Record<string, unknown>
+  created_at: string
+}
 
 export type PaymentTimelineUnifiedEntry = {
-  kind: "ledger" | "reversal_ledger" | "audit";
-  timestamp: string;
-  payload: Record<string, unknown>;
-};
+  kind: 'ledger' | 'reversal_ledger' | 'audit'
+  timestamp: string
+  payload: Record<string, unknown>
+}
 
 export type PaymentTimelineResponse = {
-  payment: PaymentRecord;
-  flags?: {
-    is_reversed?: boolean;
-  };
+  payment: PaymentRecord
+  flags?: { is_reversed?: boolean }
   reversal?: {
-    is_reversed?: boolean;
-    reason?: string;
-    reversed_by_id?: number | null;
-    reversed_by_username?: string | null;
-  };
-  ledger_entries?: PaymentTimelineLedgerEntry[];
-  reversal_ledger_entries?: PaymentTimelineLedgerEntry[];
-  audit_logs?: PaymentTimelineAuditEntry[];
-  timeline?: PaymentTimelineUnifiedEntry[];
-};
-
-type PaginatedResponse<T> = {
-  count?: number;
-  next?: string | null;
-  previous?: string | null;
-  results?: T[];
-};
-
-type RawPaymentRegisterRow = Record<string, unknown>;
-
-type RawPaymentRegisterResponse = {
-  results?: RawPaymentRegisterRow[];
-  summary?: Partial<PaymentRegisterSummary>;
-  count?: number;
-  page?: number;
-  page_size?: number;
-  num_pages?: number;
-  has_next?: boolean;
-  has_previous?: boolean;
-};
-
-export function buildPaymentCollectionIdempotencyKey(): string {
-  const randomUUID = globalThis.crypto?.randomUUID?.();
-  if (randomUUID) return `client-payment:${randomUUID}`;
-  return `client-payment:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+    is_reversed?: boolean
+    reason?: string
+    reversed_by_id?: number | null
+    reversed_by_username?: string | null
+  }
+  ledger_entries?: PaymentTimelineLedgerEntry[]
+  reversal_ledger_entries?: PaymentTimelineLedgerEntry[]
+  audit_logs?: PaymentTimelineAuditEntry[]
+  timeline?: PaymentTimelineUnifiedEntry[]
 }
 
-function normalizeCollectionPayload(
-  payload: PaymentCollectionPayload
-): PaymentCollectionPayload {
-  if (payload.idempotency_key?.trim()) {
-    return payload;
+// ── Admin payment record (DRF decimal fields are returned as strings) ──────────
+export interface PaymentRecord {
+  id: number
+  amount: string
+  method: string
+  status?: string
+  payment_date: string
+  created_at?: string
+  reference_id?: string
+  reference_no?: string | null
+  is_reversed?: boolean
+  emi_month_no?: number | null
+  collected_by_username?: string | null
+  verified_by_username?: string | null
+  subscription: number
+  subscription_status?: string
+  customer?: number | null
+  customer_name?: string | null
+  customer_phone?: string | null
+  batch_code?: string | null
+  lucky_number?: number | null
+  emi?: number | null
+  allocation_metadata?: Record<string, unknown> | null
+}
+
+// ── Admin payment register types ───────────────────────────────────────────────
+export interface PaymentRegisterRow {
+  id: number
+  subscription_number: string
+  customer_name: string
+  amount: string | number
+  method: string
+  status: string
+  created_at: string
+  reference_id?: string
+  is_reversed?: boolean
+  payment_date?: string | null
+  customer_phone?: string | null
+  reference_no?: string | null
+  subscription?: number | string | null
+  batch_code?: string | null
+  lucky_number?: number | null
+  emi?: number | string | null
+  collected_by_username?: string | null
+  verified_by_username?: string | null
+  branch_name?: string | null
+  branch_code?: string | null
+}
+
+export interface PaymentRegisterSummary {
+  total?: string | number | null
+  cash?: string | number | null
+  upi?: string | number | null
+  bank?: string | number | null
+  card?: string | number | null
+  count?: string | number | null
+  net_collected_amount?: string | number | null
+  gross_amount?: string | number | null
+  active_amount?: string | number | null
+  reversed_amount?: string | number | null
+  active_payments: number
+  visible_payments: number
+  reversed_payments: number
+  num_pages?: number | null
+  has_next?: boolean | null
+  has_previous?: boolean | null
+}
+
+// ── PaymentService (legacy helper) ───────────────────────────────────────────
+class PaymentService {
+  async getPaymentHistory(limit = 20, offset = 0): Promise<{ count: number; results: Payment[] }> {
+    const d = await apiFetch(`/api/v1/payments/history/?limit=${limit}&offset=${offset}`)
+    return d as { count: number; results: Payment[] }
   }
 
-  return {
-    ...payload,
-    idempotency_key: buildPaymentCollectionIdempotencyKey(),
-  };
-}
-
-function toArray<T>(payload: T[] | PaginatedResponse<T> | null | undefined): T[] {
-  if (!payload) return [];
-  if (Array.isArray(payload)) return payload;
-  if (Array.isArray(payload.results)) return payload.results;
-  return [];
-}
-
-function parseBooleanFromUnknown(value: unknown): boolean {
-  return value === true || value === "true" || value === 1;
-}
-
-function toNumberOrNull(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "string" && value.trim()) {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
+  async getReceipt(paymentId: string): Promise<Receipt> {
+    return apiFetch(`/api/v1/payments/receipt/${paymentId}/`) as Promise<Receipt>
   }
-  return null;
+
+  async downloadReceipt(paymentId: string): Promise<Blob> {
+    const response = await fetch(`/api/v1/payments/receipt/${paymentId}/download/`, {
+      credentials: 'include',
+    })
+    return response.blob()
+  }
+
+  async getBalance(subscriptionId: string): Promise<{ outstanding: number; due: number; past_due: number }> {
+    return apiFetch(`/api/v1/subscriptions/${subscriptionId}/balance/`) as Promise<{
+      outstanding: number
+      due: number
+      past_due: number
+    }>
+  }
 }
 
-function toStringOrUndefined(value: unknown): string | undefined {
-  return typeof value === "string" && value.trim() ? value : undefined;
+export const paymentService = new PaymentService()
+
+// ── Admin collection functions ─────────────────────────────────────────────────
+export async function getAdminSubscriptionForCollection(
+  id: number | string
+): Promise<AdminSubscriptionCollectionCandidate> {
+  return apiFetch(`/api/v1/subscriptions/${id}/`) as Promise<AdminSubscriptionCollectionCandidate>
 }
 
-function normalizePaymentRegisterRow(row: RawPaymentRegisterRow): PaymentRegisterRow {
-  const subscriptionId =
-    typeof row.subscription === "number"
-      ? row.subscription
-      : typeof row.subscription_id === "number"
-        ? row.subscription_id
-        : null;
-
-  const metadata =
-    row.allocation_metadata && typeof row.allocation_metadata === "object"
-      ? (row.allocation_metadata as Record<string, unknown>)
-      : null;
-
-  const reversal =
-    metadata?.reversal && typeof metadata.reversal === "object"
-      ? (metadata.reversal as Record<string, unknown>)
-      : null;
-
-  return {
-    id: Number(row.id ?? 0),
-    amount: String(row.amount ?? "0.00"),
-    branch_id: toNumberOrNull(row.branch_id),
-    branch_code:
-      typeof row.branch_code === "string" || row.branch_code === null
-        ? (row.branch_code as string | null)
-        : undefined,
-    branch_name:
-      typeof row.branch_name === "string" || row.branch_name === null
-        ? (row.branch_name as string | null)
-        : undefined,
-    cash_counter_id: toNumberOrNull(row.cash_counter_id),
-    cash_counter_code:
-      typeof row.cash_counter_code === "string" || row.cash_counter_code === null
-        ? (row.cash_counter_code as string | null)
-        : undefined,
-    cash_counter_name:
-      typeof row.cash_counter_name === "string" || row.cash_counter_name === null
-        ? (row.cash_counter_name as string | null)
-        : undefined,
-    method: typeof row.method === "string" ? row.method : undefined,
-    reference_no:
-      typeof row.reference_no === "string" || row.reference_no === null
-        ? (row.reference_no as string | null)
-        : undefined,
-    payment_date:
-      typeof row.payment_date === "string" ? row.payment_date : undefined,
-    customer_name:
-      typeof row.customer_name === "string" ? row.customer_name : undefined,
-    customer_phone:
-      typeof row.customer_phone === "string" ? row.customer_phone : undefined,
-    subscription: subscriptionId,
-    subscription_number:
-      typeof row.subscription_number === "string"
-        ? row.subscription_number
-        : subscriptionId !== null
-          ? `SUB-${subscriptionId}`
-          : undefined,
-    batch_code:
-      typeof row.batch_code === "string" || row.batch_code === null
-        ? (row.batch_code as string | null)
-        : undefined,
-    lucky_number:
-      typeof row.lucky_number === "number" ? row.lucky_number : undefined,
-    emi:
-      typeof row.emi === "number"
-        ? row.emi
-        : typeof row.emi_id === "number"
-          ? row.emi_id
-          : undefined,
-    collected_by_username:
-      typeof row.collected_by_username === "string" ||
-      row.collected_by_username === null
-        ? (row.collected_by_username as string | null)
-        : undefined,
-    verified_by_username:
-      typeof row.verified_by_username === "string" ||
-      row.verified_by_username === null
-        ? (row.verified_by_username as string | null)
-        : undefined,
-    is_reversed:
-      parseBooleanFromUnknown(row.is_reversed) ||
-      parseBooleanFromUnknown(reversal?.is_reversed),
-  };
+export async function listSubscriptionEmisForCollection(
+  subscriptionId: number
+): Promise<AdminEmiCollectionCandidate[]> {
+  const d = await apiFetch(`/api/v1/subscriptions/${subscriptionId}/emis/`)
+  return Array.isArray(d)
+    ? (d as AdminEmiCollectionCandidate[])
+    : ((d as { results?: AdminEmiCollectionCandidate[] })?.results ?? [])
 }
 
-function normalizePaymentRegisterSummary(
-  summary: Partial<PaymentRegisterSummary> | undefined
-): PaymentRegisterSummary {
-  return {
-    visible_payments: Number(summary?.visible_payments ?? 0),
-    gross_amount: String(summary?.gross_amount ?? "0.00"),
-    active_payments: Number(summary?.active_payments ?? 0),
-    active_amount: String(summary?.active_amount ?? "0.00"),
-    reversed_payments: Number(summary?.reversed_payments ?? 0),
-    reversed_amount: String(summary?.reversed_amount ?? "0.00"),
-    net_collected_amount: String(summary?.net_collected_amount ?? "0.00"),
-  };
+export async function searchAdminSubscriptionsForCollection(
+  q: string
+): Promise<AdminSubscriptionCollectionCandidate[]> {
+  const d = await apiFetch(`/api/v1/subscriptions/?search=${encodeURIComponent(q)}`)
+  return Array.isArray(d)
+    ? (d as AdminSubscriptionCollectionCandidate[])
+    : ((d as { results?: AdminSubscriptionCollectionCandidate[] })?.results ?? [])
 }
 
-function normalizePaymentRecord(row: Record<string, unknown>): PaymentRecord {
-  const metadata =
-    row.allocation_metadata && typeof row.allocation_metadata === "object"
-      ? (row.allocation_metadata as Record<string, unknown>)
-      : null;
-
-  const reversal =
-    metadata?.reversal && typeof metadata.reversal === "object"
-      ? (metadata.reversal as Record<string, unknown>)
-      : null;
-
-  return {
-    id: Number(row.id ?? 0),
-    customer: toNumberOrNull(row.customer) ?? undefined,
-    customer_name: toStringOrUndefined(row.customer_name),
-    customer_phone: toStringOrUndefined(row.customer_phone),
-    subscription: Number(row.subscription ?? 0),
-    subscription_status: toStringOrUndefined(row.subscription_status),
-    subscription_number: toStringOrUndefined(row.subscription_number),
-    emi: toNumberOrNull(row.emi),
-    emi_month_no: toNumberOrNull(row.emi_month_no),
-    batch: toNumberOrNull(row.batch),
-    batch_code:
-      typeof row.batch_code === "string" || row.batch_code === null
-        ? (row.batch_code as string | null)
-        : undefined,
-    branch_id: toNumberOrNull(row.branch_id),
-    branch_code:
-      typeof row.branch_code === "string" || row.branch_code === null
-        ? (row.branch_code as string | null)
-        : undefined,
-    branch_name:
-      typeof row.branch_name === "string" || row.branch_name === null
-        ? (row.branch_name as string | null)
-        : undefined,
-    cash_counter_id: toNumberOrNull(row.cash_counter_id),
-    cash_counter_code:
-      typeof row.cash_counter_code === "string" || row.cash_counter_code === null
-        ? (row.cash_counter_code as string | null)
-        : undefined,
-    cash_counter_name:
-      typeof row.cash_counter_name === "string" || row.cash_counter_name === null
-        ? (row.cash_counter_name as string | null)
-        : undefined,
-    lucky_number: toNumberOrNull(row.lucky_number),
-    amount: String(row.amount ?? "0.00"),
-    method: String(row.method ?? ""),
-    reference_no:
-      typeof row.reference_no === "string" || row.reference_no === null
-        ? (row.reference_no as string | null)
-        : undefined,
-    payment_date: String(row.payment_date ?? ""),
-    paid_at: toStringOrUndefined(row.paid_at),
-    collected_by: toNumberOrNull(row.collected_by),
-    collected_by_username:
-      typeof row.collected_by_username === "string" ||
-      row.collected_by_username === null
-        ? (row.collected_by_username as string | null)
-        : undefined,
-    verified_by: toNumberOrNull(row.verified_by),
-    verified_by_username:
-      typeof row.verified_by_username === "string" ||
-      row.verified_by_username === null
-        ? (row.verified_by_username as string | null)
-        : undefined,
-    created_at: toStringOrUndefined(row.created_at),
-    allocation_metadata: metadata,
-    is_reversed:
-      parseBooleanFromUnknown(row.is_reversed) ||
-      parseBooleanFromUnknown(reversal?.is_reversed),
-  };
-}
-
-function buildPaymentRegisterQuery(params: {
-  q?: string;
-  method?: string;
-  reversalState?: string;
-  receiptState?: string;
-  dateFrom?: string;
-  dateTo?: string;
-  subscription?: number | string;
-  customer?: number | string;
-  batch?: number | string;
-  partner?: number | string;
-  emi?: number | string;
-  page?: number;
-  page_size?: number;
-}) {
-  const search = new URLSearchParams();
-
-  if (params.q) search.set("q", String(params.q));
-  if (params.method) search.set("method", params.method);
-  if (params.reversalState) search.set("reversal_state", params.reversalState);
-  if (params.receiptState) search.set("receipt_state", params.receiptState);
-  if (params.dateFrom) search.set("date_from", params.dateFrom);
-  if (params.dateTo) search.set("date_to", params.dateTo);
-  if (params.subscription) search.set("subscription", String(params.subscription));
-  if (params.customer) search.set("customer", String(params.customer));
-  if (params.batch) search.set("batch", String(params.batch));
-  if (params.partner) search.set("partner", String(params.partner));
-  if (params.emi) search.set("emi", String(params.emi));
-  if (params.page) search.set("page", String(params.page));
-  if (params.page_size) search.set("page_size", String(params.page_size));
-
-  const query = search.toString();
-  return query ? `?${query}` : "";
-}
-
-export async function collectPayment(
-  payload: PaymentCollectionPayload
-): Promise<PaymentCollectionResult> {
-  const safePayload = normalizeCollectionPayload(payload);
-  return request<PaymentCollectionResult>("/admin/payments/collect/", {
-    method: "POST",
-    body: JSON.stringify(safePayload),
-    headers: {
-      "Content-Type": "application/json",
-    },
-  } as RequestInit);
+export async function collectPayment(data: PaymentCollectionPayload): Promise<PaymentCollectionResult> {
+  return apiFetch('/api/v1/payments/collect-emi/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }) as Promise<PaymentCollectionResult>
 }
 
 export async function reversePayment(
   paymentId: number | string,
   payload: PaymentReversePayload
 ): Promise<PaymentReverseResponse> {
-  return request<PaymentReverseResponse>(
-    `/admin/payments/${paymentId}/reverse/`,
-    {
-      method: "POST",
-      body: JSON.stringify(payload),
-      headers: {
-        "Content-Type": "application/json",
-      },
-    } as RequestInit
-  );
+  return apiFetch(`/api/v1/payments/${paymentId}/reverse/`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }) as Promise<PaymentReverseResponse>
 }
 
-export async function getPayment(
-  paymentId: number | string
-): Promise<PaymentRecord> {
-  const payload = await request<Record<string, unknown>>(
-    `/admin/payments/${paymentId}/`,
-    {
-      method: "GET",
-    } as RequestInit
-  );
-
-  return normalizePaymentRecord(payload ?? {});
+export async function getPayment(id: number | string): Promise<PaymentRecord> {
+  return apiFetch(`/api/v1/payments/${id}/`) as Promise<PaymentRecord>
 }
 
-export async function getPaymentTimeline(
-  paymentId: number | string
-): Promise<PaymentTimelineResponse> {
-  return request<PaymentTimelineResponse>(
-    `/admin/payments/${paymentId}/timeline/`,
-    {
-      method: "GET",
-    } as RequestInit
-  );
+export async function getPaymentTimeline(id: number | string): Promise<PaymentTimelineResponse> {
+  return apiFetch(`/api/v1/payments/${id}/timeline/`) as Promise<PaymentTimelineResponse>
 }
 
-export async function listPayments(params?: {
-  q?: string;
-  method?: string;
-  reversalState?: string;
-  receiptState?: string;
-  dateFrom?: string;
-  dateTo?: string;
-  subscription?: number | string;
-  customer?: number | string;
-  batch?: number | string;
-  partner?: number | string;
-  emi?: number | string;
-  page?: number;
-}): Promise<PaymentListResponse> {
-  const payload = await request<PaginatedResponse<Record<string, unknown>> & {
-    total_paid_amount?: string | number;
-  }>(`/admin/payments/${buildPaymentRegisterQuery(params ?? {})}`, {
-    method: "GET",
-  } as RequestInit);
-
-  const rawRows = Array.isArray(payload?.results) ? payload.results : [];
-
-  return {
-    count: Number(payload?.count ?? 0),
-    next: payload?.next ?? null,
-    previous: payload?.previous ?? null,
-    total_paid_amount: payload?.total_paid_amount ?? "0.00",
-    results: rawRows.map(normalizePaymentRecord),
-  };
+export async function getAdminPaymentRegister(
+  params?: Record<string, string | number | undefined>
+): Promise<{
+  count: number
+  results: PaymentRegisterRow[]
+  summary: PaymentRegisterSummary
+  num_pages: number
+  has_next: boolean
+  has_previous: boolean
+}> {
+  const filtered: Record<string, string> = {}
+  for (const [k, v] of Object.entries(params ?? {})) {
+    if (v !== undefined && v !== null && v !== '') filtered[k] = String(v)
+  }
+  const query = new URLSearchParams(filtered).toString()
+  const d = await apiFetch(`/api/v1/payments/register/${query ? `?${query}` : ''}`)
+  return d as {
+    count: number
+    results: PaymentRegisterRow[]
+    summary: PaymentRegisterSummary
+    num_pages: number
+    has_next: boolean
+    has_previous: boolean
+  }
 }
 
-export async function getAdminSubscriptionForCollection(
-  subscriptionId: number
-): Promise<AdminSubscriptionCollectionCandidate> {
-  return request<AdminSubscriptionCollectionCandidate>(
-    `/admin/subscriptions/${subscriptionId}/`,
-    {
-      method: "GET",
-    } as RequestInit
-  );
-}
-
-export async function searchAdminSubscriptionsForCollection(
-  query: string
-): Promise<AdminSubscriptionCollectionCandidate[]> {
-  const trimmed = query.trim();
-  if (!trimmed) return [];
-
-  const payload = await request<
-    | AdminSubscriptionCollectionCandidate[]
-    | PaginatedResponse<AdminSubscriptionCollectionCandidate>
-  >(`/admin/subscriptions/?q=${encodeURIComponent(trimmed)}`, {
-    method: "GET",
-  } as RequestInit);
-
-  return toArray(payload);
-}
-
-export async function listSubscriptionEmisForCollection(
-  subscriptionId: number
-): Promise<AdminEmiCollectionCandidate[]> {
-  const payload = await request<
-    AdminEmiCollectionCandidate[] | PaginatedResponse<AdminEmiCollectionCandidate>
-  >(
-    `/admin/emis/?subscription=${subscriptionId}&ordering=due_date`,
-    {
-      method: "GET",
-    } as RequestInit
-  );
-
-  return toArray(payload);
-}
-
-export async function getAdminPaymentRegister(params?: {
-  q?: string;
-  method?: string;
-  reversalState?: string;
-  receiptState?: string;
-  dateFrom?: string;
-  dateTo?: string;
-  subscription?: number | string;
-  customer?: number | string;
-  batch?: number | string;
-  partner?: number | string;
-  emi?: number | string;
-  page?: number;
-  page_size?: number;
-}): Promise<PaymentRegisterListResponse> {
-  const payload = await request<RawPaymentRegisterResponse>(
-    `/admin/payments/${buildPaymentRegisterQuery(params ?? {})}`,
-    {
-      method: "GET",
-    } as RequestInit
-  );
-
-  const rows = Array.isArray(payload?.results) ? payload.results : [];
-  const count = typeof payload?.count === "number" ? payload.count : rows.length;
-  const pageSize = payload?.page_size && payload.page_size > 0 ? payload.page_size : rows.length || 1;
-  return {
-    results: rows.map(normalizePaymentRegisterRow),
-    summary: normalizePaymentRegisterSummary(payload?.summary),
-    count,
-    page: typeof payload?.page === "number" ? payload.page : 1,
-    num_pages:
-      typeof payload?.num_pages === "number"
-        ? payload.num_pages
-        : count > 0
-          ? Math.ceil(count / pageSize)
-          : 0,
-    has_next: payload?.has_next === true,
-    has_previous: payload?.has_previous === true,
-  };
+export async function listPayments(
+  paramsOrId?: number | string | Record<string, string | number | undefined>
+): Promise<{ count: number; results: PaymentRecord[] }> {
+  let url: string
+  if (typeof paramsOrId === 'number' || typeof paramsOrId === 'string') {
+    url = `/api/v1/payments/?subscription=${paramsOrId}`
+  } else if (paramsOrId && typeof paramsOrId === 'object') {
+    const filtered: Record<string, string> = {}
+    for (const [k, v] of Object.entries(paramsOrId)) {
+      if (v !== undefined && v !== null && v !== '') filtered[k] = String(v)
+    }
+    const query = new URLSearchParams(filtered).toString()
+    url = `/api/v1/payments/${query ? `?${query}` : ''}`
+  } else {
+    url = '/api/v1/payments/'
+  }
+  const d = await apiFetch(url)
+  if (Array.isArray(d)) {
+    return { count: (d as PaymentRecord[]).length, results: d as PaymentRecord[] }
+  }
+  return d as { count: number; results: PaymentRecord[] }
 }

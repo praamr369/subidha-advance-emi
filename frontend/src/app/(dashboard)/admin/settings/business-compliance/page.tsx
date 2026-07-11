@@ -38,6 +38,12 @@ const docTypeLabels: Record<ComplianceDocumentType, string> = {
   SHOP_LICENSE: "Shop / trade license",
   BANK_PROOF: "Bank proof",
   PAN_OR_TAX_PROOF: "PAN / tax proof",
+  CA_OPINION: "CA written opinion",
+  ADVOCATE_OPINION: "Advocate legal opinion",
+  LEGAL_NOTICE: "Legal notice",
+  COURT_ORDER: "Court order / judgment",
+  LEGAL_AGREEMENT: "Signed legal agreement / contract",
+  SCHEME_APPROVAL_LETTER: "Scheme approval letter",
   OTHER: "Other compliance proof",
 };
 
@@ -175,6 +181,13 @@ export default function AdminBusinessCompliancePage() {
   const [form, setForm] = useState<ComplianceFormState>(initialForm);
   const [selectedTemplateKey, setSelectedTemplateKey] = useState<string>("");
   const [formResetKey, setFormResetKey] = useState(0);
+  // Inline reason prompt (replaces window.prompt)
+  const [reasonPrompt, setReasonPrompt] = useState<{ rowId: number; action: "reject" | "expire"; value: string } | null>(null);
+  // Inline edit state
+  const [editRowId, setEditRowId] = useState<number | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+  const [editPublicSummary, setEditPublicSummary] = useState("");
 
   async function loadData() {
     try {
@@ -326,7 +339,35 @@ export default function AdminBusinessCompliancePage() {
     }
   }
 
-  async function performAction(row: ComplianceDocument, action: "submit" | "approve" | "reject" | "expire" | "approve-summary" | "revoke-summary") {
+  function startReasonAction(row: ComplianceDocument, action: "reject" | "expire") {
+    setReasonPrompt({ rowId: row.id, action, value: "" });
+  }
+
+  async function submitReasonAction() {
+    if (!reasonPrompt) return;
+    const { rowId, action, value } = reasonPrompt;
+    const reason = value.trim();
+    if (!reason) { setError("Reason is required."); return; }
+    setReasonPrompt(null);
+    try {
+      setActionId(rowId);
+      setError(null);
+      if (action === "reject") {
+        await rejectComplianceDocument(rowId, reason);
+        setMessage("Document rejected. Upload corrected evidence before approval.");
+      } else {
+        await expireComplianceDocument(rowId, reason);
+        setMessage("Document expired/deactivated. History is preserved.");
+      }
+      await loadData();
+    } catch (err) {
+      setError(readableError(err));
+    } finally {
+      setActionId(null);
+    }
+  }
+
+  async function performAction(row: ComplianceDocument, action: "submit" | "approve" | "approve-summary" | "revoke-summary") {
     try {
       setActionId(row.id);
       setError(null);
@@ -336,16 +377,6 @@ export default function AdminBusinessCompliancePage() {
       } else if (action === "approve") {
         await approveComplianceDocument(row.id, { public_summary_approved: false });
         setMessage("Evidence approved. Public summary remains separate until explicitly approved.");
-      } else if (action === "reject") {
-        const reason = window.prompt("Reason for rejection")?.trim();
-        if (!reason) return;
-        await rejectComplianceDocument(row.id, reason);
-        setMessage("Document rejected with reason. Upload corrected evidence before approval.");
-      } else if (action === "expire") {
-        const reason = window.prompt("Reason for expiry/deactivation")?.trim();
-        if (!reason) return;
-        await expireComplianceDocument(row.id, reason);
-        setMessage("Document expired/deactivated. History is preserved.");
       } else if (action === "approve-summary") {
         await approveCompliancePublicSummary(row.id);
         setMessage("Public-safe summary approved. Source file remains private.");
@@ -353,6 +384,32 @@ export default function AdminBusinessCompliancePage() {
         await revokeCompliancePublicSummary(row.id);
         setMessage("Public summary approval revoked.");
       }
+      await loadData();
+    } catch (err) {
+      setError(readableError(err));
+    } finally {
+      setActionId(null);
+    }
+  }
+
+  function startEdit(row: ComplianceDocument) {
+    setEditRowId(row.id);
+    setEditTitle(row.title || "");
+    setEditNotes(row.notes || "");
+    setEditPublicSummary(row.public_summary || "");
+  }
+
+  async function submitEdit(rowId: number) {
+    try {
+      setActionId(rowId);
+      setError(null);
+      const formData = new FormData();
+      formData.set("title", editTitle.trim());
+      formData.set("notes", editNotes.trim());
+      formData.set("public_summary", editPublicSummary.trim());
+      await updateComplianceDocument(rowId, formData);
+      setMessage("Document updated.");
+      setEditRowId(null);
       await loadData();
     } catch (err) {
       setError(readableError(err));
@@ -416,13 +473,29 @@ export default function AdminBusinessCompliancePage() {
           </div>
         )}
         {readiness?.required_checks?.length ? (
-          <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-            {readiness.required_checks.map((check) => (
-              <div key={check.key} className="rounded-xl border border-border bg-background p-3 text-sm">
-                <div className="font-semibold text-foreground">{check.label}</div>
-                <span className={badgeClass(check.ready ? "green" : "red")}>{check.ready ? "Approved" : "Needs approved evidence"}</span>
-              </div>
-            ))}
+          <div className="mt-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Required items</p>
+            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+              {readiness.required_checks.map((check) => (
+                <div key={check.key} className="rounded-xl border border-border bg-background p-3 text-sm">
+                  <div className="font-semibold text-foreground">{check.label}</div>
+                  <span className={badgeClass(check.ready ? "green" : "red")}>{check.ready ? "Approved" : "Needs approved evidence"}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+        {readiness?.recommended_checks?.length ? (
+          <div className="mt-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recommended items</p>
+            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+              {readiness.recommended_checks.map((check) => (
+                <div key={check.key} className="rounded-xl border border-border bg-background p-3 text-sm">
+                  <div className="font-semibold text-foreground">{check.label}</div>
+                  <span className={badgeClass(check.ready ? "green" : "amber")}>{check.ready ? "Approved" : "Optional — not yet approved"}</span>
+                </div>
+              ))}
+            </div>
           </div>
         ) : null}
         {readiness?.blockers?.length ? (
@@ -495,7 +568,7 @@ export default function AdminBusinessCompliancePage() {
 
       <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
         <h2 className="text-base font-semibold text-foreground">How to clear this setup blocker</h2>
-        <div className="mt-3 grid gap-3 md:grid-cols-4">
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 md:grid-cols-5">
           {["Select template", "Upload real file", "View/check file", "Submit review", "Approve evidence"].map((step, index) => (
             <div key={step} className="rounded-xl border border-border bg-background p-3 text-sm">
               <div className="text-xs font-semibold uppercase text-muted-foreground">Step {index + 1}</div>
@@ -543,6 +616,31 @@ export default function AdminBusinessCompliancePage() {
           </div>
         </form>
       </section>
+
+      {/* Inline reason prompt */}
+      {reasonPrompt ? (
+        <section className="rounded-xl border border-amber-300 bg-amber-50 p-4 shadow-sm dark:border-amber-600/40 dark:bg-amber-900/20">
+          <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+            {reasonPrompt.action === "reject" ? "Reject document" : "Expire / deactivate document"} — enter reason
+          </h3>
+          <div className="mt-2 flex gap-2">
+            <input
+              autoFocus
+              className="flex-1 rounded-xl border border-input bg-background px-3 py-2 text-sm"
+              placeholder={reasonPrompt.action === "reject" ? "Reason for rejection (required)" : "Reason for expiry/deactivation (required)"}
+              value={reasonPrompt.value}
+              onChange={(e) => setReasonPrompt((p) => p ? { ...p, value: e.target.value } : null)}
+              onKeyDown={(e) => { if (e.key === "Enter") void submitReasonAction(); if (e.key === "Escape") setReasonPrompt(null); }}
+            />
+            <button type="button" onClick={() => void submitReasonAction()} className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">
+              Confirm
+            </button>
+            <button type="button" onClick={() => setReasonPrompt(null)} className="rounded-xl border border-border px-4 py-2 text-sm font-semibold hover:bg-accent">
+              Cancel
+            </button>
+          </div>
+        </section>
+      ) : null}
 
       <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
         <h2 className="text-base font-semibold text-foreground">Compliance document register</h2>
@@ -602,14 +700,27 @@ export default function AdminBusinessCompliancePage() {
                     </td>
                     <td className="px-3 py-3 text-muted-foreground">{row.reviewed_by_username || row.reviewed_at || row.verified_at || "Pending"}</td>
                     <td className="px-3 py-3">
-                      <div className="flex max-w-[360px] flex-wrap gap-2">
-                        <button type="button" onClick={() => void performAction(row, "submit")} disabled={actionId === row.id || row.review_status === "APPROVED" || row.review_status === "EXPIRED" || !row.has_file} className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold hover:bg-accent disabled:opacity-50">Submit</button>
-                        <button type="button" onClick={() => void performAction(row, "approve")} disabled={actionId === row.id || !row.has_file || row.review_status === "APPROVED" || row.review_status === "EXPIRED"} className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-800 disabled:opacity-50">Approve</button>
-                        <button type="button" onClick={() => void performAction(row, "reject")} disabled={actionId === row.id || row.review_status === "EXPIRED"} className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-800 disabled:opacity-50">Reject</button>
-                        <button type="button" onClick={() => void performAction(row, "expire")} disabled={actionId === row.id || row.review_status === "EXPIRED"} className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold hover:bg-accent disabled:opacity-50">Expire</button>
-                        <button type="button" onClick={() => void performAction(row, "approve-summary")} disabled={actionId === row.id || !canApprovePublicSummary(row)} className="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-800 disabled:opacity-50">Approve summary</button>
-                        <button type="button" onClick={() => void performAction(row, "revoke-summary")} disabled={actionId === row.id || !row.public_summary_ready} className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold hover:bg-accent disabled:opacity-50">Revoke summary</button>
-                      </div>
+                      {editRowId === row.id ? (
+                        <div className="flex flex-col gap-2 min-w-[220px]">
+                          <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder="Title" className="rounded-lg border border-input bg-background px-2 py-1 text-xs" />
+                          <textarea value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="Internal notes" rows={2} className="rounded-lg border border-input bg-background px-2 py-1 text-xs" />
+                          <textarea value={editPublicSummary} onChange={(e) => setEditPublicSummary(e.target.value)} placeholder="Public-safe summary" rows={2} className="rounded-lg border border-input bg-background px-2 py-1 text-xs" />
+                          <div className="flex gap-2">
+                            <button type="button" onClick={() => void submitEdit(row.id)} disabled={actionId === row.id} className="rounded-lg bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground disabled:opacity-50">Save</button>
+                            <button type="button" onClick={() => setEditRowId(null)} className="rounded-lg border border-border px-2.5 py-1 text-xs font-semibold hover:bg-accent">Cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex max-w-[400px] flex-wrap gap-2">
+                          <button type="button" onClick={() => startEdit(row)} className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold hover:bg-accent">Edit</button>
+                          <button type="button" onClick={() => void performAction(row, "submit")} disabled={actionId === row.id || row.review_status === "APPROVED" || row.review_status === "EXPIRED" || !row.has_file} className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold hover:bg-accent disabled:opacity-50">Submit</button>
+                          <button type="button" onClick={() => void performAction(row, "approve")} disabled={actionId === row.id || !row.has_file || row.review_status === "APPROVED" || row.review_status === "EXPIRED"} className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-800 disabled:opacity-50">Approve</button>
+                          <button type="button" onClick={() => startReasonAction(row, "reject")} disabled={actionId === row.id || row.review_status === "EXPIRED"} className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-800 disabled:opacity-50">Reject</button>
+                          <button type="button" onClick={() => startReasonAction(row, "expire")} disabled={actionId === row.id || row.review_status === "EXPIRED"} className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold hover:bg-accent disabled:opacity-50">Expire</button>
+                          <button type="button" onClick={() => void performAction(row, "approve-summary")} disabled={actionId === row.id || !canApprovePublicSummary(row)} className="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-800 disabled:opacity-50">Approve summary</button>
+                          <button type="button" onClick={() => void performAction(row, "revoke-summary")} disabled={actionId === row.id || !row.public_summary_ready} className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold hover:bg-accent disabled:opacity-50">Revoke summary</button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}

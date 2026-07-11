@@ -584,6 +584,25 @@ class BatchAdminViewSet(AdminOnlyModelViewSet):
         batch = self.get_object()
         return Response(build_control_center(batch))
 
+    @action(detail=True, methods=["get"], url_path="odds")
+    def odds_disclosure(self, request, pk=None):
+        """CTRL-LP-12 — Return draw odds for this batch (1-in-N per eligible slot)."""
+        batch = self.get_object()
+        total = batch.total_slots or 1
+        enrolled = batch.lucky_ids.exclude(status=LuckyIdStatus.AVAILABLE).count()
+        return Response({
+            "batch_code": batch.batch_code,
+            "total_slots": total,
+            "enrolled_count": enrolled,
+            "odds_ratio": f"1:{total}",
+            "odds_percentage": round(100 / total, 4),
+            "description": (
+                f"One winner is drawn per batch regardless of batch size. "
+                f"Each participant's chance is 1 in {total} ({round(100/total, 4)}%). "
+                f"Draw odds do not change as the draw date approaches (CTRL-LP-12)."
+            ),
+        })
+
 # =====================================================
 # CUSTOMER
 # =====================================================

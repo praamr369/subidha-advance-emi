@@ -467,6 +467,13 @@ class BusinessComplianceDocumentType(models.TextChoices):
     SHOP_LICENSE = "SHOP_LICENSE", "Shop License"
     BANK_PROOF = "BANK_PROOF", "Bank Proof"
     PAN_OR_TAX_PROOF = "PAN_OR_TAX_PROOF", "PAN/Tax Proof"
+    # Legal advisor / CA documents (internal records only)
+    CA_OPINION = "CA_OPINION", "CA Written Opinion"
+    ADVOCATE_OPINION = "ADVOCATE_OPINION", "Advocate Legal Opinion"
+    LEGAL_NOTICE = "LEGAL_NOTICE", "Legal Notice"
+    COURT_ORDER = "COURT_ORDER", "Court Order / Judgment"
+    LEGAL_AGREEMENT = "LEGAL_AGREEMENT", "Signed Legal Agreement / Contract"
+    SCHEME_APPROVAL_LETTER = "SCHEME_APPROVAL_LETTER", "Scheme Approval Letter"
     OTHER = "OTHER", "Other"
 
 

@@ -1,0 +1,15 @@
+﻿{
+  "permissions": {
+    "allow": [
+      "Bash(.venv/Scripts/python *)",
+      "Bash(.venv\\Scripts\\python *)",
+      "Bash(python manage.py *)",
+      "Bash(python -c *)",
+      "Bash(python -m django *)",
+      "Bash(python -m *)",
+      "Bash(netstat *)",
+      "PowerShell(Get-Process *)",
+      "PowerShell(Stop-Process *)"
+    ]
+  }
+}

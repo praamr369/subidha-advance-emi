@@ -571,6 +571,94 @@ def customer_document_list(*, customer, limit: int = 200) -> dict:
     }
 
 
+def customer_archive(*, customer, limit: int = 200) -> dict:
+    """Unified signed-document archive for the customer portal.
+
+    Returns agreements (subscription documents), payment receipts, and
+    delivery handover records — each with a download URL pointing to the
+    existing PDF endpoints.  Lucky-draw certificates are listed for won
+    draws only (the PDF is generated on-demand at the certificate URL).
+    """
+    entries: list[dict] = []
+
+    # 1. Subscription documents / agreements
+    for row in (
+        SubscriptionDocument.objects.filter(subscription__customer=customer)
+        .select_related("subscription")
+        .order_by("-created_at", "-id")[:limit]
+    ):
+        entries.append(
+            {
+                "category": "AGREEMENT",
+                "category_label": "Agreement / Contract",
+                "id": row.id,
+                "label": row.get_document_type_display() if hasattr(row, "get_document_type_display") else row.document_type,
+                "reference": getattr(row.subscription, "subscription_number", None) or f"Sub#{row.subscription_id}",
+                "date": row.created_at,
+                "version": row.document_version,
+                "download_url": row.file.url if row.file else None,
+                "download_label": "Download PDF",
+                "source_id": row.id,
+                "source_type": "subscription_document",
+            }
+        )
+
+    # 2. Payment receipts
+    for row in (
+        ReceiptDocument.objects.filter(customer=customer)
+        .select_related("payment", "direct_sale")
+        .order_by("-receipt_date", "-id")[:limit]
+    ):
+        entries.append(
+            {
+                "category": "RECEIPT",
+                "category_label": "Payment Receipt",
+                "id": row.id,
+                "label": f"Receipt {row.receipt_no or row.id}",
+                "reference": row.source_reference or (row.receipt_no or ""),
+                "date": row.receipt_date,
+                "version": None,
+                "download_url": f"/api/v1/customer/receipts/{row.id}/pdf/",
+                "download_label": "Download Receipt",
+                "source_id": row.id,
+                "source_type": "receipt",
+            }
+        )
+
+    # 3. Lucky draw certificates (won draws only)
+    from subscriptions.models import LuckyDraw
+
+    won_draws = (
+        LuckyDraw.objects.filter(
+            is_revealed=True,
+            winner_subscription__customer=customer,
+        )
+        .select_related("batch", "winner_lucky_id")
+        .order_by("-draw_date", "-id")[:limit]
+    )
+    for draw in won_draws:
+        entries.append(
+            {
+                "category": "DRAW_CERTIFICATE",
+                "category_label": "Lucky Draw Certificate",
+                "id": draw.id,
+                "label": f"Lucky Draw Certificate — Month {draw.draw_month}",
+                "reference": draw.batch.batch_code if draw.batch_id else f"Draw#{draw.id}",
+                "date": draw.draw_date,
+                "version": None,
+                "download_url": f"/api/v1/customer/lucky-draws/{draw.id}/certificate/",
+                "download_label": "Download Certificate",
+                "source_id": draw.id,
+                "source_type": "lucky_draw",
+            }
+        )
+
+    # Sort all entries by date descending
+    entries.sort(key=lambda e: str(e["date"] or ""), reverse=True)
+
+    return {"count": len(entries), "results": entries}
+
+
 def customer_payment_schedule(*, customer) -> dict:
     rows = list(
         Emi.objects.filter(subscription__customer=customer)

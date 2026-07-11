@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Signature Evidence Package — Subidha Furniture</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Arial, Helvetica, sans-serif; font-size: 12pt; color: #111; background: #fff; padding: 30px 40px; max-width: 800px; margin: auto; }
+h1 { font-size: 16pt; border-bottom: 2px solid #111; padding-bottom: 6px; margin-bottom: 4px; }
+h2 { font-size: 13pt; margin-top: 18px; margin-bottom: 6px; }
+p { margin-bottom: 8px; line-height: 1.5; }
+ul, ol { margin-left: 20px; margin-bottom: 8px; }
+li { margin-bottom: 4px; line-height: 1.5; }
+.meta { font-size: 10pt; color: #555; margin-top: 6px; margin-bottom: 20px; }
+.section { margin-bottom: 16px; }
+.sign-block { margin-top: 40px; display: flex; gap: 60px; }
+.sign-box { flex: 1; border-top: 1px solid #111; padding-top: 6px; font-size: 10pt; }
+table { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 11pt; }
+th { background: #eee; border: 1px solid #bbb; padding: 6px 8px; text-align: left; }
+td { border: 1px solid #bbb; padding: 5px 8px; }
+.highlight { background: #fce4ec; border-left: 4px solid #e91e63; padding: 8px 12px; margin-bottom: 10px; }
+@media print { body { padding: 15px 20px; } }
+</style>
+</head>
+<body>
+
+<h1>Signature Evidence Package</h1>
+<div class="meta">
+  Business: Subidha Furniture &nbsp;|&nbsp; Document ref: SF-LEGAL-EVP-001 &nbsp;|&nbsp; Version: 1.0 &nbsp;|&nbsp; Date: July 2026 &nbsp;|&nbsp; Classification: PRIVATE — Internal compliance record
+</div>
+
+<div class="section">
+  <h2>1. Purpose</h2>
+  <p>This document describes how Subidha Furniture retains, archives, and makes auditable the evidence of contract formation — covering physical signed agreements, digital clickwrap records, and all associated metadata. This design ensures that every agreement can be proven in a dispute.</p>
+</div>
+
+<div class="section">
+  <h2>2. Physical Signature Evidence (Tier A)</h2>
+  <ul>
+    <li><strong>Original paper copy:</strong> Retained in the shop agreement register, filed by customer name and agreement date. Stored in a locked filing cabinet at the shop premises.</li>
+    <li><strong>Scanned PDF:</strong> Original scanned using a mobile scanner app at the time of signing. PDF saved to the business Google Drive folder: <em>Subidha Furniture / Agreements / [Year] / [Customer Name]_[Agreement Type]_[Date].pdf</em></li>
+    <li><strong>Customer copy:</strong> A signed photocopy or printed duplicate is given to the customer at the time of signing.</li>
+    <li><strong>Retention period:</strong> 7 years from the date of the agreement or 3 years after the last transaction under the agreement, whichever is later.</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h2>3. Digital Clickwrap Evidence (Tier B)</h2>
+  <p>For all online consent flows (app onboarding, terms acceptance), the following metadata is captured and stored in the system audit log at the moment of submission:</p>
+  <table>
+    <tr><th>Evidence Field</th><th>What Is Captured</th></tr>
+    <tr><td>User ID</td><td>Internal customer/partner/vendor ID</td></tr>
+    <tr><td>Timestamp</td><td>UTC timestamp of consent submission (ISO 8601)</td></tr>
+    <tr><td>IP Address</td><td>Client IP at time of submission</td></tr>
+    <tr><td>User Agent</td><td>Browser / app version string</td></tr>
+    <tr><td>Consent items</td><td>List of each checkbox label that was ticked</td></tr>
+    <tr><td>Document version</td><td>Version and effective date of T&amp;C / scheme document presented</td></tr>
+    <tr><td>OTP status</td><td>Whether OTP was verified before consent (for KYC flows)</td></tr>
+    <tr><td>Acknowledgement</td><td>System-generated acknowledgement ID stored in audit log</td></tr>
+  </table>
+  <p>This audit log is append-only and cannot be modified by staff or customers after the fact.</p>
+</div>
+
+<div class="section">
+  <h2>4. Evidence Export and Retrieval</h2>
+  <ul>
+    <li>Audit log records for any customer or agreement can be exported by the admin from the business management system.</li>
+    <li>Physical scan copies are retrievable from the Google Drive archive within 24 hours on request.</li>
+    <li>In a dispute, both the scanned original and the audit log record are presented together as the evidence package.</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h2>5. Immutability Controls</h2>
+  <ul>
+    <li>Audit log entries are never deleted or edited after creation.</li>
+    <li>Google Drive archive is shared read-only with the CA/auditor; the proprietor retains write access.</li>
+    <li>Physical register is stored off-system; no software operation can alter paper records.</li>
+  </ul>
+</div>
+
+<div class="section">
+  <div class="highlight">
+    <strong>Note:</strong> If a customer disputes an agreement, the combination of (a) the scanned original with their wet-ink signature and (b) the system record showing the agreement terms at the time of signing is the primary evidence. Staff are instructed never to destroy or alter any agreement document.
+  </div>
+</div>
+
+<div class="sign-block">
+  <div class="sign-box">Proprietor Signature<br><br>Name: ___________________<br>Date: ___________________</div>
+  <div class="sign-box">Reviewed by (CA / Advocate)<br><br>Name: ___________________<br>Date: ___________________</div>
+</div>
+
+</body>
+</html>

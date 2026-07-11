@@ -6,6 +6,10 @@ from decimal import Decimal
 from reminders.models import ReminderChannel, ReminderStatus, ReminderType
 from reminders.services.reminder_service import create_payment_reminder
 from subscriptions.models import Emi, EmiStatus
+from subscriptions.services.business_rule_policy_service import (
+    get_late_payment_charge_label,
+    is_late_payment_charge_active,
+)
 
 
 def _money(value) -> Decimal:
@@ -66,6 +70,11 @@ def generate_emi_overdue_reminders(*, as_of: date, performed_by=None) -> dict:
         if _existing_emi_reminder(emi=emi, reminder_type=ReminderType.EMI_OVERDUE):
             skipped += 1
             continue
+        charge_note = (
+            f" A {get_late_payment_charge_label()} may apply per the approved policy."
+            if is_late_payment_charge_active()
+            else ""
+        )
         create_payment_reminder(
             performed_by=performed_by,
             channel=ReminderChannel.INTERNAL,
@@ -75,7 +84,7 @@ def generate_emi_overdue_reminders(*, as_of: date, performed_by=None) -> dict:
             due_date=emi.due_date,
             amount_due=_money(emi.amount),
             status=ReminderStatus.PENDING,
-            notes=f"Generated overdue EMI {emi.id}",
+            notes=f"Generated overdue EMI {emi.id}.{charge_note}",
             template_key=ReminderType.EMI_OVERDUE,
         )
         created += 1

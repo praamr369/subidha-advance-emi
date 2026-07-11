@@ -49,8 +49,6 @@ def business_rule_policy_payload(policy: BusinessRulePolicy | None = None) -> di
         blockers.append("Customer-pool funding is blocked for Lucky Plan classification.")
     if waiver_public_launch_blocked:
         blockers.append("Lucky Plan waiver public launch is blocked until advocate/CA approval is recorded.")
-    if gst_status == BusinessTaxRegistrationMode.GST_UNREGISTERED:
-        blockers.append("GST tax invoices, GST credit notes, GST debit notes, ITC wording, and GST collection are blocked while GST status is UNREGISTERED.")
     if not policy.partner_receipt_admin_approval_required:
         blockers.append("Partner receipt finalization must require admin approval.")
     if not policy.kyc_masking_required:
@@ -61,6 +59,7 @@ def business_rule_policy_payload(policy: BusinessRulePolicy | None = None) -> di
         blockers.append("Late payment charge cannot be enabled until the charge policy is configured.")
 
     if not gst_registered:
+        warnings.append("GST unregistered: GST tax invoices, credit notes, debit notes, and ITC wording are disabled. Non-GST bills are in use.")
         warnings.append("HSN/SAC can be maintained as internal readiness data only; do not show tax charged.")
     if policy.risk_status in {LegalRiskStatus.DRAFT, LegalRiskStatus.CA_REVIEW_REQUIRED, LegalRiskStatus.ADVOCATE_REVIEW_REQUIRED}:
         warnings.append("Legal/CA review is still required before public launch wording is used.")
@@ -117,6 +116,43 @@ def business_rule_policy_payload(policy: BusinessRulePolicy | None = None) -> di
         "blockers": blockers,
         "warnings": warnings,
     }
+
+
+def is_waiver_launch_permitted() -> bool:
+    """Return True only when the active policy has advocate/CA approval for public draw."""
+    policy = BusinessRulePolicy.objects.filter(is_active=True).order_by("-created_at", "-id").first()
+    if policy is None:
+        return False
+    return policy.risk_status == LegalRiskStatus.APPROVED_FOR_PUBLIC_LAUNCH
+
+
+def assert_waiver_launch_permitted() -> None:
+    """Raise ValidationError if waiver public launch is not yet approved."""
+    if not is_waiver_launch_permitted():
+        policy = BusinessRulePolicy.objects.filter(is_active=True).order_by("-created_at", "-id").first()
+        status = policy.risk_status if policy else "NONE"
+        raise ValidationError(
+            f"Lucky Plan waiver public launch is blocked (current status: {status}). "
+            "An advocate or CA must approve the scheme classification before draws can be executed. "
+            "Go to Admin → Settings → Legal & GST Controls and set Waiver launch status to "
+            "'Approved for Public Launch'."
+        )
+
+
+def is_late_payment_charge_active() -> bool:
+    """Return True when both configured and enabled flags are set on the active policy."""
+    policy = BusinessRulePolicy.objects.filter(is_active=True).order_by("-created_at", "-id").first()
+    if policy is None:
+        return False
+    return bool(policy.late_payment_charge_configured and policy.late_payment_charge_enabled)
+
+
+def get_late_payment_charge_label() -> str:
+    """Return the approved charge label from the active policy (default: 'Late Payment Charge')."""
+    policy = BusinessRulePolicy.objects.filter(is_active=True).order_by("-created_at", "-id").first()
+    if policy is None:
+        return "Late Payment Charge"
+    return (policy.late_payment_charge_label or "Late Payment Charge").strip()
 
 
 @transaction.atomic

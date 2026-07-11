@@ -326,11 +326,17 @@ def _validated_compliance_template_key(value: str) -> str:
     return key
 
 
+def _compliance_doc_qs():
+    return BusinessComplianceDocument.objects.select_related(
+        "review_state", "uploaded_by", "reviewed_by", "review_state__public_summary_approved_by"
+    ).order_by("document_type", "-created_at", "-id")
+
+
 class AdminBusinessComplianceDocumentListCreateView(_AdminPolicyBase):
     parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def get(self, request):
-        queryset = BusinessComplianceDocument.objects.all().order_by("document_type", "-created_at", "-id")
+        queryset = _compliance_doc_qs()
         serializer = BusinessComplianceDocumentAdminSerializer(queryset, many=True)
         return Response({"count": len(serializer.data), "results": serializer.data})
 
@@ -355,7 +361,7 @@ class AdminBusinessComplianceDocumentDetailView(_AdminPolicyBase):
     parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def get(self, request, pk: int):
-        document = get_object_or_404(BusinessComplianceDocument, pk=pk)
+        document = get_object_or_404(_compliance_doc_qs(), pk=pk)
         return Response(BusinessComplianceDocumentAdminSerializer(document).data)
 
     def patch(self, request, pk: int):

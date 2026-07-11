@@ -682,3 +682,31 @@ class AdminCustomerOpeningOutstandingDetailView(APIView):
             {"detail": "Posted opening balances cannot be deleted. Create an audited correction/reversal instead."},
             status=status.HTTP_409_CONFLICT,
         )
+
+
+class AdminVendorOpeningBalanceListView(APIView):
+    """GET /admin/opening-balances/vendors/ — all vendors with their current opening balance in one query."""
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        from decimal import Decimal
+        from django.db.models import Sum, Q
+        vendors = Vendor.objects.filter(is_active=True).order_by("name", "id")
+        # Aggregate opening-balance ledger entries per vendor in one DB query
+        ob_agg = (
+            VendorLedgerEntry.objects
+            .filter(entry_type="OPENING_BALANCE")
+            .values("vendor_id")
+            .annotate(net=Sum("debit") - Sum("credit"))
+        )
+        ob_map: dict[int, Decimal] = {row["vendor_id"]: row["net"] or Decimal("0.00") for row in ob_agg}
+        results = [
+            {
+                "id": v.id,
+                "name": v.name,
+                "phone": v.phone or "",
+                "opening_balance": str(ob_map.get(v.id, Decimal("0.00"))),
+            }
+            for v in vendors
+        ]
+        return Response({"count": len(results), "results": results})

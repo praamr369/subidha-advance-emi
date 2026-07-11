@@ -347,3 +347,87 @@ class FinancialSourceLifecycleEvent(models.Model):
     def __str__(self) -> str:
         return f"{self.event_no} {self.source_type}#{self.source_id} {self.event_type}"
 
+
+
+# ---------------------------------------------------------------------------
+# CTRL-FIN-5 — ReconciliationSignOff
+# A period-close attestation: before the month-end ledger is locked, an
+# authorised officer must sign off that all reconciliation items are resolved.
+# ---------------------------------------------------------------------------
+
+class ReconciliationSignOffStatus(models.TextChoices):
+    PENDING = "PENDING", "Pending"
+    SIGNED_OFF = "SIGNED_OFF", "Signed Off"
+    REVOKED = "REVOKED", "Revoked"
+
+
+class ReconciliationSignOff(models.Model):
+    reconciliation_run = models.OneToOneField(
+        ReconciliationRun,
+        on_delete=models.PROTECT,
+        related_name="sign_off",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=ReconciliationSignOffStatus.choices,
+        default=ReconciliationSignOffStatus.PENDING,
+        db_index=True,
+    )
+    signed_off_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="reconciliation_sign_offs",
+    )
+    signed_off_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    open_item_count_at_sign_off = models.PositiveIntegerField(
+        default=0,
+        help_text="Number of unresolved items at time of sign-off (must be 0 for clean close).",
+    )
+    attestation_note = models.TextField(blank=True, default="")
+    revoked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="revoked_reconciliation_sign_offs",
+    )
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    revocation_reason = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "reconciliation_sign_offs"
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["status"]),
+            models.Index(fields=["signed_off_at"]),
+        ]
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        errors = {}
+        if self.status == ReconciliationSignOffStatus.SIGNED_OFF:
+            if not self.signed_off_by_id:
+                errors["signed_off_by"] = "Sign-off officer is required."
+            if not self.signed_off_at:
+                errors["signed_off_at"] = "Sign-off timestamp is required."
+            if self.open_item_count_at_sign_off > 0:
+                errors["open_item_count_at_sign_off"] = (
+                    f"{self.open_item_count_at_sign_off} unresolved items remain. "
+                    "All items must be resolved or waived before sign-off."
+                )
+        if self.status == ReconciliationSignOffStatus.REVOKED and not self.revocation_reason:
+            errors["revocation_reason"] = "Revocation reason is required."
+        if errors:
+            from django.core.exceptions import ValidationError
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"SignOff run={self.reconciliation_run_id} [{self.status}]"
