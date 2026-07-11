@@ -435,6 +435,7 @@ INSTALLED_APPS = [
     "migration_center",
     "privacy",
     "documents",
+    "reviews",
     "django_extensions",
 ]
 
