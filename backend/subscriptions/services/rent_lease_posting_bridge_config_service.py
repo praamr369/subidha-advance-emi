@@ -53,7 +53,10 @@ def get_rent_lease_posting_bridge_state(*, readiness: dict[str, Any] | None = No
     readiness = readiness or {}
     mapping_ready = bool(readiness.get("mapping_ready") or readiness.get("status") == "READY")
     period_controls_ready = bool(readiness.get("posting_controls_ready", False))
-    bridge_setup_ready = bool(config.is_enabled and mapping_ready)
+    # Bridge is auto-approved when mapping is valid. Explicit disable (disabled_at set + is_enabled False)
+    # is the only way to block it when mapping is ready.
+    explicitly_disabled = bool(config.disabled_at is not None and not config.is_enabled)
+    bridge_setup_ready = bool(mapping_ready and not explicitly_disabled)
     return {
         "config": _auto_ready_config_payload(config, mapping_ready=mapping_ready),
         "is_enabled": bridge_setup_ready,

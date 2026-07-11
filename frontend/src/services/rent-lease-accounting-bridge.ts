@@ -13,6 +13,7 @@ export type AccountingReadiness = {
   posting_controls_ready?: boolean;
   posting_bridge_ready?: boolean;
   posting_bridge_approved?: boolean;
+  posting_execution_ready?: boolean;
   posting_mode?: "AUDIT_DEFERRED" | "POSTING_ENABLED" | "MANUAL_APPROVAL_REQUIRED" | string;
   message?: string | null;
   operator_action?: string | null;
