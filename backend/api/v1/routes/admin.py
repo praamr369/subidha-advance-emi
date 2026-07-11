@@ -5,6 +5,11 @@ from rest_framework.routers import DefaultRouter
 from api.v1.routes import admin_hr_complete
 
 from api.v1.views.admin_money_in_out import AdminMoneyInOutView
+from api.v1.views.admin_unified_payable import (
+    AdminUnifiedPayableListView,
+    AdminPayableFinanceAccountsView,
+    AdminPayableExecuteView,
+)
 from api.v1.views.admin_business_setup import (
     AdminLocalSandboxResetView,
     AdminLocalSandboxSeedView,
@@ -1303,4 +1308,9 @@ urlpatterns = [
     # ── Batch Performance Alerts ──────────────────────────────────────────────
     path("batches/performance-check/", batch_performance_check_view),
     path("batches/performance-alert/", batch_performance_alert_notify_view),
+
+    # ── Unified Payable Center ────────────────────────────────────────────────
+    path("payables/", AdminUnifiedPayableListView.as_view()),
+    path("payables/finance-accounts/", AdminPayableFinanceAccountsView.as_view()),
+    path("payables/execute/", AdminPayableExecuteView.as_view()),
 ]
