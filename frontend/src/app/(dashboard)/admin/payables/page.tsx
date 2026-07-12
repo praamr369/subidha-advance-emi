@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import {
   getUnifiedPayables,
   getPayableFinanceAccounts,
@@ -308,7 +309,30 @@ export default function UnifiedPayablePage() {
   const needsPostingCount = data?.needs_posting_count ?? 0;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 p-6 space-y-6">
+    <ERPPageShell
+      eyebrow="Finance"
+      title="Unified Payables"
+      subtitle="All outgoing obligations — salary, vendors, commissions, expenses, refunds — in one queue. Journal entries auto-post on payment."
+      breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Payables" }]}
+      stats={data ? [
+        { label: "Total Outstanding", value: rupee(data.total_outstanding), tone: "danger" },
+        { label: "Items Pending", value: data.total_items },
+        { label: "Needs Journal", value: data.needs_posting_count, tone: data.needs_posting_count > 0 ? "warning" : "default" },
+      ] : []}
+      actions={[
+        { href: ROUTES.admin.accountingBridgeReconciliation, label: "Bridge Reconciliation" },
+      ]}
+    >
+      <div className="space-y-6">
+      {/* Refresh button */}
+      <div className="flex justify-end">
+        <button
+          onClick={() => void load()}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300 hover:shadow"
+        >
+          ↻ Refresh
+        </button>
+      </div>
       {/* Toast */}
       {toast && (
         <div className={`fixed top-4 right-4 z-50 max-w-sm px-4 py-3 rounded-xl shadow-lg text-sm font-medium leading-snug ${toast.type === "ok" ? "bg-green-600 text-white" : "bg-red-600 text-white"}`}>
@@ -325,34 +349,6 @@ export default function UnifiedPayablePage() {
           onPaid={handlePaid}
         />
       )}
-
-      {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Unified Payment Center</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            All outgoing obligations — salary, vendors, commissions, expenses, refunds — in one queue.
-            Select an item → choose Cash / UPI / Bank → journal entries auto-post and appear in{" "}
-            <Link href={ROUTES.admin.accountingBridgeReconciliation} className="text-blue-600 dark:text-blue-400 hover:underline font-medium">
-              Bridge Reconciliation
-            </Link>.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Link
-            href={ROUTES.admin.accountingBridgeReconciliation}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-300 hover:shadow"
-          >
-            Bridge Reconciliation →
-          </Link>
-          <button
-            onClick={() => void load()}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300 hover:shadow"
-          >
-            ↻ Refresh
-          </button>
-        </div>
-      </div>
 
       {/* Needs-posting alert */}
       {needsPostingCount > 0 && (
@@ -562,6 +558,7 @@ export default function UnifiedPayablePage() {
           ))}
         </div>
       </div>
-    </div>
+      </div>
+    </ERPPageShell>
   );
 }

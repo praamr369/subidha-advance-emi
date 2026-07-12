@@ -956,7 +956,7 @@ export default function AdminReportsPage() {
                         {section.reports.map((report) => (
                           <li key={report.key}>
                             <Link
-                              href={`${ROUTES.admin.reportsCenter}/${encodeURIComponent(report.key)}`}
+                              href={`/admin/reports-center/${encodeURIComponent(report.key)}`}
                               className="block rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-medium text-foreground transition hover:bg-muted"
                             >
                               <span className="block">{report.title}</span>

@@ -177,6 +177,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
 
   // ── 6. Collections & Cashier ──────────────────────────────────────────────
   item("Collections & Cashier", "Collection", ROUTES.admin.financeCollect, "Unified collection workspace."),
+  item("Collections & Cashier", "Payables", ROUTES.admin.payables, "All outgoing obligations — salary, vendor settlements, commissions, expense claims, and customer refunds — with real double-entry journal posting."),
   item("Collections & Cashier", "Payments", ROUTES.admin.payments, "Payment register."),
   item("Collections & Cashier", "Settlements", ROUTES.admin.settlements, "Bank statement and UPI settlement evidence imports with manual allocations."),
   item("Collections & Cashier", "Day Closes", ROUTES.admin.settlementsDayCloses, "Cashier day close."),

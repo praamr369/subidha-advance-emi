@@ -47,7 +47,7 @@ def _salary_payables() -> list[dict[str, Any]]:
 
     sheets = (
         SalarySheet.objects
-        .select_related("employee", "employee__user")
+        .select_related("employee")
         .filter(status__in=[
             SalarySheetStatus.APPROVED,
             SalarySheetStatus.POSTED,
@@ -124,7 +124,7 @@ def _commission_payables() -> list[dict[str, Any]]:
 
     qs = (
         Commission.objects
-        .select_related("partner", "customer", "subscription")
+        .select_related("partner", "subscription")
         .filter(status=CommissionStatus.PENDING)
         .order_by("-created_at")[:200]
     )
