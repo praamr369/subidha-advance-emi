@@ -245,6 +245,7 @@ class FinancePaymentOperationsApiTests(APITestCase):
                 "customer_advance_id": advance_id,
                 "emi_id": self.emi.id,
                 "amount": "400.00",
+                "idempotency_key": "OVER-ALLOC-TEST",
             },
             format="json",
         )
