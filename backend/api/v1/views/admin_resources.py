@@ -43,6 +43,8 @@ from api.v1.serializers.admin_resources import (
     ProductAdminSerializer,
     ProductCategoryMasterSerializer,
     ProductInventoryProfilePrepareSerializer,
+    ProductRelationshipSerializer,
+    ProductSearchSerializer,
     ProductSubcategoryMasterSerializer,
     ProductUnitOfMeasureMasterSerializer,
     CustomerKycDecisionSerializer,
@@ -81,6 +83,7 @@ from subscriptions.models import (
     PlanType,
     Product,
     ProductCategoryMaster,
+    ProductRelationship,
     ProductSubcategoryMaster,
     ProductUnitOfMeasureMaster,
     Subscription,
@@ -2663,6 +2666,8 @@ class ProductAdminViewSet(AdminOnlyModelViewSet):
                 "subcategories": payload.subcategories,
                 "unit_of_measure_masters": payload.unit_of_measure_masters,
                 "unit_of_measure_options": payload.unit_of_measure_options,
+                "item_type_choices": payload.item_type_choices,
+                "stock_type_choices": payload.stock_type_choices,
             }
         )
 
@@ -2998,6 +3003,111 @@ class ProductAdminViewSet(AdminOnlyModelViewSet):
         except Exception as exc:
             return Response(
                 {"message": f"CSV import failed: {exc}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    @action(detail=True, methods=["get"], url_path="related-products")
+    def related_products(self, request, pk=None):
+        product = self.get_object()
+        relationships = ProductRelationship.objects.filter(product=product).select_related("related_product")
+        serializer = ProductRelationshipSerializer(relationships, many=True)
+        return Response({"results": serializer.data, "count": len(serializer.data)})
+
+    @action(detail=True, methods=["post"], url_path="add-related-product")
+    def add_related_product(self, request, pk=None):
+        from api.v1.serializers.admin_resources import ProductRelationshipSerializer
+        product = self.get_object()
+        data = {**request.data, "product": product.id}
+        serializer = ProductRelationshipSerializer(data=data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=["delete"], url_path="remove-related-product/(?P<related_id>[0-9]+)")
+    def remove_related_product(self, request, pk=None, related_id=None):
+        product = self.get_object()
+        try:
+            relationship = ProductRelationship.objects.get(product=product, id=related_id)
+            relationship.delete()
+            return Response({"message": "Related product removed."}, status=status.HTTP_200_OK)
+        except ProductRelationship.DoesNotExist:
+            return Response({"message": "Relationship not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    @action(detail=False, methods=["get"], url_path="search-for-attachment")
+    def search_for_attachment(self, request):
+        from api.v1.serializers.admin_resources import ProductSearchSerializer
+        q = request.query_params.get("q", "").strip()
+        exclude_id = request.query_params.get("exclude_id", "").strip()
+
+        queryset = Product.objects.filter(is_active=True).order_by("name")
+
+        if exclude_id:
+            try:
+                queryset = queryset.exclude(id=int(exclude_id))
+            except (ValueError, TypeError):
+                pass
+
+        if q:
+            queryset = queryset.filter(
+                Q(name__icontains=q)
+                | Q(product_code__icontains=q)
+                | Q(sku__icontains=q)
+            )
+
+        queryset = queryset[:30]
+        serializer = ProductSearchSerializer(queryset, many=True)
+        return Response({"results": serializer.data, "count": len(serializer.data)})
+
+    @action(detail=True, methods=["patch"], url_path="inventory-costs")
+    def update_inventory_costs(self, request, pk=None):
+        from inventory.models import InventoryItem
+        product = self.get_object()
+
+        # Get or create inventory profile
+        try:
+            inventory_item = InventoryItem.objects.get(product=product)
+        except InventoryItem.DoesNotExist:
+            return Response(
+                {"message": "Inventory profile not found. Create it first from the product page."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Update costs
+        errors = {}
+        for field in [
+            "purchase_unit_cost",
+            "standard_unit_cost",
+            "manufacturing_raw_material_cost",
+            "manufacturing_labour_cost",
+            "manufacturing_overhead_cost",
+        ]:
+            value = request.data.get(field)
+            if value is not None:
+                try:
+                    setattr(inventory_item, field, value)
+                except (ValueError, TypeError) as e:
+                    errors[field] = str(e)
+
+        if errors:
+            return Response({"errors": errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            inventory_item.save()
+            AuditLog.objects.create(
+                action_type=AuditLog.ActionType.INVENTORY_ITEM_UPDATED,
+                model_name="InventoryItem",
+                object_id=inventory_item.id,
+                performed_by=request.user,
+                metadata={"event": "INVENTORY_COSTS_UPDATED", "product_id": product.id},
+            )
+            return Response(
+                {"message": "Inventory costs updated.", "product_id": product.id},
+                status=status.HTTP_200_OK,
+            )
+        except Exception as e:
+            return Response(
+                {"message": f"Failed to update costs: {str(e)}"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

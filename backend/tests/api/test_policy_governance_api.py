@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -16,6 +17,7 @@ from subscriptions.models_business_setup import (
     PolicyPage,
     PolicyStatus,
 )
+from subscriptions.services.business_compliance_review_actions import approve_document
 from tests.helpers import (
     create_admin_user,
     create_cashier_user,
@@ -156,16 +158,17 @@ class PolicyGovernanceApiTests(APITestCase):
             uploaded_by=self.admin,
             reviewed_by=self.admin,
         )
-        BusinessComplianceDocument.objects.create(
+        udyam = BusinessComplianceDocument.objects.create(
             document_type=BusinessComplianceDocumentType.UDYAM_CERTIFICATE,
             title="Udyam internal verification",
             public_visibility=BusinessComplianceDocumentVisibility.PUBLIC_SUMMARY_ONLY,
-            verification_status=BusinessComplianceDocumentVerificationStatus.VERIFIED,
+            verification_status=BusinessComplianceDocumentVerificationStatus.PENDING,
             public_summary="Verified internally. Number not shown publicly.",
             notes="internal",
+            file=SimpleUploadedFile("udyam.pdf", b"udyam-data", content_type="application/pdf"),
             uploaded_by=self.admin,
-            reviewed_by=self.admin,
         )
+        approve_document(udyam, performed_by=self.admin, public_summary_approved_flag=True)
 
         response = self.client.get("/api/v1/public/business-compliance/summary/")
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)

@@ -311,19 +311,29 @@ def _sequence_row(profile: DocumentTypeProfile, *, financial_year: FinancialYear
     suffix = sequence.suffix if sequence else ""
     padding = sequence.padding if sequence else 5
     next_number = sequence.next_number if sequence else 1
-    preview = preview_document_number(
-        sequence=sequence,
-        document_type=profile.document_type if sequence is None and financial_year else None,
-        document_date=reference_date,
-        prefix=prefix,
-        pattern=pattern,
-        suffix=suffix,
-        next_number=next_number,
-        padding=padding,
-    ) if financial_year else None
+    # Readiness surfaces must degrade to a warning instead of crashing when
+    # numbering prerequisites (e.g. financial-year coverage) are missing.
+    preview = None
+    preview_error: str | None = None
+    if financial_year:
+        try:
+            preview = preview_document_number(
+                sequence=sequence,
+                document_type=profile.document_type if sequence is None else None,
+                document_date=reference_date,
+                prefix=prefix,
+                pattern=pattern,
+                suffix=suffix,
+                next_number=next_number,
+                padding=padding,
+            )
+        except DocumentNumberingSetupError as exc:
+            preview_error = str(exc)
     duplicate_count = _duplicate_count_for_document_type(profile.document_type)
     blockers: list[str] = []
     warnings: list[str] = []
+    if preview_error:
+        warnings.append(preview_error)
     status = "ready" if configured and duplicate_count == 0 else "needs_setup"
     if not configured and profile.required_for_go_live:
         blockers.append("Required numbering profile is not configured for the active financial year.")

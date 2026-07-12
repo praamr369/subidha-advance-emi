@@ -227,9 +227,13 @@ class ProductCatalogOptions:
     subcategories: list[dict[str, object]]
     unit_of_measure_masters: list[dict[str, object]]
     unit_of_measure_options: list[str]
+    item_type_choices: list[dict[str, str]]
+    stock_type_choices: list[dict[str, str]]
 
 
 def build_product_catalog_options() -> ProductCatalogOptions:
+    from subscriptions.models import ProductItemType, ProductStockType
+
     categories = [
         {"id": row.id, "name": row.name}
         for row in ProductCategoryMaster.objects.filter(is_active=True).order_by("name", "id")
@@ -260,9 +264,13 @@ def build_product_catalog_options() -> ProductCatalogOptions:
             *Product.objects.exclude(unit_of_measure="").values_list("unit_of_measure", flat=True),
         }
     )
+    item_type_choices = [{"value": v, "label": l} for v, l in ProductItemType.choices]
+    stock_type_choices = [{"value": v, "label": l} for v, l in ProductStockType.choices]
     return ProductCatalogOptions(
         categories=categories,
         subcategories=subcategories,
         unit_of_measure_masters=unit_masters,
         unit_of_measure_options=unit_options,
+        item_type_choices=item_type_choices,
+        stock_type_choices=stock_type_choices,
     )

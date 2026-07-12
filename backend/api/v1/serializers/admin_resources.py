@@ -35,6 +35,8 @@ from subscriptions.models import (
     PlanType,
     Product,
     ProductCategoryMaster,
+    ProductRelationship,
+    ProductRelationshipType,
     ProductSubcategoryMaster,
     ProductUnitOfMeasureMaster,
     RentSubscriptionProfile,
@@ -1520,6 +1522,8 @@ class ProductAdminSerializer(serializers.ModelSerializer):
             # Phase 2 additive fields
             "is_direct_sale_enabled",
             "lifecycle_status",
+            "item_type",
+            "stock_type",
             "inventory_profile_id",
             "inventory_ready",
             "inventory_stock_tracking_enabled",
@@ -2579,3 +2583,44 @@ class PartnerAdminSerializer(serializers.ModelSerializer):
                 "Only partner users can be represented here."
             )
         return attrs
+
+
+class ProductRelationshipSerializer(serializers.ModelSerializer):
+    related_product_name = serializers.CharField(source="related_product.name", read_only=True)
+    related_product_code = serializers.CharField(source="related_product.product_code", read_only=True)
+    related_product_item_type = serializers.CharField(source="related_product.item_type", read_only=True)
+
+    class Meta:
+        model = ProductRelationship
+        fields = [
+            "id",
+            "product",
+            "related_product",
+            "related_product_name",
+            "related_product_code",
+            "related_product_item_type",
+            "relationship_type",
+            "quantity",
+            "notes",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+    def validate(self, data):
+        product = data.get("product") or self.instance.product if self.instance else None
+        related_product = data.get("related_product")
+
+        if not product or not related_product:
+            raise serializers.ValidationError("Product and related product are required.")
+
+        if product.id == related_product.id:
+            raise serializers.ValidationError("A product cannot be related to itself.")
+
+        return data
+
+
+class ProductSearchSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Product
+        fields = ["id", "product_code", "name", "item_type", "stock_type"]

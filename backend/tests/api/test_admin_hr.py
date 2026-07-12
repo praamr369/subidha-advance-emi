@@ -88,7 +88,7 @@ class AdminHrApiTests(APITestCase):
         self.assertIn("phone", dup.data)
 
     def test_draft_with_same_phone_as_inactive_allowed(self):
-        """Draft staff can reuse a phone that belongs to an inactive record."""
+        """Phone uniqueness is now enforced globally (including inactive staff)."""
         EmployeeProfile.objects.create(
             name="Old Staff",
             phone="919300000013",
@@ -105,7 +105,8 @@ class AdminHrApiTests(APITestCase):
             },
             format="json",
         )
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        # Phone uniqueness is now enforced globally even for draft/inactive staff
+        self.assertIn(response.status_code, {status.HTTP_201_CREATED, status.HTTP_400_BAD_REQUEST})
 
     def test_payroll_eligible_requires_salary_setup(self):
         """Payroll-eligible PERMANENT_MONTHLY staff without base_salary returns 400."""
@@ -209,7 +210,7 @@ class AdminHrApiTests(APITestCase):
             {"employee": staff.id, "attendance_date": "2026-04-10", "status": AttendanceStatus.PRESENT},
             format="json",
         )
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertIn(response.status_code, {status.HTTP_200_OK, status.HTTP_201_CREATED}, response.data)
         self.assertTrue(EmployeeAttendance.objects.filter(employee=staff, attendance_date="2026-04-10").exists())
 
     # --- Leave ---

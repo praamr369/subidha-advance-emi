@@ -1,0 +1,17 @@
+addon_sku,addon_type,addon_name,addon_description,applies_to_materials,applies_to_bed_types,applies_to_sizes,price,notes
+SVC-BED-POLISH,Service,Hand Polish Finish,Extra hand-rubbed polish coat on wooden surface for deeper sheen and protection,"Sagwan / Sheesham,Sonajhuri / Mahogany,MDF,PlyBoard & Laminates","Regular,Hydraulic,Sofa Cum Bed",ALL,1500,Not applicable on SS or Particle Board
+SVC-BED-PAINT,Service,Custom Colour / Paint,Customer-chosen colour paint or enamel coat on bed frame,"MDF,Particle Board","Regular,Hydraulic",ALL,1000,Colour chart shared at time of order
+SVC-BED-ASSEMBLY,Service,Home Delivery & Assembly,Delivery to customer address + full assembly and installation by carpenter team,ALL,ALL,ALL,500,Within city/town limits; extra charge for remote villages
+SVC-BED-AMC,Service,1-Year Extended Warranty / AMC,Annual maintenance contract — 1 free carpenter visit + labour covered for 1 year,ALL,ALL,ALL,999,Parts not included; covers workmanship defects only
+ACC-BED-FOAM2,Accessory,Foam Mattress 2 Inch (add-on),2 inch plain foam mattress — suitable as base layer or for foldable beds,ALL,"Regular,Foldable,Sofa Cum Bed",ALL,1500,Covers both Queen and King sizes; confirm size at order
+ACC-BED-FOAM4-Q,Accessory,Foam Mattress 4 Inch Queen 5×7,4 inch foam mattress for Queen size 5×7 bed,ALL,ALL,5×7 ft,2250,Same as catalog SKU — linked for bundling
+ACC-BED-FOAM4-K,Accessory,Foam Mattress 4 Inch King 6×7,4 inch foam mattress for King size 6×7 bed,ALL,ALL,6×7 ft,3000,Same as catalog SKU — linked for bundling
+ACC-BED-FOAM6-Q,Accessory,Foam Mattress 6 Inch Queen 5×7,6 inch foam mattress for Queen size 5×7 bed,ALL,ALL,5×7 ft,5250,Same as catalog SKU — linked for bundling
+ACC-BED-FOAM6-K,Accessory,Foam Mattress 6 Inch King 6×7,6 inch foam mattress for King size 6×7 bed,ALL,ALL,6×7 ft,6000,Same as catalog SKU — linked for bundling
+ACC-BED-DRAWER,Accessory,Extra Side Storage Drawer,One additional slide-out storage drawer added to bed frame,"Sagwan / Sheesham,Sonajhuri / Mahogany,MDF,PlyBoard & Laminates,Particle Board",Regular — Without Storage Only,ALL,2000,Not applicable on SS beds or already-storage beds
+ACC-BED-HEAD-CARVED,Accessory,Headboard Upgrade — Carved Design,Premium hand-carved decorative headboard panel replacing standard plain headboard,"Sagwan / Sheesham,Sonajhuri / Mahogany","Regular,Hydraulic",ALL,3000,Design pattern chosen from catalogue; delivery +7 days
+ACC-BED-HEAD-PANEL,Accessory,Headboard Upgrade — Panel / Upholstered,Panel-style or fabric-upholstered headboard upgrade for a modern look,"MDF,PlyBoard & Laminates","Regular,Hydraulic",ALL,1500,Fabric colour chosen at order time
+ACC-BED-SIDE-SAG,Accessory,Bedside Tool — Sagwan / Sheesham,Matching Sagwan bedside nightstand 2×1.5×1.5 ft — sold as paired add-on,ALL,ALL,ALL,10500,Can order 1 or 2 units; priced per unit
+ACC-BED-SIDE-MDF,Accessory,Bedside Tool — MDF,Matching MDF bedside nightstand 2×1.5×1.5 ft — sold as paired add-on,ALL,ALL,ALL,7500,Can order 1 or 2 units; priced per unit
+ACC-BED-SIDE-PLY,Accessory,Bedside Tool — PlyBoard & Laminates,PlyBoard & Laminates bedside nightstand 2×1.5×1.5 ft — sold as paired add-on,ALL,ALL,ALL,6000,Can order 1 or 2 units; priced per unit
+ACC-BED-SIDE-PAR,Accessory,Bedside Tool — Particle Board,Particle Board bedside nightstand 2×1.5×1.5 ft — sold as paired add-on,ALL,ALL,ALL,3000,Can order 1 or 2 units; priced per unit

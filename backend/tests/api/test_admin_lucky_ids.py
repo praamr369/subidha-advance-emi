@@ -167,13 +167,15 @@ class AdminLuckyIdReportingTests(APITestCase):
         self.assertEqual(winner_row["status"], "WON")
 
     def test_available_endpoint_excludes_frozen_cancelled_holder(self):
+        # CTRL-LP-5: enrollment into a LOCKED batch is forbidden, so enroll
+        # while OPEN and lock afterwards (matches the real-world sequence).
         frozen_batch = create_batch(
             batch_code="LREL-LOCK-API",
             duration_months=3,
             total_slots=100,
             draw_day=5,
             start_date=date(2026, 4, 1),
-            status="LOCKED",
+            status="OPEN",
         )
         frozen_lucky = create_lucky_id(batch=frozen_batch, lucky_number=17, status="AVAILABLE")
         frozen_sub = create_subscription(
@@ -187,6 +189,8 @@ class AdminLuckyIdReportingTests(APITestCase):
         )
         frozen_lucky.status = "ASSIGNED"
         frozen_lucky.save(update_fields=["status"])
+        frozen_batch.status = "LOCKED"
+        frozen_batch.save(update_fields=["status"])
         cancel_subscription(
             subscription_id=frozen_sub.id,
             actor=self.admin,

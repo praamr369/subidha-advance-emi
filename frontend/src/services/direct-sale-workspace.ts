@@ -30,6 +30,7 @@ export type BillingProductSearchRow = {
     requires_purchase: boolean;
   };
   last_sale_price?: string | null;
+  stock_item_type?: "FINISHED_GOOD" | "ACCESSORY" | "RAW_MATERIAL" | null;
 };
 
 export type BillingProductSearchResponse = {

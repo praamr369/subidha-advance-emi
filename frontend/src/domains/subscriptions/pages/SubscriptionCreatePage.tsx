@@ -388,7 +388,7 @@ export default function SubscriptionCreatePage({
     return runtimeSearchParams.toString();
   }, [queryString, runtimeSearchParams]);
   const luckyRequestSequence = useRef(0);
-  const [planType, setPlanType] = useState<PlanType>("EMI");
+  const [planType, setPlanType] = useState<PlanType | null>(null);
 
   const [customer, setCustomer] = useState<CustomerOption | null>(null);
   const [product, setProduct] = useState<ProductOption | null>(null);
@@ -557,6 +557,7 @@ export default function SubscriptionCreatePage({
   }, [availableLuckyCount, batch, luckyId, luckyResults]);
 
   const canSubmit = useMemo(() => {
+    if (!planType) return false;
     if (!customer || !product || !startDate) return false;
     if (!tenureMonths || tenureMonths <= 0) return false;
     if (isEmiPlan && !batch) return false;
@@ -567,6 +568,7 @@ export default function SubscriptionCreatePage({
     }
     return true;
   }, [
+    planType,
     customer,
     product,
     startDate,
@@ -1018,7 +1020,7 @@ export default function SubscriptionCreatePage({
 
   function resetForFreshCreate() {
     nextLuckyRequestToken();
-    setPlanType("EMI");
+    setPlanType(null);
     setCustomer(null);
     setKycReadiness(null);
     setProduct(null);
@@ -1130,7 +1132,7 @@ export default function SubscriptionCreatePage({
           customer: customer.id,
           product: product.id,
           partner: partner?.id ?? null,
-          plan_type: planType,
+          plan_type: planType ?? "EMI",
           tenure_months: tenureMonths,
           start_date: startDate,
           batch: batch?.id ?? null,
@@ -1517,36 +1519,47 @@ export default function SubscriptionCreatePage({
 
             <div className="rounded-xl border border-border bg-background p-4">
               <div className="space-y-1">
-                <h3 className="text-sm font-semibold text-foreground">Plan Type</h3>
+                <h3 className="text-sm font-semibold text-foreground">Plan Type <span className="text-destructive">*</span></h3>
                 <p className="text-xs text-muted-foreground">
-                  Advance EMI requires batch linkage. Rent and lease use manual tenure.
+                  Choose the subscription plan. Each type has different payment and contract structure.
                 </p>
               </div>
-
-              <div className="mt-4">
-                <select
-                  value={planType}
-                  onChange={(event) => {
-                    const nextPlanType = event.target.value as PlanType;
-                    nextLuckyRequestToken();
-                    setPlanType(nextPlanType);
-                    setBatch(null);
-                    setLuckyId(null);
-                    setPartner(null);
-                    setBatchResults([]);
-                    setLuckyResults([]);
-                    setLuckyQuery("");
-                    setAvailableLuckyCount(null);
-                    setError(null);
-                    setSuccess(null);
-                  }}
-                  className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
-                >
-                  <option value="EMI">Advance EMI</option>
-                  <option value="RENT">RENT</option>
-                  <option value="LEASE">LEASE</option>
-                </select>
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                {(["EMI", "RENT", "LEASE"] as const).map((pt) => {
+                  const labels: Record<typeof pt, { title: string; desc: string }> = {
+                    EMI: { title: "Advance EMI", desc: "Batch + Lucky ID draw system" },
+                    RENT: { title: "Rent", desc: "Monthly rental contract" },
+                    LEASE: { title: "Lease", desc: "Long-term lease agreement" },
+                  };
+                  const selected = planType === pt;
+                  return (
+                    <button
+                      key={pt}
+                      type="button"
+                      onClick={() => {
+                        setPlanType(pt);
+                        if (pt !== "EMI") {
+                          nextLuckyRequestToken();
+                          setBatch(null);
+                          setLuckyId(null);
+                        }
+                      }}
+                      className={[
+                        "flex flex-col gap-0.5 rounded-lg border px-3 py-2.5 text-left transition-colors",
+                        selected
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border bg-background text-foreground hover:border-primary/40 hover:bg-muted/50",
+                      ].join(" ")}
+                    >
+                      <span className="text-sm font-semibold">{labels[pt].title}</span>
+                      <span className={["text-[11px]", selected ? "text-primary/80" : "text-muted-foreground"].join(" ")}>{labels[pt].desc}</span>
+                    </button>
+                  );
+                })}
               </div>
+              {!planType && (
+                <p className="mt-2 text-[11px] text-destructive">Please select a plan type to continue.</p>
+              )}
             </div>
           </div>
         </SectionCard>
@@ -2043,7 +2056,7 @@ export default function SubscriptionCreatePage({
           >
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <DetailValue label="Subscription ID" value={`#${success.id}`} />
-              <DetailValue label="Plan Type" value={formatPlanTypeLabel(success.plan_type || planType)} />
+              <DetailValue label="Plan Type" value={formatPlanTypeLabel(success.plan_type || planType || "EMI")} />
               <DetailValue label="Status" value={success.status || "ACTIVE"} />
               <DetailValue
                 label={isEmiPlan ? "Monthly Advance EMI" : "Recurring Amount (monthly)"}

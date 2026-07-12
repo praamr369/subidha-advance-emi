@@ -36,27 +36,26 @@ class AdminSetupReadinessApiTests(APITestCase):
         section_keys = {row["key"] for row in response.data["sections"]}
         expected_keys = {
             "business_profile",
-            "print_branding",
             "business_compliance",
             "policy_governance",
             "chart_of_accounts",
             "finance_accounts",
             "branch_cash_counter",
-            "staff_roles",
-            "product_catalog",
-            "batch_lucky_ids",
-            "payment_collection",
             "document_templates",
-            "accounting_reconciliation",
             "amendment_recontract",
+            "staff_hr_payroll",
+            "subscription_emi_setup",
+            "direct_sale_setup",
+            "finance_account_coa_mapping",
+            "accounting_bridge",
         }
         # Check that all expected keys are present (allow additional keys)
         self.assertTrue(expected_keys.issubset(section_keys),
                        f"Missing section keys: {expected_keys - section_keys}")
 
         checklist_keys = {row["key"] for row in response.data["launch_checklist"]}
-        self.assertIn("can_complete_business_compliance", checklist_keys)
-        self.assertIn("can_publish_public_policies", checklist_keys)
+        self.assertIn("can_collect_payment", checklist_keys)
+        self.assertIn("can_create_customer", checklist_keys)
 
     def test_finance_account_blocker_appears_for_non_posting_coa(self):
         self.client.force_authenticate(self.admin)

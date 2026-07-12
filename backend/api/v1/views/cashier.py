@@ -355,6 +355,8 @@ class CashierCollectDirectSalePayment(APIView):
                     "status": getattr(receipt, "status", None),
                     "receipt_date": getattr(receipt, "receipt_date", None),
                     "finance_account_id": getattr(receipt, "finance_account_id", None),
+                    "branch_id": getattr(receipt, "branch_id", None),
+                    "cash_counter_id": getattr(receipt, "cash_counter_id", None),
                 },
                 "invoice": {
                     "id": getattr(invoice, "id", None),

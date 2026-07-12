@@ -55,6 +55,8 @@ def _apply_filters(queryset, request):
     active_status = _normalize(request.query_params.get("active") or request.query_params.get("is_active"))
     capability = _normalize(request.query_params.get("capability")).upper()
     readiness = _normalize(request.query_params.get("readiness")).upper()
+    item_type = _normalize(request.query_params.get("item_type")).upper()
+    stock_type = _normalize(request.query_params.get("stock_type")).upper()
 
     if q:
         query = (
@@ -125,6 +127,12 @@ def _apply_filters(queryset, request):
         queryset = queryset.filter(is_active=True, is_direct_sale_enabled=True, base_price__gt=Decimal("0.00"))
     elif readiness in {"RENT_LEASE_READY", "RENTLEASE_READY"}:
         queryset = queryset.filter(Q(is_rent_enabled=True) | Q(is_lease_enabled=True))
+
+    if item_type:
+        queryset = queryset.filter(item_type=item_type)
+
+    if stock_type:
+        queryset = queryset.filter(stock_type=stock_type)
 
     return queryset.distinct()
 

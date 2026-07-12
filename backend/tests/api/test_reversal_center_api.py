@@ -175,7 +175,7 @@ class ReversalCenterApiTests(APITestCase):
 
     def test_inventory_item_search_returns_product_and_stock_by_location(self):
         self.client.force_authenticate(user=self.admin)
-        response = self.client.get("/api/v1/admin/inventory/items/search/?q=REV-API-SKU-001")
+        response = self.client.get("/api/v1/admin/inventory/items/search/?q=REV-API-SKU-001&include_locations=1")
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertGreaterEqual(response.data["count"], 1)
         first = response.data["results"][0]

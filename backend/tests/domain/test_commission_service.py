@@ -260,8 +260,12 @@ class CommissionServiceTests(TestCase):
         payment = result["payment"]
 
         Commission.objects.filter(payment=payment).delete()
-        self.emi.status = EmiStatus.WAIVED
-        self.emi.save(update_fields=["status"])
+        # Model save() blocks PAID -> WAIVED (EMI immutable once PAID); force
+        # the state at DB level to build the "waived EMI with payment" fixture.
+        from subscriptions.models import Emi
+
+        Emi.objects.filter(pk=self.emi.pk).update(status=EmiStatus.WAIVED)
+        self.emi.refresh_from_db()
         payment.refresh_from_db()
         payment.emi.refresh_from_db()
 

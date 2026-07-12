@@ -41,6 +41,7 @@ class DirectSaleBillingWorkspaceTests(APITestCase):
         self.client.force_authenticate(self.admin)
         ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         ensure_document_numbering_profile_for_date(DocumentType.DIRECT_SALE, date.today(), performed_by=self.admin)
+        ensure_document_numbering_profile_for_date(DocumentType.TAX_INVOICE, date.today(), performed_by=self.admin)
         self.customer = create_customer_profile(
             name="Direct Sale Workspace Customer",
             phone="7377000011",

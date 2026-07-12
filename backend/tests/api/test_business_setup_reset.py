@@ -54,7 +54,9 @@ class BusinessSetupResetApiTests(APITestCase):
             finance_account=finance,
             chart_account=chart,
             purpose="CASH_COLLECTION",
-            is_default=True,
+            # uq_default_mapping_per_purpose: another mapping may already hold
+            # the default for this purpose; this row just needs to exist.
+            is_default=False,
             is_active=True,
             created_by=self.admin,
             updated_by=self.admin,

@@ -26,13 +26,16 @@ class LuckyIdReleaseOnCancellationTests(TestCase):
         )
 
     def _make_subscription(self, *, batch_status: str, lucky_number: int) -> Subscription:
+        # CTRL-LP-5 forbids enrollment into frozen batches, so enroll while
+        # OPEN and move the batch to the target status afterwards — the same
+        # sequence real batches follow.
         batch = create_batch(
             batch_code=f"LREL-{batch_status}-{lucky_number}",
             duration_months=3,
             total_slots=100,
             draw_day=5,
             start_date=date(2026, 3, 1),
-            status=batch_status,
+            status=BatchStatus.OPEN,
         )
         lucky = create_lucky_id(batch=batch, lucky_number=lucky_number, status=LuckyIdStatus.AVAILABLE)
         subscription = create_subscription(
@@ -46,6 +49,9 @@ class LuckyIdReleaseOnCancellationTests(TestCase):
         )
         lucky.status = LuckyIdStatus.ASSIGNED
         lucky.save(update_fields=["status"])
+        if batch_status != BatchStatus.OPEN:
+            batch.status = batch_status
+            batch.save(update_fields=["status"])
         return subscription
 
     def test_open_batch_cancellation_releases_lucky_id(self):

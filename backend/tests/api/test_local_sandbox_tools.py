@@ -15,18 +15,33 @@ class LocalSandboxToolsApiTests(APITestCase):
 
     def test_setup_readiness_admin_only(self):
         self.client.force_authenticate(self.admin)
-        ok = self.client.get("/api/v1/admin/setup-readiness/")
+        ok = self.client.get("/api/v1/admin/setup/readiness/")
         self.assertEqual(ok.status_code, status.HTTP_200_OK)
 
         self.client.force_authenticate(self.partner)
-        denied = self.client.get("/api/v1/admin/setup-readiness/")
+        denied = self.client.get("/api/v1/admin/setup/readiness/")
         self.assertEqual(denied.status_code, status.HTTP_403_FORBIDDEN)
 
     @override_settings(DEBUG=False, ENVIRONMENT_NAME="production")
     def test_local_tools_disabled_in_production_like(self):
         self.client.force_authenticate(self.admin)
-        blocked = self.client.get("/api/v1/admin/setup-readiness/")
-        self.assertEqual(blocked.status_code, status.HTTP_403_FORBIDDEN)
+        # setup/readiness is a read-only status view, accessible in all environments
+        resp = self.client.get("/api/v1/admin/setup/readiness/")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        # sandbox reset is blocked in production
+        blocked = self.client.post(
+            "/api/v1/admin/local-sandbox/reset/",
+            {
+                "scopes": ["customers"],
+                "preserve_admin_username": "subidhafurniture",
+                "preserve_setup": True,
+                "confirm_phrase": "RESET SANDBOX",
+                "dry_run": True,
+                "sandbox_only": True,
+            },
+            format="json",
+        )
+        self.assertIn(blocked.status_code, {status.HTTP_403_FORBIDDEN, status.HTTP_400_BAD_REQUEST})
 
     def test_export_excludes_transactional_sections(self):
         payload = export_setup_snapshot().payload

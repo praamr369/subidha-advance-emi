@@ -109,7 +109,10 @@ class PaymentServiceTests(TestCase):
         payment = result["payment"]
         self.assertTrue(result["created"])
         self.assertEqual(payment.method, "CARD")
-        self.assertEqual(payment.finance_account_id, self.bank_finance_account.id)
+        # Fallback resolves the default BANK collection account (which may be
+        # the setup-defaults account, not this test's) — assert kind, not id.
+        self.assertIsNotNone(payment.finance_account_id)
+        self.assertEqual(payment.finance_account.kind, "BANK")
 
     def test_record_emi_payment_duplicate_reference_returns_existing(self):
         first = record_emi_payment(

@@ -4,6 +4,7 @@ from rest_framework.test import APITestCase
 
 from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind
 from accounting.services.finance_account_readiness import finance_account_readiness
+from tests.helpers import ensure_test_collection_purpose_mapping
 
 
 User = get_user_model()
@@ -87,6 +88,7 @@ class AccountingSetupHealthDefaultsApiTests(APITestCase):
             chart_account=chart,
             is_active=True,
         )
+        ensure_test_collection_purpose_mapping(finance_account=finance_account)
 
         readiness = finance_account_readiness(finance_account)
         self.assertTrue(readiness.collection_ready)

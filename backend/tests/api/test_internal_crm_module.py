@@ -47,11 +47,11 @@ class InternalCrmModuleApiTests(APITestCase):
         row = self._create_lead()
         response = self.client.post(
             f"/api/v1/admin/crm/internal/leads/{row['id']}/stage/",
-            {"stage": "INTERESTED"},
+            {"stage": "CONTACTED"},
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-        self.assertEqual(response.data["stage"], "INTERESTED")
+        self.assertEqual(response.data["stage"], "CONTACTED")
 
     def test_convert_lead_to_customer(self):
         row = self._create_lead()
@@ -79,13 +79,10 @@ class InternalCrmModuleApiTests(APITestCase):
         row = self._create_lead()
         due_at = (timezone.now() - timedelta(hours=2)).isoformat()
         create_response = self.client.post(
-            "/api/v1/admin/crm/internal/follow-ups/",
+            f"/api/v1/admin/crm/internal/leads/{row['id']}/tasks/",
             {
-                "lead": row["id"],
-                "customer": None,
                 "assigned_to": self.cashier.id,
                 "due_at": due_at,
-                "status": "OPEN",
                 "call_note": "",
             },
             format="json",

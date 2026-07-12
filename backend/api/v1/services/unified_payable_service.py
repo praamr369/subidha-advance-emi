@@ -137,10 +137,10 @@ def _commission_payables() -> list[dict[str, Any]]:
             "payable_type_label": "Commission Payout",
             "payable_id": c.id,
             "reference": f"Commission #{c.id}",
-            "party_name": party.name if party else "—",
+            "party_name": (party.get_full_name() or party.username) if party else "—",
             "party_type": "Partner",
-            "amount": _money(getattr(c, "amount", 0)),
-            "outstanding": _money(getattr(c, "amount", 0)),
+            "amount": _money(getattr(c, "commission_amount", 0)),
+            "outstanding": _money(getattr(c, "commission_amount", 0)),
             "status": c.status,
             "needs_posting": False,
             "date": str(getattr(c, "created_at", "")).split("T")[0],
@@ -409,7 +409,7 @@ def _execute_commission(*, payable_id, finance_account_id, amount, payment_date,
         settlement_metadata={"reference_no": reference_no, "notes": notes},
     )
     commission = result.get("commission") or Commission.objects.get(pk=payable_id)
-    commission_amount = _dec(getattr(commission, "amount", amount))
+    commission_amount = _dec(getattr(commission, "commission_amount", None) or amount)
 
     journal_id = None
     if finance_account_id:
@@ -480,10 +480,13 @@ def _execute_expense_claim(*, payable_id, finance_account_id, amount, payment_da
     from accounting.services.operational_accounts_service import ensure_phase3_system_accounts
     from django.db.models import Sum as DSum
 
+    # NB: "branch" is a nullable FK — joining it under select_for_update() breaks
+    # on Postgres (FOR UPDATE cannot lock the nullable side of an outer join),
+    # so lock only this row.
     claim = (
         EmployeeExpenseClaim.objects
-        .select_for_update()
-        .select_related("employee", "expense_account", "branch")
+        .select_for_update(of=("self",))
+        .select_related("employee", "expense_account")
         .get(pk=payable_id)
     )
     finance_account = FinanceAccount.objects.select_related("chart_account").get(pk=finance_account_id)

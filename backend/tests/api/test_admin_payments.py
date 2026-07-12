@@ -1,5 +1,6 @@
 from decimal import Decimal
 from datetime import date
+from django.utils import timezone
 
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -26,13 +27,14 @@ class AdminPaymentApiTests(APITestCase):
     def setUp(self):
         self.admin = create_admin_user()
         self.client.force_authenticate(user=self.admin)
+        self._test_date = timezone.now().date()
         ensure_test_accounting_posting_prerequisites(
-            date(2026, 3, 17),
+            self._test_date,
             performed_by=self.admin,
         )
         ensure_document_numbering_profile_for_date(
             "EMI_RECEIPT",
-            date(2026, 3, 17),
+            self._test_date,
             performed_by=self.admin,
         )
 
@@ -99,7 +101,7 @@ class AdminPaymentApiTests(APITestCase):
                 "amount": "1000.00",
                 "payment_method": "CASH",
                 "finance_account_id": self.cash_finance.id,
-                "payment_date": "2026-03-17",
+                "payment_date": str(self._test_date),
                 "reference_no": "ADM-API-001",
                 "notes": "admin collect test",
             },
@@ -127,7 +129,7 @@ class AdminPaymentApiTests(APITestCase):
                 "amount": "1000.00",
                 "payment_method": "CARD",
                 "finance_account_id": self.bank_finance.id,
-                "payment_date": "2026-03-17",
+                "payment_date": str(self._test_date),
                 "reference_no": "ADM-API-CARD-001",
             },
             format="json",
@@ -149,7 +151,7 @@ class AdminPaymentApiTests(APITestCase):
                 "amount": "1000.00",
                 "payment_method": "CASH",
                 "finance_account_id": self.cash_finance.id,
-                "payment_date": "2026-03-17",
+                "payment_date": str(self._test_date),
                 "reference_no": "ADM-API-002",
             },
             format="json",
@@ -161,7 +163,7 @@ class AdminPaymentApiTests(APITestCase):
                 "amount": "1000.00",
                 "payment_method": "CASH",
                 "finance_account_id": self.cash_finance.id,
-                "payment_date": "2026-03-17",
+                "payment_date": str(self._test_date),
                 "reference_no": "ADM-API-002",
             },
             format="json",
@@ -189,7 +191,7 @@ class AdminPaymentApiTests(APITestCase):
                 "amount": "400.00",
                 "payment_method": "CASH",
                 "finance_account_id": self.cash_finance.id,
-                "payment_date": "2026-03-17",
+                "payment_date": str(self._test_date),
             },
             format="json",
         )
@@ -203,7 +205,7 @@ class AdminPaymentApiTests(APITestCase):
             "amount": "400.00",
             "payment_method": "CASH",
             "finance_account_id": self.cash_finance.id,
-            "payment_date": "2026-03-17",
+            "payment_date": str(self._test_date),
             "idempotency_key": "admin-api-cash-double-submit-001",
         }
         first = self.client.post("/api/v1/admin/payments/collect/", payload, format="json")
@@ -239,7 +241,7 @@ class AdminPaymentApiTests(APITestCase):
                 "amount": "1000.00",
                 "payment_method": "CASH",
                 "finance_account_id": self.cash_finance.id,
-                "payment_date": "2026-03-17",
+                "payment_date": str(self._test_date),
                 "reference_no": "ADM-API-003",
             },
             format="json",
@@ -276,7 +278,7 @@ class AdminPaymentApiTests(APITestCase):
                 "amount": "1000.00",
                 "payment_method": "CASH",
                 "finance_account_id": self.cash_finance.id,
-                "payment_date": "2026-03-17",
+                "payment_date": str(self._test_date),
                 "reference_no": "ADM-API-004",
             },
             format="json",
@@ -305,7 +307,7 @@ class AdminPaymentApiTests(APITestCase):
                 "amount": "1000.00",
                 "payment_method": "CASH",
                 "finance_account_id": self.cash_finance.id,
-                "payment_date": "2026-03-17",
+                "payment_date": str(self._test_date),
                 "reference_no": "ADM-API-005",
             },
             format="json",
@@ -348,7 +350,7 @@ class AdminPaymentApiTests(APITestCase):
                 "amount": "1000.00",
                 "payment_method": "CASH",
                 "finance_account_id": self.cash_finance.id,
-                "payment_date": "2026-03-17",
+                "payment_date": str(self._test_date),
                 "reference_no": "ADM-API-006",
             },
             format="json",
@@ -386,7 +388,7 @@ class AdminPaymentApiTests(APITestCase):
                 "amount": "1000.00",
                 "payment_method": "CASH",
                 "finance_account_id": self.cash_finance.id,
-                "payment_date": "2026-03-17",
+                "payment_date": str(self._test_date),
                 "reference_no": "ADM-API-007",
             },
             format="json",
@@ -413,7 +415,7 @@ class AdminPaymentApiTests(APITestCase):
                 "amount": "1000.00",
                 "payment_method": "CASH",
                 "finance_account_id": self.cash_finance.id,
-                "payment_date": "2026-03-17",
+                "payment_date": str(self._test_date),
                 "reference_no": "ADM-API-008",
             },
             format="json",

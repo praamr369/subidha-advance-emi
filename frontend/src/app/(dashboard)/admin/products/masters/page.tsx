@@ -22,6 +22,8 @@ const EMPTY_CATALOG_OPTIONS: ProductCatalogOptions = {
   subcategories: [],
   unit_of_measure_masters: [],
   unit_of_measure_options: ["PCS"],
+  item_type_choices: [],
+  stock_type_choices: [],
 };
 
 function toErrorMessage(error: unknown): string {

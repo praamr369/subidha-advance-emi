@@ -167,7 +167,7 @@ class UnifiedReceivablePreviewView(APIView):
             request_id=(request.headers.get("X-Request-ID") or None),
             user_agent=(request.headers.get("User-Agent") or None),
         )
-        return Response(payload, status=status.HTTP_200_OK)
+        return Response({**payload, "mutates_data": False}, status=status.HTTP_200_OK)
 
 
 class AdminUnifiedReceivablePreviewView(UnifiedReceivablePreviewView):

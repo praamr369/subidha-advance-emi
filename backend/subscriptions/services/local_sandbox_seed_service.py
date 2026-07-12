@@ -40,21 +40,24 @@ def seed_local_sandbox(*, performed_by):
     User = get_user_model()
 
     with transaction.atomic():
+        from django.contrib.auth.hashers import make_password
+
+        sandbox_password = make_password("Sandbox@12345")
         partner, _ = User.objects.get_or_create(
             username="SANDBOX-PARTNER",
-            defaults={"role": UserRole.PARTNER, "is_active": True},
+            defaults={"role": UserRole.PARTNER, "is_active": True, "phone": "9800000101", "password": sandbox_password},
         )
         cashier, _ = User.objects.get_or_create(
             username="SANDBOX-CASHIER",
-            defaults={"role": UserRole.CASHIER, "is_active": True, "is_staff": True},
+            defaults={"role": UserRole.CASHIER, "is_active": True, "is_staff": True, "phone": "9800000102", "password": sandbox_password},
         )
         customer_user, _ = User.objects.get_or_create(
             username="SANDBOX-CUSTOMER",
-            defaults={"role": UserRole.CUSTOMER, "is_active": True},
+            defaults={"role": UserRole.CUSTOMER, "is_active": True, "phone": "9800000103", "password": sandbox_password},
         )
         customer, _ = Customer.objects.get_or_create(
             user=customer_user,
-            defaults={"name": "DEMO CUSTOMER", "phone": "LOCAL-9000000000", "kyc_status": "PENDING"},
+            defaults={"name": "DEMO CUSTOMER", "phone": "9800000104", "kyc_status": "PENDING"},
         )
 
         category, _ = ProductCategoryMaster.objects.get_or_create(name="SANDBOX-CAT", defaults={"is_active": True})
@@ -63,12 +66,12 @@ def seed_local_sandbox(*, performed_by):
         product.save(update_fields=["category"])
 
         batch = create_batch(batch_code="SANDBOX-BATCH-001")
-        lucky = create_lucky_id(batch=batch, lucky_number=999, status=LuckyIdStatus.AVAILABLE)
+        lucky = create_lucky_id(batch=batch, lucky_number=99, status=LuckyIdStatus.AVAILABLE)
         subscription = create_subscription(customer=customer, product=product, batch=batch, lucky_id=lucky, partner=partner)
 
         emi_paid = Emi.objects.create(subscription=subscription, month_no=1, due_date=timezone.localdate(), amount=Decimal("1000.00"), status=EmiStatus.PAID)
         emi_overdue = Emi.objects.create(subscription=subscription, month_no=2, due_date=timezone.localdate() - timedelta(days=30), amount=Decimal("1000.00"), status=EmiStatus.PENDING)
-        Payment.objects.create(subscription=subscription, emi=emi_paid, amount=Decimal("1000.00"), payment_date=timezone.localdate(), method=PaymentMethod.CASH)
+        Payment.objects.create(subscription=subscription, customer=customer, emi=emi_paid, amount=Decimal("1000.00"), payment_date=timezone.localdate(), method=PaymentMethod.CASH)
 
         advanced = {"direct_sales_created": 0, "purchase_bills_created": 0, "service_tickets_created": 0}
         doc_series = getattr(settings, "DIRECT_SALE_DEFAULT_DOC_SERIES_ID", None)
@@ -101,7 +104,9 @@ def seed_local_sandbox(*, performed_by):
         if location:
             Warehouse.objects.get_or_create(code="SANDBOX-WH-001", defaults={"name": "SANDBOX-WH", "stock_location": location, "is_active": True})
 
-        LuckyDraw.objects.get_or_create(batch=batch, draw_month=timezone.localdate().replace(day=1), defaults={"is_revealed": False})
+        import hashlib
+        sandbox_commit = hashlib.sha256(b"SANDBOX-DRAW-COMMIT").hexdigest()
+        LuckyDraw.objects.get_or_create(batch=batch, draw_month=1, defaults={"is_revealed": False, "committed_hash": sandbox_commit})
 
     return {
         "seeded": True,

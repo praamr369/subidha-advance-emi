@@ -73,7 +73,13 @@ def seed_bridge_ready_environment(reference_date: date | None = None, *, perform
     prereqs = ensure_test_accounting_posting_prerequisites(reference_date, performed_by=performed_by)
     setup_result = apply_accounting_setup_defaults(performed_by=performed_by)
     finance_accounts = ensure_default_payment_collection_accounts()
-    return {**prereqs, "setup_defaults": setup_result, "finance_accounts": finance_accounts, "finance_account": finance_accounts["CASH"]}
+    return {
+        **prereqs,
+        "setup_defaults": setup_result,
+        "finance_accounts": finance_accounts,
+        "finance_account": finance_accounts["CASH"],
+        "cash_account": finance_accounts["CASH"],
+    }
 
 
 def seed_payment_bridge_ready_environment(reference_date: date | None = None, *, performed_by=None):

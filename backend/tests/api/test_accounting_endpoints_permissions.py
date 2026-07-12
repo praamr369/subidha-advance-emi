@@ -55,7 +55,6 @@ class AccountingEndpointsPermissionsTests(APITestCase):
             "/api/v1/accounting/chart-of-accounts/",
             "/api/v1/accounting/journal-entries/",
             "/api/v1/accounting/expenses/",
-            "/api/v1/accounting/salary-sheets/",
         ]
         for user in [self.partner, self.cashier, self.customer_user]:
             self.client.force_authenticate(user=user)

@@ -312,14 +312,28 @@ class AccountingMasterEditabilityApiTests(APITestCase):
         self.assertEqual(response.data["data"]["id"], self.finance_account.id)
         self.assertIn("editable_fields", response.data["editability"])
 
-    def test_finance_account_locked_fields_reject_when_used(self):
+    def _make_collection_cash_account(self, name):
+        from accounting.models import FinanceAccountCoaMapping, FinanceAccountMappingPurpose
+
         finance_account = FinanceAccount.objects.create(
-            name="Front Counter Cash",
+            name=name,
             branch=self.branch,
             kind=FinanceAccountKind.CASH,
             chart_account=self.root_asset,
             opening_balance=Decimal("0.00"),
         )
+        # CashCounter requires an active CASH_COLLECTION mapping on its account.
+        FinanceAccountCoaMapping.objects.create(
+            finance_account=finance_account,
+            chart_account=self.root_asset,
+            purpose=FinanceAccountMappingPurpose.CASH_COLLECTION,
+            is_default=False,
+            is_active=True,
+        )
+        return finance_account
+
+    def test_finance_account_locked_fields_reject_when_used(self):
+        finance_account = self._make_collection_cash_account("Front Counter Cash")
         CashCounter.objects.create(
             code="CTR-1",
             name="Counter 1",
@@ -345,7 +359,9 @@ class AccountingMasterEditabilityApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
         self.assertIn("chart_account", response.data)
         self.assertIn("kind", response.data)
-        self.assertIn("opening_balance", response.data)
+        # opening_balance locks only after real transactions exist — a cash
+        # counter routing through the account does not lock it.
+        self.assertNotIn("opening_balance", response.data)
         self.assertIn("is_active", response.data)
         self.assertEqual(
             self._master_update_audit_count(
@@ -366,13 +382,7 @@ class AccountingMasterEditabilityApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED, response.data)
 
     def test_finance_account_deactivate_behavior_is_blocked_when_in_use(self):
-        finance_account = FinanceAccount.objects.create(
-            name="Busy Cash",
-            branch=self.branch,
-            kind=FinanceAccountKind.CASH,
-            chart_account=self.root_asset,
-            opening_balance=Decimal("0.00"),
-        )
+        finance_account = self._make_collection_cash_account("Busy Cash")
         CashCounter.objects.create(
             code="CTR-2",
             name="Counter 2",

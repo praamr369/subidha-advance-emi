@@ -25,6 +25,7 @@ import { FormSection } from "@/components/ui/operations";
 import SmartSuggestField from "@/components/forms/SmartSuggestField";
 import { apiFetch } from "@/lib/api";
 import { getProductCatalogOptions, type ProductCatalogOptions } from "@/services/products";
+import QuickCreateInventoryDrawer from "@/components/inventory/QuickCreateInventoryDrawer";
 
 type CreatedProductResponse = {
   id: number;
@@ -266,12 +267,17 @@ export default function AdminProductCreatePage() {
     subcategories: [],
     unit_of_measure_masters: [],
     unit_of_measure_options: ["PCS"],
+    item_type_choices: [],
+    stock_type_choices: [],
   });
 
+  const [itemType, setItemType] = useState("FINISHED_GOOD");
+  const [stockType, setStockType] = useState("STOCK_ITEM");
   const [isActive, setIsActive] = useState(true);
   const [isEmiEnabled, setIsEmiEnabled] = useState(true);
   const [isRentEnabled, setIsRentEnabled] = useState(false);
   const [isLeaseEnabled, setIsLeaseEnabled] = useState(false);
+  const [isDirectSaleEnabled, setIsDirectSaleEnabled] = useState(true);
 
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const [selectedImagePreview, setSelectedImagePreview] = useState<string | null>(
@@ -283,6 +289,7 @@ export default function AdminProductCreatePage() {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [created, setCreated] = useState<CreatedProductResponse | null>(null);
+  const [quickCreateType, setQuickCreateType] = useState<"ACCESSORY" | "RAW_MATERIAL" | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -300,6 +307,8 @@ export default function AdminProductCreatePage() {
             subcategories: [],
             unit_of_measure_masters: [],
             unit_of_measure_options: ["PCS"],
+            item_type_choices: [],
+            stock_type_choices: [],
           });
         }
       }
@@ -367,15 +376,15 @@ export default function AdminProductCreatePage() {
 
   const currentPrice = useMemo(() => Number(trimmedBasePrice || 0), [trimmedBasePrice]);
 
+  // Services and add-ons can have zero price (quoted separately)
+  const requiresPrice = itemType !== "SERVICE" && itemType !== "ADD_ON";
   const canSave = useMemo(() => {
     return (
       trimmedProductCode.length > 0 &&
       trimmedName.length > 0 &&
-      Number.isFinite(currentPrice) &&
-      currentPrice > 0 &&
-      isEmiEnabled
+      (!requiresPrice || (Number.isFinite(currentPrice) && currentPrice > 0))
     );
-  }, [trimmedProductCode, trimmedName, currentPrice, isEmiEnabled]);
+  }, [trimmedProductCode, trimmedName, currentPrice, requiresPrice]);
 
   function resetForm() {
     setProductCode("");
@@ -388,10 +397,13 @@ export default function AdminProductCreatePage() {
     setDescription("");
     setHsnSacCode("");
     setGstRate("");
+    setItemType("FINISHED_GOOD");
+    setStockType("STOCK_ITEM");
     setIsActive(true);
     setIsEmiEnabled(true);
     setIsRentEnabled(false);
     setIsLeaseEnabled(false);
+    setIsDirectSaleEnabled(true);
     setSelectedImageFile(null);
     setSelectedImagePreview(null);
     setError(null);
@@ -417,19 +429,12 @@ export default function AdminProductCreatePage() {
       next.name = "Product name is required.";
     }
 
-    if (!trimmedBasePrice) {
-      next.base_price = "Base price is required.";
-    } else if (!Number.isFinite(price) || price <= 0) {
-      next.base_price = "Base price must be greater than zero.";
-    }
-
-    if (!isEmiEnabled && !isRentEnabled && !isLeaseEnabled) {
-      next.is_emi_enabled = "At least one product mode must be enabled.";
-    }
-
-    if (!isEmiEnabled) {
-      next.is_emi_enabled =
-        "Current backend default plan type is EMI, so EMI must remain enabled at product creation.";
+    if (requiresPrice) {
+      if (!trimmedBasePrice) {
+        next.base_price = "Base price is required.";
+      } else if (!Number.isFinite(price) || price <= 0) {
+        next.base_price = "Base price must be greater than zero.";
+      }
     }
 
     if (selectedImageFile) {
@@ -492,10 +497,13 @@ export default function AdminProductCreatePage() {
       if (gstRate.trim()) {
         formData.append("gst_rate", gstRate.trim());
       }
+      formData.append("item_type", itemType);
+      formData.append("stock_type", stockType);
       formData.append("is_active", String(isActive));
       formData.append("is_emi_enabled", String(isEmiEnabled));
       formData.append("is_rent_enabled", String(isRentEnabled));
       formData.append("is_lease_enabled", String(isLeaseEnabled));
+      formData.append("is_direct_sale_enabled", String(isDirectSaleEnabled));
 
       if (selectedImageFile) {
         formData.append("image", selectedImageFile);
@@ -623,6 +631,71 @@ export default function AdminProductCreatePage() {
             description="Create the product master fields used by admin and subscription workflows."
           >
             <div className="grid gap-4">
+              {/* Item type + stock type — first picks, drives everything else */}
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label htmlFor="item-type" className="mb-2 block text-sm font-medium text-foreground">
+                    Item Type <span className="text-destructive">*</span>
+                  </label>
+                  <select
+                    id="item-type"
+                    value={itemType}
+                    onChange={(e) => { setItemType(e.target.value); setError(null); }}
+                    disabled={saving}
+                    className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {catalogOptions.item_type_choices.length > 0
+                      ? catalogOptions.item_type_choices.map(c => <option key={c.value} value={c.value}>{c.label}</option>)
+                      : (
+                        <>
+                          <option value="FINISHED_GOOD">Finished Good</option>
+                          <option value="RAW_MATERIAL">Raw Material</option>
+                          <option value="ACCESSORY">Accessory</option>
+                          <option value="SERVICE">Service</option>
+                          <option value="ADD_ON">Add-on</option>
+                        </>
+                      )
+                    }
+                  </select>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {itemType === "FINISHED_GOOD" && "Ready-to-sell product delivered to customer."}
+                    {itemType === "RAW_MATERIAL" && "Input material used in manufacturing. Not sold directly."}
+                    {itemType === "ACCESSORY" && "Add-on item sold alongside a main product."}
+                    {itemType === "SERVICE" && "Labour or service charge. No physical inventory."}
+                    {itemType === "ADD_ON" && "Optional upgrade sold with a base product."}
+                  </p>
+                </div>
+
+                <div>
+                  <label htmlFor="stock-type" className="mb-2 block text-sm font-medium text-foreground">
+                    Stock Type <span className="text-destructive">*</span>
+                  </label>
+                  <select
+                    id="stock-type"
+                    value={stockType}
+                    onChange={(e) => { setStockType(e.target.value); setError(null); }}
+                    disabled={saving}
+                    className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {catalogOptions.stock_type_choices.length > 0
+                      ? catalogOptions.stock_type_choices.map(c => <option key={c.value} value={c.value}>{c.label}</option>)
+                      : (
+                        <>
+                          <option value="STOCK_ITEM">Stock Item</option>
+                          <option value="MADE_TO_ORDER">Made to Order</option>
+                          <option value="NON_STOCK">Non-Stock</option>
+                        </>
+                      )
+                    }
+                  </select>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {stockType === "STOCK_ITEM" && "Kept in warehouse/store. Tracked by inventory system."}
+                    {stockType === "MADE_TO_ORDER" && "Manufactured only after order is placed."}
+                    {stockType === "NON_STOCK" && "Services or items not physically tracked."}
+                  </p>
+                </div>
+              </div>
+
               <div>
                 <label
                   htmlFor="product-code"
@@ -925,20 +998,13 @@ export default function AdminProductCreatePage() {
                     <input
                       type="checkbox"
                       checked={isEmiEnabled}
-                      onChange={() => {
-                        setIsEmiEnabled(true);
-                        setError(null);
-                      }}
-                      disabled
+                      onChange={(e) => { setIsEmiEnabled(e.target.checked); setError(null); }}
+                      disabled={saving}
                       className="mt-1"
                     />
                     <div>
-                      <div className="text-sm font-medium text-foreground">
-                        EMI Enabled
-                      </div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        Locked on for current backend default plan behavior.
-                      </div>
+                      <div className="text-sm font-medium text-foreground">EMI Enabled</div>
+                      <div className="mt-1 text-xs text-muted-foreground">Eligible for EMI subscription plans.</div>
                       <FieldError message={fieldErrors.is_emi_enabled} />
                     </div>
                   </div>
@@ -972,20 +1038,29 @@ export default function AdminProductCreatePage() {
                     <input
                       type="checkbox"
                       checked={isLeaseEnabled}
-                      onChange={(event) => {
-                        setIsLeaseEnabled(event.target.checked);
-                        setError(null);
-                      }}
+                      onChange={(event) => { setIsLeaseEnabled(event.target.checked); setError(null); }}
                       disabled={saving}
                       className="mt-1"
                     />
                     <div>
-                      <div className="text-sm font-medium text-foreground">
-                        Lease Enabled
-                      </div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        Marks the product as lease-capable for future platform growth.
-                      </div>
+                      <div className="text-sm font-medium text-foreground">Lease Enabled</div>
+                      <div className="mt-1 text-xs text-muted-foreground">Eligible for lease contracts.</div>
+                    </div>
+                  </div>
+                </label>
+
+                <label className="rounded-xl border border-border bg-background p-4">
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={isDirectSaleEnabled}
+                      onChange={(event) => { setIsDirectSaleEnabled(event.target.checked); setError(null); }}
+                      disabled={saving}
+                      className="mt-1"
+                    />
+                    <div>
+                      <div className="text-sm font-medium text-foreground">Direct Sale Enabled</div>
+                      <div className="mt-1 text-xs text-muted-foreground">Eligible for one-time direct billing without EMI.</div>
                     </div>
                   </div>
                 </label>
@@ -1054,6 +1129,29 @@ export default function AdminProductCreatePage() {
           </ERPSectionShell>
         ) : null}
 
+        {/* Quick-create shortcuts for accessories / raw materials */}
+        <FormSection
+          title="Quick-create inventory items"
+          description="Need to add an accessory variant or raw material to the database? Use these shortcuts to create them without leaving this page."
+        >
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setQuickCreateType("ACCESSORY")}
+              className="inline-flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/10 transition-colors"
+            >
+              + Quick Add Accessory
+            </button>
+            <button
+              type="button"
+              onClick={() => setQuickCreateType("RAW_MATERIAL")}
+              className="inline-flex items-center gap-2 rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+            >
+              + Quick Add Raw Material
+            </button>
+          </div>
+        </FormSection>
+
         <FormSection
           title="Create product"
           description="Save only after confirming product code, pricing, catalog structure, and optional image."
@@ -1079,6 +1177,18 @@ export default function AdminProductCreatePage() {
           />
         </FormSection>
       </div>
+
+      {quickCreateType && (
+        <QuickCreateInventoryDrawer
+          open={!!quickCreateType}
+          itemType={quickCreateType}
+          onClose={() => setQuickCreateType(null)}
+          onCreated={(result) => {
+            setQuickCreateType(null);
+            alert(`Created: ${result.product_name} (${result.product_code})`);
+          }}
+        />
+      )}
     </ERPPageShell>
   );
 }

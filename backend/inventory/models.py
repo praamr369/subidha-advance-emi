@@ -292,6 +292,21 @@ class InventoryItem(InventoryTimeStampedModel):
         validators=[MinValueValidator(Decimal("0.001"))],
     )
     is_active = models.BooleanField(default=True, db_index=True)
+    # Accessory variant grouping — items in the same group are variants of each other
+    # (e.g. "Side Rail" group: Teak 6ft, Sal 5ft, Teak 4ft …)
+    variant_group = models.ForeignKey(
+        "AccessoryVariantGroup",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="variants",
+    )
+    variant_label = models.CharField(
+        max_length=120,
+        blank=True,
+        default="",
+        help_text="Human label for this variant within its group, e.g. 'Teak 6ft'.",
+    )
 
     class Meta:
         db_table = "inventory_items"
@@ -1597,3 +1612,287 @@ class InventoryAdjustment(InventoryTimeStampedModel):
     class Meta:
         db_table = "inventory_adjustments"
         ordering = ["-created_at", "-id"]
+
+
+# ---------------------------------------------------------------------------
+# Accessory Variant Groups — group related accessories (e.g. "Side Rail" with
+# Teak 6ft, Sal 5ft variants). A finished-good links to the GROUP; at billing
+# time the admin picks the specific variant.
+# ---------------------------------------------------------------------------
+
+class AccessoryVariantGroup(InventoryTimeStampedModel):
+    """Groups multiple accessory inventory items that are variants of each other."""
+
+    code = models.CharField(max_length=40, unique=True, db_index=True)
+    name = models.CharField(max_length=160)
+    category = models.CharField(max_length=80, blank=True, default="", db_index=True)
+    subcategory = models.CharField(max_length=80, blank=True, default="", db_index=True)
+    description = models.TextField(blank=True, default="")
+    is_required = models.BooleanField(
+        default=False,
+        help_text="If True, one variant MUST be selected when this group appears on a billing.",
+    )
+    is_active = models.BooleanField(default=True, db_index=True)
+    sort_order = models.PositiveSmallIntegerField(default=1)
+
+    class Meta:
+        db_table = "inventory_accessory_variant_groups"
+        ordering = ["category", "subcategory", "name", "id"]
+        indexes = [
+            models.Index(fields=["is_active", "category"]),
+        ]
+
+    def save(self, *args, **kwargs):
+        self.code = (self.code or "").strip().upper()
+        self.name = (self.name or "").strip()
+        self.category = (self.category or "").strip()
+        self.subcategory = (self.subcategory or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.code} – {self.name}"
+
+
+# ---------------------------------------------------------------------------
+# Service Catalog — standalone services that can be offered with products
+# ---------------------------------------------------------------------------
+
+class ServiceCatalogItemStatus(models.TextChoices):
+    ACTIVE = "ACTIVE", "Active"
+    INACTIVE = "INACTIVE", "Inactive"
+
+
+class ServiceType(models.TextChoices):
+    WARRANTY = "WARRANTY", "Warranty"
+    INSTALLATION = "INSTALLATION", "Installation"
+    MAINTENANCE = "MAINTENANCE", "Maintenance / AMC"
+    POLISH = "POLISH", "Polish / Finishing"
+    DELIVERY = "DELIVERY", "Delivery / Logistics"
+    REPAIR = "REPAIR", "Repair"
+    ADDON = "ADDON", "Add-on / Upgrade"
+    OTHER = "OTHER", "Other"
+
+
+class ServiceCatalogItem(InventoryTimeStampedModel):
+    """Admin-managed catalog of services (installation, warranty, maintenance, etc.)."""
+
+    code = models.CharField(max_length=40, unique=True, db_index=True)
+    name = models.CharField(max_length=160)
+    description = models.TextField(blank=True, default="")
+    category = models.CharField(max_length=80, blank=True, default="", db_index=True)
+    service_type = models.CharField(
+        max_length=16,
+        choices=ServiceType.choices,
+        default=ServiceType.OTHER,
+        db_index=True,
+    )
+    standard_price = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=MONEY_ZERO,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    tax_rate_percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=MONEY_ZERO,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    status = models.CharField(
+        max_length=10,
+        choices=ServiceCatalogItemStatus.choices,
+        default=ServiceCatalogItemStatus.ACTIVE,
+        db_index=True,
+    )
+    hsn_sac_code = models.CharField(max_length=20, blank=True, default="")
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "inventory_service_catalog_items"
+        ordering = ["category", "name", "id"]
+        indexes = [
+            models.Index(fields=["status", "category"]),
+        ]
+
+    def save(self, *args, **kwargs):
+        self.code = (self.code or "").strip().upper()
+        self.name = (self.name or "").strip()
+        self.category = (self.category or "").strip()
+        self.hsn_sac_code = (self.hsn_sac_code or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.code} – {self.name}"
+
+
+# ---------------------------------------------------------------------------
+# Finished-Good ↔ Accessory links
+# ---------------------------------------------------------------------------
+
+class FGAccessoryChargeMode(models.TextChoices):
+    FREE = "FREE", "Free (Included)"
+    CHARGEABLE = "CHARGEABLE", "Chargeable"
+
+
+class FinishedGoodAccessoryLink(InventoryTimeStampedModel):
+    """Links an accessory (single item OR variant group) to a FINISHED_GOOD.
+
+    Exactly one of `accessory` or `variant_group` must be set:
+    - `accessory` → specific single item (no variant choice at billing time)
+    - `variant_group` → all active variants in that group are offered at billing time
+    """
+
+    finished_good = models.ForeignKey(
+        InventoryItem,
+        on_delete=models.CASCADE,
+        related_name="accessory_links",
+        limit_choices_to={"stock_item_type": InventoryItemType.FINISHED_GOOD},
+    )
+    # Specific single accessory (mutually exclusive with variant_group)
+    accessory = models.ForeignKey(
+        InventoryItem,
+        on_delete=models.PROTECT,
+        related_name="linked_to_finished_goods",
+        limit_choices_to={"stock_item_type": InventoryItemType.ACCESSORY},
+        null=True,
+        blank=True,
+    )
+    # Variant group (mutually exclusive with accessory)
+    variant_group = models.ForeignKey(
+        AccessoryVariantGroup,
+        on_delete=models.PROTECT,
+        related_name="fg_links",
+        null=True,
+        blank=True,
+    )
+    charge_mode = models.CharField(
+        max_length=12,
+        choices=FGAccessoryChargeMode.choices,
+        default=FGAccessoryChargeMode.FREE,
+        db_index=True,
+    )
+    sale_price = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=MONEY_ZERO,
+        validators=[MinValueValidator(MONEY_ZERO)],
+        help_text="Charged price when charge_mode=CHARGEABLE; ignored when FREE.",
+    )
+    is_default_included = models.BooleanField(
+        default=True,
+        help_text="Pre-selected when creating a sale/subscription.",
+    )
+    sort_order = models.PositiveSmallIntegerField(default=1)
+    notes = models.CharField(max_length=255, blank=True, default="")
+
+    class Meta:
+        db_table = "inventory_fg_accessory_links"
+        ordering = ["sort_order", "id"]
+        indexes = [
+            models.Index(fields=["finished_good", "charge_mode"]),
+        ]
+
+    def clean(self):
+        errors = {}
+        has_accessory = bool(self.accessory_id)
+        has_group = bool(self.variant_group_id)
+        if not has_accessory and not has_group:
+            errors["accessory"] = "Either a specific accessory or a variant group must be set."
+        if has_accessory and has_group:
+            errors["accessory"] = "Set either a specific accessory or a variant group, not both."
+        if has_accessory and self.accessory_id:
+            if self.finished_good_id and self.finished_good_id == self.accessory_id:
+                errors["accessory"] = "Accessory cannot be the same item as the finished good."
+            if self.accessory.stock_item_type != InventoryItemType.ACCESSORY:
+                errors["accessory"] = "Linked item must be an Accessory."
+        if self.finished_good_id and self.finished_good.stock_item_type != InventoryItemType.FINISHED_GOOD:
+            errors["finished_good"] = "Linked item must be a Finished Good."
+        if self.charge_mode == FGAccessoryChargeMode.FREE and self.sale_price and self.sale_price > MONEY_ZERO:
+            errors["sale_price"] = "Sale price must be zero when charge mode is Free."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.notes = (self.notes or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.finished_good_id} ↔ ACC:{self.accessory_id}"
+
+
+# ---------------------------------------------------------------------------
+# Finished-Good ↔ Service links
+# ---------------------------------------------------------------------------
+
+class FGServiceChargeMode(models.TextChoices):
+    FREE = "FREE", "Free (Included)"
+    CHARGEABLE = "CHARGEABLE", "Chargeable"
+
+
+class FinishedGoodServiceLink(InventoryTimeStampedModel):
+    """Links a ServiceCatalogItem to a FINISHED_GOOD inventory item."""
+
+    finished_good = models.ForeignKey(
+        InventoryItem,
+        on_delete=models.CASCADE,
+        related_name="service_links",
+        limit_choices_to={"stock_item_type": InventoryItemType.FINISHED_GOOD},
+    )
+    service = models.ForeignKey(
+        ServiceCatalogItem,
+        on_delete=models.PROTECT,
+        related_name="finished_good_links",
+    )
+    charge_mode = models.CharField(
+        max_length=12,
+        choices=FGServiceChargeMode.choices,
+        default=FGServiceChargeMode.FREE,
+        db_index=True,
+    )
+    sale_price = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=MONEY_ZERO,
+        validators=[MinValueValidator(MONEY_ZERO)],
+        help_text="Override price; 0 means use service standard_price when chargeable.",
+    )
+    is_default_included = models.BooleanField(
+        default=True,
+        help_text="Pre-selected when creating a sale/subscription.",
+    )
+    sort_order = models.PositiveSmallIntegerField(default=1)
+    notes = models.CharField(max_length=255, blank=True, default="")
+
+    class Meta:
+        db_table = "inventory_fg_service_links"
+        ordering = ["sort_order", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["finished_good", "service"],
+                name="uq_fg_service_link",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["finished_good", "charge_mode"]),
+        ]
+
+    def clean(self):
+        errors = {}
+        if self.finished_good_id:
+            if self.finished_good.stock_item_type != InventoryItemType.FINISHED_GOOD:
+                errors["finished_good"] = "Linked item must be a Finished Good."
+        if self.charge_mode == FGServiceChargeMode.FREE and self.sale_price and self.sale_price > MONEY_ZERO:
+            errors["sale_price"] = "Sale price must be zero when charge mode is Free."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.notes = (self.notes or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.finished_good_id} ↔ SVC:{self.service_id}"

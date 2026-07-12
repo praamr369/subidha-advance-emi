@@ -456,11 +456,19 @@ class AccountingSetupService:
             details.append({"purpose": purpose, "finance_account": finance_name, "status": "created"})
             if dry_run:
                 continue
+            # uq_default_mapping_per_purpose allows one active default per
+            # purpose across ALL finance accounts — if another account already
+            # holds it, create this mapping as non-default instead of crashing.
+            default_taken = is_default and FinanceAccountCoaMapping.objects.filter(
+                purpose=purpose,
+                is_default=True,
+                is_active=True,
+            ).exists()
             mapping = FinanceAccountCoaMapping.objects.create(
                 finance_account=finance,
                 chart_account=chart,
                 purpose=purpose,
-                is_default=is_default,
+                is_default=is_default and not default_taken,
                 is_active=True,
                 created_by=actor,
                 updated_by=actor,

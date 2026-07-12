@@ -38,6 +38,7 @@ import {
   type BillingProductSearchRow,
 } from "@/services/direct-sale-workspace";
 import { recheckStockNeed } from "@/services/inventory-ops";
+import AccessorySelectionPanel, { type AccessorySelectionResult } from "@/components/inventory/AccessorySelectionPanel";
 import { getAdminDirectSaleReturnEligibility, type DirectSaleReturnEligibility } from "@/services/reversals";
 import {
   buildAdminBillingDocumentRoute,
@@ -380,6 +381,7 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
     new_customer_email: "",
   });
   const [lines, setLines] = useState<DraftLine[]>([makeLine()]);
+  const [accessoryPanel, setAccessoryPanel] = useState<{ productId: number; lineId: string } | null>(null);
   const lineSearchTimers = useRef<Record<string, number>>({});
   const customerSearchTimer = useRef<number | null>(null);
   const createAttemptKey = useRef<string | null>(null);
@@ -951,6 +953,55 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
       selected_product: product,
       requirement_quantity: "1.000",
     });
+    // If this is a finished good with accessories/services, offer the selection panel
+    if (product.stock_item_type === "FINISHED_GOOD") {
+      setAccessoryPanel({ productId: product.id, lineId });
+    }
+  }
+
+  function handleAccessoryConfirm(result: AccessorySelectionResult) {
+    if (!accessoryPanel) return;
+    setAccessoryPanel(null);
+    // Add each selected chargeable accessory/service as an additional draft line
+    for (const acc of result.accessories) {
+      if (acc.chargeMode === "CHARGEABLE") {
+        setLines((prev) => [
+          ...prev,
+          {
+            ...makeLine(),
+            product_id: String(acc.productId),
+            description: acc.variantLabel || acc.productName,
+            unit_price: Number(acc.salePrice || 0).toFixed(2),
+            product_search: `${acc.productCode} - ${acc.productName}`,
+            product_loading: false,
+            product_results: [],
+            product_error: null,
+            selected_product: null,
+            requirement_quantity: "1.000",
+          },
+        ]);
+      }
+    }
+    for (const svc of result.services) {
+      if (svc.chargeMode === "CHARGEABLE") {
+        setLines((prev) => [
+          ...prev,
+          {
+            ...makeLine(),
+            product_id: "",
+            description: svc.serviceName,
+            unit_price: Number(svc.salePrice || 0).toFixed(2),
+            gst_rate: svc.taxRatePercent || "0",
+            product_search: `${svc.serviceCode} - ${svc.serviceName}`,
+            product_loading: false,
+            product_results: [],
+            product_error: null,
+            selected_product: null,
+            requirement_quantity: "1.000",
+          },
+        ]);
+      }
+    }
   }
 
   function validateForm(): { errors: string[]; customerMode: string | null } {
@@ -2279,6 +2330,34 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
           }
         }}
       />
+
+      {/* Accessory / Service selection panel — shown after selecting a FINISHED_GOOD */}
+      {accessoryPanel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setAccessoryPanel(null)} />
+          <div className="relative z-10 w-full max-w-xl rounded-2xl border border-border bg-background shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-4">
+              <h2 className="text-base font-semibold text-foreground">Accessories &amp; Services</h2>
+              <button
+                type="button"
+                onClick={() => setAccessoryPanel(null)}
+                className="rounded p-1.5 text-muted-foreground hover:bg-muted"
+              >
+                <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                  <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22z" />
+                </svg>
+              </button>
+            </div>
+            <div className="max-h-[70vh] overflow-y-auto p-5">
+              <AccessorySelectionPanel
+                productId={accessoryPanel.productId}
+                onConfirm={handleAccessoryConfirm}
+                onCancel={() => setAccessoryPanel(null)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </ERPPageShell>
   );
 }

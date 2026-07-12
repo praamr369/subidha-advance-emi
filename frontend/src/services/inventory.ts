@@ -1152,3 +1152,468 @@ export async function postOpeningStockImport(file: File, asOfDate: string) {
     body: form,
   });
 }
+
+// ---------------------------------------------------------------------------
+// Inventory Catalog — Finished Goods, Raw Materials, Accessories, Services
+// ---------------------------------------------------------------------------
+
+export type InventoryCatalogRow = {
+  id: number;
+  product_id: number;
+  product_code: string;
+  product_name: string;
+  sku: string | null;
+  stock_item_type: "FINISHED_GOOD" | "RAW_MATERIAL" | "ACCESSORY";
+  unit_of_measure: string;
+  stock_tracking_enabled: boolean;
+  stock_tracking_status: string;
+  standard_unit_cost: string;
+  reorder_level_qty: string;
+  valuation_method: string;
+  barcode: string | null;
+  is_active: boolean;
+  category: string;
+  subcategory: string;
+  base_price: string;
+};
+
+export type FinishedGoodRow = InventoryCatalogRow & {
+  accessory_count: number;
+  service_count: number;
+  has_bom: boolean;
+};
+
+export type RawMaterialRow = InventoryCatalogRow & {
+  bom_usage_count: number;
+};
+
+export type AccessoryRow = InventoryCatalogRow & {
+  linked_fg_count: number;
+};
+
+export type ServiceType = "WARRANTY" | "INSTALLATION" | "MAINTENANCE" | "POLISH" | "DELIVERY" | "REPAIR" | "ADDON" | "OTHER";
+
+export const SERVICE_TYPE_LABELS: Record<ServiceType, string> = {
+  WARRANTY: "Warranty",
+  INSTALLATION: "Installation",
+  MAINTENANCE: "Maintenance / AMC",
+  POLISH: "Polish / Finishing",
+  DELIVERY: "Delivery / Logistics",
+  REPAIR: "Repair",
+  ADDON: "Add-on / Upgrade",
+  OTHER: "Other",
+};
+
+export type ServiceCatalogItem = {
+  id: number;
+  code: string;
+  name: string;
+  description: string;
+  category: string;
+  service_type: ServiceType;
+  standard_price: string;
+  tax_rate_percent: string;
+  status: "ACTIVE" | "INACTIVE";
+  hsn_sac_code: string;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FGAccessoryLink = {
+  id: number;
+  finished_good: number;
+  accessory: number;
+  accessory_id: number;
+  accessory_name: string;
+  accessory_sku: string | null;
+  accessory_code: string;
+  accessory_inv_id: number;
+  charge_mode: "FREE" | "CHARGEABLE";
+  sale_price: string;
+  is_default_included: boolean;
+  sort_order: number;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FGServiceLink = {
+  id: number;
+  finished_good: number;
+  service: number;
+  service_code: string;
+  service_name: string;
+  service_category: string;
+  service_type: ServiceType;
+  service_standard_price: string;
+  service_hsn_sac_code: string;
+  service_tax_rate_percent: string;
+  charge_mode: "FREE" | "CHARGEABLE";
+  sale_price: string;
+  is_default_included: boolean;
+  sort_order: number;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FGBomLine = {
+  id: number;
+  inventory_item_id: number;
+  product_name: string;
+  product_code: string;
+  item_type: string;
+  quantity_per_unit: string;
+  wastage_percent: string;
+  unit_of_measure: string;
+};
+
+export type FGActiveBom = {
+  id: number;
+  bom_no: string;
+  revision_no: number;
+  status: string;
+  lines: FGBomLine[];
+};
+
+export type FGProfileDetail = {
+  profile: InventoryCatalogRow;
+  accessories: FGAccessoryLink[];
+  services: FGServiceLink[];
+  active_bom: FGActiveBom | null;
+  bom_count: number;
+};
+
+export type InventoryOverview = {
+  finished_goods: number;
+  raw_materials: number;
+  accessories: number;
+  active_services: number;
+  accessory_links: number;
+  service_links: number;
+};
+
+type CatalogPage<T> = {
+  count: number;
+  page: number;
+  page_size: number;
+  num_pages: number;
+  results: T[];
+};
+
+export function fetchInventoryOverview() {
+  return apiFetch<InventoryOverview>("/admin/inventory/overview/");
+}
+
+export function listFinishedGoods(params: { q?: string; page?: number; page_size?: number; tracking_status?: string } = {}) {
+  const sp = new URLSearchParams();
+  if (params.q) sp.set("q", params.q);
+  if (params.page) sp.set("page", String(params.page));
+  if (params.page_size) sp.set("page_size", String(params.page_size));
+  if (params.tracking_status) sp.set("tracking_status", params.tracking_status);
+  const qs = sp.toString();
+  return apiFetch<CatalogPage<FinishedGoodRow>>(`/admin/inventory/finished-goods/${qs ? `?${qs}` : ""}`);
+}
+
+export function fetchFGProfile(id: number) {
+  return apiFetch<FGProfileDetail>(`/admin/inventory/finished-goods/${id}/profile/`);
+}
+
+export function listRawMaterials(params: { q?: string; page?: number; page_size?: number } = {}) {
+  const sp = new URLSearchParams();
+  if (params.q) sp.set("q", params.q);
+  if (params.page) sp.set("page", String(params.page));
+  if (params.page_size) sp.set("page_size", String(params.page_size));
+  const qs = sp.toString();
+  return apiFetch<CatalogPage<RawMaterialRow>>(`/admin/inventory/raw-materials/${qs ? `?${qs}` : ""}`);
+}
+
+export function listAccessories(params: { q?: string; page?: number; page_size?: number } = {}) {
+  const sp = new URLSearchParams();
+  if (params.q) sp.set("q", params.q);
+  if (params.page) sp.set("page", String(params.page));
+  if (params.page_size) sp.set("page_size", String(params.page_size));
+  const qs = sp.toString();
+  return apiFetch<CatalogPage<AccessoryRow>>(`/admin/inventory/accessories/${qs ? `?${qs}` : ""}`);
+}
+
+export function listServiceCatalog(params: { q?: string; page?: number; page_size?: number; status?: string; category?: string } = {}) {
+  const sp = new URLSearchParams();
+  if (params.q) sp.set("q", params.q);
+  if (params.page) sp.set("page", String(params.page));
+  if (params.page_size) sp.set("page_size", String(params.page_size));
+  if (params.status) sp.set("status", params.status);
+  if (params.category) sp.set("category", params.category);
+  const qs = sp.toString();
+  return apiFetch<CatalogPage<ServiceCatalogItem>>(`/admin/inventory/service-catalog/${qs ? `?${qs}` : ""}`);
+}
+
+export function createServiceCatalogItem(data: Partial<ServiceCatalogItem>) {
+  return apiFetch<ServiceCatalogItem>("/admin/inventory/service-catalog/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
+export function updateServiceCatalogItem(id: number, data: Partial<ServiceCatalogItem>) {
+  return apiFetch<ServiceCatalogItem>(`/admin/inventory/service-catalog/${id}/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
+export function deleteServiceCatalogItem(id: number) {
+  return apiFetch<void>(`/admin/inventory/service-catalog/${id}/`, { method: "DELETE" });
+}
+
+export function listFGAccessoryLinks(fgId: number) {
+  return apiFetch<FGAccessoryLink[]>(`/admin/inventory/finished-goods/${fgId}/accessories/`);
+}
+
+export function addFGAccessoryLink(fgId: number, data: { accessory: number; charge_mode: string; sale_price: string; is_default_included: boolean; sort_order?: number; notes?: string }) {
+  return apiFetch<FGAccessoryLink>(`/admin/inventory/finished-goods/${fgId}/accessories/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
+export function updateFGAccessoryLink(fgId: number, linkId: number, data: Partial<FGAccessoryLink>) {
+  return apiFetch<FGAccessoryLink>(`/admin/inventory/finished-goods/${fgId}/accessories/${linkId}/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
+export function deleteFGAccessoryLink(fgId: number, linkId: number) {
+  return apiFetch<void>(`/admin/inventory/finished-goods/${fgId}/accessories/${linkId}/`, { method: "DELETE" });
+}
+
+export function listFGServiceLinks(fgId: number) {
+  return apiFetch<FGServiceLink[]>(`/admin/inventory/finished-goods/${fgId}/services/`);
+}
+
+export function addFGServiceLink(fgId: number, data: { service: number; charge_mode: string; sale_price: string; is_default_included: boolean; sort_order?: number; notes?: string }) {
+  return apiFetch<FGServiceLink>(`/admin/inventory/finished-goods/${fgId}/services/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
+export function updateFGServiceLink(fgId: number, linkId: number, data: Partial<FGServiceLink>) {
+  return apiFetch<FGServiceLink>(`/admin/inventory/finished-goods/${fgId}/services/${linkId}/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
+export function deleteFGServiceLink(fgId: number, linkId: number) {
+  return apiFetch<void>(`/admin/inventory/finished-goods/${fgId}/services/${linkId}/`, { method: "DELETE" });
+}
+
+// ---------------------------------------------------------------------------
+// Accessory Variant Groups
+// ---------------------------------------------------------------------------
+
+export type AccessoryVariantGroup = {
+  id: number;
+  code: string;
+  name: string;
+  category: string;
+  subcategory: string;
+  description: string;
+  is_required: boolean;
+  is_active: boolean;
+  sort_order: number;
+  variant_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AccessoryVariantGroupDetail = AccessoryVariantGroup & {
+  variants: {
+    id: number;
+    product_id: number;
+    product_name: string;
+    product_code: string;
+    variant_label: string;
+    sku: string | null;
+    unit_of_measure: string;
+    base_price: string;
+    standard_unit_cost: string;
+    stock_tracking_status: string;
+  }[];
+};
+
+export function listAccessoryVariantGroups(params: { q?: string; category?: string; active_only?: boolean; page?: number; page_size?: number } = {}) {
+  const sp = new URLSearchParams();
+  if (params.q) sp.set("q", params.q);
+  if (params.category) sp.set("category", params.category);
+  if (params.active_only) sp.set("active_only", "true");
+  if (params.page) sp.set("page", String(params.page));
+  if (params.page_size) sp.set("page_size", String(params.page_size));
+  const qs = sp.toString();
+  return apiFetch<{ count: number; page: number; page_size: number; results: AccessoryVariantGroup[] }>(`/admin/inventory/accessory-variant-groups/${qs ? `?${qs}` : ""}`);
+}
+
+export function fetchAccessoryVariantGroup(id: number) {
+  return apiFetch<AccessoryVariantGroupDetail>(`/admin/inventory/accessory-variant-groups/${id}/`);
+}
+
+export function createAccessoryVariantGroup(data: Partial<AccessoryVariantGroup>) {
+  return apiFetch<AccessoryVariantGroup>("/admin/inventory/accessory-variant-groups/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
+export function updateAccessoryVariantGroup(id: number, data: Partial<AccessoryVariantGroup>) {
+  return apiFetch<AccessoryVariantGroup>(`/admin/inventory/accessory-variant-groups/${id}/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
+export function deleteAccessoryVariantGroup(id: number) {
+  return apiFetch<void>(`/admin/inventory/accessory-variant-groups/${id}/`, { method: "DELETE" });
+}
+
+// ---------------------------------------------------------------------------
+// Quick Create
+// ---------------------------------------------------------------------------
+
+export type QuickCreatePayload = {
+  product_code: string;
+  name: string;
+  base_price: string;
+  unit_of_measure?: string;
+  category?: string;
+  subcategory?: string;
+  description?: string;
+  sku?: string;
+  standard_unit_cost?: string;
+  reorder_level_qty?: string;
+  variant_group?: number | null;
+  variant_label?: string;
+};
+
+export type QuickCreateResult = {
+  product_id: number;
+  product_code: string;
+  product_name: string;
+  inventory_item_id: number;
+  stock_item_type: string;
+  variant_group?: number | null;
+  variant_label?: string;
+};
+
+export function quickCreateAccessory(data: QuickCreatePayload) {
+  return apiFetch<QuickCreateResult>("/admin/inventory/quick-create/accessory/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
+export function quickCreateRawMaterial(data: QuickCreatePayload) {
+  return apiFetch<QuickCreateResult>("/admin/inventory/quick-create/raw-material/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Billing Accessory Options
+// ---------------------------------------------------------------------------
+
+export type BillingAccessoryVariant = {
+  id: number;
+  product_id: number;
+  product_name: string;
+  product_code: string;
+  variant_label: string;
+  sku: string | null;
+  unit_of_measure: string;
+  base_price: string;
+  standard_unit_cost: string;
+};
+
+export type BillingAccessoryOption = {
+  link_id: number;
+  link_type: "group" | "single";
+  group_id: number | null;
+  group_name: string | null;
+  group_code: string | null;
+  group_category: string;
+  group_subcategory: string;
+  is_required: boolean;
+  charge_mode: "FREE" | "CHARGEABLE";
+  sale_price: string;
+  is_default_included: boolean;
+  notes: string;
+  sort_order: number;
+  variants: BillingAccessoryVariant[];
+  selected_variant_id: number | null;
+};
+
+export type BillingServiceOption = {
+  link_id: number;
+  service_id: number;
+  service_code: string;
+  service_name: string;
+  service_category: string;
+  charge_mode: "FREE" | "CHARGEABLE";
+  sale_price: string;
+  standard_price: string;
+  tax_rate_percent: string;
+  hsn_sac_code: string;
+  is_default_included: boolean;
+  notes: string;
+  sort_order: number;
+};
+
+export type BillingAccessoryOptionsResponse = {
+  product_id: number;
+  inventory_item_id: number;
+  product_name: string;
+  accessory_options: BillingAccessoryOption[];
+  service_options: BillingServiceOption[];
+  has_options: boolean;
+};
+
+export function fetchBillingAccessoryOptions(productId: number) {
+  return apiFetch<BillingAccessoryOptionsResponse>(`/admin/inventory/finished-goods/${productId}/billing-accessories/`);
+}
+
+// Assign variant group to an accessory item
+export function assignVariantGroupToAccessory(inventoryItemId: number, data: { variant_group: number | null; variant_label?: string }) {
+  return apiFetch<{ id: number; variant_group: number | null; variant_group_name: string | null; variant_label: string }>(
+    `/admin/inventory/accessories/${inventoryItemId}/assign-variant-group/`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }
+  );
+}
+
+// Add variant-group link to a finished good
+export function addFGAccessoryGroupLink(fgId: number, data: { variant_group: number; charge_mode?: string; sale_price?: string; is_default_included?: boolean; sort_order?: number; notes?: string }) {
+  return apiFetch<{ id: number; finished_good: number; variant_group: number; variant_group_name: string; charge_mode: string; sale_price: string; is_default_included: boolean }>(
+    `/admin/inventory/finished-goods/${fgId}/accessory-group-links/`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }
+  );
+}

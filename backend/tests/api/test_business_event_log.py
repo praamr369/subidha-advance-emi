@@ -17,6 +17,7 @@ from tests.helpers import (
     create_product,
     create_subscription,
     ensure_default_payment_collection_accounts,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 
@@ -24,6 +25,7 @@ class BusinessEventLogApiTests(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.admin = create_admin_user(username="events_admin", phone="9810000001")
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         self.cashier = create_cashier_user(username="events_cashier", phone="9810000002")
         self.customer = create_customer_profile(name="Events Customer", phone="9810000003")
         self.product = create_product(name="Events Product", product_code="EV-001")

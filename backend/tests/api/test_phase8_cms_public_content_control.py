@@ -46,6 +46,7 @@ class Phase8CmsPublicContentControlTests(APITestCase):
             "name",
             "base_price",
             "category",
+            "category_slug",
             "subcategory",
             "image",
             "description",

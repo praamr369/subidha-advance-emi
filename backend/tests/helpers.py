@@ -114,51 +114,64 @@ def ensure_test_financial_year(reference_date: date | None = None, *, performed_
 
 
 def ensure_test_open_accounting_period(reference_date: date | None = None, *, performed_by=None):
+    """
+    Open accounting periods for EVERY month of the financial year containing
+    reference_date. Tests routinely post at relative dates (today - 40 days)
+    that cross month boundaries; opening only the reference month makes those
+    tests calendar-dependent and they break as real time advances.
+    Returns (financial_year, period-for-reference-month).
+    """
     invalidate_period_memo()
     reference_date = reference_date or date.today()
     financial_year = ensure_test_financial_year(reference_date, performed_by=performed_by)
     fy_code = financial_year.code
     fy_end = financial_year.end_date
 
-    period_start = date(reference_date.year, reference_date.month, 1)
-    if reference_date.month == 12:
-        next_month = date(reference_date.year + 1, 1, 1)
-    else:
-        next_month = date(reference_date.year, reference_date.month + 1, 1)
-    period_end = min(next_month - date.resolution, fy_end)
-    period, _ = AccountingPeriod.objects.get_or_create(
-        start_date=period_start,
-        end_date=period_end,
-        defaults={
-            "financial_year": financial_year,
-            "code": f"{fy_code}-{reference_date.year}{reference_date.month:02d}",
-            "label": reference_date.strftime("%B %Y"),
-            "name": reference_date.strftime("%B %Y"),
-            "status": AccountingPeriodStatus.OPEN,
-        },
-    )
-    updates = []
-    if period.financial_year_id != financial_year.id:
-        period.financial_year = financial_year
-        updates.append("financial_year")
-    if period.status != AccountingPeriodStatus.OPEN:
-        period.status = AccountingPeriodStatus.OPEN
-        updates.append("status")
-    if period.is_locked:
-        period.is_locked = False
-        updates.append("is_locked")
-    if period.locked_at is not None:
-        period.locked_at = None
-        updates.append("locked_at")
-    if period.locked_by_id is not None:
-        period.locked_by = None
-        updates.append("locked_by")
-    if period.lock_reason:
-        period.lock_reason = ""
-        updates.append("lock_reason")
-    if updates:
-        period.save(update_fields=[*updates, "updated_at"])
-    return financial_year, period
+    reference_period = None
+    cursor = financial_year.start_date.replace(day=1)
+    while cursor <= fy_end:
+        if cursor.month == 12:
+            next_month = date(cursor.year + 1, 1, 1)
+        else:
+            next_month = date(cursor.year, cursor.month + 1, 1)
+        period_start = max(cursor, financial_year.start_date)
+        period_end = min(next_month - date.resolution, fy_end)
+        period, _ = AccountingPeriod.objects.get_or_create(
+            start_date=period_start,
+            end_date=period_end,
+            defaults={
+                "financial_year": financial_year,
+                "code": f"{fy_code}-{cursor.year}{cursor.month:02d}",
+                "label": cursor.strftime("%B %Y"),
+                "name": cursor.strftime("%B %Y"),
+                "status": AccountingPeriodStatus.OPEN,
+            },
+        )
+        updates = []
+        if period.financial_year_id != financial_year.id:
+            period.financial_year = financial_year
+            updates.append("financial_year")
+        if period.status != AccountingPeriodStatus.OPEN:
+            period.status = AccountingPeriodStatus.OPEN
+            updates.append("status")
+        if period.is_locked:
+            period.is_locked = False
+            updates.append("is_locked")
+        if period.locked_at is not None:
+            period.locked_at = None
+            updates.append("locked_at")
+        if period.locked_by_id is not None:
+            period.locked_by = None
+            updates.append("locked_by")
+        if period.lock_reason:
+            period.lock_reason = ""
+            updates.append("lock_reason")
+        if updates:
+            period.save(update_fields=[*updates, "updated_at"])
+        if period_start <= reference_date <= period_end:
+            reference_period = period
+        cursor = next_month
+    return financial_year, reference_period
 
 
 def ensure_open_accounting_period_for_date(reference_date: date, *, performed_by=None):
@@ -180,6 +193,24 @@ def ensure_test_accounting_posting_prerequisites(reference_date: date | None = N
     posting_date = posting_date or reference_date or date.today()
     financial_year, period = ensure_test_open_accounting_period(posting_date, performed_by=performed_by)
     numbering_profile = ensure_test_journal_numbering_profile(posting_date, performed_by=performed_by)
+    # Posting flows issue documents beyond journals (invoices, receipts).
+    # Ensure profiles for the document types those flows demand so tests are
+    # not calendar-dependent on a hardcoded financial year.
+    for doc_type in (
+        DocumentType.DIRECT_SALE,
+        DocumentType.TAX_INVOICE,
+        DocumentType.DIRECT_SALE_RECEIPT,
+        DocumentType.EMI_RECEIPT,
+        DocumentType.RENT_INVOICE,
+        DocumentType.LEASE_INVOICE,
+        DocumentType.SECURITY_DEPOSIT_RECEIPT,
+        DocumentType.CREDIT_NOTE,
+    ):
+        upsert_numbering_profile(
+            document_type=doc_type,
+            reference_date=posting_date,
+            performed_by=performed_by,
+        )
     return {
         "financial_year": financial_year,
         "accounting_period": period,
@@ -265,6 +296,25 @@ def create_product(
     )
 
 
+def ensure_waiver_launch_approved():
+    """
+    Mark the active business-rule policy as approved for public lucky-draw
+    launch. Production gates draw reveals on advocate/CA approval
+    (assert_waiver_launch_permitted); tests run under approved conditions —
+    the scheme is legal-approved — unless a test explicitly asserts the block.
+    """
+    from subscriptions.models_business_setup import LegalRiskStatus
+    from subscriptions.services.business_rule_policy_service import (
+        get_or_create_active_business_rule_policy,
+    )
+
+    policy = get_or_create_active_business_rule_policy()
+    if policy.risk_status != LegalRiskStatus.APPROVED_FOR_PUBLIC_LAUNCH:
+        policy.risk_status = LegalRiskStatus.APPROVED_FOR_PUBLIC_LAUNCH
+        policy.save(update_fields=["risk_status", "updated_at"])
+    return policy
+
+
 def create_batch(
     *,
     batch_code="APRIL2026",
@@ -274,6 +324,7 @@ def create_batch(
     start_date=date(2026, 3, 1),
     status="OPEN",
 ):
+    ensure_waiver_launch_approved()
     return Batch.objects.create(
         batch_code=batch_code,
         total_slots=total_slots,

@@ -31,6 +31,29 @@ from api.v1.views.accounting_mapping_remediation import (
 )
 from api.v1.views.accounting_year_end_close import AccountingYearEndCloseView, AccountingYearEndReadinessView
 from api.v1.views.admin_product_inventory_profile import AdminProductInventoryProfilePrepareView
+from api.v1.views.admin_inventory_catalog import (
+    AdminAccessoriesListView,
+    AdminFGAccessoryLinkDetailView,
+    AdminFGAccessoryLinksView,
+    AdminFGServiceLinkDetailView,
+    AdminFGServiceLinksView,
+    AdminFinishedGoodProfileView,
+    AdminFinishedGoodsListView,
+    AdminInventoryOverviewView,
+    AdminRawMaterialsListView,
+    AdminServiceCatalogDetailView,
+    AdminServiceCatalogListCreateView,
+    AdminServiceTypeChoicesView,
+)
+from api.v1.views.admin_inventory_quick_create import (
+    AdminAccessoryVariantGroupDetailView,
+    AdminAccessoryVariantGroupListCreateView,
+    AdminBillingAccessoryOptionsView,
+    AdminFGAccessoryGroupLinkView,
+    AdminInventoryItemVariantGroupView,
+    AdminQuickCreateAccessoryView,
+    AdminQuickCreateRawMaterialView,
+)
 from api.v1.views.admin_product_register import AdminProductRegisterView
 from smart_fields.views import (
     SmartConfirmView,
@@ -52,6 +75,31 @@ urlpatterns = [
     path("admin/smart/suggest/", SmartSuggestView.as_view()),
     path("admin/smart/confirm/", SmartConfirmView.as_view()),
     path("admin/products/<int:pk>/prepare-inventory-profile/", AdminProductInventoryProfilePrepareView.as_view()),
+    # Inventory catalog: finished goods, raw materials, accessories, services
+    path("admin/inventory/overview/", AdminInventoryOverviewView.as_view()),
+    path("admin/inventory/finished-goods/", AdminFinishedGoodsListView.as_view()),
+    path("admin/inventory/finished-goods/<int:pk>/profile/", AdminFinishedGoodProfileView.as_view()),
+    path("admin/inventory/finished-goods/<int:fg_pk>/accessories/", AdminFGAccessoryLinksView.as_view()),
+    path("admin/inventory/finished-goods/<int:fg_pk>/accessories/<int:pk>/", AdminFGAccessoryLinkDetailView.as_view()),
+    path("admin/inventory/finished-goods/<int:fg_pk>/services/", AdminFGServiceLinksView.as_view()),
+    path("admin/inventory/finished-goods/<int:fg_pk>/services/<int:pk>/", AdminFGServiceLinkDetailView.as_view()),
+    path("admin/inventory/raw-materials/", AdminRawMaterialsListView.as_view()),
+    path("admin/inventory/accessories/", AdminAccessoriesListView.as_view()),
+    path("admin/inventory/service-catalog/", AdminServiceCatalogListCreateView.as_view()),
+    path("admin/inventory/service-catalog/<int:pk>/", AdminServiceCatalogDetailView.as_view()),
+    path("admin/inventory/service-type-choices/", AdminServiceTypeChoicesView.as_view()),
+    # Accessory variant groups
+    path("admin/inventory/accessory-variant-groups/", AdminAccessoryVariantGroupListCreateView.as_view()),
+    path("admin/inventory/accessory-variant-groups/<int:pk>/", AdminAccessoryVariantGroupDetailView.as_view()),
+    # FG → variant-group link
+    path("admin/inventory/finished-goods/<int:fg_pk>/accessory-group-links/", AdminFGAccessoryGroupLinkView.as_view()),
+    # Assign variant group to an accessory item
+    path("admin/inventory/accessories/<int:pk>/assign-variant-group/", AdminInventoryItemVariantGroupView.as_view()),
+    # Quick create
+    path("admin/inventory/quick-create/accessory/", AdminQuickCreateAccessoryView.as_view()),
+    path("admin/inventory/quick-create/raw-material/", AdminQuickCreateRawMaterialView.as_view()),
+    # Billing accessory options (used at billing/contract time)
+    path("admin/inventory/finished-goods/<int:product_id>/billing-accessories/", AdminBillingAccessoryOptionsView.as_view()),
     path("admin/brochures/", include(brochure_admin_urlpatterns)),
     path("admin/accounting/mapping-audit/", AccountingMappingAuditView.as_view()),
     path("admin/accounting/mapping-audit/seed-safe-defaults/", AccountingMappingAuditSeedDefaultsView.as_view()),

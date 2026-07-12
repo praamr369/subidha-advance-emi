@@ -557,6 +557,20 @@ class ProductUnitOfMeasureMaster(TimeStampedModel):
         return f"{self.code} - {self.name}"
 
 
+class ProductItemType(models.TextChoices):
+    FINISHED_GOOD = "FINISHED_GOOD", "Finished Good"
+    RAW_MATERIAL = "RAW_MATERIAL", "Raw Material"
+    ACCESSORY = "ACCESSORY", "Accessory"
+    SERVICE = "SERVICE", "Service"
+    ADD_ON = "ADD_ON", "Add-on"
+
+
+class ProductStockType(models.TextChoices):
+    STOCK_ITEM = "STOCK_ITEM", "Stock Item"
+    MADE_TO_ORDER = "MADE_TO_ORDER", "Made to Order"
+    NON_STOCK = "NON_STOCK", "Non-Stock"
+
+
 class Product(TimeStampedModel):
     product_code = models.CharField(max_length=50, unique=True)
     name = models.CharField(max_length=255)
@@ -612,6 +626,20 @@ class Product(TimeStampedModel):
     is_lease_ready = models.BooleanField(default=False, db_index=True)
     # Phase 2: direct sale eligibility flag (additive, defaults to true for existing products)
     is_direct_sale_enabled = models.BooleanField(default=True, db_index=True)
+    # Product classification — what kind of item this is
+    item_type = models.CharField(
+        max_length=20,
+        choices=ProductItemType.choices,
+        default=ProductItemType.FINISHED_GOOD,
+        db_index=True,
+    )
+    # Stock type — stocked in warehouse or made-to-order
+    stock_type = models.CharField(
+        max_length=20,
+        choices=ProductStockType.choices,
+        default=ProductStockType.STOCK_ITEM,
+        db_index=True,
+    )
     # Phase 2: product lifecycle / PLM status
     lifecycle_status = models.CharField(
         max_length=20,
@@ -683,7 +711,17 @@ class Product(TimeStampedModel):
                 errors["subcategory_master"] = "Subcategory must belong to the selected category."
         if self.plan_type_default not in PlanType.values:
             errors["plan_type_default"] = "Unsupported default plan type."
-        if not any(
+        # Products with no modes are allowed when:
+        # - it's a new product (pk is None) being created before inventory profile is attached, OR
+        # - the attached inventory profile is RAW_MATERIAL or ACCESSORY (no subscription modes needed).
+        _inv_type = None
+        try:
+            _inv_type = self.inventory_profile.stock_item_type
+        except Exception:
+            pass
+        _is_inventory_only = _inv_type in {"RAW_MATERIAL", "ACCESSORY"}
+        _is_new_product = self.pk is None
+        if not _is_new_product and not _is_inventory_only and not any(
             [
                 self.is_emi_enabled,
                 self.is_rent_enabled,
@@ -691,7 +729,7 @@ class Product(TimeStampedModel):
                 self.is_direct_sale_enabled,
             ]
         ):
-            errors["is_emi_enabled"] = "At least one product mode must be enabled."
+            errors["is_emi_enabled"] = "At least one product mode must be enabled (EMI, Rent, Lease, or Direct Sale)."
         if self.plan_type_default == PlanType.EMI and not self.is_emi_enabled:
             errors["plan_type_default"] = "Default plan type EMI requires EMI to be enabled."
         if self.plan_type_default == PlanType.RENT and not self.is_rent_enabled:
@@ -5184,6 +5222,33 @@ class PossessionStatus(models.TextChoices):
     UNDER_INSPECTION = "UNDER_INSPECTION", "Under Inspection"
     MAINTENANCE = "MAINTENANCE", "Maintenance"
     CLOSED = "CLOSED", "Closed"
+
+
+class ProductRelationshipType(models.TextChoices):
+    ACCESSORY = "ACCESSORY", "Accessory"
+    RAW_MATERIAL = "RAW_MATERIAL", "Raw Material"
+    SERVICE = "SERVICE", "Service"
+    ADD_ON = "ADD_ON", "Add-on"
+
+
+class ProductRelationship(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="related_products")
+    related_product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="parent_products")
+    relationship_type = models.CharField(max_length=20, choices=ProductRelationshipType.choices)
+    quantity = models.DecimalField(max_digits=8, decimal_places=2, default=1)
+    notes = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(db_index=True, default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True, db_index=True)
+
+    class Meta:
+        unique_together = ("product", "related_product", "relationship_type")
+        indexes = [
+            models.Index(fields=["product", "relationship_type"]),
+            models.Index(fields=["related_product"]),
+        ]
+
+    def __str__(self):
+        return f"{self.product.name} → {self.related_product.name} ({self.relationship_type})"
 
 
 class ProductPossession(models.Model):

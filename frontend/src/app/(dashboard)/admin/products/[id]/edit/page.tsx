@@ -7,6 +7,8 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 
 import ProductQuickActions from "@/components/admin/products/ProductQuickActions";
+import RelatedProductsSection from "@/components/admin/products/RelatedProductsSection";
+import InventoryProfileCostEditor from "@/components/admin/inventory/InventoryProfileCostEditor";
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
@@ -42,11 +44,12 @@ export default function AdminProductEditPage() {
   const params = useParams<{ id: string }>();
   const productId = params?.id;
   const [product, setProduct] = useState<ProductRecord | null>(null);
-  const [catalogOptions, setCatalogOptions] = useState<ProductCatalogOptions>({ categories: [], subcategories: [], unit_of_measure_masters: [], unit_of_measure_options: ["PCS"] });
+  const [catalogOptions, setCatalogOptions] = useState<ProductCatalogOptions>({ categories: [], subcategories: [], unit_of_measure_masters: [], unit_of_measure_options: ["PCS"], item_type_choices: [], stock_type_choices: [] });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [showCostEditor, setShowCostEditor] = useState(false);
 
   const [name, setName] = useState("");
   const [productCode, setProductCode] = useState("");
@@ -64,6 +67,8 @@ export default function AdminProductEditPage() {
   const [rent, setRent] = useState(false);
   const [lease, setLease] = useState(false);
   const [directSale, setDirectSale] = useState(true);
+  const [itemType, setItemType] = useState("FINISHED_GOOD");
+  const [stockType, setStockType] = useState("STOCK_ITEM");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [clearImage, setClearImage] = useState(false);
@@ -86,6 +91,8 @@ export default function AdminProductEditPage() {
     setRent(Boolean(next.is_rent_enabled));
     setLease(Boolean(next.is_lease_enabled));
     setDirectSale(next.is_direct_sale_enabled !== false);
+    setItemType(next.item_type || "FINISHED_GOOD");
+    setStockType(next.stock_type || "STOCK_ITEM");
     setImageFile(null);
     setImagePreview(null);
     setClearImage(false);
@@ -153,6 +160,8 @@ export default function AdminProductEditPage() {
         is_rent_enabled: rent,
         is_lease_enabled: lease,
         is_direct_sale_enabled: directSale,
+        item_type: itemType,
+        stock_type: stockType,
       };
       if (payload instanceof FormData) {
         payload.set("name", name);
@@ -171,6 +180,8 @@ export default function AdminProductEditPage() {
         payload.set("is_rent_enabled", String(rent));
         payload.set("is_lease_enabled", String(lease));
         payload.set("is_direct_sale_enabled", String(directSale));
+        payload.set("item_type", itemType);
+        payload.set("stock_type", stockType);
         if (imageFile) payload.set("image", imageFile);
         if (clearImage) payload.set("clear_image", "true");
       }
@@ -215,6 +226,7 @@ export default function AdminProductEditPage() {
               {error ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div> : null}
               <div className="sticky top-0 z-10 flex flex-wrap justify-end gap-2 rounded-xl border border-border bg-background/95 p-3 shadow-sm backdrop-blur">
                 <Link href={`/admin/products/${product.id}`} className="inline-flex h-10 items-center justify-center rounded-xl border border-border px-4 text-sm font-medium">Cancel</Link>
+                <button type="button" onClick={() => setShowCostEditor(true)} disabled={saving} className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium transition hover:bg-muted disabled:opacity-60">Costing</button>
                 <button type="submit" disabled={saving} className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60">{saving ? "Saving..." : "Save Product"}</button>
               </div>
               <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">Changes affect future onboarding and billing only. Existing contracts, invoices, receipts, payments, and subscription pricing snapshots are not mutated.</div>
@@ -224,6 +236,11 @@ export default function AdminProductEditPage() {
                 <label className="text-sm text-muted-foreground">Product code<input className={fieldClass()} value={productCode} onChange={(event) => setProductCode(event.target.value)} required /></label>
                 <label className="text-sm text-muted-foreground">SKU<input className={fieldClass()} value={sku} onChange={(event) => setSku(event.target.value)} /></label>
                 <label className="text-sm text-muted-foreground">Unit<input className={fieldClass()} value={unit} onChange={(event) => setUnit(event.target.value)} list="unit-options" /><datalist id="unit-options">{catalogOptions.unit_of_measure_options.map((item) => <option key={item} value={item} />)}</datalist></label>
+              </FormCard>
+
+              <FormCard title="Classification" description="Product type and stock management mode.">
+                <label className="text-sm text-muted-foreground">Item Type<select className={fieldClass()} value={itemType} onChange={(event) => setItemType(event.target.value)}><option value="FINISHED_GOOD">Finished Good</option><option value="RAW_MATERIAL">Raw Material</option><option value="ACCESSORY">Accessory</option><option value="SERVICE">Service</option><option value="ADD_ON">Add-on</option></select></label>
+                <label className="text-sm text-muted-foreground">Stock Type<select className={fieldClass()} value={stockType} onChange={(event) => setStockType(event.target.value)}><option value="STOCK_ITEM">Stock Item</option><option value="MADE_TO_ORDER">Made to Order</option><option value="NON_STOCK">Non-Stock</option></select></label>
               </FormCard>
 
               <FormCard title="Pricing" description="Product base price is the future contract total. Historical snapshots are preserved.">
@@ -262,6 +279,10 @@ export default function AdminProductEditPage() {
                 <label className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm">Direct Sale<input type="checkbox" checked={directSale} onChange={(event) => setDirectSale(event.target.checked)} /></label>
               </FormCard>
 
+              <ERPSectionShell title="Related Products" description="Attach accessories, raw materials, services, and add-ons to this product.">
+                <RelatedProductsSection productId={productId ? Number(productId) : 0} productName={name} saving={saving} />
+              </ERPSectionShell>
+
               <ERPSectionShell title="Image" description="Single image used for catalog completeness and daily product lookup." id="image">
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-3"><input type="file" accept="image/*" onChange={onImageChange} className={fieldClass()} /><label className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm">Remove existing image<input type="checkbox" checked={clearImage} onChange={(event) => { setClearImage(event.target.checked); if (event.target.checked) setImageFile(null); }} /></label></div>
@@ -283,6 +304,16 @@ export default function AdminProductEditPage() {
             </aside>
           </form>
         ) : null}
+
+        {showCostEditor && product && (
+          <InventoryProfileCostEditor
+            productId={product.id}
+            productName={product.name}
+            itemType={itemType}
+            onClose={() => setShowCostEditor(false)}
+            onSave={() => void loadPage()}
+          />
+        )}
       </div>
     </ERPPageShell>
   );

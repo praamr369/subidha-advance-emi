@@ -43,19 +43,22 @@ class AdminSettlementAllocationApiTests(APITestCase):
 
         self.customer = create_customer_profile(name="Settlement Alloc Customer", phone="9312000010")
         self.product = create_product(name="Settlement Alloc Product", product_code="SETTLE-ALLOC-PROD-01", base_price=Decimal("1000.00"))
-        self.batch = create_batch(batch_code="SETTLEALLOC2026", duration_months=1, total_slots=100, draw_day=5, start_date=date(2026, 5, 1))
+        self.batch = create_batch(batch_code="SETTLEALLOC2026", duration_months=2, total_slots=100, draw_day=5, start_date=date(2026, 5, 1))
         self.lucky_id = create_lucky_id(batch=self.batch, lucky_number=7)
         self.subscription = create_subscription(
             customer=self.customer,
             product=self.product,
             batch=self.batch,
             lucky_id=self.lucky_id,
-            total_amount=Decimal("1000.00"),
+            total_amount=Decimal("2000.00"),
             monthly_amount=Decimal("1000.00"),
-            tenure_months=1,
+            tenure_months=2,
             start_date=date(2026, 5, 1),
         )
         self.emi = create_emi(subscription=self.subscription, month_no=1, amount=Decimal("1000.00"), due_date=date(2026, 5, 5))
+        # uq_payment_per_emi allows only one payment per EMI — the UPI payment
+        # below needs its own EMI row.
+        self.emi_upi = create_emi(subscription=self.subscription, month_no=2, amount=Decimal("1000.00"), due_date=date(2026, 6, 5))
 
         self.payment = Payment.objects.create(
             customer=self.customer,
@@ -93,7 +96,7 @@ class AdminSettlementAllocationApiTests(APITestCase):
         self.payment_upi = Payment.objects.create(
             customer=self.customer,
             subscription=self.subscription,
-            emi=self.emi,
+            emi=self.emi_upi,
             amount=Decimal("98.00"),
             method="UPI",
             reference_no="SETTLE-ALLOC-PAY-UPI-001",

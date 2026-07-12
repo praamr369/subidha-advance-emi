@@ -394,6 +394,27 @@ export default function AdminInventoryPage() {
             </ERPSectionShell>
           </div>
 
+          {/* Product Catalog Links */}
+          <ERPSectionShell title="Inventory Catalog" description="Manage finished goods, raw materials, accessories, and service items.">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {[
+                { label: "Finished Goods", desc: "Products for sale/subscription with accessories & services.", href: ROUTES.admin.inventoryFinishedGoods, icon: <Package className="h-5 w-5 text-sky-600" />, color: "border-sky-200 bg-sky-50 dark:bg-sky-900/10" },
+                { label: "Raw Materials", desc: "Input materials used in manufacturing BOMs.", href: ROUTES.admin.inventoryRawMaterials, icon: <Factory className="h-5 w-5 text-violet-600" />, color: "border-violet-200 bg-violet-50 dark:bg-violet-900/10" },
+                { label: "Accessories", desc: "Components that attach to finished goods — free or chargeable.", href: ROUTES.admin.inventoryAccessories, icon: <Wrench className="h-5 w-5 text-amber-600" />, color: "border-amber-200 bg-amber-50 dark:bg-amber-900/10" },
+                { label: "Service Catalog", desc: "Installation, warranty, AMC and other services.", href: ROUTES.admin.inventoryServiceCatalog, icon: <ClipboardCheck className="h-5 w-5 text-emerald-600" />, color: "border-emerald-200 bg-emerald-50 dark:bg-emerald-900/10" },
+                { label: "Variant Groups", desc: "Manage accessory variant groups (e.g. Side Rail — Teak/Sal/Pine).", href: ROUTES.admin.inventoryAccessoryVariantGroups, icon: <Layers className="h-5 w-5 text-rose-600" />, color: "border-rose-200 bg-rose-50 dark:bg-rose-900/10" },
+              ].map(({ label, desc, href, icon, color }) => (
+                <Link key={label} href={href} className={`group flex gap-3 rounded-xl border px-4 py-4 transition hover:shadow-sm ${color}`}>
+                  <div className="mt-0.5 shrink-0">{icon}</div>
+                  <div>
+                    <div className="text-sm font-semibold text-foreground group-hover:underline">{label}</div>
+                    <div className="mt-0.5 text-xs text-muted-foreground">{desc}</div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </ERPSectionShell>
+
           <Phase7Guidance
             items={[
               {

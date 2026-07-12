@@ -2,6 +2,23 @@ import { request } from "@/services/api";
 import { toResultsArray } from "@/services/api/list";
 import { resolveApiMediaUrl } from "@/lib/media";
 
+export type ProductItemType = "FINISHED_GOOD" | "RAW_MATERIAL" | "ACCESSORY" | "SERVICE" | "ADD_ON";
+export type ProductStockType = "STOCK_ITEM" | "MADE_TO_ORDER" | "NON_STOCK";
+
+export const ITEM_TYPE_LABELS: Record<ProductItemType, string> = {
+  FINISHED_GOOD: "Finished Good",
+  RAW_MATERIAL: "Raw Material",
+  ACCESSORY: "Accessory",
+  SERVICE: "Service",
+  ADD_ON: "Add-on",
+};
+
+export const STOCK_TYPE_LABELS: Record<ProductStockType, string> = {
+  STOCK_ITEM: "Stock Item",
+  MADE_TO_ORDER: "Made to Order",
+  NON_STOCK: "Non-Stock",
+};
+
 export type ProductRecord = {
   id: number;
   name: string;
@@ -22,6 +39,8 @@ export type ProductRecord = {
   gst_rate?: string | number | null;
   image?: string | null;
   is_active?: boolean;
+  item_type?: ProductItemType | string;
+  stock_type?: ProductStockType | string;
   plan_type_default?: "EMI" | "RENT" | "LEASE" | string | null;
   is_emi_enabled?: boolean;
   is_rent_enabled?: boolean;
@@ -52,6 +71,8 @@ export type ProductListParams = {
   image_status?: string;
   capability?: string;
   readiness?: string;
+  item_type?: string;
+  stock_type?: string;
   page?: number;
   page_size?: number;
 };
@@ -89,6 +110,8 @@ export type ProductCatalogOptions = {
   subcategories: { id: number; name: string; category_id: number; category_name: string; description?: string; is_active?: boolean }[];
   unit_of_measure_masters: { id: number; code: string; name: string }[];
   unit_of_measure_options: string[];
+  item_type_choices: { value: string; label: string }[];
+  stock_type_choices: { value: string; label: string }[];
 };
 
 export type ProductCategoryMasterRecord = {
@@ -273,4 +296,60 @@ export async function prepareProductInventoryProfile(id: number | string, payloa
 
 export async function getProductStockStatus(productId: number): Promise<ProductStockStatus> {
   return request<ProductStockStatus>(`/inventory/products/${productId}/stock-status/`);
+}
+
+export type ProductRelationshipType = "ACCESSORY" | "RAW_MATERIAL" | "SERVICE" | "ADD_ON";
+
+export const RELATIONSHIP_TYPE_LABELS: Record<ProductRelationshipType, string> = {
+  ACCESSORY: "Accessory",
+  RAW_MATERIAL: "Raw Material",
+  SERVICE: "Service",
+  ADD_ON: "Add-on",
+};
+
+export type ProductRelationship = {
+  id: number;
+  product: number;
+  related_product: number;
+  related_product_name: string;
+  related_product_code: string;
+  related_product_item_type: string;
+  relationship_type: ProductRelationshipType;
+  quantity: string | number;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ProductSearchResult = {
+  id: number;
+  product_code: string;
+  name: string;
+  item_type: ProductItemType;
+  stock_type: ProductStockType;
+};
+
+export async function getProductRelationships(productId: number | string): Promise<ProductRelationship[]> {
+  const result = await request<{ results: ProductRelationship[] }>(`/admin/products/${productId}/related-products/`);
+  return result.results || [];
+}
+
+export async function addProductRelationship(productId: number | string, relatedProductId: number, relationshipType: ProductRelationshipType, quantity: number = 1, notes: string = ""): Promise<ProductRelationship> {
+  return request<ProductRelationship>(`/admin/products/${productId}/add-related-product/`, {
+    method: "POST",
+    body: JSON.stringify({ related_product: relatedProductId, relationship_type: relationshipType, quantity, notes }),
+    retryCount: 0,
+  });
+}
+
+export async function removeProductRelationship(productId: number | string, relationshipId: number): Promise<void> {
+  await request(`/admin/products/${productId}/remove-related-product/${relationshipId}/`, { method: "DELETE", retryCount: 0 });
+}
+
+export async function searchProductsForAttachment(q: string = "", excludeId?: number | string): Promise<ProductSearchResult[]> {
+  const params = new URLSearchParams();
+  if (q) params.set("q", q);
+  if (excludeId) params.set("exclude_id", String(excludeId));
+  const result = await request<{ results: ProductSearchResult[] }>(`/admin/products/search-for-attachment/?${params}`);
+  return result.results || [];
 }

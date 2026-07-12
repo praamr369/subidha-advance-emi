@@ -79,7 +79,8 @@ class WhatsAppLinkGenerationTests(TestCase):
     def test_result_contains_note_about_manual_send(self):
         reminder = _make_reminder(customer=self.customer)
         result = generate_whatsapp_link(reminder_id=reminder.id)
-        self.assertIn("manually", result["note"].lower())
+        # Note should mention manual sending (message uses "Manual send required")
+        self.assertIn("manual", result["note"].lower())
 
     def test_link_message_is_url_encoded(self):
         reminder = _make_reminder(customer=self.customer)

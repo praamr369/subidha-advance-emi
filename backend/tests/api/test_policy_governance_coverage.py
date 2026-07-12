@@ -234,7 +234,7 @@ class PolicyGovernanceCoverageTests(APITestCase):
     def test_setup_readiness_exposes_policy_governance_blocker(self):
         seed_default_policy_pages(performed_by=self.admin)
         self.client.force_authenticate(user=self.admin)
-        response = self.client.get("/api/v1/admin/setup-readiness/")
+        response = self.client.get("/api/v1/admin/setup/readiness/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         section = next(item for item in response.data["sections"] if item["key"] == "policy_governance")
         self.assertEqual(section["status"], "BLOCKED")
