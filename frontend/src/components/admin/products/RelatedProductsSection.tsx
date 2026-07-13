@@ -20,7 +20,6 @@ interface RelatedProductsSectionProps {
 
 export default function RelatedProductsSection({
   productId,
-  productName,
   saving,
 }: RelatedProductsSectionProps) {
   const [relationships, setRelationships] = useState<ProductRelationship[]>([]);
@@ -44,6 +43,7 @@ export default function RelatedProductsSection({
   // Load relationships on mount
   useEffect(() => {
     loadRelationships();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productId]);
 
   async function loadRelationships() {

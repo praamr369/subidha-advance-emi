@@ -22,11 +22,7 @@ function fc() {
   return "mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none transition focus:border-ring disabled:opacity-60";
 }
 
-function matchCat(cats: PimCategory[], text: string): PimCategory | undefined {
-  if (!text) return undefined;
-  const q = text.trim().toLowerCase();
-  return cats.find((c) => c.name.toLowerCase() === q || c.name.toLowerCase().includes(q) || q.includes(c.name.toLowerCase()));
-}
+
 
 export default function CatalogSpecificationFields({ categoryId, values, onCategoryChange, onValuesChange, disabled = false, error }: Props) {
   const [categories, setCategories] = useState<PimCategory[]>([]);
@@ -47,7 +43,7 @@ export default function CatalogSpecificationFields({ categoryId, values, onCateg
 
   // Load subcategories and category-level attributes when category changes
   useEffect(() => {
-    if (!categoryId) { setSubcategories([]); setAttributes([]); return; }
+    if (!categoryId) { setTimeout(() => { setSubcategories([]); setAttributes([]); }, 0); return; }
     Promise.all([
       pimService.getSubcategories(categoryId),
       pimService.getAttributes(categoryId, undefined),

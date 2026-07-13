@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Plus, Trash2, Edit2, Check, X } from "lucide-react";
+import { Plus, Trash2, Check, X } from "lucide-react";
 import { pimService, type PimVariant, type PimCategoryAttribute } from "@/services/pim";
 import { formatRupee } from "@/lib/utils/currency";
 

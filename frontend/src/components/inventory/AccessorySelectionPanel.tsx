@@ -62,8 +62,10 @@ export default function AccessorySelectionPanel({ productId, onConfirm, onCancel
   const [svcSelection, setSvcSelection] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
-    setLoading(true);
-    setError(null);
+    setTimeout(() => {
+      setLoading(true);
+      setError(null);
+    }, 0);
     fetchBillingAccessoryOptions(productId)
       .then((res) => {
         setData(res);
