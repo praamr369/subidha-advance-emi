@@ -403,7 +403,7 @@ export default function InventoryOpeningStockPage() {
 
               <form onSubmit={(ev) => void handleSaveManualDraft(ev)} className="p-5 space-y-5">
                 {/* Product picker — isolated z-context so dropdown floats above everything */}
-                <div className="relative z-[60] space-y-1">
+                <div className="relative z-50 space-y-1">
                   <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Product / inventory item <span className="text-destructive">*</span>
                   </label>
@@ -427,7 +427,7 @@ export default function InventoryOpeningStockPage() {
                 </div>
 
                 {/* Form fields grid */}
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="relative z-0 grid gap-4 md:grid-cols-2">
                   <div className="space-y-1">
                     <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Warehouse / location <span className="text-destructive">*</span>
