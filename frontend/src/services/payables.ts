@@ -5,7 +5,8 @@ export type PayableType =
   | "vendor_settlement"
   | "commission"
   | "expense_claim"
-  | "credit_refund";
+  | "credit_refund"
+  | "payout_batch";
 
 export interface PayableItem {
   id: string;

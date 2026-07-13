@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { Search, RefreshCw, ExternalLink, BookOpen, CreditCard, AlertTriangle, CheckCircle2 } from "lucide-react";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import {
   getUnifiedPayables,
@@ -13,7 +14,7 @@ import {
 } from "@/services/payables";
 import { ROUTES } from "@/lib/routes";
 
-// ── helpers ──────────────────────────────────────────────────────────────────
+// ── helpers ───────────────────────────────────────────────────────────────────
 
 function rupee(v: string | number | null | undefined) {
   const n = parseFloat(String(v ?? "0")) || 0;
@@ -30,6 +31,7 @@ const TYPE_COLOR: Record<string, string> = {
   commission: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
   expense_claim: "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300",
   credit_refund: "bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300",
+  payout_batch: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300",
 };
 
 const KIND_COLOR: Record<string, string> = {
@@ -39,20 +41,48 @@ const KIND_COLOR: Record<string, string> = {
 };
 
 const JOURNAL_EXPLANATION: Record<string, string> = {
-  salary: "Accrual: DR Salary Expense / CR Salary Payable → Payment: DR Salary Payable / CR Finance Account",
+  salary: "Accrual: DR Salary Expense / CR Salary Payable  →  Payment: DR Salary Payable / CR Finance Account",
   vendor_settlement: "DR Accounts Payable / CR Finance Account",
   commission: "DR Partner Commission Payable / CR Finance Account",
-  expense_claim: "Accrual: DR Expense / CR Accounts Payable → Payment: DR Accounts Payable / CR Finance Account",
+  expense_claim: "Accrual: DR Expense / CR Accounts Payable  →  Payment: DR Accounts Payable / CR Finance Account",
   credit_refund: "DR Customer Receivable / CR Finance Account",
+  payout_batch: "DR Partner Commission Payable / CR Finance Account  (bulk partner disbursement)",
 };
 
-// ── Pay modal ────────────────────────────────────────────────────────────────
+// Source-module deep-links per payable type
+const SOURCE_LINKS: Record<string, { label: string; href: string }[]> = {
+  salary: [
+    { label: "HR Payroll", href: ROUTES.admin.hrPayroll },
+    { label: "Salary Sheets", href: "/admin/hr/payroll" },
+  ],
+  vendor_settlement: [
+    { label: "Vendors", href: "/admin/vendors" },
+    { label: "Accounting Payables", href: "/admin/accounting/payables" },
+  ],
+  commission: [
+    { label: "Commissions", href: "/admin/commissions" },
+    { label: "Partner Performance", href: "/admin/partner" },
+  ],
+  expense_claim: [
+    { label: "HR Staff", href: "/admin/hr/staff" },
+  ],
+  credit_refund: [
+    { label: "Refunds", href: "/admin/refunds" },
+    { label: "Collections", href: ROUTES.admin.collections },
+  ],
+  payout_batch: [
+    { label: "Payout Batches", href: "/admin/batches" },
+    { label: "Commissions", href: "/admin/commissions" },
+  ],
+};
+
+// ── Pay modal ─────────────────────────────────────────────────────────────────
 
 interface PayModalProps {
   item: PayableItem;
   accounts: FinanceAccount[];
   onClose: () => void;
-  onPaid: (msg: string) => void;
+  onPaid: (msg: string, journalId?: number | null) => void;
 }
 
 function PayModal({ item, accounts, onClose, onPaid }: PayModalProps) {
@@ -68,7 +98,8 @@ function PayModal({ item, accounts, onClose, onPaid }: PayModalProps) {
 
   const needsAccount = !["commission"].includes(item.payable_type);
   const selectedAccount = accounts.find((a) => String(a.id) === financeAccountId);
-  const journalExplanation = JOURNAL_EXPLANATION[item.payable_type] ?? "";
+  const journalExplanation = JOURNAL_EXPLANATION[item.payable_type] ?? "Journal entry will be posted automatically.";
+  const sourceLinks = SOURCE_LINKS[item.payable_type] ?? [];
 
   async function handlePay() {
     setErr(null);
@@ -83,7 +114,7 @@ function PayModal({ item, accounts, onClose, onPaid }: PayModalProps) {
         reference_no: referenceNo,
         notes,
       });
-      onPaid(result.message);
+      onPaid(result.message, result.journal_entry_id);
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : "Payment failed.");
     } finally {
@@ -97,28 +128,34 @@ function PayModal({ item, accounts, onClose, onPaid }: PayModalProps) {
         {/* Header */}
         <div className="flex items-start justify-between gap-3 border-b border-gray-200 dark:border-gray-700 px-5 py-4">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-base font-semibold text-gray-900 dark:text-white">Execute Payment</h2>
               {item.needs_posting && (
                 <span className="text-xs bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 rounded-full px-2 py-0.5 font-medium">
-                  Auto-posts accrual journal first
+                  Auto-posts accrual first
                 </span>
               )}
+              <span className={`text-xs rounded-full px-2 py-0.5 font-medium ${TYPE_COLOR[item.payable_type] ?? "bg-gray-100"}`}>
+                {item.payable_type_label}
+              </span>
             </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{item.reference} · {item.party_name}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+              {item.reference} · <span className="font-medium">{item.party_name}</span>
+              <span className="ml-1 text-gray-400">({item.party_type})</span>
+            </p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">×</button>
         </div>
 
         <div className="px-5 py-4 space-y-4 max-h-[70vh] overflow-y-auto">
-          {/* Summary row */}
+          {/* Summary */}
           <div className="grid grid-cols-3 gap-2 text-sm">
             <div className="rounded-xl bg-gray-50 dark:bg-gray-800 p-3">
-              <div className="text-xs text-gray-500 dark:text-gray-400">Type</div>
-              <div className="font-medium text-gray-900 dark:text-white mt-1">{item.payable_type_label}</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">Party</div>
+              <div className="font-medium text-gray-900 dark:text-white mt-1 truncate">{item.party_name}</div>
             </div>
             <div className="rounded-xl bg-gray-50 dark:bg-gray-800 p-3">
-              <div className="text-xs text-gray-500 dark:text-gray-400">Total</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">Total Amount</div>
               <div className="font-medium text-gray-900 dark:text-white mt-1">{rupee(item.amount)}</div>
             </div>
             <div className="rounded-xl bg-red-50 dark:bg-red-900/20 p-3">
@@ -127,16 +164,33 @@ function PayModal({ item, accounts, onClose, onPaid }: PayModalProps) {
             </div>
           </div>
 
-          {/* Payment mode */}
+          {/* Source module links */}
+          {sourceLinks.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              <span className="text-xs text-gray-400 self-center">Source:</span>
+              {sourceLinks.map((l) => (
+                <Link
+                  key={l.href}
+                  href={l.href}
+                  target="_blank"
+                  className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline border border-blue-200 dark:border-blue-800 rounded-full px-2.5 py-0.5"
+                >
+                  {l.label} <ExternalLink className="h-3 w-3" />
+                </Link>
+              ))}
+            </div>
+          )}
+
+          {/* Payment account */}
           {needsAccount && (
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Payment mode — Cash / UPI / Bank
+                <CreditCard className="inline h-3.5 w-3.5 mr-1" />Payment account (Cash / UPI / Bank)
               </label>
               {accounts.length === 0 ? (
                 <div className="text-sm text-red-600 dark:text-red-400 rounded-xl border border-red-200 dark:border-red-700 px-3 py-2">
-                  No active finance accounts. Configure under{" "}
-                  <Link href={ROUTES.admin.settingsBusinessSetupFinanceAccounts} className="underline">Finance Accounts</Link>.
+                  No active finance accounts.{" "}
+                  <Link href={ROUTES.admin.settingsBusinessSetupFinanceAccounts} className="underline">Configure →</Link>
                 </div>
               ) : (
                 <>
@@ -166,10 +220,7 @@ function PayModal({ item, accounts, onClose, onPaid }: PayModalProps) {
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Amount (₹)</label>
             <input
-              type="number"
-              step="0.01"
-              min="0.01"
-              max={item.outstanding}
+              type="number" step="0.01" min="0.01" max={item.outstanding}
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               className="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white"
@@ -181,19 +232,13 @@ function PayModal({ item, accounts, onClose, onPaid }: PayModalProps) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Payment date</label>
-              <input
-                type="date"
-                value={paymentDate}
-                onChange={(e) => setPaymentDate(e.target.value)}
+              <input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)}
                 className="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Reference no.</label>
-              <input
-                type="text"
-                value={referenceNo}
-                onChange={(e) => setReferenceNo(e.target.value)}
+              <input type="text" value={referenceNo} onChange={(e) => setReferenceNo(e.target.value)}
                 placeholder="UTR / cheque / receipt"
                 className="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white"
               />
@@ -203,35 +248,34 @@ function PayModal({ item, accounts, onClose, onPaid }: PayModalProps) {
           {/* Notes */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Notes (optional)</label>
-            <textarea
-              rows={2}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+            <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)}
               className="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white resize-none"
               placeholder="Additional remarks…"
             />
           </div>
 
           {err && (
-            <div className="rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 px-4 py-3 text-sm text-red-700 dark:text-red-300">
+            <div className="rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 px-4 py-3 text-sm text-red-700 dark:text-red-300 flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
               {err}
             </div>
           )}
 
           {/* Journal explanation */}
-          <div className="rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 px-4 py-3 text-xs text-blue-700 dark:text-blue-300 space-y-1">
-            <div className="font-semibold">Journal entries that will be posted</div>
-            <div className="font-mono">{journalExplanation}</div>
+          <div className="rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 px-4 py-3 text-xs text-blue-700 dark:text-blue-300 space-y-1.5">
+            <div className="font-semibold flex items-center gap-1.5"><BookOpen className="h-3.5 w-3.5" /> Journal entries that will be posted</div>
+            <div className="font-mono bg-blue-100 dark:bg-blue-900/40 rounded px-2 py-1 leading-relaxed">{journalExplanation}</div>
             {item.needs_posting && (
-              <div className="mt-1 text-amber-700 dark:text-amber-300 font-medium">
-                ⚠ Accrual journal will be auto-posted before payment because this item is still in APPROVED state.
+              <div className="text-amber-700 dark:text-amber-300 font-medium flex items-center gap-1.5">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                Accrual journal auto-posted first (item is still APPROVED).
               </div>
             )}
-            <div className="mt-1 text-blue-600 dark:text-blue-400">
-              Posted entries appear in{" "}
-              <Link href={ROUTES.admin.accountingBridgeReconciliation} className="underline font-medium">
-                Bridge Reconciliation →
-              </Link>
+            <div className="text-blue-600 dark:text-blue-400">
+              Posted entries visible in{" "}
+              <Link href={ROUTES.admin.accountingBridgeReconciliation} className="underline font-medium">Bridge Reconciliation →</Link>
+              {" "}and{" "}
+              <Link href={ROUTES.admin.accountingJournals} className="underline font-medium">Journal Ledger →</Link>
             </div>
           </div>
         </div>
@@ -254,7 +298,27 @@ function PayModal({ item, accounts, onClose, onPaid }: PayModalProps) {
   );
 }
 
-// ── Main page ────────────────────────────────────────────────────────────────
+// ── Success toast ─────────────────────────────────────────────────────────────
+
+function SuccessToast({ msg, journalId, onClose }: { msg: string; journalId?: number | null; onClose: () => void }) {
+  return (
+    <div className="fixed bottom-5 right-5 z-50 max-w-sm rounded-2xl bg-green-600 text-white shadow-2xl px-5 py-4 space-y-2">
+      <div className="flex items-start gap-2">
+        <CheckCircle2 className="h-5 w-5 flex-shrink-0 mt-0.5" />
+        <p className="text-sm font-medium">{msg}</p>
+        <button onClick={onClose} className="ml-auto text-white/70 hover:text-white">×</button>
+      </div>
+      {journalId && (
+        <div className="text-xs text-green-100">
+          Journal #{journalId} posted.{" "}
+          <Link href={ROUTES.admin.accountingBridgeReconciliation} className="underline font-medium">View in reconciliation →</Link>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 
 const TYPES = [
   { value: "", label: "All types" },
@@ -263,6 +327,19 @@ const TYPES = [
   { value: "commission", label: "Commission" },
   { value: "expense_claim", label: "Expense Claim" },
   { value: "credit_refund", label: "Customer Refund" },
+  { value: "payout_batch", label: "Partner Payout Batch" },
+];
+
+// Module quick-access links shown in the sidebar
+const MODULE_LINKS = [
+  { label: "HR Payroll", href: ROUTES.admin.hrPayroll, desc: "Salary sheets", color: "border-blue-200 dark:border-blue-800" },
+  { label: "Vendors", href: "/admin/vendors", desc: "Vendor settlements", color: "border-purple-200 dark:border-purple-800" },
+  { label: "Commissions", href: "/admin/commissions", desc: "Partner commissions", color: "border-amber-200 dark:border-amber-800" },
+  { label: "Payout Batches", href: "/admin/batches", desc: "Bulk partner payouts", color: "border-indigo-200 dark:border-indigo-800" },
+  { label: "Refunds", href: "/admin/refunds", desc: "Customer refunds", color: "border-rose-200 dark:border-rose-800" },
+  { label: "Finance Accounts", href: ROUTES.admin.settingsBusinessSetupFinanceAccounts, desc: "Cash / Bank / UPI", color: "border-gray-200 dark:border-gray-700" },
+  { label: "Journal Ledger", href: ROUTES.admin.accountingJournals, desc: "All posted entries", color: "border-green-200 dark:border-green-800" },
+  { label: "Bridge Reconciliation", href: ROUTES.admin.accountingBridgeReconciliation, desc: "Verify posted journals", color: "border-teal-200 dark:border-teal-800" },
 ];
 
 export default function UnifiedPayablePage() {
@@ -274,12 +351,7 @@ export default function UnifiedPayablePage() {
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [paying, setPaying] = useState<PayableItem | null>(null);
-  const [toast, setToast] = useState<{ msg: string; type: "ok" | "err" } | null>(null);
-
-  const showToast = (msg: string, type: "ok" | "err" = "ok") => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 5000);
-  };
+  const [toast, setToast] = useState<{ msg: string; journalId?: number | null } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -298,195 +370,150 @@ export default function UnifiedPayablePage() {
     }
   }, [typeFilter, search]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { load(); }, [load]);
 
-  function handlePaid(msg: string) {
+  const handlePaid = useCallback((msg: string, journalId?: number | null) => {
     setPaying(null);
-    showToast(msg);
-    void load();
-  }
+    setToast({ msg, journalId });
+    setTimeout(() => setToast(null), 8000);
+    load();
+  }, [load]);
 
   const needsPostingCount = data?.needs_posting_count ?? 0;
+  const totalOutstanding = data?.total_outstanding ?? "0.00";
 
   return (
     <ERPPageShell
-      eyebrow="Finance"
       title="Unified Payables"
-      subtitle="All outgoing obligations — salary, vendors, commissions, expenses, refunds — in one queue. Journal entries auto-post on payment."
-      breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Payables" }]}
-      stats={data ? [
-        { label: "Total Outstanding", value: rupee(data.total_outstanding), tone: "danger" },
-        { label: "Items Pending", value: data.total_items },
-        { label: "Needs Journal", value: data.needs_posting_count, tone: data.needs_posting_count > 0 ? "warning" : "default" },
-      ] : []}
-      actions={[
-        { href: ROUTES.admin.accountingBridgeReconciliation, label: "Bridge Reconciliation" },
-      ]}
+      subtitle="All outgoing payment obligations — salary, vendor, commission, payout, refund"
     >
-      <div className="space-y-6">
-      {/* Refresh button */}
-      <div className="flex justify-end">
-        <button
-          onClick={() => void load()}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300 hover:shadow"
-        >
-          ↻ Refresh
-        </button>
+      {/* Summary KPIs */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mt-2 mb-5">
+        <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
+          <p className="text-xs text-gray-500 dark:text-gray-400">Total Outstanding</p>
+          <p className="text-xl font-bold text-red-600 dark:text-red-400 mt-1">{rupee(totalOutstanding)}</p>
+        </div>
+        <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
+          <p className="text-xs text-gray-500 dark:text-gray-400">Payable Items</p>
+          <p className="text-xl font-bold text-gray-900 dark:text-white mt-1">{data?.total_items ?? "—"}</p>
+        </div>
+        <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/10 p-4">
+          <p className="text-xs text-amber-600 dark:text-amber-400">Need Accrual Posting</p>
+          <p className="text-xl font-bold text-amber-700 dark:text-amber-400 mt-1">{needsPostingCount}</p>
+        </div>
+        <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
+          <p className="text-xs text-gray-500 dark:text-gray-400">Finance Accounts</p>
+          <p className="text-xl font-bold text-gray-900 dark:text-white mt-1">{accounts.length}</p>
+        </div>
       </div>
-      {/* Toast */}
-      {toast && (
-        <div className={`fixed top-4 right-4 z-50 max-w-sm px-4 py-3 rounded-xl shadow-lg text-sm font-medium leading-snug ${toast.type === "ok" ? "bg-green-600 text-white" : "bg-red-600 text-white"}`}>
-          {toast.msg}
-        </div>
-      )}
 
-      {/* Pay modal */}
-      {paying && (
-        <PayModal
-          item={paying}
-          accounts={accounts}
-          onClose={() => setPaying(null)}
-          onPaid={handlePaid}
-        />
-      )}
-
-      {/* Needs-posting alert */}
-      {needsPostingCount > 0 && (
-        <div className="rounded-2xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-5 py-3 text-sm text-amber-800 dark:text-amber-300 flex items-center gap-3">
-          <span className="text-lg">⚠</span>
-          <span>
-            <strong>{needsPostingCount} item{needsPostingCount > 1 ? "s" : ""}</strong> need an accrual journal before payment.
-            Clicking <strong>Pay</strong> auto-posts the accrual first, then records the payment — no separate step needed.
-          </span>
-        </div>
-      )}
-
-      {/* KPI tiles */}
-      {data && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <div
-            className={`col-span-2 sm:col-span-1 rounded-2xl border p-4 shadow-sm cursor-pointer transition-colors ${typeFilter === "" ? "bg-gray-900 dark:bg-gray-100 border-gray-900 dark:border-gray-100" : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 hover:border-gray-400"}`}
-            onClick={() => setTypeFilter("")}
-          >
-            <div className={`text-xs font-medium uppercase tracking-wide ${typeFilter === "" ? "text-gray-300 dark:text-gray-600" : "text-gray-500 dark:text-gray-400"}`}>Total outstanding</div>
-            <div className={`text-2xl font-bold mt-1 ${typeFilter === "" ? "text-white dark:text-gray-900" : "text-red-600 dark:text-red-400"}`}>{rupee(data.total_outstanding)}</div>
-            <div className={`text-xs mt-0.5 ${typeFilter === "" ? "text-gray-400 dark:text-gray-500" : "text-gray-400"}`}>{data.total_items} items</div>
-          </div>
-          {data.type_summary.map((ts) => (
-            <div
-              key={ts.payable_type}
-              className={`rounded-2xl border p-4 shadow-sm cursor-pointer transition-colors ${typeFilter === ts.payable_type ? "bg-blue-600 border-blue-600 text-white" : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 hover:border-blue-400"}`}
-              onClick={() => setTypeFilter(typeFilter === ts.payable_type ? "" : ts.payable_type)}
+      {/* Type summary chips */}
+      {data && data.type_summary.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          {data.type_summary.map((s) => (
+            <button
+              key={s.payable_type}
+              onClick={() => setTypeFilter((prev) => prev === s.payable_type ? "" : s.payable_type)}
+              className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                typeFilter === s.payable_type
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : `${TYPE_COLOR[s.payable_type] ?? "bg-gray-100 text-gray-700"} border-transparent hover:border-gray-300`
+              }`}
             >
-              <div className={`text-xs font-medium ${typeFilter === ts.payable_type ? "text-blue-100" : "text-gray-500 dark:text-gray-400"}`}>{ts.label}</div>
-              <div className={`text-xl font-bold mt-1 ${typeFilter === ts.payable_type ? "text-white" : "text-gray-900 dark:text-white"}`}>{rupee(ts.total)}</div>
-              <div className={`text-xs mt-0.5 ${typeFilter === ts.payable_type ? "text-blue-200" : "text-gray-400"}`}>{ts.count} pending</div>
-            </div>
+              {s.label} · {s.count} · {rupee(s.total)}
+            </button>
           ))}
         </div>
       )}
 
-      {/* Type filter pills */}
-      <div className="flex flex-wrap gap-2 items-center">
-        {TYPES.map((t) => (
-          <button
-            key={t.value}
-            onClick={() => setTypeFilter(t.value)}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${typeFilter === t.value ? "bg-blue-600 text-white" : "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-blue-400"}`}
-          >
-            {t.label}
-          </button>
-        ))}
-        <form
-          onSubmit={(e) => { e.preventDefault(); setSearch(searchInput); }}
-          className="flex gap-2 ml-auto"
-        >
+      <div className="flex gap-3 flex-wrap mb-4">
+        {/* Search */}
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
+            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+            placeholder="Search party, reference…"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search party / reference…"
-            className="rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-white w-52"
+            onKeyDown={(e) => e.key === "Enter" && setSearch(searchInput)}
           />
-          <button type="submit" className="px-3 py-1.5 rounded-xl bg-gray-800 dark:bg-gray-700 text-white text-sm">Search</button>
-          {search && (
-            <button type="button" onClick={() => { setSearch(""); setSearchInput(""); }} className="px-3 py-1.5 rounded-xl border border-gray-300 dark:border-gray-600 text-sm text-gray-500">Clear</button>
-          )}
-        </form>
+        </div>
+        {/* Type filter */}
+        <select
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value)}
+          className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+        >
+          {TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+        </select>
+        <button onClick={load} className="inline-flex items-center gap-1.5 rounded-xl border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-800">
+          <RefreshCw className="h-4 w-4" /> Refresh
+        </button>
       </div>
 
-      {/* Table */}
-      {loading ? (
-        <div className="text-center py-16 text-gray-400">Loading payables…</div>
-      ) : error ? (
-        <div className="rounded-2xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 p-5 text-sm text-red-700 dark:text-red-300">
-          {error}
-          <button onClick={() => void load()} className="ml-3 underline">Retry</button>
-        </div>
-      ) : !data || data.items.length === 0 ? (
-        <div className="text-center py-20 text-gray-400">
-          <div className="text-5xl mb-4">✓</div>
-          <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">No pending payables</div>
-          <div className="text-sm mt-1">All obligations are settled for the selected filter.</div>
-        </div>
-      ) : (
-        <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+      {/* Main table */}
+      <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden mb-5">
+        {loading ? (
+          <div className="p-12 text-center text-sm text-gray-500 dark:text-gray-400">Loading payables…</div>
+        ) : error ? (
+          <div className="p-8 text-center">
+            <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
+            <button onClick={load} className="mt-3 text-sm text-blue-600 underline">Retry</button>
+          </div>
+        ) : !data || data.items.length === 0 ? (
+          <div className="p-12 text-center">
+            <CheckCircle2 className="h-10 w-10 text-green-400 mx-auto mb-3" />
+            <p className="text-gray-500 dark:text-gray-400 font-medium">No pending payables</p>
+            <p className="text-xs text-gray-400 mt-1">All obligations are paid or no items match the filter.</p>
+          </div>
+        ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead className="bg-gray-50 dark:bg-gray-800 text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
                 <tr>
-                  <th className="px-4 py-3">Type</th>
-                  <th className="px-4 py-3">Reference</th>
-                  <th className="px-4 py-3">Party</th>
-                  <th className="px-4 py-3 text-right">Total</th>
-                  <th className="px-4 py-3 text-right">Outstanding</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Journal</th>
-                  <th className="px-4 py-3">Date</th>
-                  <th className="px-4 py-3 text-right">Action</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">Type</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">Reference</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">Party</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 dark:text-gray-400">Amount</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 dark:text-gray-400">Outstanding</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400">Journal</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400">Date</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 dark:text-gray-400">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                 {data.items.map((item) => (
-                  <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
+                  <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                     <td className="px-4 py-3">
-                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${TYPE_COLOR[item.payable_type] ?? "bg-gray-100 text-gray-700"}`}>
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_COLOR[item.payable_type] ?? "bg-gray-100 text-gray-700"}`}>
                         {item.payable_type_label}
                       </span>
                     </td>
-                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
-                      <div>{item.reference}</div>
-                      {item.notes && (
-                        <div className="text-xs text-gray-400 mt-0.5 max-w-[180px] truncate">{item.notes}</div>
-                      )}
-                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 font-mono whitespace-nowrap">{item.reference}</td>
                     <td className="px-4 py-3">
-                      <div className="text-gray-900 dark:text-white">{item.party_name}</div>
+                      <div className="font-medium text-gray-900 dark:text-white text-xs">{item.party_name}</div>
                       <div className="text-xs text-gray-400">{item.party_type}</div>
                     </td>
-                    <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{rupee(item.amount)}</td>
-                    <td className="px-4 py-3 text-right">
-                      <span className="font-semibold text-red-600 dark:text-red-400">{rupee(item.outstanding)}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col gap-1">
-                        <span className="text-xs text-gray-500 dark:text-gray-400">{item.status}</span>
-                        {item.needs_posting && (
-                          <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">Accrual needed</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      {item.journal_posted ? (
-                        <span className="text-xs text-green-600 dark:text-green-400 font-medium">✓ Posted</span>
+                    <td className="px-4 py-3 text-right tabular-nums text-xs text-gray-700 dark:text-gray-300">{rupee(item.amount)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums text-xs font-semibold text-red-600 dark:text-red-400">{rupee(item.outstanding)}</td>
+                    <td className="px-4 py-3 text-center">
+                      {item.needs_posting ? (
+                        <span className="inline-flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 font-medium">
+                          <AlertTriangle className="h-3 w-3" /> Needs accrual
+                        </span>
+                      ) : item.journal_posted ? (
+                        <span className="text-xs text-green-600 dark:text-green-400">✓ Posted</span>
                       ) : (
-                        <span className="text-xs text-gray-400">Pending</span>
+                        <span className="text-xs text-gray-400">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">{item.date ?? "—"}</td>
+                    <td className="px-4 py-3 text-center text-xs text-gray-400 whitespace-nowrap">{item.date ?? "—"}</td>
                     <td className="px-4 py-3 text-right">
                       <button
                         onClick={() => setPaying(item)}
-                        className={`inline-flex items-center gap-1 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${item.needs_posting ? "bg-amber-600 hover:bg-amber-700" : "bg-green-600 hover:bg-green-700"}`}
+                        className={`inline-flex items-center gap-1 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${
+                          item.needs_posting ? "bg-amber-600 hover:bg-amber-700" : "bg-green-600 hover:bg-green-700"
+                        }`}
                       >
                         {item.needs_posting ? "Post & Pay" : "Pay"}
                       </button>
@@ -496,8 +523,9 @@ export default function UnifiedPayablePage() {
               </tbody>
             </table>
           </div>
+        )}
 
-          {/* Footer */}
+        {data && data.items.length > 0 && (
           <div className="border-t border-gray-100 dark:border-gray-800 px-4 py-3 flex flex-wrap justify-between items-center gap-3 text-sm">
             <div className="flex gap-4 text-xs text-gray-400">
               <span>{data.total_items} item{data.total_items !== 1 ? "s" : ""}</span>
@@ -509,19 +537,16 @@ export default function UnifiedPayablePage() {
               Total outstanding: {rupee(data.total_outstanding)}
             </span>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Finance accounts reference panel */}
+      {/* Available payment accounts */}
       {accounts.length > 0 && (
-        <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm p-5">
+        <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm p-5 mb-5">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Available payment accounts</h3>
-            <Link
-              href={ROUTES.admin.settingsBusinessSetupFinanceAccounts}
-              className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-            >
-              Manage accounts →
+            <Link href={ROUTES.admin.settingsBusinessSetupFinanceAccounts} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
+              Manage →
             </Link>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -536,29 +561,41 @@ export default function UnifiedPayablePage() {
         </div>
       )}
 
-      {/* Quick links */}
+      {/* Module quick-access */}
       <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm p-5">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Related modules</h3>
-        <div className="flex flex-wrap gap-2 text-sm">
-          {[
-            { label: "Bridge Reconciliation", href: ROUTES.admin.accountingBridgeReconciliation },
-            { label: "Journal Entries", href: ROUTES.admin.accounting },
-            { label: "Finance Accounts", href: ROUTES.admin.settingsBusinessSetupFinanceAccounts },
-            { label: "HR Payroll", href: ROUTES.admin.hrPayroll },
-            { label: "Vendors", href: "/admin/vendors" },
-            { label: "Collections", href: ROUTES.admin.collections },
-          ].map((link) => (
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Connected modules</h3>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {MODULE_LINKS.map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-1.5 text-gray-700 dark:text-gray-300 hover:border-blue-400 transition-colors"
+              className={`rounded-xl border ${link.color} bg-gray-50 dark:bg-gray-800 px-3 py-3 hover:border-primary/50 hover:bg-primary/5 transition-colors`}
             >
-              {link.label} →
+              <div className="text-xs font-semibold text-gray-800 dark:text-gray-200">{link.label}</div>
+              <div className="text-xs text-gray-400 mt-0.5">{link.desc}</div>
             </Link>
           ))}
         </div>
       </div>
-      </div>
+
+      {/* Pay modal */}
+      {paying && (
+        <PayModal
+          item={paying}
+          accounts={accounts}
+          onClose={() => setPaying(null)}
+          onPaid={handlePaid}
+        />
+      )}
+
+      {/* Success toast */}
+      {toast && (
+        <SuccessToast
+          msg={toast.msg}
+          journalId={toast.journalId}
+          onClose={() => setToast(null)}
+        />
+      )}
     </ERPPageShell>
   );
 }

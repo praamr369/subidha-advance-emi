@@ -70,6 +70,7 @@ urlpatterns = [
     path("auth/", include("api.v1.routes.auth")),
     path("admin/payments/collect/", IdempotentAdminPaymentCollectView.as_view()),
     path("admin/products/register/", AdminProductRegisterView.as_view()),
+    path("admin/catalog/", include("api.v1.routes.catalog")),
     path("admin/smart/pincode/<str:pincode>/", SmartPincodeLookupView.as_view()),
     path("admin/smart/hsn/suggest/", SmartHsnSuggestView.as_view()),
     path("admin/smart/suggest/", SmartSuggestView.as_view()),
@@ -177,4 +178,5 @@ urlpatterns = [
     path("public/quotations/", include(public_quotation_urlpatterns)),
     path("executive/", include("api.v1.routes.executive")),
     path("winner/", include("api.v1.route_modules.winner_urls")),
+    path("pim/", include("products_pim.urls")),
 ]

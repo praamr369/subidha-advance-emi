@@ -23,6 +23,7 @@ import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import FormActions from "@/components/ui/FormActions";
 import { FormSection } from "@/components/ui/operations";
 import SmartSuggestField from "@/components/forms/SmartSuggestField";
+import CatalogSpecificationFields from "@/components/admin/products/CatalogSpecificationFields";
 import { apiFetch } from "@/lib/api";
 import { getProductCatalogOptions, type ProductCatalogOptions } from "@/services/products";
 import QuickCreateInventoryDrawer from "@/components/inventory/QuickCreateInventoryDrawer";
@@ -60,7 +61,9 @@ type FieldErrors = Partial<
     | "image"
     | "is_emi_enabled"
     | "is_rent_enabled"
-    | "is_lease_enabled",
+    | "is_lease_enabled"
+    | "catalog_category"
+    | "base_specs",
     string
   >
 >;
@@ -143,6 +146,8 @@ function parseFieldErrors(error: unknown): FieldErrors {
     pick("unit_of_measure");
     pick("category");
     pick("subcategory");
+    pick("catalog_category");
+    pick("base_specs");
     pick("description");
     pick("image");
     pick("is_emi_enabled");
@@ -259,6 +264,8 @@ export default function AdminProductCreatePage() {
   const [unitOfMeasure, setUnitOfMeasure] = useState("PCS");
   const [category, setCategory] = useState("");
   const [subcategory, setSubcategory] = useState("");
+  const [catalogCategoryId, setCatalogCategoryId] = useState<number | null>(null);
+  const [baseSpecs, setBaseSpecs] = useState<Record<string, unknown>>({});
   const [description, setDescription] = useState("");
   const [hsnSacCode, setHsnSacCode] = useState("");
   const [gstRate, setGstRate] = useState("");
@@ -394,6 +401,8 @@ export default function AdminProductCreatePage() {
     setUnitOfMeasure("PCS");
     setCategory("");
     setSubcategory("");
+    setCatalogCategoryId(null);
+    setBaseSpecs({});
     setDescription("");
     setHsnSacCode("");
     setGstRate("");
@@ -490,6 +499,8 @@ export default function AdminProductCreatePage() {
         formData.append("subcategory_master", String(selectedSubcategoryMaster.id));
       }
       formData.append("subcategory", trimmedSubcategory);
+      if (catalogCategoryId) formData.append("catalog_category", String(catalogCategoryId));
+      formData.append("base_specs", JSON.stringify(baseSpecs));
       formData.append("description", trimmedDescription);
       if (hsnSacCode.trim()) {
         formData.append("hsn_sac_code", hsnSacCode.trim().toUpperCase());
@@ -913,6 +924,15 @@ export default function AdminProductCreatePage() {
                 />
                 <FieldError message={fieldErrors.description} />
               </div>
+
+              <CatalogSpecificationFields
+                categoryId={catalogCategoryId}
+                values={baseSpecs}
+                onCategoryChange={setCatalogCategoryId}
+                onValuesChange={setBaseSpecs}
+                disabled={saving}
+                error={fieldErrors.base_specs || fieldErrors.catalog_category}
+              />
 
               <div className="grid gap-4 md:grid-cols-2">
                 <SmartSuggestField

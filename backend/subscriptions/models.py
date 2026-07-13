@@ -592,6 +592,16 @@ class Product(TimeStampedModel):
     )
     category = models.CharField(max_length=120, blank=True, default="", db_index=True)
     subcategory = models.CharField(max_length=120, blank=True, default="", db_index=True)
+    # PIM bridge is additive: legacy category fields remain authoritative for
+    # existing subscriptions until a later explicit migration/variant phase.
+    catalog_category = models.ForeignKey(
+        "catalog.CatalogCategory",
+        on_delete=models.PROTECT,
+        related_name="products",
+        null=True,
+        blank=True,
+    )
+    base_specs = models.JSONField(default=dict, blank=True)
     sku = models.CharField(max_length=60, unique=True, null=True, blank=True, db_index=True)
     unit_of_measure_master = models.ForeignKey(
         ProductUnitOfMeasureMaster,
@@ -709,6 +719,11 @@ class Product(TimeStampedModel):
         if self.subcategory_master_id and self.category_master_id:
             if self.subcategory_master.category_id != self.category_master_id:
                 errors["subcategory_master"] = "Subcategory must belong to the selected category."
+        from catalog.services.product_spec_validation_service import validate_product_base_specs
+        try:
+            validate_product_base_specs(category=self.catalog_category, values=self.base_specs)
+        except ValidationError as exc:
+            errors.update(exc.message_dict)
         if self.plan_type_default not in PlanType.values:
             errors["plan_type_default"] = "Unsupported default plan type."
         # Products with no modes are allowed when:
@@ -3943,6 +3958,8 @@ class AuditLog(models.Model):
             "PRODUCT_INVENTORY_PROFILE_PREPARED",
             "Product Inventory Profile Prepared",
         )
+        CATALOG_CREATED = "CATALOG_CREATED", "Catalog Record Created"
+        CATALOG_UPDATED = "CATALOG_UPDATED", "Catalog Record Updated"
         INVENTORY_ITEM_CREATED = "INVENTORY_ITEM_CREATED", "Inventory Item Created"
         INVENTORY_ITEM_UPDATED = "INVENTORY_ITEM_UPDATED", "Inventory Item Updated"
         STOCK_LOCATION_CREATED = "STOCK_LOCATION_CREATED", "Stock Location Created"

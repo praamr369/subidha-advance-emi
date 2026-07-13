@@ -1503,6 +1503,8 @@ class ProductAdminSerializer(serializers.ModelSerializer):
             "subcategory_master_name",
             "category",
             "subcategory",
+            "catalog_category",
+            "base_specs",
             "sku",
             "unit_of_measure_master",
             "unit_of_measure_master_name",
@@ -1584,6 +1586,14 @@ class ProductAdminSerializer(serializers.ModelSerializer):
             "subcategory_master",
             instance.subcategory_master if instance else None,
         )
+        catalog_category = data.get(
+            "catalog_category",
+            instance.catalog_category if instance else None,
+        )
+        base_specs = data.get(
+            "base_specs",
+            instance.base_specs if instance else {},
+        )
         description = data.get(
             "description",
             instance.description if instance else "",
@@ -1631,6 +1641,8 @@ class ProductAdminSerializer(serializers.ModelSerializer):
             subcategory_master=subcategory_master,
             category=category,
             subcategory=subcategory,
+            catalog_category=catalog_category,
+            base_specs=base_specs,
             sku=sku,
             unit_of_measure_master=unit_of_measure_master,
             unit_of_measure=unit_of_measure,

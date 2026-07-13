@@ -153,6 +153,9 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Sales & Contracts", "Brochure Quotations", ROUTES.admin.brochureQuotations, "Non-financial quotation drafts, PDFs, public share links, and agreement-in-principle status tracking."),
   item("Sales & Contracts", "Product Workspace", ROUTES.admin.productsWorkspace, "Product operations workspace."),
   item("Sales & Contracts", "Product Masters", ROUTES.admin.productsMasters, "Product category, subcategory, and UOM setup."),
+  item("Sales & Contracts", "PIM Products", ROUTES.admin.pimProducts, "Enterprise PIM — category-specific attributes and SKU variants."),
+  item("Sales & Contracts", "PIM Categories", ROUTES.admin.pimCategories, "PIM category tree with attribute templates."),
+  item("Sales & Contracts", "PIM Manage Categories", ROUTES.admin.pimCategoriesManage, "Create and edit PIM categories, subcategories and attribute types."),
   // Rent / lease contract sub-section
   item("Sales & Contracts", "Rent/Lease Cockpit", ROUTES.admin.rentLease, "Rent and lease cockpit."),
   item("Sales & Contracts", "Rent Contracts", `${ROUTES.admin.subscriptions}?plan_type=RENT`, "Rent contract register."),

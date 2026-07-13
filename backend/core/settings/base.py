@@ -425,6 +425,7 @@ INSTALLED_APPS = [
     "inventory",
     "manufacturing",
     "billing",
+    "catalog",
     "brochures",
     "reminders",
     "system_jobs",
@@ -437,6 +438,7 @@ INSTALLED_APPS = [
     "documents",
     "reviews",
     "django_extensions",
+    "products_pim",
 ]
 
 MIDDLEWARE = [

@@ -2611,6 +2611,7 @@ class ProductAdminViewSet(AdminOnlyModelViewSet):
         Product.objects.select_related(
             "category_master",
             "subcategory_master",
+            "catalog_category",
             "unit_of_measure_master",
             "inventory_profile",
         ).all().order_by("name")

@@ -34,6 +34,8 @@ export type ProductRecord = {
   subcategory_master_name?: string | null;
   category?: string;
   subcategory?: string;
+  catalog_category?: number | null;
+  base_specs?: Record<string, unknown>;
   description?: string;
   hsn_sac_code?: string | null;
   gst_rate?: string | number | null;

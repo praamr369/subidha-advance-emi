@@ -16,6 +16,9 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import SmartSuggestField from "@/components/forms/SmartSuggestField";
+import CatalogSpecificationFields from "@/components/admin/products/CatalogSpecificationFields";
+import PimSyncSection from "@/components/admin/pim/PimSyncSection";
+import { pimService, type PimProduct } from "@/services/pim";
 import { shouldBypassNextImageOptimization } from "@/lib/media";
 import { getProduct, getProductCatalogOptions, updateProduct, type ProductCatalogOptions, type ProductRecord } from "@/services/products";
 
@@ -34,6 +37,30 @@ function safePlan(value: unknown): "EMI" | "RENT" | "LEASE" {
 
 function FormCard({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
   return <ERPSectionShell title={title} description={description}><div className="grid gap-4 md:grid-cols-2">{children}</div></ERPSectionShell>;
+}
+
+function PimStatusMini({ productCode }: { productCode: string }) {
+  const [pimProduct, setPimProduct] = useState<PimProduct | null | undefined>(undefined);
+  useEffect(() => {
+    if (!productCode) { setPimProduct(null); return; }
+    pimService.getProducts({ search: productCode }).then((list) => {
+      const match = list.find((p) => p.code === productCode);
+      setPimProduct(match ?? null);
+    }).catch(() => setPimProduct(null));
+  }, [productCode]);
+  if (pimProduct === undefined) return <div className="flex items-center justify-between rounded-xl border px-3 py-2 text-sm"><span>PIM</span><span className="text-xs text-muted-foreground">Checking…</span></div>;
+  if (!pimProduct) return (
+    <div className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm dark:border-amber-900 dark:bg-amber-950/30">
+      <span>PIM</span>
+      <Link href={`/admin/pim/products`} className="text-xs text-amber-600 hover:underline">Not synced</Link>
+    </div>
+  );
+  return (
+    <div className="flex items-center justify-between rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-sm dark:border-green-900 dark:bg-green-950/30">
+      <span>PIM #{pimProduct.id}</span>
+      <Link href={`/admin/pim/products/${pimProduct.id}/edit`} className="text-xs text-green-700 hover:underline dark:text-green-400">Edit PIM →</Link>
+    </div>
+  );
 }
 
 function check(label: string, ok: boolean) {
@@ -57,6 +84,8 @@ export default function AdminProductEditPage() {
   const [unit, setUnit] = useState("PCS");
   const [category, setCategory] = useState("");
   const [subcategory, setSubcategory] = useState("");
+  const [catalogCategoryId, setCatalogCategoryId] = useState<number | null>(null);
+  const [baseSpecs, setBaseSpecs] = useState<Record<string, unknown>>({});
   const [description, setDescription] = useState("");
   const [hsnSacCode, setHsnSacCode] = useState("");
   const [gstRate, setGstRate] = useState("");
@@ -81,6 +110,8 @@ export default function AdminProductEditPage() {
     setUnit(next.unit_of_measure || "PCS");
     setCategory(next.category || "");
     setSubcategory(next.subcategory || "");
+    setCatalogCategoryId(next.catalog_category ?? null);
+    setBaseSpecs(next.base_specs || {});
     setDescription(next.description || "");
     setHsnSacCode(next.hsn_sac_code || "");
     setGstRate(next.gst_rate != null ? String(next.gst_rate) : "");
@@ -150,6 +181,8 @@ export default function AdminProductEditPage() {
         unit_of_measure: unit || "PCS",
         category,
         subcategory,
+        catalog_category: catalogCategoryId,
+        base_specs: baseSpecs,
         description,
         hsn_sac_code: hsnSacCode.trim().toUpperCase(),
         gst_rate: gstRate.trim() ? gstRate.trim() : null,
@@ -170,6 +203,8 @@ export default function AdminProductEditPage() {
         payload.set("unit_of_measure", unit || "PCS");
         payload.set("category", category);
         payload.set("subcategory", subcategory);
+        if (catalogCategoryId) payload.set("catalog_category", String(catalogCategoryId)); else payload.set("catalog_category", "");
+        payload.set("base_specs", JSON.stringify(baseSpecs));
         payload.set("description", description);
         payload.set("hsn_sac_code", hsnSacCode.trim().toUpperCase());
         if (gstRate.trim()) payload.set("gst_rate", gstRate.trim());
@@ -268,6 +303,13 @@ export default function AdminProductEditPage() {
                   />
                 </div>
                 <label className="text-sm text-muted-foreground">GST Rate (%)<input className={fieldClass()} type="number" min="0" step="0.01" value={gstRate} onChange={(event) => setGstRate(event.target.value)} /></label>
+                <CatalogSpecificationFields
+                  categoryId={catalogCategoryId}
+                  values={baseSpecs}
+                  onCategoryChange={setCatalogCategoryId}
+                  onValuesChange={setBaseSpecs}
+                  disabled={saving}
+                />
               </FormCard>
 
               <FormCard title="Capabilities" description="Controls future use in EMI, rent, lease, and direct-sale workflows.">
@@ -278,6 +320,15 @@ export default function AdminProductEditPage() {
                 <label className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm">Lease<input type="checkbox" checked={lease} onChange={(event) => setLease(event.target.checked)} /></label>
                 <label className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm">Direct Sale<input type="checkbox" checked={directSale} onChange={(event) => setDirectSale(event.target.checked)} /></label>
               </FormCard>
+
+              {/* PIM Sync — auto-matches category/subcategory, inline spec editing */}
+              <PimSyncSection
+                productCode={productCode}
+                productName={name}
+                categoryText={category}
+                subcategoryText={subcategory}
+                basePrice={basePrice}
+              />
 
               <ERPSectionShell title="Related Products" description="Attach accessories, raw materials, services, and add-ons to this product.">
                 <RelatedProductsSection productId={productId ? Number(productId) : 0} productName={name} saving={saving} />
@@ -297,6 +348,25 @@ export default function AdminProductEditPage() {
               </ERPSectionShell>
               <ERPSectionShell title="Inventory readiness" description="Prepare/recheck profile from this edit page without posting stock movements.">
                 <div className="space-y-3"><div className="text-sm text-muted-foreground">Profile: {product.inventory_profile_id ? `#${product.inventory_profile_id}` : "Pending"}</div><ProductQuickActions product={{ ...product, name, product_code: productCode, sku, unit_of_measure: unit, category, subcategory, base_price: basePrice, is_active: active, is_emi_enabled: emi, is_rent_enabled: rent, is_lease_enabled: lease, is_direct_sale_enabled: directSale }} mode="detail" onChanged={() => loadPage()} /></div>
+              </ERPSectionShell>
+              <ERPSectionShell title="Module Links" description="This product across all 3 modules.">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between rounded-xl border px-3 py-2 text-sm">
+                    <span>Products Register</span>
+                    <Link href={`/admin/products/${product.id}`} className="text-xs text-primary hover:underline">View</Link>
+                  </div>
+                  <PimStatusMini productCode={productCode} />
+                  <div className="flex items-center justify-between rounded-xl border px-3 py-2 text-sm">
+                    <span>Inventory</span>
+                    {product.inventory_profile_id
+                      ? <Link href={`/admin/inventory/profiles/${product.inventory_profile_id}`} className="text-xs text-primary hover:underline">Profile #{product.inventory_profile_id}</Link>
+                      : <span className="text-xs text-amber-600">Not set up</span>
+                    }
+                  </div>
+                  <Link href="/admin/pim/products" className="block rounded-xl border border-dashed px-3 py-2 text-center text-xs text-muted-foreground hover:border-primary hover:text-primary">
+                    Open PIM Workbench →
+                  </Link>
+                </div>
               </ERPSectionShell>
               <ERPSectionShell title="Safe edit boundary" description="What this page does not do.">
                 <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground"><li>Does not recalculate EMI.</li><li>Does not mutate active contracts.</li><li>Does not change invoices, receipts, payments, or delivery records.</li><li>Does not post stock ledger opening quantity.</li></ul>

@@ -4,7 +4,8 @@ import { formatRupee } from "@/lib/utils/currency";
 import Link from "next/link";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Download, RefreshCw, Search, SlidersHorizontal, X } from "lucide-react";
+import { Download, RefreshCw, Search, SlidersHorizontal, X, Layers, ExternalLink } from "lucide-react";
+import { pimService, type PimProduct, type PimCategory } from "@/services/pim";
 
 import ProductQuickActions from "@/components/admin/products/ProductQuickActions";
 import ERPDataToolbar from "@/components/erp/ERPDataToolbar";
@@ -129,10 +130,129 @@ function activeFilterCount(filters: FilterState): number {
   return Object.values(filters).filter(Boolean).length;
 }
 
+// ── PIM Quick Panel (inline within products page) ────────────────────────────
+
+function PimPanel() {
+  const [pimProducts, setPimProducts] = useState<PimProduct[]>([]);
+  const [pimCategories, setPimCategories] = useState<PimCategory[]>([]);
+  const [pimLoading, setPimLoading] = useState(true);
+  const [pimSearch, setPimSearch] = useState("");
+  const [pimCat, setPimCat] = useState<number | "">("");
+
+  useEffect(() => {
+    Promise.all([
+      pimService.getProducts({ search: pimSearch || undefined, category: pimCat || undefined }),
+      pimService.getCategories(),
+    ]).then(([prods, cats]) => {
+      setPimProducts(Array.isArray(prods) ? prods : []);
+      setPimCategories(Array.isArray(cats) ? cats : []);
+    }).catch(() => {}).finally(() => setPimLoading(false));
+  }, [pimSearch, pimCat]);
+
+  return (
+    <div className="space-y-4">
+      {/* PIM header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <p className="text-sm text-muted-foreground">
+            Enterprise PIM — category-specific attributes, SKU variants, dynamic specs.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Link href="/admin/pim/products/create" className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+            <Layers className="h-4 w-4" /> New PIM Product
+          </Link>
+          <Link href="/admin/pim/categories" className="inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm hover:bg-muted">
+            Categories
+          </Link>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[180px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <input
+            className="w-full pl-9 pr-3 py-2 text-sm border rounded-xl bg-background"
+            placeholder="Search PIM products…"
+            value={pimSearch}
+            onChange={(e) => setPimSearch(e.target.value)}
+          />
+        </div>
+        <select
+          className="px-3 py-2 text-sm border rounded-xl bg-background"
+          value={pimCat}
+          onChange={(e) => setPimCat(e.target.value ? Number(e.target.value) : "")}
+        >
+          <option value="">All Categories</option>
+          {pimCategories.map((c) => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+        </select>
+      </div>
+
+      {/* PIM product table */}
+      <div className="rounded-xl border overflow-x-auto">
+        {pimLoading ? (
+          <div className="p-8 text-center text-sm text-muted-foreground">Loading PIM products…</div>
+        ) : pimProducts.length === 0 ? (
+          <div className="p-8 text-center text-sm text-muted-foreground">
+            No PIM products found.{" "}
+            <Link href="/admin/pim/products/create" className="text-primary underline">Create one →</Link>
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50 border-b">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Code</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Name</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Category</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">Price</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground">SKUs</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground">Status</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground">Manage</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {pimProducts.map((p) => (
+                <tr key={p.id} className="hover:bg-muted/30 transition-colors">
+                  <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">{p.code}</td>
+                  <td className="px-4 py-2.5 font-medium">{p.name}</td>
+                  <td className="px-4 py-2.5 text-muted-foreground text-xs">{p.category_name}{p.subcategory_name ? ` / ${p.subcategory_name}` : ""}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums">{formatRupee(Number(p.base_price))}</td>
+                  <td className="px-4 py-2.5 text-center">
+                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-semibold">{p.variant_count ?? 0}</span>
+                  </td>
+                  <td className="px-4 py-2.5 text-center">
+                    {p.is_published
+                      ? <span className="text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5">Published</span>
+                      : <span className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">Draft</span>
+                    }
+                  </td>
+                  <td className="px-4 py-2.5 text-center">
+                    <Link href={`/admin/pim/products/${p.id}/edit`} className="inline-flex items-center gap-1 text-primary text-xs hover:underline font-medium">
+                      Edit <ExternalLink className="h-3 w-3" />
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <div className="rounded-xl border border-blue-200 bg-blue-50 dark:bg-blue-900/10 dark:border-blue-800 px-4 py-3 text-xs text-blue-700 dark:text-blue-300">
+        <strong>PIM products</strong> support dynamic category attributes (bed size/material, fridge liters, AC tons, etc.) and per-SKU variants.
+        Subscription products above are used for EMI/Rent/Lease billing. Both systems can coexist for the same physical product.
+      </div>
+    </div>
+  );
+}
+
 export default function AdminProductsPage() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+
+  const [activeTab, setActiveTab] = useState<"subscription" | "pim">("subscription");
 
   const [payload, setPayload] = useState<ProductRegisterPage>(() => emptyPage());
   const [catalogOptions, setCatalogOptions] = useState<ProductCatalogOptions>(() => emptyCatalogOptions());
@@ -358,6 +478,29 @@ export default function AdminProductsPage() {
           { label: "Image missing", value: summary.image_missing, detail: "Catalog cleanup needed" },
         ]} />
 
+        {/* Tab switcher — Subscription Products vs PIM Products */}
+        <div className="flex gap-1 p-1 rounded-xl bg-muted w-fit">
+          <button
+            type="button"
+            onClick={() => setActiveTab("subscription")}
+            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === "subscription" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            Subscription Products
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("pim")}
+            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 ${activeTab === "pim" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            <Layers className="h-4 w-4" /> PIM Products
+          </button>
+        </div>
+
+        {/* PIM panel */}
+        {activeTab === "pim" && <PimPanel />}
+
+        {/* Subscription products section */}
+        {activeTab === "subscription" && <>
         <ERPSectionShell title="Filters" description="All filters run on the full dataset. State is cached in the URL — refresh keeps your filters.">
           <form onSubmit={applyFilters} className="space-y-3">
             {/* Row 1: Search + quick dropdowns */}
@@ -621,6 +764,7 @@ export default function AdminProductsPage() {
             )}
           </ERPSectionShell>
         ) : null}
+        </>}
       </div>
     </ERPPageShell>
   );

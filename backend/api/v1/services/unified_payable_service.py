@@ -227,6 +227,43 @@ def _credit_refund_payables() -> list[dict[str, Any]]:
     return rows
 
 
+def _payout_batch_payables() -> list[dict[str, Any]]:
+    """
+    Include finalized payout batches that are READY (not yet PAID/CANCELLED).
+    These represent bulk partner commission payouts ready for disbursement.
+    """
+    try:
+        from subscriptions.models import CommissionPayoutBatch, CommissionPayoutBatchStatus
+    except ImportError:
+        return []
+
+    qs = (
+        CommissionPayoutBatch.objects
+        .filter(status=CommissionPayoutBatchStatus.FINALIZED)
+        .order_by("-created_at")[:100]
+    )
+    rows = []
+    for batch in qs:
+        rows.append({
+            "id": f"payout_batch:{batch.id}",
+            "payable_type": "payout_batch",
+            "payable_type_label": "Partner Payout Batch",
+            "payable_id": batch.id,
+            "reference": getattr(batch, "batch_no", f"BATCH-{batch.id}"),
+            "party_name": f"Batch of {getattr(batch, 'partner_count', '?')} partners",
+            "party_type": "Partner Batch",
+            "amount": _money(getattr(batch, "total_amount", 0)),
+            "outstanding": _money(getattr(batch, "total_amount", 0)),
+            "status": batch.status,
+            "needs_posting": False,
+            "date": str(getattr(batch, "created_at", "")).split("T")[0],
+            "journal_posted": getattr(batch, "journal_entry_id", None) is not None,
+            "notes": f"{getattr(batch, 'line_count', 0)} commission lines",
+            "source_url": f"/admin/batches/{batch.id}",
+        })
+    return rows
+
+
 def build_unified_payable_list(
     *,
     payable_type: str | None = None,
@@ -238,6 +275,7 @@ def build_unified_payable_list(
         "commission": _commission_payables,
         "expense_claim": _expense_claim_payables,
         "credit_refund": _credit_refund_payables,
+        "payout_batch": _payout_batch_payables,
     }
 
     if payable_type and payable_type in collectors:
@@ -314,6 +352,7 @@ def execute_payable_payment(
         "commission": _execute_commission,
         "expense_claim": _execute_expense_claim,
         "credit_refund": _execute_credit_refund,
+        "payout_batch": _execute_payout_batch,
     }
     fn = dispatch.get(payable_type)
     if fn is None:
@@ -671,4 +710,73 @@ def _execute_credit_refund(*, payable_id, finance_account_id, amount, payment_da
         "journal_entry_id": journal_id,
         "message": f"Customer refund ₹{refund_amount:.2f} disbursed."
         + (" Journal: DR Customer Receivable / CR Finance Account." if journal_id else ""),
+    }
+
+
+# ── Payout Batch ──────────────────────────────────────────────────────────────
+
+def _execute_payout_batch(*, payable_id, finance_account_id, amount, payment_date, reference_no, notes, executed_by):
+    """
+    Marks a finalized CommissionPayoutBatch as PAID and posts the journal:
+      DR  Partner Commission Payable  (clears the liability)
+      CR  Finance Account             (cash / bank / UPI disbursed)
+    """
+    try:
+        from subscriptions.models import CommissionPayoutBatch, CommissionPayoutBatchStatus
+        batch = CommissionPayoutBatch.objects.get(pk=payable_id)
+    except Exception as exc:
+        raise ValueError(f"Payout batch not found: {exc}") from exc
+
+    if batch.status != CommissionPayoutBatchStatus.FINALIZED:
+        raise ValueError(f"Batch {payable_id} is in status {batch.status!r}, not FINALIZED.")
+
+    journal_id = None
+    if finance_account_id:
+        from accounting.models import FinanceAccount
+        from accounting.services.bridge_posting_service import post_bridge_entry
+        from accounting.services.operational_accounts_service import ensure_phase3_system_accounts
+
+        finance_account = FinanceAccount.objects.select_related("chart_account").get(pk=finance_account_id)
+        accounts = ensure_phase3_system_accounts()
+        batch_amount = _dec(getattr(batch, "total_amount", amount))
+
+        posted_journal, _ = post_bridge_entry(
+            source_instance=batch,
+            purpose="PARTNER_PAYOUT_BATCH_DISBURSEMENT",
+            entry_date=payment_date,
+            memo=f"Partner payout batch #{payable_id} — {getattr(batch, 'batch_no', f'BATCH-{payable_id}')}",
+            voucher_type="PARTNER_PAYOUT",
+            source_type="PAYOUT_BATCH",
+            source_reference=reference_no or getattr(batch, "batch_no", f"BATCH-{payable_id}"),
+            trace_metadata={
+                "batch_id": payable_id,
+                "amount": f"{batch_amount:.2f}",
+                "reference_no": reference_no,
+            },
+            lines=[
+                {
+                    "chart_account": accounts.get("PARTNER_COMMISSION_PAYABLE") or accounts.get("ACCOUNTS_PAYABLE"),
+                    "description": f"Payout batch #{payable_id} — partner commission liability cleared",
+                    "debit_amount": batch_amount,
+                    "credit_amount": MONEY_ZERO,
+                },
+                {
+                    "chart_account": finance_account.chart_account,
+                    "description": reference_no or f"Payout batch disbursement {payable_id}",
+                    "debit_amount": MONEY_ZERO,
+                    "credit_amount": batch_amount,
+                },
+            ],
+        )
+        journal_id = posted_journal.id
+
+    CommissionPayoutBatch.objects.filter(pk=payable_id).update(status=CommissionPayoutBatchStatus.PAID)
+    return {
+        "success": True,
+        "payable_type": "payout_batch",
+        "payable_id": payable_id,
+        "amount_paid": _money(amount),
+        "journal_entry_id": journal_id,
+        "message": f"Partner payout batch ₹{_dec(amount):.2f} disbursed."
+        + (" Journal: DR Partner Commission Payable / CR Finance Account." if journal_id else ""),
     }
