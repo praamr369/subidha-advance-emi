@@ -484,8 +484,9 @@ export default function InventoryOpeningStockPage() {
                       data-testid="opening-stock-cost-input"
                       type="text"
                       inputMode="decimal"
-                      value={manualCost}
-                      onChange={(ev) => setManualCost(ev.target.value)}
+                      value={manualUnitCost}
+                      onChange={(ev) => setManualUnitCost(ev.target.value)}
+                      placeholder={pickedItem?.standard_unit_cost ?? "0.00"}
                       className="w-full rounded-xl border-2 border-border bg-card px-3 py-2.5 text-sm font-medium text-foreground transition-all focus:border-primary focus:ring-4 focus:ring-primary/10"
                     />
                     {manualFieldErrors.unit_cost ? (
