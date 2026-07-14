@@ -4,10 +4,9 @@ import { ROUTES } from "@/lib/routes";
 
 const links = [
   { href: ROUTES.admin.settingsBusinessSetup, label: "Business Setup" },
-  { href: ROUTES.admin.settingsBusinessSetupProfile, label: "Business Profile" },
+  { href: ROUTES.admin.settingsBusinessSetupProfile, label: "Unified Business & Brand" },
   { href: ROUTES.admin.settingsBusinessSetupPrintBranding, label: "Print & PDF Branding" },
   { href: ROUTES.admin.settingsBusinessSetupEmailSmtp, label: "Email (SMTP / OTP)" },
-  { href: ROUTES.admin.settingsBusinessSetupPublicSite, label: "Public Site" },
   { href: ROUTES.admin.settingsPolicies, label: "Policy Governance" },
   { href: ROUTES.admin.settingsBusinessCompliance, label: "Business Compliance" },
   { href: ROUTES.admin.settingsBusinessSetupBranches, label: "Branches" },
@@ -22,7 +21,6 @@ const links = [
   { href: ROUTES.admin.accountingBridges, label: "Accounting bridges" },
   { href: ROUTES.admin.accountingBridgeReconciliation, label: "Bridge reconciliation" },
   { href: ROUTES.admin.settingsBusinessSetupDocumentNumbering, label: "Document Numbering" },
-  { href: ROUTES.admin.brandData, label: "Brand Data Center" },
   { href: ROUTES.admin.settingsBusinessSetupOpeningBalances, label: "Opening Balances" },
   { href: ROUTES.admin.settingsBusinessSetupMigration, label: "Migration Center" },
   { href: ROUTES.admin.settingsBusinessSetupReset, label: "Dry Runs & Reset" },
