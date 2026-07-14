@@ -156,12 +156,21 @@ export default function ProductPickerCombobox({
   return (
     <div ref={wrapRef} className="relative w-full" onKeyDown={handleKeyDown}>
       {/* Trigger button / selected display */}
-      <button
-        type="button"
+      <div
+        role="combobox"
+        aria-expanded={open}
+        aria-controls="product-picker-listbox"
+        tabIndex={disabled ? -1 : 0}
         data-testid={testId}
-        disabled={disabled}
-        onClick={openPicker}
-        className={`flex w-full items-center gap-2 rounded-xl border-2 px-3 py-2.5 text-left text-sm transition-all shadow-sm ${
+        onClick={disabled ? undefined : openPicker}
+        onKeyDown={(e) => {
+          if (disabled) return;
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            openPicker();
+          }
+        }}
+        className={`flex w-full cursor-pointer items-center gap-2 rounded-xl border-2 px-3 py-2.5 text-left text-sm transition-all shadow-sm ${
           disabled ? "cursor-not-allowed opacity-60 bg-muted border-border" : "border-border/60 bg-card hover:border-primary/40 hover:shadow-md focus:border-primary focus:ring-4 focus:ring-primary/10"
         } ${required && !value ? "border-destructive/60" : ""}`}
       >
@@ -189,7 +198,7 @@ export default function ProductPickerCombobox({
             <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
           </>
         )}
-      </button>
+      </div>
 
       {/* Dropdown panel */}
       {open ? (
