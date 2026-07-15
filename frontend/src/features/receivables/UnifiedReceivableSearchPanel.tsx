@@ -33,6 +33,7 @@ function badgeLabel(kind: UnifiedReceivableResultType | ""): string {
   if (kind === "DEPOSIT") return "Deposit";
   if (kind === "RECEIPT") return "Receipt";
   if (kind === "CUSTOMER") return "Customer";
+  if (kind === "LEGACY") return "Legacy Balance";
   return kind;
 }
 
@@ -47,6 +48,7 @@ function badgeClass(kind: UnifiedReceivableResultType | ""): string {
   if (kind === "DEPOSIT") return "border-slate-200 bg-slate-50 text-slate-800";
   if (kind === "RECEIPT") return "border-cyan-200 bg-cyan-50 text-cyan-900";
   if (kind === "CUSTOMER") return "border-fuchsia-200 bg-fuchsia-50 text-fuchsia-900";
+  if (kind === "LEGACY") return "border-fuchsia-200 bg-fuchsia-50 text-fuchsia-900";
   return "border-border bg-muted text-foreground";
 }
 
@@ -82,7 +84,7 @@ export default function UnifiedReceivableSearchPanel({
   lastPaymentSummary,
   onQueryChange,
   onSearch,
-  onAdvanceEmiSelect,
+  onCollectSelect,
   onRetrySearch,
 }: {
   title: string;
@@ -98,7 +100,7 @@ export default function UnifiedReceivableSearchPanel({
   lastPaymentSummary?: string | null;
   onQueryChange: (value: string) => void;
   onSearch: (query: string) => void;
-  onAdvanceEmiSelect?: (row: UnifiedReceivableResult) => void;
+  onCollectSelect?: (receivable: UnifiedReceivableResult) => void;
   onRetrySearch?: () => void;
 }) {
   const helperId = "unified-receivable-search-helper";
@@ -183,14 +185,14 @@ export default function UnifiedReceivableSearchPanel({
             const route = row.collection_route?.trim() || "";
             const primaryBadge = row.result_type || "";
             const extras = row.secondary_badges ?? [];
-            const canEmiInline = row.primary_action === "COLLECT_EMI" && Boolean(onAdvanceEmiSelect);
-            const canEmiRoute = row.primary_action === "COLLECT_EMI" && !onAdvanceEmiSelect && Boolean(route);
-            const canDirectRoute = row.primary_action === "COLLECT_DIRECT_SALE" && Boolean(route);
-            const canRentLeaseRoute = row.primary_action === "COLLECT_RENT_LEASE" && Boolean(route);
+            const canCollectInline = ["COLLECT_EMI", "COLLECT_LEGACY_RECEIVABLE", "COLLECT_DIRECT_SALE", "COLLECT_RENT_LEASE"].includes(row.primary_action) && Boolean(onCollectSelect);
+            const canEmiRoute = row.primary_action === "COLLECT_EMI" && !onCollectSelect && Boolean(route);
+            const canDirectRoute = row.primary_action === "COLLECT_DIRECT_SALE" && !onCollectSelect && Boolean(route);
+            const canRentLeaseRoute = row.primary_action === "COLLECT_RENT_LEASE" && !onCollectSelect && Boolean(route);
             const canOpenSaleRoute = row.primary_action === "OPEN_SALE" && Boolean(route);
             const canViewReceiptsRoute = row.primary_action === "VIEW_RECEIPTS" && Boolean(route);
             const disabledReason = row.reason_if_not_collectible || row.disabled_reason || "Collection is not available for this receivable.";
-            const noAction = !canEmiInline && !canEmiRoute && !canDirectRoute && !canRentLeaseRoute && !canOpenSaleRoute && !canViewReceiptsRoute;
+            const noAction = !canCollectInline && !canEmiRoute && !canDirectRoute && !canRentLeaseRoute && !canOpenSaleRoute && !canViewReceiptsRoute;
             const showSourceEvidence = shouldShowRentLeaseEvidence(row);
 
             return (
@@ -257,9 +259,9 @@ export default function UnifiedReceivableSearchPanel({
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {canEmiInline ? (
-                    <button type="button" data-testid="unified-receivable-open-emi-flow" onClick={() => onAdvanceEmiSelect?.(row)} disabled={actionLoadingKey === loadingKey} title="Opens the in-page EMI collection workflow using the canonical route from the server." className="inline-flex h-10 items-center justify-center rounded-xl bg-emerald-700 px-4 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60">
-                      {actionLoadingKey === loadingKey ? "Loading EMI..." : "Use EMI Flow"}
+                  {canCollectInline ? (
+                    <button type="button" data-testid="unified-receivable-open-collect-flow" onClick={() => onCollectSelect?.(row)} disabled={actionLoadingKey === loadingKey} title="Opens the inline collection workflow." className="inline-flex h-10 items-center justify-center rounded-xl bg-emerald-700 px-4 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60">
+                      {actionLoadingKey === loadingKey ? "Loading..." : row.primary_action === "COLLECT_LEGACY_RECEIVABLE" ? "Collect Legacy Balance" : row.primary_action === "COLLECT_DIRECT_SALE" ? "Collect Direct Sale" : row.primary_action === "COLLECT_RENT_LEASE" ? "Collect Rent/Lease" : "Use EMI Flow"}
                     </button>
                   ) : null}
 

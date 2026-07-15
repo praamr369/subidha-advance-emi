@@ -50,7 +50,9 @@ class ContractReferenceSerializer(serializers.ModelSerializer):
 
 
 class UnifiedReceivableCollectSerializer(serializers.Serializer):
-    source_type = serializers.ChoiceField(choices=ContractReferenceType.choices)
+    source_type = serializers.ChoiceField(
+        choices=[*ContractReferenceType.choices, ("LEGACY_RECEIVABLE", "Legacy Receivable")]
+    )
     source_id = serializers.IntegerField(min_value=1)
     amount = serializers.DecimalField(max_digits=12, decimal_places=2)
     payment_method = serializers.ChoiceField(choices=["CASH", "UPI", "BANK"])
@@ -60,7 +62,8 @@ class UnifiedReceivableCollectSerializer(serializers.Serializer):
     cash_counter_id = serializers.IntegerField(required=False, min_value=1)
     reference = serializers.CharField(required=False, allow_blank=True, max_length=100)
     reference_no = serializers.CharField(required=False, allow_blank=True, max_length=100)
-    payment_date = serializers.DateField(required=False)
+    payment_date = serializers.DateField(required=False, allow_null=True)
+    receipt_date = serializers.DateField(required=False, allow_null=True)
     note = serializers.CharField(required=False, allow_blank=True, max_length=500)
     notes = serializers.CharField(required=False, allow_blank=True, max_length=500)
     idempotency_key = serializers.CharField(required=False, allow_blank=True, max_length=160)
@@ -77,6 +80,7 @@ class UnifiedReceivableCollectSerializer(serializers.Serializer):
             attrs.get("reference_no") or attrs.get("reference") or ""
         ).strip() or None
         attrs["note"] = (attrs.get("note") or attrs.get("notes") or "").strip() or None
+        attrs["payment_date"] = attrs.get("payment_date") or attrs.get("receipt_date") or None
         attrs["idempotency_key"] = (attrs.get("idempotency_key") or "").strip() or None
         crid = attrs.get("contract_reference_id")
         attrs["contract_reference_id"] = int(crid) if crid else None

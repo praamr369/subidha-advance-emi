@@ -3,9 +3,6 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-import BusinessSetupLinks from "@/components/admin/business-setup/BusinessSetupLinks";
-import { SetupChecklistPageShell } from "@/components/layout/page-shells";
-import PageHeader from "@/components/ui/PageHeader";
 import { listChartOfAccounts, type ChartOfAccount } from "@/services/accounting";
 import { getAccountingSetupStatus, type AccountingSetupStatusPayload } from "@/services/accounting-setup";
 
@@ -25,7 +22,7 @@ function badgeClass(tone: "green" | "amber" | "red" | "blue" | "slate") {
   return `inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${map[tone]}`;
 }
 
-export default function ChartAccountsSetupGuidePage() {
+export function ChartAccountsPanel() {
   const [status, setStatus] = useState<AccountingSetupStatusPayload | null>(null);
   const [accounts, setAccounts] = useState<ChartOfAccount[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -69,31 +66,31 @@ export default function ChartAccountsSetupGuidePage() {
   const controlCount = accounts.filter((row) => row.is_active && !row.allow_manual_posting).length;
 
   return (
-    <SetupChecklistPageShell
-      readiness={
-        <>
-          <PageHeader title="Chart accounts" description="Chart accounts live under the Accounting module. This setup page shows readiness and guides first-run setup without duplicating accounting masters." />
-          {!error && status ? (
-            <div className="grid gap-3 md:grid-cols-4">
-              <div className="rounded-xl border border-border bg-card p-4 shadow-sm"><div className="text-xs font-medium text-muted-foreground">Active chart accounts</div><div className="mt-1 text-lg font-semibold tabular-nums text-foreground">{chartActiveTotal}</div><div className="mt-2 text-xs text-muted-foreground">Total {toNumber(status.chart_accounts_total)} · Roots {chartRootsAll}</div></div>
-              <div className="rounded-xl border border-border bg-card p-4 shadow-sm"><div className="text-xs font-medium text-muted-foreground">Active child chart accounts</div><div className="mt-1 text-lg font-semibold tabular-nums text-foreground">{chartChildrenActive}</div><div className="mt-2 text-xs text-muted-foreground">All child rows incl. inactive: {chartChildrenAll}</div></div>
-              <div className="rounded-xl border border-border bg-card p-4 shadow-sm"><div className="text-xs font-medium text-muted-foreground">Posting leaf accounts</div><div className="mt-1 text-lg font-semibold tabular-nums text-foreground">{postingLeafCount}</div><div className="mt-2 text-xs text-muted-foreground">Manual/system posting-ready ledgers.</div></div>
-              <div className="rounded-xl border border-border bg-card p-4 shadow-sm"><div className="text-xs font-medium text-muted-foreground">Control/group accounts</div><div className="mt-1 text-lg font-semibold tabular-nums text-foreground">{controlCount}</div><div className="mt-2 text-xs text-muted-foreground">Non-posting grouping/control rows.</div></div>
-              <div className="rounded-xl border border-border bg-card p-4 shadow-sm md:col-span-4"><div className="text-xs font-medium text-muted-foreground">Mappings and journal readiness</div><div className="mt-1 text-sm text-foreground">{mappingsLine}</div><div className="mt-1 text-xs text-muted-foreground">{journalLine}</div></div>
-            </div>
-          ) : null}
-        </>
-      }
-      blockers={error ? <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</div> : null}
-      actions={<BusinessSetupLinks />}
-      checklist={
-        <div className="space-y-4">
-          <div className="flex flex-wrap gap-2">
-            <Link href="/admin/accounting/chart-of-accounts" className="rounded-xl bg-primary px-3 py-2 text-sm font-medium text-primary-foreground">Open Chart of Accounts</Link>
-            <Link href="/admin/accounting/setup" className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground">Accounting setup</Link>
-            <Link href="/admin/accounting/books" className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground">Open Books</Link>
-            <button type="button" onClick={() => void loadPage()} className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground">Refresh</button>
-          </div>
+    <div className="space-y-6">
+      <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+        <h2 className="text-xl font-semibold text-foreground">Chart accounts</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Chart accounts live under the Accounting module. This setup page shows readiness and guides first-run setup without duplicating accounting masters.</p>
+      </div>
+
+      {!error && status ? (
+        <div className="grid gap-3 md:grid-cols-4">
+          <div className="rounded-xl border border-border bg-card p-4 shadow-sm"><div className="text-xs font-medium text-muted-foreground">Active chart accounts</div><div className="mt-1 text-lg font-semibold tabular-nums text-foreground">{chartActiveTotal}</div><div className="mt-2 text-xs text-muted-foreground">Total {toNumber(status.chart_accounts_total)} · Roots {chartRootsAll}</div></div>
+          <div className="rounded-xl border border-border bg-card p-4 shadow-sm"><div className="text-xs font-medium text-muted-foreground">Active child chart accounts</div><div className="mt-1 text-lg font-semibold tabular-nums text-foreground">{chartChildrenActive}</div><div className="mt-2 text-xs text-muted-foreground">All child rows incl. inactive: {chartChildrenAll}</div></div>
+          <div className="rounded-xl border border-border bg-card p-4 shadow-sm"><div className="text-xs font-medium text-muted-foreground">Posting leaf accounts</div><div className="mt-1 text-lg font-semibold tabular-nums text-foreground">{postingLeafCount}</div><div className="mt-2 text-xs text-muted-foreground">Manual/system posting-ready ledgers.</div></div>
+          <div className="rounded-xl border border-border bg-card p-4 shadow-sm"><div className="text-xs font-medium text-muted-foreground">Control/group accounts</div><div className="mt-1 text-lg font-semibold tabular-nums text-foreground">{controlCount}</div><div className="mt-2 text-xs text-muted-foreground">Non-posting grouping/control rows.</div></div>
+          <div className="rounded-xl border border-border bg-card p-4 shadow-sm md:col-span-4"><div className="text-xs font-medium text-muted-foreground">Mappings and journal readiness</div><div className="mt-1 text-sm text-foreground">{mappingsLine}</div><div className="mt-1 text-xs text-muted-foreground">{journalLine}</div></div>
+        </div>
+      ) : null}
+
+      {error ? <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</div> : null}
+
+      <div className="space-y-4">
+        <div className="flex flex-wrap gap-2">
+          <Link href="/admin/accounting/chart-of-accounts" className="rounded-xl bg-primary px-3 py-2 text-sm font-medium text-primary-foreground">Open Chart of Accounts</Link>
+          <Link href="/admin/accounting/setup" className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium text-foreground">Accounting setup</Link>
+          <Link href="/admin/accounting/books" className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium text-foreground">Open Books</Link>
+          <button type="button" onClick={() => void loadPage()} className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium text-foreground">Refresh</button>
+        </div>
           <div className="grid gap-3 md:grid-cols-5">
             {["ASSET", "LIABILITY", "EQUITY", "INCOME", "EXPENSE"].map((type) => (
               <div key={type} className="rounded-xl border border-border bg-card p-3 text-sm"><div className="text-xs font-semibold text-muted-foreground">{type}</div><div className="mt-1 text-lg font-semibold text-foreground">{typeCounts[type] || 0}</div></div>
@@ -110,8 +107,9 @@ export default function ChartAccountsSetupGuidePage() {
             </div>
           </div>
         </div>
-      }
-      evidence={<p className="text-sm text-muted-foreground">Configure chart accounts first, then finance accounts. Finance accounts must map to active ASSET chart accounts; income, liability, inventory, and expense accounts remain ledger-only posting destinations.</p>}
-    />
+      <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+        <p className="text-sm text-muted-foreground">Configure chart accounts first, then finance accounts. Finance accounts must map to active ASSET chart accounts; income, liability, inventory, and expense accounts remain ledger-only posting destinations.</p>
+      </div>
+    </div>
   );
 }

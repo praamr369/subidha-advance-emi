@@ -50,8 +50,7 @@ const categoryOrder = [
 const primaryActions = [
   { label: "Business Profile", href: ROUTES.admin.settingsBusinessSetupProfile },
   { label: "Dry Runs & Reset", href: ROUTES.admin.settingsBusinessSetupReset },
-  { label: "Branch Setup", href: ROUTES.admin.settingsBusinessSetupBranches },
-  { label: "Cash Counter Setup", href: ROUTES.admin.settingsBusinessSetupCashDesks },
+  { label: "Branches & Desks", href: ROUTES.admin.settingsBusinessSetupBranchesDesks },
   { label: "Finance Accounts", href: ROUTES.admin.settingsBusinessSetupFinanceAccounts },
   { label: "Accounting Setup", href: ROUTES.admin.accountingSetup },
   { label: "Accounting Bridges", href: ROUTES.admin.accountingBridges },

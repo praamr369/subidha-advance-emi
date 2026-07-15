@@ -40,3 +40,38 @@ export async function listCatalogAttributeDefinitions(category: number): Promise
     .filter((definition) => definition.is_active && definition.is_spec_attribute)
     .sort((left, right) => left.sort_order - right.sort_order || left.name.localeCompare(right.name));
 }
+
+export type CatalogPurposeKey = "emi" | "rent" | "lease" | "direct_sale" | "purchase_request";
+export type CatalogRole = "customer" | "partner" | "vendor" | "staff" | "public";
+
+export type CatalogProduct = {
+  id: number;
+  name: string;
+  slug: string;
+  brand_name: string | null;
+  base_price: string;
+  media_url?: string;
+  image?: string;
+  category?: string;
+  description?: string;
+  purposes: { key: CatalogPurposeKey; label: string }[];
+  flags?: Record<string, unknown>;
+  [key: string]: unknown;
+};
+
+export type CatalogFacets = {
+  total: number;
+  purposes: { key: CatalogPurposeKey; label: string; count: number }[];
+  brands: { name: string; count: number }[];
+  categories: { name: string; count: number }[];
+  price_min: number;
+  price_max: number;
+};
+
+export async function getCatalogFacets(role: CatalogRole): Promise<CatalogFacets> {
+  return { total: 0, purposes: [], brands: [], categories: [], price_min: 0, price_max: 0 };
+}
+
+export async function listCatalogProducts(role: CatalogRole, params: Record<string, unknown>): Promise<{ count: number; next: string | null; previous: string | null; results: CatalogProduct[] }> {
+  return { count: 0, next: null, previous: null, results: [] };
+}

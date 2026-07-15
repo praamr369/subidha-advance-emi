@@ -880,7 +880,7 @@ export default function AdminCollectionsPage() {
           searched={unifiedSearchSubmitted}
           onQueryChange={setUnifiedSearchQuery}
           onSearch={handleUnifiedReceivableSearch}
-          onAdvanceEmiSelect={handleUnifiedAdvanceEmiSelect}
+          onCollectSelect={handleUnifiedAdvanceEmiSelect}
         />
 
         <ERPSectionShell

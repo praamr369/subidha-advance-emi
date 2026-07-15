@@ -5,7 +5,8 @@ export type OutstandingOperation =
   | "rent"
   | "lease"
   | "direct_sale"
-  | "billing_invoice";
+  | "billing_invoice"
+  | "legacy_receivable";
 
 export type OutstandingState =
   | "all"
@@ -61,6 +62,7 @@ export type OutstandingSummary = {
   lease_outstanding: string;
   direct_sale_outstanding: string;
   billing_invoice_outstanding: string;
+  legacy_receivable_outstanding: string;
   overdue_count: number;
   serious_30_plus_count: number;
 };

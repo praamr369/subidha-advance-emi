@@ -4,12 +4,14 @@ export type ReceivableSourceType =
   | "ADVANCE_EMI"
   | "RENT"
   | "LEASE"
-  | "DIRECT_SALE";
+  | "DIRECT_SALE"
+  | "LEGACY_RECEIVABLE";
 
 export type CollectionPrimaryAction =
   | "COLLECT_EMI"
   | "COLLECT_DIRECT_SALE"
   | "COLLECT_RENT_LEASE"
+  | "COLLECT_LEGACY_RECEIVABLE"
   | "OPEN_SALE"
   | "VIEW_RECEIPTS"
   | "VIEW_ONLY"
@@ -26,7 +28,8 @@ export type UnifiedReceivableResultType =
   | "LEASE"
   | "DEPOSIT"
   | "RECEIPT"
-  | "CUSTOMER";
+  | "CUSTOMER"
+  | "LEGACY";
 
 export type UnifiedReceivableResult = {
   /** Server-provided classification for cashier UX badges (additive). */
@@ -115,6 +118,7 @@ function normalizeSourceType(value: unknown): ReceivableSourceType {
   if (sourceType === "RENT") return "RENT";
   if (sourceType === "LEASE") return "LEASE";
   if (sourceType === "DIRECT_SALE") return "DIRECT_SALE";
+  if (sourceType === "LEGACY_RECEIVABLE") return "LEGACY_RECEIVABLE";
   return "ADVANCE_EMI";
 }
 
@@ -140,6 +144,7 @@ function normalizePrimaryAction(value: unknown): CollectionPrimaryAction {
   const v = String(value || "").toUpperCase();
   if (v === "COLLECT_RENT_LEASE") return "COLLECT_RENT_LEASE";
   if (v === "COLLECT_DIRECT_SALE") return "COLLECT_DIRECT_SALE";
+  if (v === "COLLECT_LEGACY_RECEIVABLE") return "COLLECT_LEGACY_RECEIVABLE";
   if (v === "OPEN_SALE") return "OPEN_SALE";
   if (v === "VIEW_RECEIPTS") return "VIEW_RECEIPTS";
   if (v === "VIEW_ONLY") return "VIEW_ONLY";
@@ -163,6 +168,7 @@ function normalizeResultType(
     "DEPOSIT",
     "RECEIPT",
     "CUSTOMER",
+    "LEGACY",
   ];
   if (allowed.includes(token as UnifiedReceivableResultType)) {
     return token as UnifiedReceivableResultType;
@@ -171,6 +177,7 @@ function normalizeResultType(
   if (sourceType === "DIRECT_SALE") return "DIRECT_SALE";
   if (sourceType === "RENT") return "RENT";
   if (sourceType === "LEASE") return "LEASE";
+  if (sourceType === "LEGACY_RECEIVABLE") return "LEGACY";
   return "";
 }
 

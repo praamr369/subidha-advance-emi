@@ -3,8 +3,6 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import BusinessSetupLinks from "@/components/admin/business-setup/BusinessSetupLinks";
-import PageHeader from "@/components/ui/PageHeader";
 import { getAccountingBooksReadiness, type AccountingBooksReadiness } from "@/services/accounting-books";
 import { getAccountingSetupStatus, repairSuggestedMappings, type AccountingSetupStatusPayload } from "@/services/accounting-setup";
 import { getSetupChecklist, type SetupChecklist } from "@/services/business-setup";
@@ -29,7 +27,7 @@ function badgeClass(tone: "green" | "amber" | "red" | "blue" | "slate") {
   return `inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${map[tone]}`;
 }
 
-export default function AccountingSetupGuidePage() {
+export function FinanceAccountsPanel() {
   const [checklist, setChecklist] = useState<SetupChecklist | null>(null);
   const [acctStatus, setAcctStatus] = useState<AccountingSetupStatusPayload | null>(null);
   const [booksReadiness, setBooksReadiness] = useState<AccountingBooksReadiness | null>(null);
@@ -73,8 +71,10 @@ export default function AccountingSetupGuidePage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Accounting setup" description="Configure chart accounts and finance accounts using existing Accounting masters. Finance accounts are real cash/bank/UPI settlement instruments; posting profiles remain separate." />
-      <BusinessSetupLinks />
+      <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+        <h2 className="text-xl font-semibold text-foreground">Finance accounts setup</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Configure chart accounts and finance accounts using existing Accounting masters. Finance accounts are real cash/bank/UPI settlement instruments; posting profiles remain separate.</p>
+      </div>
 
       {error ? <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</div> : null}
 

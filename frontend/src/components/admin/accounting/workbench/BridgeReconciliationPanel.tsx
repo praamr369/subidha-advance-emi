@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import ERPPageShell from "@/components/erp/ERPPageShell";
+import ActionButton from "@/components/ui/ActionButton";
 import { ROUTES } from "@/lib/routes";
 
 import {
@@ -288,7 +288,7 @@ function RowsTable({ title, description, rows, selected, onToggle, onPreview, on
 function ControlTowerInventory({ payload }: { payload: AccountingBridgeReconciliationPayload }) {
   const tower = payload.phase_f_control_tower;
   const inventory = tower?.source_inventory ?? [];
-  if (!tower) return <section className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">Phase F Control Tower is not available from backend payload.</section>;
+  if (!tower) return <section className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">Reconciliation Control Tower is not available from backend payload.</section>;
 
   const readinessState = tower.readiness?.state ?? tower.readiness?.primary_state ?? "UNKNOWN";
   const readinessCounts = tower.readiness?.counts ?? {};
@@ -299,7 +299,7 @@ function ControlTowerInventory({ payload }: { payload: AccountingBridgeReconcili
   return (
     <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
       <div className="mb-4">
-        <h2 className="text-lg font-semibold text-foreground">Phase F Control Tower</h2>
+        <h2 className="text-lg font-semibold text-foreground">Reconciliation Control Tower</h2>
         <p className="text-sm text-muted-foreground">Daily operator view. Empty source definitions and validation-only references are hidden from the main workflow.</p>
       </div>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
@@ -310,8 +310,8 @@ function ControlTowerInventory({ payload }: { payload: AccountingBridgeReconcili
         <SummaryCard label="Boundaries" value={sourceContract + unsupported} detail={`${sourceContract} source-contract · ${unsupported} unsupported`} tone="border-border bg-muted/50 text-foreground" />
       </div>
       <div className="mt-4 rounded-xl border border-border bg-background p-4 text-sm text-muted-foreground">
-        <div className="font-semibold text-foreground">F24/F25 guardrails</div>
-        <div className="mt-2 grid gap-2 md:grid-cols-2 xl:grid-cols-4"><span>No new source model</span><span>No new posting source</span><span>No source mutation</span><span>No auto-post/reconcile/close</span></div>
+        <div className="font-semibold text-foreground">Operational Guardrails</div>
+        <div className="mt-2 grid gap-2 md:grid-cols-2 xl:grid-cols-4"><span>Explicit manual posting</span><span>Strict source tracking</span><span>Immutable history</span><span>No auto-reconcile</span></div>
       </div>
       {activeCount ? null : <div className="mt-4 rounded-xl border border-dashed p-5 text-sm text-muted-foreground">No current bridge source rows require operator action.</div>}
     </section>
@@ -371,7 +371,7 @@ function ProductionValidation({ payload }: { payload: AccountingBridgeReconcilia
   );
 }
 
-export default function AccountingBridgeReconciliationPage() {
+export function BridgeReconciliationPanel() {
   const [payload, setPayload] = useState<AccountingBridgeReconciliationPayload | null>(null);
   const [filters, setFilters] = useState<AccountingBridgeReconciliationFilters>({});
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -471,21 +471,11 @@ export default function AccountingBridgeReconciliationPage() {
   }
 
   const BRIDGE_RECON_SUBTITLE = "Post unposted bridge candidates to accounting journals. All posting is explicit — no auto-post or auto-reconcile.";
-  if (loading && !payload) return <ERPPageShell eyebrow="Accounting" title="Bridge Reconciliation" subtitle={BRIDGE_RECON_SUBTITLE} breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Accounting", href: ROUTES.admin.accounting }, { label: "Bridge Reconciliation" }]} statusBadge={{ label: "Admin Only", tone: "info" as const }}><div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">Loading accounting bridge reconciliation…</div></ERPPageShell>;
-  if (error && !payload) return <ERPPageShell eyebrow="Accounting" title="Bridge Reconciliation" subtitle={BRIDGE_RECON_SUBTITLE} breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Accounting", href: ROUTES.admin.accounting }, { label: "Bridge Reconciliation" }]} statusBadge={{ label: "Admin Only", tone: "info" as const }}><div className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-900">{error}</div></ERPPageShell>;
+  if (loading && !payload) return <div className="space-y-6"><div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">Loading accounting bridge reconciliation…</div></div>;
+  if (error && !payload) return <div className="space-y-6"><div className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-900">{error}</div></div>;
 
   return (
-    <ERPPageShell
-      eyebrow="Accounting"
-      title="Bridge Reconciliation"
-      subtitle="Post unposted bridge candidates to accounting journals. All posting is explicit — no auto-post or auto-reconcile."
-      breadcrumbs={[
-        { label: "Admin", href: ROUTES.admin.dashboard },
-        { label: "Accounting", href: ROUTES.admin.accounting },
-        { label: "Bridge Reconciliation" },
-      ]}
-      statusBadge={{ label: "Admin Only", tone: "info" as const }}
-    >
+    <div className="space-y-6">
       <div className="flex items-center gap-2">
         <p className="flex-1 text-xs text-muted-foreground">{SAFETY_COPY}</p>
         <button type="button" onClick={() => load(filters)} className="h-9 rounded-xl border border-border bg-card px-4 text-sm font-semibold hover:bg-muted">Refresh</button>
@@ -541,6 +531,6 @@ export default function AccountingBridgeReconciliationPage() {
           )}
         </>
       ) : null}
-    </ERPPageShell>
+    </div>
   );
 }

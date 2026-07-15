@@ -25,6 +25,7 @@ OP_RENT = "rent"
 OP_LEASE = "lease"
 OP_DIRECT_SALE = "direct_sale"
 OP_BILLING_INVOICE = "billing_invoice"
+OP_LEGACY_RECEIVABLE = "legacy_receivable"
 OP_ALL = "all"
 
 STATE_ALL = "all"
@@ -378,6 +379,52 @@ def _collect_standalone_invoice_rows(*, today: date) -> list[dict[str, Any]]:
     return rows
 
 
+def _collect_opening_outstanding_rows(*, today: date) -> list[dict[str, Any]]:
+    from accounting.models import CustomerOpeningOutstanding
+    rows: list[dict[str, Any]] = []
+    outstandings = CustomerOpeningOutstanding.objects.filter(is_settled=False).order_by("entry_date", "id")
+    for out in outstandings:
+        amount = _money(out.outstanding_amount)
+        if amount <= MONEY_ZERO:
+            continue
+        due_date = out.entry_date
+        overdue_days = _overdue_days(due_date=due_date, today=today)
+        rows.append(
+            {
+                "id": f"LEGACY-OUT-{out.id}",
+                "operation_type": OP_LEGACY_RECEIVABLE,
+                "source_type": "LEGACY_RECEIVABLE",
+                "source_id": out.id,
+                "customer_id": None,
+                "customer_name": out.customer_name or "",
+                "customer_phone": out.phone or "",
+                "contract_reference": "Legacy Balance",
+                "document_no": f"OB-{out.id}",
+                "product_summary": out.notes or "Migrated Opening Balance",
+                "batch_code": None,
+                "lucky_number": None,
+                "due_date": due_date.isoformat() if due_date else None,
+                "original_amount": _money_string(amount),
+                "paid_amount": _money_string(MONEY_ZERO),
+                "waived_amount": _money_string(MONEY_ZERO),
+                "outstanding_amount": _money_string(amount),
+                "overdue_days": overdue_days,
+                "age_bucket": _age_bucket_from_days(overdue_days),
+                "status": "OVERDUE" if overdue_days > 0 else "DUE",
+                "collection_allowed": True,
+                "detail_url": "",
+                "customer_url": "",
+                "payment_url": f"/admin/finance/collect?workflow=legacy-receivable&outstanding={out.id}",
+                "risk_flags": ["OVERDUE_30_PLUS"] if overdue_days >= 30 else [],
+                "_due_date_obj": due_date,
+                "_operation_weight": 6,
+                "_outstanding_decimal": amount,
+                "_state": _state_for_due_date(due_date=due_date, today=today),
+            }
+        )
+    return rows
+
+
 def _matches_text(row: dict[str, Any], query: str) -> bool:
     if not query:
         return True
@@ -454,6 +501,7 @@ def _summary(rows: list[dict[str, Any]], *, today: date) -> dict[str, Any]:
     lease = MONEY_ZERO
     direct_sale = MONEY_ZERO
     invoice = MONEY_ZERO
+    legacy = MONEY_ZERO
     overdue_count = 0
     serious_30_plus_count = 0
     for row in rows:
@@ -479,6 +527,8 @@ def _summary(rows: list[dict[str, Any]], *, today: date) -> dict[str, Any]:
             direct_sale += out
         elif op == OP_BILLING_INVOICE:
             invoice += out
+        elif op == OP_LEGACY_RECEIVABLE:
+            legacy += out
 
         if int(row.get("overdue_days") or 0) >= 30:
             serious_30_plus_count += 1
@@ -492,6 +542,7 @@ def _summary(rows: list[dict[str, Any]], *, today: date) -> dict[str, Any]:
         "lease_outstanding": _money_string(lease),
         "direct_sale_outstanding": _money_string(direct_sale),
         "billing_invoice_outstanding": _money_string(invoice),
+        "legacy_receivable_outstanding": _money_string(legacy),
         "overdue_count": overdue_count,
         "serious_30_plus_count": serious_30_plus_count,
     }
@@ -503,6 +554,7 @@ def build_outstanding_ledger(*, filters: OutstandingLedgerFilters) -> dict[str, 
     rows.extend(_collect_subscription_rows(today=today))
     rows.extend(_collect_direct_sale_rows(today=today))
     rows.extend(_collect_standalone_invoice_rows(today=today))
+    rows.extend(_collect_opening_outstanding_rows(today=today))
 
     filtered = _apply_filters(rows, filters)
     total_count = len(filtered)

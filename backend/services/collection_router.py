@@ -20,6 +20,7 @@ from subscriptions.services.rent_lease_collection_workflow_service import (
     collect_security_deposit_with_metadata,
     rent_lease_receivable_position,
 )
+from accounting.services.legacy_receivable_service import settle_legacy_receivable
 
 
 def _payment_collection_idempotency_key(value: str | None) -> str | None:
@@ -232,5 +233,27 @@ def route_collection(
                 }
             )
         return payload
+
+    if source_type == "LEGACY_RECEIVABLE":
+        result = settle_legacy_receivable(
+            receivable_id=source_id,
+            amount=amount,
+            payment_method=payment_method,
+            finance_account_id=finance_account_id,
+            performed_by=collected_by,
+            reference_no=reference_no,
+            notes=note,
+            receipt_date=payment_date,
+            branch_id=branch_id,
+            cash_counter_id=cash_counter_id,
+            idempotency_key=idempotency_key,
+        )
+        return {
+            "source_type": source_type,
+            "created": result.get("created", True),
+            "receipt_id": result.get("receipt_id"),
+            "legacy_settlement_id": result.get("legacy_settlement_id"),
+            "message": "Legacy balance collection posted successfully.",
+        }
 
     raise ValidationError({"source_type": f"Unsupported source type: {source_type}."})

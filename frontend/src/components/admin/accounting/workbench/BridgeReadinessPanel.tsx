@@ -6,7 +6,6 @@ import { useEffect, useMemo, useState } from "react";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ActionButton from "@/components/ui/ActionButton";
-import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -353,7 +352,7 @@ function GroupedRows({ groupedEvents }: { groupedEvents: Array<[string, Accounti
   );
 }
 
-export default function AccountingBridgeReadinessPage() {
+export function BridgeReadinessPanel() {
   const [payload, setPayload] = useState<AccountingBridgeReadinessPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -408,13 +407,7 @@ export default function AccountingBridgeReadinessPage() {
   }, [allEvents]);
 
   if (loading) {
-    return <ERPPageShell
-      eyebrow="Accounting"
-      title="Accounting Bridge Readiness"
-      subtitle="Read-only readiness matrix for setup definitions. Real source posting remains inside controlled bridge reconciliation."
-      breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Accounting", href: ROUTES.admin.accounting }, { label: "Bridge Readiness" }]}
-      statusBadge={{ label: "Admin Only — Read Only", tone: "info" as const }}
-    ><LoadingBlock label="Loading accounting bridge readiness..." /></ERPPageShell>;
+    return <div className="space-y-6"><LoadingBlock label="Loading accounting bridge readiness..." /></div>;
   }
 
   const summary: Partial<AccountingBridgeReadinessPayload["summary"]> = payload?.summary ?? { source_count: allEvents.length };
@@ -428,14 +421,7 @@ export default function AccountingBridgeReadinessPage() {
   const bridgeStatus = activeBlockerCount > 0 ? "Action required" : unsupportedCount > 0 ? "Boundary review" : setupReadyCount > 0 ? "Setup ready" : "Needs review";
 
   return (
-    <ERPPageShell
-      eyebrow="Accounting"
-      title="Accounting Bridge Readiness"
-      subtitle="Read-only readiness matrix for setup definitions. Real source posting remains inside controlled bridge reconciliation."
-      breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Accounting", href: ROUTES.admin.accounting }, { label: "Bridge Readiness" }]}
-      actions={[{ href: BRIDGE_RECONCILIATION_HREF, label: "Bridge Reconciliation", variant: "primary" }, { href: MAPPING_AUDIT_HREF, label: "Mapping Audit", variant: "secondary" }, { href: ROUTES.admin.accountingSetup, label: "Accounting Setup", variant: "secondary" }]}
-      statusBadge={{ label: bridgeStatus, tone: activeBlockerCount > 0 ? "warning" : "success" }}
-    >
+    <div className="space-y-6">
       <div className="space-y-6">
         {error ? <ErrorState title="Unable to load bridge readiness" description={error} onRetry={() => void load()} /> : null}
 
@@ -515,6 +501,6 @@ export default function AccountingBridgeReadinessPage() {
           )}
         </WorkspaceSection>
       </div>
-    </ERPPageShell>
+    </div>
   );
 }

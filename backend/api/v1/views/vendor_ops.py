@@ -162,6 +162,29 @@ class AdminFinanceOpeningBalanceView(APIView):
         return Response(result, status=status.HTTP_200_OK)
 
 
+class AdminVendorOpeningBalanceView(APIView):
+    """POST /admin/opening-balances/vendors/<pk>/ — Set vendor opening balance."""
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, pk: int):
+        from datetime import date
+        from accounting.services.opening_balance_migration_service import set_vendor_opening_balance
+
+        vendor = get_object_or_404(Vendor, pk=pk)
+        try:
+            entry_date = date.fromisoformat(str(request.data.get("entry_date") or timezone.localdate()))
+            result = set_vendor_opening_balance(
+                vendor=vendor,
+                amount=request.data.get("amount", "0"),
+                entry_date=entry_date,
+                notes=request.data.get("notes", ""),
+                actor=request.user,
+            )
+        except (TypeError, ValueError) as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(result, status=status.HTTP_200_OK)
+
+
 class AdminVendorOutstandingView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 

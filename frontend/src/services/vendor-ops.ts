@@ -19,64 +19,15 @@ export async function listAdminVendorLedger(id: number): Promise<ApiListResponse
   return apiFetch(`/admin/vendors/${id}/ledger/`);
 }
 
-export async function setVendorOpeningBalance(id: number, amount: string, entry_date: string, notes?: string): Promise<ApiObject> {
-  return apiFetch(`/admin/vendors/${id}/ledger/`, { method: "POST", body: { amount, entry_date, notes: notes ?? "" } });
-}
-
 export async function setFinanceOpeningBalance(id: number, amount: string, entry_date: string): Promise<ApiObject> {
-  return apiFetch(`/admin/opening-balances/finance-accounts/${id}/`, { method: "POST", body: { amount, entry_date } });
-}
-
-// ── Customer opening outstandings (BillBook migration) ────────────────────
-
-export type CustomerOpeningOutstanding = {
-  id: number;
-  customer_name: string;
-  phone: string;
-  outstanding_amount: string;
-  entry_date: string;
-  notes: string;
-  is_settled: boolean;
-  settled_at: string | null;
-};
-
-export async function listCustomerOpeningOutstandings(settled?: boolean): Promise<{ count: number; total_outstanding: string; results: CustomerOpeningOutstanding[] }> {
-  const q = settled !== undefined ? `?settled=${settled}` : "";
-  return apiFetch(`/admin/opening-balances/customers/${q}`);
-}
-
-export async function createCustomerOpeningOutstanding(data: {
-  customer_name: string;
-  phone?: string;
-  outstanding_amount: string;
-  entry_date?: string;
-  notes?: string;
-}): Promise<CustomerOpeningOutstanding> {
-  return apiFetch("/admin/opening-balances/customers/", { method: "POST", body: data });
-}
-
-export async function settleCustomerOpeningOutstanding(id: number, is_settled: boolean): Promise<ApiObject> {
-  return apiFetch(`/admin/opening-balances/customers/${id}/`, { method: "PATCH", body: { is_settled } });
-}
-
-export async function deleteCustomerOpeningOutstanding(id: number): Promise<void> {
-  return apiFetch(`/admin/opening-balances/customers/${id}/`, { method: "DELETE" });
+  return apiFetch(`/admin/opening-balances/finance-accounts/${id}/`, { method: "POST", body: JSON.stringify({ amount, entry_date }) });
 }
 
 export async function getAdminVendorOutstanding(id: number): Promise<ApiObject> {
   return apiFetch(`/admin/vendors/${id}/outstanding/`);
 }
 
-export type VendorOpeningBalanceRow = {
-  id: number;
-  name: string;
-  phone: string;
-  opening_balance: string;
-};
 
-export async function listVendorOpeningBalances(): Promise<{ count: number; results: VendorOpeningBalanceRow[] }> {
-  return apiFetch("/admin/opening-balances/vendors/");
-}
 
 export async function listAdminVendorPurchases(id: number): Promise<ApiListResponse> {
   return apiFetch(`/admin/vendors/${id}/purchases/`);

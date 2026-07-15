@@ -2,10 +2,15 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import QuickDataEntryWorkbench from "./QuickDataEntryWorkbench";
 
 import BusinessSetupLinks from "@/components/admin/business-setup/BusinessSetupLinks";
 import ERPPageShell from "@/components/erp/ERPPageShell";
+import { ROUTES } from "@/lib/routes";
+import { listFinanceAccounts, type FinanceAccount } from "@/services/accounting";
+import { setFinanceOpeningBalance } from "@/services/vendor-ops";
 import {
+  addWorkbenchRow,
   adoptUploadForEditing,
   bulkSetWorkbenchRows,
   createWorkbenchBatch,
@@ -61,10 +66,11 @@ function StatusBadge({ status }: { status: string }) {
 
 const WIZARD_STEPS = ["Upload", "Mapping", "Validation", "Duplicates", "Preview", "Import", "Reconcile"] as const;
 
-type TabKey = "overview" | "wizard" | "workbench" | "templates" | "history" | "reconciliation" | "readiness" | "audit";
+type TabKey = "overview" | "quick_entry" | "wizard" | "workbench" | "templates" | "history" | "reconciliation" | "readiness" | "audit";
 
 const TABS: Array<{ key: TabKey; label: string }> = [
   { key: "overview", label: "Overview" },
+  { key: "quick_entry", label: "Quick Data Entry" },
   { key: "wizard", label: "Import Wizard" },
   { key: "workbench", label: "Data Workbench" },
   { key: "templates", label: "Templates" },
@@ -96,13 +102,13 @@ export default function MigrationCenterPage() {
 
   const openWorkbenchForDataset = useCallback((datasetKey: string) => {
     setPreselectDataset(datasetKey);
-    setTab("workbench");
+    setTab("quick_entry");
   }, []);
 
   return (
     <ERPPageShell
-      title="Migration Center"
-      subtitle="Migrate customers, vendors, products, stock, and opening balances from legacy software (myBillBook, Tally, Vyapar…) with staging, validation, reconciliation, and rollback. Nothing touches live data before an approved import."
+      title="Data Migration & Opening Balances"
+      subtitle="Enter opening balances manually or migrate data from legacy software (myBillBook, Tally, Vyapar…) with staging, validation, reconciliation, and rollback."
     >
       <div className="mb-4"><BusinessSetupLinks /></div>
       {error && <div className="mb-4 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-600">{error}</div>}
@@ -118,6 +124,7 @@ export default function MigrationCenterPage() {
         ))}
       </div>
       {tab === "overview" && overview && <OverviewTab overview={overview} onStartImport={() => setTab("wizard")} onOpenWorkbench={() => setTab("workbench")} onOpenDataset={openWorkbenchForDataset} />}
+      {tab === "quick_entry" && <QuickDataEntryWorkbench preselectDataset={preselectDataset} />}
       {tab === "wizard" && overview && <ImportWizard overview={overview} onFinished={refreshOverview} onEditInWorkbench={openInWorkbench} />}
       {tab === "workbench" && overview && <WorkbenchTab overview={overview} handoffBatch={handoffBatch} clearHandoff={() => setHandoffBatch(null)} preselectDataset={preselectDataset} clearPreselect={() => setPreselectDataset(null)} onFinished={refreshOverview} />}
       {tab === "templates" && overview && <TemplatesTab overview={overview} />}
@@ -169,7 +176,7 @@ function OverviewTab({ overview, onStartImport, onOpenWorkbench, onOpenDataset }
       <div className="rounded-2xl border border-border bg-card p-5">
         <div className="mb-1 text-sm font-semibold text-foreground">Opening balances & setup</div>
         <p className="mb-3 text-xs text-muted-foreground">
-          Enter opening balances in bulk here using the Data Workbench — cash, bank, UPI, customer receivables, vendor payables, and stock. All imports are staged, validated against live Finance Accounts and master data, and fully reversible. For small one-off entries, use the standalone <Link href="/admin/settings/business-setup/opening-balances" className="underline hover:text-foreground">Opening Balances</Link> page instead.
+          Enter opening balances manually or in bulk using the Data Workbench — cash, bank, UPI, customer receivables, vendor payables, and stock. All imports are staged, validated against live Finance Accounts and master data, and fully reversible. Click a dataset below to open a blank editable grid.
         </p>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {OPENING_BALANCE_SHORTCUTS.map((item) => (
@@ -543,6 +550,7 @@ function WorkbenchTab({ overview, handoffBatch, clearHandoff, preselectDataset, 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [entryMode, setEntryMode] = useState<"form" | "grid">("form");
   const [phase, setPhase] = useState<"edit" | "import">("edit");
   const [preview, setPreview] = useState<Record<string, unknown> | null>(null);
   const [confirmation, setConfirmation] = useState("");
@@ -614,6 +622,16 @@ function WorkbenchTab({ overview, handoffBatch, clearHandoff, preselectDataset, 
     }
   }
 
+  async function saveQuickEntry(values: Record<string, string>) {
+    if (!batch) return;
+    const res = await run(() => addWorkbenchRow(batch.id, values));
+    if (res) {
+      setBatch(res.batch);
+      await loadRows(batch.id);
+      setNotice(`Row added. Batch totals: ${res.batch.valid_rows} valid, ${res.batch.warning_rows} warning, ${res.batch.error_rows} error.`);
+    }
+  }
+
   async function proceedToImport() {
     if (!batch) return;
     await run(() => detectMigrationDuplicates(batch.id));
@@ -674,65 +692,114 @@ function WorkbenchTab({ overview, handoffBatch, clearHandoff, preselectDataset, 
       {batch && dataset && phase === "edit" && (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="text-sm font-semibold text-foreground">{dataset.label} — <span className="font-mono">{batch.batch_number}</span></div>
+            <div className="flex items-center gap-3">
+              <div className="text-sm font-semibold text-foreground">{dataset.label} — <span className="font-mono">{batch.batch_number}</span></div>
+              <div className="flex rounded-lg border border-border bg-muted/40 p-0.5">
+                <button onClick={() => setEntryMode("form")} className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${entryMode === "form" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>Quick Entry</button>
+                <button onClick={() => setEntryMode("grid")} className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${entryMode === "grid" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>Data Grid</button>
+              </div>
+            </div>
             <div className="flex flex-wrap gap-2 text-xs">
               <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-emerald-600">{batch.valid_rows} valid</span>
               <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-amber-600">{batch.warning_rows} warning</span>
               <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-red-600">{batch.error_rows} error</span>
             </div>
           </div>
-          <div className="overflow-x-auto rounded-2xl border border-border bg-card">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-border bg-muted/40 text-left">
-                  <th className="p-2 font-medium text-muted-foreground">#</th>
-                  {dataset.fields.map((f) => <th key={f.key} className="p-2 font-medium text-muted-foreground whitespace-nowrap">{f.label}{f.required ? " *" : ""}</th>)}
-                  <th className="p-2 font-medium text-muted-foreground">Status</th>
-                  <th className="p-2"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row, index) => (
-                  <tr key={index} className={`border-b border-border/50 ${row.status === "ERROR" ? "bg-red-500/5" : ""}`}>
-                    <td className="p-1 text-muted-foreground">{index + 1}</td>
-                    {dataset.fields.map((f) => (
-                      <td key={f.key} className="p-1">
-                        {f.choices && f.choices.length > 0 ? (
-                          <select value={row.values[f.key] ?? ""} onChange={(e) => setCell(index, f.key, e.target.value)} className="w-full min-w-[90px] rounded border border-border bg-background px-1.5 py-1">
-                            <option value=""></option>
-                            {f.choices.map((c) => <option key={c} value={c}>{c}</option>)}
-                          </select>
-                        ) : (
-                          <input
-                            value={row.values[f.key] ?? ""}
-                            onChange={(e) => setCell(index, f.key, e.target.value)}
-                            className="w-full min-w-[110px] rounded border border-border bg-background px-1.5 py-1"
-                            aria-label={`${f.label} row ${index + 1}`}
-                          />
-                        )}
-                      </td>
+          
+          {entryMode === "form" ? (
+            <div className="space-y-6">
+              <WorkbenchQuickEntryForm dataset={dataset} onSaveAndAddAnother={saveQuickEntry} busy={busy} />
+              
+              {rows.length > 0 && (
+                <div className="rounded-2xl border border-border bg-card">
+                  <div className="border-b border-border bg-muted/40 px-5 py-3 text-sm font-medium text-foreground">Recently Added ({rows.length})</div>
+                  <div className="max-h-[300px] overflow-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-border/50 text-left">
+                          <th className="p-3 font-medium text-muted-foreground">#</th>
+                          {dataset.fields.map((f) => <th key={f.key} className="p-3 font-medium text-muted-foreground whitespace-nowrap">{f.label}</th>)}
+                          <th className="p-3 font-medium text-muted-foreground">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rows.slice().reverse().map((row, idx) => (
+                          <tr key={idx} className={`border-b border-border/30 ${row.status === "ERROR" ? "bg-red-500/5" : ""}`}>
+                            <td className="p-3 text-muted-foreground">{rows.length - idx}</td>
+                            {dataset.fields.map((f) => <td key={f.key} className="p-3">{row.values[f.key] ?? "-"}</td>)}
+                            <td className="p-3">
+                              {row.status && <span className={`rounded px-1.5 py-0.5 ${row.status === "ERROR" ? "bg-red-500/15 text-red-600" : row.status === "WARNING" ? "bg-amber-500/15 text-amber-600" : "bg-emerald-500/15 text-emerald-600"}`} title={(row.errors ?? []).concat(row.warnings ?? []).join(" | ")}>{row.status}</span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex flex-wrap gap-2 pt-2">
+                <button disabled={busy || batch.valid_rows + batch.warning_rows === 0 || batch.error_rows > 0} onClick={proceedToImport} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" title={batch.error_rows > 0 ? "Fix all errors first" : ""}>Validate & Proceed to Import</button>
+                <button onClick={() => { setBatch(null); setRows([]); setNotice(null); }} className="rounded-xl border border-border px-4 py-2 text-sm">Close Workbench</button>
+                <button disabled={busy} onClick={doDeleteBatch} className="ml-auto rounded-xl border border-red-500/40 px-4 py-2 text-sm text-red-600 disabled:opacity-50">Delete Batch</button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="overflow-x-auto rounded-2xl border border-border bg-card">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/40 text-left">
+                      <th className="p-2 font-medium text-muted-foreground">#</th>
+                      {dataset.fields.map((f) => <th key={f.key} className="p-2 font-medium text-muted-foreground whitespace-nowrap">{f.label}{f.required ? " *" : ""}</th>)}
+                      <th className="p-2 font-medium text-muted-foreground">Status</th>
+                      <th className="p-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((row, index) => (
+                      <tr key={index} className={`border-b border-border/50 ${row.status === "ERROR" ? "bg-red-500/5" : ""}`}>
+                        <td className="p-1 text-muted-foreground">{index + 1}</td>
+                        {dataset.fields.map((f) => (
+                          <td key={f.key} className="p-1">
+                            {f.choices && f.choices.length > 0 ? (
+                              <select value={row.values[f.key] ?? ""} onChange={(e) => setCell(index, f.key, e.target.value)} className="w-full min-w-[90px] rounded border border-border bg-background px-1.5 py-1">
+                                <option value=""></option>
+                                {f.choices.map((c) => <option key={c} value={c}>{c}</option>)}
+                              </select>
+                            ) : (
+                              <input
+                                value={row.values[f.key] ?? ""}
+                                onChange={(e) => setCell(index, f.key, e.target.value)}
+                                className="w-full min-w-[110px] rounded border border-border bg-background px-1.5 py-1"
+                                aria-label={`${f.label} row ${index + 1}`}
+                              />
+                            )}
+                          </td>
+                        ))}
+                        <td className="p-1 whitespace-nowrap">
+                          {row.status && <span className={`rounded px-1.5 py-0.5 ${row.status === "ERROR" ? "bg-red-500/15 text-red-600" : row.status === "WARNING" ? "bg-amber-500/15 text-amber-600" : "bg-emerald-500/15 text-emerald-600"}`} title={(row.errors ?? []).concat(row.warnings ?? []).join(" | ")}>{row.status}</span>}
+                        </td>
+                        <td className="p-1"><button onClick={() => removeRow(index)} className="rounded px-1.5 py-0.5 text-red-600 hover:bg-red-500/10" aria-label={`Delete row ${index + 1}`}>✕</button></td>
+                      </tr>
                     ))}
-                    <td className="p-1 whitespace-nowrap">
-                      {row.status && <span className={`rounded px-1.5 py-0.5 ${row.status === "ERROR" ? "bg-red-500/15 text-red-600" : row.status === "WARNING" ? "bg-amber-500/15 text-amber-600" : "bg-emerald-500/15 text-emerald-600"}`} title={(row.errors ?? []).concat(row.warnings ?? []).join(" | ")}>{row.status}</span>}
-                    </td>
-                    <td className="p-1"><button onClick={() => removeRow(index)} className="rounded px-1.5 py-0.5 text-red-600 hover:bg-red-500/10" aria-label={`Delete row ${index + 1}`}>✕</button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {rows.some((r) => r.errors && r.errors.length > 0) && (
-            <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-2.5 text-xs text-red-600">
-              {rows.filter((r) => r.errors && r.errors.length).slice(0, 6).map((r, i) => <div key={i}>Row {(r.rowNumber ?? 0)}: {(r.errors ?? []).join("; ")}</div>)}
+                  </tbody>
+                </table>
+              </div>
+              {rows.some((r) => r.errors && r.errors.length > 0) && (
+                <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-2.5 text-xs text-red-600">
+                  {rows.filter((r) => r.errors && r.errors.length).slice(0, 6).map((r, i) => <div key={i}>Row {(r.rowNumber ?? 0)}: {(r.errors ?? []).join("; ")}</div>)}
+                </div>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <button onClick={addBlankRow} className="rounded-xl border border-border px-4 py-2 text-sm font-medium">+ Add Row</button>
+                <button disabled={busy} onClick={saveAndValidate} className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">{busy ? "Saving…" : "Save & Validate"}</button>
+                <button disabled={busy || batch.valid_rows + batch.warning_rows === 0 || batch.error_rows > 0} onClick={proceedToImport} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" title={batch.error_rows > 0 ? "Fix all errors first" : ""}>Validate & Proceed to Import</button>
+                <button onClick={() => { setBatch(null); setRows([]); setNotice(null); }} className="rounded-xl border border-border px-4 py-2 text-sm">Close</button>
+                <button disabled={busy} onClick={doDeleteBatch} className="ml-auto rounded-xl border border-red-500/40 px-4 py-2 text-sm text-red-600 disabled:opacity-50">Delete Batch</button>
+              </div>
             </div>
           )}
-          <div className="flex flex-wrap gap-2">
-            <button onClick={addBlankRow} className="rounded-xl border border-border px-4 py-2 text-sm font-medium">+ Add Row</button>
-            <button disabled={busy} onClick={saveAndValidate} className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">{busy ? "Saving…" : "Save & Validate"}</button>
-            <button disabled={busy || batch.valid_rows + batch.warning_rows === 0 || batch.error_rows > 0} onClick={proceedToImport} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" title={batch.error_rows > 0 ? "Fix all errors first" : ""}>Validate & Proceed to Import</button>
-            <button onClick={() => { setBatch(null); setRows([]); setNotice(null); }} className="rounded-xl border border-border px-4 py-2 text-sm">Close</button>
-            <button disabled={busy} onClick={doDeleteBatch} className="ml-auto rounded-xl border border-red-500/40 px-4 py-2 text-sm text-red-600 disabled:opacity-50">Delete Batch</button>
-          </div>
         </div>
       )}
 
@@ -984,5 +1051,70 @@ function AuditTab() {
         </div>
       )}
     </div>
+  );
+}
+
+function WorkbenchQuickEntryForm({
+  dataset,
+  onSaveAndAddAnother,
+  busy,
+}: {
+  dataset: MigrationDataset;
+  onSaveAndAddAnother: (values: Record<string, string>) => Promise<void>;
+  busy: boolean;
+}) {
+  const [values, setValues] = useState<Record<string, string>>({});
+
+  function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    void onSaveAndAddAnother(values).then(() => setValues({}));
+  }
+
+  return (
+    <form onSubmit={handleSave} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+      <div className="mb-4 text-sm font-semibold text-foreground">New Record</div>
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {dataset.fields.map((f) => (
+          <label key={f.key} className="block">
+            <span className="mb-1.5 block text-xs font-medium text-muted-foreground">{f.label}{f.required && <span className="ml-1 text-red-500">*</span>}</span>
+            {f.choices && f.choices.length > 0 ? (
+              <select
+                required={f.required}
+                value={values[f.key] ?? ""}
+                onChange={(e) => setValues((prev) => ({ ...prev, [f.key]: e.target.value }))}
+                className="w-full rounded-xl border border-input bg-background px-4 py-2.5 text-sm shadow-sm transition hover:border-ring focus:border-ring focus:ring-1 focus:ring-ring"
+              >
+                <option value=""></option>
+                {f.choices.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            ) : (
+              <input
+                required={f.required}
+                value={values[f.key] ?? ""}
+                onChange={(e) => setValues((prev) => ({ ...prev, [f.key]: e.target.value }))}
+                className="w-full rounded-xl border border-input bg-background px-4 py-2.5 text-sm shadow-sm transition hover:border-ring focus:border-ring focus:ring-1 focus:ring-ring"
+                placeholder={`Enter ${f.label.toLowerCase()}`}
+              />
+            )}
+          </label>
+        ))}
+      </div>
+      <div className="mt-6 flex items-center justify-end gap-3 border-t border-border/50 pt-5">
+        <button
+          type="button"
+          onClick={() => setValues({})}
+          className="rounded-xl px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
+        >
+          Clear
+        </button>
+        <button
+          type="submit"
+          disabled={busy}
+          className="rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground shadow transition hover:opacity-90 disabled:opacity-50"
+        >
+          {busy ? "Saving..." : "Save & Add Another"}
+        </button>
+      </div>
+    </form>
   );
 }

@@ -223,6 +223,11 @@ export default function AdminOutstandingsPage() {
               <div className="text-lg font-semibold text-foreground">{formatRupee(summary?.direct_sale_outstanding)}</div>
               <div className="text-xs text-muted-foreground">Direct sale invoice balance</div>
             </div>
+            <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 space-y-1">
+              <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Legacy Receivable</div>
+              <div className="text-lg font-semibold text-foreground">{formatRupee(summary?.legacy_receivable_outstanding)}</div>
+              <div className="text-xs text-muted-foreground">Migrated opening balances</div>
+            </div>
             <div className="rounded-xl border border-border bg-amber-50 border-amber-200 px-4 py-3 space-y-1">
               <div className="text-xs font-medium text-amber-700 uppercase tracking-wide">Overdue</div>
               <div className="text-lg font-semibold text-amber-900">{formatRupee(summary?.overdue_amount)}</div>
@@ -291,6 +296,7 @@ export default function AdminOutstandingsPage() {
               <option value="lease">Lease</option>
               <option value="direct_sale">Direct Sale</option>
               <option value="billing_invoice">Billing Invoice</option>
+              <option value="legacy_receivable">Legacy Receivable</option>
             </select>
             <select
               title="Due state filter"
