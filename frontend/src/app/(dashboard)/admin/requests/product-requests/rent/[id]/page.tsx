@@ -13,6 +13,7 @@ import StepIndicator from "@/domains/product-requests/components/StepIndicator";
 import CustomerLinkSection from "@/domains/product-requests/components/CustomerLinkSection";
 import PricingSection from "@/domains/product-requests/components/PricingSection";
 import ApprovalConfirmDialog from "@/domains/product-requests/components/ApprovalConfirmDialog";
+import CustomerDetailsCard from "@/domains/product-requests/components/CustomerDetailsCard";
 import {
   decideAdminProductRequest,
   getProductRequest,
@@ -268,6 +269,27 @@ export default function RentRequestDetailPage() {
                     description="Final review before creating the rental subscription."
                   >
                     <div className="space-y-4">
+                      {/* Customer Details Card */}
+                      {(request.customer_id || selectedCustomerId) && (
+                        <div className="mb-4">
+                          <CustomerDetailsCard
+                            customer={{
+                              id: request.customer_id || selectedCustomerId,
+                              name: request.customer_name || request.requested_customer_name,
+                              phone: request.customer_phone || request.requested_customer_phone,
+                              email: request.customer_email,
+                              address: request.customer_address || request.requested_address,
+                              city: request.customer_city,
+                              state: request.customer_state,
+                              pincode: request.customer_pincode,
+                              customerSince: request.customer_joined_at,
+                              verificationStatus: (request.customer_verification_status as any) || "verified",
+                              status: "active",
+                            }}
+                          />
+                        </div>
+                      )}
+
                       {/* Summary Cards */}
                       <div className="grid gap-3 md:grid-cols-2">
                         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">

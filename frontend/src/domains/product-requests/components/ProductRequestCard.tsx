@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import CustomerDetailsHover from "./CustomerDetailsHover";
 import type { ProductRequestRecord } from "@/services/product-requests";
 
 type Props = {
@@ -66,7 +67,35 @@ export default function ProductRequestCard({ request, showRequester }: Props) {
           <div className="flex-1">
             <div className="text-xs font-semibold text-slate-500 uppercase">Product Request</div>
             <h3 className="mt-1 text-lg font-semibold text-slate-900">{request.product_name}</h3>
-            <p className="mt-1 text-sm text-slate-600">{request.requested_customer_name || request.customer_name || "Customer pending"}</p>
+            <p className="mt-1 text-sm text-slate-600">
+              <CustomerDetailsHover
+                customer={
+                  request.customer_id
+                    ? {
+                        id: request.customer_id,
+                        name: request.customer_name,
+                        phone: request.customer_phone,
+                        email: request.customer_email,
+                        address: request.customer_address,
+                        city: request.customer_city,
+                        state: request.customer_state,
+                        pincode: request.customer_pincode,
+                        customerSince: request.customer_joined_at,
+                        verificationStatus: request.customer_verification_status,
+                        status: "active",
+                      }
+                    : {
+                        name: request.requested_customer_name,
+                        phone: request.requested_customer_phone,
+                        address: request.requested_address,
+                        status: "pending",
+                      }
+                }
+                side="bottom"
+              >
+                {request.requested_customer_name || request.customer_name || "Customer pending"}
+              </CustomerDetailsHover>
+            </p>
           </div>
           <span className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${
             request.status === "APPROVED" ? "bg-emerald-100 text-emerald-800" :
