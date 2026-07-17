@@ -9,10 +9,13 @@ import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { DetailPanel, FormSection } from "@/components/ui/operations";
 import ProductRequestCard from "@/domains/product-requests/components/ProductRequestCard";
+import StepIndicator from "@/domains/product-requests/components/StepIndicator";
+import CustomerLinkSection from "@/domains/product-requests/components/CustomerLinkSection";
+import PricingSection from "@/domains/product-requests/components/PricingSection";
+import ApprovalConfirmDialog from "@/domains/product-requests/components/ApprovalConfirmDialog";
 import {
   decideAdminProductRequest,
   getProductRequest,
-  getProductRequestOptions,
   type ProductRequestCustomerOption,
   type ProductRequestOptions,
   type ProductRequestRecord,
@@ -60,6 +63,8 @@ export default function RentRequestDetailPage() {
   const [reviewNote, setReviewNote] = useState("");
   const [rejectReason, setRejectReason] = useState("");
   const [step, setStep] = useState<"customer" | "pricing" | "review">("customer");
+  const [showApprovalDialog, setShowApprovalDialog] = useState(false);
+  const [dialogMode, setDialogMode] = useState<"approve" | "reject">("approve");
 
   const loadRequest = useCallback(async () => {
     if (!requestId) {
@@ -95,33 +100,9 @@ export default function RentRequestDetailPage() {
     }
   }, [requestId]);
 
-  const loadOptions = useCallback(
-    async (query = customerQuery) => {
-      try {
-        const payload = await getProductRequestOptions("admin", {
-          customerQ: query || undefined,
-        });
-        setOptions(payload);
-      } catch (err) {
-        setActionError(toErrorMessage(err));
-      }
-    },
-    [customerQuery]
-  );
-
   useEffect(() => {
     void loadRequest();
   }, [loadRequest]);
-
-  useEffect(() => {
-    if (!request || request.status !== "SUBMITTED") return;
-    void loadOptions();
-  }, [loadOptions, request]);
-
-  const selectedCustomer = useMemo<ProductRequestCustomerOption | null>(
-    () => (options?.customers?.find((item) => String(item.id) === selectedCustomerId) ?? null),
-    [options, selectedCustomerId]
-  );
 
   const totalRentalCost = useMemo(() => {
     const monthly = Number(monthlyRent) || 0;
@@ -129,16 +110,7 @@ export default function RentRequestDetailPage() {
     return monthly * months;
   }, [monthlyRent, tenure]);
 
-  async function handleCustomerSearch() {
-    try {
-      await loadOptions(customerQuery);
-      setActionError(null);
-    } catch (err) {
-      setActionError(toErrorMessage(err));
-    }
-  }
-
-  async function handleApprove() {
+  async function submitApproval() {
     if (!request) return;
     if (!selectedCustomerId && !request.customer_id) {
       setActionError("Must select or have a linked customer.");
@@ -159,8 +131,9 @@ export default function RentRequestDetailPage() {
         payload.customer_id = Number(selectedCustomerId);
       }
       await decideAdminProductRequest(requestId, payload);
-      setSuccessMessage("Rent request approved. Rental subscription created.");
-      setStep("review");
+      setShowApprovalDialog(false);
+      setSuccessMessage("✓ Rent request approved. Rental subscription created.");
+      setTimeout(() => setStep("review"), 300);
     } catch (err) {
       setActionError(toErrorMessage(err));
     } finally {
@@ -168,7 +141,7 @@ export default function RentRequestDetailPage() {
     }
   }
 
-  async function handleReject() {
+  async function submitRejection() {
     if (!request) return;
     setActionLoading(true);
     setActionError(null);
@@ -181,7 +154,8 @@ export default function RentRequestDetailPage() {
         review_note: reviewNote.trim() || undefined,
       };
       await decideAdminProductRequest(requestId, payload);
-      setSuccessMessage("Rent request rejected.");
+      setShowApprovalDialog(false);
+      setSuccessMessage("✓ Rent request rejected.");
     } catch (err) {
       setActionError(toErrorMessage(err));
     } finally {
@@ -219,8 +193,8 @@ export default function RentRequestDetailPage() {
           <>
             {actionError ? <ERPErrorState title="Action failed" description={actionError} /> : null}
             {successMessage ? (
-              <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
-                <p className="font-semibold">{successMessage}</p>
+              <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800 animate-in fade-in">
+                {successMessage}
               </section>
             ) : null}
 
@@ -228,48 +202,36 @@ export default function RentRequestDetailPage() {
 
             {request.status === "SUBMITTED" ? (
               <>
+                {/* Step Progress Indicator */}
+                <div className="rounded-xl border border-border bg-muted/30 p-4">
+                  <StepIndicator
+                    steps={[
+                      { id: "customer", label: "Link Customer", description: "Select existing customer" },
+                      { id: "pricing", label: "Set Rent & Tenure", description: "Configure terms" },
+                      { id: "review", label: "Review & Approve", description: "Final decision" },
+                    ]}
+                    currentStep={step}
+                    allowBacktrack={true}
+                    onStepClick={(stepId) => {
+                      if (stepId === "customer") setStep("customer");
+                      else if (stepId === "pricing" && (request.customer_id || selectedCustomerId)) setStep("pricing");
+                      else if (stepId === "review" && (request.customer_id || selectedCustomerId)) setStep("review");
+                    }}
+                  />
+                </div>
+
                 {/* Step 1: Link Customer */}
                 {step === "customer" && !request.customer_id ? (
                   <FormSection title="Step 1: Link Customer" description="Select an existing customer for this rental.">
-                    <div className="space-y-4">
-                      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
-                        <label className="space-y-2 text-sm">
-                          <span className="font-medium">Search customers</span>
-                          <input
-                            value={customerQuery}
-                            onChange={(e) => setCustomerQuery(e.target.value)}
-                            placeholder="Name, phone, email, or username"
-                            className="h-11 w-full rounded-xl border border-border bg-background px-3"
-                          />
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => void handleCustomerSearch()}
-                          className="mt-6 h-11 rounded-xl border border-border bg-background px-4 text-sm font-medium hover:bg-muted"
-                        >
-                          Search
-                        </button>
-                      </div>
-
-                      <label className="block space-y-2 text-sm">
-                        <span className="font-medium">Select customer</span>
-                        <select
-                          value={selectedCustomerId}
-                          onChange={(e) => {
-                            setSelectedCustomerId(e.target.value);
-                            if (e.target.value) setStep("pricing");
-                          }}
-                          className="h-11 w-full rounded-xl border border-border bg-background px-3"
-                        >
-                          <option value="">Choose customer...</option>
-                          {(options?.customers ?? []).map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.name} · {c.phone}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
+                    <CustomerLinkSection
+                      onCustomerSelect={(customerId) => {
+                        setSelectedCustomerId(customerId);
+                        if (customerId) setStep("pricing");
+                      }}
+                      selectedCustomerId={selectedCustomerId}
+                      snapshotName={request.requested_customer_name}
+                      snapshotPhone={request.requested_customer_phone}
+                    />
                   </FormSection>
                 ) : null}
 
@@ -279,63 +241,23 @@ export default function RentRequestDetailPage() {
                     title="Step 2: Set Monthly Rent & Tenure"
                     description="Configure the rental terms. Review proposed pricing and adjust if needed."
                   >
-                    <div className="space-y-4">
-                      <div className="rounded-xl border border-border bg-muted/30 px-4 py-3">
-                        <div className="text-xs uppercase font-semibold text-muted-foreground">Product</div>
-                        <div className="mt-1 text-sm font-medium">{request.product_name}</div>
-                        <div className="mt-1 text-xs text-muted-foreground">Base price: {formatRupee(request.product?.base_price || 0)}</div>
-                      </div>
+                    <PricingSection
+                      productName={request.product_name}
+                      basePrice={request.product?.base_price || 0}
+                      monthlyAmount={Number(monthlyRent)}
+                      onMonthlyAmountChange={setMonthlyRent}
+                      tenure={Number(tenure)}
+                      onTenureChange={setTenure}
+                      type="RENT"
+                    />
 
-                      <div className="grid gap-3 md:grid-cols-2">
-                        <label className="block space-y-2 text-sm">
-                          <span className="font-medium">Monthly rent amount</span>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={monthlyRent}
-                            onChange={(e) => setMonthlyRent(e.target.value)}
-                            className="h-11 w-full rounded-xl border border-border bg-background px-3"
-                          />
-                        </label>
-
-                        <label className="block space-y-2 text-sm">
-                          <span className="font-medium">Tenure (months)</span>
-                          <input
-                            type="number"
-                            min="1"
-                            value={tenure}
-                            onChange={(e) => setTenure(e.target.value)}
-                            className="h-11 w-full rounded-xl border border-border bg-background px-3"
-                          />
-                        </label>
-                      </div>
-
-                      <div className="rounded-xl border border-border bg-muted/30 px-4 py-3">
-                        <div className="flex flex-col gap-2">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Monthly:</span>
-                            <span className="font-medium">{formatRupee(monthlyRent || 0)}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Duration:</span>
-                            <span className="font-medium">{tenure} months</span>
-                          </div>
-                          <div className="border-t border-border pt-2 flex justify-between text-sm font-bold">
-                            <span>Total Rental Cost:</span>
-                            <span className="text-lg">{formatRupee(totalRentalCost)}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => setStep("review")}
-                        className="h-10 rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90"
-                      >
-                        Review & Approve →
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setStep("review")}
+                      className="mt-6 h-11 w-full rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition"
+                    >
+                      Review & Approve →
+                    </button>
                   </FormSection>
                 ) : null}
 
@@ -346,60 +268,94 @@ export default function RentRequestDetailPage() {
                     description="Final review before creating the rental subscription."
                   >
                     <div className="space-y-4">
+                      {/* Summary Cards */}
                       <div className="grid gap-3 md:grid-cols-2">
-                        <div className="rounded-xl border border-border bg-muted/30 px-4 py-3">
-                          <div className="text-xs uppercase font-semibold text-muted-foreground">Customer</div>
-                          <div className="mt-1 text-sm font-medium">
-                            {selectedCustomer?.name || request.customer_name || request.requested_customer_name}
+                        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                          <div className="text-xs font-semibold uppercase text-emerald-600">Customer</div>
+                          <div className="mt-2 text-sm font-bold text-emerald-900">
+                            {request.customer_name || request.requested_customer_name}
                           </div>
                         </div>
-                        <div className="rounded-xl border border-border bg-muted/30 px-4 py-3">
-                          <div className="text-xs uppercase font-semibold text-muted-foreground">Total Cost</div>
-                          <div className="mt-1 text-sm font-bold">{formatRupee(totalRentalCost)}</div>
+                        <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+                          <div className="text-xs font-semibold uppercase text-blue-600">Total Cost</div>
+                          <div className="mt-2 text-lg font-bold text-blue-900">{formatRupee(totalRentalCost)}</div>
                         </div>
                       </div>
 
-                      <label className="block space-y-2 text-sm">
-                        <span className="font-medium">Review note (optional)</span>
-                        <textarea
-                          value={reviewNote}
-                          onChange={(e) => setReviewNote(e.target.value)}
-                          rows={3}
-                          placeholder="Any notes for this approval..."
-                          className="w-full rounded-xl border border-border bg-background px-3 py-2"
-                        />
-                      </label>
+                      {/* Notes Section */}
+                      <div className="space-y-3">
+                        <label className="block space-y-2 text-sm">
+                          <span className="font-semibold text-foreground">Review note (optional)</span>
+                          <textarea
+                            value={reviewNote}
+                            onChange={(e) => setReviewNote(e.target.value)}
+                            rows={3}
+                            placeholder="Any notes for this approval..."
+                            className="w-full rounded-xl border border-border bg-background px-3 py-2 font-medium focus:border-primary focus:ring-2 focus:ring-primary/20"
+                          />
+                        </label>
 
-                      <label className="block space-y-2 text-sm">
-                        <span className="font-medium">Reject reason (if rejecting)</span>
-                        <textarea
-                          value={rejectReason}
-                          onChange={(e) => setRejectReason(e.target.value)}
-                          rows={3}
-                          placeholder="Why is this being rejected?"
-                          className="w-full rounded-xl border border-border bg-background px-3 py-2"
-                        />
-                      </label>
+                        <label className="block space-y-2 text-sm">
+                          <span className="font-semibold text-foreground">Reject reason (if rejecting)</span>
+                          <textarea
+                            value={rejectReason}
+                            onChange={(e) => setRejectReason(e.target.value)}
+                            rows={3}
+                            placeholder="Why is this being rejected?"
+                            className="w-full rounded-xl border border-border bg-background px-3 py-2 font-medium focus:border-primary focus:ring-2 focus:ring-primary/20"
+                          />
+                        </label>
+                      </div>
 
-                      <div className="flex flex-wrap gap-2">
+                      {/* Action Buttons */}
+                      <div className="flex flex-col gap-2 sm:flex-row sm:gap-3 pt-2">
                         <button
                           type="button"
-                          onClick={() => void handleApprove()}
+                          onClick={() => {
+                            setDialogMode("approve");
+                            setShowApprovalDialog(true);
+                          }}
                           disabled={actionLoading}
-                          className="h-10 rounded-xl bg-emerald-600 px-4 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                          className="h-11 rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition flex items-center justify-center gap-2"
                         >
+                          <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
                           {actionLoading ? "Processing..." : "Approve Rental"}
                         </button>
                         <button
                           type="button"
-                          onClick={() => void handleReject()}
+                          onClick={() => {
+                            setDialogMode("reject");
+                            setShowApprovalDialog(true);
+                          }}
                           disabled={actionLoading}
-                          className="h-10 rounded-xl bg-red-600 px-4 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                          className="h-11 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50 transition flex items-center justify-center gap-2"
                         >
+                          <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                          </svg>
                           {actionLoading ? "Processing..." : "Reject Rental"}
                         </button>
                       </div>
                     </div>
+
+                    {/* Approval Confirmation Dialog */}
+                    <ApprovalConfirmDialog
+                      isOpen={showApprovalDialog}
+                      onClose={() => setShowApprovalDialog(false)}
+                      onApprove={submitApproval}
+                      onReject={submitRejection}
+                      isLoading={actionLoading}
+                      title={dialogMode === "approve" ? "Approve Rental Request?" : "Reject Rental Request?"}
+                      description={
+                        dialogMode === "approve"
+                          ? `Confirm approval for ${request.product_name} rental. A rental subscription will be created for ${formatRupee(totalRentalCost)}.`
+                          : `Confirm rejection of ${request.product_name} rental request.${rejectReason ? " " + rejectReason : ""}`
+                      }
+                      approveLabel="Approve"
+                      rejectLabel="Reject"
+                    />
                   </FormSection>
                 ) : null}
               </>
