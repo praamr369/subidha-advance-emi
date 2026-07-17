@@ -9,7 +9,18 @@ type Props = {
 };
 
 export default function ProductRequestCard({ request, showRequester }: Props) {
-  const requestLink = `/admin/requests/product-requests/${request.id}`;
+  const getRequestLink = (req: ProductRequestRecord): string => {
+    const typePathMap: Record<string, string> = {
+      DIRECT_SALE: "direct-sale",
+      ADVANCE_EMI: "advance-emi",
+      RENT: "rent",
+      LEASE: "lease",
+    };
+    const typePath = typePathMap[req.request_type] || "direct-sale";
+    return `/admin/requests/product-requests/${typePath}/${req.id}`;
+  };
+
+  const requestLink = getRequestLink(request);
   const statusColor =
     request.status === "APPROVED"
       ? "bg-emerald-50 border-emerald-200"
