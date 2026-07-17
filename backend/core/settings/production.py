@@ -1,6 +1,10 @@
 from .base import *  # noqa
 
 DEBUG = False
+
+# Prevent accidental business reset in production.
+# Set to True explicitly only when running a controlled migration/teardown.
+ALLOW_BUSINESS_RESET = False
 SECURE_SSL_REDIRECT = True
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True

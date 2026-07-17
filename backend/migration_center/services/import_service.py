@@ -258,6 +258,8 @@ def _import_opening_stock(row: MigrationStagingRow, data: dict[str, Any], actor)
 
 def _import_customer_outstanding(row: MigrationStagingRow, data: dict[str, Any], actor) -> tuple[str, int, list, dict | None]:
     from accounting.models import CustomerOpeningOutstanding
+    from subscriptions.models import CustomerSource
+    from subscriptions.services.customer_service import find_or_create_customer
 
     amount = _dec(data.get("outstanding"))
     if amount <= 0:
@@ -272,15 +274,34 @@ def _import_customer_outstanding(row: MigrationStagingRow, data: dict[str, Any],
             str(data.get("remarks") or ""),
         ) if part
     )
+    
+    # Create or link CRM customer
+    customer_name = str(data.get("customer") or "")
+    phone = str(data.get("mobile") or "")
+    customer = None
+    extra: list[dict] = []
+    
+    if phone:
+        customer, created = find_or_create_customer(
+            name=customer_name,
+            phone=phone,
+            source=CustomerSource.IMPORT,
+            created_by=actor,
+        )
+        if created:
+            extra.append({"model": "accounts.User", "pk": customer.user_id})
+            extra.append({"model": "subscriptions.Customer", "pk": customer.pk})
+
     outstanding = CustomerOpeningOutstanding.objects.create(
-        customer_name=str(data.get("customer") or ""),
-        phone=str(data.get("mobile") or ""),
+        customer=customer,
+        customer_name=customer_name,
+        phone=phone,
         outstanding_amount=amount,
         entry_date=_date_or_today(data.get("invoice_date")),
         notes=notes,
         created_by=actor,
     )
-    return "accounting.CustomerOpeningOutstanding", outstanding.pk, [], {"action": "created"}
+    return "accounting.CustomerOpeningOutstanding", outstanding.pk, extra, {"action": "created"}
 
 
 def _import_vendor_outstanding(row: MigrationStagingRow, data: dict[str, Any], actor) -> tuple[str, int, list, dict | None]:

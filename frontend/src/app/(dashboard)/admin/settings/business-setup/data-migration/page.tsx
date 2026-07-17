@@ -906,12 +906,43 @@ function HistoryTab({ onChanged }: { onChanged: () => void }) {
     finally { setBusy(false); }
   }
 
+  async function doDeleteAll() {
+    const deletable = batches.filter((b) => b.imported_rows === 0);
+    const imported = batches.filter((b) => b.imported_rows > 0);
+    if (deletable.length === 0) {
+      setError("No batches to delete. Batches with imported rows must be rolled back individually first.");
+      return;
+    }
+    const msg = imported.length > 0
+      ? `Delete ${deletable.length} draft/staged batch(es)? ${imported.length} batch(es) with imported rows will be skipped (roll them back first). This cannot be undone.`
+      : `Delete all ${deletable.length} migration batch(es) and their staging rows? This cannot be undone.`;
+    if (!window.confirm(msg)) return;
+    setBusy(true);
+    setError(null);
+    try {
+      for (const b of deletable) {
+        await deleteMigrationBatch(b.id);
+      }
+      setNotice(`Cleared ${deletable.length} migration batch(es).${imported.length > 0 ? ` ${imported.length} batch(es) with imported rows were skipped.` : ""}`);
+      refresh();
+      onChanged();
+    } catch (e) { setError(toErr(e)); }
+    finally { setBusy(false); }
+  }
+
   return (
     <div className="space-y-4">
       {notice && <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-2.5 text-sm text-emerald-700">{notice}</div>}
       {error && <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-2.5 text-sm text-red-600">{error}</div>}
       <div className="rounded-2xl border border-border bg-card p-5">
-        <div className="mb-3 text-sm font-semibold text-foreground">Import history</div>
+        <div className="mb-3 flex items-center justify-between">
+          <div className="text-sm font-semibold text-foreground">Import history</div>
+          {batches.length > 0 && (
+            <button disabled={busy} onClick={() => void doDeleteAll()} className="rounded-lg border border-red-500/40 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-500/10 disabled:opacity-50">
+              Clear all migration data
+            </button>
+          )}
+        </div>
         {batches.length === 0 ? <div className="text-sm text-muted-foreground">No batches yet.</div> : (
           <BatchTable
             batches={batches}

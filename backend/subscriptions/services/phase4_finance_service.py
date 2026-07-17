@@ -400,6 +400,10 @@ def customer_finance_summary(*, customer) -> dict:
     receipts = ReceiptDocument.objects.filter(customer=customer)
     rent_lease_subscriptions = subscriptions.filter(plan_type__in=[PlanType.RENT, PlanType.LEASE])
     rent_lease_demands = RentLeaseBillingDemand.objects.filter(subscription__customer=customer)
+    
+    legacy_outstandings = customer.opening_outstandings.filter(is_settled=False)
+    legacy_pending = _money(legacy_outstandings.aggregate(total=Sum("outstanding_amount"))["total"] or Decimal("0"))
+
     deposit_rows = []
     for sub in rent_lease_subscriptions.select_related("rent_profile", "lease_profile"):
         snapshot = build_deposit_snapshot(subscription=sub)
@@ -430,10 +434,11 @@ def customer_finance_summary(*, customer) -> dict:
             "total_invoices": invoices.count(),
             "total_receipts": receipts.count(),
             "total_paid": _money(payments.aggregate(total=Sum("amount"))["total"]),
-            "total_pending": _money(emis.filter(status=EmiStatus.PENDING).aggregate(total=Sum("amount"))["total"]),
+            "total_pending": _money((emis.filter(status=EmiStatus.PENDING).aggregate(total=Sum("amount"))["total"] or Decimal("0")) + legacy_pending),
             "total_overdue": _money(
-                emis.filter(status=EmiStatus.PENDING, due_date__lt=timezone.localdate()).aggregate(total=Sum("amount"))["total"]
+                (emis.filter(status=EmiStatus.PENDING, due_date__lt=timezone.localdate()).aggregate(total=Sum("amount"))["total"] or Decimal("0")) + legacy_pending
             ),
+            "legacy_outstanding": legacy_pending,
             "active_contracts": subscriptions.filter(status__in=["ACTIVE", "APPROVED"]).count(),
             "rent_lease_pending_invoices": rent_lease_demands.filter(
                 demand_type__in=[RentLeaseDemandType.RENT_MONTHLY, RentLeaseDemandType.LEASE_MONTHLY],

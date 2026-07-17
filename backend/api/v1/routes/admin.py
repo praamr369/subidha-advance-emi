@@ -3,6 +3,8 @@ from rest_framework.routers import DefaultRouter
 
 # HR Routes (Session 4 Consolidation - 2026-06-24)
 from api.v1.routes import admin_hr_complete
+from api.v1.routes import workbench as workbench_routes
+from api.v1.routes import online_request as online_request_routes
 
 from api.v1.views.admin_money_in_out import AdminMoneyInOutView
 from api.v1.views.admin_unified_payable import (
@@ -1379,4 +1381,4 @@ urlpatterns = [
     # ── Deposit forfeiture invoices ───────────────────────────────────────────
     path("finance/forfeiture-invoices/", AdminForfeitureInvoiceListView.as_view()),
     path("finance/forfeiture-invoices/<int:pk>/issue/", AdminForfeitureInvoiceIssueView.as_view()),
-]
+] + workbench_routes.urlpatterns + online_request_routes.urlpatterns

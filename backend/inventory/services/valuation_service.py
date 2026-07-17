@@ -5,23 +5,34 @@ from decimal import Decimal
 
 from django.db import transaction
 
-from inventory.models import InventoryItem, InventoryValuation
+from inventory.models import InventoryItem, InventoryValuation, InventoryValuationMethod
 
 
 def _decimal(value) -> Decimal:
     return Decimal(str(value or "0")).quantize(Decimal("0.01"))
 
 
-def _latest_weighted_cost(item: InventoryItem) -> Decimal:
+def weighted_average_unit_cost(item: InventoryItem, *, as_of_date: date | None = None) -> Decimal:
+    """Company valuation policy: Weighted Average Cost over persisted purchase
+    bill lines (optionally only bills dated on/before ``as_of_date`` so a
+    historical stock-out values deterministically), falling back to the item's
+    standard unit cost when no purchase history exists."""
     total_cost = Decimal("0.00")
     total_quantity = Decimal("0.000")
-    for line in item.purchase_bill_lines.all():
+    lines = item.purchase_bill_lines.all()
+    if as_of_date is not None:
+        lines = lines.select_related("purchase_bill").filter(purchase_bill__bill_date__lte=as_of_date)
+    for line in lines:
         quantity = Decimal(str(line.quantity or "0.000"))
         total_quantity += quantity
         total_cost += quantity * Decimal(str(line.unit_cost or "0.00"))
     if total_quantity <= 0:
         return _decimal(item.standard_unit_cost)
     return (total_cost / total_quantity).quantize(Decimal("0.01"))
+
+
+def _latest_weighted_cost(item: InventoryItem) -> Decimal:
+    return weighted_average_unit_cost(item)
 
 
 def build_inventory_valuation(*, as_of_date: date | None = None):
@@ -69,7 +80,9 @@ def create_inventory_valuation_snapshot(*, as_of_date: date | None = None, creat
     payload = build_inventory_valuation(as_of_date=as_of_date)
     snapshot = InventoryValuation.objects.create(
         as_of_date=date.fromisoformat(payload["as_of_date"]),
-        method="FIFO",
+        # The builder above values stock at weighted average cost, so record AVG
+        # (the previous hardcoded "FIFO" label misstated the method actually used).
+        method=InventoryValuationMethod.AVG,
         totals_json=payload,
         created_by=created_by,
     )

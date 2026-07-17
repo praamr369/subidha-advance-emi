@@ -397,6 +397,25 @@ def _cost_from_snapshot(snapshot: Any, quantity: Decimal) -> tuple[Decimal | Non
     return unit, amount, None
 
 
+def _weighted_average_cost_evidence(row: StockLedger, quantity: Decimal) -> tuple[Decimal | None, Decimal | None, str | None]:
+    """Company valuation-policy fallback when the sale/delivery snapshot carries
+    no persisted COGS evidence: value the stock-out at the Weighted Average Cost
+    of persisted purchase bill lines dated on/before the movement date. This is
+    derived from persisted purchase documents (not a guess), deterministic for a
+    given movement date, and labeled as WEIGHTED_AVERAGE evidence."""
+    from inventory.services.valuation_service import weighted_average_unit_cost
+
+    if quantity <= Decimal("0.000"):
+        return None, None, "Stock-out quantity must be greater than zero for weighted-average COGS."
+    unit = weighted_average_unit_cost(row.inventory_item, as_of_date=row.movement_date)
+    if unit is None or unit <= Decimal("0.00"):
+        return None, None, "No purchase-bill cost history or standard cost exists for weighted-average COGS."
+    amount = base._money(unit * quantity)
+    if amount <= Decimal("0.00"):
+        return None, None, "Weighted-average COGS amount is zero; COGS is deferred."
+    return base._money(unit), amount, None
+
+
 def _stock_ledger_cogs_evidence(row: StockLedger) -> tuple[str, str, Decimal | None, Decimal | None, str | None]:
     ref_pk = _stock_ledger_ref_pk(row)
     if ref_pk is None:
@@ -416,6 +435,8 @@ def _stock_ledger_cogs_evidence(row: StockLedger) -> tuple[str, str, Decimal | N
             return DEFERRED_COGS_STOCK_LEDGER_EVENT_KEY, "COGS deferred", None, None, "Linked invoice/direct sale is not finalized for COGS posting."
         unit, amount, reason = _cost_from_snapshot(line.tax_profile_snapshot or line.invoice.tax_profile_snapshot, quantity)
         if reason:
+            unit, amount, reason = _weighted_average_cost_evidence(row, quantity)
+        if reason:
             return DEFERRED_COGS_STOCK_LEDGER_EVENT_KEY, "COGS deferred", unit, amount, reason
         event_key = "cogs_direct_sale_delivery" if line.invoice.direct_sale_id else "cogs_sale_delivery"
         return event_key, STOCK_LEDGER_LABEL_BY_EVENT[event_key], unit, amount, None
@@ -428,6 +449,8 @@ def _stock_ledger_cogs_evidence(row: StockLedger) -> tuple[str, str, Decimal | N
         if line.direct_sale.status not in {"DELIVERED", "INVOICED"}:
             return DEFERRED_COGS_STOCK_LEDGER_EVENT_KEY, "COGS deferred", None, None, "Linked direct sale is not delivered/invoiced."
         unit, amount, reason = _cost_from_snapshot(line.direct_sale.tax_profile_snapshot, quantity)
+        if reason:
+            unit, amount, reason = _weighted_average_cost_evidence(row, quantity)
         if reason:
             return DEFERRED_COGS_STOCK_LEDGER_EVENT_KEY, "COGS deferred", unit, amount, reason
         return "cogs_direct_sale_delivery", STOCK_LEDGER_LABEL_BY_EVENT["cogs_direct_sale_delivery"], unit, amount, None
@@ -444,7 +467,10 @@ def _stock_ledger_cogs_evidence(row: StockLedger) -> tuple[str, str, Decimal | N
             unit, amount, reason = _cost_from_snapshot(snapshot, quantity)
             if not reason:
                 return "cogs_subscription_delivery", STOCK_LEDGER_LABEL_BY_EVENT["cogs_subscription_delivery"], unit, amount, None
-        return DEFERRED_COGS_STOCK_LEDGER_EVENT_KEY, "COGS deferred", None, None, "Subscription delivery snapshots do not contain persisted COGS/unit-cost evidence."
+        unit, amount, reason = _weighted_average_cost_evidence(row, quantity)
+        if not reason:
+            return "cogs_subscription_delivery", STOCK_LEDGER_LABEL_BY_EVENT["cogs_subscription_delivery"], unit, amount, None
+        return DEFERRED_COGS_STOCK_LEDGER_EVENT_KEY, "COGS deferred", None, None, reason
     return UNSUPPORTED_STOCK_LEDGER_EVENT_KEY, "Unsupported StockLedger movement", None, None, "Stock-out row does not link to a supported finalized sale/delivery source."
 
 

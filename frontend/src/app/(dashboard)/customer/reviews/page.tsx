@@ -158,7 +158,7 @@ export default function CustomerReviewsPage() {
           <div className="space-y-3">
             {myReviews.map((r) => (
               <div key={r.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
-                <div className="flex items-center justify-between mb-1">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
                   <span className="text-yellow-400">{"★".repeat(r.rating)}{"☆".repeat(5 - r.rating)}</span>
                   <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_CLS[r.status ?? "pending"]}`}>
                     {r.status}

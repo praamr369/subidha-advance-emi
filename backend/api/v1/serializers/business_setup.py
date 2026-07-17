@@ -73,7 +73,10 @@ class DocumentPrintSettingsSerializer(BusinessSetupModelSerializer):
         return request.build_absolute_uri(url) if request else url
 
     def get_business_logo_url(self, instance):
-        return self._image_url(getattr(instance, "business_logo", None))
+        url = self._image_url(getattr(instance, "business_logo", None))
+        if not url and instance.business_profile and instance.business_profile.logo_url:
+            return instance.business_profile.logo_url
+        return url
 
     def get_authorized_signature_url(self, instance):
         return self._image_url(getattr(instance, "authorized_signature", None))

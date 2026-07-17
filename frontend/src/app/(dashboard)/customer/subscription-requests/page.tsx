@@ -1,20 +1,22 @@
 "use client";
 
-import { RefreshCw } from "lucide-react";
+import Link from "next/link";
+import { Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
-import ActionButton from "@/components/ui/ActionButton";
-import PaginationControls from "@/components/ui/PaginationControls";
-import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
-import TableToolbar from "@/components/ui/TableToolbar";
-import { WorkspaceNotice } from "@/components/ui/role-workspace";
-import { WorkspaceSection } from "@/components/ui/workspace";
-import SubscriptionRequestCard from "@/domains/subscription-requests/components/SubscriptionRequestCard";
+import PaginationControls from "@/components/ui/PaginationControls";
+import CustomerPageShell, {
+  CPageCard,
+  CPageSection,
+  CPageStats,
+  CPageStat,
+  CPageTabs,
+} from "@/components/layout/CustomerPageShell";
 import {
   listSubscriptionRequests,
   type SubscriptionRequestRecord,
@@ -22,26 +24,63 @@ import {
 
 const PAGE_SIZE = 25;
 
-function toErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message.trim()) {
-    return error.message;
-  }
-  return "Failed to load subscription requests.";
+type StatusFilter = "" | "SUBMITTED" | "APPROVED" | "REJECTED" | "CANCELLED";
+
+const STATUS_TABS = [
+  { value: "" as StatusFilter, label: "All" },
+  { value: "SUBMITTED" as StatusFilter, label: "Pending" },
+  { value: "APPROVED" as StatusFilter, label: "Approved" },
+  { value: "REJECTED" as StatusFilter, label: "Rejected" },
+];
+
+function formatDate(v?: string | null): string {
+  if (!v) return "—";
+  const d = Date.parse(v);
+  if (Number.isNaN(d)) return v;
+  return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-type RequestStatusFilter =
-  | ""
-  | "SUBMITTED"
-  | "APPROVED"
-  | "REJECTED"
-  | "CANCELLED";
+function RequestCard({ row }: { row: SubscriptionRequestRecord }) {
+  return (
+    <CPageCard href={`/customer/subscription-requests/${row.id}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-bold text-foreground truncate">
+            {row.product_name || `Request #${row.id}`}
+          </div>
+          <div className="mt-0.5 text-xs font-mono text-muted-foreground">REQ-{row.id}</div>
+        </div>
+        <ERPStatusBadge status={row.status} />
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 border-t border-border/60 pt-3 text-xs">
+        <div>
+          <span className="text-muted-foreground">Product</span>
+          <div className="font-semibold mt-0.5">{row.product_name || "—"}</div>
+        </div>
+        <div>
+          <span className="text-muted-foreground">Submitted</span>
+          <div className="font-semibold mt-0.5">{formatDate(row.created_at)}</div>
+        </div>
+        {row.batch_code ? (
+          <div>
+            <span className="text-muted-foreground">Batch</span>
+            <div className="font-semibold mt-0.5">{row.batch_code}</div>
+          </div>
+        ) : null}
+      </div>
+      {row.status === "SUBMITTED" ? (
+        <div className="mt-2 rounded-xl bg-amber-50 dark:bg-amber-950/30 px-3 py-1.5 text-xs text-amber-700 dark:text-amber-400">
+          Awaiting admin review — not yet a live contract
+        </div>
+      ) : null}
+    </CPageCard>
+  );
+}
 
 export default function CustomerSubscriptionRequestsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-
-  const statusFilter = ((searchParams.get("status") || "").trim().toUpperCase() ||
-    "") as RequestStatusFilter;
+  const statusFilter = ((searchParams.get("status") || "").trim().toUpperCase() || "") as StatusFilter;
   const currentPage = Math.max(Number(searchParams.get("page") || 1), 1);
 
   const [rows, setRows] = useState<SubscriptionRequestRecord[]>([]);
@@ -50,251 +89,120 @@ export default function CustomerSubscriptionRequestsPage() {
   const [numPages, setNumPages] = useState(0);
   const [hasNext, setHasNext] = useState(false);
   const [hasPrevious, setHasPrevious] = useState(false);
-  const [statusInput, setStatusInput] = useState<RequestStatusFilter>(statusFilter);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    setStatusInput(statusFilter);
-    setPage(currentPage);
-  }, [statusFilter, currentPage]);
+  const loadPage = useCallback(async () => {
+    setLoading(true);
+    try {
+      const payload = await listSubscriptionRequests("customer", {
+        status: statusFilter || undefined,
+        page: currentPage,
+        pageSize: PAGE_SIZE,
+      });
+      setRows(payload.results);
+      setCount(payload.count);
+      setPage(payload.page);
+      setNumPages(payload.num_pages);
+      setHasNext(payload.has_next);
+      setHasPrevious(payload.has_previous);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load requests.");
+      setRows([]);
+      setCount(0);
+    } finally {
+      setLoading(false);
+    }
+  }, [currentPage, statusFilter]);
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (mode === "initial") setLoading(true);
-      else setRefreshing(true);
+  useEffect(() => { void loadPage(); }, [loadPage]);
 
-      try {
-        const payload = await listSubscriptionRequests("customer", {
-          status: statusFilter || undefined,
-          page: currentPage,
-          pageSize: PAGE_SIZE,
-        });
-        setRows(payload.results);
-        setCount(payload.count);
-        setPage(payload.page);
-        setNumPages(payload.num_pages);
-        setHasNext(payload.has_next);
-        setHasPrevious(payload.has_previous);
-        setError(null);
-      } catch (err) {
-        setError(toErrorMessage(err));
-        setRows([]);
-        setCount(0);
-        setNumPages(0);
-        setHasNext(false);
-        setHasPrevious(false);
-      } finally {
-        if (mode === "initial") setLoading(false);
-        else setRefreshing(false);
-      }
-    },
-    [currentPage, statusFilter]
-  );
+  const stats = useMemo(() => ({
+    submitted: rows.filter((r) => r.status === "SUBMITTED").length,
+    approved: rows.filter((r) => r.status === "APPROVED").length,
+    rejected: rows.filter((r) => r.status === "REJECTED").length,
+  }), [rows]);
 
-  useEffect(() => {
-    void loadPage("initial");
-  }, [loadPage]);
-
-  const summary = useMemo(() => {
-    return {
-      submitted: rows.filter((row) => row.status === "SUBMITTED").length,
-      approved: rows.filter((row) => row.status === "APPROVED").length,
-      rejected: rows.filter((row) => row.status === "REJECTED").length,
-    };
-  }, [rows]);
-
-  function applyFilter(nextStatus: RequestStatusFilter) {
+  function applyFilter(s: StatusFilter) {
     const next = new URLSearchParams();
-    if (nextStatus) next.set("status", nextStatus);
-    router.replace(
-      next.toString()
-        ? `/customer/subscription-requests?${next.toString()}`
-        : "/customer/subscription-requests"
-    );
+    if (s) next.set("status", s);
+    router.replace(next.toString() ? `/customer/subscription-requests?${next.toString()}` : "/customer/subscription-requests");
   }
 
   function replacePage(targetPage: number) {
     const next = new URLSearchParams();
     if (statusFilter) next.set("status", statusFilter);
     if (targetPage > 1) next.set("page", String(targetPage));
-    router.replace(
-      next.toString()
-        ? `/customer/subscription-requests?${next.toString()}`
-        : "/customer/subscription-requests"
-    );
+    router.replace(next.toString() ? `/customer/subscription-requests?${next.toString()}` : "/customer/subscription-requests");
   }
 
   return (
-    <ERPPageShell
-      eyebrow="Customer Intake"
+    <CustomerPageShell
       title="Subscription Requests"
-      subtitle="Track customer-created intake requests that remain separate from real subscriptions until admin approval."
-      helperNote="A submitted request is not a live contract. Approval creates the real subscription, EMI schedule, and related audit trail through the backend workflow."
-      helperTone="info"
-      breadcrumbs={[
-        { label: "Customer", href: "/customer" },
-        { label: "Subscription Requests" },
-      ]}
-      actions={[
-        {
-          href: "/customer/subscription-requests/create",
-          label: "New Request",
-          variant: "primary",
-        },
-        {
-          href: "/customer/subscriptions",
-          label: "My Subscriptions",
-          variant: "secondary",
-        },
-      ]}
-      statusBadge={{ label: "Approval required", tone: "info" }}
-      stats={[
-        { label: "Requests", value: count },
-        {
-          label: "Page submitted",
-          value: summary.submitted,
-          tone: summary.submitted > 0 ? "warning" : "default",
-        },
-        {
-          label: "Page approved",
-          value: summary.approved,
-          tone: summary.approved > 0 ? "success" : "default",
-        },
-        {
-          label: "Page rejected",
-          value: summary.rejected,
-          tone: summary.rejected > 0 ? "danger" : "default",
-        },
-      ]}
-    >
-      <div className="space-y-6">
-        <WorkspaceSection
-          title="Request register controls"
-          description="Filter request intake by current review status and refresh the register without leaving the customer workspace."
-          action={
-            <ActionButton
-              variant="outline"
-              onClick={() => void loadPage("refresh")}
-              disabled={loading || refreshing}
-              leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
-            >
-              {refreshing ? "Refreshing..." : "Refresh"}
-            </ActionButton>
-          }
+      subtitle="Track your submitted plan requests"
+      actions={
+        <Link
+          href="/customer/subscription-requests/create"
+          className="flex items-center gap-1.5 rounded-xl bg-primary text-primary-foreground px-3 py-1.5 text-xs font-semibold hover:opacity-90"
         >
-          <TableToolbar
-            footer={
-              statusFilter ? (
-                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <span className="font-semibold uppercase tracking-[0.14em]">
-                    Active filter
-                  </span>
-                  <ERPStatusBadge status={statusFilter} hideIcon />
-                </div>
-              ) : (
-                <div className="text-sm text-muted-foreground">
-                  Requests stay operationally separate from live subscriptions. Use this register to follow review status, then open approved subscriptions from the detail view when available.
-                </div>
-              )
-            }
-          >
-            <div className="grid gap-4 lg:grid-cols-[220px_auto]">
-              <select
-                value={statusInput}
-                onChange={(event) =>
-                  setStatusInput(event.target.value as RequestStatusFilter)
-                }
-                className="h-11 rounded-xl border border-border bg-background px-4 text-sm"
-              >
-                <option value="">All statuses</option>
-                <option value="SUBMITTED">Submitted</option>
-                <option value="APPROVED">Approved</option>
-                <option value="REJECTED">Rejected</option>
-                <option value="CANCELLED">Cancelled</option>
-              </select>
+          <Plus className="size-3.5" /> New
+        </Link>
+      }
+    >
+      {/* Stats */}
+      {!loading && count > 0 ? (
+        <CPageStats>
+          <CPageStat label="Total" value={count} />
+          <CPageStat label="Pending" value={stats.submitted} tone="warning" />
+          <CPageStat label="Approved" value={stats.approved} tone="success" />
+          <CPageStat label="Rejected" value={stats.rejected} tone={stats.rejected > 0 ? "danger" : "default"} />
+        </CPageStats>
+      ) : null}
 
-              <div className="flex flex-wrap gap-2">
-                <ActionButton type="button" onClick={() => applyFilter(statusInput)}>
-                  Apply
-                </ActionButton>
-                <ActionButton
-                  type="button"
-                  variant="outline"
-                  onClick={() => applyFilter("")}
-                >
-                  Clear
-                </ActionButton>
-              </div>
-            </div>
-          </TableToolbar>
-        </WorkspaceSection>
+      <CPageSection>
+        <CPageTabs tabs={STATUS_TABS} active={statusFilter} onChange={applyFilter} />
+      </CPageSection>
 
-        {loading ? <ERPLoadingState label="Loading subscription requests..." /> : null}
+      {loading ? <ERPLoadingState label="Loading requests..." /> : null}
 
-        {!loading && error ? (
-          <ERPErrorState
-            title="Unable to load subscription requests"
-            description={error}
-            onRetry={() => void loadPage("initial")}
-          />
-        ) : null}
+      {!loading && error ? (
+        <ERPErrorState title="Unable to load requests" description={error} onRetry={() => void loadPage()} />
+      ) : null}
 
-        {!loading && !error ? (
-          <WorkspaceSection
-            title="Customer request register"
-            description="Submitted requests and their latest approval posture, without collapsing them into active subscription truth."
-          >
-            {rows.length === 0 ? (
-              <ERPEmptyState
-                title="No subscription requests yet"
-                description="Create a request when you want admin to review and activate a new subscription."
-                action={
-                  <ActionButton
-                    href="/customer/subscription-requests/create"
-                    variant="outline"
-                  >
-                    Create request
-                  </ActionButton>
-                }
+      {!loading && !error && rows.length === 0 ? (
+        <ERPEmptyState
+          title="No requests"
+          description={statusFilter ? `No ${statusFilter.toLowerCase()} requests.` : "You haven't submitted any subscription requests yet."}
+        />
+      ) : null}
+
+      {!loading && !error && rows.length > 0 ? (
+        <CPageSection>
+          <div className="space-y-3">
+            {rows.map((row) => <RequestCard key={row.id} row={row} />)}
+          </div>
+          {count > PAGE_SIZE ? (
+            <div className="mt-4">
+              <PaginationControls
+                count={count}
+                page={page}
+                pageSize={PAGE_SIZE}
+                numPages={numPages}
+                hasNext={hasNext}
+                hasPrevious={hasPrevious}
+                disabled={loading}
+                onPrevious={() => replacePage(Math.max(page - 1, 1))}
+                onNext={() => replacePage(page + 1)}
               />
-            ) : (
-              <div className="space-y-4">
-                {rows.map((request) => (
-                  <SubscriptionRequestCard
-                    key={request.id}
-                    request={request}
-                    href={`/customer/subscription-requests/${request.id}`}
-                  />
-                ))}
-              </div>
-            )}
-
-            {rows.length > 0 ? (
-              <div className="mt-5">
-                <PaginationControls
-                  count={count}
-                  page={page}
-                  pageSize={PAGE_SIZE}
-                  numPages={numPages}
-                  hasNext={hasNext}
-                  hasPrevious={hasPrevious}
-                  disabled={loading || refreshing}
-                  onPrevious={() => replacePage(Math.max(page - 1, 1))}
-                  onNext={() => replacePage(page + 1)}
-                />
-              </div>
-            ) : null}
-
-            <div className="mt-5">
-              <WorkspaceNotice tone="info" title="Why this register stays separate">
-                Subscription requests are intake records only. Approval or rejection remains auditable here, while actual subscription payment and EMI truth stay on the live subscription routes.
-              </WorkspaceNotice>
             </div>
-          </WorkspaceSection>
-        ) : null}
+          ) : null}
+        </CPageSection>
+      ) : null}
+
+      <div className="mt-4 rounded-2xl border border-dashed border-border bg-muted/30 px-4 py-3 text-xs text-muted-foreground">
+        A submitted request is not a live contract. Admin approval creates the real subscription, EMI schedule, and lucky draw assignment.
       </div>
-    </ERPPageShell>
+    </CustomerPageShell>
   );
 }

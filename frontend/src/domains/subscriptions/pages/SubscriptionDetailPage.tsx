@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 
-import SubscriptionContractDocument from "@/components/print/SubscriptionContractDocument";
+
 import ActionButton from "@/components/ui/ActionButton";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 
@@ -154,61 +154,6 @@ export default function AdminSubscriptionDetailPage() {
 
       {!loading && !error && subscription ? (
         <>
-          <SubscriptionContractDocument
-            audienceLabel="Contract summary for customer handover and shop operations."
-            contractReference={`SUB-${subscription.id}`}
-            subscriptionId={subscription.id}
-            statusLabel={subscription.status}
-            statusToneClassName={contractStatusToneClassName}
-            customerFields={[
-              { label: "Customer", value: customer?.name ?? "-", emphasize: true },
-              { label: "Phone", value: customer?.phone ?? "-" },
-              { label: "Product", value: product?.name ?? "-", emphasize: true },
-              { label: "Product Code", value: product?.product_code ?? "-" },
-            ]}
-            contractFields={[
-              { label: "Plan Type", value: subscription.plan_type },
-              { label: "Tenure", value: `${subscription.tenure_months} months` },
-              { label: "Start Date", value: subscription.start_date || "—" },
-              { label: "Batch", value: batch?.batch_code ?? "-" },
-              {
-                label: "Lucky Number",
-                value: luckyId
-                  ? `#${String(luckyId.lucky_number).padStart(2, "0")}`
-                  : "—",
-              },
-              { label: "Partner", value: partner?.username ?? "—" },
-            ]}
-            financialFields={[
-              {
-                label: "Monthly EMI",
-                value: formatCurrency(subscription.monthly_amount),
-                emphasize: true,
-              },
-              {
-                label: "Total Contract Value",
-                value: formatCurrency(subscription.total_amount),
-                emphasize: true,
-              },
-              { label: "Paid Amount", value: formatCurrency(totalPaid) },
-              { label: "Waived Amount", value: formatCurrency(subscription.waived_amount) },
-              {
-                label: "Remaining Exposure",
-                value: formatCurrency(remainingAmount),
-                emphasize: true,
-              },
-              {
-                label: "EMI Coverage",
-                value: `${paidEmiCount} paid · ${pendingEmiCount} pending · ${waivedEmiCount} waived`,
-              },
-            ]}
-            terms={[
-              "Product base price is treated as total contract value in this workflow.",
-              "Monthly EMI is derived from contract value and tenure months in canonical records.",
-              "Winner benefits, when applicable, waive future eligible EMI rows only.",
-            ]}
-          />
-
           <section
             className="receipt-print-hide"
             style={{

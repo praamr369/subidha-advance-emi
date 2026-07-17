@@ -177,7 +177,6 @@ def render_receipt_pdf(*, receipt) -> bytes:
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import mm
     from reportlab.pdfgen import canvas
-    from reportlab.lib import colors
 
     buf = BytesIO()
     c = canvas.Canvas(buf, pagesize=A4, pageCompression=0)
@@ -195,6 +194,19 @@ def render_receipt_pdf(*, receipt) -> bytes:
         title="Payment Receipt",
     )
 
+    def line(text: str, size: int = 10, lead: float = 13.5):
+        nonlocal cy
+        c.setFont("Helvetica", size)
+        c.drawString(mx, cy, text)
+        cy -= lead
+
+    def rule():
+        nonlocal cy
+        cy -= 2
+        c.setLineWidth(0.6)
+        c.line(mx, cy, width - mx, cy)
+        cy -= 10
+
     payment = getattr(receipt, "payment", None)
     customer_name = receipt.customer_name_snapshot or getattr(getattr(receipt, "customer", None), "name", "Customer")
     customer_phone = receipt.customer_phone_snapshot or getattr(getattr(receipt, "customer", None), "phone", "")
@@ -202,83 +214,23 @@ def render_receipt_pdf(*, receipt) -> bytes:
     finance_account_name = getattr(getattr(receipt, "finance_account", None), "name", None) or "N/A"
     payment_method = getattr(payment, 'method', getattr(receipt, 'payment_method', 'CASH'))
 
-    # Draw Title
-    cy -= 10
-    c.setFont("Helvetica-Bold", 16)
-    c.setFillColor(colors.HexColor("#1e293b"))
-    c.drawString(mx, cy, "PAYMENT RECEIPT")
-    cy -= 15
+    rule()
+    line("PAYMENT RECEIPT", size=13, lead=17)
+    line(f"Document Type: Payment Receipt", size=10)
+    line(f"Receipt Number: {receipt_no}", size=10)
+    line(f"Issue Date: {receipt.receipt_date}", size=10)
+    line(f"Status: {receipt.status}", size=10)
+    line(f"Generated Timestamp: {generated_label}", size=9)
+    rule()
+    line(f"Customer: {customer_name}", size=10)
+    line(f"Phone (masked): {_mask_phone(customer_phone)}", size=10)
+    line(f"Contract/Reference: {receipt.source_reference or 'N/A'}", size=10)
+    rule()
+    line(f"Description: Payment Collection", size=10)
+    line(f"Payment Method: {payment_method}", size=10)
+    line(f"Collected By: {collected_by}", size=10)
+    line(f"Total Amount Paid: INR {receipt.amount:,.2f}", size=12)
 
-    # Draw Top Information Grid
-    c.setLineWidth(0.5)
-    c.setStrokeColor(colors.HexColor("#cbd5e1"))
-    
-    # Left Column: Receipt Info
-    c.setFont("Helvetica-Bold", 9)
-    c.setFillColor(colors.HexColor("#64748b"))
-    c.drawString(mx, cy, "RECEIPT NUMBER")
-    c.drawString(mx, cy - 25, "DATE OF ISSUE")
-    c.drawString(mx, cy - 50, "REFERENCE / CONTRACT")
-
-    c.setFont("Helvetica", 10)
-    c.setFillColor(colors.HexColor("#0f172a"))
-    c.drawString(mx, cy - 12, receipt_no)
-    c.drawString(mx, cy - 37, str(receipt.receipt_date))
-    c.drawString(mx, cy - 62, str(receipt.source_reference or 'N/A'))
-
-    # Right Column: Customer Info
-    right_col_x = width / 2
-    c.setFont("Helvetica-Bold", 9)
-    c.setFillColor(colors.HexColor("#64748b"))
-    c.drawString(right_col_x, cy, "BILLED TO")
-    c.drawString(right_col_x, cy - 37, "PHONE")
-
-    c.setFont("Helvetica", 10)
-    c.setFillColor(colors.HexColor("#0f172a"))
-    c.drawString(right_col_x, cy - 12, customer_name)
-    c.drawString(right_col_x, cy - 49, _mask_phone(customer_phone))
-
-    cy -= 85
-
-    # Payment Details Table Header
-    c.setFillColor(colors.HexColor("#f1f5f9"))
-    c.rect(mx, cy - 20, width - (2 * mx), 20, fill=1, stroke=0)
-    
-    c.setFont("Helvetica-Bold", 9)
-    c.setFillColor(colors.HexColor("#334155"))
-    c.drawString(mx + 5*mm, cy - 14, "DESCRIPTION")
-    c.drawString(mx + 60*mm, cy - 14, "PAYMENT METHOD")
-    c.drawString(mx + 105*mm, cy - 14, "COLLECTED BY")
-    c.drawRightString(width - mx - 5*mm, cy - 14, "AMOUNT (INR)")
-    
-    cy -= 45
-
-    # Payment Details Row
-    c.setFont("Helvetica", 10)
-    c.setFillColor(colors.HexColor("#0f172a"))
-    c.drawString(mx + 5*mm, cy, "Payment Collection")
-    c.drawString(mx + 60*mm, cy, str(payment_method))
-    c.drawString(mx + 105*mm, cy, collected_by)
-    c.setFont("Helvetica-Bold", 10)
-    c.drawRightString(width - mx - 5*mm, cy, f"{receipt.amount:,.2f}")
-
-    cy -= 15
-    c.setStrokeColor(colors.HexColor("#e2e8f0"))
-    c.line(mx, cy, width - mx, cy)
-
-    # Total Row
-    cy -= 25
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(width - mx - 60*mm, cy, "TOTAL PAID:")
-    c.drawRightString(width - mx - 5*mm, cy, f"INR {receipt.amount:,.2f}")
-
-    # Footer Notes
-    cy -= 40
-    c.setFont("Helvetica-Oblique", 9)
-    c.setFillColor(colors.HexColor("#64748b"))
-    c.drawString(mx, cy, f"Generated on {generated_label}.")
-    c.drawString(mx, cy - 12, "This is a computer generated receipt and does not require a physical signature.")
-    
     c.showPage()
     c.save()
     data = buf.getvalue()
@@ -572,6 +524,254 @@ def render_return_inspection_pdf(*, return_or_inspection_record) -> bytes:
     line(f"Inspector: {getattr(getattr(inspection, 'inspected_by', None), 'username', 'N/A')}", size=10)
     line(f"Receiver/Approver: {getattr(getattr(inspection, 'approved_by', None), 'username', 'N/A')}", size=10)
     line("Customer Acknowledgement / Signature: ______________________", size=10)
+
+    c.showPage()
+    c.save()
+    data = buf.getvalue()
+    buf.close()
+    return data
+
+
+def render_credit_note_pdf(*, note) -> bytes:
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.pdfgen import canvas
+    from reportlab.lib import colors
+
+    buf = BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4, pageCompression=0)
+    width, height = A4
+    mx = 16 * mm
+    cy = height - (52 * mm)
+
+    note_no = note.note_no or f"CRN-{note.id}"
+    generated_label = _draw_common_header(
+        canvas=c,
+        width=width,
+        height=height,
+        margin_x=mx,
+        document_no=note_no,
+        title="Credit Note",
+    )
+
+    original_invoice = note.original_invoice
+    customer_name = getattr(original_invoice, "customer_name_snapshot", "") or getattr(getattr(original_invoice, "customer", None), "name", "Customer")
+    customer_phone = getattr(original_invoice, "customer_phone_snapshot", "") or getattr(getattr(original_invoice, "customer", None), "phone", "")
+
+    # Draw Title
+    cy -= 10
+    c.setFont("Helvetica-Bold", 16)
+    c.setFillColor(colors.HexColor("#1e293b"))
+    c.drawString(mx, cy, "CREDIT NOTE")
+    cy -= 15
+
+    # Draw Top Information Grid
+    c.setLineWidth(0.5)
+    c.setStrokeColor(colors.HexColor("#cbd5e1"))
+    
+    # Left Column: Note Info
+    c.setFont("Helvetica-Bold", 9)
+    c.setFillColor(colors.HexColor("#64748b"))
+    c.drawString(mx, cy, "CREDIT NOTE NUMBER")
+    c.drawString(mx, cy - 25, "DATE OF ISSUE")
+    c.drawString(mx, cy - 50, "ORIGINAL INVOICE")
+
+    c.setFont("Helvetica", 10)
+    c.setFillColor(colors.HexColor("#0f172a"))
+    c.drawString(mx, cy - 12, note_no)
+    c.drawString(mx, cy - 37, str(note.note_date))
+    c.drawString(mx, cy - 62, str(getattr(original_invoice, "document_no", "N/A")))
+
+    # Right Column: Customer Info
+    right_col_x = width / 2
+    c.setFont("Helvetica-Bold", 9)
+    c.setFillColor(colors.HexColor("#64748b"))
+    c.drawString(right_col_x, cy, "BILLED TO")
+    c.drawString(right_col_x, cy - 37, "PHONE")
+
+    c.setFont("Helvetica", 10)
+    c.setFillColor(colors.HexColor("#0f172a"))
+    c.drawString(right_col_x, cy - 12, customer_name)
+    c.drawString(right_col_x, cy - 49, _mask_phone(customer_phone))
+
+    cy -= 85
+
+    # Details Table Header
+    c.setFillColor(colors.HexColor("#f1f5f9"))
+    c.rect(mx, cy - 20, width - (2 * mx), 20, fill=1, stroke=0)
+    
+    c.setFont("Helvetica-Bold", 9)
+    c.setFillColor(colors.HexColor("#334155"))
+    c.drawString(mx + 5*mm, cy - 14, "DESCRIPTION")
+    c.drawString(mx + 60*mm, cy - 14, "STOCK EFFECT")
+    c.drawString(mx + 90*mm, cy - 14, "REASON")
+    c.drawRightString(width - mx - 5*mm, cy - 14, "ADJUSTMENT")
+
+    cy -= 20
+    
+    # Details Row
+    c.setFillColor(colors.HexColor("#0f172a"))
+    c.setFont("Helvetica", 10)
+    
+    cy -= 15
+    c.drawString(mx + 5*mm, cy, "Billing Adjustment")
+    c.drawString(mx + 60*mm, cy, "Yes" if note.stock_effect else "No")
+    
+    reason = (note.reason or "N/A")[:30] + ("..." if len(note.reason or "") > 30 else "")
+    c.drawString(mx + 90*mm, cy, reason)
+    
+    c.setFont("Helvetica-Bold", 10)
+    c.drawRightString(width - mx - 5*mm, cy, f"{note.total_adjustment:,.2f}")
+
+    cy -= 15
+    
+    # Bottom Border
+    c.setStrokeColor(colors.HexColor("#e2e8f0"))
+    c.line(mx, cy, width - mx, cy)
+    cy -= 15
+
+    # Total Summary
+    c.setFont("Helvetica-Bold", 10)
+    c.setFillColor(colors.HexColor("#64748b"))
+    c.drawString(width - mx - 60*mm, cy, "TAXABLE ADJUSTMENT:")
+    c.setFillColor(colors.HexColor("#0f172a"))
+    c.drawRightString(width - mx - 5*mm, cy, f"{note.taxable_adjustment:,.2f}")
+    
+    cy -= 15
+    c.setFillColor(colors.HexColor("#64748b"))
+    c.drawString(width - mx - 60*mm, cy, "TAX ADJUSTMENT:")
+    c.setFillColor(colors.HexColor("#0f172a"))
+    c.drawRightString(width - mx - 5*mm, cy, f"{note.tax_adjustment:,.2f}")
+    
+    cy -= 20
+    c.setFont("Helvetica-Bold", 12)
+    c.setFillColor(colors.HexColor("#1e293b"))
+    c.drawString(width - mx - 60*mm, cy, "TOTAL ADJUSTMENT:")
+    c.drawRightString(width - mx - 5*mm, cy, f"{note.total_adjustment:,.2f}")
+
+    c.showPage()
+    c.save()
+    data = buf.getvalue()
+    buf.close()
+    return data
+
+
+def render_debit_note_pdf(*, note) -> bytes:
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.pdfgen import canvas
+    from reportlab.lib import colors
+
+    buf = BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4, pageCompression=0)
+    width, height = A4
+    mx = 16 * mm
+    cy = height - (52 * mm)
+
+    note_no = note.note_no or f"DBN-{note.id}"
+    generated_label = _draw_common_header(
+        canvas=c,
+        width=width,
+        height=height,
+        margin_x=mx,
+        document_no=note_no,
+        title="Debit Note",
+    )
+
+    original_invoice = note.original_invoice
+    customer_name = getattr(original_invoice, "customer_name_snapshot", "") or getattr(getattr(original_invoice, "customer", None), "name", "Customer")
+    customer_phone = getattr(original_invoice, "customer_phone_snapshot", "") or getattr(getattr(original_invoice, "customer", None), "phone", "")
+
+    # Draw Title
+    cy -= 10
+    c.setFont("Helvetica-Bold", 16)
+    c.setFillColor(colors.HexColor("#1e293b"))
+    c.drawString(mx, cy, "DEBIT NOTE")
+    cy -= 15
+
+    # Draw Top Information Grid
+    c.setLineWidth(0.5)
+    c.setStrokeColor(colors.HexColor("#cbd5e1"))
+    
+    # Left Column: Note Info
+    c.setFont("Helvetica-Bold", 9)
+    c.setFillColor(colors.HexColor("#64748b"))
+    c.drawString(mx, cy, "DEBIT NOTE NUMBER")
+    c.drawString(mx, cy - 25, "DATE OF ISSUE")
+    c.drawString(mx, cy - 50, "ORIGINAL INVOICE")
+
+    c.setFont("Helvetica", 10)
+    c.setFillColor(colors.HexColor("#0f172a"))
+    c.drawString(mx, cy - 12, note_no)
+    c.drawString(mx, cy - 37, str(note.note_date))
+    c.drawString(mx, cy - 62, str(getattr(original_invoice, "document_no", "N/A")))
+
+    # Right Column: Customer Info
+    right_col_x = width / 2
+    c.setFont("Helvetica-Bold", 9)
+    c.setFillColor(colors.HexColor("#64748b"))
+    c.drawString(right_col_x, cy, "BILLED TO")
+    c.drawString(right_col_x, cy - 37, "PHONE")
+
+    c.setFont("Helvetica", 10)
+    c.setFillColor(colors.HexColor("#0f172a"))
+    c.drawString(right_col_x, cy - 12, customer_name)
+    c.drawString(right_col_x, cy - 49, _mask_phone(customer_phone))
+
+    cy -= 85
+
+    # Details Table Header
+    c.setFillColor(colors.HexColor("#f1f5f9"))
+    c.rect(mx, cy - 20, width - (2 * mx), 20, fill=1, stroke=0)
+    
+    c.setFont("Helvetica-Bold", 9)
+    c.setFillColor(colors.HexColor("#334155"))
+    c.drawString(mx + 5*mm, cy - 14, "DESCRIPTION")
+    c.drawString(mx + 60*mm, cy - 14, "STOCK EFFECT")
+    c.drawString(mx + 90*mm, cy - 14, "REASON")
+    c.drawRightString(width - mx - 5*mm, cy - 14, "ADJUSTMENT")
+
+    cy -= 20
+    
+    # Details Row
+    c.setFillColor(colors.HexColor("#0f172a"))
+    c.setFont("Helvetica", 10)
+    
+    cy -= 15
+    c.drawString(mx + 5*mm, cy, "Billing Adjustment")
+    c.drawString(mx + 60*mm, cy, "Yes" if note.stock_effect else "No")
+    
+    reason = (note.reason or "N/A")[:30] + ("..." if len(note.reason or "") > 30 else "")
+    c.drawString(mx + 90*mm, cy, reason)
+    
+    c.setFont("Helvetica-Bold", 10)
+    c.drawRightString(width - mx - 5*mm, cy, f"{note.total_adjustment:,.2f}")
+
+    cy -= 15
+    
+    # Bottom Border
+    c.setStrokeColor(colors.HexColor("#e2e8f0"))
+    c.line(mx, cy, width - mx, cy)
+    cy -= 15
+
+    # Total Summary
+    c.setFont("Helvetica-Bold", 10)
+    c.setFillColor(colors.HexColor("#64748b"))
+    c.drawString(width - mx - 60*mm, cy, "TAXABLE ADJUSTMENT:")
+    c.setFillColor(colors.HexColor("#0f172a"))
+    c.drawRightString(width - mx - 5*mm, cy, f"{note.taxable_adjustment:,.2f}")
+    
+    cy -= 15
+    c.setFillColor(colors.HexColor("#64748b"))
+    c.drawString(width - mx - 60*mm, cy, "TAX ADJUSTMENT:")
+    c.setFillColor(colors.HexColor("#0f172a"))
+    c.drawRightString(width - mx - 5*mm, cy, f"{note.tax_adjustment:,.2f}")
+    
+    cy -= 20
+    c.setFont("Helvetica-Bold", 12)
+    c.setFillColor(colors.HexColor("#1e293b"))
+    c.drawString(width - mx - 60*mm, cy, "TOTAL ADJUSTMENT:")
+    c.drawRightString(width - mx - 5*mm, cy, f"{note.total_adjustment:,.2f}")
 
     c.showPage()
     c.save()

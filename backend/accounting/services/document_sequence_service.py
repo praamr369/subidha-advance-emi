@@ -336,7 +336,7 @@ def _sequence_row(profile: DocumentTypeProfile, *, financial_year: FinancialYear
         warnings.append(preview_error)
     status = "ready" if configured and duplicate_count == 0 else "needs_setup"
     if not configured and profile.required_for_go_live:
-        blockers.append("Required numbering profile is not configured for the active financial year.")
+        blockers.append(f"Required numbering profile '{profile.label}' is not configured for the active financial year.")
     if duplicate_count:
         status = "duplicate_risk"
         blockers.append("Duplicate issued numbers exist for this document type. Review historical data before issuing more documents.")

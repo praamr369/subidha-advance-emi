@@ -69,12 +69,10 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Profiles & Parties", "Customers", ROUTES.admin.profilesCustomers, "Customer register and identity cockpit."),
   item("Profiles & Parties", "Partners", ROUTES.admin.profilesPartners, "Partner register and identity cockpit.", {
     children: [
-      // Phase 6: partner collection requests remain here as a controlled approval queue under Partners.
-      // Approval or rejection updates request status only; no commission/payout/payment records are created
-      // from this page. Documented: kept in Profiles & Parties (not CRM & Requests) because the
-      // approve/reject action is partner-relationship-owned, not a generic inbound request queue.
-      // Partner payment requests (intake queue only) are classified under CRM & Requests (Phase 6).
-      item("Profiles & Parties", "Partner Collections", ROUTES.admin.partnersCollectionRequests, "Controlled approval queue for partner-submitted collection reports. Approve or reject request status only.", {
+      // Phase 7: Unified partner collection requests page handles both collection reports and payment intake.
+      // Approval or rejection updates request status; payment posting flows through accounting bridge (separate page).
+      // Consolidated into single page for streamlined workflow: one partner request queue, unified approval interface.
+      item("Profiles & Parties", "Collection Requests", ROUTES.admin.partnersCollectionRequests, "Unified approval queue for partner-submitted collection reports and payment requests. Review, approve, or reject.", {
         badgeSource: "queue.partner_collection_requests_pending",
       }),
     ],
@@ -111,16 +109,11 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("CRM & Requests", "KYC Re-verification Queue", ROUTES.admin.kycReverification, "KYC documents expiring soon or overdue for re-verification."),
   item("CRM & Requests", "KYC Expiry Notifications", ROUTES.admin.kycExpiryNotifications, "Preview and send email reminders to customers with expiring KYC documents."),
   item("CRM & Requests", "Customer Disputes", ROUTES.admin.crmDisputes, "Manage customer complaints and dispute resolution workflow."),
-  // Legacy aliases — now redirect to /admin/requests/* canonical paths (see next.config.ts)
-  // Phase 6: partner payment requests moved here from Profiles & Parties — intake queue only.
-  // The page links to collection workspace for review context; no payment is posted from this page.
-  item("CRM & Requests", "Partner Payment Requests", ROUTES.admin.partnerPaymentRequests, "Request intake queue for partner-submitted payment reports. No financial posting from this page.", {
-    badgeSource: "queue.partner_payment_requests_pending",
-  }),
-  // Phase 6: canonical /admin/requests/* alias routes — thin server redirects to existing legacy pages.
+  // Phase 6/7: canonical /admin/requests/* alias routes — thin server redirects to existing legacy pages.
   item("CRM & Requests", "Online Enquiries", ROUTES.admin.requestsOnlineEnquiries, "Public enquiry queue. Request intake — no procurement or payment posting from this page."),
   item("CRM & Requests", "Support", ROUTES.admin.requestsSupport, "Customer support intake. Request intake — service execution remains in Service Desk."),
   item("CRM & Requests", "Subscription Requests", ROUTES.admin.requestsSubscriptions, "Controlled approval queue for subscription requests. No silent contract/payment creation.", { badgeSource: "queue.subscription_requests_pending" }),
+  item("CRM & Requests", "Product Requests", ROUTES.admin.subscriptionRequests, "Controlled approval queue for product requests (e.g. direct sale requests).", { badgeSource: "queue.product_requests_pending" }),
 
   // ── 4. Sales & Contracts ──────────────────────────────────────────────────
   // Rent/lease contract items are included here (canonical route family:
@@ -389,7 +382,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Settings & Governance", "Business Profile", ROUTES.admin.settingsBusinessSetupProfile, "Business profile."),
   item("Settings & Governance", "Business Setup", ROUTES.admin.settingsBusinessSetup, "Fresh-start readiness, finance setup, branch/counter setup, documents, inventory onboarding."),
   item("Settings & Governance", "Business Setup Checklist", ROUTES.admin.settingsBusinessSetupChecklist, "Setup readiness checklist."),
-  item("Settings & Governance", "Business Compliance", ROUTES.admin.settingsBusinessCompliance, "Contract templates, e-sign evidence, seller-of-record, GST, stamp-duty, grievance, and direct-selling readiness controls."),
+  item("Settings & Governance", "Compliance & Policies", ROUTES.admin.settingsCompliancePolicies, "Contract templates, e-sign evidence, seller-of-record, GST, stamp-duty, grievance, and direct-selling readiness controls alongside public policies."),
   item("Settings & Governance", "Legal & GST Controls", ROUTES.admin.settingsLegalControls, "DB-backed GST mode, waiver launch status, refund SLA, partner receipt approval, KYC masking, deposit inspection, and late-charge controls."),
   item("Settings & Governance", "Counters / Cash Desks", ROUTES.admin.counters, "Cash counter and desk configuration."),
   item("Settings & Governance", "Finance Setup", ROUTES.admin.settingsFinance, "Finance setup."),
@@ -398,7 +391,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Settings & Governance", "KYC Compliance", ROUTES.admin.complianceKyc, "Free-only KYC governance across Lucky Plan, rent, lease, delivery, refunds, and winner settlement."),
   item("Settings & Governance", "Brand & Business Data Center", ROUTES.admin.brandData, "Public business profile, social links, and media reference center."),
   item("Settings & Governance", "Imports / Backups", ROUTES.admin.settingsImports, "Import, export, and readiness tools."),
-  item("Settings & Governance", "Policies", ROUTES.admin.settingsPolicies, "Policy settings."),
+
   // Audit logs were missing from navigation — added here (gap filled)
   item("Settings & Governance", "Audit Logs", ROUTES.admin.auditLogs, "System-wide audit trail."),
   item("Settings & Governance", "Audit Events", ROUTES.admin.auditEvents, "Granular audit event log."),

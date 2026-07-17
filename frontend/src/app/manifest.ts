@@ -12,8 +12,8 @@ export default function manifest(): MetadataRoute.Manifest {
     background_color: "#ffffff",
     theme_color: "#1e293b",
     icons: [
-      { src: "/brand/subidha-logo.png", sizes: "192x192", type: "image/png" },
-      { src: "/brand/subidha-logo.png", sizes: "512x512", type: "image/png" },
+      { src: "/brand/logo.png", sizes: "192x192", type: "image/png" },
+      { src: "/brand/logo.png", sizes: "512x512", type: "image/png" },
     ],
     categories: ["shopping", "finance", "business"],
     lang: "en-IN",

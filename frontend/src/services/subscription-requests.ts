@@ -74,6 +74,8 @@ export type SubscriptionRequestProductOption = {
   product_code?: string | null;
   base_price?: string;
   image?: string | null;
+  category?: string | null;
+  subcategory?: string | null;
 };
 
 export type SubscriptionRequestBatchOption = {
@@ -213,6 +215,8 @@ function normalizeOptions(payload: unknown): SubscriptionRequestOptions {
         product_code: toNullableString(row.product_code),
         base_price: toStringOrUndefined(row.base_price) ?? "0.00",
         image: resolveApiMediaUrl(toNullableString(row.image)),
+        category: toNullableString(row.category),
+        subcategory: toNullableString(row.subcategory),
       };
     }),
     batches: toArray(root.batches).map((item) => {

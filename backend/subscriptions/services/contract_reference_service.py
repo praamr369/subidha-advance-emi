@@ -717,6 +717,17 @@ def _unified_collection_fingerprint(
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
+def _split_collection_fingerprint(base_fingerprint: str, splits: list[dict]) -> str:
+    parts = [base_fingerprint]
+    for split in splits:
+        parts.append(
+            f"{q2(Decimal(str(split['amount'])))}|"
+            f"{(split.get('payment_method') or '').strip().upper()}|"
+            f"{split.get('finance_account_id')}"
+        )
+    return hashlib.sha256("||".join(parts).encode()).hexdigest()
+
+
 def direct_sale_receivable_position(sale) -> dict[str, object]:
     from billing.services.direct_sale_collection_service import (
         get_direct_sale_receivable_position,
@@ -892,12 +903,14 @@ def collect_unified_receivable(
     note: str | None = None,
     idempotency_key: str | None = None,
     contract_reference_id: int | None = None,
+    splits: list[dict] | None = None,
 ) -> tuple[dict[str, object], int]:
     from services.collection_router import route_collection
 
     source_type = (source_type or "").strip().upper()
     payment_method = (payment_method or "CASH").strip().upper()
     idem = (idempotency_key or "").strip()
+    splits = list(splits or [])
 
     fingerprint = _unified_collection_fingerprint(
         source_type=source_type,
@@ -906,25 +919,86 @@ def collect_unified_receivable(
         payment_method=payment_method,
         finance_account_id=finance_account_id,
     )
+    if splits:
+        fingerprint = _split_collection_fingerprint(fingerprint, splits)
 
-    def _dispatch() -> tuple[dict[str, object], int]:
-        result = route_collection(
+    def _dispatch_single(
+        *,
+        tender_amount,
+        tender_method: str,
+        tender_finance_account_id: int,
+        tender_reference_no: str | None,
+        tender_idempotency_key: str | None,
+    ) -> dict[str, object]:
+        return route_collection(
             source_type=source_type,
             source_id=source_id,
             collected_by=collected_by,
-            amount=amount,
-            payment_method=payment_method,
-            finance_account_id=finance_account_id,
-            reference_no=reference_no,
+            amount=tender_amount,
+            payment_method=tender_method,
+            finance_account_id=tender_finance_account_id,
+            reference_no=tender_reference_no,
             payment_date=payment_date,
             branch_id=branch_id,
             cash_counter_id=cash_counter_id,
             note=note,
             contract_reference_id=contract_reference_id,
-            idempotency_key=idem or None,
+            idempotency_key=tender_idempotency_key,
         )
-        status_code = 201 if result.get("created", True) else 200
-        return result, status_code
+
+    def _dispatch() -> tuple[dict[str, object], int]:
+        if not splits:
+            result = _dispatch_single(
+                tender_amount=amount,
+                tender_method=payment_method,
+                tender_finance_account_id=finance_account_id,
+                tender_reference_no=reference_no,
+                tender_idempotency_key=idem or None,
+            )
+            status_code = 201 if result.get("created", True) else 200
+            return result, status_code
+
+        # Split tender: post one collection per tender line atomically so a
+        # customer can pay one month (e.g. ₹100) as ₹60 CASH + ₹40 UPI.
+        with transaction.atomic():
+            tender_results: list[dict[str, object]] = []
+            for index, split in enumerate(splits, start=1):
+                split_reference = (split.get("reference_no") or "").strip() or None
+                tender_results.append(
+                    _dispatch_single(
+                        tender_amount=split["amount"],
+                        tender_method=(split.get("payment_method") or "CASH").strip().upper(),
+                        tender_finance_account_id=split["finance_account_id"],
+                        tender_reference_no=split_reference,
+                        tender_idempotency_key=f"{idem}:SPLIT{index}" if idem else None,
+                    )
+                )
+        created = any(row.get("created", True) for row in tender_results)
+        primary = dict(tender_results[0])
+        primary.update(
+            {
+                "created": created,
+                "split_payment": True,
+                "split_count": len(tender_results),
+                "splits": [
+                    {
+                        "amount": str(q2(Decimal(str(split["amount"])))),
+                        "payment_method": (split.get("payment_method") or "CASH").strip().upper(),
+                        "finance_account_id": split["finance_account_id"],
+                        "receipt_id": row.get("receipt_id"),
+                        "receipt_no": row.get("receipt_no"),
+                        "payment_id": row.get("payment_id"),
+                        "rent_lease_collection_id": row.get("rent_lease_collection_id"),
+                        "created": row.get("created", True),
+                    }
+                    for split, row in zip(splits, tender_results)
+                ],
+                "message": (
+                    f"Split collection posted successfully across {len(tender_results)} tenders."
+                ),
+            }
+        )
+        return primary, (201 if created else 200)
 
     if idem:
         with transaction.atomic():

@@ -1,18 +1,14 @@
 "use client";
-import { formatRupee } from "@/lib/utils/currency";
 
-import { RefreshCw } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ChevronRight, RefreshCw, Briefcase, Plus } from "lucide-react";
 
-import ERPEmptyState from "@/components/erp/ERPEmptyState";
-import ERPErrorState from "@/components/erp/ERPErrorState";
-import ERPLoadingState from "@/components/erp/ERPLoadingState";
-import ERPPageShell from "@/components/erp/ERPPageShell";
-import ERPSectionShell from "@/components/erp/ERPSectionShell";
-import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
-import ActionButton from "@/components/ui/ActionButton";
-import DataTable, { type Column } from "@/components/ui/DataTable";
-import { DataTableShell, DetailPanel, KpiCard, MobileSafeTable, QuickActionGrid, WorkflowCard } from "@/components/ui/operations";
+import EmptyState from "@/components/feedback/EmptyState";
+import ErrorState from "@/components/feedback/ErrorState";
+import LoadingBlock from "@/components/feedback/LoadingBlock";
+import StatusBadge from "@/components/ui/status-badge";
+import { formatRupee } from "@/lib/utils/currency";
 import { getPartnerDashboard } from "@/services/partner";
 
 type DashboardPayload = Awaited<ReturnType<typeof getPartnerDashboard>>;
@@ -43,7 +39,6 @@ type VerifiedPaymentRow = {
   reference_no: string;
 };
 
-
 function toNumber(value: unknown): number | undefined {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
@@ -66,20 +61,6 @@ function formatDate(value?: string | null): string {
     day: "2-digit",
     month: "short",
     year: "numeric",
-  });
-}
-
-function formatDateTime(value?: string | null): string {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-
-  return date.toLocaleString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
   });
 }
 
@@ -187,348 +168,148 @@ export default function PartnerCollectionsPage() {
   const verifiedPayments = dynamicCollectionsData.recentVerifiedPayments;
   const followUpQueue = dynamicCollectionsData.followUpQueue;
 
-  const approvedCount = useMemo(
-    () => requests.filter((item) => item.status.toUpperCase() === "APPROVED").length,
-    [requests]
-  );
-
-  const underReviewCount = useMemo(
-    () =>
-      requests.filter((item) => item.status.toUpperCase() === "UNDER_REVIEW").length,
-    [requests]
-  );
-
-  const submittedCount = useMemo(
-    () => requests.filter((item) => item.status.toUpperCase() === "SUBMITTED").length,
-    [requests]
-  );
-
-  const rejectedCount = useMemo(
-    () => requests.filter((item) => item.status.toUpperCase() === "REJECTED").length,
-    [requests]
-  );
-
-  const hasAnyCollectionData =
-    requests.length > 0 || verifiedPayments.length > 0 || followUpQueue.length > 0;
-
-  const requestColumns = useMemo<Column<CollectionRequestRow>[]>(
-    () => [
-      {
-        key: "subscription_code",
-        title: "Subscription",
-        render: (row) => (
-          <div className="space-y-1">
-            <div className="font-medium text-foreground">{row.subscription_code}</div>
-            <div className="text-xs text-muted-foreground">{row.customer_name}</div>
-          </div>
-        ),
-      },
-      {
-        key: "amount",
-        title: "Amount",
-        align: "right",
-        render: (row) => formatRupee(row.amount),
-      },
-      {
-        key: "method",
-        title: "Method",
-      },
-      {
-        key: "payment_date",
-        title: "Collection Date",
-        render: (row) => formatDate(row.payment_date),
-      },
-      {
-        key: "submitted_at",
-        title: "Submitted At",
-        render: (row) => formatDateTime(row.submitted_at),
-      },
-      {
-        key: "status",
-        title: "Status",
-        render: (row) => <ERPStatusBadge status={row.status} />,
-      },
-      {
-        key: "reference_no",
-        title: "Reference",
-        render: (row) => row.reference_no || "—",
-      },
-    ],
-    []
-  );
-
-  const verifiedColumns = useMemo<Column<VerifiedPaymentRow>[]>(
-    () => [
-      {
-        key: "subscription_code",
-        title: "Subscription",
-        render: (row) => (
-          <div className="space-y-1">
-            <div className="font-medium text-foreground">{row.subscription_code}</div>
-            <div className="text-xs text-muted-foreground">{row.customer_name}</div>
-          </div>
-        ),
-      },
-      {
-        key: "amount",
-        title: "Amount",
-        align: "right",
-        render: (row) => formatRupee(row.amount),
-      },
-      {
-        key: "method",
-        title: "Method",
-      },
-      {
-        key: "payment_date",
-        title: "Payment Date",
-        render: (row) => formatDate(row.payment_date),
-      },
-      {
-        key: "verified_at",
-        title: "Verified At",
-        render: (row) => formatDateTime(row.verified_at),
-      },
-      {
-        key: "reference_no",
-        title: "Reference",
-        render: (row) => row.reference_no || "—",
-      },
-    ],
-    []
-  );
+  const totalItems = requests.length + verifiedPayments.length + followUpQueue.length;
 
   return (
-    <ERPPageShell
-      eyebrow="Partner Collections"
-      title="Collection Workspace"
-      subtitle="Track submitted field collections, review progress, and the verified payment rows that become partner-visible only after controlled approval."
-      helperNote="Partner collection requests are operational intake, not final payment truth. Verified payments appear only after backend verification and admin approval complete."
-      helperTone="info"
-      breadcrumbs={[
-        { label: "Partner", href: "/partner" },
-        { label: "Collections" },
-      ]}
-      actions={[
-        {
-          label: "Submit Collection",
-          href: "/partner/collections/create",
-          variant: "primary",
-        },
-        {
-          label: "Payments",
-          href: "/partner/payments",
-          variant: "secondary",
-        },
-        {
-          label: "Customers",
-          href: "/partner/customers",
-          variant: "secondary",
-        },
-      ]}
-      stats={[
-        { label: "Submitted", value: submittedCount },
-        { label: "Under review", value: underReviewCount, tone: "warning" },
-        { label: "Approved", value: approvedCount, tone: "success" },
-        {
-          label: "Rejected",
-          value: rejectedCount,
-          tone: rejectedCount > 0 ? "danger" : "default",
-        },
-      ]}
-      statusBadge={{ label: "Partner collection scope", tone: "info" }}
-    >
+    <div className="flex flex-col p-4 space-y-5">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-foreground">Collections</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Manage field collections & payments
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/partner/collections/create"
+            className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm transition active:scale-95"
+          >
+            <Plus className="size-5" />
+          </Link>
+          <button
+            type="button"
+            onClick={() => void loadPage("refresh")}
+            disabled={refreshing}
+            className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground shadow-sm transition hover:bg-muted disabled:opacity-50"
+          >
+            <RefreshCw className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
+          </button>
+        </div>
+      </div>
+
+      {/* Stats Summary */}
+      <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <Briefcase className="size-5" />
+        </div>
+        <div>
+          <div className="text-xl font-bold text-foreground">{totalItems}</div>
+          <div className="text-xs font-medium text-muted-foreground">Recent Activities</div>
+        </div>
+      </div>
+
+      {/* Lists */}
       <div className="space-y-6">
-        <ERPSectionShell
-          title="Collection boundary"
-          description="Use this workspace to understand where a partner-submitted collection is in the pipeline without crossing into admin finance or reconciliation controls."
-          actions={
-            <ActionButton
-              variant="outline"
-              onClick={() => void loadPage("refresh")}
-              disabled={refreshing}
-              leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
-            >
-              {refreshing ? "Refreshing..." : "Refresh"}
-            </ActionButton>
-          }
-        >
-          <WorkflowCard
-            title="Refresh collections"
-            description="Reload request, follow-up, and verified-payment panels."
+        {loading ? (
+          <LoadingBlock label="Loading collections..." />
+        ) : error ? (
+          <ErrorState title="Error" description={error} onRetry={() => void loadPage("initial")} />
+        ) : totalItems === 0 ? (
+          <EmptyState
+            title="No collections found"
+            description="You have no recent collection requests or payments."
           />
-        </ERPSectionShell>
-
-        <QuickActionGrid>
-          <KpiCard label="Submitted" value={submittedCount} />
-          <KpiCard label="Under Review" value={underReviewCount} />
-          <KpiCard label="Approved" value={approvedCount} />
-          <KpiCard label="Rejected" value={rejectedCount} />
-        </QuickActionGrid>
-
-        {loading ? <ERPLoadingState label="Loading partner collections..." /> : null}
-
-        {!loading && error ? (
-          <ERPErrorState
-            title="Unable to load partner collections"
-            description={error}
-            onRetry={() => void loadPage("initial")}
-          />
-        ) : null}
-
-        {!loading && !error ? (
+        ) : (
           <>
-            {!hasAnyCollectionData ? (
-              <DetailPanel
-                title="Collection activity"
-                description="No submitted requests, verified payments, or follow-up items are currently available in this partner scope."
-              >
-                <ERPEmptyState
-                  title="No collection workflow activity"
-                  description="Create a new collection request to begin the partner collection flow."
-                  action={
-                    <ActionButton href="/partner/collections/create" variant="outline">
-                      Submit collection
-                    </ActionButton>
-                  }
-                />
-              </DetailPanel>
-            ) : (
-              <>
-                <DetailPanel
-                  title="Submitted collection requests"
-                  description="Partner-created requests waiting for review or final decision."
-                >
-                  {requests.length === 0 ? (
-                    <ERPEmptyState
-                      title="No submitted collection requests"
-                      description="No partner collection requests matched the current workspace."
-                    />
-                  ) : (
-                    <DataTableShell>
-                      <MobileSafeTable className="border-none bg-transparent">
-                        <DataTable<CollectionRequestRow>
-                          rows={requests}
-                          columns={requestColumns}
-                          rowActions={(row) => (
-                            <div className="flex flex-wrap gap-2">
-                              <ActionButton
-                                href={`/partner/collections/${row.id}`}
-                                variant="outline"
-                                className="min-h-11"
-                              >
-                                Request detail
-                              </ActionButton>
-                              {typeof row.subscription_id === "number" ? (
-                                <ActionButton
-                                  href={`/partner/collections/create?subscription=${row.subscription_id}`}
-                                  variant="outline"
-                                  className="min-h-11"
-                                >
-                                  New request
-                                </ActionButton>
-                              ) : null}
-                            </div>
-                          )}
-                        />
-                      </MobileSafeTable>
-                    </DataTableShell>
-                  )}
-                </DetailPanel>
+            {followUpQueue.length > 0 && (
+              <div className="space-y-3">
+                <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">Needs Action</h2>
+                {followUpQueue.map((row) => (
+                  <Link
+                    key={row.id}
+                    href={`/partner/collections/${row.id}`}
+                    className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20 p-4 shadow-sm transition active:scale-95"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="font-bold text-foreground truncate">{row.customer_name}</div>
+                        <div className="font-bold text-foreground">{formatRupee(row.amount)}</div>
+                      </div>
+                      <div className="mt-0.5 text-xs font-medium text-muted-foreground">{row.subscription_code} · {row.method}</div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <StatusBadge status={row.status} />
+                        {row.review_note && (
+                          <span className="text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-400 font-semibold truncate">
+                            {row.review_note}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <ChevronRight className="size-5 shrink-0 text-muted-foreground/50" />
+                  </Link>
+                ))}
+              </div>
+            )}
 
-                <DetailPanel
-                  title="Recently verified payments"
-                  description="These rows represent finalized payment visibility after approval and verification."
-                >
-                  {verifiedPayments.length === 0 ? (
-                    <ERPEmptyState
-                      title="No verified payments visible"
-                      description="No verified partner-visible payment rows are currently available."
-                    />
-                  ) : (
-                    <DataTableShell>
-                      <MobileSafeTable className="border-none bg-transparent">
-                        <DataTable<VerifiedPaymentRow>
-                          rows={verifiedPayments}
-                          columns={verifiedColumns}
-                          rowActions={(row) => (
-                            <ActionButton
-                              href={
-                                row.subscription_id
-                                  ? `/partner/payments?subscription=${row.subscription_id}`
-                                  : "/partner/payments"
-                              }
-                              variant="outline"
-                              className="min-h-11"
-                            >
-                              Open payments
-                            </ActionButton>
-                          )}
-                        />
-                      </MobileSafeTable>
-                    </DataTableShell>
-                  )}
-                </DetailPanel>
+            {requests.length > 0 && (
+              <div className="space-y-3">
+                <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">Recent Requests</h2>
+                {requests.map((row) => (
+                  <Link
+                    key={row.id}
+                    href={`/partner/collections/${row.id}`}
+                    className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm transition active:scale-95"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="font-bold text-foreground truncate">{row.customer_name}</div>
+                        <div className="font-bold text-foreground">{formatRupee(row.amount)}</div>
+                      </div>
+                      <div className="mt-0.5 text-xs font-medium text-muted-foreground">{row.subscription_code} · {row.method}</div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <StatusBadge status={row.status} />
+                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                          {formatDate(row.payment_date)}
+                        </span>
+                      </div>
+                    </div>
+                    <ChevronRight className="size-5 shrink-0 text-muted-foreground/50" />
+                  </Link>
+                ))}
+              </div>
+            )}
 
-                <DetailPanel
-                  title="Follow-up queue"
-                  description="Requests needing re-submission, trace clarification, or partner action."
-                >
-                  {followUpQueue.length === 0 ? (
-                    <ERPEmptyState
-                      title="No follow-up queue items"
-                      description="No partner follow-up items currently require action."
-                    />
-                  ) : (
-                    <DataTableShell>
-                      <MobileSafeTable className="border-none bg-transparent">
-                        <DataTable<CollectionRequestRow>
-                          rows={followUpQueue}
-                          columns={[
-                            ...requestColumns.slice(0, 2),
-                            {
-                              key: "status",
-                              title: "Status",
-                              render: (row) => <ERPStatusBadge status={row.status} />,
-                            },
-                            {
-                              key: "review_note",
-                              title: "Review Note",
-                              render: (row) => row.review_note || "—",
-                            },
-                          ]}
-                          rowActions={(row) => (
-                            <div className="flex flex-wrap gap-2">
-                              <ActionButton
-                                href={`/partner/collections/${row.id}`}
-                                variant="outline"
-                                className="min-h-11"
-                              >
-                                Request detail
-                              </ActionButton>
-                              <ActionButton
-                                href={
-                                  row.subscription_id
-                                    ? `/partner/collections/create?subscription=${row.subscription_id}`
-                                    : "/partner/collections/create"
-                                }
-                                variant="outline"
-                                className="min-h-11"
-                              >
-                                Submit new request
-                              </ActionButton>
-                            </div>
-                          )}
-                        />
-                      </MobileSafeTable>
-                    </DataTableShell>
-                  )}
-                </DetailPanel>
-              </>
+            {verifiedPayments.length > 0 && (
+              <div className="space-y-3">
+                <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">Verified Payments</h2>
+                {verifiedPayments.map((row) => (
+                  <Link
+                    key={row.id}
+                    href={row.subscription_id ? `/partner/payments?subscription=${row.subscription_id}` : "/partner/payments"}
+                    className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm transition active:scale-95"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="font-bold text-foreground truncate">{row.customer_name}</div>
+                        <div className="font-bold text-green-600 dark:text-green-500">{formatRupee(row.amount)}</div>
+                      </div>
+                      <div className="mt-0.5 text-xs font-medium text-muted-foreground">{row.subscription_code} · {row.method}</div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <StatusBadge status="VERIFIED" />
+                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                          {formatDate(row.payment_date)}
+                        </span>
+                      </div>
+                    </div>
+                    <ChevronRight className="size-5 shrink-0 text-muted-foreground/50" />
+                  </Link>
+                ))}
+              </div>
             )}
           </>
-        ) : null}
+        )}
       </div>
-    </ERPPageShell>
+    </div>
   );
 }

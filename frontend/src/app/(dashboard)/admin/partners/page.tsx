@@ -1,7 +1,7 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import DataTable from "@/components/ui/DataTable";
@@ -79,8 +79,6 @@ function normalizePartner(item: unknown): Partner {
 }
 
 export default function AdminPartnersPage() {
-  const router = useRouter();
-
   const [partners, setPartners] = useState<Partner[]>([]);
   const [query, setQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("");
@@ -250,38 +248,14 @@ export default function AdminPartnersPage() {
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
-      <div className="mb-4 flex flex-wrap gap-2.5">
+      <div className="mb-4 flex items-center gap-2">
         <button
           type="button"
           onClick={() => void loadAll("refresh")}
           disabled={refreshing}
           className="inline-flex items-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {refreshing ? "Refreshing..." : "Refresh"}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => router.push("/admin/finance/commissions")}
-          className="inline-flex items-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
-        >
-          Open Partner Commissions
-        </button>
-
-        <button
-          type="button"
-          onClick={() => router.push("/admin/partners/collection-requests")}
-          className="inline-flex items-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
-        >
-          Open Collection Requests
-        </button>
-
-        <button
-          type="button"
-          onClick={() => router.push("/admin/subscriptions")}
-          className="inline-flex items-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
-        >
-          Open Subscriptions
+          {refreshing ? "Refreshing…" : "Refresh"}
         </button>
       </div>
 
@@ -504,35 +478,24 @@ export default function AdminPartnersPage() {
                   title: "Actions",
                   render: (row) => (
                     <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => router.push(`/admin/partners/${row.id}`)}
+                      <Link
+                        href={`/admin/partners/${row.id}`}
                         className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                       >
-                        Access
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          router.push(`/admin/subscriptions?partner=${row.id}`)
-                        }
+                        View
+                      </Link>
+                      <Link
+                        href={`/admin/subscriptions?partner=${row.id}`}
                         className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                       >
                         Subscriptions
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          router.push(
-                            `/admin/finance/commissions?partner=${row.id}`
-                          )
-                        }
+                      </Link>
+                      <Link
+                        href={`/admin/finance/commissions?partner=${row.id}`}
                         className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                       >
                         Commissions
-                      </button>
+                      </Link>
                     </div>
                   ),
                 },
@@ -540,68 +503,6 @@ export default function AdminPartnersPage() {
             />
           )}
 
-          {!loading && !error && filteredPartners.length > 0 ? (
-            <section className="mt-4 rounded-xl border border-border bg-card p-4 shadow-sm">
-              <h2 className="mb-3 text-base font-semibold text-card-foreground">
-                Quick Partner Actions
-              </h2>
-
-              <div className="grid gap-3">
-                {filteredPartners.slice(0, 8).map((partner) => (
-                  <div
-                    key={partner.id}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-background p-4"
-                  >
-                    <div>
-                      <div className="font-semibold text-foreground">
-                        {partner.username}{" "}
-                        <span className="font-normal text-muted-foreground">
-                          ({partner.phone || "No phone"})
-                        </span>
-                      </div>
-                      <div className="mt-1 text-sm text-muted-foreground">
-                        Active subscriptions: {partner.active_subscriptions} •
-                        Referred customers: {partner.referred_customers} • Monthly
-                        book: {formatCurrency(partner.total_monthly_book)}
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => router.push(`/admin/partners/${partner.id}`)}
-                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                      >
-                        Access
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          router.push(`/admin/subscriptions?partner=${partner.id}`)
-                        }
-                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                      >
-                        View Subscriptions
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          router.push(
-                            `/admin/finance/commissions?partner=${partner.id}`
-                          )
-                        }
-                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                      >
-                        View Commissions
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          ) : null}
         </>
       ) : null}
     </ERPPageShell>

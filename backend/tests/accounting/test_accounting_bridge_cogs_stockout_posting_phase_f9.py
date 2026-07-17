@@ -119,6 +119,9 @@ class AccountingBridgeCogsStockOutPostingPhaseF9Tests(APITestCase):
         self.assertTrue(candidate["can_post"])
 
     def test_missing_cost_is_deferred_and_non_postable(self):
+        # No snapshot evidence AND no persisted cost basis at all (no purchase
+        # bills, zero standard cost) => COGS must stay deferred.
+        InventoryItem.objects.filter(pk=self.item.pk).update(standard_unit_cost=Decimal("0.00"))
         row = self._stock_out(cost_snapshot=False)
         response = self.client.get("/api/v1/admin/accounting/bridge-reconciliation/?source_model=StockLedger")
         candidate = next(item for item in response.data["results"] if item.get("source_pk") == row.id)
@@ -126,6 +129,18 @@ class AccountingBridgeCogsStockOutPostingPhaseF9Tests(APITestCase):
         self.assertFalse(candidate["can_post"])
         post = self.client.post(f"/api/v1/admin/accounting/bridge-reconciliation/candidates/stockledger:{row.id}:deferred_cogs/post/", {"idempotency_key": "x", "confirm": True}, format="json")
         self.assertEqual(post.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_missing_snapshot_falls_back_to_weighted_average_cost(self):
+        # Snapshot evidence missing, but the item has a persisted cost basis:
+        # the weighted-average valuation policy supplies COGS and the candidate
+        # becomes READY instead of deferring forever.
+        row = self._stock_out(cost_snapshot=False)
+        response = self.client.get("/api/v1/admin/accounting/bridge-reconciliation/?source_model=StockLedger")
+        candidate = next(item for item in response.data["results"] if item.get("source_pk") == row.id)
+        self.assertEqual(candidate["event_key"], "cogs_sale_delivery")
+        self.assertEqual(candidate["unit_cost"], "500.00")
+        self.assertEqual(candidate["cogs_amount"], "1000.00")
+        self.assertTrue(candidate["can_post"])
 
     def test_preview_is_read_only_balanced_and_does_not_consume_numbering(self):
         row = self._stock_out()
@@ -213,7 +228,29 @@ class AccountingBridgeCogsStockOutPostingPhaseF9Tests(APITestCase):
 
     def test_batch_post_verify_and_reconciliation_diagnostics(self):
         row = self._stock_out()
-        deferred = self._stock_out(cost_snapshot=False)
+        deferred_item = InventoryItem.objects.create(
+            product=create_product(name="F9 Chair", product_code="F9-CHAIR-001", base_price=Decimal("1000.00")),
+            sku="F9-CHAIR-SKU",
+            stock_item_type=InventoryItemType.FINISHED_GOOD,
+            stock_tracking_enabled=True,
+            opening_stock_qty=Decimal("0.000"),
+            reorder_level_qty=Decimal("0.000"),
+            standard_unit_cost=Decimal("0.00"),
+            default_stock_location=self.location,
+        )
+        deferred_line = self._invoice_line(cost_snapshot=False)
+        BillingInvoiceLine.objects.filter(pk=deferred_line.pk).update(inventory_item=deferred_item)
+        deferred = StockLedger.objects.create(
+            inventory_item=deferred_item,
+            movement_type=StockMovementType.SALE_OUT,
+            quantity_in=Decimal("0.000"),
+            quantity_out=Decimal("2.000"),
+            movement_date=self.today,
+            stock_location=self.location,
+            reference_model="BillingInvoiceLine",
+            reference_id=f"{deferred_line.invoice_id}:{deferred_line.id}",
+            notes="F9 deferred COGS stock-out",
+        )
         run = ReconciliationRun.objects.create(run_no=next_reconciliation_run_no(), scope="PHASE_F9_TEST", module="ACCOUNTING_BRIDGE", date_from=row.movement_date, date_to=row.movement_date, status=ReconciliationRunStatus.RUNNING, started_by=self.admin)
         run_accounting_bridge_checks(run=run, totals={"checked": 0, "matched": 0, "exceptions": 0, "high_risk": 0})
         self.assertTrue(ReconciliationItem.objects.filter(run=run, source_type="StockLedger", source_id=str(row.id), exception_code="STOCK_LEDGER_MISSING_ACCOUNTING_BRIDGE_POSTING").exists())

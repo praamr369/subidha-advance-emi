@@ -247,6 +247,10 @@ export type PartnerCollectionRequest = {
   status?: string;
   reference_no?: string | null;
   review_note?: string | null;
+  is_flagged_bad?: boolean;
+  flag_reason?: string | null;
+  flagged_at?: string | null;
+  flagged_by_username?: string | null;
 };
 
 export type PartnerCollectionRequestDetail = PartnerCollectionRequest & {
@@ -898,6 +902,27 @@ export async function changePartnerUsername(
 ): Promise<UsernameChangeResponse> {
   return apiFetch<UsernameChangeResponse>("/partner/profile/username/", {
     method: "PATCH",
+    body: payload,
+  });
+}
+
+export type PartnerPasswordChangePayload = {
+  current_password: string;
+  new_password: string;
+  confirm_password: string;
+};
+
+export type PartnerPasswordChangeResponse = {
+  changed: boolean;
+  detail: string;
+  requires_relogin: boolean;
+};
+
+export async function changePartnerPassword(
+  payload: PartnerPasswordChangePayload
+): Promise<PartnerPasswordChangeResponse> {
+  return apiFetch<PartnerPasswordChangeResponse>("/partner/profile/change-password/", {
+    method: "POST",
     body: payload,
   });
 }

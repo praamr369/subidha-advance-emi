@@ -247,7 +247,7 @@ function SubscriptionWorkflowLanding() {
         { href: ROUTES.admin.subscriptionsAdvanceEmiCreate, label: "Create Advance EMI", variant: "primary" },
         { href: ROUTES.admin.subscriptionsRentCreate, label: "Create Rent", variant: "secondary" },
         { href: ROUTES.admin.subscriptionsLeaseCreate, label: "Create Lease", variant: "secondary" },
-        { href: ROUTES.admin.subscriptionRequests, label: "Subscription Requests", variant: "secondary" },
+        { href: ROUTES.admin.subscriptionRequests, label: "Product Requests", variant: "secondary" },
       ]}
       statusBadge={{ label: "Contract Source Workflow", tone: "info" }}
     >

@@ -38,6 +38,8 @@ export type BusinessProfile = {
   legal_name: string;
   trade_name?: string;
   business_code?: string;
+  business_type?: string;
+  year_of_establishment?: number | null;
   primary_email?: string;
   primary_phone?: string;
   alternate_phone?: string;
@@ -52,6 +54,18 @@ export type BusinessProfile = {
   country?: string;
   gstin?: string;
   pan_number?: string;
+  cin_number?: string;
+  tan_number?: string;
+  udyam_number?: string;
+  trade_license_number?: string;
+  shop_act_number?: string;
+  authorized_signatory_name?: string;
+  authorized_signatory_designation?: string;
+  bank_name?: string;
+  bank_account_number?: string;
+  bank_ifsc_code?: string;
+  bank_branch?: string;
+  upi_id?: string;
   invoice_prefix?: string;
   receipt_prefix?: string;
   default_currency_code?: string;
@@ -121,6 +135,8 @@ export async function listBackupJobs(): Promise<{ jobs: Array<Record<string, unk
 export async function getRestorePreview(payload: { restore_type?: "FULL_BACKUP_RESTORE_PREVIEW" | "SELECTED_SCOPE_RESTORE_PREVIEW" | "SETUP_SNAPSHOT_RESTORE_PREVIEW" | "LOCAL_SANDBOX_RESTORE_PREVIEW"; backup_job_id?: number; scopes?: string[]; snapshot_payload?: Record<string, unknown>; preserve_admin_username?: string }): Promise<Record<string, unknown>> { return apiFetch<Record<string, unknown>>("/admin/business-setup/restore/preview/", { method: "POST", body: payload }); }
 export async function executeRestore(payload: { restore_job_id: number; confirmation_phrase: string }): Promise<Record<string, unknown>> { return apiFetch<Record<string, unknown>>("/admin/business-setup/restore/", { method: "POST", body: payload }); }
 export async function listRestoreJobs(): Promise<{ jobs: Array<Record<string, unknown>> }> { return apiFetch<{ jobs: Array<Record<string, unknown>> }>("/admin/business-setup/restore-jobs/"); }
+
+export async function getServerDate(): Promise<{ server_date: string; server_datetime: string }> { return apiFetch<{ server_date: string; server_datetime: string }>("/admin/server-date/"); }
 
 export type PolicyGovernanceSeedResult = { status: string; seed_result?: Record<string, unknown>; public_published?: number; internal_accepted?: number; skipped?: number; errors?: string[]; safety_contract?: string };
 export async function previewSeedPolicyGovernance(): Promise<Record<string, unknown>> { return apiFetch<Record<string, unknown>>("/admin/setup/seed-policy-governance/"); }

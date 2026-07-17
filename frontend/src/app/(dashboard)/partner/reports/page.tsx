@@ -2,18 +2,11 @@
 import { formatRupee } from "@/lib/utils/currency";
 
 import { useEffect, useMemo, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Download, FileText, IndianRupee, Clock, TrendingUp } from "lucide-react";
 
-import ERPEmptyState from "@/components/erp/ERPEmptyState";
-import ERPErrorState from "@/components/erp/ERPErrorState";
-import ERPLoadingState from "@/components/erp/ERPLoadingState";
-import ERPPageShell from "@/components/erp/ERPPageShell";
-import ActionButton from "@/components/ui/ActionButton";
-import DataTable, { type Column } from "@/components/ui/DataTable";
-import { MobileSafeTable } from "@/components/ui/operations";
-import StatCard from "@/components/ui/StatCard";
-import { WorkspaceNotice } from "@/components/ui/role-workspace";
-import { WorkspaceSection } from "@/components/ui/workspace";
+import EmptyState from "@/components/feedback/EmptyState";
+import ErrorState from "@/components/feedback/ErrorState";
+import LoadingBlock from "@/components/feedback/LoadingBlock";
 import { downloadAuthenticatedFile } from "@/lib/export/auth-download";
 import {
   getPartnerDashboard,
@@ -31,7 +24,6 @@ type TrendRow = {
   commission_amount: string;
 };
 
-
 function moneyValue(value: string | number | null | undefined): string {
   if (value === null || value === undefined) {
     return "—";
@@ -46,13 +38,6 @@ function metricValue(value: number | string | null | undefined): string {
   return String(value);
 }
 
-function toErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message.trim()) {
-    return error.message;
-  }
-  return "Failed to load partner reports.";
-}
-
 function formatPeriod(year?: number | null, month?: number | null): string {
   if (!year || !month) return "Unknown period";
   return new Date(year, month - 1, 1).toLocaleDateString("en-IN", {
@@ -64,9 +49,7 @@ function formatPeriod(year?: number | null, month?: number | null): string {
 export default function PartnerReportsPage() {
   const [dashboard, setDashboard] = useState<PartnerDashboardResponse | null>(null);
   const [earnings, setEarnings] = useState<PartnerEarningsSummary | null>(null);
-  const [statementStatus, setStatementStatus] = useState<
-    "" | "PENDING" | "SETTLED" | "REVERSED"
-  >("");
+  const [statementStatus, setStatementStatus] = useState<"" | "PENDING" | "SETTLED" | "REVERSED">("");
   const [statementDateFrom, setStatementDateFrom] = useState("");
   const [statementDateTo, setStatementDateTo] = useState("");
   const [exportingFormat, setExportingFormat] = useState<"csv" | "pdf" | null>(null);
@@ -88,7 +71,7 @@ export default function PartnerReportsPage() {
       setEarnings(earningsPayload);
       setError(null);
     } catch (err) {
-      setError(toErrorMessage(err));
+      setError(err instanceof Error ? err.message : "Failed to load partner reports.");
       setDashboard(null);
       setEarnings(null);
     } finally {
@@ -143,21 +126,6 @@ export default function PartnerReportsPage() {
     return Array.from(grouped.values()).sort((a, b) => b.sort_key.localeCompare(a.sort_key));
   }, [earnings]);
 
-  const selectedRangeLabel = useMemo(() => {
-    if (statementDateFrom && statementDateTo) {
-      return `${statementDateFrom} → ${statementDateTo}`;
-    }
-    if (statementDateFrom) return `From ${statementDateFrom}`;
-    if (statementDateTo) return `Until ${statementDateTo}`;
-    return "All dates";
-  }, [statementDateFrom, statementDateTo]);
-
-  function clearStatementFilters() {
-    setStatementStatus("");
-    setStatementDateFrom("");
-    setStatementDateTo("");
-  }
-
   async function handleExport(format: "csv" | "pdf") {
     setExportingFormat(format);
     setExportError(null);
@@ -173,273 +141,169 @@ export default function PartnerReportsPage() {
         `partner-earnings-statement.${format}`
       );
     } catch (err) {
-      setExportError(toErrorMessage(err));
+      setExportError(err instanceof Error ? err.message : "Failed to export.");
     } finally {
       setExportingFormat(null);
     }
   }
 
-  const trendColumns = useMemo<Column<TrendRow>[]>(
-    () => [
-      { key: "period", title: "Period" },
-      {
-        key: "collected_amount",
-        title: "Collected",
-        align: "right",
-        render: (row) => moneyValue(row.collected_amount),
-      },
-      {
-        key: "commission_amount",
-        title: "Commission",
-        align: "right",
-        render: (row) => moneyValue(row.commission_amount),
-      },
-    ],
-    []
-  );
-
   return (
-    <ERPPageShell
-      eyebrow="Partner Reports"
-      title="Partner Reports"
-      subtitle="Partner-scoped collection and commission report truth sourced from the live earnings and dashboard endpoints."
-      helperNote="This workspace reports only live partner-scoped data already exposed by the backend. It does not fabricate analytics or expose admin-only finance controls."
-      helperTone="info"
-      breadcrumbs={[
-        { label: "Partner", href: "/partner" },
-        { label: "Reports" },
-      ]}
-      actions={[
-        {
-          href: "/partner/payments",
-          label: "Open Payments",
-          variant: "secondary",
-        },
-        {
-          href: "/partner/commissions",
-          label: "Open Commissions",
-          variant: "primary",
-        },
-      ]}
-      stats={[
-        {
-          label: "Collected",
-          value: moneyValue(earnings?.total_collected),
-          tone: "success",
-        },
-        {
-          label: "Total Commission",
-          value: moneyValue(earnings?.total_commission),
-        },
-        {
-          label: "Pending Commission",
-          value: moneyValue(earnings?.pending_commission),
-          tone: "warning",
-        },
-        {
-          label: "Settled Commission",
-          value: moneyValue(earnings?.settled_commission),
-        },
-        {
-          label: "Latest period",
-          value: trendRows[0]?.period || "—",
-        },
-      ]}
-      statusBadge={{ label: "Partner Report Truth", tone: "info" }}
-    >
-      <div className="space-y-6">
-        <div className="flex justify-end">
-          <ActionButton
-            type="button"
-            variant="outline"
-            onClick={() => void loadPage("refresh")}
-            leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
-          >
-            {refreshing ? "Refreshing..." : "Refresh"}
-          </ActionButton>
+    <div className="flex flex-col p-4 space-y-5">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-foreground">Reports</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Collection and commission report
+          </p>
         </div>
-
-        {loading ? <ERPLoadingState label="Loading partner reports..." /> : null}
-
-        {!loading && error ? (
-          <ERPErrorState
-            title="Unable to load partner reports"
-            description={error}
-            onRetry={() => void loadPage("initial")}
-          />
-        ) : null}
-
-        {!loading && !error && (!dashboard || !earnings) ? (
-          <ERPEmptyState
-            title="No partner report data"
-            description="Partner report sources are currently empty for this scope."
-          />
-        ) : null}
-
-        {!loading && !error && dashboard && earnings ? (
-          <>
-            <WorkspaceSection
-              title="Reporting boundary"
-              description="Partner reports stay grounded in live dashboard and earnings endpoints only."
-            >
-              <WorkspaceNotice tone="info" title="No synthetic analytics">
-                Customer counts, subscription counts, pending EMI totals, collection totals, commission totals, and exported statements on this page all come from existing partner endpoints. No frontend-only rollups are introduced here.
-              </WorkspaceNotice>
-            </WorkspaceSection>
-
-            <WorkspaceSection
-              title="Operational summary"
-              description="Current partner-visible counts that support day-to-day reporting and follow-up."
-            >
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <StatCard
-                  label="Total Customers"
-                  value={metricValue(summary?.total_customers)}
-                  subtext="Partner-linked customer scope only"
-                />
-                <StatCard
-                  label="Total Subscriptions"
-                  value={metricValue(summary?.total_subscriptions)}
-                  subtext="Active, completed, won, and defaulted contracts"
-                />
-                <StatCard
-                  label="Pending EMIs"
-                  value={metricValue(summary?.pending_emis)}
-                  subtext="Current partner-scoped pending schedule rows"
-                  tone="warning"
-                />
-                <StatCard
-                  label="Waived EMIs"
-                  value={metricValue(summary?.waived_emis)}
-                  subtext="Waiver impact inside partner-owned subscriptions"
-                  tone="info"
-                />
-              </div>
-            </WorkspaceSection>
-
-            <WorkspaceSection
-              title="Earnings statement export"
-              description="Export partner-scoped commission visibility as CSV or PDF using the existing earnings export endpoint."
-            >
-              {exportError ? (
-                <div className="mb-4">
-                  <WorkspaceNotice tone="danger" title="Unable to export statement">
-                    {exportError}
-                  </WorkspaceNotice>
-                </div>
-              ) : null}
-
-              <div className="grid gap-4 xl:grid-cols-[repeat(3,minmax(0,1fr))_auto]">
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-foreground">
-                    Status
-                  </label>
-                  <select
-                    value={statementStatus}
-                    onChange={(event) =>
-                      setStatementStatus(
-                        event.target.value as "" | "PENDING" | "SETTLED" | "REVERSED"
-                      )
-                    }
-                    className="h-11 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
-                  >
-                    <option value="">All</option>
-                    <option value="PENDING">Pending</option>
-                    <option value="SETTLED">Settled</option>
-                    <option value="REVERSED">Reversed</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-foreground">
-                    From
-                  </label>
-                  <input
-                    type="date"
-                    value={statementDateFrom}
-                    onChange={(event) => setStatementDateFrom(event.target.value)}
-                    className="h-11 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
-                  />
-                </div>
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-foreground">
-                    To
-                  </label>
-                  <input
-                    type="date"
-                    value={statementDateTo}
-                    onChange={(event) => setStatementDateTo(event.target.value)}
-                    className="h-11 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
-                  />
-                </div>
-                <div className="flex flex-wrap items-end gap-2">
-                  <ActionButton
-                    type="button"
-                    variant="ghost"
-                    onClick={clearStatementFilters}
-                    disabled={exportingFormat !== null}
-                  >
-                    Clear filters
-                  </ActionButton>
-                  <ActionButton
-                    type="button"
-                    variant="outline"
-                    onClick={() => void handleExport("csv")}
-                    disabled={exportingFormat !== null}
-                    loading={exportingFormat === "csv"}
-                  >
-                    {exportingFormat === "csv" ? "Exporting..." : "CSV"}
-                  </ActionButton>
-                  <ActionButton
-                    type="button"
-                    onClick={() => void handleExport("pdf")}
-                    disabled={exportingFormat !== null}
-                    loading={exportingFormat === "pdf"}
-                  >
-                    {exportingFormat === "pdf" ? "Exporting..." : "PDF"}
-                  </ActionButton>
-                </div>
-              </div>
-
-              <div className="mt-4">
-                <WorkspaceNotice tone="default" title="Current export scope">
-                  Status: {statementStatus || "All"} · Date range: {selectedRangeLabel}
-                </WorkspaceNotice>
-              </div>
-            </WorkspaceSection>
-
-            <WorkspaceSection
-              title="Monthly collection and commission trend"
-              description="Trend rows below come directly from the partner earnings endpoint and provide route-safe drill-in to payments and commissions."
-              action={
-                <div className="flex flex-wrap gap-2">
-                  <ActionButton href="/partner/payments" variant="outline">
-                    Payments
-                  </ActionButton>
-                  <ActionButton href="/partner/commissions" variant="ghost">
-                    Commissions
-                  </ActionButton>
-                </div>
-              }
-            >
-              {trendRows.length === 0 ? (
-                <ERPEmptyState
-                  title="No report rows yet"
-                  description="No partner-scoped collection or commission history is currently available."
-                />
-              ) : (
-                <MobileSafeTable className="border-none bg-transparent">
-                  <DataTable<TrendRow>
-                    rows={trendRows}
-                    emptyText="No partner report rows."
-                    columns={trendColumns}
-                    pageSize={12}
-                  />
-                </MobileSafeTable>
-              )}
-            </WorkspaceSection>
-          </>
-        ) : null}
+        <button
+          type="button"
+          onClick={() => void loadPage("refresh")}
+          disabled={refreshing}
+          className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground shadow-sm transition hover:bg-muted disabled:opacity-50"
+        >
+          <RefreshCw className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
+        </button>
       </div>
-    </ERPPageShell>
+
+      {loading ? (
+        <LoadingBlock label="Loading reports..." />
+      ) : error ? (
+        <ErrorState title="Error" description={error} onRetry={() => void loadPage("initial")} />
+      ) : !dashboard || !earnings ? (
+        <EmptyState
+          title="No data"
+          description="Partner report sources are currently empty for this scope."
+        />
+      ) : (
+        <>
+          {/* Main Stats */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+              <div className="flex size-8 items-center justify-center rounded-full bg-success/10 text-success mb-2">
+                <IndianRupee className="size-4" />
+              </div>
+              <div className="text-sm font-medium text-muted-foreground">Collected</div>
+              <div className="text-lg font-bold text-foreground">{moneyValue(earnings?.total_collected)}</div>
+            </div>
+            <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+              <div className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-primary mb-2">
+                <TrendingUp className="size-4" />
+              </div>
+              <div className="text-sm font-medium text-muted-foreground">Commission</div>
+              <div className="text-lg font-bold text-foreground">{moneyValue(earnings?.total_commission)}</div>
+            </div>
+            <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+              <div className="flex size-8 items-center justify-center rounded-full bg-warning/10 text-warning mb-2">
+                <Clock className="size-4" />
+              </div>
+              <div className="text-sm font-medium text-muted-foreground">Pending</div>
+              <div className="text-lg font-bold text-foreground">{moneyValue(earnings?.pending_commission)}</div>
+            </div>
+            <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+              <div className="flex size-8 items-center justify-center rounded-full bg-info/10 text-info mb-2">
+                <FileText className="size-4" />
+              </div>
+              <div className="text-sm font-medium text-muted-foreground">Settled</div>
+              <div className="text-lg font-bold text-foreground">{moneyValue(earnings?.settled_commission)}</div>
+            </div>
+          </div>
+
+          {/* Operational summary */}
+          <div>
+            <h2 className="text-sm font-bold text-foreground uppercase tracking-wider mb-3">Operational Summary</h2>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center rounded-2xl border border-border bg-card p-4 shadow-sm">
+                <span className="text-sm font-medium text-muted-foreground">Total Customers</span>
+                <span className="font-bold text-foreground">{metricValue(summary?.total_customers)}</span>
+              </div>
+              <div className="flex justify-between items-center rounded-2xl border border-border bg-card p-4 shadow-sm">
+                <span className="text-sm font-medium text-muted-foreground">Total Subscriptions</span>
+                <span className="font-bold text-foreground">{metricValue(summary?.total_subscriptions)}</span>
+              </div>
+              <div className="flex justify-between items-center rounded-2xl border border-border bg-card p-4 shadow-sm">
+                <span className="text-sm font-medium text-muted-foreground">Pending EMIs</span>
+                <span className="font-bold text-warning">{metricValue(summary?.pending_emis)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Export Statement */}
+          <div className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-4">
+            <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">Export Statement</h2>
+            {exportError && <div className="text-xs text-danger">{exportError}</div>}
+            <div className="space-y-3">
+              <select
+                value={statementStatus}
+                onChange={(e) => setStatementStatus(e.target.value as any)}
+                className="h-12 w-full rounded-2xl border border-border bg-background px-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+              >
+                <option value="">All Status</option>
+                <option value="PENDING">Pending</option>
+                <option value="SETTLED">Settled</option>
+                <option value="REVERSED">Reversed</option>
+              </select>
+              <div className="flex gap-2">
+                <input
+                  type="date"
+                  value={statementDateFrom}
+                  onChange={(e) => setStatementDateFrom(e.target.value)}
+                  className="h-12 flex-1 rounded-2xl border border-border bg-background px-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                />
+                <input
+                  type="date"
+                  value={statementDateTo}
+                  onChange={(e) => setStatementDateTo(e.target.value)}
+                  className="h-12 flex-1 rounded-2xl border border-border bg-background px-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => void handleExport("csv")}
+                  disabled={exportingFormat !== null}
+                  className="h-12 flex-1 flex items-center justify-center gap-2 rounded-2xl bg-primary px-4 text-sm font-bold text-primary-foreground active:scale-95 transition disabled:opacity-50"
+                >
+                  <Download className="size-4" /> CSV
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleExport("pdf")}
+                  disabled={exportingFormat !== null}
+                  className="h-12 flex-1 flex items-center justify-center gap-2 rounded-2xl border border-border bg-background px-4 text-sm font-bold text-foreground active:scale-95 transition disabled:opacity-50"
+                >
+                  <Download className="size-4" /> PDF
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Trend rows */}
+          <div>
+            <h2 className="text-sm font-bold text-foreground uppercase tracking-wider mb-3">Monthly Trends</h2>
+            {trendRows.length === 0 ? (
+              <EmptyState title="No trend data" description="No collection or commission history available." />
+            ) : (
+              <div className="space-y-3">
+                {trendRows.map((row) => (
+                  <div key={row.id} className="rounded-2xl border border-border bg-card p-4 shadow-sm flex flex-col gap-2">
+                    <div className="font-bold text-foreground border-b border-border pb-2 mb-1">{row.period}</div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-muted-foreground font-medium">Collected</span>
+                      <span className="text-sm font-bold">{moneyValue(row.collected_amount)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-muted-foreground font-medium">Commission</span>
+                      <span className="text-sm font-bold text-primary">{moneyValue(row.commission_amount)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
   );
 }

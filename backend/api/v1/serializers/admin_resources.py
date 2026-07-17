@@ -1530,6 +1530,12 @@ class ProductAdminSerializer(serializers.ModelSerializer):
             "inventory_ready",
             "inventory_stock_tracking_enabled",
             "inventory_delivery_stock_bridge_enabled",
+            # Warranty coverage
+            "warranty_enabled",
+            "warranty_months_manufacturing",
+            "warranty_months_structural",
+            "warranty_months_extended_max",
+            "extended_warranty_cost_percentage",
             "created_at",
         ]
         read_only_fields = [

@@ -65,8 +65,11 @@ import NotificationBellDropdown from "@/components/layout/NotificationBellDropdo
 import PortalHeader from "@/components/layout/PortalHeader";
 import PortalShell from "@/components/layout/PortalShell";
 import AdminSidebarNav from "@/components/layout/AdminSidebarNav";
+import PartnerMobileBottomNav from "@/components/layout/PartnerMobileBottomNav";
+import CustomerMobileBottomNav from "@/components/layout/CustomerMobileBottomNav";
 import RoleSidebar from "@/components/layout/RoleSidebar";
 import SidebarHoverCard from "@/components/layout/SidebarHoverCard";
+import SidebarLiveStatusWidget from "@/components/layout/SidebarLiveStatusWidget";
 import BusinessSetupWorkflowBanner from "@/components/admin/business-setup/BusinessSetupWorkflowBanner";
 import WorkflowProvider from "@/components/workflows/WorkflowProvider";
 import AdminWorkspaceMenubar from "@/components/layout/AdminWorkspaceMenubar";
@@ -217,15 +220,7 @@ function parseSessionSnapshot(snapshot: string): ReturnType<typeof getStoredSess
 }
 
 function readExpandedGroups(): Record<string, boolean> {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = window.localStorage.getItem(SIDEBAR_GROUPS_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {};
-  }
+  return {};
 }
 
 function readWorkspaceWidthPresetSnapshot(): string {
@@ -640,12 +635,8 @@ function SidebarContent({
   }, [role]);
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem(SIDEBAR_GROUPS_KEY, JSON.stringify(expandedGroups));
-    } catch {
-      // Enhancement-only persistence.
-    }
-  }, [expandedGroups]);
+    // Sidebar groups are no longer persisted to allow accordion behavior to reset on fresh load.
+  }, []);
 
   const toggleGroup = useCallback(
     (title: string, defaultOpen: boolean) => {
@@ -653,10 +644,13 @@ function SidebarContent({
         setFlyoutGroup((current) => (current === title ? null : title));
         return;
       }
-      setExpandedGroups((current) => ({
-        ...current,
-        [title]: !(current[title] ?? defaultOpen),
-      }));
+      setExpandedGroups((current) => {
+        const isOpening = !(current[title] ?? defaultOpen);
+        if (isOpening) {
+          return { [title]: true };
+        }
+        return { [title]: false };
+      });
     },
     [collapsed, isMobile]
   );
@@ -860,6 +854,11 @@ function SidebarContent({
             </div>
           </div>
         </div>
+
+        <div className="mb-4">
+          <SidebarLiveStatusWidget isMobile={isMobile} collapsed={collapsed} />
+        </div>
+
         <div className="flex gap-2">
           <Link
             href={getProfileHref(role)}
@@ -1602,6 +1601,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
       <WorkflowProvider role={role}>
         <div className="relative overflow-x-clip" style={workspaceShellStyle}>
           <PortalShell
+            mainClassName={role === "PARTNER" || role === "CUSTOMER" ? "pb-16 md:pb-0" : undefined}
             sidebar={
               <RoleSidebar collapsed={sidebarCollapsed}>
                 <SidebarContent
@@ -1646,6 +1646,13 @@ export default function DashboardShell({ children }: DashboardShellProps) {
               {children}
             </>
           </PortalShell>
+
+          {role === "PARTNER" ? (
+            <PartnerMobileBottomNav pathname={pathname} onOpenMenu={openMobileMenu} />
+          ) : null}
+          {role === "CUSTOMER" ? (
+            <CustomerMobileBottomNav pathname={pathname} onOpenMenu={openMobileMenu} />
+          ) : null}
 
           <RoleSidebar mobile mobileOpen={mobileOpen} onOverlayClick={closeMobileMenu}>
             <div id="mobile-sidebar-nav">

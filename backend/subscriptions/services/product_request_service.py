@@ -188,13 +188,24 @@ def approve_product_request_for_admin(
     admin: User,
     review_note: str = "",
     create_crm_lead: bool = False,
+    pricing_override: dict | None = None,
 ) -> ProductRequest:
+    """
+    Approve a product request with optional pricing overrides.
+
+    pricing_override dict can contain:
+    - For DIRECT_SALE: unit_price (decimal)
+    - For RENT: monthly_rent_amount (decimal)
+    - For LEASE: monthly_lease_amount (decimal)
+    """
     req = ProductRequest.objects.select_for_update().get(id=request_id)
     if req.status != ProductRequestStatus.SUBMITTED:
         raise ValidationError({"detail": "Only submitted requests can be approved."})
 
     if not req.customer_id:
         raise ValidationError({"detail": "Customer must be created and linked before approval."})
+
+    pricing_override = pricing_override or {}
 
     if req.request_type == ProductRequestType.ADVANCE_EMI:
         # Create EMI Subscription
@@ -211,6 +222,11 @@ def approve_product_request_for_admin(
         req.approved_subscription = sub
     elif req.request_type == ProductRequestType.DIRECT_SALE:
         # Create Direct Sale (Draft Invoice)
+        # Support pricing override for admin review
+        unit_price = pricing_override.get("unit_price") if pricing_override else None
+        if unit_price is None:
+            unit_price = req.product.base_price
+
         sale = create_direct_sale(
             payload={
                 "customer": req.customer,
@@ -225,7 +241,7 @@ def approve_product_request_for_admin(
                     {
                         "product": req.product,
                         "quantity": 1,
-                        "unit_price": req.product.base_price,
+                        "unit_price": unit_price,
                         "tax_rate": getattr(req.product, "tax_rate", 0) if hasattr(req.product, "tax_rate") else 0,
                     }
                 ]
@@ -234,7 +250,9 @@ def approve_product_request_for_admin(
         )
         req.approved_direct_sale = sale
     elif req.request_type == ProductRequestType.RENT:
-        monthly_rent = getattr(req.product, "rental_monthly_price", req.product.base_price / 12)
+        monthly_rent = pricing_override.get("monthly_rent_amount") if pricing_override else None
+        if monthly_rent is None:
+            monthly_rent = getattr(req.product, "rental_monthly_price", req.product.base_price / 12)
         tenure_months = req.requested_tenure_months_snapshot or 12
         sub = create_rent_subscription(
             customer=req.customer,
@@ -246,7 +264,9 @@ def approve_product_request_for_admin(
         )
         req.approved_subscription = sub
     elif req.request_type == ProductRequestType.LEASE:
-        monthly_lease = getattr(req.product, "lease_monthly_price", req.product.base_price / 24)
+        monthly_lease = pricing_override.get("monthly_lease_amount") if pricing_override else None
+        if monthly_lease is None:
+            monthly_lease = getattr(req.product, "lease_monthly_price", req.product.base_price / 24)
         tenure_months = req.requested_tenure_months_snapshot or 24
         sub = create_lease_subscription(
             customer=req.customer,
@@ -458,3 +478,53 @@ def get_product_stock_status(product_id: int) -> dict:
             "product_id": product.id,
             "product_name": product.name,
         }
+
+
+def get_product_pricing_info(product_id: int) -> dict:
+    """Get pricing information for RENT/LEASE requests."""
+    try:
+        product = Product.objects.get(id=product_id)
+    except Product.DoesNotExist:
+        return {"found": False, "error": "Product not found"}
+
+    monthly_rent = getattr(product, "rental_monthly_price", product.base_price / 12)
+    monthly_lease = getattr(product, "lease_monthly_price", product.base_price / 24)
+
+    return {
+        "found": True,
+        "product_id": product.id,
+        "product_name": product.name,
+        "base_price": str(product.base_price),
+        "monthly_rent_default": str(monthly_rent),
+        "monthly_lease_default": str(monthly_lease),
+    }
+
+
+def validate_product_request_step(
+    *,
+    request_id: int,
+    request_type: str,
+    step: str,
+) -> dict:
+    """Validate that a request is ready for a specific workflow step."""
+    req = ProductRequest.objects.select_related("customer", "batch").get(id=request_id)
+
+    if step == "link_customer":
+        return {"valid": False, "message": "Customer already linked"} if req.customer_id else {"valid": True}
+
+    if step == "select_batch" and request_type == ProductRequestType.ADVANCE_EMI:
+        return {"valid": bool(req.batch_id), "message": "Batch must be selected for EMI requests"}
+
+    if step == "review":
+        if not req.customer_id:
+            return {"valid": False, "message": "Customer must be linked first"}
+        if request_type == ProductRequestType.ADVANCE_EMI and not req.batch_id:
+            return {"valid": False, "message": "Batch must be selected"}
+        return {"valid": True}
+
+    if step == "approve":
+        if req.status != ProductRequestStatus.SUBMITTED:
+            return {"valid": False, "message": "Only submitted requests can be approved"}
+        return {"valid": True}
+
+    return {"valid": False, "message": f"Unknown step: {step}"}

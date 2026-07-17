@@ -1,11 +1,20 @@
 import { apiFetch } from "@/lib/api";
 
+export type CollectionSplit = {
+  amount: string;
+  payment_method: "CASH" | "UPI" | "BANK" | "CARD";
+  finance_account_id: number;
+  reference_no?: string;
+};
+
 export type UnifiedCollectionPayload = {
   source_type: string;
   source_id: number;
   amount: string;
   payment_method: "CASH" | "UPI" | "BANK" | "CARD";
   finance_account_id: number;
+  /** Split tender: when present, amounts must sum to `amount`. */
+  splits?: CollectionSplit[];
   reference_no?: string;
   notes?: string;
   receipt_date?: string;

@@ -112,7 +112,7 @@ export default function CookiePreferencesPage() {
             ))}
           </div>
 
-          <div className="flex gap-3 mt-4">
+          <div className="flex flex-wrap gap-3 mt-4">
             <button
               onClick={() => setPrefs({ ...prefs, analytics: true, marketing: true, personalization: true })}
               className="flex-1 py-2 border rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-800"

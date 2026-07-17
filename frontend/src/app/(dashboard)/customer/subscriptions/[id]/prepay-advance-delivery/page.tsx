@@ -97,7 +97,7 @@ export default function PrepaymentPage({ params }: { params: Promise<{ id: strin
 
       {/* Contract Summary */}
       <div className="rounded-2xl border border-border bg-card p-4 mb-5">
-        <div className="grid grid-cols-2 gap-4 text-sm">
+        <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
           <div>
             <div className="text-xs text-muted-foreground">Contract Reference</div>
             <div className="font-semibold mt-1">{calc.contract_ref}</div>

@@ -1,6 +1,7 @@
 from django.urls import path
 
 from api.v1.views.catalog import (
+    CustomerCatalogDetailView,
     CustomerCatalogFacetsView,
     CustomerCatalogListView,
 )
@@ -47,6 +48,11 @@ from api.v1.views.subscription_requests import (
     CustomerSubscriptionRequestListCreateView,
     CustomerSubscriptionRequestOptionsView,
 )
+from api.v1.views.product_requests import (
+    CustomerProductRequestCancelView,
+    CustomerProductRequestListView,
+    CustomerProductRequestOptionsView,
+)
 from api.v1.views.customer_support_tickets import (
     CustomerSupportTicketCommentView,
     CustomerSupportTicketDetailView,
@@ -86,6 +92,9 @@ urlpatterns = [
     path("subscription-requests/", CustomerSubscriptionRequestListCreateView.as_view()),
     path("subscription-requests/<int:pk>/", CustomerSubscriptionRequestDetailView.as_view()),
     path("subscription-requests/<int:pk>/cancel/", CustomerSubscriptionRequestCancelView.as_view()),
+    path("product-request-options/", CustomerProductRequestOptionsView.as_view()),
+    path("product-requests/", CustomerProductRequestListView.as_view()),
+    path("product-requests/<int:pk>/cancel/", CustomerProductRequestCancelView.as_view()),
     path("deliveries/", CustomerDeliveryListView.as_view()),
     path("deliveries/<int:pk>/", CustomerDeliveryDetailView.as_view()),
     path("deliveries/<int:pk>/pdf/", CustomerDeliveryPdfView.as_view()),
@@ -116,5 +125,6 @@ urlpatterns = [
     path("support-requests/<int:pk>/", CustomerSupportRequestDetailView.as_view()),
     # Approved product catalog (browse by purpose: EMI / rent / lease / sale)
     path("catalog/", CustomerCatalogListView.as_view()),
+    path("catalog/<int:pk>/", CustomerCatalogDetailView.as_view()),
     path("catalog/facets/", CustomerCatalogFacetsView.as_view()),
 ]

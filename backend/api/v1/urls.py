@@ -159,6 +159,7 @@ urlpatterns = [
     path("manufacturing/", include("api.v1.routes.manufacturing")),
     path("billing/", include("api.v1.routes.billing")),
     path("crm/", include("api.v1.routes.crm")),
+    path("crm-pipeline/", include("api.v1.routes.crm_pipeline")),
     path("service-desk/", include("api.v1.routes.service_desk")),
     path("reminders/", include("api.v1.routes.reminders")),
     path("dashboards/", include("api.v1.routes.dashboard_surfaces")),

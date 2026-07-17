@@ -4836,6 +4836,12 @@ class BridgePostingApproval(AccountingTimeStampedModel):
 class CustomerOpeningOutstanding(AccountingTimeStampedModel):
     """Opening receivable balance migrated from a previous system (e.g. BillBook)."""
 
+    customer = models.ForeignKey(
+        "subscriptions.Customer",
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name="opening_outstandings",
+    )
     customer_name = models.CharField(max_length=150, db_index=True)
     phone = models.CharField(max_length=20, blank=True, default="")
     outstanding_amount = models.DecimalField(
@@ -4858,4 +4864,34 @@ class CustomerOpeningOutstanding(AccountingTimeStampedModel):
         ordering = ["-entry_date", "customer_name"]
 
     def __str__(self):
-        return f"{self.customer_name} — ₹{self.outstanding_amount}"
+        return f"{self.customer_name} - {self.outstanding_amount}"
+
+
+class UnifiedPayableIdempotencyStatus(models.TextChoices):
+    PENDING = "PENDING", "Pending"
+    COMPLETED = "COMPLETED", "Completed"
+
+class UnifiedPayableIdempotency(AccountingTimeStampedModel):
+    """
+    Binds an optional client idempotency key to at most one successful unified payable
+    response per user.
+    """
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="unified_payable_idempotency_keys",
+    )
+    key = models.CharField(max_length=160)
+    fingerprint = models.CharField(max_length=64)
+    status = models.CharField(
+        max_length=16,
+        choices=UnifiedPayableIdempotencyStatus.choices,
+        default=UnifiedPayableIdempotencyStatus.PENDING,
+        db_index=True,
+    )
+    response_body = models.JSONField(default=dict, blank=True)
+    response_status = models.PositiveSmallIntegerField(default=200)
+
+    class Meta:
+        db_table = "unified_payable_idempotency"
+        unique_together = (("user", "key"),)

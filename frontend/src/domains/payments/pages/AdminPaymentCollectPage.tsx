@@ -1,11 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import ERPPageShell from "@/components/erp/ERPPageShell";
 import { listBranches, listCashCounters, type BranchRecord, type CashCounterRecord } from "@/services/branch-control";
 import { listFinanceAccounts, type FinanceAccount } from "@/services/accounting";
 import UnifiedReceivableSearchPanel from "@/features/receivables/UnifiedReceivableSearchPanel";
-import { searchAdminReceivables, type UnifiedReceivableResult } from "@/services/receivables";
+import ReceivableWorkbenchPanel from "@/features/receivables/ReceivableWorkbenchPanel";
+import {
+  fetchAdminReceivableWorkbench,
+  searchAdminReceivables,
+  type ReceivableWorkbench,
+  type UnifiedReceivableResult,
+} from "@/services/receivables";
 import { normalizeApiError } from "@/services/api/errors";
 import AdminUniversalCollectForm from "@/domains/payments/components/AdminUniversalCollectForm";
 import ReceivableDetailCard from "@/features/receivables/ReceivableDetailCard";
@@ -32,6 +37,10 @@ export default function AdminPaymentCollectPage({
   const [selectedReceivable, setSelectedReceivable] = useState<UnifiedReceivableResult | null>(null);
   const [successResponse, setSuccessResponse] = useState<UnifiedCollectionResponse | null>(null);
 
+  const [workbench, setWorkbench] = useState<ReceivableWorkbench | null>(null);
+  const [workbenchLoading, setWorkbenchLoading] = useState(false);
+  const [workbenchError, setWorkbenchError] = useState<string | null>(null);
+
   useEffect(() => {
     let active = true;
     async function loadMasters() {
@@ -55,8 +64,23 @@ export default function AdminPaymentCollectPage({
 
   useEffect(() => {
     if (queryString) {
-      setSearchQuery(queryString);
-      void handleSearch(queryString);
+      let q = queryString.trim();
+      if (q.startsWith("?")) {
+        const params = new URLSearchParams(q);
+        const sub = params.get("subscription");
+        const out = params.get("outstanding");
+        
+        if (sub) {
+          q = sub;
+        } else if (out) {
+          q = `outstanding:${out}`;
+        } else {
+          q = Array.from(params.values())[0] || q;
+        }
+      }
+      
+      setSearchQuery(q);
+      void handleSearch(q);
     }
   }, [queryString]);
 
@@ -82,6 +106,16 @@ export default function AdminPaymentCollectPage({
     }
   }
 
+  function loadWorkbench(sourceType: UnifiedReceivableResult["source_type"], sourceId: number) {
+    setWorkbench(null);
+    setWorkbenchError(null);
+    setWorkbenchLoading(true);
+    fetchAdminReceivableWorkbench({ source_type: sourceType, source_id: sourceId })
+      .then((payload) => setWorkbench(payload))
+      .catch((error) => setWorkbenchError(normalizeApiError(error).message || "Unable to load customer position."))
+      .finally(() => setWorkbenchLoading(false));
+  }
+
   function handleSelectReceivable(row: UnifiedReceivableResult) {
     if (row.primary_action === "VIEW_ONLY" || row.primary_action === "DISABLED") {
       setSearchError(`Collection is disabled for this record: ${row.disabled_reason || "Read-only"}`);
@@ -90,11 +124,32 @@ export default function AdminPaymentCollectPage({
     setSearchError(null);
     setSuccessResponse(null);
     setSelectedReceivable(row);
+    if (row.source_id) {
+      loadWorkbench(row.source_type, row.source_id);
+    }
+  }
+
+  function handleSelectOtherDue(sourceType: string, sourceId: number) {
+    const match = searchResults.find(
+      (row) => row.source_type === sourceType && row.source_id === sourceId
+    );
+    if (match) {
+      handleSelectReceivable(match);
+      return;
+    }
+    // Not in current results — search by the workbench customer so the cashier can pick it.
+    const customerName = workbench?.customer?.name;
+    if (customerName) {
+      setSearchQuery(customerName);
+      void handleSearch(customerName);
+    }
   }
 
   function handleSuccess(response: UnifiedCollectionResponse) {
     setSuccessResponse(response);
     setSelectedReceivable(null);
+    setWorkbench(null);
+    setWorkbenchError(null);
     if (onCreated && response.payment_id) {
       onCreated(response.payment_id as number);
     }
@@ -106,6 +161,8 @@ export default function AdminPaymentCollectPage({
 
   function handleCancel() {
     setSelectedReceivable(null);
+    setWorkbench(null);
+    setWorkbenchError(null);
   }
 
   return (
@@ -163,9 +220,16 @@ export default function AdminPaymentCollectPage({
       />
 
       {selectedReceivable && (
-        <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
+        <div className="mt-8 space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
           <ReceivableDetailCard receivable={selectedReceivable} />
-          
+
+          <ReceivableWorkbenchPanel
+            workbench={workbench}
+            loading={workbenchLoading}
+            error={workbenchError}
+            onSelectOtherDue={handleSelectOtherDue}
+          />
+
           <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
             <div className="border-b px-6 py-4">
               <h3 className="text-lg font-semibold leading-none tracking-tight">

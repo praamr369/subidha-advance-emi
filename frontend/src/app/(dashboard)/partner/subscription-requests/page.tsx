@@ -1,274 +1,310 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { RefreshCw } from "lucide-react";
+import { ChevronRight, ClipboardList, Plus, RefreshCw } from "lucide-react";
 
-import ERPEmptyState from "@/components/erp/ERPEmptyState";
-import ERPErrorState from "@/components/erp/ERPErrorState";
-import ERPLoadingState from "@/components/erp/ERPLoadingState";
-import ActionButton from "@/components/ui/ActionButton";
-import PaginationControls from "@/components/ui/PaginationControls";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
-import TableToolbar from "@/components/ui/TableToolbar";
-import { WorkspaceNotice } from "@/components/ui/role-workspace";
-import { WorkspaceSection } from "@/components/ui/workspace";
-import SubscriptionRequestCard from "@/domains/subscription-requests/components/SubscriptionRequestCard";
+import ActionButton from "@/components/ui/ActionButton";
+import DataTable, { type Column } from "@/components/ui/DataTable";
+import { DataTableShell, MobileSafeTable } from "@/components/ui/operations";
 import {
   listSubscriptionRequests,
   type SubscriptionRequestRecord,
 } from "@/services/subscription-requests";
 
-const PAGE_SIZE = 25;
+const STATUS_COLORS: Record<string, string> = {
+  APPROVED: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+  REJECTED: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
+  SUBMITTED: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+  CANCELLED: "bg-muted text-muted-foreground",
+};
 
-type RequestStatusFilter = "" | "SUBMITTED" | "APPROVED" | "REJECTED" | "CANCELLED";
+function fmtDate(value?: string | null): string {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return value;
+  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
 
-function toErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message.trim()) {
-    return error.message;
-  }
-  return "Failed to load partner subscription requests.";
+function statusLabel(s: string): string {
+  if (s === "SUBMITTED") return "Submitted";
+  return s.charAt(0) + s.slice(1).toLowerCase();
 }
 
 export default function PartnerSubscriptionRequestsPage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-
-  const statusFilter = ((searchParams.get("status") || "").trim().toUpperCase() ||
-    "") as RequestStatusFilter;
-  const currentPage = Math.max(Number(searchParams.get("page") || 1), 1);
-
   const [rows, setRows] = useState<SubscriptionRequestRecord[]>([]);
-  const [count, setCount] = useState(0);
-  const [page, setPage] = useState(currentPage);
-  const [numPages, setNumPages] = useState(0);
-  const [hasNext, setHasNext] = useState(false);
-  const [hasPrevious, setHasPrevious] = useState(false);
-  const [statusInput, setStatusInput] = useState<RequestStatusFilter>(statusFilter);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState("");
 
-  useEffect(() => {
-    setStatusInput(statusFilter);
-    setPage(currentPage);
-  }, [statusFilter, currentPage]);
+  const load = useCallback(async (mode: "initial" | "refresh" = "initial") => {
+    if (mode === "initial") setLoading(true);
+    else setRefreshing(true);
+    try {
+      const res = await listSubscriptionRequests("partner", {
+        status: statusFilter || undefined,
+        pageSize: 50,
+      });
+      setRows(Array.isArray(res.results) ? res.results : []);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load requests.");
+      setRows([]);
+    } finally {
+      if (mode === "initial") setLoading(false);
+      else setRefreshing(false);
+    }
+  }, [statusFilter]);
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (mode === "initial") setLoading(true);
-      else setRefreshing(true);
+  useEffect(() => { void load("initial"); }, [load]);
 
-      try {
-        const payload = await listSubscriptionRequests("partner", {
-          status: statusFilter || undefined,
-          page: currentPage,
-          pageSize: PAGE_SIZE,
-        });
-        setRows(payload.results);
-        setCount(payload.count);
-        setPage(payload.page);
-        setNumPages(payload.num_pages);
-        setHasNext(payload.has_next);
-        setHasPrevious(payload.has_previous);
-        setError(null);
-      } catch (err) {
-        setError(toErrorMessage(err));
-        setRows([]);
-        setCount(0);
-        setNumPages(0);
-        setHasNext(false);
-        setHasPrevious(false);
-      } finally {
-        if (mode === "initial") setLoading(false);
-        else setRefreshing(false);
-      }
+  const counts = useMemo(() => ({
+    submitted: rows.filter((r) => r.status === "SUBMITTED").length,
+    approved: rows.filter((r) => r.status === "APPROVED").length,
+    rejected: rows.filter((r) => r.status === "REJECTED").length,
+    cancelled: rows.filter((r) => r.status === "CANCELLED").length,
+  }), [rows]);
+
+  const columns = useMemo<Column<SubscriptionRequestRecord>[]>(() => [
+    {
+      key: "id",
+      title: "Customer / Product",
+      render: (row) => (
+        <div className="space-y-1">
+          <div className="font-medium text-foreground">
+            {row.customer_name || row.requested_customer_name || "New Customer"}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {row.customer_phone || row.requested_customer_phone || "—"}
+          </div>
+        </div>
+      ),
     },
-    [currentPage, statusFilter]
-  );
-
-  useEffect(() => {
-    void loadPage("initial");
-  }, [loadPage]);
-
-  const summary = useMemo(() => {
-    return {
-      submitted: rows.filter((row) => row.status === "SUBMITTED").length,
-      approved: rows.filter((row) => row.status === "APPROVED").length,
-      cancelled: rows.filter((row) => row.status === "CANCELLED").length,
-    };
-  }, [rows]);
-
-  function applyFilter(nextStatus: RequestStatusFilter) {
-    const next = new URLSearchParams();
-    if (nextStatus) next.set("status", nextStatus);
-    router.replace(
-      next.toString()
-        ? `/partner/subscription-requests?${next.toString()}`
-        : "/partner/subscription-requests"
-    );
-  }
-
-  function replacePage(targetPage: number) {
-    const next = new URLSearchParams();
-    if (statusFilter) next.set("status", statusFilter);
-    if (targetPage > 1) next.set("page", String(targetPage));
-    router.replace(
-      next.toString()
-        ? `/partner/subscription-requests?${next.toString()}`
-        : "/partner/subscription-requests"
-    );
-  }
+    {
+      key: "product_name",
+      title: "Product / Batch",
+      render: (row) => (
+        <div className="space-y-1">
+          <div className="text-sm text-foreground">{row.product_name || "—"}</div>
+          <div className="text-xs text-muted-foreground">{row.batch_code || "No batch"}</div>
+        </div>
+      ),
+    },
+    {
+      key: "status",
+      title: "Status",
+      render: (row) => <ERPStatusBadge status={row.status} />,
+    },
+    {
+      key: "created_at",
+      title: "Submitted On",
+      render: (row) => fmtDate(row.created_at),
+    },
+    {
+      key: "review_note",
+      title: "Admin Note",
+      render: (row) => (
+        <span className="text-xs text-muted-foreground">{row.review_note || "—"}</span>
+      ),
+    },
+  ], []);
 
   return (
     <ERPPageShell
-      eyebrow="Partner Intake"
-      title="Partner Subscription Requests"
-      subtitle="Submit and track partner-led EMI subscription intake without creating an active contract before admin approval."
-      helperNote="Partner requests remain intake records until admin approval creates the real subscription. This workspace does not expose approval shortcuts or contract-state overrides."
+      eyebrow="Partner Portal"
+      title="Subscription Requests"
+      subtitle="Submit new plan requests for your customers and track approval status from admin."
+      helperNote="Once admin approves a request, a subscription is created and linked to your partner account."
       helperTone="info"
       breadcrumbs={[
         { label: "Partner", href: "/partner" },
         { label: "Subscription Requests" },
       ]}
       actions={[
-        {
-          href: "/partner/subscription-requests/create",
-          label: "New Request",
-          variant: "primary",
-        },
-        {
-          href: "/partner/subscriptions",
-          label: "Partner Subscriptions",
-          variant: "secondary",
-        },
+        { label: "New Request", href: "/partner/subscription-requests/create", variant: "primary" },
+        { label: "My Subscriptions", href: "/partner/subscriptions", variant: "secondary" },
+        { label: "My Customers", href: "/partner/customers", variant: "secondary" },
       ]}
-      statusBadge={{ label: "Partner intake queue", tone: "info" }}
       stats={[
-        { label: "Requests", value: count },
-        { label: "Page submitted", value: summary.submitted, tone: "warning" },
-        { label: "Page approved", value: summary.approved, tone: "success" },
-        { label: "Page cancelled", value: summary.cancelled, tone: summary.cancelled > 0 ? "danger" : undefined },
+        { label: "Submitted", value: counts.submitted, tone: "default" },
+        { label: "Approved", value: counts.approved, tone: "success" },
+        { label: "Rejected", value: counts.rejected, tone: counts.rejected > 0 ? "danger" : "default" },
+        { label: "Total", value: rows.length },
       ]}
+      statusBadge={{ label: "Partner scope", tone: "info" }}
     >
-      <div className="space-y-6">
-        <WorkspaceSection
-          title="Request register controls"
-          description="Filter partner request intake by review posture and refresh the register without leaving the partner workspace."
-          action={
+      <div className="space-y-5">
+        {/* Filter bar */}
+        <div className="flex flex-wrap items-center gap-2">
+          {(["", "SUBMITTED", "APPROVED", "REJECTED", "CANCELLED"] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setStatusFilter(s)}
+              className={`h-9 rounded-full border px-4 text-xs font-bold transition ${
+                statusFilter === s
+                  ? "border-primary/40 bg-primary text-primary-foreground"
+                  : "border-border bg-card text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {s === "" ? "All" : statusLabel(s)}
+            </button>
+          ))}
+          <div className="ml-auto">
             <ActionButton
               variant="outline"
-              onClick={() => void loadPage("refresh")}
+              onClick={() => void load("refresh")}
               disabled={loading || refreshing}
               leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
             >
-              {refreshing ? "Refreshing..." : "Refresh"}
+              {refreshing ? "Refreshing…" : "Refresh"}
             </ActionButton>
-          }
-        >
-          <TableToolbar
-            footer={
-              statusFilter ? (
-                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <span className="font-semibold uppercase tracking-[0.14em]">
-                    Active filter
-                  </span>
-                  <ERPStatusBadge status={statusFilter} hideIcon />
-                </div>
-              ) : (
-                <div className="text-sm text-muted-foreground">
-                  Existing partner-visible customers and new-customer snapshots both stay in review until admin approval activates the real subscription.
-                </div>
-              )
-            }
-          >
-            <div className="grid gap-4 lg:grid-cols-[220px_auto]">
-              <select
-                value={statusInput}
-                onChange={(event) => setStatusInput(event.target.value as RequestStatusFilter)}
-                className="h-11 rounded-xl border border-border bg-background px-4 text-sm"
-              >
-                <option value="">All statuses</option>
-                <option value="SUBMITTED">Submitted</option>
-                <option value="APPROVED">Approved</option>
-                <option value="REJECTED">Rejected</option>
-                <option value="CANCELLED">Cancelled</option>
-              </select>
+          </div>
+        </div>
 
-              <div className="flex flex-wrap gap-2">
-                <ActionButton type="button" onClick={() => applyFilter(statusInput)}>
-                  Apply
-                </ActionButton>
-                <ActionButton
-                  type="button"
-                  variant="outline"
-                  onClick={() => applyFilter("")}
-                >
-                  Clear
-                </ActionButton>
+        {/* CTA banner when no requests yet */}
+        {!loading && !error && rows.length === 0 ? (
+          <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border bg-muted/30 px-6 py-10 text-center">
+            <div className="flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+              <ClipboardList className="size-7" />
+            </div>
+            <div>
+              <div className="text-base font-bold text-foreground">No subscription requests yet</div>
+              <div className="mt-1 text-sm text-muted-foreground">
+                {statusFilter
+                  ? `No requests with status "${statusLabel(statusFilter)}".`
+                  : "Submit a request to enrol a customer into a Lucky Plan product."}
               </div>
             </div>
-          </TableToolbar>
-        </WorkspaceSection>
-
-        {loading ? <ERPLoadingState label="Loading partner subscription requests..." /> : null}
-
-        {!loading && error ? (
-          <ERPErrorState
-            title="Unable to load partner subscription requests"
-            description={error}
-            onRetry={() => void loadPage("initial")}
-          />
+            {!statusFilter ? (
+              <Link
+                href="/partner/subscription-requests/create"
+                className="inline-flex h-11 items-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground transition hover:bg-primary/90 active:scale-[0.98]"
+              >
+                <Plus className="size-4" /> New Subscription Request
+              </Link>
+            ) : null}
+          </div>
         ) : null}
 
-        {!loading && !error && rows.length === 0 ? (
-          <ERPEmptyState
-            title="No partner subscription requests yet"
-            description="Create a request for a partner-visible customer or submit a new customer snapshot for admin approval."
-            action={
-              <ActionButton
-                href="/partner/subscription-requests/create"
-                variant="outline"
-              >
-                Create Request
-              </ActionButton>
-            }
-          />
+        {!loading && error ? (
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300">
+            {error}{" "}
+            <button type="button" onClick={() => void load("initial")} className="font-semibold underline">
+              Retry
+            </button>
+          </div>
+        ) : null}
+
+        {loading ? (
+          <div className="space-y-3">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-20 animate-pulse rounded-2xl border border-border bg-muted" />
+            ))}
+          </div>
         ) : null}
 
         {!loading && !error && rows.length > 0 ? (
-          <WorkspaceSection
-            title="Partner request directory"
-            description="Open a request to review approval posture, customer snapshot details, and any approved subscription linkage."
-          >
-            <div className="space-y-4">
-              {rows.map((request) => (
-                <SubscriptionRequestCard
-                  key={request.id}
-                  request={request}
-                  href={`/partner/subscription-requests/${request.id}`}
-                  showRequester
-                />
-              ))}
-
-              <WorkspaceNotice tone="info" title="Why this register stays separate">
-                Request rows show intake review posture only. They do not create live subscriptions, post payments, or bypass admin approval workflow.
-              </WorkspaceNotice>
-
-              <PaginationControls
-                count={count}
-                page={page}
-                pageSize={PAGE_SIZE}
-                numPages={numPages}
-                hasNext={hasNext}
-                hasPrevious={hasPrevious}
-                disabled={loading || refreshing}
-                onPrevious={() => replacePage(page - 1)}
-                onNext={() => replacePage(page + 1)}
-              />
+          <>
+            {/* Mobile cards */}
+            <div className="space-y-3 md:hidden">
+              {rows.map((row) => {
+                const s = row.status || "SUBMITTED";
+                const colorCls = STATUS_COLORS[s] ?? "bg-muted text-muted-foreground";
+                const hasApprovedSub = row.approved_subscription_number || row.approved_subscription_id;
+                return (
+                  <div key={row.id} className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
+                    <div className="flex items-start gap-3 p-4">
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-xs font-bold text-primary">
+                        #{row.id}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-semibold text-foreground text-sm truncate">
+                          {row.customer_name || row.requested_customer_name || "New Customer"}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-0.5 truncate">
+                          {row.product_name || "—"}
+                          {row.batch_code ? ` · ${row.batch_code}` : ""}
+                        </div>
+                        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                          <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${colorCls}`}>
+                            {statusLabel(s)}
+                          </span>
+                          <span className="text-[11px] text-muted-foreground">{fmtDate(row.created_at)}</span>
+                        </div>
+                        {row.review_note ? (
+                          <div className="mt-1.5 text-xs text-muted-foreground italic">{row.review_note}</div>
+                        ) : null}
+                      </div>
+                    </div>
+                    {hasApprovedSub ? (
+                      <div className="flex items-center gap-2 border-t border-border bg-emerald-50 dark:bg-emerald-950/20 px-4 py-2.5">
+                        <span className="text-xs text-emerald-700 dark:text-emerald-300 font-medium flex-1">
+                          Approved → {row.approved_subscription_number || `SUB-${row.approved_subscription_id}`}
+                        </span>
+                        <Link
+                          href={`/partner/subscriptions/${row.approved_subscription_id}`}
+                          className="text-xs font-bold text-primary flex items-center gap-1"
+                        >
+                          Open <ChevronRight className="size-3" />
+                        </Link>
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
             </div>
-          </WorkspaceSection>
+
+            {/* Desktop table */}
+            <div className="hidden md:block">
+              <DataTableShell>
+                <MobileSafeTable className="border-none bg-transparent">
+                  <DataTable<SubscriptionRequestRecord>
+                    rows={rows}
+                    columns={columns}
+                    rowActions={(row) => (
+                      <div className="flex flex-wrap gap-2">
+                        {row.approved_subscription_id ? (
+                          <ActionButton
+                            href={`/partner/subscriptions/${row.approved_subscription_id}`}
+                            variant="outline"
+                            className="min-h-11"
+                          >
+                            View Subscription
+                          </ActionButton>
+                        ) : null}
+                        {row.status === "SUBMITTED" ? (
+                          <ActionButton
+                            href={`/partner/subscription-requests/create`}
+                            variant="ghost"
+                            className="min-h-11"
+                          >
+                            New Request
+                          </ActionButton>
+                        ) : null}
+                      </div>
+                    )}
+                  />
+                </MobileSafeTable>
+              </DataTableShell>
+            </div>
+          </>
+        ) : null}
+
+        {/* Always-visible new request button */}
+        {!loading && rows.length > 0 ? (
+          <div className="pt-2">
+            <Link
+              href="/partner/subscription-requests/create"
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-primary/40 bg-primary/5 text-sm font-bold text-primary transition hover:bg-primary/10 active:scale-[0.98]"
+            >
+              <Plus className="size-4" />
+              Submit a New Subscription Request
+            </Link>
+          </div>
         ) : null}
       </div>
     </ERPPageShell>

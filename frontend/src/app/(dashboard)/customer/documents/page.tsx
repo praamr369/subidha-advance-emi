@@ -1,13 +1,12 @@
 "use client";
 
-import { FileDown, FileText, Award, Receipt } from "lucide-react";
+import { Award, FileDown, FileText, Receipt } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
-import ERPPageShell from "@/components/erp/ERPPageShell";
-import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import CustomerPageShell, { CPageCard, CPageSection, CPageTabs } from "@/components/layout/CustomerPageShell";
 import { apiFetch } from "@/lib/api";
 
 type ArchiveCategory = "ALL" | "AGREEMENT" | "RECEIPT" | "DRAW_CERTIFICATE";
@@ -38,29 +37,23 @@ function formatDate(value: string | null | undefined): string {
 }
 
 function categoryIcon(cat: string) {
-  if (cat === "RECEIPT") return <Receipt className="h-4 w-4 text-muted-foreground" />;
+  if (cat === "RECEIPT") return <Receipt className="h-4 w-4 text-emerald-600" />;
   if (cat === "DRAW_CERTIFICATE") return <Award className="h-4 w-4 text-amber-500" />;
   return <FileText className="h-4 w-4 text-muted-foreground" />;
 }
 
-function categoryBadge(cat: string, label: string) {
-  const cls: Record<string, string> = {
-    AGREEMENT: "bg-blue-50 text-blue-700 border-blue-200",
-    RECEIPT: "bg-green-50 text-green-700 border-green-200",
-    DRAW_CERTIFICATE: "bg-amber-50 text-amber-700 border-amber-200",
-  };
-  return (
-    <span className={`inline-block rounded border px-2 py-0.5 text-xs font-medium ${cls[cat] ?? "bg-muted text-muted-foreground border-border"}`}>
-      {label}
-    </span>
-  );
+function catBadgeCls(cat: string) {
+  if (cat === "AGREEMENT") return "bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400";
+  if (cat === "RECEIPT") return "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400";
+  if (cat === "DRAW_CERTIFICATE") return "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400";
+  return "bg-muted text-muted-foreground";
 }
 
-const TABS: { key: ArchiveCategory; label: string }[] = [
-  { key: "ALL", label: "All Documents" },
-  { key: "AGREEMENT", label: "Agreements" },
-  { key: "RECEIPT", label: "Receipts" },
-  { key: "DRAW_CERTIFICATE", label: "Draw Certificates" },
+const TABS = [
+  { value: "ALL" as ArchiveCategory, label: "All" },
+  { value: "AGREEMENT" as ArchiveCategory, label: "Agreements" },
+  { value: "RECEIPT" as ArchiveCategory, label: "Receipts" },
+  { value: "DRAW_CERTIFICATE" as ArchiveCategory, label: "Certificates" },
 ];
 
 export default function CustomerDocumentsPage() {
@@ -82,119 +75,76 @@ export default function CustomerDocumentsPage() {
     }
   }, []);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   const visible = tab === "ALL" ? entries : entries.filter((e) => e.category === tab);
 
-  const counts: Record<ArchiveCategory, number> = {
-    ALL: entries.length,
-    AGREEMENT: entries.filter((e) => e.category === "AGREEMENT").length,
-    RECEIPT: entries.filter((e) => e.category === "RECEIPT").length,
-    DRAW_CERTIFICATE: entries.filter((e) => e.category === "DRAW_CERTIFICATE").length,
-  };
-
   return (
-    <ERPPageShell
-      title="My Documents & Archive"
-      subtitle="Download your signed agreements, payment receipts, and Lucky Draw certificates."
-      breadcrumbs={[{ label: "Dashboard", href: "/customer" }, { label: "Documents" }]}
-      actions={[{ href: "/customer/account-statement", label: "Account Statement", variant: "secondary" }]}
-      headerMode="erp"
+    <CustomerPageShell
+      title="My Documents"
+      subtitle="Download your agreements, receipts, and certificates"
+      backHref="/customer"
+      backLabel="Dashboard"
     >
-      {/* Tab bar */}
-      <div className="flex flex-wrap gap-1 border-b pb-2 mb-4">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
-              tab === t.key
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-muted"
-            }`}
-          >
-            {t.label}
-            {counts[t.key] > 0 && (
-              <span className={`ml-1.5 text-xs ${tab === t.key ? "opacity-80" : "opacity-60"}`}>
-                ({counts[t.key]})
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
+      <CPageSection>
+        <CPageTabs tabs={TABS} active={tab} onChange={setTab} />
+      </CPageSection>
 
-      <ERPSectionShell
-        title={TABS.find((t) => t.key === tab)?.label ?? "Documents"}
-        description={
-          tab === "AGREEMENT"
-            ? "Your signed subscription and EMI contracts."
-            : tab === "RECEIPT"
-            ? "Payment receipts for every EMI and advance payment."
-            : tab === "DRAW_CERTIFICATE"
-            ? "Lucky Draw winner certificates issued to you."
-            : "All signed documents, receipts, and certificates in one place."
-        }
-      >
-        {loading ? <ERPLoadingState label="Loading archive…" /> : null}
-        {!loading && error ? (
-          <ERPErrorState title="Unable to load documents" message={error} onRetry={() => void load()} />
-        ) : null}
-        {!loading && !error && visible.length === 0 ? (
-          <ERPEmptyState
-            title="No documents yet"
-            description={
-              tab === "DRAW_CERTIFICATE"
-                ? "Certificates appear here when you win a Lucky Draw."
-                : "Documents will appear here once your subscription is active."
-            }
-          />
-        ) : null}
+      {loading ? <ERPLoadingState label="Loading archive…" /> : null}
+      {!loading && error ? (
+        <ERPErrorState title="Unable to load documents" description={error} onRetry={() => void load()} />
+      ) : null}
+      {!loading && !error && visible.length === 0 ? (
+        <ERPEmptyState
+          title="No documents yet"
+          description={tab === "DRAW_CERTIFICATE" ? "Certificates appear here when you win a Lucky Draw." : "Documents will appear here once your subscription is active."}
+        />
+      ) : null}
 
-        {!loading && !error && visible.length > 0 ? (
-          <div className="divide-y">
+      {!loading && !error && visible.length > 0 ? (
+        <CPageSection title={`${visible.length} document${visible.length !== 1 ? "s" : ""}`}>
+          <div className="space-y-2.5">
             {visible.map((entry) => (
-              <div key={`${entry.source_type}-${entry.source_id}`} className="flex flex-wrap items-center justify-between gap-3 py-3 px-1">
-                <div className="flex items-start gap-3 min-w-0">
+              <CPageCard key={`${entry.source_type}-${entry.source_id}`}>
+                <div className="flex items-start gap-3">
                   <div className="mt-0.5 shrink-0">{categoryIcon(entry.category)}</div>
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2 mb-0.5">
-                      <span className="text-sm font-medium">{entry.label}</span>
-                      {categoryBadge(entry.category, entry.category_label)}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <span className="text-sm font-bold text-foreground truncate">{entry.label}</span>
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${catBadgeCls(entry.category)}`}>
+                        {entry.category_label}
+                      </span>
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      Ref: {entry.reference || "—"}
-                      {entry.version ? ` · Version ${entry.version}` : ""}
+                      {entry.reference || "—"}
+                      {entry.version ? ` · v${entry.version}` : ""}
                       {" · "}
                       {formatDate(entry.date)}
                     </div>
                   </div>
                 </div>
-
                 {entry.download_url ? (
                   <a
                     href={entry.download_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"
+                    className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-background py-2.5 text-xs font-semibold text-foreground hover:bg-muted transition"
                   >
-                    <FileDown className="h-3.5 w-3.5" />
+                    <FileDown className="size-3.5" />
                     {entry.download_label}
                   </a>
                 ) : (
-                  <span className="text-xs text-muted-foreground">File not available</span>
+                  <p className="mt-3 text-xs text-muted-foreground text-center">File not available</p>
                 )}
-              </div>
+              </CPageCard>
             ))}
           </div>
-        ) : null}
-      </ERPSectionShell>
+        </CPageSection>
+      ) : null}
 
-      {/* Info note */}
-      <div className="mt-4 rounded-lg border border-border bg-muted/40 px-4 py-3 text-xs text-muted-foreground">
-        <strong>Archive policy:</strong> All documents are stored for a minimum of 7 years. If you cannot find a document, contact our Grievance Officer — we will retrieve and deliver your copy within 2 working days.
+      <div className="rounded-xl border border-dashed border-border bg-muted/30 px-4 py-3 text-xs text-muted-foreground">
+        All documents are stored for a minimum of 7 years. Can&apos;t find a document? Contact our Grievance Officer and we&apos;ll retrieve it within 2 working days.
       </div>
-    </ERPPageShell>
+    </CustomerPageShell>
   );
 }

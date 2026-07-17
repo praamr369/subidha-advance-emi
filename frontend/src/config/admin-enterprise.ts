@@ -84,7 +84,7 @@ export const ADMIN_ENTERPRISE_MODULES: AdminEnterpriseModule[] = [
       { label: "Party Directory", href: ROUTES.admin.crmParties },
       { label: "Leads", href: ROUTES.admin.leads },
       {
-        label: "Subscription Requests",
+        label: "Product Requests",
         href: ROUTES.admin.subscriptionRequests,
       },
       { label: "Customers", href: ROUTES.admin.customers },

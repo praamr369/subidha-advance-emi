@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
-import DashboardShell from "@/components/layout/DashboardShell";
-import RoleGuard from "@/components/guards/RoleGuard";
+import PartnerShellRouter from "@/components/layout/PartnerShellRouter";
 import { buildPortalMetadata } from "@/lib/portal-metadata";
 
 export const metadata: Metadata = buildPortalMetadata(
@@ -11,5 +10,5 @@ export const metadata: Metadata = buildPortalMetadata(
 );
 
 export default function PartnerLayout({ children }: { children: ReactNode }) {
-  return <RoleGuard allowedRoles={["PARTNER"]}><DashboardShell>{children}</DashboardShell></RoleGuard>;
+  return <PartnerShellRouter>{children}</PartnerShellRouter>;
 }

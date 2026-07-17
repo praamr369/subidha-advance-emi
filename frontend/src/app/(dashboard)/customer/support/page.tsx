@@ -1,16 +1,20 @@
 "use client";
 
 import Link from "next/link";
+import { HelpCircle, Plus } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
-import ERPPageShell from "@/components/erp/ERPPageShell";
-import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
-import ActionButton from "@/components/ui/ActionButton";
-import { MobileSafeTable } from "@/components/ui/operations";
+import CustomerPageShell, {
+  CPageCard,
+  CPageSection,
+  CPageStats,
+  CPageStat,
+  CPageTabs,
+} from "@/components/layout/CustomerPageShell";
 import { ROUTES } from "@/lib/routes";
 import {
   listCustomerSupportTickets,
@@ -22,17 +26,18 @@ function formatDt(v: string | null | undefined): string {
   if (!v) return "—";
   const t = Date.parse(v);
   if (Number.isNaN(t)) return v;
-  return new Date(t).toLocaleString("en-IN", {
+  return new Date(t).toLocaleDateString("en-IN", {
     day: "2-digit",
     month: "short",
     year: "numeric",
   });
 }
 
-function errMsg(e: unknown, fallback: string): string {
-  if (e instanceof Error && e.message.trim()) return e.message;
-  return fallback;
-}
+const TABS = [
+  { value: "open" as SupportTicketTab, label: "Open" },
+  { value: "waiting_customer" as SupportTicketTab, label: "My Turn" },
+  { value: "resolved" as SupportTicketTab, label: "Resolved" },
+];
 
 export default function CustomerSupportHubPage() {
   const [tab, setTab] = useState<SupportTicketTab>("open");
@@ -51,113 +56,86 @@ export default function CustomerSupportHubPage() {
     } catch (e) {
       setRows([]);
       setCount(0);
-      setError(errMsg(e, "Unable to load support tickets."));
+      setError(e instanceof Error ? e.message : "Unable to load support tickets.");
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    void load(tab);
-  }, [load, tab]);
+  useEffect(() => { void load(tab); }, [load, tab]);
 
   return (
-    <ERPPageShell
-      eyebrow="Customer Support"
-      title="Support & requests"
-      subtitle="Raise structured requests (TKT numbers) for EMI, rent, lease, delivery, payments, and general help. Operational records are never changed from this desk."
-      breadcrumbs={[
-        { label: "Customer", href: ROUTES.customer.dashboard },
-        { label: "Support" },
-      ]}
-      actions={[
-        { href: ROUTES.customer.supportNew, label: "Create New Request", variant: "primary" },
-        { href: ROUTES.customer.payments, label: "Payments", variant: "secondary" },
-      ]}
-      headerMode="erp"
+    <CustomerPageShell
+      title="Support"
+      subtitle="Raise and track requests with the shop team"
+      actions={
+        <Link
+          href={ROUTES.customer.supportNew}
+          className="flex items-center gap-1.5 rounded-xl bg-primary text-primary-foreground px-3 py-1.5 text-xs font-semibold hover:opacity-90"
+        >
+          <Plus className="size-3.5" />
+          New Request
+        </Link>
+      }
     >
-      <div className="space-y-6">
-        <div className="flex flex-wrap gap-2">
-          {(
-            [
-              ["open", "Open requests"],
-              ["waiting_customer", "Waiting for my reply"],
-              ["resolved", "Resolved"],
-            ] as const
-          ).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setTab(key)}
-              className={`min-h-11 rounded-full border px-4 py-2 text-sm touch-manipulation ${
-                tab === key
-                  ? "border-primary bg-primary/10 font-medium text-primary"
-                  : "border-border bg-[var(--surface-card)] text-muted-foreground"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+      {/* Filter tabs */}
+      <CPageSection>
+        <CPageTabs tabs={TABS} active={tab} onChange={(v) => { setTab(v); void load(v); }} />
+      </CPageSection>
 
-        {loading ? <ERPLoadingState label="Loading tickets…" /> : null}
-        {!loading && error ? (
-          <ERPErrorState title="Could not load tickets" description={error} onRetry={() => void load(tab)} />
-        ) : null}
-        {!loading && !error && rows.length === 0 ? (
-          <ERPEmptyState
-            title="No tickets in this view"
-            description="Create a request to start a tracked conversation with the shop team."
-            action={<ActionButton href={ROUTES.customer.supportNew}>Create request</ActionButton>}
-          />
-        ) : null}
-        {!loading && !error && rows.length > 0 ? (
-          <ERPSectionShell
-            title="Your tickets"
-            description={`${count} total in this filter · ticket numbers look like TKT-FY-#####`}
-          >
-            <MobileSafeTable className="border-border">
-              <table className="w-full min-w-[560px] text-left text-sm">
-                <thead className="bg-[var(--surface-muted)] text-xs uppercase text-muted-foreground">
-                  <tr>
-                    <th className="px-3 py-3">Ticket</th>
-                    <th className="px-3 py-3">Subject</th>
-                    <th className="px-3 py-3">Category</th>
-                    <th className="px-3 py-3">Priority</th>
-                    <th className="px-3 py-3">Status</th>
-                    <th className="px-3 py-3">Updated</th>
-                    <th className="px-3 py-3" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((r) => (
-                    <tr key={r.id} className="border-t border-border">
-                      <td className="px-3 py-3 font-mono text-xs">{r.ticket_no}</td>
-                      <td className="px-3 py-3">{r.subject}</td>
-                      <td className="px-3 py-3 text-muted-foreground">{r.category.replaceAll("_", " ")}</td>
-                      <td className="px-3 py-3">
-                        <ERPStatusBadge status={r.priority} label={r.priority.replaceAll("_", " ")} hideIcon />
-                      </td>
-                      <td className="px-3 py-3">
+      {loading ? <ERPLoadingState label="Loading tickets…" /> : null}
+
+      {!loading && error ? (
+        <ERPErrorState title="Could not load tickets" description={error} onRetry={() => void load(tab)} />
+      ) : null}
+
+      {!loading && !error && rows.length === 0 ? (
+        <ERPEmptyState
+          title="No tickets"
+          description={
+            tab === "open"
+              ? "You have no open support requests. Tap '+ New Request' to raise one."
+              : tab === "waiting_customer"
+                ? "No requests are waiting for your reply."
+                : "No resolved tickets yet."
+          }
+          icon={<HelpCircle className="h-10 w-10 text-muted-foreground/40" />}
+        />
+      ) : null}
+
+      {!loading && !error && rows.length > 0 ? (
+        <>
+          <CPageStats>
+            <CPageStat label="Tickets" value={count} />
+          </CPageStats>
+
+          <CPageSection title="Your requests">
+            <div className="space-y-3">
+              {rows.map((r) => (
+                <CPageCard key={r.id} href={`${ROUTES.customer.support}/${r.id}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+                        <span className="font-mono text-[10px] font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                          {r.ticket_no}
+                        </span>
                         <ERPStatusBadge status={r.status} />
-                      </td>
-                      <td className="px-3 py-3 text-muted-foreground">{formatDt(r.updated_at)}</td>
-                      <td className="px-3 py-3 text-right">
-                        <Link
-                          href={`${ROUTES.customer.support}/${r.id}`}
-                          className="inline-flex min-h-11 min-w-[4.5rem] items-center justify-end text-primary underline-offset-2 hover:underline"
-                        >
-                          View
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </MobileSafeTable>
-          </ERPSectionShell>
-        ) : null}
-      </div>
-    </ERPPageShell>
+                      </div>
+                      <p className="text-sm font-semibold text-foreground leading-snug">{r.subject}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {r.category.replaceAll("_", " ")} · {formatDt(r.updated_at)}
+                      </p>
+                    </div>
+                    <div className="shrink-0">
+                      <ERPStatusBadge status={r.priority} label={r.priority.replaceAll("_", " ")} hideIcon />
+                    </div>
+                  </div>
+                </CPageCard>
+              ))}
+            </div>
+          </CPageSection>
+        </>
+      ) : null}
+    </CustomerPageShell>
   );
 }

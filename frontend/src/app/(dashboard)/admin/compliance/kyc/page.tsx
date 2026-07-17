@@ -117,7 +117,7 @@ export default function AdminComplianceKycPage() {
         { href: ROUTES.admin.crmKyc, label: "CRM KYC queue", variant: "primary" },
         { href: ROUTES.admin.kycReverification, label: "Re-verification", variant: "secondary" },
         { href: ROUTES.admin.kycExpiryNotifications, label: "Expiry notifications", variant: "secondary" },
-        { href: ROUTES.admin.settingsBusinessCompliance, label: "Business compliance", variant: "secondary" },
+        { href: ROUTES.admin.settingsCompliancePolicies, label: "Business compliance", variant: "secondary" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
@@ -185,7 +185,7 @@ export default function AdminComplianceKycPage() {
                 <Link href={ROUTES.admin.kycExpiryNotifications} className="block rounded-lg border border-border bg-background px-3 py-2 font-medium text-foreground hover:bg-muted">
                   KYC expiry notifications
                 </Link>
-                <Link href={ROUTES.admin.settingsBusinessCompliance} className="block rounded-lg border border-border bg-background px-3 py-2 font-medium text-foreground hover:bg-muted">
+                <Link href={ROUTES.admin.settingsCompliancePolicies} className="block rounded-lg border border-border bg-background px-3 py-2 font-medium text-foreground hover:bg-muted">
                   Business compliance evidence
                 </Link>
               </div>

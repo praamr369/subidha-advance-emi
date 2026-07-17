@@ -109,8 +109,7 @@ const nextConfig: NextConfig = {
   compress: true,
   poweredByHeader: false,
   experimental: {
-    webpackBuildWorker: false,
-    optimizePackageImports: ["lucide-react"],
+    optimizePackageImports: ["lucide-react", "@tanstack/react-query"],
   },
   typescript: {
     ignoreBuildErrors: true,

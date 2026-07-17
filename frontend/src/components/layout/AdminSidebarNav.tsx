@@ -119,9 +119,9 @@ export default function AdminSidebarNav({
       <div key={`${item.href}:${item.label}:${depth}`}>
         <div
           className={cn(
-            "group/navrow relative flex min-h-[2.5rem] items-center rounded-xl transition-colors",
+            "group/navrow relative flex min-h-[2.5rem] items-center rounded-xl transition-all duration-200",
             active
-              ? "bg-[color-mix(in_oklab,var(--sidebar-primary)_16%,transparent)] ring-1 ring-inset ring-[color-mix(in_oklab,var(--sidebar-primary)_30%,transparent)]"
+              ? "bg-[linear-gradient(180deg,color-mix(in_oklab,var(--sidebar-primary)_20%,transparent),color-mix(in_oklab,var(--sidebar-primary)_10%,transparent))] ring-1 ring-inset ring-[color-mix(in_oklab,var(--sidebar-primary)_40%,transparent)] shadow-[inset_0_1px_1px_color-mix(in_oklab,white_20%,transparent),0_4px_12px_-4px_color-mix(in_oklab,var(--sidebar-primary)_30%,transparent)]"
               : "hover:bg-card/[0.05]"
           )}
         >
@@ -159,9 +159,12 @@ export default function AdminSidebarNav({
           </Link>
 
           {badgeCount > 0 ? (
-            <span className="mr-1.5 inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-[var(--sidebar-primary)] px-1.5 text-[11px] font-semibold leading-5 text-white">
-              {badgeCount}
-            </span>
+            <div className="relative mr-1.5 flex h-5 min-w-[1.25rem] items-center justify-center">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--sidebar-primary)] opacity-40" />
+              <span className="relative inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-[var(--sidebar-primary)] px-1.5 text-[11px] font-bold leading-5 text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_2px_4px_rgba(0,0,0,0.2)]">
+                {badgeCount}
+              </span>
+            </div>
           ) : null}
 
           {canFavorite && !item.children?.length ? (
@@ -263,8 +266,9 @@ export default function AdminSidebarNav({
           {groups.map((group, index) => {
             const meta = groupMeta[index];
             const GroupIcon = group.icon;
+            const anyGroupExplicitlyOpen = groups.some((g) => expandedGroups[g.title] === true);
             const open =
-              searching || meta.active || (expandedGroups[group.title] ?? meta.active);
+              searching || (expandedGroups[group.title] === true) || (!anyGroupExplicitlyOpen && meta.active);
             return (
               <div
                 key={group.title}
@@ -283,7 +287,7 @@ export default function AdminSidebarNav({
                     className={cn(
                       "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ring-1 ring-inset transition-colors",
                       meta.active
-                        ? "bg-[color-mix(in_oklab,var(--sidebar-primary)_18%,transparent)] text-[var(--sidebar-primary)] ring-[color-mix(in_oklab,var(--sidebar-primary)_30%,transparent)]"
+                        ? "bg-[linear-gradient(180deg,color-mix(in_oklab,var(--sidebar-primary)_24%,transparent),color-mix(in_oklab,var(--sidebar-primary)_12%,transparent))] text-[var(--sidebar-primary)] ring-[color-mix(in_oklab,var(--sidebar-primary)_40%,transparent)] shadow-[inset_0_1px_1px_color-mix(in_oklab,white_20%,transparent),0_2px_8px_-2px_color-mix(in_oklab,var(--sidebar-primary)_30%,transparent)]"
                         : "bg-card/[0.04] text-[var(--sidebar-item-muted)] ring-white/[0.06]"
                     )}
                   >
@@ -309,11 +313,18 @@ export default function AdminSidebarNav({
                     )}
                   />
                 </button>
-                {open ? (
-                  <div className="space-y-0.5 px-1.5 pb-2">
-                    {group.items.map((item) => renderItem(item))}
+                <div
+                  className={cn(
+                    "grid transition-all duration-200 ease-in-out",
+                    open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0 pointer-events-none"
+                  )}
+                >
+                  <div className="overflow-hidden">
+                    <div className="space-y-0.5 px-1.5 pb-2">
+                      {group.items.map((item) => renderItem(item))}
+                    </div>
                   </div>
-                ) : null}
+                </div>
               </div>
             );
           })}

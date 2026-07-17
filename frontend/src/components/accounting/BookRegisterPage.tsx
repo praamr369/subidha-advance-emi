@@ -13,8 +13,6 @@ import { RegistryPageShell } from "@/components/layout/page-shells";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { MetricStrip } from "@/components/ui/operations";
 import { WorkspaceSection } from "@/components/ui/workspace";
-import RegisterPrintDocument from "@/components/print/RegisterPrintDocument";
-import PrintActionBanner from "@/components/print/PrintActionBanner";
 import {
   accountingDate,
   accountingErrorMessage,
@@ -190,29 +188,7 @@ export default function BookRegisterPage<T extends GenericRecord>({
               />
             </WorkspaceSection>
 
-            <PrintActionBanner
-              className="mb-4 receipt-print-hide"
-              title="Register Print / PDF"
-              description="Print this view for filing or save as PDF. The printable preview keeps the latest rows compact for one-page output."
-            />
 
-            <WorkspaceSection
-              title="Printable Register"
-              description="This print layout uses live rows and stays compact for one-page filing where possible."
-            >
-              <RegisterPrintDocument
-                title={printTitle}
-                subtitle={subtitle}
-                reference={rangeLabel}
-                headers={columns.map((column) => column.header)}
-                rows={printableRows}
-                footerNote={
-                  overflowRows > 0
-                    ? `Showing ${previewLimit} of ${rows.length} rows for compact print output. Use date filters to print additional slices without shrinking readability.`
-                    : undefined
-                }
-              />
-            </WorkspaceSection>
           </div>
         }
       />

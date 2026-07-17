@@ -1,29 +1,27 @@
 "use client";
-import { formatRupee } from "@/lib/utils/currency";
 
+import { formatRupee } from "@/lib/utils/currency";
+import { RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
-import DataTable from "@/components/ui/DataTable";
-import { DataTableShell } from "@/components/ui/operations";
-import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
-import CustomerProductSummaryCard from "@/domains/subscriptions/components/CustomerProductSummaryCard";
+import CustomerPageShell, {
+  CPageCard,
+  CPageSection,
+  CPageStats,
+  CPageStat,
+} from "@/components/layout/CustomerPageShell";
 import {
   buildSubscriptionDetailSemantics,
   formatLuckyNumberLabel,
   formatWinnerMonthLabel,
 } from "@/domains/subscriptions/detail/view-model";
-import {
-  DetailHeroSurface,
-  DetailMetricTile,
-  DetailSectionShell,
-} from "@/domains/subscriptions/detail/surfaces";
 import { formatPlanTypeLabel } from "@/lib/plan-labels";
-
 import {
   getCustomerSubscription,
   listCustomerSubscriptions,
@@ -40,49 +38,18 @@ function text(value: unknown, fallback = "—"): string {
   return typeof value === "string" && value.trim() ? value : fallback;
 }
 
-
 function formatDate(value?: string | null): string {
   if (!value) return "—";
-
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "—";
-
-  return parsed.toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+  return parsed.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 function formatDateTime(value?: string | null): string {
   if (!value) return "—";
-
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "—";
-
-  return parsed.toLocaleString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function resolveEmiBadge(row: EmiRow): { status: string; label: string } {
-  const raw = row.status.toUpperCase();
-  if (raw === "PAID") return { status: "PAID", label: "Paid" };
-  if (raw === "WAIVED") return { status: "WAIVED", label: "Waived" };
-
-  if (row.outstanding_amount > 0 && row.due_date) {
-    const dueTs = Date.parse(row.due_date);
-    if (!Number.isNaN(dueTs) && dueTs < Date.now()) {
-      return { status: "OVERDUE", label: "Overdue" };
-    }
-  }
-
-  if (raw === "PENDING") return { status: "PENDING", label: "Pending" };
-  return { status: raw || "PENDING", label: raw ? raw.replaceAll("_", " ") : "Pending" };
+  return parsed.toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 type EmiRow = {
@@ -96,708 +63,285 @@ type EmiRow = {
   status: string;
 };
 
+function resolveEmiBadge(row: EmiRow): { status: string; label: string } {
+  const raw = row.status.toUpperCase();
+  if (raw === "PAID") return { status: "PAID", label: "Paid" };
+  if (raw === "WAIVED") return { status: "WAIVED", label: "Waived" };
+  if (row.outstanding_amount > 0 && row.due_date) {
+    const dueTs = Date.parse(row.due_date);
+    if (!Number.isNaN(dueTs) && dueTs < Date.now()) return { status: "OVERDUE", label: "Overdue" };
+  }
+  if (raw === "PENDING") return { status: "PENDING", label: "Pending" };
+  return { status: raw || "PENDING", label: raw ? raw.replaceAll("_", " ") : "Pending" };
+}
+
+function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-start justify-between gap-3 py-2 border-b border-border/60 last:border-0">
+      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide shrink-0">{label}</span>
+      <span className="text-sm font-semibold text-foreground text-right max-w-[60%] break-words">{value}</span>
+    </div>
+  );
+}
+
 export default function CustomerSubscriptionDetailPage() {
   const params = useParams<{ id: string }>();
   const subscriptionId = params?.id;
 
-  const [subscription, setSubscription] = useState<CustomerSubscription | null>(
-    null
-  );
+  const [subscription, setSubscription] = useState<CustomerSubscription | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
+  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
+    try {
+      if (mode === "initial") setLoading(true); else setRefreshing(true);
+      setError(null);
+      if (!subscriptionId) throw new Error("Missing subscription id.");
       try {
-        if (mode === "initial") {
-          setLoading(true);
-        } else {
-          setRefreshing(true);
-        }
-
-        setError(null);
-
-        if (!subscriptionId) {
-          throw new Error("Missing subscription id.");
-        }
-
-        try {
-          const payload = await getCustomerSubscription(subscriptionId);
-          setSubscription(payload);
-        } catch (primaryError) {
-          const listPayload = await listCustomerSubscriptions();
-          const fallback = listPayload.results.find(
-            (item) => String(item.id) === String(subscriptionId)
-          );
-
-          if (!fallback) {
-            throw primaryError;
-          }
-
-          setSubscription(fallback);
-        }
-      } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Failed to load subscription details."
-        );
-        setSubscription(null);
-      } finally {
-        if (mode === "initial") {
-          setLoading(false);
-        } else {
-          setRefreshing(false);
-        }
+        const payload = await getCustomerSubscription(subscriptionId);
+        setSubscription(payload);
+      } catch (primaryError) {
+        const listPayload = await listCustomerSubscriptions();
+        const fallback = listPayload.results.find((item) => String(item.id) === String(subscriptionId));
+        if (!fallback) throw primaryError;
+        setSubscription(fallback);
       }
-    },
-    [subscriptionId]
-  );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load subscription details.");
+      setSubscription(null);
+    } finally {
+      if (mode === "initial") setLoading(false); else setRefreshing(false);
+    }
+  }, [subscriptionId]);
 
-  useEffect(() => {
-    void loadPage("initial");
-  }, [loadPage]);
+  useEffect(() => { void loadPage("initial"); }, [loadPage]);
 
-  const emis = useMemo<CustomerEmi[]>(() => {
-    return Array.isArray(subscription?.emis)
-      ? (subscription?.emis as CustomerEmi[])
-      : [];
-  }, [subscription]);
+  const emis = useMemo<CustomerEmi[]>(() => (
+    Array.isArray(subscription?.emis) ? (subscription?.emis as CustomerEmi[]) : []
+  ), [subscription]);
 
-  const emiRows = useMemo<EmiRow[]>(() => {
-    return emis.map((emi, index) => {
-      const amount = toNumber(emi.amount);
-      const paidAmount = toNumber(emi.paid_amount);
-      const waivedAmount = toNumber(emi.waived_amount);
-
-      const computedOutstanding = Math.max(
-        amount - paidAmount - waivedAmount,
-        0
-      );
-
-      return {
-        id: emi.id ?? index + 1,
-        month_no: toNumber(emi.month_no ?? emi.sequence_no ?? index + 1),
-        due_date: text(emi.due_date, ""),
-        amount,
-        paid_amount: paidAmount,
-        waived_amount: waivedAmount,
-        outstanding_amount:
-          emi.outstanding_amount !== undefined &&
-          emi.outstanding_amount !== null &&
-          String(emi.outstanding_amount) !== ""
-            ? toNumber(emi.outstanding_amount)
-            : computedOutstanding,
-        status: text(emi.status, "—"),
-      };
-    });
-  }, [emis]);
-
-  const derivedFinancialSummary = useMemo(() => {
-    const emiTotal = emiRows.reduce((sum, row) => sum + row.amount, 0);
-    const paidAmount = emiRows.reduce((sum, row) => sum + row.paid_amount, 0);
-    const waivedAmount = emiRows.reduce(
-      (sum, row) => sum + row.waived_amount,
-      0
-    );
-    const outstandingAmount = emiRows.reduce(
-      (sum, row) => sum + row.outstanding_amount,
-      0
-    );
-
+  const emiRows = useMemo<EmiRow[]>(() => emis.map((emi, index) => {
+    const amount = toNumber(emi.amount);
+    const paidAmount = toNumber(emi.paid_amount);
+    const waivedAmount = toNumber(emi.waived_amount);
+    const computedOutstanding = Math.max(amount - paidAmount - waivedAmount, 0);
     return {
-      emi_total: emiTotal,
+      id: emi.id ?? index + 1,
+      month_no: toNumber(emi.month_no ?? emi.sequence_no ?? index + 1),
+      due_date: text(emi.due_date, ""),
+      amount,
       paid_amount: paidAmount,
       waived_amount: waivedAmount,
-      outstanding_amount: outstandingAmount,
+      outstanding_amount: emi.outstanding_amount !== undefined && emi.outstanding_amount !== null && String(emi.outstanding_amount) !== ""
+        ? toNumber(emi.outstanding_amount)
+        : computedOutstanding,
+      status: text(emi.status, "—"),
     };
-  }, [emiRows]);
+  }), [emis]);
+
+  const derivedFinancialSummary = useMemo(() => ({
+    emi_total: emiRows.reduce((sum, row) => sum + row.amount, 0),
+    paid_amount: emiRows.reduce((sum, row) => sum + row.paid_amount, 0),
+    waived_amount: emiRows.reduce((sum, row) => sum + row.waived_amount, 0),
+    outstanding_amount: emiRows.reduce((sum, row) => sum + row.outstanding_amount, 0),
+  }), [emiRows]);
 
   const financialSummary = useMemo(() => {
     const backendSummary = subscription?.financial_summary;
-
-    const hasBackendValues =
-      backendSummary &&
-      [
-        backendSummary.emi_total,
-        backendSummary.paid_amount,
-        backendSummary.waived_amount,
-        backendSummary.outstanding_amount,
-      ].some(
-        (value) =>
-          value !== null && value !== undefined && String(value).trim() !== ""
-      );
-
+    const hasBackendValues = backendSummary && [
+      backendSummary.emi_total, backendSummary.paid_amount,
+      backendSummary.waived_amount, backendSummary.outstanding_amount,
+    ].some((v) => v !== null && v !== undefined && String(v).trim() !== "");
     if (hasBackendValues) {
       return {
-        emi_total:
-          backendSummary?.emi_total !== undefined &&
-          backendSummary?.emi_total !== null
-            ? toNumber(backendSummary.emi_total)
-            : derivedFinancialSummary.emi_total,
-        paid_amount:
-          backendSummary?.paid_amount !== undefined &&
-          backendSummary?.paid_amount !== null
-            ? toNumber(backendSummary.paid_amount)
-            : derivedFinancialSummary.paid_amount,
-        waived_amount:
-          backendSummary?.waived_amount !== undefined &&
-          backendSummary?.waived_amount !== null
-            ? toNumber(backendSummary.waived_amount)
-            : derivedFinancialSummary.waived_amount,
-        outstanding_amount:
-          backendSummary?.outstanding_amount !== undefined &&
-          backendSummary?.outstanding_amount !== null
-            ? toNumber(backendSummary.outstanding_amount)
-            : derivedFinancialSummary.outstanding_amount,
+        emi_total: backendSummary?.emi_total != null ? toNumber(backendSummary.emi_total) : derivedFinancialSummary.emi_total,
+        paid_amount: backendSummary?.paid_amount != null ? toNumber(backendSummary.paid_amount) : derivedFinancialSummary.paid_amount,
+        waived_amount: backendSummary?.waived_amount != null ? toNumber(backendSummary.waived_amount) : derivedFinancialSummary.waived_amount,
+        outstanding_amount: backendSummary?.outstanding_amount != null ? toNumber(backendSummary.outstanding_amount) : derivedFinancialSummary.outstanding_amount,
       };
     }
-
     return derivedFinancialSummary;
   }, [subscription, derivedFinancialSummary]);
 
-  const paidEmiCount = useMemo(
-    () => emiRows.filter((row) => row.status.toUpperCase() === "PAID").length,
-    [emiRows]
-  );
-
-  const pendingEmiCount = useMemo(
-    () =>
-      emiRows.filter((row) => row.status.toUpperCase() === "PENDING").length,
-    [emiRows]
-  );
-
-  const waivedEmiCount = useMemo(
-    () => emiRows.filter((row) => row.status.toUpperCase() === "WAIVED").length,
-    [emiRows]
-  );
+  const paidEmiCount = useMemo(() => emiRows.filter((r) => r.status.toUpperCase() === "PAID").length, [emiRows]);
+  const pendingEmiCount = useMemo(() => emiRows.filter((r) => r.status.toUpperCase() === "PENDING").length, [emiRows]);
+  const waivedEmiCount = useMemo(() => emiRows.filter((r) => r.status.toUpperCase() === "WAIVED").length, [emiRows]);
 
   const winnerSummary = subscription?.winner_summary;
-  const detailSemantics = useMemo(
-    () =>
-      buildSubscriptionDetailSemantics({
-        contractStatus: subscription?.status,
-        winnerStatus: winnerSummary?.winner_status ?? subscription?.winner_status,
-        winnerMonth: winnerSummary?.winner_month ?? subscription?.winner_month,
-        luckyNumber: winnerSummary?.lucky_number ?? subscription?.lucky_number,
-        drawId: winnerSummary?.draw_id,
-        drawMonth: winnerSummary?.draw_month,
-        drawRevealedAt: winnerSummary?.draw_revealed_at,
-        waiverScope: winnerSummary?.waiver_scope,
-        waivedEmiCount:
-          winnerSummary?.waived_emi_count ??
-          subscription?.waived_emi_count ??
-          waivedEmiCount,
-        waivedAmount:
-          winnerSummary?.waived_amount ??
-          financialSummary.waived_amount ??
-          subscription?.waived_amount,
-        outstandingAmount: financialSummary.outstanding_amount,
-      }),
-    [
-      financialSummary.outstanding_amount,
-      financialSummary.waived_amount,
-      subscription?.lucky_number,
-      subscription?.status,
-      subscription?.waived_amount,
-      subscription?.waived_emi_count,
-      subscription?.winner_month,
-      subscription?.winner_status,
-      waivedEmiCount,
-      winnerSummary?.draw_id,
-      winnerSummary?.draw_month,
-      winnerSummary?.draw_revealed_at,
-      winnerSummary?.lucky_number,
-      winnerSummary?.waived_amount,
-      winnerSummary?.waived_emi_count,
-      winnerSummary?.waiver_scope,
-      winnerSummary?.winner_month,
-      winnerSummary?.winner_status,
-    ]
-  );
-
-  const paymentProgressLabel =
-    emiRows.length > 0
-      ? `${paidEmiCount} of ${emiRows.length} Advance EMI rows paid`
-      : "No Advance EMI schedule";
-
-  const columns = useMemo(
-    () => [
-      {
-        key: "month_no",
-        title: "Advance EMI Month",
-        render: (row: EmiRow) => `Month ${row.month_no}`,
-      },
-      {
-        key: "due_date",
-        title: "Due Date",
-        render: (row: EmiRow) => formatDate(row.due_date),
-      },
-      {
-        key: "amount",
-        title: "Amount",
-        align: "right" as const,
-        render: (row: EmiRow) => formatRupee(row.amount),
-      },
-      {
-        key: "paid_amount",
-        title: "Paid",
-        align: "right" as const,
-        render: (row: EmiRow) => formatRupee(row.paid_amount),
-      },
-      {
-        key: "waived_amount",
-        title: "Waived",
-        align: "right" as const,
-        render: (row: EmiRow) => formatRupee(row.waived_amount),
-      },
-      {
-        key: "outstanding_amount",
-        title: "Outstanding",
-        align: "right" as const,
-        render: (row: EmiRow) => formatRupee(row.outstanding_amount),
-      },
-      {
-        key: "status",
-        title: "Status",
-        render: (row: EmiRow) => {
-          const badge = resolveEmiBadge(row);
-          return <ERPStatusBadge status={badge.status} label={badge.label} />;
-        },
-      },
-    ],
-    []
-  );
+  const detailSemantics = useMemo(() => buildSubscriptionDetailSemantics({
+    contractStatus: subscription?.status,
+    winnerStatus: winnerSummary?.winner_status ?? subscription?.winner_status,
+    winnerMonth: winnerSummary?.winner_month ?? subscription?.winner_month,
+    luckyNumber: winnerSummary?.lucky_number ?? subscription?.lucky_number,
+    drawId: winnerSummary?.draw_id,
+    drawMonth: winnerSummary?.draw_month,
+    drawRevealedAt: winnerSummary?.draw_revealed_at,
+    waiverScope: winnerSummary?.waiver_scope,
+    waivedEmiCount: winnerSummary?.waived_emi_count ?? subscription?.waived_emi_count ?? waivedEmiCount,
+    waivedAmount: winnerSummary?.waived_amount ?? financialSummary.waived_amount ?? subscription?.waived_amount,
+    outstandingAmount: financialSummary.outstanding_amount,
+  }), [financialSummary, subscription, winnerSummary, waivedEmiCount]);
 
   return (
-    <ERPPageShell
-      eyebrow="Customer Subscription"
-      title="Subscription Details"
-      subtitle="Track contract lifecycle, winner benefit history, waiver impact, and advance EMI settlement from your live subscription record."
-      helperNote="Winner history, waiver impact, and settlement posture are shown separately so customer-visible contract status never hides payment or waiver truth."
-      helperTone="info"
-      breadcrumbs={[
-        { label: "Customer", href: "/customer" },
-        { label: "Subscriptions", href: "/customer/subscriptions" },
-        { label: subscription?.subscription_number || "Details" },
-      ]}
-      actions={[
-        {
-          href: `/customer/payments?subscription=${
-            subscription?.id ?? subscriptionId ?? ""
-          }`,
-          label: "View Payments",
-          variant: "primary",
-        },
-        {
-          href: `/customer/deliveries?subscription=${
-            subscription?.id ?? subscriptionId ?? ""
-          }`,
-          label: "View Deliveries",
-          variant: "secondary",
-        },
-        {
-          href: "/customer/support",
-          label: "Support",
-          variant: "secondary",
-        },
-      ]}
-      stats={[
-        {
-          label: "Contract status",
-          value: subscription?.status || "—",
-          tone: detailSemantics.contractTone,
-        },
-        {
-          label: "Outstanding",
-          value: formatRupee(financialSummary.outstanding_amount),
-          tone: detailSemantics.isSettled ? "success" : "warning",
-        },
-        {
-          label: "Paid EMI rows",
-          value: paidEmiCount,
-          tone: paidEmiCount > 0 ? "success" : "default",
-        },
-        {
-          label: "Next due",
-          value: formatDate(subscription?.next_due_date),
-          tone: pendingEmiCount > 0 ? "warning" : "success",
-        },
-      ]}
-      statusBadge={{
-        label: detailSemantics.contractStatus,
-        tone: detailSemantics.contractTone,
-      }}
-    >
-      <div className="mb-4 flex justify-end">
+    <CustomerPageShell
+      title={subscription?.subscription_number || `SUB-${subscriptionId || ""}`}
+      subtitle={subscription?.product_name || "Subscription details"}
+      backHref="/customer/subscriptions"
+      backLabel="Subscriptions"
+      actions={
         <button
           type="button"
           onClick={() => void loadPage("refresh")}
           disabled={refreshing}
-          className="inline-flex items-center rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+          className="flex items-center gap-1.5 rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
         >
-          {refreshing ? "Refreshing..." : "Refresh"}
+          <RefreshCw className={`size-3.5 ${refreshing ? "animate-spin" : ""}`} />
+          Refresh
         </button>
-      </div>
-
-      {loading ? <ERPLoadingState label="Loading subscription details..." /> : null}
-
+      }
+    >
+      {loading ? <ERPLoadingState label="Loading subscription…" /> : null}
       {!loading && error ? (
-        <ERPErrorState
-          title="Unable to load subscription"
-          description={error}
-          onRetry={() => void loadPage("initial")}
-        />
+        <ERPErrorState title="Unable to load subscription" description={error} onRetry={() => void loadPage("initial")} />
       ) : null}
-
       {!loading && !error && !subscription ? (
-        <ERPEmptyState
-          title="Subscription not found"
-          description="No customer subscription record was returned."
-        />
+        <ERPEmptyState title="Subscription not found" description="No customer subscription record was returned." />
       ) : null}
 
       {!loading && !error && subscription ? (
-        <div className="space-y-6">
-          <section className="rounded-3xl border border-border bg-card p-5 shadow-sm">
-            <div className="mb-5">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-                Subscription clarity
-              </p>
-              <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
-                Contract, winner, and waiver state
-              </h2>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                Contract lifecycle, winner benefit history, and waiver impact are shown separately so a completed winner remains easy to understand.
-              </p>
-            </div>
+        <>
+          {/* Financial stats */}
+          <CPageStats>
+            <CPageStat label="Outstanding" value={formatRupee(financialSummary.outstanding_amount)} tone={detailSemantics.isSettled ? "success" : "warning"} />
+            <CPageStat label="Paid EMIs" value={paidEmiCount} tone={paidEmiCount > 0 ? "success" : "default"} />
+            <CPageStat label="Total EMIs" value={emiRows.length} />
+            <CPageStat label="Pending" value={pendingEmiCount} tone={pendingEmiCount > 0 ? "warning" : "success"} />
+          </CPageStats>
 
-            <div className="grid gap-4 xl:grid-cols-[1.35fr_1fr_1fr]">
-              <DetailHeroSurface
-                eyebrow="Contract lifecycle"
-                title={detailSemantics.contractHeadline}
-                description={detailSemantics.contractDescription}
-                tone={detailSemantics.contractTone}
-                badge={<ERPStatusBadge status={subscription.status} size="md" />}
-                meta={
+          {/* Quick links */}
+          <CPageSection>
+            <div className="grid grid-cols-2 gap-2">
+              <Link
+                href={`/customer/payments?subscription=${subscription.id}`}
+                className="flex h-10 items-center justify-center rounded-xl bg-primary text-xs font-bold text-primary-foreground transition active:scale-95"
+              >
+                View Payments
+              </Link>
+              <Link
+                href={`/customer/deliveries?subscription=${subscription.id}`}
+                className="flex h-10 items-center justify-center rounded-xl border border-border bg-card text-xs font-bold text-foreground transition active:scale-95"
+              >
+                View Deliveries
+              </Link>
+            </div>
+          </CPageSection>
+
+          {/* Contract info */}
+          <CPageSection title="Contract Details">
+            <CPageCard>
+              <InfoRow label="Status" value={<ERPStatusBadge status={subscription.status} />} />
+              <InfoRow label="Product" value={text(subscription.product_name)} />
+              <InfoRow label="Plan type" value={formatPlanTypeLabel(subscription.plan_type)} />
+              <InfoRow label="Batch" value={text(subscription.batch_code)} />
+              <InfoRow label="Start date" value={formatDate(subscription.start_date)} />
+              <InfoRow label="Lucky number" value={formatLuckyNumberLabel(subscription.lucky_number)} />
+              <InfoRow label="Next due" value={formatDate(subscription.next_due_date)} />
+              <InfoRow label="Created" value={formatDate(subscription.created_at)} />
+            </CPageCard>
+          </CPageSection>
+
+          {/* Financial position */}
+          <CPageSection title="Financial Position">
+            <CPageCard>
+              <InfoRow label="EMI total" value={formatRupee(financialSummary.emi_total)} />
+              <InfoRow label="Paid" value={<span className="text-emerald-600 dark:text-emerald-400">{formatRupee(financialSummary.paid_amount)}</span>} />
+              <InfoRow label="Waived" value={formatRupee(financialSummary.waived_amount)} />
+              <InfoRow label="Outstanding" value={<span className={detailSemantics.isSettled ? "text-emerald-600" : "text-amber-600"}>{formatRupee(financialSummary.outstanding_amount)}</span>} />
+            </CPageCard>
+          </CPageSection>
+
+          {/* Winner info */}
+          {detailSemantics.hasWinnerHistory || subscription.winner_status ? (
+            <CPageSection title="Winner Status">
+              <CPageCard>
+                <div className="mb-3">
+                  <ERPStatusBadge status={detailSemantics.winnerStatus === "WON" ? "WON" : "NOT_WON"} label={detailSemantics.winnerStatus === "WON" ? "Winner!" : "Not won yet"} />
+                </div>
+                {detailSemantics.winnerMonth ? (
+                  <InfoRow label="Winner month" value={formatWinnerMonthLabel(detailSemantics.winnerMonth)} />
+                ) : null}
+                {detailSemantics.drawRevealedAt ? (
+                  <InfoRow label="Draw revealed" value={formatDateTime(detailSemantics.drawRevealedAt)} />
+                ) : null}
+                {detailSemantics.hasWaiver ? (
                   <>
-                    <DetailMetricTile
-                      label="Lifecycle status"
-                      value={detailSemantics.contractStatus}
-                      tone={detailSemantics.contractTone}
-                    />
-                    <DetailMetricTile
-                      label="Payment progress"
-                      value={paymentProgressLabel}
-                      hint={
-                        pendingEmiCount > 0
-                          ? `${pendingEmiCount} Advance EMI rows still need settlement.`
-                          : "No pending Advance EMI rows remain."
-                      }
-                    />
-                    <DetailMetricTile
-                      label="Remaining amount"
-                      value={formatRupee(financialSummary.outstanding_amount)}
-                      tone={detailSemantics.isSettled ? "success" : "warning"}
-                    />
+                    <InfoRow label="Waived EMIs" value={String(detailSemantics.waivedEmiCount)} />
+                    <InfoRow label="Waived amount" value={formatRupee(detailSemantics.waivedAmount)} />
                   </>
-                }
-              />
-
-              <DetailHeroSurface
-                eyebrow="Winner benefit"
-                title={detailSemantics.winnerHeadline}
-                description={detailSemantics.winnerDescription}
-                tone={detailSemantics.winnerTone}
-                badge={
-                  <ERPStatusBadge
-                    status={detailSemantics.winnerStatus === "WON" ? "WON" : "NOT_WON"}
-                    label={
-                      detailSemantics.winnerStatus === "WON"
-                        ? "Winner recorded"
-                        : "Not won"
-                    }
-                    size="md"
-                  />
-                }
-                meta={
-                  <>
-                    <DetailMetricTile
-                      label="Winner month"
-                      value={formatWinnerMonthLabel(detailSemantics.winnerMonth)}
-                      tone={detailSemantics.winnerTone}
-                    />
-                    <DetailMetricTile
-                      label="Lucky number"
-                      value={formatLuckyNumberLabel(detailSemantics.luckyNumber)}
-                      hint={
-                        detailSemantics.drawId != null
-                          ? `Draw #${detailSemantics.drawId}`
-                          : "Lucky number stays linked to this contract"
-                      }
-                    />
-                    <DetailMetricTile
-                      label="Draw revealed"
-                      value={formatDateTime(detailSemantics.drawRevealedAt)}
-                      hint={
-                        detailSemantics.drawMonth != null
-                          ? `Draw month ${detailSemantics.drawMonth}`
-                          : "Winner month stored on the contract"
-                      }
-                    />
-                  </>
-                }
-              />
-
-              <DetailHeroSurface
-                eyebrow="Waiver and settlement impact"
-                title={detailSemantics.waiverHeadline}
-                description={detailSemantics.waiverDescription}
-                tone={detailSemantics.waiverTone}
-                badge={
-                  <ERPStatusBadge
-                    status={detailSemantics.isSettled ? "COMPLETED" : "ACTIVE"}
-                    label={detailSemantics.isSettled ? "Fully settled" : "Still settling"}
-                    size="md"
-                  />
-                }
-                meta={
-                  <>
-                    <DetailMetricTile
-                      label="Waived Advance EMI rows"
-                      value={String(detailSemantics.waivedEmiCount)}
-                      tone={detailSemantics.hasWaiver ? detailSemantics.waiverTone : "default"}
-                    />
-                    <DetailMetricTile
-                      label="Waived amount"
-                      value={formatRupee(detailSemantics.waivedAmount)}
-                      tone={detailSemantics.hasWaiver ? detailSemantics.waiverTone : "default"}
-                    />
-                    <DetailMetricTile
-                      label="Waiver scope"
-                      value={detailSemantics.waiverScope || "—"}
-                      hint="Winner benefits apply only to future Advance EMI rows."
-                    />
-                  </>
-                }
-              />
-            </div>
-          </section>
-
-          {detailSemantics.hasWinnerHistory ? (
-            <div className="rounded-2xl border border-sky-200/80 bg-sky-50/80 p-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-sky-700">
-                Winner history stays separate from contract status
-              </p>
-              <p className="mt-2 text-sm leading-6 text-sky-950">
-                A winner subscription may appear as <span className="font-semibold">WON</span> while it still has remaining Advance EMI exposure, and later as <span className="font-semibold">COMPLETED</span> once every Advance EMI row is paid or waived. The winner record stays visible in both cases.
-              </p>
-            </div>
-          ) : pendingEmiCount > 0 ? (
-            <div className="rounded-2xl border border-amber-200/80 bg-amber-50/80 p-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-700">
-                Settlement note
-              </p>
-              <p className="mt-2 text-sm leading-6 text-amber-950">
-                Pending Advance EMI rows remain outstanding until a payment is recorded or a waiver is applied in the backend.
-              </p>
-            </div>
+                ) : null}
+              </CPageCard>
+            </CPageSection>
           ) : null}
 
-          <DetailSectionShell
-            title="Product module"
-            description="Live product media and the exact subscription-linked catalog context for this contract."
-          >
-            <CustomerProductSummaryCard subscription={subscription} />
-          </DetailSectionShell>
-
-          <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-            <DetailSectionShell
-              title="Contract and allocation"
-              description="Customer-visible product, batch, lucky number, and lifecycle facts for this subscription."
-            >
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                <DetailMetricTile
-                  label="Subscription"
-                  value={subscription.subscription_number || `SUB-${subscription.id}`}
-                />
-                <DetailMetricTile
-                  label="Product"
-                  value={text(subscription.product_name)}
-                  hint={formatPlanTypeLabel(subscription.plan_type)}
-                />
-                <DetailMetricTile
-                  label="Batch"
-                  value={text(subscription.batch_code)}
-                  hint={`Start ${formatDate(subscription.start_date)}`}
-                />
-                <DetailMetricTile
-                  label="Lucky number"
-                  value={formatLuckyNumberLabel(subscription.lucky_number)}
-                />
-                <DetailMetricTile
-                  label="Delivery status"
-                  value={text(subscription.delivery_status)}
-                  hint={`Fulfillment ${text(subscription.fulfillment_status)}`}
-                />
-                <DetailMetricTile
-                  label="Created"
-                  value={formatDate(subscription.created_at)}
-                />
-              </div>
-            </DetailSectionShell>
-
-            <DetailSectionShell
-              title="Financial position"
-              description="Current contract-level financial posture from advance EMI rows and the canonical backend summary."
-            >
-              <div className="grid gap-4 sm:grid-cols-2">
-                <DetailMetricTile
-                  label="Advance EMI total"
-                  value={formatRupee(financialSummary.emi_total)}
-                />
-                <DetailMetricTile
-                  label="Paid amount"
-                  value={formatRupee(financialSummary.paid_amount)}
-                  tone="success"
-                />
-                <DetailMetricTile
-                  label="Waived amount"
-                  value={formatRupee(financialSummary.waived_amount)}
-                  tone={detailSemantics.hasWaiver ? detailSemantics.waiverTone : "default"}
-                />
-                <DetailMetricTile
-                  label="Outstanding"
-                  value={formatRupee(financialSummary.outstanding_amount)}
-                  tone={detailSemantics.isSettled ? "success" : "warning"}
-                />
-                <DetailMetricTile
-                  label="Paid Advance EMI rows"
-                  value={paidEmiCount}
-                />
-                <DetailMetricTile
-                  label="Pending Advance EMI rows"
-                  value={pendingEmiCount}
-                  tone={pendingEmiCount > 0 ? "warning" : "success"}
-                />
-              </div>
-            </DetailSectionShell>
-          </div>
-
-          <DetailSectionShell
-            title="Delivery tracking"
-            description="Delivery events appear here only when the shop creates or updates linked delivery records."
-          >
-            {subscription.delivery_summary ? (
-              <>
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                      Current delivery
-                    </p>
-                    <p className="mt-2 text-lg font-semibold text-slate-950">
-                      {subscription.delivery_summary.delivery_reference}
-                    </p>
-                    <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                      Delivery updates come from internal operations only and remain linked to this subscription for audit clarity.
-                    </p>
-                  </div>
-                  <ERPStatusBadge status={subscription.delivery_summary.status} size="md" />
-                </div>
-
-                <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                  <DetailMetricTile
-                    label="Scheduled date"
-                    value={formatDate(subscription.delivery_summary.scheduled_date)}
-                  />
-                  <DetailMetricTile
-                    label="Out for delivery"
-                    value={formatDateTime(subscription.delivery_summary.out_for_delivery_at)}
-                  />
-                  <DetailMetricTile
-                    label="Delivered at"
-                    value={formatDateTime(subscription.delivery_summary.delivered_at)}
-                  />
-                  <DetailMetricTile
-                    label="Receiver"
-                    value={text(subscription.delivery_summary.receiver_name)}
-                    hint={text(subscription.delivery_summary.receiver_phone)}
-                  />
-                  <DetailMetricTile
-                    label="Address"
-                    value={text(subscription.delivery_summary.delivery_address_snapshot)}
-                    className="sm:col-span-2 xl:col-span-2"
-                  />
-                  <DetailMetricTile
-                    label="Notes"
-                    value={text(subscription.delivery_summary.notes)}
-                    className="sm:col-span-2 xl:col-span-2"
-                  />
-                </div>
-
-                {Array.isArray(subscription.deliveries) &&
-                subscription.deliveries.length > 0 ? (
-                  <div className="mt-6 overflow-x-auto rounded-2xl border border-border bg-background p-2">
-                    <table className="min-w-full border-separate border-spacing-0">
-                      <thead>
-                        <tr className="text-left">
-                          {["Reference", "Status", "Scheduled", "Delivered"].map((label) => (
-                            <th
-                              key={label}
-                              className="border-b border-slate-200 px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500"
-                            >
-                              {label}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {subscription.deliveries.map((row) => (
-                          <tr key={row.id}>
-                            <td className="border-b border-slate-200 px-4 py-3 text-sm text-slate-900">
-                              {row.delivery_reference}
-                            </td>
-                            <td className="border-b border-slate-200 px-4 py-3 text-sm">
-                              <ERPStatusBadge status={row.status} />
-                            </td>
-                            <td className="border-b border-slate-200 px-4 py-3 text-sm text-slate-700">
-                              {formatDate(row.scheduled_date)}
-                            </td>
-                            <td className="border-b border-slate-200 px-4 py-3 text-sm text-slate-700">
-                              {formatDateTime(row.delivered_at)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : null}
-              </>
-            ) : (
-              <div className="rounded-2xl border border-border bg-background px-4 py-4 text-sm leading-6 text-muted-foreground">
-                Delivery tracking will appear here once the shop creates a delivery record for this subscription.
-              </div>
-            )}
-          </DetailSectionShell>
-
-          <DetailSectionShell
-            title="Advance EMI schedule"
-            description="Customer-visible advance EMI rows with paid, waived, and outstanding amounts shown separately."
-          >
+          {/* EMI schedule */}
+          <CPageSection title="Advance EMI Schedule">
             {emiRows.length === 0 ? (
-              <ERPEmptyState
-                title="No Advance EMI schedule found"
-                description="No advance EMI rows were returned for this subscription."
-              />
+              <ERPEmptyState title="No EMI schedule" description="No advance EMI rows for this subscription." />
             ) : (
-              <DataTableShell>
-                <DataTable<EmiRow> rows={emiRows} columns={columns} />
-              </DataTableShell>
+              <div className="space-y-2">
+                {emiRows.map((row) => {
+                  const badge = resolveEmiBadge(row);
+                  return (
+                    <CPageCard key={row.id}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-bold text-foreground">Month {row.month_no}</div>
+                          <div className="text-xs text-muted-foreground mt-0.5">{formatDate(row.due_date)}</div>
+                        </div>
+                        <ERPStatusBadge status={badge.status} label={badge.label} />
+                      </div>
+                      <div className="mt-3 grid grid-cols-3 gap-2 border-t border-border/60 pt-3 text-xs">
+                        <div>
+                          <div className="text-muted-foreground">Due</div>
+                          <div className="font-semibold mt-0.5">{formatRupee(row.amount)}</div>
+                        </div>
+                        <div>
+                          <div className="text-muted-foreground">Paid</div>
+                          <div className="font-semibold text-emerald-600 mt-0.5">{formatRupee(row.paid_amount)}</div>
+                        </div>
+                        <div>
+                          <div className="text-muted-foreground">Balance</div>
+                          <div className={`font-semibold mt-0.5 ${row.outstanding_amount > 0 ? "text-amber-600" : "text-foreground"}`}>{formatRupee(row.outstanding_amount)}</div>
+                        </div>
+                      </div>
+                    </CPageCard>
+                  );
+                })}
+              </div>
             )}
-          </DetailSectionShell>
-        </div>
+          </CPageSection>
+
+          {/* Delivery summary */}
+          {subscription.delivery_summary ? (
+            <CPageSection title="Delivery">
+              <CPageCard>
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="text-sm font-bold text-foreground">{subscription.delivery_summary.delivery_reference}</div>
+                  <ERPStatusBadge status={subscription.delivery_summary.status} />
+                </div>
+                <InfoRow label="Scheduled" value={formatDate(subscription.delivery_summary.scheduled_date)} />
+                {subscription.delivery_summary.delivered_at ? (
+                  <InfoRow label="Delivered" value={formatDateTime(subscription.delivery_summary.delivered_at)} />
+                ) : null}
+                {subscription.delivery_summary.receiver_name ? (
+                  <InfoRow label="Receiver" value={text(subscription.delivery_summary.receiver_name)} />
+                ) : null}
+              </CPageCard>
+            </CPageSection>
+          ) : null}
+        </>
       ) : null}
-    </ERPPageShell>
+    </CustomerPageShell>
   );
 }

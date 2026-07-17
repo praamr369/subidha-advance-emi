@@ -98,6 +98,11 @@ export default function AdminProductEditPage() {
   const [directSale, setDirectSale] = useState(true);
   const [itemType, setItemType] = useState("FINISHED_GOOD");
   const [stockType, setStockType] = useState("STOCK_ITEM");
+  const [warrantyEnabled, setWarrantyEnabled] = useState(true);
+  const [warrantyManufacturing, setWarrantyManufacturing] = useState("12");
+  const [warrantyStructural, setWarrantyStructural] = useState("36");
+  const [warrantyExtendedMax, setWarrantyExtendedMax] = useState("12");
+  const [extendedWarrantyCostPct, setExtendedWarrantyCostPct] = useState("7.50");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [clearImage, setClearImage] = useState(false);
@@ -124,6 +129,11 @@ export default function AdminProductEditPage() {
     setDirectSale(next.is_direct_sale_enabled !== false);
     setItemType(next.item_type || "FINISHED_GOOD");
     setStockType(next.stock_type || "STOCK_ITEM");
+    setWarrantyEnabled(next.warranty_enabled !== false);
+    setWarrantyManufacturing(String(next.warranty_months_manufacturing ?? 12));
+    setWarrantyStructural(String(next.warranty_months_structural ?? 36));
+    setWarrantyExtendedMax(String(next.warranty_months_extended_max ?? 12));
+    setExtendedWarrantyCostPct(next.extended_warranty_cost_percentage != null ? String(next.extended_warranty_cost_percentage) : "7.50");
     setImageFile(null);
     setImagePreview(null);
     setClearImage(false);
@@ -195,6 +205,11 @@ export default function AdminProductEditPage() {
         is_direct_sale_enabled: directSale,
         item_type: itemType,
         stock_type: stockType,
+        warranty_enabled: warrantyEnabled,
+        warranty_months_manufacturing: Number(warrantyManufacturing) || 12,
+        warranty_months_structural: Number(warrantyStructural) || 36,
+        warranty_months_extended_max: Number(warrantyExtendedMax) || 12,
+        extended_warranty_cost_percentage: extendedWarrantyCostPct.trim() || "7.50",
       };
       if (payload instanceof FormData) {
         payload.set("name", name);
@@ -217,6 +232,11 @@ export default function AdminProductEditPage() {
         payload.set("is_direct_sale_enabled", String(directSale));
         payload.set("item_type", itemType);
         payload.set("stock_type", stockType);
+        payload.set("warranty_enabled", String(warrantyEnabled));
+        payload.set("warranty_months_manufacturing", String(Number(warrantyManufacturing) || 12));
+        payload.set("warranty_months_structural", String(Number(warrantyStructural) || 36));
+        payload.set("warranty_months_extended_max", String(Number(warrantyExtendedMax) || 12));
+        payload.set("extended_warranty_cost_percentage", extendedWarrantyCostPct.trim() || "7.50");
         if (imageFile) payload.set("image", imageFile);
         if (clearImage) payload.set("clear_image", "true");
       }
@@ -238,7 +258,8 @@ export default function AdminProductEditPage() {
     subscription: active && emi && Number(basePrice || 0) > 0,
     directSale: active && directSale,
     rentLease: active && (rent || lease),
-  }), [active, basePrice, category, directSale, emi, imagePreview, lease, product?.image, product?.inventory_ready, productCode, rent, sku, subcategory]);
+    warranty: warrantyEnabled && Number(warrantyManufacturing) > 0,
+  }), [active, basePrice, category, directSale, emi, imagePreview, lease, product?.image, product?.inventory_ready, productCode, rent, sku, subcategory, warrantyEnabled, warrantyManufacturing]);
 
   return (
     <ERPPageShell
@@ -321,6 +342,46 @@ export default function AdminProductEditPage() {
                 <label className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm">Direct Sale<input type="checkbox" checked={directSale} onChange={(event) => setDirectSale(event.target.checked)} /></label>
               </FormCard>
 
+              <ERPSectionShell title="Warranty Coverage" description="Configure warranty periods and extended warranty pricing. Applies to future deliveries only.">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm md:col-span-2">
+                    Warranty Enabled
+                    <input type="checkbox" checked={warrantyEnabled} onChange={(e) => setWarrantyEnabled(e.target.checked)} />
+                  </label>
+                  {warrantyEnabled ? (
+                    <>
+                      <label className="text-sm text-muted-foreground">
+                        Manufacturing Warranty (months)
+                        <input className={fieldClass()} type="number" min="0" max="120" value={warrantyManufacturing} onChange={(e) => setWarrantyManufacturing(e.target.value)} />
+                      </label>
+                      <label className="text-sm text-muted-foreground">
+                        Structural Warranty (months)
+                        <input className={fieldClass()} type="number" min="0" max="120" value={warrantyStructural} onChange={(e) => setWarrantyStructural(e.target.value)} />
+                      </label>
+                      <label className="text-sm text-muted-foreground">
+                        Max Extended Warranty (months)
+                        <input className={fieldClass()} type="number" min="0" max="60" value={warrantyExtendedMax} onChange={(e) => setWarrantyExtendedMax(e.target.value)} />
+                      </label>
+                      <label className="text-sm text-muted-foreground">
+                        Extended Warranty Cost (% of price)
+                        <input className={fieldClass()} type="number" min="0" max="100" step="0.01" value={extendedWarrantyCostPct} onChange={(e) => setExtendedWarrantyCostPct(e.target.value)} />
+                      </label>
+                      <div className="md:col-span-2 rounded-xl border border-border bg-muted/30 px-4 py-3 text-xs text-muted-foreground space-y-1">
+                        <div>Manufacturing warranty covers defects in materials and workmanship for <strong>{warrantyManufacturing} months</strong> from delivery.</div>
+                        <div>Structural warranty covers frame and core structure for <strong>{warrantyStructural} months</strong> from delivery.</div>
+                        {Number(warrantyExtendedMax) > 0 ? (
+                          <div>Extended warranty available up to <strong>{warrantyExtendedMax} months</strong> at <strong>{extendedWarrantyCostPct}%</strong> of product price ({formatRupee(Number(basePrice || 0) * Number(extendedWarrantyCostPct || 0) / 100)} per month).</div>
+                        ) : null}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="md:col-span-2 rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+                      Warranty is disabled for this product. No warranty tracking or claims will be available for future deliveries.
+                    </div>
+                  )}
+                </div>
+              </ERPSectionShell>
+
               {/* PIM Sync — auto-matches category/subcategory, inline spec editing */}
               <PimSyncSection
                 productCode={productCode}
@@ -344,7 +405,7 @@ export default function AdminProductEditPage() {
 
             <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start">
               <ERPSectionShell title="Readiness panel" description="Fast checks before using this product operationally.">
-                <div className="space-y-2">{check("Inventory ready", readiness.inventory)}{check("Image attached", readiness.image)}{check("SKU/code ready", readiness.sku)}{check("Cataloged", readiness.catalog)}{check("Subscription-ready", readiness.subscription)}{check("Direct sale-ready", readiness.directSale)}{check("Rent/lease-ready", readiness.rentLease)}</div>
+                <div className="space-y-2">{check("Inventory ready", readiness.inventory)}{check("Image attached", readiness.image)}{check("SKU/code ready", readiness.sku)}{check("Cataloged", readiness.catalog)}{check("Subscription-ready", readiness.subscription)}{check("Direct sale-ready", readiness.directSale)}{check("Rent/lease-ready", readiness.rentLease)}{check("Warranty configured", readiness.warranty)}</div>
               </ERPSectionShell>
               <ERPSectionShell title="Inventory readiness" description="Prepare/recheck profile from this edit page without posting stock movements.">
                 <div className="space-y-3"><div className="text-sm text-muted-foreground">Profile: {product.inventory_profile_id ? `#${product.inventory_profile_id}` : "Pending"}</div><ProductQuickActions product={{ ...product, name, product_code: productCode, sku, unit_of_measure: unit, category, subcategory, base_price: basePrice, is_active: active, is_emi_enabled: emi, is_rent_enabled: rent, is_lease_enabled: lease, is_direct_sale_enabled: directSale }} mode="detail" onChanged={() => loadPage()} /></div>

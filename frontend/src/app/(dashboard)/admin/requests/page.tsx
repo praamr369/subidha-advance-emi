@@ -6,6 +6,19 @@ import { ROUTES } from "@/lib/routes";
 
 const REQUEST_GROUPS = [
   {
+    title: "Online Request Workflow",
+    description: "Quote-to-approval pipeline for customer purchase, EMI, rent, and lease requests.",
+    items: [
+      {
+        label: "Online Requests",
+        description:
+          "Full quote-to-approval workflow: generate quotes, send to customers, accept, approve, and auto-create subscriptions or direct sales.",
+        href: ROUTES.admin.requestsOnlineRequests,
+        badge: "Controlled approval queue",
+      },
+    ],
+  },
+  {
     title: "Public & Customer Enquiries",
     description: "Inbound requests from public forms or customer-facing channels. Request intake only.",
     items: [
@@ -33,6 +46,13 @@ const REQUEST_GROUPS = [
         label: "Subscription Requests",
         description:
           "Customer and partner EMI subscription intake awaiting admin approval. Approval follows the existing backend workflow — no silent contract or payment creation.",
+        href: ROUTES.admin.requestsSubscriptions,
+        badge: "Controlled approval queue",
+      },
+      {
+        label: "Product Requests",
+        description:
+          "Customer and partner product intake (e.g. direct sale requests) awaiting admin approval.",
         href: ROUTES.admin.subscriptionRequests,
         badge: "Controlled approval queue",
       },
@@ -42,13 +62,6 @@ const REQUEST_GROUPS = [
     title: "Partner Requests",
     description: "Partner-submitted request queues. Approval or review does not auto-post commissions or payouts.",
     items: [
-      {
-        label: "Partner Payment Requests",
-        description:
-          "Partner-submitted payment report intake. Review context links to Collection Workspace. No financial posting from this page.",
-        href: ROUTES.admin.partnerPaymentRequests,
-        badge: "Request intake",
-      },
       {
         label: "Partner Collection Requests",
         description:

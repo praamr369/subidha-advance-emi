@@ -14,10 +14,12 @@ import CustomerLinkSection from "@/domains/product-requests/components/CustomerL
 import PricingSection from "@/domains/product-requests/components/PricingSection";
 import ApprovalConfirmDialog from "@/domains/product-requests/components/ApprovalConfirmDialog";
 import CustomerDetailsCard from "@/domains/product-requests/components/CustomerDetailsCard";
+import { useRequestKeyboardShortcuts } from "@/hooks/useRequestKeyboardShortcuts";
 import {
   decideAdminProductRequest,
   getProductRequest,
   type ProductRequestRecord,
+  type ProductRequestOptions,
 } from "@/services/product-requests";
 import { formatRupee } from "@/lib/utils/currency";
 
@@ -82,8 +84,7 @@ export default function LeaseRequestDetailPage() {
         return;
       }
       setRequest(payload);
-      const defaultLease = payload.product?.base_price ? Number(payload.product.base_price) / 24 : 0;
-      setMonthlyLease(defaultLease.toFixed(2));
+      setMonthlyLease("");
       setReviewNote(payload.review_note || "");
       setError(null);
 
@@ -102,6 +103,27 @@ export default function LeaseRequestDetailPage() {
   useEffect(() => {
     void loadRequest();
   }, [loadRequest]);
+
+  // Keyboard shortcuts
+  useRequestKeyboardShortcuts({
+    "Ctrl+Enter": () => {
+      if (request?.status === "SUBMITTED" && step === "review") {
+        setDialogMode("approve");
+        setShowApprovalDialog(true);
+      }
+    },
+    "D": () => {
+      if (request?.status === "SUBMITTED" && step === "review") {
+        setDialogMode("reject");
+        setShowApprovalDialog(true);
+      }
+    },
+    "R": () => void loadRequest(),
+    "Escape": () => {
+      setShowApprovalDialog(false);
+      setActionError(null);
+    },
+  });
 
   const totalLeaseCost = useMemo(() => {
     const monthly = Number(monthlyLease) || 0;
@@ -176,13 +198,26 @@ export default function LeaseRequestDetailPage() {
       actions={[
         { href: "/admin/requests/product-requests", label: "Back", variant: "secondary" },
       ]}
+      stats={
+        request
+          ? [
+              { label: "Request Type", value: "Lease", tone: "info" as const },
+              { label: "Status", value: request.status || "Unknown", tone: request.status === "APPROVED" ? ("success" as const) : request.status === "REJECTED" ? ("danger" as const) : ("info" as const) },
+              { label: "Monthly Lease", value: formatRupee(monthlyLease || "0"), tone: "success" as const },
+              { label: "Total Cost", value: formatRupee(String(totalLeaseCost)), tone: "success" as const },
+            ]
+          : undefined
+      }
       statusBadge={{
         label: request?.status || "Loading",
         tone: request?.status === "APPROVED" ? "success" : request?.status === "REJECTED" ? "danger" : "info",
       }}
     >
-      <div className="space-y-6">
-        {loading ? <ERPLoadingState label="Loading lease request..." /> : null}
+      {/* Desktop two-column layout */}
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+        {/* Main Content - Left Column (3/4 width) */}
+        <div className="xl:col-span-3 space-y-6">
+          {loading ? <ERPLoadingState label="Loading lease request..." /> : null}
 
         {!loading && error ? (
           <ERPErrorState title="Unable to load request" description={error} onRetry={() => void loadRequest()} />
@@ -241,8 +276,8 @@ export default function LeaseRequestDetailPage() {
                     description="Configure the lease terms. Review proposed pricing and adjust if needed."
                   >
                     <PricingSection
-                      productName={request.product_name}
-                      basePrice={request.product?.base_price || 0}
+                      productName={request.product_name || ""}
+                      basePrice={0}
                       monthlyAmount={Number(monthlyLease)}
                       onMonthlyAmountChange={setMonthlyLease}
                       tenure={Number(tenure)}
@@ -272,16 +307,16 @@ export default function LeaseRequestDetailPage() {
                         <div className="mb-4">
                           <CustomerDetailsCard
                             customer={{
-                              id: request.customer_id || selectedCustomerId,
-                              name: request.customer_name || request.requested_customer_name,
-                              phone: request.customer_phone || request.requested_customer_phone,
-                              email: request.customer_email,
-                              address: request.customer_address || request.requested_address,
-                              city: request.customer_city,
-                              state: request.customer_state,
-                              pincode: request.customer_pincode,
-                              customerSince: request.customer_joined_at,
-                              verificationStatus: (request.customer_verification_status as any) || "verified",
+                              id: Number(request.customer_id || selectedCustomerId),
+                              name: request.customer_name || request.requested_customer_name || "",
+                              phone: request.customer_phone || request.requested_customer_phone || "",
+                              email: request.customer_email || undefined,
+                              address: request.requested_customer_address || undefined,
+                              city: request.requested_customer_city || undefined,
+                              state: undefined,
+                              pincode: undefined,
+                              customerSince: undefined,
+                              verificationStatus: "verified",
                               status: "active",
                             }}
                           />
@@ -401,6 +436,82 @@ export default function LeaseRequestDetailPage() {
             )}
           </>
         ) : null}
+        </div>
+
+        {/* Right Sidebar - Fixed Desktop Sidebar (1/4 width) */}
+        {request && (
+          <div className="xl:col-span-1">
+            <div className="sticky top-20 space-y-4">
+              {/* Status Overview Card */}
+              <div className="rounded-xl border border-border bg-card p-6">
+                <h3 className="text-sm font-semibold text-foreground mb-4">Request Status</h3>
+                <div className="inline-block rounded-full px-3 py-1.5 bg-teal-100 text-teal-800 font-semibold text-sm">
+                  {request.status}
+                </div>
+                <div className="mt-4 space-y-3 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Type:</span>
+                    <span className="font-semibold">Lease</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Monthly:</span>
+                    <span className="font-semibold">${monthlyLease || "0"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Total:</span>
+                    <span className="font-semibold">${totalLeaseCost || "0"}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Actions Card */}
+              {request.status === "SUBMITTED" && (
+                <div className="rounded-xl border border-border bg-card p-6">
+                  <h3 className="text-sm font-semibold text-foreground mb-4">Quick Actions</h3>
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => {setDialogMode("approve"); setShowApprovalDialog(true);}}
+                      disabled={actionLoading}
+                      className="w-full h-10 rounded-lg bg-emerald-600 text-white font-semibold text-sm hover:bg-emerald-700 transition disabled:opacity-50"
+                    >
+                      Approve (Ctrl+⏎)
+                    </button>
+                    <button
+                      onClick={() => {setDialogMode("reject"); setShowApprovalDialog(true);}}
+                      disabled={actionLoading}
+                      className="w-full h-10 rounded-lg bg-red-600 text-white font-semibold text-sm hover:bg-red-700 transition disabled:opacity-50"
+                    >
+                      Reject (D)
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Keyboard Shortcuts Card */}
+              <div className="rounded-xl border border-border bg-card p-6">
+                <h3 className="text-xs font-semibold text-foreground mb-3 uppercase">Keyboard Shortcuts</h3>
+                <div className="space-y-2 text-xs text-muted-foreground">
+                  <div className="flex justify-between">
+                    <span>Approve</span>
+                    <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">Ctrl+⏎</kbd>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Reject</span>
+                    <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">D</kbd>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Refresh</span>
+                    <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">R</kbd>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Close</span>
+                    <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">Esc</kbd>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </ERPPageShell>
   );

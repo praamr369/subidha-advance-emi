@@ -71,12 +71,17 @@ type PartnerRoutes = {
   customers: string;
   subscriptions: string;
   subscriptionRequests: string;
+  collections: string;
   collectionRequests: string;
+  payments: string;
   commissions: string;
   payouts: string;
+  contractAmendments: string;
+  kycRequests: string;
+  serviceDesk: string;
   reports: string;
   notifications: string;
-  contractAmendments: string;
+  profile: string;
 };
 
 type CustomerRoutes = {
@@ -147,12 +152,17 @@ const PARTNER_ROUTES = buildRouteNamespace<PartnerRoutes>(roleRouteNamespaces.pa
   customers: "/partner/customers",
   subscriptions: "/partner/subscriptions",
   subscriptionRequests: "/partner/subscription-requests",
+  collections: "/partner/collections",
   collectionRequests: "/partner/collection-requests",
+  payments: "/partner/payments",
   commissions: "/partner/commissions",
   payouts: "/partner/payouts",
+  contractAmendments: "/partner/contract-amendments",
+  kycRequests: "/partner/kyc-requests",
+  serviceDesk: "/partner/service-desk",
   reports: "/partner/reports",
   notifications: "/partner/notifications",
-  contractAmendments: "/partner/contract-amendments",
+  profile: "/partner/profile",
 });
 
 const CUSTOMER_ROUTES = buildRouteNamespace<CustomerRoutes>(roleRouteNamespaces.customer, {
@@ -260,16 +270,55 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
   // (Was ADMIN_WORKBENCH_NAVIGATION — condensed dummy landing pages, retired.)
   ADMIN: ADMIN_PARENT_NAVIGATION,
   PARTNER: [
-    { title: "Dashboard", icon: "dashboard", items: [{ label: "Dashboard", href: PARTNER_ROUTES.dashboard, icon: "dashboard" }] },
-    { title: "Product Catalog", icon: "products", items: [{ label: "Product Catalog", href: PARTNER_ROUTES.catalog, icon: "products" }] },
-    { title: "My Customers", icon: "customers", items: [{ label: "My Customers", href: PARTNER_ROUTES.customers, icon: "customers" }] },
-    { title: "Contract Amendments", icon: "subscriptions", items: [{ label: "Customer amendment requests", href: PARTNER_ROUTES.contractAmendments, icon: "subscriptions" }] },
-    { title: "Leads", icon: "leads", items: [{ label: "Leads", href: PARTNER_ROUTES.subscriptionRequests, icon: "leads" }] },
-    { title: "Commissions", icon: "collections", items: [{ label: "Commissions", href: PARTNER_ROUTES.commissions, icon: "commissions" }] },
-    { title: "Payouts", icon: "payoutBatches", items: [{ label: "Payouts", href: PARTNER_ROUTES.payouts, icon: "payoutBatches" }] },
-    { title: "Statements", icon: "reports", items: [{ label: "Statements", href: PARTNER_ROUTES.reports, icon: "reports" }] },
-    { title: "Support", icon: "support", items: [{ label: "Support", href: PARTNER_ROUTES.notifications, icon: "support" }] },
-    { title: "Profile", icon: "profile", items: [{ label: "Profile", href: PARTNER_ROUTES.dashboard, icon: "profile" }] },
+    {
+      title: "Home",
+      icon: "home",
+      items: [{ label: "Dashboard", href: PARTNER_ROUTES.dashboard, icon: "home" }],
+    },
+    {
+      title: "My Work",
+      icon: "customers",
+      items: [
+        { label: "My Customers", href: PARTNER_ROUTES.customers, icon: "customers" },
+        { label: "My Subscriptions", href: PARTNER_ROUTES.subscriptions, icon: "subscriptions" },
+        { label: "Submit a Collection", href: PARTNER_ROUTES.collections, icon: "collections" },
+        { label: "All Payments", href: PARTNER_ROUTES.payments, icon: "payments" },
+      ],
+    },
+    {
+      title: "My Earnings",
+      icon: "commissions",
+      items: [
+        { label: "Commission Ledger", href: PARTNER_ROUTES.commissions, icon: "commissions" },
+        { label: "Settled Payouts", href: PARTNER_ROUTES.payouts, icon: "payoutBatches" },
+      ],
+    },
+    {
+      title: "Products & Contracts",
+      icon: "products",
+      items: [
+        { label: "Product Catalog", href: PARTNER_ROUTES.catalog, icon: "products" },
+        { label: "Contract Amendments", href: PARTNER_ROUTES.contractAmendments, icon: "subscriptions" },
+      ],
+    },
+    {
+      title: "Requests",
+      icon: "serviceDesk",
+      items: [
+        { label: "Subscription Requests", href: PARTNER_ROUTES.subscriptionRequests, icon: "subscriptions" },
+        { label: "KYC & Login Requests", href: PARTNER_ROUTES.kycRequests, icon: "governance" },
+        { label: "Help & Service Desk", href: PARTNER_ROUTES.serviceDesk, icon: "support" },
+        { label: "Notifications", href: PARTNER_ROUTES.notifications, icon: "reminders" },
+      ],
+    },
+    {
+      title: "Reports & Account",
+      icon: "reports",
+      items: [
+        { label: "My Reports", href: PARTNER_ROUTES.reports, icon: "reports" },
+        { label: "My Account", href: PARTNER_ROUTES.profile, icon: "profile" },
+      ],
+    },
   ],
   CUSTOMER: [
     { title: "Dashboard", icon: "home", items: [{ label: "Dashboard", href: CUSTOMER_ROUTES.dashboard, icon: "home" }] },

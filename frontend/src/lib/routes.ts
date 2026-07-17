@@ -118,7 +118,7 @@ export const ROUTES = {
     aiSources: "/admin/ai/sources",
     aiQueryLog: "/admin/ai/query-log",
     aiReadiness: "/admin/ai/readiness",
-    partnerPaymentRequests: "/admin/partner-payment-requests",
+    partnerPaymentRequests: "/admin/partners/collection-requests", // Unified with partnersCollectionRequests
     auditLogs: "/admin/audit-logs",
     auditEvents: "/admin/audit/events",
     settings: "/admin/settings",
@@ -141,7 +141,7 @@ export const ROUTES = {
     settingsBusinessSetupDryRuns: "/admin/settings/business-setup/dry-runs",
     settingsBusinessSetupReset: "/admin/settings/business-setup/reset",
     settingsBusinessSetupDataMigration: "/admin/settings/business-setup/data-migration",
-    settingsBusinessCompliance: "/admin/settings/business-compliance",
+    settingsCompliancePolicies: "/admin/settings/compliance-policies",
     settingsLegalControls: "/admin/settings/legal-controls",
     complianceKyc: "/admin/compliance/kyc",
     revenueWorkbench: "/admin/revenue-workbench",
@@ -149,7 +149,6 @@ export const ROUTES = {
     settingsFinance: "/admin/settings/finance",
     settingsImports: "/admin/settings/imports",
     settingsMasters: "/admin/settings/masters",
-    settingsPolicies: "/admin/settings/policies",
     setupReadiness: "/admin/setup/readiness",
     brandData: "/admin/brand-data",
     branches: "/admin/branches",
@@ -208,7 +207,7 @@ export const ROUTES = {
     contractAmendments: "/admin/contract-amendments",
     contractAmendmentsNew: "/admin/contract-amendments/new",
     contractAmendmentsRecontractReport: "/admin/contract-amendments/recontract-report",
-    subscriptionRequests: "/admin/requests/subscriptions", // was /admin/subscription-requests — now canonical is requests/subscriptions
+    subscriptionRequests: "/admin/requests/product-requests", // was /admin/subscription-requests — now canonical is requests/subscriptions
     payments: "/admin/payments",
     paymentsCreate: "/admin/payments/create",
     paymentsHistory: "/admin/payments/history",
@@ -273,6 +272,7 @@ export const ROUTES = {
     requestsOnlineEnquiries: "/admin/requests/online-enquiries",
     requestsSupport: "/admin/requests/support",
     requestsSubscriptions: "/admin/requests/subscriptions",
+    requestsOnlineRequests: "/admin/requests/online-requests",
 
     // P2D: Enterprise Control
     controlRoot: "/admin/control",
@@ -413,12 +413,18 @@ export const ROUTES = {
     customers: "/partner/customers",
     subscriptions: "/partner/subscriptions",
     subscriptionRequests: "/partner/subscription-requests",
+    collections: "/partner/collections",
     collectionRequests: "/partner/collection-requests",
+    payments: "/partner/payments",
     commissions: "/partner/commissions",
     payouts: "/partner/payouts",
+    catalog: "/partner/catalog",
+    contractAmendments: "/partner/contract-amendments",
+    kycRequests: "/partner/kyc-requests",
+    serviceDesk: "/partner/service-desk",
     reports: "/partner/reports",
     notifications: "/partner/notifications",
-    contractAmendments: "/partner/contract-amendments",
+    profile: "/partner/profile",
   },
 
   customer: {

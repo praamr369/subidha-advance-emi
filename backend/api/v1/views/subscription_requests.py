@@ -75,6 +75,8 @@ def _serialize_request_products(request):
             "product_code": product.product_code,
             "base_price": str(product.base_price),
             "image": serialize_media_url(request, getattr(product, "image", None)),
+            "category": getattr(product, "category", "") or "",
+            "subcategory": getattr(product, "subcategory", "") or "",
         }
         for product in products
     ]

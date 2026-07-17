@@ -53,9 +53,17 @@ export type CatalogProduct = {
   media_url?: string;
   image?: string;
   category?: string;
+  subcategory?: string;
   description?: string;
+  product_code?: string;
+  base_specs?: Record<string, string>;
+  warranty_enabled?: boolean;
+  warranty_months_manufacturing?: number;
+  warranty_months_structural?: number;
+  warranty_months_extended_max?: number;
+  extended_warranty_cost_percentage?: string;
   purposes: { key: CatalogPurposeKey; label: string }[];
-  flags?: Record<string, unknown>;
+  flags?: Record<string, boolean>;
   [key: string]: unknown;
 };
 
@@ -69,9 +77,43 @@ export type CatalogFacets = {
 };
 
 export async function getCatalogFacets(role: CatalogRole): Promise<CatalogFacets> {
-  return { total: 0, purposes: [], brands: [], categories: [], price_min: 0, price_max: 0 };
+  const payload = await request(`/${role}/catalog/facets/`);
+  const data = (payload || {}) as any;
+  return {
+    total: data.total || 0,
+    purposes: data.purposes || [],
+    brands: [],
+    categories: data.categories || [],
+    price_min: 0,
+    price_max: 0,
+  };
 }
 
-export async function listCatalogProducts(role: CatalogRole, params: Record<string, unknown>): Promise<{ count: number; next: string | null; previous: string | null; results: CatalogProduct[] }> {
-  return { count: 0, next: null, previous: null, results: [] };
+export async function listCatalogProducts(
+  role: CatalogRole, 
+  params: Record<string, unknown>
+): Promise<{ count: number; next: string | null; previous: string | null; results: CatalogProduct[] }> {
+  const searchParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null) {
+      searchParams.set(key, String(value));
+    }
+  }
+  const query = searchParams.toString() ? `?${searchParams.toString()}` : "";
+  const payload = await request(`/${role}/catalog/${query}`);
+  const data = (payload || {}) as any;
+  return {
+    count: data.count || 0,
+    next: data.next || null,
+    previous: data.previous || null,
+    results: data.results || [],
+  };
+}
+
+export async function getCatalogProduct(
+  role: CatalogRole,
+  id: number | string
+): Promise<CatalogProduct> {
+  const payload = await request(`/${role}/catalog/${id}/`);
+  return payload as CatalogProduct;
 }

@@ -140,6 +140,21 @@ class SubscriptionRequestStatus(models.TextChoices):
     CANCELLED = "CANCELLED", "Cancelled"
 
 
+class ProductRequestType(models.TextChoices):
+    ADVANCE_EMI = "ADVANCE_EMI", "Advance EMI"
+    RENT = "RENT", "Rent"
+    LEASE = "LEASE", "Lease"
+    DIRECT_SALE = "DIRECT_SALE", "Direct Sale"
+
+
+class ProductRequestStatus(models.TextChoices):
+    SUBMITTED = "SUBMITTED", "Submitted"
+    APPROVED = "APPROVED", "Approved"
+    REJECTED = "REJECTED", "Rejected"
+    CANCELLED = "CANCELLED", "Cancelled"
+
+
+
 class FulfillmentStatus(models.TextChoices):
     PENDING = "PENDING", "Pending"
     DELIVERED = "DELIVERED", "Delivered"
@@ -830,13 +845,45 @@ class PublicLead(TimeStampedModel):
         null=True,
         blank=True,
     )
+    # Registration tracking (no auth → Customer with auth account)
     converted_customer = models.ForeignKey(
         "Customer",
         on_delete=models.SET_NULL,
         related_name="converted_public_leads",
         null=True,
         blank=True,
+        help_text="Customer account created when public lead registers",
     )
+
+    # Quote workflow tracking (PublicLead → OnlineRequest)
+    converted_online_request = models.ForeignKey(
+        "OnlineRequest",
+        on_delete=models.SET_NULL,
+        related_name="public_lead_source",
+        null=True,
+        blank=True,
+        help_text="OnlineRequest created when enquiry moved to quote workflow",
+    )
+
+    # Final request tracking (OnlineRequest → ProductRequest/SubscriptionRequest)
+    converted_product_request = models.ForeignKey(
+        "ProductRequest",
+        on_delete=models.SET_NULL,
+        related_name="public_lead_source",
+        null=True,
+        blank=True,
+        help_text="ProductRequest created when quote accepted",
+    )
+    converted_subscription_request = models.ForeignKey(
+        "SubscriptionRequest",
+        on_delete=models.SET_NULL,
+        related_name="public_lead_source",
+        null=True,
+        blank=True,
+        help_text="SubscriptionRequest created when quote accepted",
+    )
+
+    # Final fulfillment tracking
     converted_subscription = models.ForeignKey(
         "Subscription",
         on_delete=models.SET_NULL,
@@ -1045,6 +1092,17 @@ class SubscriptionRequest(TimeStampedModel):
     preferred_lucky_number = models.PositiveSmallIntegerField()
     requested_tenure_months_snapshot = models.PositiveIntegerField()
     notes = models.TextField(blank=True, default="")
+
+    # Source tracking (CRM Pipeline)
+    source_public_lead = models.ForeignKey(
+        "PublicLead",
+        on_delete=models.SET_NULL,
+        related_name="subscription_requests_from_lead",
+        null=True,
+        blank=True,
+        help_text="Original PublicLead if this request came from public enquiry",
+    )
+
     status = models.CharField(
         max_length=20,
         choices=SubscriptionRequestStatus.choices,
@@ -1060,12 +1118,38 @@ class SubscriptionRequest(TimeStampedModel):
     )
     reviewed_at = models.DateTimeField(null=True, blank=True, db_index=True)
     review_note = models.TextField(blank=True, default="")
+    # Fulfillment conversions
     approved_subscription = models.OneToOneField(
         "subscriptions.Subscription",
         on_delete=models.PROTECT,
         related_name="subscription_request",
         null=True,
         blank=True,
+        help_text="Subscription created (Advance EMI, Rent, or Lease)",
+    )
+    approved_direct_sale = models.OneToOneField(
+        "billing.DirectSale",
+        on_delete=models.SET_NULL,
+        related_name="subscription_request",
+        null=True,
+        blank=True,
+        help_text="Direct sale/invoice created",
+    )
+    approved_rent_profile = models.OneToOneField(
+        "RentSubscriptionProfile",
+        on_delete=models.SET_NULL,
+        related_name="subscription_request",
+        null=True,
+        blank=True,
+        help_text="Rent-specific profile (if subscription is RENT type)",
+    )
+    approved_lease_profile = models.OneToOneField(
+        "LeaseSubscriptionProfile",
+        on_delete=models.SET_NULL,
+        related_name="subscription_request",
+        null=True,
+        blank=True,
+        help_text="Lease-specific profile (if subscription is LEASE type)",
     )
     updated_at = models.DateTimeField(auto_now=True, db_index=True)
 
@@ -1178,7 +1262,210 @@ class SubscriptionRequest(TimeStampedModel):
         return f"SubscriptionRequest #{self.pk} - {self.status}"
 
 
+class ProductRequest(TimeStampedModel):
+    requester = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="product_requests",
+    )
+    requester_role_snapshot = models.CharField(max_length=20, db_index=True)
+    partner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="partner_product_requests",
+        null=True,
+        blank=True,
+    )
+    customer = models.ForeignKey(
+        "Customer",
+        on_delete=models.PROTECT,
+        related_name="product_requests",
+        null=True,
+        blank=True,
+    )
+    requested_customer_name = models.CharField(max_length=100, blank=True, default="")
+    requested_customer_phone = models.CharField(max_length=15, blank=True, default="")
+    requested_customer_email = models.EmailField(blank=True, default="")
+    requested_customer_address = models.TextField(blank=True, default="")
+    requested_customer_city = models.CharField(max_length=100, blank=True, default="")
+    product = models.ForeignKey(
+        "Product",
+        on_delete=models.PROTECT,
+        related_name="product_requests",
+    )
+    request_type = models.CharField(
+        max_length=20,
+        choices=ProductRequestType.choices,
+        db_index=True,
+    )
+    # Required for EMI
+    batch = models.ForeignKey(
+        "Batch",
+        on_delete=models.PROTECT,
+        related_name="product_requests",
+        null=True,
+        blank=True,
+    )
+    preferred_lucky_number = models.PositiveSmallIntegerField(null=True, blank=True)
+    requested_tenure_months_snapshot = models.PositiveIntegerField(null=True, blank=True)
+
+    notes = models.TextField(blank=True, default="")
+
+    # Source tracking (CRM Pipeline)
+    source_public_lead = models.ForeignKey(
+        "PublicLead",
+        on_delete=models.SET_NULL,
+        related_name="product_requests_from_lead",
+        null=True,
+        blank=True,
+        help_text="Original PublicLead if this request came from public enquiry",
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=ProductRequestStatus.choices,
+        default=ProductRequestStatus.SUBMITTED,
+        db_index=True,
+    )
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="reviewed_product_requests",
+        null=True,
+        blank=True,
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    review_note = models.TextField(blank=True, default="")
+    
+    # Fulfillment conversions (all request types can convert to these)
+    approved_subscription = models.OneToOneField(
+        "subscriptions.Subscription",
+        on_delete=models.PROTECT,
+        related_name="product_request",
+        null=True,
+        blank=True,
+        help_text="Subscription created (Advance EMI, Rent, or Lease)",
+    )
+    approved_direct_sale = models.OneToOneField(
+        "billing.DirectSale",
+        on_delete=models.PROTECT,
+        related_name="product_request",
+        null=True,
+        blank=True,
+        help_text="Direct sale/invoice created",
+    )
+    approved_rent_profile = models.OneToOneField(
+        "RentSubscriptionProfile",
+        on_delete=models.SET_NULL,
+        related_name="product_request",
+        null=True,
+        blank=True,
+        help_text="Rent-specific profile (if subscription is RENT type)",
+    )
+    approved_lease_profile = models.OneToOneField(
+        "LeaseSubscriptionProfile",
+        on_delete=models.SET_NULL,
+        related_name="product_request",
+        null=True,
+        blank=True,
+        help_text="Lease-specific profile (if subscription is LEASE type)",
+    )
+    updated_at = models.DateTimeField(auto_now=True, db_index=True)
+
+    class Meta:
+        db_table = "product_requests"
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["requester", "status"]),
+            models.Index(fields=["customer", "status"]),
+            models.Index(fields=["request_type", "status"]),
+            models.Index(fields=["created_at"]),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(preferred_lucky_number__isnull=True) | (Q(preferred_lucky_number__gte=0) & Q(preferred_lucky_number__lte=99)),
+                name="chk_product_request_lucky_number_range",
+            ),
+        ]
+
+    def clean(self):
+        errors = {}
+        valid_role_snapshots = {"ADMIN", "PARTNER", "CUSTOMER", "CASHIER"}
+
+        if not self.requester_role_snapshot or not self.requester_role_snapshot.strip():
+            errors["requester_role_snapshot"] = "Requester role snapshot is required."
+        elif self.requester_role_snapshot not in valid_role_snapshots:
+            errors["requester_role_snapshot"] = "Requester role snapshot is invalid."
+
+        if self.requester_role_snapshot == "CUSTOMER":
+            if self.partner_id:
+                errors["partner"] = "Customer requests cannot carry a partner."
+            if self.customer_id and self.customer.user_id != self.requester_id:
+                errors["customer"] = "Customer requests must be linked to the requesting customer profile."
+
+        if self.requester_role_snapshot == "PARTNER" and self.partner_id != self.requester_id:
+            errors["partner"] = "Partner requests must use the requesting partner identity."
+
+        if not self.customer_id:
+            if not self.requested_customer_name or not self.requested_customer_name.strip():
+                errors["requested_customer_name"] = "Customer name is required when no customer is linked."
+            if not self.requested_customer_phone or not self.requested_customer_phone.strip():
+                errors["requested_customer_phone"] = "Customer phone is required when no customer is linked."
+
+        if self.request_type == ProductRequestType.ADVANCE_EMI:
+            if not self.batch_id:
+                errors["batch"] = "Batch is required for EMI requests."
+            if self.preferred_lucky_number is None:
+                errors["preferred_lucky_number"] = "Lucky number is required for EMI requests."
+
+        if self.status == ProductRequestStatus.APPROVED:
+            if not self.approved_subscription_id and not self.approved_direct_sale_id:
+                errors["status"] = "Approved requests must link to an approved subscription or direct sale."
+            if not self.reviewed_by_id or not self.reviewed_at:
+                errors["reviewed_by"] = "Approved requests must store review metadata."
+
+        if self.status == ProductRequestStatus.REJECTED:
+            if not self.reviewed_by_id or not self.reviewed_at:
+                errors["reviewed_by"] = "Rejected requests must store review metadata."
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.requester_role_snapshot = (self.requester_role_snapshot or "").strip().upper()
+        self.requested_customer_name = (self.requested_customer_name or "").strip()
+        self.requested_customer_phone = (self.requested_customer_phone or "").strip()
+        self.requested_customer_email = (self.requested_customer_email or "").strip()
+        self.requested_customer_address = (self.requested_customer_address or "").strip()
+        self.requested_customer_city = (self.requested_customer_city or "").strip()
+        self.notes = (self.notes or "").strip()
+        self.review_note = (self.review_note or "").strip()
+
+        if self.customer_id:
+            self.requested_customer_name = self.requested_customer_name or self.customer.name
+            self.requested_customer_phone = self.requested_customer_phone or self.customer.phone
+            self.requested_customer_email = (
+                self.requested_customer_email
+                or getattr(self.customer.user, "email", "")
+                or ""
+            )
+            self.requested_customer_address = (
+                self.requested_customer_address or self.customer.address
+            )
+            self.requested_customer_city = self.requested_customer_city or self.customer.city
+
+        if self.request_type == ProductRequestType.ADVANCE_EMI and not self.requested_tenure_months_snapshot and self.batch_id:
+            self.requested_tenure_months_snapshot = self.batch.duration_months
+
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"ProductRequest #{self.pk} - {self.request_type} - {self.status}"
+
+
 # =====================================================
+
 # BATCH
 # =====================================================
 
@@ -2961,13 +3248,11 @@ class Payment(TimeStampedModel):
                 condition=~Q(idempotency_key=""),
                 name="uq_payment_idempotency_key",
             ),
-            # CTRL-LP-8 — Lucky-ID payment truth link: one payment record per EMI
-            # ensures a clean audit trail from payment → EMI → Subscription → LuckyId.
-            models.UniqueConstraint(
-                fields=["emi"],
-                condition=Q(emi__isnull=False),
-                name="uq_payment_per_emi",
-            ),
+            # CTRL-LP-8 note: the former uq_payment_per_emi constraint was removed to
+            # support partial and split-tender collections (e.g. part CASH + part UPI
+            # against the same EMI month). The payment → EMI → Subscription → LuckyId
+            # audit trail is preserved per payment row; over-collection is guarded in
+            # record_emi_payment via the EMI outstanding-balance check.
             models.CheckConstraint(
                 condition=Q(amount__gt=0),
                 name="chk_payment_amount_positive",
@@ -4524,6 +4809,7 @@ class CommissionPayoutBatch(models.Model):
     class Status(models.TextChoices):
         DRAFT = "DRAFT", "Draft"
         FINALIZED = "FINALIZED", "Finalized"
+        PAID = "PAID", "Paid"
         CANCELLED = "CANCELLED", "Cancelled"
 
     batch_code = models.CharField(max_length=50, unique=True)
@@ -6892,3 +7178,85 @@ class DepositForfeitureTaxInvoice(TimeStampedModel):
 
     def __str__(self):
         return f"ForfeitureInv {self.invoice_number} sub={self.subscription_id} [{self.status}]"
+
+
+# ============================================================
+# Partner → Customer KYC / Login Request
+# ============================================================
+
+class PartnerCustomerKycRequestType(models.TextChoices):
+    KYC_UPGRADE = "KYC_UPGRADE", "KYC Verification Request"
+    LOGIN_ID_SETUP = "LOGIN_ID_SETUP", "Login ID Setup Request"
+    KYC_DOCUMENT_UPLOAD = "KYC_DOCUMENT_UPLOAD", "KYC Document Upload Request"
+
+
+class PartnerCustomerKycRequestStatus(models.TextChoices):
+    PENDING = "PENDING", "Pending"
+    APPROVED = "APPROVED", "Approved"
+    REJECTED = "REJECTED", "Rejected"
+    MORE_INFO = "MORE_INFO", "More Information Needed"
+    IN_PROGRESS = "IN_PROGRESS", "In Progress"
+
+
+class PartnerCustomerKycRequest(models.Model):
+    """Partner-submitted request for admin to action a customer's KYC or login."""
+    partner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="customer_kyc_requests",
+        db_index=True,
+    )
+    customer = models.ForeignKey(
+        "subscriptions.Customer",
+        on_delete=models.PROTECT,
+        related_name="partner_kyc_requests",
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+    customer_name = models.CharField(max_length=200, blank=True, default="")
+    customer_phone = models.CharField(max_length=20, blank=True, default="")
+    request_type = models.CharField(
+        max_length=30,
+        choices=PartnerCustomerKycRequestType.choices,
+        default=PartnerCustomerKycRequestType.KYC_UPGRADE,
+        db_index=True,
+    )
+    notes = models.TextField(blank=True, default="")
+    status = models.CharField(
+        max_length=20,
+        choices=PartnerCustomerKycRequestStatus.choices,
+        default=PartnerCustomerKycRequestStatus.PENDING,
+        db_index=True,
+    )
+    admin_remarks = models.TextField(blank=True, default="")
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="reviewed_partner_kyc_requests",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["partner", "status"]),
+            models.Index(fields=["customer", "status"]),
+        ]
+
+    def __str__(self):
+        name = (
+            (self.customer.name if self.customer_id else None)
+            or self.customer_name
+            or "Unknown"
+        )
+        return f"{self.request_type} — {name} ({self.status})"
+
+
+# Import models so Django registers them
+from subscriptions.models_address import Address, ServiceZone, PincodeDatabase  # noqa
+from subscriptions.models_workbench import WorkbenchItem, WorkbenchAction  # noqa
+from subscriptions.models_online_request import OnlineRequest, OnlineRequestAction  # noqa

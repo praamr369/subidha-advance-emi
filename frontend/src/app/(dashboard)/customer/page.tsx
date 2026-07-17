@@ -1012,10 +1012,10 @@ export default function CustomerDashboardPage() {
                         ₹{Number(product.base_price).toLocaleString("en-IN")}
                       </div>
                       <Link
-                        href={ROUTES.customer.subscriptions}
+                        href={`/customer/catalog/${product.id}`}
                         className="mt-2 flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
                       >
-                        View my plans <ArrowRight className="h-3 w-3" />
+                        View product details <ArrowRight className="h-3 w-3" />
                       </Link>
                     </div>
                   </div>

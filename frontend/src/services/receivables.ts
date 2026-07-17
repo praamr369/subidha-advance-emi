@@ -311,6 +311,74 @@ export function resolveCashierContractReference(
   );
 }
 
+export type WorkbenchPaymentRow = {
+  payment_id: number;
+  date: string | null;
+  amount: string;
+  method: string;
+  reference_no: string;
+  receipt_no?: string;
+  collection_number?: string;
+  finance_account_id: number | null;
+};
+
+export type WorkbenchScheduleRow = {
+  period_label: string;
+  month_no?: number;
+  demand_id?: number;
+  demand_type?: string;
+  due_date: string | null;
+  amount: string;
+  paid_amount: string;
+  outstanding_amount: string;
+  status: string;
+  is_overdue: boolean;
+  payments: WorkbenchPaymentRow[];
+};
+
+export type WorkbenchOtherDue = {
+  source_type: ReceivableSourceType;
+  source_id: number;
+  reference: string;
+  due_amount: string;
+  overdue_amount: string;
+  next_due_date: string | null;
+  status: string;
+};
+
+export type ReceivableWorkbench = {
+  source_type: ReceivableSourceType;
+  source_id: number;
+  customer: { id: number | null; name: string; phone: string };
+  contract: {
+    reference: string;
+    plan_type: string;
+    status: string;
+    start_date: string | null;
+    tenure_months?: number;
+    monthly_amount?: string;
+    contract_value: string;
+    total_paid: string;
+    total_outstanding: string;
+    overdue_amount: string;
+    next_due: { label: string; due_date: string | null; amount: string } | null;
+    product_summary: string;
+  };
+  schedule: WorkbenchScheduleRow[];
+  other_dues: WorkbenchOtherDue[];
+};
+
+export function fetchAdminReceivableWorkbench(input: {
+  source_type: ReceivableSourceType;
+  source_id: number;
+}): Promise<ReceivableWorkbench> {
+  const params = new URLSearchParams({
+    source_type: input.source_type,
+    source_id: String(input.source_id),
+  });
+  return request<ReceivableWorkbench>(`/admin/receivables/workbench/?${params.toString()}`);
+}
+
 export function previewAdminReceivableAllocation(input: {
   source_type: ReceivableSourceType;
   source_id: number;

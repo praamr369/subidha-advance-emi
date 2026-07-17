@@ -70,7 +70,7 @@ export default function EligibilityCheckPage() {
 
         {/* Main Eligibility Card */}
         <div className={`bg-white rounded-lg shadow-lg p-8 mb-8 border-2 ${statusBorder}`}>
-          <div className="flex items-start gap-6">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:gap-6">
             {/* Status Icon */}
             <div className={`w-24 h-24 rounded-full ${statusBg} flex items-center justify-center flex-shrink-0`}>
               {isEligible ? (
@@ -92,7 +92,7 @@ export default function EligibilityCheckPage() {
               {data.reason && (
                 <p className="text-gray-600 mb-4">{data.reason}</p>
               )}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-2">
                 <div>
                   <p className="text-sm text-gray-500">Subscription Status</p>
                   <p className="text-lg font-semibold text-gray-900 capitalize">{data.subscription_status}</p>

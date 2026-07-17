@@ -118,6 +118,7 @@ class UnifiedReceivableCollectView(APIView):
                 note=validated.get("note"),
                 idempotency_key=validated.get("idempotency_key"),
                 contract_reference_id=validated.get("contract_reference_id"),
+                splits=validated.get("splits"),
             )
         except ValidationError as exc:
             detail = exc.message_dict if hasattr(exc, "message_dict") else exc.messages
@@ -171,4 +172,36 @@ class UnifiedReceivablePreviewView(APIView):
 
 
 class AdminUnifiedReceivablePreviewView(UnifiedReceivablePreviewView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+
+class UnifiedReceivableWorkbenchView(APIView):
+    """Read-only 360° context for one receivable before collection:
+    contract value, month-wise schedule with paid months + methods, and
+    every other open due of the same customer."""
+
+    permission_classes = [permissions.IsAuthenticated, IsCashierOrAdmin]
+
+    def get(self, request, *args, **kwargs):
+        from subscriptions.services.receivable_workbench_service import build_receivable_workbench
+
+        source_type = (request.query_params.get("source_type") or "").strip().upper()
+        try:
+            source_id = int(request.query_params.get("source_id") or 0)
+        except (TypeError, ValueError):
+            source_id = 0
+        if not source_type or source_id <= 0:
+            return Response(
+                {"detail": "source_type and source_id are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            payload = build_receivable_workbench(source_type=source_type, source_id=source_id)
+        except ValidationError as exc:
+            detail = exc.message_dict if hasattr(exc, "message_dict") else exc.messages
+            return Response({"detail": detail}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(payload, status=status.HTTP_200_OK)
+
+
+class AdminUnifiedReceivableWorkbenchView(UnifiedReceivableWorkbenchView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]

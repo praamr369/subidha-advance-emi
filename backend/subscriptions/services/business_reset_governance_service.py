@@ -53,6 +53,7 @@ RESET_SCOPE_REGISTRY: tuple[ResetScopeSpec, ...] = (
     ResetScopeSpec("SUBSCRIPTION_EMI_ONLY", "Subscriptions/EMI", "VERY_HIGH", ("subscriptions.Batch", "subscriptions.LuckyId", "subscriptions.Subscription", "subscriptions.Emi", "subscriptions.Payment", "subscriptions.LuckyDraw", "subscriptions.PaymentReconciliation", "subscriptions.Commission", "subscriptions.CommissionPayoutBatch"), True),
     ResetScopeSpec("RENT_LEASE_ONLY", "Rent/lease", "HIGH", ("subscriptions.RentSubscriptionProfile", "subscriptions.LeaseSubscriptionProfile", "subscriptions.RentLeaseDemand", "subscriptions.RentLeaseDepositLedger", "subscriptions.ProductPossession", "subscriptions.RentLeaseReturnInspection")),
     ResetScopeSpec("AUTH_ARTIFACTS_ONLY", "Auth artifacts", "MEDIUM", ("sessions.Session", "token_blacklist.OutstandingToken", "token_blacklist.BlacklistedToken", "accounts.PasswordResetRequest")),
+    ResetScopeSpec("MIGRATION_CENTER_ONLY", "Migration / import staging data", "MEDIUM", ("migration_center.MigrationBatch", "migration_center.MigrationStagingRow", "migration_center.MigrationMappingRule", "migration_center.MigrationAuditLog")),
     ResetScopeSpec("FULL_BUSINESS_DATA_EXCEPT_PRESERVED_ADMIN", "Full business reset except preserved admin", "VERY_HIGH", (), True),
 )
 
@@ -211,6 +212,8 @@ def _truncate_models(models: list[type]) -> None:
 
 
 def execute_modular_reset(*, scopes: list[str], preserve_username: str, confirmation_phrase: str, performed_by, backup_job_id: int | None = None) -> dict[str, Any]:
+    if not getattr(settings, "ALLOW_BUSINESS_RESET", True):
+        raise ValueError("Business reset is disabled on this server. Set ALLOW_BUSINESS_RESET=True in settings to enable it.")
     preview = build_reset_preview(scopes=scopes, preserve_username=preserve_username)
     if not preview["allowed"]:
         raise ValueError("Reset is blocked. Resolve blockers from preview before execution.")

@@ -1,22 +1,15 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { RefreshCw, Search } from "lucide-react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { ChevronRight, RefreshCw, Search, FileText } from "lucide-react";
 
-import ERPEmptyState from "@/components/erp/ERPEmptyState";
-import ERPErrorState from "@/components/erp/ERPErrorState";
-import ERPLoadingState from "@/components/erp/ERPLoadingState";
-import ActionButton from "@/components/ui/ActionButton";
-import DataTable, { type Column } from "@/components/ui/DataTable";
+import EmptyState from "@/components/feedback/EmptyState";
+import ErrorState from "@/components/feedback/ErrorState";
+import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PaginationControls from "@/components/ui/PaginationControls";
-import ERPPageShell from "@/components/erp/ERPPageShell";
-import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
-import TableToolbar from "@/components/ui/TableToolbar";
-import { WorkspaceNotice } from "@/components/ui/role-workspace";
-import { WorkspaceSection } from "@/components/ui/workspace";
-import { MobileSafeTable } from "@/components/ui/operations";
-import { formatPlanTypeLabel } from "@/lib/plan-labels";
+import StatusBadge from "@/components/ui/status-badge";
 import {
   listPartnerSubscriptionsRegister,
   type PartnerSubscriptionRegisterResponse,
@@ -30,21 +23,6 @@ function formatMoney(value?: string | number | null): string {
   const numeric = Number(value);
   if (Number.isNaN(numeric)) return String(value);
   return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value ?? 0));
-}
-
-function formatDate(value?: string | null): string {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-function statusToken(value?: string): string {
-  return String(value || "").trim().toUpperCase();
 }
 
 function toNumber(value?: string | number | null): number {
@@ -96,11 +74,8 @@ export default function PartnerSubscriptionsPage() {
 
   const loadSubscriptions = useCallback(
     async (mode: "initial" | "refresh" = "initial") => {
-      if (mode === "initial") {
-        setLoading(true);
-      } else {
-        setRefreshing(true);
-      }
+      if (mode === "initial") setLoading(true);
+      else setRefreshing(true);
 
       try {
         const response: PartnerSubscriptionRegisterResponse =
@@ -127,11 +102,8 @@ export default function PartnerSubscriptionsPage() {
         setHasNext(false);
         setHasPrevious(false);
       } finally {
-        if (mode === "initial") {
-          setLoading(false);
-        } else {
-          setRefreshing(false);
-        }
+        if (mode === "initial") setLoading(false);
+        else setRefreshing(false);
       }
     },
     [currentPage, customerFilter, initialStatus, q]
@@ -151,20 +123,16 @@ export default function PartnerSubscriptionsPage() {
     if (customerFilter) next.set("customer", customerFilter);
 
     const queryString = next.toString();
-    router.replace(
-      queryString ? `/partner/subscriptions?${queryString}` : "/partner/subscriptions"
-    );
+    router.replace(queryString ? `/partner/subscriptions?${queryString}` : "/partner/subscriptions");
   }
 
-  function clearFilters() {
+  function handleReset() {
     setSearchInput("");
     setStatusInput("");
     const next = new URLSearchParams();
     if (customerFilter) next.set("customer", customerFilter);
     const queryString = next.toString();
-    router.replace(
-      queryString ? `/partner/subscriptions?${queryString}` : "/partner/subscriptions"
-    );
+    router.replace(queryString ? `/partner/subscriptions?${queryString}` : "/partner/subscriptions");
   }
 
   function replacePage(targetPage: number) {
@@ -174,323 +142,137 @@ export default function PartnerSubscriptionsPage() {
     if (customerFilter) next.set("customer", customerFilter);
     if (targetPage > 1) next.set("page", String(targetPage));
     const queryString = next.toString();
-    router.replace(
-      queryString ? `/partner/subscriptions?${queryString}` : "/partner/subscriptions"
-    );
+    router.replace(queryString ? `/partner/subscriptions?${queryString}` : "/partner/subscriptions");
   }
 
-  const summary = useMemo(() => {
-    const pageActive = rows.filter((row) => statusToken(row.status) === "ACTIVE").length;
-    const pageCompleted = rows.filter((row) => statusToken(row.status) === "COMPLETED").length;
-    const pageWon = rows.filter((row) => statusToken(row.status) === "WON").length;
-    const pageOutstanding = rows.reduce((sum, row) => sum + getOutstandingAmount(row), 0);
-    return { pageActive, pageCompleted, pageWon, pageOutstanding };
-  }, [rows]);
-
-  const columns = useMemo<Column<PartnerSubscription>[]>(
-    () => [
-      {
-        key: "subscription_number",
-        title: "Subscription",
-        sortable: true,
-        render: (row) => (
-          <div className="space-y-1">
-            <div className="font-medium text-foreground">
-              {row.subscription_number || `SUB-${row.id}`}
-            </div>
-            <div className="text-xs text-muted-foreground">
-              Lucky #{row.lucky_number ?? "—"} · {formatPlanTypeLabel(row.plan_type)}
-            </div>
-          </div>
-        ),
-      },
-      {
-        key: "customer_name",
-        title: "Customer",
-        sortable: true,
-        render: (row) => (
-          <div className="space-y-1">
-            <div className="font-medium text-foreground">{row.customer_name || "—"}</div>
-            <div className="text-xs text-muted-foreground">{row.customer_phone || "—"}</div>
-          </div>
-        ),
-      },
-      {
-        key: "product_name",
-        title: "Product / Batch",
-        render: (row) => (
-          <div className="space-y-2">
-            <div className="text-sm text-foreground">{row.product_name || "—"}</div>
-            <div className="flex flex-wrap gap-2">
-              <ERPStatusBadge
-                status={row.batch_status || "OPEN"}
-                label={row.batch_code || "No batch"}
-              />
-            </div>
-          </div>
-        ),
-      },
-      {
-        key: "status",
-        title: "Contract State",
-        sortable: true,
-        render: (row) => (
-          <div className="space-y-2">
-            <ERPStatusBadge status={row.status || "PENDING"} />
-            {getOutstandingAmount(row) > 0 ? (
-              <ERPStatusBadge status="PENDING" label={`Outstanding ${formatMoney(getOutstandingAmount(row))}`} />
-            ) : (
-              <ERPStatusBadge status="PAID" label="No Outstanding" />
-            )}
-          </div>
-        ),
-      },
-      {
-        key: "monthly_amount",
-        title: "Financial",
-        align: "right",
-        render: (row) => (
-          <div className="space-y-1 text-right">
-            <div className="font-semibold text-foreground">
-              {formatMoney(row.monthly_amount)}
-            </div>
-            <div className="text-xs text-muted-foreground">
-              Total {formatMoney(row.total_amount)}
-            </div>
-            <div className="text-xs text-muted-foreground">
-              {row.pending_emi_count ?? 0} pending EMI
-            </div>
-          </div>
-        ),
-      },
-      {
-        key: "next_due_date",
-        title: "Timing",
-        sortable: true,
-        sortAccessor: (row) => Date.parse(row.next_due_date || row.start_date || "") || 0,
-        render: (row) => (
-          <div className="space-y-1">
-            <div className="text-sm text-foreground">Start {formatDate(row.start_date)}</div>
-            <div className="text-xs text-muted-foreground">
-              Next due {formatDate(row.next_due_date)}
-            </div>
-            <div className="text-xs text-muted-foreground">
-              Last payment {formatDate(row.last_payment_date)}
-            </div>
-          </div>
-        ),
-      },
-    ],
-    []
-  );
-
   return (
-    <ERPPageShell
-      eyebrow="Partner Contracts"
-      title="Partner Subscriptions"
-      subtitle="Review only the subscriptions attributed to your partner scope, with clearer contract state, outstanding amount, and next action visibility."
-      helperNote="This register is partner-scoped visibility only. Admin-only lifecycle controls, finance settlement, and payout authorization stay outside this workspace."
-      helperTone="info"
-      breadcrumbs={[
-        { label: "Partner", href: "/partner" },
-        { label: "Subscriptions" },
-      ]}
-      actions={[
-        {
-          href: "/partner/subscription-requests",
-          label: "Subscription Requests",
-          variant: "primary",
-        },
-        {
-          href: "/partner/customers",
-          label: "Customers",
-          variant: "secondary",
-        },
-        {
-          href: "/partner/collections",
-          label: "Collections",
-          variant: "secondary",
-        },
-      ]}
-      stats={[
-        { label: "Matching", value: count },
-        { label: "Page Active", value: summary.pageActive, tone: "success" },
-        {
-          label: "Page Completed",
-          value: summary.pageCompleted,
-          tone: summary.pageCompleted > 0 ? "default" : undefined,
-        },
-        { label: "Page Outstanding", value: formatMoney(summary.pageOutstanding), tone: "warning" },
-      ]}
-      statusBadge={{ label: "Partner contract scope", tone: "info" }}
-    >
-      <div className="space-y-6">
-        <WorkspaceSection
-          title="Subscription workflow"
-          description="Filter by contract status, search within the current partner scope, and jump directly into detail or collection actions."
-          action={
-            <ActionButton
-              type="button"
-              variant="outline"
-              onClick={() => void loadSubscriptions("refresh")}
-              disabled={refreshing || loading}
-              leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
-            >
-              {refreshing ? "Refreshing..." : "Refresh"}
-            </ActionButton>
-          }
+    <div className="flex flex-col p-4 space-y-5">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-foreground">Subscriptions</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Manage your partner subscriptions
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void loadSubscriptions("refresh")}
+          disabled={refreshing}
+          className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground shadow-sm transition hover:bg-muted disabled:opacity-50"
         >
-          <TableToolbar
-            footer={
-              q || initialStatus || customerFilter ? (
-                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <span className="font-semibold uppercase tracking-[0.14em]">Active filters</span>
-                  {q ? <ERPStatusBadge status="OPEN" label={`Search: ${q}`} hideIcon /> : null}
-                  {initialStatus ? <ERPStatusBadge status={initialStatus} hideIcon /> : null}
-                  {customerFilter ? (
-                    <ERPStatusBadge status="ASSIGNED" label={`Customer scope: ${customerFilter}`} hideIcon />
+          <RefreshCw className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
+        </button>
+      </div>
+
+      {/* Stats Summary */}
+      <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <FileText className="size-5" />
+        </div>
+        <div>
+          <div className="text-xl font-bold text-foreground">{count}</div>
+          <div className="text-xs font-medium text-muted-foreground">Total Subscriptions</div>
+        </div>
+      </div>
+
+      {/* Search & Filters */}
+      <form onSubmit={handleApplyFilters} className="space-y-3">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="text"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search customer, phone, product..."
+            className="h-12 w-full rounded-2xl border border-border bg-background pl-10 pr-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+          />
+        </div>
+        <div className="flex gap-2">
+          <select
+            value={statusInput}
+            onChange={(e) => setStatusInput(e.target.value as FilterStatus)}
+            className="h-10 flex-1 rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+          >
+            <option value="">All Statuses</option>
+            <option value="ACTIVE">Active</option>
+            <option value="COMPLETED">Completed</option>
+            <option value="WON">Won</option>
+            <option value="DEFAULTED">Defaulted</option>
+          </select>
+          <button
+            type="submit"
+            className="h-10 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground active:scale-95"
+          >
+            Apply
+          </button>
+          {(q || initialStatus) && (
+            <button
+              type="button"
+              onClick={handleReset}
+              className="h-10 rounded-xl border border-border bg-card px-4 text-sm font-bold text-foreground active:scale-95"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      </form>
+
+      {/* List */}
+      <div className="space-y-3">
+        {loading ? (
+          <LoadingBlock label="Loading subscriptions..." />
+        ) : error ? (
+          <ErrorState title="Error" description={error} onRetry={() => void loadSubscriptions("initial")} />
+        ) : count === 0 ? (
+          <EmptyState
+            title="No subscriptions found"
+            description={q || initialStatus || customerFilter ? "No subscriptions matched your filters." : "You have no subscriptions yet."}
+          />
+        ) : (
+          rows.map((row) => (
+            <Link
+              key={row.id}
+              href={`/partner/subscriptions/${row.id}`}
+              className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm transition active:scale-95"
+            >
+              <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-xs font-bold text-primary">
+                #{row.lucky_number ?? "—"}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="font-bold text-foreground text-sm truncate">{row.subscription_number || `SUB-${row.id}`}</div>
+                <div className="mt-0.5 text-xs font-medium text-muted-foreground truncate">{row.customer_name || "—"} · {row.customer_phone || ""}</div>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <StatusBadge status={row.status || "PENDING"} />
+                  {getOutstandingAmount(row) > 0 ? (
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                      Due {formatMoney(getOutstandingAmount(row))}
+                    </span>
                   ) : null}
                 </div>
-              ) : (
-                <div className="text-sm text-muted-foreground">
-                  This screen stays partner-scoped and excludes admin-only financial controls. It improves follow-up visibility only.
-                </div>
-              )
-            }
-          >
-            <form
-              onSubmit={handleApplyFilters}
-              className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_auto]"
-            >
-              <label className="relative block">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  type="text"
-                  value={searchInput}
-                  onChange={(event) => setSearchInput(event.target.value)}
-                  placeholder="Search customer, phone, product, batch, lucky no."
-                  className="h-10 w-full rounded-xl border border-border bg-background pl-9 pr-4 text-sm outline-none transition focus:border-ring"
-                />
-              </label>
-
-              <select
-                value={statusInput}
-                onChange={(event) => setStatusInput(event.target.value as FilterStatus)}
-                className="h-10 rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
-              >
-                <option value="">All states</option>
-                <option value="ACTIVE">Active</option>
-                <option value="COMPLETED">Completed</option>
-                <option value="WON">Won</option>
-                <option value="DEFAULTED">Defaulted</option>
-              </select>
-
-              <div className="flex flex-wrap gap-2">
-                <ActionButton type="submit">
-                  Apply
-                </ActionButton>
-                <ActionButton type="button" variant="outline" onClick={clearFilters}>
-                  Reset
-                </ActionButton>
-                {customerFilter ? (
-                  <ActionButton
-                    type="button"
-                    variant="ghost"
-                    onClick={() => router.replace("/partner/subscriptions")}
-                  >
-                    Clear Scope
-                  </ActionButton>
-                ) : null}
               </div>
-            </form>
-          </TableToolbar>
-        </WorkspaceSection>
+              <ChevronRight className="size-5 shrink-0 text-muted-foreground/50" />
+            </Link>
+          ))
+        )}
 
-        {loading ? <ERPLoadingState label="Loading subscriptions..." /> : null}
-
-        {!loading && error ? (
-          <ERPErrorState
-            title="Failed to load subscriptions"
-            description={error}
-            onRetry={() => void loadSubscriptions("initial")}
-          />
-        ) : null}
-
-        {!loading && !error ? (
-          <WorkspaceSection
-            title="Subscription rows"
-            description="Open the partner subscription detail page for EMI schedule and payment progress, or jump directly into collection workflow."
-          >
-            {count === 0 ? (
-              <ERPEmptyState
-                title="No subscriptions found"
-                description="No subscriptions matched the current partner scope and filter set."
-              />
-            ) : rows.length === 0 ? (
-              <ERPEmptyState
-                title="No rows on this page"
-                description="The current page has no results. Move to a previous page or change the filters."
-              />
-            ) : (
-              <MobileSafeTable className="border-none bg-transparent">
-                <DataTable<PartnerSubscription>
-                  rows={rows}
-                  columns={columns}
-                  pageSize={PAGE_SIZE}
-                  onRowClick={(row) => router.push(`/partner/subscriptions/${row.id}`)}
-                  rowActions={(row) => (
-                    <div className="flex flex-wrap gap-2">
-                      <ActionButton
-                        href={`/partner/subscriptions/${row.id}`}
-                        variant="outline"
-                        className="min-h-11"
-                      >
-                        View Detail
-                      </ActionButton>
-                      {row.customer ? (
-                        <ActionButton
-                          href={`/partner/customers/${row.customer}`}
-                          variant="ghost"
-                          className="min-h-11"
-                        >
-                          Customer
-                        </ActionButton>
-                      ) : null}
-                      <ActionButton
-                        href={`/partner/collections/create?subscription=${row.id}`}
-                        variant="ghost"
-                        className="min-h-11"
-                      >
-                        Collect
-                      </ActionButton>
-                    </div>
-                  )}
-                />
-              </MobileSafeTable>
-            )}
-
-            <div className="mt-5">
-              <WorkspaceNotice tone="info" title="Contract follow-up boundary">
-                This register is for partner contract visibility and next-step routing only. Payment posting still flows through collection requests, while reconciliation and payout controls remain protected in separate finance workflows.
-              </WorkspaceNotice>
-            </div>
-
-            {count > 0 ? (
-              <PaginationControls
-                count={count}
-                page={page}
-                pageSize={PAGE_SIZE}
-                numPages={numPages}
-                hasNext={hasNext}
-                hasPrevious={hasPrevious}
-                disabled={loading || refreshing}
-                onPrevious={() => replacePage(Math.max(page - 1, 1))}
-                onNext={() => replacePage(page + 1)}
-              />
-            ) : null}
-          </WorkspaceSection>
+        {/* Pagination */}
+        {count > 0 ? (
+          <div className="pt-4">
+            <PaginationControls
+              count={count}
+              page={page}
+              pageSize={PAGE_SIZE}
+              numPages={numPages}
+              hasNext={hasNext}
+              hasPrevious={hasPrevious}
+              disabled={loading || refreshing}
+              onPrevious={() => replacePage(Math.max(page - 1, 1))}
+              onNext={() => replacePage(page + 1)}
+            />
+          </div>
         ) : null}
       </div>
-    </ERPPageShell>
+    </div>
   );
 }

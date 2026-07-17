@@ -55,6 +55,11 @@ export type ProductRecord = {
   inventory_ready?: boolean;
   inventory_stock_tracking_enabled?: boolean;
   inventory_delivery_stock_bridge_enabled?: boolean;
+  warranty_enabled?: boolean;
+  warranty_months_manufacturing?: number;
+  warranty_months_structural?: number;
+  warranty_months_extended_max?: number;
+  extended_warranty_cost_percentage?: string | number;
   readiness_badges?: string[];
   missing_fields?: string[];
   next_actions?: string[];

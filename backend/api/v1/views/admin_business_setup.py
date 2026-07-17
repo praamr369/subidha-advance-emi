@@ -646,3 +646,52 @@ class AdminLocalSandboxResetView(APIView):
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(result, status=status.HTTP_200_OK)
+
+
+class AdminServerDateView(APIView):
+    """Return the current server date so the frontend can verify the Indian FY without trusting the browser clock."""
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        from django.utils import timezone
+        now = timezone.now()
+        return Response({
+            "server_date": now.date().isoformat(),
+            "server_datetime": now.isoformat(),
+        }, status=status.HTTP_200_OK)
+
+
+class AdminBusinessLogoUploadView(APIView):
+    """
+    POST /api/v1/admin/business-setup/profile/logo/upload/
+    Accepts multipart/form-data with 'file'. Saves to storage and returns URL.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        file = request.FILES.get("file")
+        if not file:
+            return Response({"detail": "File is required. Send as 'file'."}, status=status.HTTP_400_BAD_REQUEST)
+
+        allowed_types = {"image/jpeg", "image/png", "image/svg+xml", "image/webp"}
+        if file.content_type not in allowed_types:
+            return Response({"detail": "Only JPEG, PNG, SVG, or WebP images are accepted."}, status=status.HTTP_400_BAD_REQUEST)
+
+        max_size = 5 * 1024 * 1024
+        if file.size > max_size:
+            return Response({"detail": "File must be smaller than 5 MB."}, status=status.HTTP_400_BAD_REQUEST)
+
+        from django.core.files.storage import default_storage
+        import os
+        import uuid
+
+        ext = os.path.splitext(file.name)[1].lower()
+        if not ext and file.content_type == "image/svg+xml":
+            ext = ".svg"
+        filename = f"business/logos/logo_{uuid.uuid4().hex[:12]}{ext}"
+        
+        path = default_storage.save(filename, file)
+        url = request.build_absolute_uri(default_storage.url(path))
+        
+        return Response({"url": url}, status=status.HTTP_201_CREATED)

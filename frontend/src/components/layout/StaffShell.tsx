@@ -6,6 +6,8 @@ import type { ReactNode } from "react";
 
 import RoleGuard from "@/components/guards/RoleGuard";
 import { ROUTES } from "@/lib/routes";
+import { LogOut } from "lucide-react";
+import { useLogout } from "@/hooks/useLogout";
 
 const STAFF_NAV = [
   { href: ROUTES.staff.dashboard, label: "Dashboard" },
@@ -23,6 +25,7 @@ function isActive(pathname: string, href: string): boolean {
 
 export default function StaffShell({ children }: { children: ReactNode }) {
   const pathname = usePathname() || "";
+  const { logout, isLoggingOut } = useLogout();
 
   return (
     <RoleGuard allowedRoles={["STAFF"]}>
@@ -47,6 +50,15 @@ export default function StaffShell({ children }: { children: ReactNode }) {
                   {item.label}
                 </Link>
               ))}
+              <button
+                type="button"
+                onClick={logout}
+                disabled={isLoggingOut}
+                className="flex items-center gap-1.5 rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-destructive transition hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50"
+              >
+                <LogOut className="h-4 w-4" />
+                {isLoggingOut ? "Logging out..." : "Logout"}
+              </button>
             </nav>
           </div>
         </header>

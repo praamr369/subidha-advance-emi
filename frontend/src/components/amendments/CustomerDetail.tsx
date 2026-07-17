@@ -175,7 +175,7 @@ function ProductRecontractCustomerConsentPanel({
         {preview.schedule_preview_lines && preview.schedule_preview_lines.length > 0 ? (
           <div className="rounded-xl border border-border bg-muted/20 p-3">
             <div className="text-xs font-semibold uppercase text-muted-foreground">Future EMI schedule preview lines (read-only)</div>
-            <div className="mt-2 overflow-auto">
+            <div className="mt-2 overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="text-left text-muted-foreground">

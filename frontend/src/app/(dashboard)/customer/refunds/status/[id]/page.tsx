@@ -62,28 +62,28 @@ export default function RefundStatusPage() {
         {data && (
           <>
             <WorkspaceSection title="Progress">
-              <div className="relative">
-                <div className="flex items-center justify-between">
-                  {STATUS_STEPS.map((step, i) => (
-                    <div key={step.key} className="flex flex-col items-center flex-1">
+              <div className="flex items-start justify-between gap-0">
+                {STATUS_STEPS.map((step, i) => (
+                  <div key={step.key} className="flex flex-1 flex-col items-center">
+                    <div className="flex w-full items-center">
                       <div
-                        className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 ${
+                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold ${
                           i <= currentStep
-                            ? "bg-blue-600 border-blue-600 text-white"
-                            : "bg-white dark:bg-gray-800 border-gray-300 text-gray-400"
+                            ? "border-blue-600 bg-blue-600 text-white"
+                            : "border-gray-300 bg-white text-gray-400 dark:bg-gray-800"
                         }`}
                       >
                         {i < currentStep ? "✓" : i + 1}
                       </div>
-                      <div className="text-xs mt-1 text-center w-16 hidden sm:block">{step.label}</div>
                       {i < STATUS_STEPS.length - 1 && (
-                        <div className={`absolute top-4 h-0.5 ${i < currentStep ? "bg-blue-600" : "bg-gray-200"}`}
-                          style={{ left: `${(i + 0.5) * (100 / STATUS_STEPS.length)}%`, width: `${100 / STATUS_STEPS.length}%` }}
+                        <div
+                          className={`h-0.5 flex-1 ${i < currentStep ? "bg-blue-600" : "bg-gray-200"}`}
                         />
                       )}
                     </div>
-                  ))}
-                </div>
+                    <div className="mt-1 hidden text-center text-xs sm:block">{step.label}</div>
+                  </div>
+                ))}
               </div>
               <div className="mt-4 text-center">
                 <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200">
@@ -93,7 +93,7 @@ export default function RefundStatusPage() {
             </WorkspaceSection>
 
             <WorkspaceSection title="Refund Details">
-              <dl className="grid grid-cols-2 gap-4 text-sm">
+              <dl className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
                 <div>
                   <dt className="text-gray-500">Return Reason</dt>
                   <dd className="font-medium mt-1">{data.reason.replace(/_/g, " ")}</dd>

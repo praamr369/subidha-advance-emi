@@ -5,21 +5,13 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import type { CatalogProduct } from "@/services/catalog";
 
 function buildCustomerCtas(product: CatalogProduct): CatalogCta[] {
-  const ctas: CatalogCta[] = [];
-  if (product.flags?.emi) {
-    ctas.push({
-      label: "Request EMI plan",
-      href: `/customer/subscription-requests/create?product=${product.id}`,
-    });
-  }
-  // Rent / lease / direct-sale / generic purchase all route through a support
-  // enquiry so the admin can convert it into the right contract type.
-  ctas.push({
-    label: product.flags?.emi ? "Purchase request" : "Request this product",
-    href: `/customer/support/new?product=${product.id}`,
-    variant: product.flags?.emi ? "secondary" : "primary",
-  });
-  return ctas;
+  return [
+    {
+      label: "View Details",
+      href: `/customer/catalog/${product.id}`,
+      variant: "primary",
+    }
+  ];
 }
 
 export default function CustomerCatalogPage() {
@@ -29,7 +21,7 @@ export default function CustomerCatalogPage() {
       subtitle="Browse admin-approved products for EMI, rent, lease, direct sale, or a purchase request."
       breadcrumbs={[{ label: "Customer", href: "/customer" }, { label: "Product Catalog" }]}
       actions={[
-        { href: "/customer/subscription-requests", label: "My Requests", variant: "secondary" },
+        { href: "/customer/product-requests", label: "My Requests", variant: "secondary" },
         { href: "/customer/direct-sales", label: "Direct Sales", variant: "secondary" },
       ]}
     >

@@ -4,10 +4,9 @@ import Link from "next/link";
 import { Search } from "lucide-react";
 import { type FormEvent } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
 import { TableSkeleton } from "@/components/feedback/Skeleton";
 import { WorkspaceSection as SectionCard } from "@/components/ui/workspace";
+import { EmptyState, ErrorState } from "@/components/admin-workbench";
 import type { UnifiedReceivableResult, UnifiedReceivableResultType } from "@/services/receivables";
 
 function money(value: string | number | null | undefined): string {

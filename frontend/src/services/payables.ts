@@ -21,6 +21,7 @@ export interface PayableItem {
   status: string;
   date: string | null;
   journal_posted: boolean;
+  journal_id?: number | null;
   needs_posting: boolean;
   notes: string;
 }
@@ -67,13 +68,26 @@ export interface PayableExecuteResult {
   message: string;
 }
 
+export interface PayableActionRequest {
+  payable_type: PayableType;
+  payable_id: number;
+  action: "approve" | "reject" | "cancel" | "submit" | "finalize";
+}
+
+export interface PayableActionResult {
+  success: boolean;
+  message: string;
+}
+
 export async function getUnifiedPayables(params?: {
   payable_type?: string;
   search?: string;
+  status_category?: string;
 }): Promise<UnifiedPayableData> {
   const qs = new URLSearchParams();
   if (params?.payable_type) qs.set("payable_type", params.payable_type);
   if (params?.search) qs.set("search", params.search);
+  if (params?.status_category) qs.set("status_category", params.status_category);
   const suffix = qs.toString() ? `?${qs}` : "";
   return apiFetch<UnifiedPayableData>(`/admin/payables/${suffix}`);
 }
@@ -86,6 +100,15 @@ export async function executePayable(
   payload: PayableExecuteRequest
 ): Promise<PayableExecuteResult> {
   return apiFetch<PayableExecuteResult>("/admin/payables/execute/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function executePayableAction(
+  payload: PayableActionRequest
+): Promise<PayableActionResult> {
+  return apiFetch<PayableActionResult>("/admin/payables/action/", {
     method: "POST",
     body: JSON.stringify(payload),
   });

@@ -194,29 +194,54 @@ export default function BranchesAndDesksWorkbench() {
                 </section>
 
                 <section className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-                  <div className="p-6 border-b border-border/50 bg-muted/10">
-                    <h3 className="text-lg font-bold text-foreground">Active branch register</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">Use /admin/branches to create or edit. Exactly one active branch should be primary.</p>
+                  <div className="flex items-center justify-between p-6 border-b border-border/50 bg-muted/10">
+                    <div>
+                      <h3 className="text-lg font-bold text-foreground">Active branch register</h3>
+                      <p className="mt-1 text-sm text-muted-foreground">Exactly one active branch should be marked primary. Use the branch master to create or edit.</p>
+                    </div>
+                    <Link href={ROUTES.admin.branches} className="rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-accent shadow-sm">
+                      Open branch master →
+                    </Link>
                   </div>
                   <div className="p-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3 bg-card">
-                    {branches.length === 0 && !loading ? <div className="col-span-full rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">No branch rows returned.</div> : null}
-                    {branches.map((branch) => (
-                      <div key={branch.id} className="group relative rounded-2xl border border-border bg-background p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/20">
-                        <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
-                          <div>
-                            <div className="text-lg font-bold text-foreground tracking-tight">{branch.name}</div>
-                            <div className="text-xs font-semibold text-muted-foreground mt-0.5 uppercase tracking-wider">{branch.code}</div>
-                          </div>
-                          <div className="flex flex-col items-end gap-1.5">
-                            <span className={badgeClass(branch.status === "ACTIVE" ? "green" : "slate")}>{branch.status}</span>
-                            {branch.is_primary ? <span className={badgeClass("blue")}>Primary</span> : null}
-                          </div>
-                        </div>
-                        <div className="text-sm text-muted-foreground leading-relaxed mt-4 pt-4 border-t border-border/50">
-                          {branch.address || branch.phone || branch.email || "No contact/address metadata yet."}
-                        </div>
+                    {branches.length === 0 && !loading ? (
+                      <div className="col-span-full flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border p-10 text-center">
+                        <p className="text-sm text-muted-foreground">No branches configured yet.</p>
+                        <Link href={ROUTES.admin.branches} className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:bg-primary/90">Create first branch →</Link>
                       </div>
-                    ))}
+                    ) : null}
+                    {branches.map((branch) => {
+                      const branchCounters = counters.filter((c) => c.branch === branch.id);
+                      return (
+                        <div key={branch.id} className="group relative rounded-2xl border border-border bg-background p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/20">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <div className="text-lg font-bold text-foreground tracking-tight">{branch.name}</div>
+                              <div className="text-xs font-semibold text-muted-foreground mt-0.5 uppercase tracking-wider">{branch.code}</div>
+                            </div>
+                            <div className="flex flex-col items-end gap-1.5">
+                              <span className={badgeClass(branch.status === "ACTIVE" ? "green" : "slate")}>{branch.status}</span>
+                              {branch.is_primary ? <span className={badgeClass("blue")}>Primary</span> : null}
+                            </div>
+                          </div>
+                          <div className="mt-4 pt-4 border-t border-border/50 space-y-1.5 text-sm">
+                            {branch.phone ? <div className="flex items-center gap-2 text-muted-foreground"><span className="text-xs font-semibold w-14 shrink-0">Phone</span><span>{branch.phone}</span></div> : null}
+                            {branch.email ? <div className="flex items-center gap-2 text-muted-foreground"><span className="text-xs font-semibold w-14 shrink-0">Email</span><span className="truncate">{branch.email}</span></div> : null}
+                            {branch.address ? <div className="flex items-start gap-2 text-muted-foreground"><span className="text-xs font-semibold w-14 shrink-0 pt-0.5">Address</span><span>{branch.address}</span></div> : null}
+                            {!branch.phone && !branch.email && !branch.address ? <p className="text-muted-foreground/60 text-xs">No contact / address saved yet.</p> : null}
+                          </div>
+                          <div className="mt-3 pt-3 border-t border-border/50 flex items-center gap-2">
+                            <span className={badgeClass(branchCounters.length > 0 ? "green" : "red")}>
+                              {branchCounters.length} counter{branchCounters.length !== 1 ? "s" : ""}
+                            </span>
+                            {branchCounters.map((c) => (
+                              <span key={c.id} className="text-xs text-muted-foreground">{c.name}</span>
+                            ))}
+                            {branchCounters.length === 0 ? <span className="text-xs text-red-700">No counter — cannot collect money</span> : null}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </section>
               </div>
@@ -249,15 +274,75 @@ export default function BranchesAndDesksWorkbench() {
                 </section>
 
                 <section className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-                  <div className="p-6 border-b border-border/50 bg-muted/10">
-                    <h3 className="text-lg font-bold text-foreground">Operational Rules for Cash Desks</h3>
+                  <div className="flex items-center justify-between p-6 border-b border-border/50 bg-muted/10">
+                    <div>
+                      <h3 className="text-lg font-bold text-foreground">Counter register</h3>
+                      <p className="mt-1 text-sm text-muted-foreground">Each counter maps one branch to one finance account. Cashiers collect through counters.</p>
+                    </div>
+                    <Link href={ROUTES.admin.counters} className="rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-accent shadow-sm">
+                      Manage counters →
+                    </Link>
                   </div>
-                  <div className="p-6">
-                    <ul className="list-disc space-y-3 pl-6 text-sm text-muted-foreground leading-relaxed">
+                  {counters.length === 0 && !loading ? (
+                    <div className="p-10 flex flex-col items-center gap-3 text-center">
+                      <p className="text-sm text-muted-foreground">No active counters yet. Create one after setting up a branch and finance account.</p>
+                      <Link href={ROUTES.admin.counters} className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:bg-primary/90">Create first counter →</Link>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-muted/30 border-b border-border/50">
+                          <tr className="text-left text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                            <th className="px-5 py-3">Counter</th>
+                            <th className="px-5 py-3">Branch</th>
+                            <th className="px-5 py-3">Finance account</th>
+                            <th className="px-5 py-3">Assigned to</th>
+                            <th className="px-5 py-3">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/40">
+                          {counters.map((counter) => (
+                            <tr key={counter.id} className="bg-background hover:bg-muted/20 transition-colors">
+                              <td className="px-5 py-4">
+                                <div className="font-semibold text-foreground">{counter.name}</div>
+                                <div className="text-xs text-muted-foreground uppercase tracking-wider mt-0.5">{counter.code}</div>
+                              </td>
+                              <td className="px-5 py-4 text-muted-foreground">
+                                {counter.branch_name || <span className="text-red-600 font-semibold">No branch</span>}
+                                {counter.branch_code ? <div className="text-xs uppercase tracking-wider mt-0.5">{counter.branch_code}</div> : null}
+                              </td>
+                              <td className="px-5 py-4 text-muted-foreground">
+                                {counter.finance_account_name || <span className="text-red-600 font-semibold">Not mapped</span>}
+                              </td>
+                              <td className="px-5 py-4 text-muted-foreground">
+                                {counter.assigned_user_username
+                                  ? <span className="font-medium text-foreground">{counter.assigned_user_username}</span>
+                                  : <span className="text-muted-foreground/60">Unassigned</span>}
+                              </td>
+                              <td className="px-5 py-4">
+                                <span className={badgeClass(counter.is_active ? "green" : "slate")}>
+                                  {counter.is_active ? "Active" : "Inactive"}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </section>
+
+                <section className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+                  <div className="p-5 border-b border-border/50 bg-muted/10">
+                    <h3 className="text-base font-bold text-foreground">Operational rules</h3>
+                  </div>
+                  <div className="p-5">
+                    <ul className="list-disc space-y-2.5 pl-5 text-sm text-muted-foreground leading-relaxed">
                       <li>Use one default counter per branch for day-to-day receipts to keep reconciliation simple.</li>
                       <li>Map each counter to the correct finance account (e.g. Main Cash, HDFC Bank, UPI).</li>
-                      <li>Do not expose internal accounting ledger IDs on customer documents; counters should surface friendly names only (e.g. "Cash Desk 1").</li>
+                      <li>Do not expose internal accounting ledger IDs on customer documents — counters should surface friendly names only (e.g. "Cash Desk 1").</li>
                       <li>Counters are what cashiers log into to process collections. A branch without a counter cannot collect money.</li>
+                      <li>Unassigned counters can still be used but assigning a staff member improves shift-end reconciliation.</li>
                     </ul>
                   </div>
                 </section>

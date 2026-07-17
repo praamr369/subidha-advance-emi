@@ -15,6 +15,7 @@ from subscriptions.models import (
     LuckyId,
     LuckyIdStatus,
     Product,
+    ProductItemType,
     SubscriptionRequest,
     SubscriptionRequestStatus,
 )
@@ -54,7 +55,7 @@ def subscription_request_lock_queryset():
 def requestable_product_queryset():
     return Product.objects.filter(
         is_active=True,
-        is_emi_enabled=True,
+        item_type=ProductItemType.FINISHED_GOOD,
     ).order_by("name", "id")
 
 

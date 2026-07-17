@@ -1,15 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import AmendmentSafetyNotice from "@/components/amendments/SafetyNotice";
-import ERPErrorState from "@/components/erp/ERPErrorState";
-import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
-import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import ActionButton from "@/components/ui/ActionButton";
-import { DetailPanel, MetricStrip } from "@/components/ui/operations";
+import { ProfileToolbar } from "@/components/crm-workbench";
+import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ErrorState from "@/components/feedback/ErrorState";
 import {
   AMENDMENT_STATUSES,
   amendmentContractTypeLabel,
@@ -17,6 +16,27 @@ import {
   listAdminAmendments,
   type AmendmentRecord,
 } from "@/services/amendments";
+
+const STATUS_OPTIONS = [
+  { value: "REQUESTED", label: "Requested" },
+  { value: "UNDER_REVIEW", label: "Under review" },
+  { value: "APPROVED", label: "Approved" },
+  { value: "REJECTED", label: "Rejected" },
+  { value: "CANCELLED", label: "Cancelled" },
+];
+
+const CONTRACT_TYPE_OPTIONS = [
+  { value: "EMI_SUBSCRIPTION", label: "EMI Subscription" },
+  { value: "RENT_LEASE", label: "Rent / Lease" },
+];
+
+const STATUS_BADGE: Record<string, string> = {
+  REQUESTED: "bg-blue-100 text-blue-800",
+  UNDER_REVIEW: "bg-amber-100 text-amber-800",
+  APPROVED: "bg-green-100 text-green-800",
+  REJECTED: "bg-red-100 text-red-800",
+  CANCELLED: "bg-gray-100 text-gray-800",
+};
 
 function dateLabel(value?: string | null) {
   if (!value) return "—";
@@ -40,154 +60,160 @@ export default function AdminAmendmentList({
   contractType?: string;
 }) {
   const [rows, setRows] = useState<AmendmentRecord[]>([]);
-  const [statusInput, setStatusInput] = useState(status);
-  const [typeInput, setTypeInput] = useState(contractType);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState(status);
+  const [typeFilter, setTypeFilter] = useState(contractType);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setRows(await listAdminAmendments({ status: status || undefined, contractType: contractType || undefined }));
+      let allRows = await listAdminAmendments({
+        status: statusFilter || undefined,
+        contractType: typeFilter || undefined
+      });
+
+      if (search) {
+        allRows = allRows.filter((row) =>
+          row.amendment_no?.toLowerCase().includes(search.toLowerCase()) ||
+          row.customer_name?.toLowerCase().includes(search.toLowerCase()) ||
+          row.subscription_number?.toLowerCase().includes(search.toLowerCase())
+        );
+      }
+
+      setRows(allRows);
       setError(null);
     } catch (err) {
+      setRows([]);
       setError(err instanceof Error ? err.message : "Failed to load amendment register.");
     } finally {
       setLoading(false);
     }
-  }, [contractType, status]);
+  }, [statusFilter, typeFilter, search]);
 
   useEffect(() => {
-    setStatusInput(status);
-    setTypeInput(contractType);
-    void load();
-  }, [status, contractType, load]);
+    setStatusFilter(status);
+    setTypeFilter(contractType);
+  }, [status, contractType]);
 
-  const filterHref = () => {
-    const params = new URLSearchParams();
-    if (statusInput) params.set("status", statusInput);
-    if (typeInput) params.set("contract_type", typeInput);
-    const query = params.toString();
-    return query ? `/admin/contract-amendments?${query}` : "/admin/contract-amendments";
-  };
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const stats = useMemo(() => [
+    { label: "Total", value: rows.length, tone: "info" as const },
+    { label: "Requested", value: rows.filter((r) => r.status === "REQUESTED").length, tone: "default" as const },
+    { label: "Under review", value: rows.filter((r) => r.status === "UNDER_REVIEW").length, tone: "warning" as const },
+    { label: "Approved", value: rows.filter((r) => r.status === "APPROVED").length, tone: "success" as const },
+    { label: "Rejected", value: rows.filter((r) => r.status === "REJECTED").length, tone: "default" as const },
+  ], [rows]);
+
+  const COLUMNS = [
+    { accessor: "amendment_no", header: "Amendment", width: 120 },
+    { accessor: "customer_name", header: "Customer", width: 160 },
+    { accessor: "contract_type", header: "Contract Type", width: 140,
+      cell: (val: string) => amendmentContractTypeLabel(val) },
+    { accessor: "amendment_type", header: "Amendment Type", width: 140,
+      cell: (val: string) => amendmentTypeLabel(val) },
+    { accessor: "created_at", header: "Requested", width: 110,
+      cell: (val: string) => dateLabel(val) },
+    { accessor: "status", header: "Status", width: 130,
+      cell: (val: string) => (
+        <span className={`inline-block rounded-full px-2 py-1 text-xs font-semibold ${STATUS_BADGE[val] || "bg-gray-100 text-gray-800"}`}>
+          {val}
+        </span>
+      )
+    },
+  ];
 
   return (
     <ERPPageShell
-      eyebrow="Admin amendments"
       title="Contract Amendments"
-      subtitle="Admin review register for customer and partner amendment requests. Customer and partner requests will appear here after submission."
+      subtitle="Admin review register for customer and partner amendment requests."
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Contract Amendments" }]}
-      statusBadge={{ label: "Decision only", tone: "warning" }}
+      stats={stats}
     >
-      <div className="space-y-5">
+      <div className="space-y-6">
         <AmendmentSafetyNotice />
-        <div className="flex flex-wrap gap-2 rounded-xl border border-border bg-card p-4">
+
+        <div className="flex flex-wrap gap-2">
           <ActionButton href="/admin/contract-amendments/new" variant="primary">
             Create amendment
           </ActionButton>
-          <ActionButton href="/admin/contract-amendments" variant="outline">
-            View all statuses
-          </ActionButton>
           <ActionButton href="/admin/contract-amendments/recontract-report" variant="outline">
-            Open Recontract Report
+            Recontract Report
           </ActionButton>
         </div>
-        <MetricStrip
-          items={[
-            { label: "Total", value: String(rows.length) },
-            { label: "Requested", value: String(rows.filter((r) => r.status === "REQUESTED").length) },
-            { label: "Under review", value: String(rows.filter((r) => r.status === "UNDER_REVIEW").length) },
-            { label: "Approved", value: String(rows.filter((r) => r.status === "APPROVED").length) },
-            { label: "Rejected", value: String(rows.filter((r) => r.status === "REJECTED").length) },
-            { label: "Cancelled", value: String(rows.filter((r) => r.status === "CANCELLED").length) },
+
+        <ProfileToolbar
+          searchValue={search}
+          onSearchChange={setSearch}
+          onRefresh={load}
+          filters={[
+            { key: "status", label: "Status", options: STATUS_OPTIONS },
+            { key: "type", label: "Contract Type", options: CONTRACT_TYPE_OPTIONS },
           ]}
+          filterValues={{ status: statusFilter, type: typeFilter }}
+          onFilterChange={(key, value) => {
+            if (key === "status") setStatusFilter(value);
+            if (key === "type") setTypeFilter(value);
+          }}
+          onApply={() => {}}
+          onReset={() => {
+            setSearch("");
+            setStatusFilter("");
+            setTypeFilter("");
+          }}
         />
-        <DetailPanel title="Filters" description="Filter amendment requests without changing source contracts.">
-          <div className="grid gap-3 md:grid-cols-[220px_220px_auto]">
-            <select
-              className="h-11 rounded-xl border border-border bg-background px-3"
-              value={statusInput}
-              onChange={(event) => setStatusInput(event.target.value)}
-            >
-              <option value="">All statuses</option>
-              {AMENDMENT_STATUSES.map((row) => (
-                <option key={row} value={row}>
-                  {row}
-                </option>
-              ))}
-            </select>
-            <select
-              className="h-11 rounded-xl border border-border bg-background px-3"
-              value={typeInput}
-              onChange={(event) => setTypeInput(event.target.value)}
-            >
-              <option value="">All contract types</option>
-              <option value="EMI_SUBSCRIPTION">EMI Subscription</option>
-              <option value="RENT_LEASE">Rent / Lease</option>
-            </select>
-            <div className="flex flex-wrap gap-2">
-              <ActionButton href={filterHref()}>Filter</ActionButton>
-              <ActionButton href="/admin/contract-amendments" variant="outline">
-                Clear
-              </ActionButton>
-            </div>
+
+        {loading && <LoadingBlock label="Loading amendments..." />}
+
+        {error && <ErrorState title="Failed to load amendments" description={error} onRetry={load} />}
+
+        {!loading && !error && (
+          <div className="overflow-x-auto rounded-xl border border-border bg-card">
+            <table className="min-w-full text-left text-xs">
+              <thead className="bg-muted/50 text-muted-foreground">
+                <tr>
+                  {COLUMNS.map((col) => (
+                    <th key={col.accessor} className="px-3 py-2 font-medium" style={{ width: col.width }}>
+                      {col.header}
+                    </th>
+                  ))}
+                  <th className="px-3 py-2 font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={COLUMNS.length + 1} className="px-3 py-4 text-center text-muted-foreground">
+                      {search || statusFilter || typeFilter ? "No matching amendments found." : "No amendments."}
+                    </td>
+                  </tr>
+                ) : (
+                  rows.map((row) => (
+                    <tr key={row.id} className="border-t border-border hover:bg-muted/20">
+                      {COLUMNS.map((col) => (
+                        <td key={`${row.id}-${col.accessor}`} className="px-3 py-2" style={{ width: col.width }}>
+                          {col.cell ? (col as any).cell((row as any)[col.accessor], row) : (row as any)[col.accessor]}
+                        </td>
+                      ))}
+                      <td className="px-3 py-2">
+                        <Link
+                          href={`/admin/contract-amendments/${row.id}`}
+                          className="text-primary hover:underline text-xs font-medium"
+                        >
+                          View
+                        </Link>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
-        </DetailPanel>
-        {loading ? <ERPLoadingState label="Loading amendment register..." /> : null}
-        {!loading && error ? (
-          <ERPErrorState title="Unable to load amendments" description={error} onRetry={() => void load()} />
-        ) : null}
-        {!loading && !error && rows.length === 0 ? (
-          <DetailPanel title="No amendments found" description="No amendment requests match the current filters. Create an admin-side request, clear filters, or open the recontract report.">
-            <div className="grid gap-3 md:grid-cols-3">
-              <Link href="/admin/contract-amendments/new" className="rounded-xl border border-border bg-muted/20 p-4 transition hover:border-primary/50">
-                <div className="text-sm font-semibold text-foreground">Create amendment</div>
-                <div className="mt-1 text-xs text-muted-foreground">Admin can create a request on behalf of a customer or partner when backend validation allows it.</div>
-              </Link>
-              <Link href="/admin/contract-amendments" className="rounded-xl border border-border bg-muted/20 p-4 transition hover:border-primary/50">
-                <div className="text-sm font-semibold text-foreground">View all statuses</div>
-                <div className="mt-1 text-xs text-muted-foreground">Clear filters and see requested, under-review, approved, rejected, and cancelled records.</div>
-              </Link>
-              <Link href="/admin/contract-amendments/recontract-report" className="rounded-xl border border-border bg-muted/20 p-4 transition hover:border-primary/50">
-                <div className="text-sm font-semibold text-foreground">Open Recontract Report</div>
-                <div className="mt-1 text-xs text-muted-foreground">Approved product upgrade/downgrade amendments with saved previews will appear there.</div>
-              </Link>
-            </div>
-            <div className="mt-4 rounded-xl border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
-              Customer and partner amendment requests will appear here after submission. No fake rows are generated.
-            </div>
-          </DetailPanel>
-        ) : null}
-        {!loading && !error && rows.length > 0 ? (
-          <DetailPanel title="Amendment register" description="Open a request to review, approve, reject, cancel/archive, preview, or execute only evidence-gated safe workflows.">
-            <div className="grid gap-3">
-              {rows.map((row) => (
-                <Link
-                  key={row.id}
-                  href={`/admin/contract-amendments/${row.id}`}
-                  className="rounded-xl border border-border bg-card p-4 transition hover:border-primary/50"
-                >
-                  <div className="flex flex-wrap justify-between gap-3">
-                    <div>
-                      <div className="font-semibold">{row.amendment_no || `AMD-${row.id}`}</div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {row.customer_name || "Customer"} · {sourceLabel(row)}
-                      </div>
-                    </div>
-                    <ERPStatusBadge status={row.status} />
-                  </div>
-                  <div className="mt-3 grid gap-2 text-sm md:grid-cols-5">
-                    <span>{amendmentContractTypeLabel(row.contract_type)}</span>
-                    <span>{amendmentTypeLabel(row.amendment_type)}</span>
-                    <span>{row.workflow_capability?.category ?? "—"}</span>
-                    <span>{row.requested_role}</span>
-                    <span>{dateLabel(row.created_at)}</span>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </DetailPanel>
-        ) : null}
+        )}
       </div>
     </ERPPageShell>
   );
