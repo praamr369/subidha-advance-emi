@@ -21,9 +21,11 @@ from api.v1.views.admin_finance_gaps import (
 from api.v1.views.admin_business_setup import (
     AdminLocalSandboxResetView,
     AdminLocalSandboxSeedView,
+    AdminServerDateView,
     AdminSetupSnapshotExportView,
     AdminSetupSnapshotImportView,
     AdminBusinessProfileView,
+    AdminBusinessLogoUploadView,
     AdminEmailSmtpSettingsView,
     AdminEmailSmtpTestView,
     BusinessSetupBackupJobDetailView,
@@ -62,6 +64,13 @@ from api.v1.views.contract_references import (
     AdminUnifiedReceivablePreviewView,
     AdminReceivablesSearchView,
     AdminUnifiedReceivableCollectView,
+    AdminUnifiedReceivableWorkbenchView,
+)
+from api.v1.views.payables import (
+    AdminUnifiedPayableView,
+    AdminPayableActionView,
+    AdminPayableFinanceAccountsView,
+    AdminPayableExecuteView,
 )
 from api.v1.views.admin_deliveries import (
     AdminDirectSaleDeliveryCancelView,
@@ -176,8 +185,11 @@ from api.v1.views.admin_reconciliation import (
 )
 from api.v1.views.admin_partner_collection_requests import (
     AdminPartnerCollectionRequestApproveView,
+    AdminPartnerCollectionRequestEditView,
+    AdminPartnerCollectionRequestFlagView,
     AdminPartnerCollectionRequestListView,
     AdminPartnerCollectionRequestRejectView,
+    AdminPartnerCollectionRequestReopenView,
 )
 from api.v1.views.finance_operations import (
     AdminAdvanceAllocationView,
@@ -558,6 +570,15 @@ from api.v1.views.subscription_requests import (
     AdminSubscriptionRequestOptionsView,
     AdminSubscriptionRequestRejectView,
 )
+from api.v1.views.product_requests import (
+    AdminProductRequestCancelView,
+    AdminProductRequestDecisionView,
+    AdminProductRequestDetailView,
+    AdminProductRequestEditView,
+    AdminProductRequestListView,
+    AdminProductRequestOptionsView,
+    AdminProductRequestStockCheckView,
+)
 from api.v1.views.admin_opening_stock import (
     AdminOpeningStockBatchHistoryView,
     AdminOpeningStockBulkApplyView,
@@ -730,7 +751,17 @@ urlpatterns = [
     path("receivables/search/", AdminReceivablesSearchView.as_view()),
     path("receivables/preview/", AdminUnifiedReceivablePreviewView.as_view()),
     path("receivables/collect/", AdminUnifiedReceivableCollectView.as_view()),
+    path("receivables/workbench/", AdminUnifiedReceivableWorkbenchView.as_view()),
+
+    # Payables
+    path("payables/", AdminUnifiedPayableView.as_view()),
+    path("payables/action/", AdminPayableActionView.as_view()),
+    path("payables/finance-accounts/", AdminPayableFinanceAccountsView.as_view()),
+    path("payables/execute/", AdminPayableExecuteView.as_view()),
+
     path("business-profile/", AdminBusinessProfileView.as_view()),
+    path("business-profile/logo/upload/", AdminBusinessLogoUploadView.as_view()),
+    path("business-setup/checklist/", BusinessSetupChecklistView.as_view()),
     path("settings/email-smtp/", AdminEmailSmtpSettingsView.as_view()),
     path("settings/email-smtp/test/", AdminEmailSmtpTestView.as_view()),
     path("public-site/profile/", AdminPublicBusinessProfileView.as_view()),
@@ -771,6 +802,7 @@ urlpatterns = [
     path("setup-snapshot/import/", AdminSetupSnapshotImportView.as_view()),
     path("local-sandbox/seed/", AdminLocalSandboxSeedView.as_view()),
     path("local-sandbox/reset/", AdminLocalSandboxResetView.as_view()),
+    path("server-date/", AdminServerDateView.as_view()),
     path("business-setup/dry-runs/options/", AdminDryRunOptionsView.as_view()),
     path("business-setup/dry-runs/run/", AdminDryRunRunView.as_view()),
     path("business-setup/dry-runs/history/", AdminDryRunHistoryView.as_view()),
@@ -823,6 +855,13 @@ urlpatterns = [
     path("subscription-requests/<int:pk>/", AdminSubscriptionRequestDetailView.as_view()),
     path("subscription-requests/<int:pk>/approve/", AdminSubscriptionRequestApproveView.as_view()),
     path("subscription-requests/<int:pk>/reject/", AdminSubscriptionRequestRejectView.as_view()),
+    path("product-request-options/", AdminProductRequestOptionsView.as_view()),
+    path("product-requests/", AdminProductRequestListView.as_view()),
+    path("product-requests/<int:pk>/decision/", AdminProductRequestDecisionView.as_view()),
+    path("product-requests/<int:pk>/cancel/", AdminProductRequestCancelView.as_view()),
+    path("product-requests/<int:pk>/edit/", AdminProductRequestEditView.as_view()),
+    path("product-requests/<int:pk>/stock-check/", AdminProductRequestStockCheckView.as_view()),
+    path("product-requests/<int:pk>/", AdminProductRequestDetailView.as_view()),
     path("support-requests/", AdminSupportRequestListView.as_view()),
     path("support-requests/<int:pk>/", AdminSupportRequestDetailView.as_view()),
     path("support-requests/<int:pk>/status/", AdminSupportRequestStatusUpdateView.as_view()),
@@ -920,6 +959,9 @@ urlpatterns = [
     path("collection-requests/", AdminPartnerCollectionRequestListView.as_view()),
     path("collection-requests/<int:pk>/approve/", AdminPartnerCollectionRequestApproveView.as_view()),
     path("collection-requests/<int:pk>/reject/", AdminPartnerCollectionRequestRejectView.as_view()),
+    path("collection-requests/<int:pk>/flag/", AdminPartnerCollectionRequestFlagView.as_view()),
+    path("collection-requests/<int:pk>/reopen/", AdminPartnerCollectionRequestReopenView.as_view()),
+    path("collection-requests/<int:pk>/edit/", AdminPartnerCollectionRequestEditView.as_view()),
     path("reports/revenue-aggregate/", AdminRevenueAggregateView.as_view()),
     path("reports/revenue-summary/", AdminRevenueSummaryView.as_view()),
     path("reports/emi-aggregate/", AdminEmiAggregateView.as_view()),
