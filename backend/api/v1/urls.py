@@ -10,6 +10,7 @@ from api.v1.views.admin_payment_collection import IdempotentAdminPaymentCollectV
 from api.v1.views.unified_workbench import urlpatterns as workbench_urlpatterns
 from api.v1.views.workbench_dashboard import urlpatterns as workbench_dashboard_urlpatterns
 from api.v1.views.workbench_lead_workflow import urlpatterns as workbench_lead_urlpatterns
+from api.v1.views.lead_conversion_workflow import urlpatterns as lead_conversion_urlpatterns
 from api.v1.views.accounting_bridge_reconciliation import (
     AccountingBridgeBatchPostView,
     AccountingBridgeBatchPreviewView,
@@ -188,3 +189,4 @@ urlpatterns = [
 urlpatterns += workbench_urlpatterns
 urlpatterns += workbench_dashboard_urlpatterns
 urlpatterns += workbench_lead_urlpatterns
+urlpatterns += lead_conversion_urlpatterns
