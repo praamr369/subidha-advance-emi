@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 from django.db.models import Count, Q, Sum, Avg, F
+from django.db.models.functions import TruncDate
 from django.utils import timezone
 from decimal import Decimal
 
@@ -58,7 +59,7 @@ def get_funnel_analytics(days: int = 30) -> dict:
     # Subscriptions created from approved requests
     subscriptions_created = Subscription.objects.filter(
         created_at__range=[start_date, end_date],
-        source_online_request__isnull=False
+        online_request__isnull=False
     ).count()
 
     # Direct sales from approved requests (via OnlineRequest.approved_direct_sale FK)
@@ -126,7 +127,7 @@ def get_product_performance(days: int = 30) -> list[dict]:
                 product_id=row['product_id'],
                 created_at__range=[start_date, end_date]
             )
-            .aggregate(total=Sum('price'))['total'] or Decimal(0)
+            .aggregate(total=Sum('total_amount'))['total'] or Decimal(0)
         )
 
         # Direct sales revenue (estimate based on requests converted to sales)
@@ -156,7 +157,7 @@ def get_timeline_analytics(days: int = 30) -> dict:
     daily_leads = (
         PublicLead.objects
         .filter(created_at__range=[start_date, end_date])
-        .extra(select={'date': 'DATE(created_at)'})
+        .annotate(date=TruncDate('created_at'))
         .values('date')
         .annotate(count=Count('id'))
         .order_by('date')
@@ -166,7 +167,7 @@ def get_timeline_analytics(days: int = 30) -> dict:
     daily_requests = (
         OnlineRequest.objects
         .filter(created_at__range=[start_date, end_date])
-        .extra(select={'date': 'DATE(created_at)'})
+        .annotate(date=TruncDate('created_at'))
         .values('date')
         .annotate(count=Count('id'))
         .order_by('date')
@@ -179,7 +180,7 @@ def get_timeline_analytics(days: int = 30) -> dict:
             approved_at__range=[start_date, end_date],
             status__in=['APPROVED', 'COMPLETED']
         )
-        .extra(select={'date': 'DATE(approved_at)'})
+        .annotate(date=TruncDate('approved_at'))
         .values('date')
         .annotate(count=Count('id'))
         .order_by('date')
@@ -190,9 +191,9 @@ def get_timeline_analytics(days: int = 30) -> dict:
         Subscription.objects
         .filter(
             created_at__range=[start_date, end_date],
-            source_online_request__isnull=False
+            online_request__isnull=False
         )
-        .extra(select={'date': 'DATE(created_at)'})
+        .annotate(date=TruncDate('created_at'))
         .values('date')
         .annotate(count=Count('id'))
         .order_by('date')
@@ -205,7 +206,7 @@ def get_timeline_analytics(days: int = 30) -> dict:
             created_at__range=[start_date, end_date],
             status__in=['CONFIRMED', 'INVOICED', 'COMPLETED']
         )
-        .extra(select={'date': 'DATE(created_at)'})
+        .annotate(date=TruncDate('created_at'))
         .values('date')
         .annotate(count=Count('id'))
         .order_by('date')
@@ -246,7 +247,6 @@ def get_request_type_analytics(days: int = 30) -> dict:
             count=Count('id'),
             approved=Count('id', filter=Q(status__in=['APPROVED', 'COMPLETED'])),
             total_amount=Sum('total_amount'),
-            avg_amount=Avg('total_amount'),
         )
         .order_by('-count')
     )
@@ -256,14 +256,16 @@ def get_request_type_analytics(days: int = 30) -> dict:
         request_type = row['request_type']
         count = row['count']
         approved = row['approved']
+        total_amt = float(row['total_amount'] or 0)
         conversion_rate = round((approved / count * 100), 1) if count > 0 else 0
+        avg_amount = round(total_amt / count, 2) if count > 0 else 0
 
         result[request_type] = {
             'requests_count': count,
             'approved_count': approved,
             'conversion_rate': conversion_rate,
-            'total_amount': float(row['total_amount'] or 0),
-            'avg_amount': float(row['avg_amount'] or 0),
+            'total_amount': total_amt,
+            'avg_amount': avg_amount,
         }
 
     return result
