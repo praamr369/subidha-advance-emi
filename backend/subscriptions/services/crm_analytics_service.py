@@ -5,10 +5,9 @@ from django.db.models import Count, Q, Sum, Avg
 from django.utils import timezone
 from decimal import Decimal
 
-from subscriptions.models import PublicLead, Subscription, ProductRequest
+from subscriptions.models import PublicLead, Subscription, ProductRequest, SubscriptionRequest
 from subscriptions.models_online_request import OnlineRequest
 from billing.models import DirectSale
-from requests.models import SubscriptionRequest
 
 
 def get_date_range(days: int = 30) -> tuple[datetime, datetime]:
