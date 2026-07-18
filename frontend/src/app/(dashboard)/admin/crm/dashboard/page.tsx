@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
@@ -34,19 +33,7 @@ export default function CrmDashboardPage() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/v1/admin/crm/analytics/dashboard/", {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
-      }
-
-      const data: DashboardMetrics = await response.json();
+      const data: DashboardMetrics = await apiFetch("/api/v1/admin/crm/analytics/dashboard/");
       setMetrics(data);
       setError(null);
     } catch (err) {
