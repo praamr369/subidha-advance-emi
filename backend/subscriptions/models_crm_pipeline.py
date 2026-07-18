@@ -1,7 +1,7 @@
 """Unified CRM Pipeline for lead-to-sale conversion tracking"""
 
 from django.db import models
-from django.contrib.auth.models import User
+from django.conf import settings
 
 
 class CRMPipeline(models.Model):
@@ -63,7 +63,7 @@ class CRMPipeline(models.Model):
 
     # Approval Tracking
     approved_by = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

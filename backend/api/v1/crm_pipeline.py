@@ -20,18 +20,32 @@ class CRMPipelineSerializer:
 
     @staticmethod
     def to_representation(obj):
+        # Get customer info from lead or online request
+        customer_name = None
+        phone = None
+        email = None
+
+        if obj.lead:
+            customer_name = obj.lead.name
+            phone = obj.lead.phone
+            email = obj.lead.email
+        elif obj.online_request and obj.online_request.customer:
+            customer_name = obj.online_request.customer.name
+            phone = obj.online_request.customer.phone
+            email = obj.online_request.customer.email if hasattr(obj.online_request.customer, 'email') else None
+
         return {
             'id': obj.id,
             'lead': {
                 'id': obj.lead.id if obj.lead else None,
-                'customer_name': obj.lead.customer_name if obj.lead else None,
-                'phone': obj.lead.customer_phone if obj.lead else None,
-                'email': obj.lead.customer_email if obj.lead else None,
+                'customer_name': customer_name,
+                'phone': phone,
+                'email': email,
             },
             'current_stage': obj.current_stage,
             'request_type': obj.request_type,
-            'quoted_amount': float(obj.quoted_amount),
-            'revenue': float(obj.revenue),
+            'quoted_amount': float(obj.quoted_amount) if obj.quoted_amount else 0,
+            'revenue': float(obj.revenue) if obj.revenue else 0,
             'probability': obj.probability,
             'approved_by': obj.approved_by.username if obj.approved_by else None,
             'approved_at': obj.approved_at.isoformat() if obj.approved_at else None,

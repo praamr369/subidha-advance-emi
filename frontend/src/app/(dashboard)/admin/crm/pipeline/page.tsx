@@ -18,8 +18,8 @@ export default function CRMPipelinePage() {
   const loadPipeline = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await apiFetch('/api/v1/crm-pipeline/pipeline/');
-      setLeads(data.results || data);
+      const data = await apiFetch('/api/v1/crm-pipeline/pipeline/') as { results?: KanbanLead[] } | KanbanLead[];
+      setLeads(Array.isArray(data) ? data : (data.results || []));
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load pipeline');

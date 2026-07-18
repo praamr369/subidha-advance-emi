@@ -44,6 +44,7 @@ export default function HomePlanFlowPreview() {
             alt="Plan Flow"
             width={800}
             height={533}
+            priority
             className="w-full object-cover min-h-[18rem]"
           />
         </div>

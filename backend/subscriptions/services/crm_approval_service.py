@@ -79,11 +79,17 @@ def approve_online_request(
         pipeline = CRMPipeline.objects.get(online_request=online_request)
     except CRMPipeline.DoesNotExist:
         # Create pipeline if it doesn't exist
+        if not online_request.source_public_lead:
+            lead = PublicLead.objects.create(
+                name=online_request.customer.name if online_request.customer else 'Unknown',
+                phone=online_request.customer.phone if online_request.customer else '',
+                email=online_request.customer.email if hasattr(online_request.customer, 'email') else '',
+            )
+        else:
+            lead = online_request.source_public_lead
+
         pipeline = CRMPipeline.objects.create(
-            lead=online_request.source_public_lead or PublicLead.objects.create(
-                customer_name=online_request.customer.name if online_request.customer else 'Unknown',
-                customer_phone=online_request.customer.phone if online_request.customer else '',
-            ),
+            lead=lead,
             online_request=online_request,
             request_type=online_request.request_type,
         )

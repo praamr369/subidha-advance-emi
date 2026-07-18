@@ -100,7 +100,7 @@ export default function LeadDetailModal({
           auto_convert: true,
           notes: `Approved as ${approvalType} by operator`,
         }),
-      });
+      }) as { contract: any };
 
       onApprove(approvalType, response.contract);
       onClose();

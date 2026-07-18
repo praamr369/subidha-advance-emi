@@ -159,7 +159,7 @@ export default function CinematicStory() {
               const offset = index - active;
               return (
                 <div
-                  key={chapter.asset}
+                  key={chapter.title}
                   className="imx-layer absolute inset-0"
                   style={{
                     ["--imx-depth" as string]: 12,

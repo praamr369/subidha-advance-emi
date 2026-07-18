@@ -33,7 +33,7 @@ export default function PipelineAnalyticsPage() {
       try {
         setLoading(true);
         const data = await apiFetch(`/api/v1/crm-pipeline/pipeline/analytics/?days=${days}`);
-        setAnalytics(data);
+        setAnalytics(data as PipelineAnalytics);
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load analytics");
