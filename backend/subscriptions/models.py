@@ -4211,6 +4211,22 @@ class AuditLog(models.Model):
             "SUBSCRIPTION_REQUEST_CANCELLED",
             "Subscription Request Cancelled",
         )
+        PRODUCT_REQUEST_APPROVED = (
+            "PRODUCT_REQUEST_APPROVED",
+            "Product Request Approved",
+        )
+        PRODUCT_REQUEST_REJECTED = (
+            "PRODUCT_REQUEST_REJECTED",
+            "Product Request Rejected",
+        )
+        PRODUCT_REQUEST_CANCELLED = (
+            "PRODUCT_REQUEST_CANCELLED",
+            "Product Request Cancelled",
+        )
+        PRODUCT_REQUEST_EDITED = (
+            "PRODUCT_REQUEST_EDITED",
+            "Product Request Edited",
+        )
         EMI_PAID = "EMI_PAID", "EMI Paid"
         EMI_WAIVED = "EMI_WAIVED", "EMI Waived"
         DRAW_EXECUTED = "DRAW_EXECUTED", "Draw Executed"

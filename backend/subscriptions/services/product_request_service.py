@@ -287,11 +287,12 @@ def approve_product_request_for_admin(
     req.save()
 
     log_audit(
-        action="PRODUCT_REQUEST_APPROVED",
+        action_type=AuditLog.ActionType.PRODUCT_REQUEST_APPROVED,
+        instance=req,
         performed_by=admin,
-        target_model="ProductRequest",
-        target_id=req.id,
-        detail=f"Admin approved product request #{req.id} ({req.request_type}). Note: {review_note}",
+        metadata={
+            "detail": f"Admin approved product request #{req.id} ({req.request_type}). Note: {review_note}",
+        },
     )
 
     if create_crm_lead:
@@ -317,11 +318,12 @@ def reject_product_request_for_admin(
     req.review_note = review_note
     req.save()
     log_audit(
-        action="PRODUCT_REQUEST_REJECTED",
+        action_type=AuditLog.ActionType.PRODUCT_REQUEST_REJECTED,
+        instance=req,
         performed_by=admin,
-        target_model="ProductRequest",
-        target_id=req.id,
-        detail=f"Admin rejected product request #{req.id}. Note: {review_note}",
+        metadata={
+            "detail": f"Admin rejected product request #{req.id}. Note: {review_note}",
+        },
     )
     return req
 
@@ -354,11 +356,12 @@ def cancel_product_request_for_admin(*, request_id: int, admin: User, review_not
     req.save()
 
     log_audit(
-        action="PRODUCT_REQUEST_CANCELLED_BY_ADMIN",
+        action_type=AuditLog.ActionType.PRODUCT_REQUEST_CANCELLED,
+        instance=req,
         performed_by=admin,
-        target_model="ProductRequest",
-        target_id=req.id,
-        detail=f"Admin cancelled product request #{req.id}. Note: {review_note}",
+        metadata={
+            "detail": f"Admin cancelled product request #{req.id}. Note: {review_note}",
+        },
     )
     return req
 
@@ -389,11 +392,12 @@ def edit_product_request_for_admin(
     if changed:
         req.save()
         log_audit(
-            action="PRODUCT_REQUEST_EDITED_BY_ADMIN",
+            action_type=AuditLog.ActionType.PRODUCT_REQUEST_EDITED,
+            instance=req,
             performed_by=admin,
-            target_model="ProductRequest",
-            target_id=req.id,
-            detail=f"Admin edited product request #{req.id}. Changed fields: {', '.join(changed)}",
+            metadata={
+                "detail": f"Admin edited product request #{req.id}. Changed fields: {', '.join(changed)}",
+            },
         )
     return req
 

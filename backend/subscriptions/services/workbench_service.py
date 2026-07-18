@@ -267,3 +267,171 @@ def workbench_vendor_create(
         },
         priority=1,
     )
+
+
+class WorkbenchService:
+    """Unified workbench service for customer request lifecycle"""
+
+    @staticmethod
+    def get_customer_workbench(customer_id: int):
+        """Get complete unified workbench for a customer"""
+        from subscriptions.models import OnlineRequest, ProductRequest, Subscription, PublicLead
+        from billing.models import DirectSale
+
+        try:
+            customer = Customer.objects.get(id=customer_id)
+        except Customer.DoesNotExist:
+            raise ValueError(f"Customer not found: {customer_id}")
+
+        # Get all related data
+        online_requests = OnlineRequest.objects.filter(
+            customer=customer
+        ).values('id', 'request_number', 'status', 'request_type', 'product__name', 'total_amount', 'created_at')
+
+        product_requests = ProductRequest.objects.filter(
+            customer=customer
+        ).values('id', 'request_type', 'status', 'product__name', 'created_at')
+
+        invoices = DirectSale.objects.filter(
+            customer=customer
+        ).values('id', 'grand_total', 'status', 'created_at')
+
+        subscriptions = Subscription.objects.filter(
+            customer=customer
+        ).values('id', 'plan_type', 'status', 'created_at')
+
+        try:
+            crm_lead = PublicLead.objects.filter(
+                converted_customer=customer
+            ).first() or PublicLead.objects.filter(
+                email=customer.user.email if customer.user else None
+            ).first() if customer.user else None
+
+            if crm_lead:
+                crm_lead_data = {
+                    'id': crm_lead.id,
+                    'status': crm_lead.status,
+                    'assigned_to': crm_lead.assigned_to.get_full_name() if crm_lead.assigned_to else None,
+                    'notes': crm_lead.notes or '',
+                    'created_at': crm_lead.created_at,
+                }
+            else:
+                crm_lead_data = None
+        except PublicLead.DoesNotExist:
+            crm_lead_data = None
+
+        # Build timeline
+        timeline = WorkbenchService._build_timeline(customer, online_requests, product_requests)
+
+        # Determine next actions
+        next_actions = WorkbenchService._determine_actions(online_requests, product_requests)
+
+        return {
+            'customer': {
+                'id': customer.id,
+                'name': customer.name,
+                'phone': customer.phone,
+                'email': customer.user.email if customer.user else '',
+                'city': customer.city,
+                'kyc_status': customer.kyc_status or 'PENDING',
+                'status': 'ACTIVE',
+            },
+            'online_requests': list(online_requests),
+            'crm_lead': crm_lead_data,
+            'product_requests': list(product_requests),
+            'invoices': list(invoices),
+            'subscriptions': list(subscriptions),
+            'timeline': timeline,
+            'next_actions': next_actions,
+        }
+
+    @staticmethod
+    def _build_timeline(customer, online_requests, product_requests):
+        """Build chronological timeline of events"""
+        timeline = []
+
+        for req in online_requests:
+            timeline.append({
+                'time': req['created_at'],
+                'event': f"Online enquiry created: {req['request_number']}",
+                'type': 'enquiry',
+            })
+
+        for req in product_requests:
+            timeline.append({
+                'time': req['created_at'],
+                'event': f"Product request created: {req['request_type']}",
+                'type': 'request',
+            })
+
+        return sorted(timeline, key=lambda x: x['time'])
+
+    @staticmethod
+    def _determine_actions(online_requests, product_requests):
+        """Determine recommended next actions"""
+        actions = []
+
+        if online_requests and online_requests[0]['status'] == 'DRAFT':
+            actions.append("Send quote to customer")
+
+        if online_requests and online_requests[0]['status'] == 'QUOTE_SENT':
+            actions.append("Follow up on quote")
+
+        if product_requests and product_requests[0]['status'] == 'SUBMITTED':
+            actions.append("Approve product request")
+
+        if not actions:
+            actions.append("Review customer profile")
+
+        return actions
+
+    def update_customer_profile(self, customer_id: int, updates: dict):
+        """Atomically update customer profile"""
+        with transaction.atomic():
+            customer = Customer.objects.select_for_update().get(id=customer_id)
+            changed = []
+
+            for field, value in updates.items():
+                if value is not None and hasattr(customer, field):
+                    setattr(customer, field, value)
+                    changed.append(field)
+
+            if changed:
+                customer.save()
+
+            return {
+                'status': 'success',
+                'changed': changed,
+            }
+
+    def approve_request(self, customer_id: int, request_id: int, admin, notes: str = ''):
+        """Approve product request and create invoice"""
+        from billing.models import DirectSale
+
+        with transaction.atomic():
+            product_request = ProductRequest.objects.get(id=request_id, customer_id=customer_id)
+
+            if product_request.status != 'SUBMITTED':
+                raise ValueError(f"Cannot approve request in {product_request.status} status")
+
+            # Create invoice
+            invoice = DirectSale.objects.create(
+                customer_id=customer_id,
+                product=product_request.product,
+                subtotal=product_request.product.base_price,
+                status='CREATED',
+                created_by=admin,
+            )
+
+            # Update product request
+            product_request.status = 'APPROVED'
+            product_request.approved_by = admin
+            product_request.approved_at = timezone.now()
+            product_request.save()
+
+            return {
+                'status': 'success',
+                'request_id': request_id,
+                'invoice_id': invoice.id,
+                'message': f'✓ Approved. Invoice created',
+            }

@@ -61,40 +61,14 @@ export default function ProductRequestCard({ request, showRequester }: Props) {
   const typeStyles = getTypeStyles(request.request_type);
 
   return (
-    <Link href={getRequestLink(request)} className="block h-full">
-      <div className={`rounded-xl border p-4 shadow-sm transition hover:shadow-md hover:border-slate-300 cursor-pointer ${statusColor}`}>
+    <div className={`rounded-xl border p-4 shadow-sm transition hover:shadow-md hover:border-slate-300 ${statusColor}`}>
+      <Link href={getRequestLink(request)} className="block h-full">
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <div className="text-xs font-semibold text-slate-500 uppercase">Product Request</div>
             <h3 className="mt-1 text-lg font-semibold text-slate-900">{request.product_name}</h3>
-            <div className="mt-1 text-sm text-slate-600">
-              <CustomerDetailsHover
-                customer={
-                  (request.customer_id
-                    ? {
-                        id: request.customer_id,
-                        name: request.customer_name || "",
-                        phone: request.customer_phone || "",
-                        email: request.customer_email || undefined,
-                        address: undefined,
-                        city: undefined,
-                        state: undefined,
-                        pincode: undefined,
-                        customerSince: undefined,
-                        verificationStatus: "verified",
-                        status: "active",
-                      }
-                    : {
-                        name: request.requested_customer_name || "",
-                        phone: request.requested_customer_phone || "",
-                        address: request.requested_customer_address || undefined,
-                        status: "pending",
-                      }) as any
-                }
-                side="bottom"
-              >
-                {request.requested_customer_name || request.customer_name || "Customer pending"}
-              </CustomerDetailsHover>
+            <div className="mt-1 text-sm text-slate-600 cursor-pointer hover:underline">
+              {request.requested_customer_name || request.customer_name || "Customer pending"}
             </div>
           </div>
           <span className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${
@@ -135,7 +109,7 @@ export default function ProductRequestCard({ request, showRequester }: Props) {
         </div>
 
         <div className="mt-3 border-t pt-2 text-xs text-slate-500">Click to review and approve/reject</div>
-      </div>
-    </Link>
+      </Link>
+    </div>
   );
 }

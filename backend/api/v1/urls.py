@@ -7,6 +7,9 @@ from brochures.urls import public_quotation_urlpatterns
 from api.v1.views.health import PublicApiDeepHealthView, PublicApiHealthView
 from api.v1.views.realtime import RealtimeTicketView, realtime_stream
 from api.v1.views.admin_payment_collection import IdempotentAdminPaymentCollectView
+from api.v1.views.unified_workbench import urlpatterns as workbench_urlpatterns
+from api.v1.views.workbench_dashboard import urlpatterns as workbench_dashboard_urlpatterns
+from api.v1.views.workbench_lead_workflow import urlpatterns as workbench_lead_urlpatterns
 from api.v1.views.accounting_bridge_reconciliation import (
     AccountingBridgeBatchPostView,
     AccountingBridgeBatchPreviewView,
@@ -181,3 +184,7 @@ urlpatterns = [
     path("winner/", include("api.v1.route_modules.winner_urls")),
     path("pim/", include("products_pim.urls")),
 ]
+
+urlpatterns += workbench_urlpatterns
+urlpatterns += workbench_dashboard_urlpatterns
+urlpatterns += workbench_lead_urlpatterns
