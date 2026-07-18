@@ -26,6 +26,10 @@ type Row = {
   status?: string;
   status_display?: string;
   created_at?: string;
+  source_lead_name?: string;
+  source_lead_id?: number;
+  converted_product_request_id?: number;
+  converted_subscription_request_id?: number;
 };
 
 const STATUS_TABS = [
@@ -102,6 +106,10 @@ export default function AdminOnlineRequestsPage() {
           status: String(r.status ?? ""),
           status_display: String(r.status_display ?? r.status ?? ""),
           created_at: String(r.created_at ?? ""),
+          source_lead_name: r.source_lead_name as string | undefined,
+          source_lead_id: r.source_lead_id as number | undefined,
+          converted_product_request_id: r.converted_product_request_id as number | undefined,
+          converted_subscription_request_id: r.converted_subscription_request_id as number | undefined,
         })),
       );
       setCount(Number(payload?.count ?? results.length));
@@ -210,7 +218,7 @@ export default function AdminOnlineRequestsPage() {
           ) : (
             <>
               <div className="overflow-auto rounded-xl border border-border bg-card">
-                <table className="w-full min-w-[860px] text-left text-sm">
+                <table className="w-full min-w-[1060px] text-left text-sm">
                   <thead className="bg-muted/40 text-xs uppercase tracking-[0.12em] text-muted-foreground">
                     <tr>
                       <th className="px-4 py-3">Request #</th>
@@ -219,6 +227,8 @@ export default function AdminOnlineRequestsPage() {
                       <th className="px-4 py-3">Type</th>
                       <th className="px-4 py-3 text-right">Qty</th>
                       <th className="px-4 py-3 text-right">Total</th>
+                      <th className="px-4 py-3">Source</th>
+                      <th className="px-4 py-3">Conversion</th>
                       <th className="px-4 py-3">Status</th>
                       <th className="px-4 py-3">Date</th>
                       <th className="px-4 py-3 text-right">Actions</th>
@@ -245,6 +255,37 @@ export default function AdminOnlineRequestsPage() {
                         <td className="px-4 py-3 text-right tabular-nums">{row.quantity ?? "—"}</td>
                         <td className="px-4 py-3 text-right tabular-nums font-medium">
                           {formatRupee(row.total_amount)}
+                        </td>
+                        <td className="px-4 py-3 text-xs">
+                          {row.source_lead_id ? (
+                            <Link
+                              href={`/admin/crm/leads?id=${row.source_lead_id}`}
+                              className="text-primary hover:underline"
+                            >
+                              {row.source_lead_name || `Lead #${row.source_lead_id}`}
+                            </Link>
+                          ) : (
+                            <span className="text-muted-foreground">Direct</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-xs">
+                          {row.converted_product_request_id ? (
+                            <Link
+                              href={`/admin/requests/product-requests/${row.converted_product_request_id}`}
+                              className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-400"
+                            >
+                              PR #{row.converted_product_request_id}
+                            </Link>
+                          ) : row.converted_subscription_request_id ? (
+                            <Link
+                              href={`/admin/requests/subscription-requests/${row.converted_subscription_request_id}`}
+                              className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-400"
+                            >
+                              SR #{row.converted_subscription_request_id}
+                            </Link>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           <StatusBadge status={row.status} label={row.status_display} />

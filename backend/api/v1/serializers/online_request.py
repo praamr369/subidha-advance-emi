@@ -24,9 +24,21 @@ class OnlineRequestActionSerializer(serializers.ModelSerializer):
 
 
 class OnlineRequestListSerializer(serializers.ModelSerializer):
-    customer_name = serializers.CharField(source='customer.name', read_only=True)
+    customer_name = serializers.CharField(source='customer.name', read_only=True, allow_null=True)
     product_name = serializers.CharField(source='product.name', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
+    source_lead_name = serializers.CharField(
+        source='source_public_lead.name', read_only=True, allow_null=True, default=None,
+    )
+    source_lead_id = serializers.IntegerField(
+        source='source_public_lead.id', read_only=True, allow_null=True, default=None,
+    )
+    converted_product_request_id = serializers.IntegerField(
+        source='converted_product_request.id', read_only=True, allow_null=True, default=None,
+    )
+    converted_subscription_request_id = serializers.IntegerField(
+        source='converted_subscription_request.id', read_only=True, allow_null=True, default=None,
+    )
 
     class Meta:
         model = OnlineRequest
@@ -42,14 +54,22 @@ class OnlineRequestListSerializer(serializers.ModelSerializer):
             'total_amount',
             'status',
             'status_display',
+            'source_lead_name',
+            'source_lead_id',
+            'converted_product_request_id',
+            'converted_subscription_request_id',
             'created_at',
         ]
         read_only_fields = ['id', 'request_number', 'created_at']
 
 
 class OnlineRequestDetailSerializer(serializers.ModelSerializer):
-    customer_name = serializers.CharField(source='customer.name', read_only=True)
+    customer_name = serializers.CharField(source='customer.name', read_only=True, allow_null=True)
+    customer_phone = serializers.CharField(source='customer.phone_number', read_only=True, allow_null=True, default=None)
     product_name = serializers.CharField(source='product.name', read_only=True)
+    product_base_price = serializers.DecimalField(
+        source='product.base_price', read_only=True, max_digits=12, decimal_places=2, allow_null=True
+    )
     batch_name = serializers.CharField(source='batch.name', read_only=True, allow_null=True)
     approved_by_name = serializers.CharField(
         source='approved_by.get_full_name',
@@ -66,6 +86,32 @@ class OnlineRequestDetailSerializer(serializers.ModelSerializer):
     can_approve = serializers.BooleanField(read_only=True)
     is_quote_expired = serializers.BooleanField(read_only=True)
 
+    # CRM Pipeline linkage
+    source_lead_id = serializers.IntegerField(
+        source='source_public_lead.id', read_only=True, allow_null=True, default=None,
+    )
+    source_lead_name = serializers.CharField(
+        source='source_public_lead.name', read_only=True, allow_null=True, default=None,
+    )
+    source_lead_phone = serializers.CharField(
+        source='source_public_lead.phone', read_only=True, allow_null=True, default=None,
+    )
+    source_lead_status = serializers.CharField(
+        source='source_public_lead.status', read_only=True, allow_null=True, default=None,
+    )
+    converted_product_request_id = serializers.IntegerField(
+        source='converted_product_request.id', read_only=True, allow_null=True, default=None,
+    )
+    converted_subscription_request_id = serializers.IntegerField(
+        source='converted_subscription_request.id', read_only=True, allow_null=True, default=None,
+    )
+    approved_subscription_id = serializers.IntegerField(
+        source='approved_subscription.id', read_only=True, allow_null=True, default=None,
+    )
+    approved_direct_sale_id = serializers.IntegerField(
+        source='approved_direct_sale.id', read_only=True, allow_null=True, default=None,
+    )
+
     class Meta:
         model = OnlineRequest
         fields = [
@@ -73,8 +119,10 @@ class OnlineRequestDetailSerializer(serializers.ModelSerializer):
             'request_number',
             'customer',
             'customer_name',
+            'customer_phone',
             'product',
             'product_name',
+            'product_base_price',
             'request_type',
             'request_type_display',
             'quantity',
@@ -99,6 +147,15 @@ class OnlineRequestDetailSerializer(serializers.ModelSerializer):
             'approval_notes',
             'can_accept_quote',
             'can_approve',
+            # CRM Pipeline linkage
+            'source_lead_id',
+            'source_lead_name',
+            'source_lead_phone',
+            'source_lead_status',
+            'converted_product_request_id',
+            'converted_subscription_request_id',
+            'approved_subscription_id',
+            'approved_direct_sale_id',
             'created_at',
             'updated_at',
             'actions',
@@ -125,7 +182,6 @@ class OnlineRequestCreateSerializer(serializers.ModelSerializer):
             'preferred_tenure',
             'preferred_lucky_number',
             'batch',
-            'unit_price',
         ]
 
 

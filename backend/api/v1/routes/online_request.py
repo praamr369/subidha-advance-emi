@@ -33,31 +33,31 @@ urlpatterns = [
         CustomerRequestAcceptQuoteView.as_view(),
         name='customer-request-accept-quote',
     ),
-    # Admin endpoints
-    path('admin/requests/online/', AdminRequestListView.as_view(), name='admin-request-list'),
-    path('admin/requests/online/<int:pk>/', AdminRequestDetailView.as_view(), name='admin-request-detail'),
+    # Admin endpoints (included under admin/ prefix already via routes/admin.py)
+    path('requests/online/', AdminRequestListView.as_view(), name='admin-request-list'),
+    path('requests/online/<int:pk>/', AdminRequestDetailView.as_view(), name='admin-request-detail'),
     path(
-        'admin/requests/online/<int:pk>/generate-quote/',
+        'requests/online/<int:pk>/generate-quote/',
         AdminGenerateQuoteView.as_view(),
         name='admin-generate-quote',
     ),
     path(
-        'admin/requests/online/<int:pk>/send-quote/',
+        'requests/online/<int:pk>/send-quote/',
         AdminSendQuoteView.as_view(),
         name='admin-send-quote',
     ),
     path(
-        'admin/requests/online/<int:pk>/approve/',
+        'requests/online/<int:pk>/approve/',
         AdminApproveRequestView.as_view(),
         name='admin-approve-request',
     ),
     path(
-        'admin/requests/online/<int:pk>/reject/',
+        'requests/online/<int:pk>/reject/',
         AdminRejectRequestView.as_view(),
         name='admin-reject-request',
     ),
     path(
-        'admin/requests/online/<int:pk>/complete/',
+        'requests/online/<int:pk>/complete/',
         AdminCompleteRequestView.as_view(),
         name='admin-complete-request',
     ),

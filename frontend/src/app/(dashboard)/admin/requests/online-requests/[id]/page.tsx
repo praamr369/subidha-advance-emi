@@ -41,6 +41,7 @@ type RequestDetail = {
   customer_name: string;
   product: number;
   product_name: string;
+  product_base_price?: string;
   request_type: string;
   request_type_display: string;
   quantity: number;
@@ -78,6 +79,7 @@ function parseDetail(raw: Record<string, unknown>): RequestDetail {
     customer_name: String(raw.customer_name ?? ""),
     product: Number(raw.product ?? 0),
     product_name: String(raw.product_name ?? ""),
+    product_base_price: raw.product_base_price != null ? String(raw.product_base_price) : undefined,
     request_type: String(raw.request_type ?? ""),
     request_type_display: String(raw.request_type_display ?? raw.request_type ?? ""),
     quantity: Number(raw.quantity ?? 0),
@@ -359,6 +361,30 @@ export default function AdminOnlineRequestDetailPage() {
               <InfoRow label="Updated">{formatDateTime(detail.updated_at)}</InfoRow>
             </div>
           </ERPSectionShell>
+
+          {/* Price Comparison */}
+          {detail.product_base_price && (
+            <div className="rounded-xl border border-border bg-card p-4">
+              <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground mb-3">
+                Pricing Information
+              </h3>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Product Base Price:</span>
+                  <span className="text-sm font-medium">{formatRupee(detail.product_base_price)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Quoted Unit Price:</span>
+                  <span className="text-sm font-medium">{formatRupee(detail.unit_price)}</span>
+                </div>
+                {detail.product_base_price !== detail.unit_price && (
+                  <div className="md:col-span-2 rounded-lg border border-amber-200 bg-amber-50/50 p-2 text-xs text-amber-800 dark:border-amber-800/40 dark:bg-amber-900/20 dark:text-amber-300">
+                    ⚠️ Custom price applied: Quote price differs from product base price
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Pricing breakdown */}
           <PricingBreakdownCard

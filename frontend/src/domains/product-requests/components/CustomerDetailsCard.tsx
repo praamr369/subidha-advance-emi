@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { formatRupee } from "@/lib/utils/currency";
+import { ROUTES } from "@/lib/routes";
 
 export interface CustomerDetails {
   id?: number | string;
@@ -87,7 +89,7 @@ export default function CustomerDetailsCard({
       </div>
 
       {/* Customer Avatar & Name */}
-      <div className="flex items-center gap-3">
+      <Link href={customer.id ? `${ROUTES.admin.customers}/${customer.id}` : "#"} className="flex items-center gap-3 hover:opacity-80 transition">
         <div className={`flex h-12 w-12 items-center justify-center rounded-full font-bold text-white ${
           customer.status === "active" ? "bg-gradient-to-br from-blue-500 to-blue-600" :
           customer.status === "suspended" ? "bg-gradient-to-br from-red-500 to-red-600" :
@@ -96,13 +98,13 @@ export default function CustomerDetailsCard({
           {initials}
         </div>
         <div className="flex-1">
-          <div className="font-bold text-foreground">{customer.name || "Unknown"}</div>
+          <div className="font-bold text-primary hover:underline">{customer.name || "Unknown"}</div>
           <div className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${statusColor.bg} ${statusColor.text} mt-1`}>
             <span className={`h-1.5 w-1.5 rounded-full ${statusColor.dot}`} />
             {(customer.status || "active").charAt(0).toUpperCase() + (customer.status || "active").slice(1)}
           </div>
         </div>
-      </div>
+      </Link>
 
       {/* Contact Information */}
       <div className="space-y-3 border-t border-border pt-4">
@@ -226,7 +228,7 @@ export default function CustomerDetailsCard({
 
       {/* Footer note */}
       <div className="border-t border-border pt-3 text-xs text-muted-foreground text-center">
-        Click customer name to view full profile
+        Click name to view full profile
       </div>
     </div>
   );

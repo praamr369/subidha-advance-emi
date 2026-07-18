@@ -72,7 +72,6 @@ class CustomerRequestListView(APIView):
                 preferred_tenure=serializer.validated_data.get('preferred_tenure'),
                 preferred_lucky_number=serializer.validated_data.get('preferred_lucky_number'),
                 batch=serializer.validated_data.get('batch'),
-                unit_price=serializer.validated_data.get('unit_price'),
             )
             resp_serializer = OnlineRequestDetailSerializer(
                 online_request_base_queryset().get(pk=req_obj.id),

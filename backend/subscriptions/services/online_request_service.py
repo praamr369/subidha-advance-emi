@@ -25,6 +25,9 @@ def online_request_base_queryset():
         'approved_by',
         'approved_subscription',
         'approved_direct_sale',
+        'source_public_lead',
+        'converted_product_request',
+        'converted_subscription_request',
     ).prefetch_related('actions')
 
 
