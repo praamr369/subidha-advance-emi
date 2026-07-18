@@ -101,6 +101,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("CRM & Requests", "CRM Workspace", ROUTES.admin.crmWorkspace, "Lead, customer, and support operating board."),
   item("CRM & Requests", "Leads", ROUTES.admin.crmLeads, "Lead register."),
   item("CRM & Requests", "Pipeline", ROUTES.admin.crmPipeline, "Lead pipeline."),
+  item("CRM & Requests", "Analytics", "/admin/crm/analytics", "Conversion funnel, product performance, and timeline trends."),
   item("CRM & Requests", "Follow-ups", ROUTES.admin.crmFollowUps, "Follow-up tasks."),
   item("CRM & Requests", "KYC", ROUTES.admin.crmKyc, "KYC review queue.", {
     badgeSource: "queue.customer_kyc_pending",
