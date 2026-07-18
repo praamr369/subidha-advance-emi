@@ -98,7 +98,8 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   //
   // /admin/requests/* canonical hub (Phase 6 thin aliases → existing legacy pages):
   item("CRM & Requests", "Requests Hub", ROUTES.admin.requestsHub, "Unified request intake hub. Request intake only — no financial posting from this page."),
-  item("CRM & Requests", "CRM Workspace & Dashboard", ROUTES.admin.crmWorkspace, "Unified CRM dashboard with real-time lead-to-sale tracking, ROI metrics, and customer intelligence routing."),
+  item("CRM & Requests", "CRM Workspace", ROUTES.admin.crmWorkspace, "Operational CRM hub with customer profiles, lead management, follow-ups, and KYC queue."),
+  item("CRM & Requests", "CRM Dashboard", ROUTES.admin.crmDashboard, "Analytics dashboard: funnel visualization, ROI metrics, conversion tracking, and revenue analysis."),
   item("CRM & Requests", "Leads", ROUTES.admin.crmLeads, "Lead register."),
   item("CRM & Requests", "Pipeline", ROUTES.admin.crmPipeline, "Lead pipeline."),
   item("CRM & Requests", "Analytics", "/admin/crm/analytics", "Conversion funnel, product performance, and timeline trends."),
