@@ -464,16 +464,16 @@ export default function LeadWorkflowPage() {
 
           <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-4">
             <div className="font-semibold text-amber-900 dark:text-amber-200 mb-2">Step 2: Online Enquiry</div>
-            <p className="text-sm text-amber-800 dark:text-amber-300">
+            <p className="text-sm text-amber-800 dark:text-amber-300 mb-2">
               When the same customer submits an online enquiry, the system automatically:
-              <ul className="list-disc list-inside mt-2">
-                <li>Checks if they exist as a customer (by phone/email)</li>
-                <li>Creates a new customer if they don't exist</li>
-                <li>Links the lead to the customer</li>
-                <li>Creates an OnlineRequest record</li>
-                <li>Updates the lead status to "CONTACTED"</li>
-              </ul>
             </p>
+            <ul className="list-disc list-inside text-sm text-amber-800 dark:text-amber-300">
+              <li>Checks if they exist as a customer (by phone/email)</li>
+              <li>Creates a new customer if they don't exist</li>
+              <li>Links the lead to the customer</li>
+              <li>Creates an OnlineRequest record</li>
+              <li>Updates the lead status to "CONTACTED"</li>
+            </ul>
           </div>
 
           <div className="rounded-lg bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 p-4">
