@@ -294,7 +294,7 @@ def get_dashboard_metrics() -> dict:
         total_revenue_subscriptions_result = (
             Subscription.objects
             .filter(status__in=['ACTIVE', 'PROCESSING'])
-            .aggregate(total=Sum('price'))
+            .aggregate(total=Sum('total_amount'))
         )
         total_revenue_subscriptions = (
             total_revenue_subscriptions_result['total'] or Decimal(0)
@@ -303,7 +303,7 @@ def get_dashboard_metrics() -> dict:
         total_revenue_direct_sales_result = (
             DirectSale.objects
             .filter(status__in=['CONFIRMED', 'INVOICED', 'COMPLETED'])
-            .aggregate(total=Sum('amount'))
+            .aggregate(total=Sum('grand_total'))
         )
         total_revenue_direct_sales = (
             total_revenue_direct_sales_result['total'] or Decimal(0)
