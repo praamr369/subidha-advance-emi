@@ -52,12 +52,7 @@ class DisputeStatsSerializer(serializers.Serializer):
     resolved_count = serializers.IntegerField(read_only=True)
 
 
-class OnlineEnquiryStatsSerializer(serializers.Serializer):
-    """Stats for Online Enquiries page"""
-    total_count = serializers.IntegerField(read_only=True)
-    new_count = serializers.IntegerField(read_only=True)
-    in_progress_count = serializers.IntegerField(read_only=True)
-    closed_count = serializers.IntegerField(read_only=True)
+# Online Enquiries removed - unified CRM pipeline (Phase 1)
 
 
 class SupportRequestStatsSerializer(serializers.Serializer):

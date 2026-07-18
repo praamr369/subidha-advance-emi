@@ -1,7 +1,6 @@
 from django.urls import path
 from api.v1.views.crm_stats import (
     CrmStatsView,
-    OnlineEnquiryStatsView,
     SupportRequestStatsView,
     SubscriptionRequestStatsView,
 )
@@ -17,7 +16,7 @@ urlpatterns = [
     path('admin/crm/disputes/stats/', CrmStatsView.as_view(), name='crm-disputes-stats'),
 
     # Requests Stats
-    path('admin/requests/online-enquiries/stats/', OnlineEnquiryStatsView.as_view(), name='enquiries-stats'),
+    # Online Enquiries removed - unified CRM pipeline (Phase 1)
     path('admin/requests/support/stats/', SupportRequestStatsView.as_view(), name='support-stats'),
     path('admin/requests/subscriptions/stats/', SubscriptionRequestStatsView.as_view(), name='subscription-requests-stats'),
 ]

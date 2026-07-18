@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 
 from crm.models import Lead, FollowUp, KycVerification, AmlFlag, Dispute
 from subscriptions.models import Subscription
-from requests.models import OnlineEnquiry, SupportRequest, SubscriptionRequest
+from requests.models import SupportRequest, SubscriptionRequest
 from api.v1.serializers.crm_stats import (
     CrmAggregateStatsSerializer,
     LeadStatsSerializer,
@@ -16,7 +16,6 @@ from api.v1.serializers.crm_stats import (
     KycStatsSerializer,
     AmlStatsSerializer,
     DisputeStatsSerializer,
-    OnlineEnquiryStatsSerializer,
     SupportRequestStatsSerializer,
     SubscriptionRequestStatsSerializer,
 )
@@ -130,27 +129,7 @@ class CrmStatsView(APIView):
         }
 
 
-class OnlineEnquiryStatsView(APIView):
-    """Get stats for Online Enquiries page"""
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        try:
-            total = OnlineEnquiry.objects.count()
-            new = OnlineEnquiry.objects.filter(status='NEW').count()
-            in_progress = OnlineEnquiry.objects.filter(status='IN_PROGRESS').count()
-            closed = OnlineEnquiry.objects.filter(status='CLOSED').count()
-
-            data = {
-                'total_count': total,
-                'new_count': new,
-                'in_progress_count': in_progress,
-                'closed_count': closed,
-            }
-            serializer = OnlineEnquiryStatsSerializer(data)
-            return Response(serializer.data)
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+# Online Enquiries removed - unified CRM pipeline (Phase 1)
 
 
 class SupportRequestStatsView(APIView):

@@ -641,14 +641,7 @@ from api.v1.views.account_links import (
     AdminPartnerAccountLinkView,
     AdminPartyAccountLinkView,
 )
-from api.v1.views.online_enquiries import (
-    AdminOnlineEnquiryCreatePurchaseDraftView,
-    AdminOnlineEnquiryDetailView,
-    AdminOnlineEnquiryListView,
-    AdminOnlineEnquiryRequestVendorQuotesView,
-    AdminOnlineEnquirySelectVendorQuoteView,
-    AdminOnlineEnquirySuggestVendorsView,
-)
+# Online Enquiries removed - unified CRM pipeline (Phase 1)
 from api.v1.views.vendor_ops import (
     AdminFinanceOpeningBalanceView,
     AdminCustomerOpeningOutstandingDetailView,
@@ -1187,12 +1180,7 @@ urlpatterns = [
     path("vendors/categories/", AdminVendorCategoryListCreateView.as_view()),
     path("vendor-sourcing/suggest/", AdminVendorSourcingSuggestView.as_view()),
     path("vendor-sourcing/request-quotes/", AdminVendorSourcingRequestQuotesView.as_view()),
-    path("online-enquiries/", AdminOnlineEnquiryListView.as_view()),
-    path("online-enquiries/<int:pk>/", AdminOnlineEnquiryDetailView.as_view()),
-    path("online-enquiries/<int:pk>/suggest-vendors/", AdminOnlineEnquirySuggestVendorsView.as_view()),
-    path("online-enquiries/<int:pk>/request-vendor-quotes/", AdminOnlineEnquiryRequestVendorQuotesView.as_view()),
-    path("online-enquiries/<int:pk>/select-vendor-quote/", AdminOnlineEnquirySelectVendorQuoteView.as_view()),
-    path("online-enquiries/<int:pk>/create-purchase-draft/", AdminOnlineEnquiryCreatePurchaseDraftView.as_view()),
+    # Online Enquiries removed - unified CRM pipeline (Phase 1)
     path("vendor-quotes/requests/", AdminVendorQuoteRequestListCreateView.as_view()),
     path("vendor-quotes/requests/<int:pk>/", AdminVendorQuoteRequestDetailView.as_view()),
     path("vendor-quotes/<int:pk>/accept/", AdminVendorQuoteAcceptView.as_view()),
