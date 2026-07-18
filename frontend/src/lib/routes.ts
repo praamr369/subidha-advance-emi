@@ -100,7 +100,7 @@ export const ROUTES = {
     biInventory: "/admin/bi/inventory",
     biHr: "/admin/bi/hr",
     crmWorkspace: "/admin/crm",
-    crmDashboard: "/admin/crm/dashboard",
+    crmAnalytics: "/admin/crm/analytics",
     salesWorkspace: "/admin/billing/direct-sale", // was /admin/sales — now redirected
     serviceWorkspace: "/admin/service-desk", // was /admin/service — now redirected
     workspace: "/admin/erp", // was /admin/workspace — now redirected
