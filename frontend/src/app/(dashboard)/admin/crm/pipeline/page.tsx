@@ -64,7 +64,8 @@ export default function CRMPipelinePage() {
       ]}
       actions={[
         { href: ROUTES.admin.crmWorkspace, label: "Workspace", variant: "secondary" },
-        { href: ROUTES.admin.crmAnalytics, label: "Analytics", variant: "secondary" },
+        { href: ROUTES.admin.crmAnalytics, label: "CRM Analytics", variant: "secondary" },
+        { href: ROUTES.admin.crmPipelineAnalytics, label: "Pipeline Analytics", variant: "primary" },
       ]}
       statusBadge={{ label: "Unified Pipeline", tone: "success" as const }}
       stats={[

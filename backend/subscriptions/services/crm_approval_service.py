@@ -104,6 +104,14 @@ def approve_online_request(
     # Step 4: Send notifications
     send_approval_notification(online_request, created_contract)
 
+    # Step 5: Post to accounting (GL entries)
+    if created_contract:
+        from subscriptions.services.crm_gl_posting_service import post_approval_to_accounting
+        try:
+            post_approval_to_accounting(created_contract, approval_type, approval_user)
+        except Exception as e:
+            print(f"GL posting warning: {str(e)}")
+
     return created_contract
 
 

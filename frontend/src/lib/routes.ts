@@ -102,6 +102,7 @@ export const ROUTES = {
     crmWorkspace: "/admin/crm",
     crmAnalytics: "/admin/crm/analytics",
     crmPipeline: "/admin/crm/pipeline",
+    crmPipelineAnalytics: "/admin/crm/pipeline-analytics",
     salesWorkspace: "/admin/billing/direct-sale", // was /admin/sales — now redirected
     serviceWorkspace: "/admin/service-desk", // was /admin/service — now redirected
     workspace: "/admin/erp", // was /admin/workspace — now redirected

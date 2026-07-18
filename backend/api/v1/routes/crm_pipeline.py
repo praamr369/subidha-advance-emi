@@ -42,4 +42,9 @@ urlpatterns = [
     path('pipeline/funnel/', CRMPipelineViewSet.as_view({
         'get': 'funnel',
     }), name='crm-pipeline-funnel'),
+
+    # Pipeline analytics
+    path('pipeline/analytics/', CRMPipelineViewSet.as_view({
+        'get': 'analytics',
+    }), name='crm-pipeline-analytics'),
 ]

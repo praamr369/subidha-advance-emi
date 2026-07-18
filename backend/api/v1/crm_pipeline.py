@@ -228,7 +228,7 @@ class CRMPipelineViewSet(viewsets.ModelViewSet):
         """
         Get pipeline funnel visualization data.
 
-        GET /api/v1/crm/pipeline/funnel/
+        GET /api/v1/crm-pipeline/pipeline/funnel/
         """
         from django.db.models import Count
 
@@ -236,14 +236,86 @@ class CRMPipelineViewSet(viewsets.ModelViewSet):
 
         funnel_data = []
         stages = ['LEAD', 'ENQUIRY', 'QUOTED', 'APPROVED', 'CONVERTED']
+        total = queryset.count()
 
         for stage in stages:
             count = queryset.filter(current_stage=stage).count()
+            pct = round((count / total * 100), 1) if total > 0 else 0
             funnel_data.append({
                 'stage': stage,
                 'count': count,
+                'percentage': pct,
             })
 
         return Response({
             'funnel': funnel_data,
+            'total': total,
+        })
+
+    @action(detail=False, methods=['get'])
+    def analytics(self, request):
+        """
+        Get comprehensive CRM pipeline analytics.
+
+        GET /api/v1/crm-pipeline/pipeline/analytics/?days=30
+        """
+        from django.db.models import Count, Sum
+        from django.utils import timezone
+        from datetime import timedelta
+
+        days = int(request.query_params.get('days', 30))
+        end_date = timezone.now()
+        start_date = end_date - timedelta(days=days)
+
+        queryset = CRMPipeline.objects.filter(created_at__range=[start_date, end_date])
+
+        # Stage breakdown
+        stage_breakdown = {}
+        for stage in ['LEAD', 'ENQUIRY', 'QUOTED', 'APPROVED', 'CONVERTED']:
+            count = queryset.filter(current_stage=stage).count()
+            revenue = float(
+                queryset.filter(current_stage=stage).aggregate(Sum('revenue'))['revenue__sum'] or 0
+            )
+            stage_breakdown[stage] = {
+                'count': count,
+                'revenue': revenue,
+            }
+
+        # Type breakdown
+        type_breakdown = {}
+        for req_type in ['DIRECT_SALE', 'SUBSCRIPTION', 'RENT', 'LEASE']:
+            count = queryset.filter(request_type=req_type).count()
+            revenue = float(
+                queryset.filter(request_type=req_type).aggregate(Sum('revenue'))['revenue__sum'] or 0
+            )
+            type_breakdown[req_type] = {
+                'count': count,
+                'revenue': revenue,
+            }
+
+        # Conversion metrics
+        approved = queryset.filter(current_stage__in=['APPROVED', 'CONVERTED']).count()
+        converted = queryset.filter(current_stage__in=['CONVERTED', 'ACTIVE', 'WON']).count()
+        total = queryset.count()
+
+        conversion_rate = round((converted / total * 100), 2) if total > 0 else 0
+        approval_rate = round((approved / total * 100), 2) if total > 0 else 0
+
+        # Revenue metrics
+        total_revenue = float(queryset.aggregate(Sum('revenue'))['revenue__sum'] or 0)
+        avg_revenue = round(total_revenue / max(total, 1), 2)
+
+        return Response({
+            'period_days': days,
+            'summary': {
+                'total_leads': total,
+                'approved_count': approved,
+                'converted_count': converted,
+                'total_revenue': total_revenue,
+                'avg_revenue_per_lead': avg_revenue,
+                'conversion_rate': conversion_rate,
+                'approval_rate': approval_rate,
+            },
+            'by_stage': stage_breakdown,
+            'by_type': type_breakdown,
         })
