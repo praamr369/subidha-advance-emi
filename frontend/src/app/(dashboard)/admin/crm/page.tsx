@@ -116,7 +116,8 @@ export default function AdminCrmOverviewPage() {
       const data: DashboardMetrics = await apiFetch("/api/v1/admin/crm/analytics/dashboard/");
       setMetrics(data);
     } catch (err) {
-      console.error("Error loading dashboard metrics:", err);
+      // Silently fail - metrics are optional, page should still display
+      setMetrics(null);
     }
   }, []);
 
