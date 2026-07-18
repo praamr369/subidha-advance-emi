@@ -272,7 +272,7 @@ export default function ProductGrid({ products, locale = "en" }: { products: Pub
             return (
               <ProductCard3D
                 key={product.id}
-                id={product.id}
+                id={String(product.id)}
                 title={product.name}
                 category={product.category || "Uncategorized"}
                 price={price}
