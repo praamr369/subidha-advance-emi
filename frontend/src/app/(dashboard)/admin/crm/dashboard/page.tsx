@@ -7,6 +7,7 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { ROUTES } from "@/lib/routes";
 import { formatRupee } from "@/lib/utils/currency";
+import { apiFetch } from "@/lib/api";
 
 interface WorkflowStats {
   stage: string;
@@ -145,25 +146,8 @@ export default function UnifiedCRMDashboardPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      // This would call the unified analytics endpoint
-      // For now, showing the structure
-      const mockData: DashboardData = {
-        leads: { stage: "Leads", count: 0 },
-        onlineRequests: { stage: "Online Requests", count: 0 },
-        productRequests: { stage: "Product Requests", count: 0 },
-        subscriptionRequests: { stage: "Subscription Requests", count: 0 },
-        subscriptions: { stage: "Active Subscriptions", count: 0 },
-        directSales: { stage: "Direct Sales", count: 0 },
-        roi: {
-          totalLeads: 0,
-          totalConversions: 0,
-          conversionRate: 0,
-          totalRevenue: 0,
-          avgRevenuePerLead: 0,
-          roi: 0,
-        },
-      };
-      setData(mockData);
+      const data: DashboardData = await apiFetch("/api/v1/admin/crm/analytics/dashboard/");
+      setData(data);
     } catch (error) {
       console.error("Error loading dashboard data:", error);
     } finally {

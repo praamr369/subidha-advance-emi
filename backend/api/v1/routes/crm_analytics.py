@@ -5,9 +5,15 @@ from api.v1.views.crm_analytics import (
     CRMTimelineAnalyticsView,
     CRMRequestTypeAnalyticsView,
     CRMAnalyticsSummaryView,
+    CRMDashboardMetricsView,
 )
 
 urlpatterns = [
+    path(
+        'dashboard/',
+        CRMDashboardMetricsView.as_view(),
+        name='crm-dashboard-metrics',
+    ),
     path(
         'summary/',
         CRMAnalyticsSummaryView.as_view(),

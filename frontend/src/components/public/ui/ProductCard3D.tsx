@@ -1,6 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -27,26 +26,23 @@ export default function ProductCard3D({
   className,
 }: ProductCard3DProps) {
   return (
-    <motion.div
-      whileHover={{ y: -6 }}
+    <div
       className={cn(
-        "group relative flex min-w-[240px] flex-col overflow-hidden rounded-[1.8rem] border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-card)_98%,transparent)] p-3 shadow-[0_16px_34px_-24px_rgba(15,23,42,0.5)] transition-shadow hover:shadow-[0_24px_54px_-24px_rgba(15,23,42,0.6)] dark:shadow-[0_16px_34px_-24px_rgba(0,0,0,0.6)] dark:hover:shadow-[0_24px_54px_-24px_rgba(0,0,0,0.7)]",
+        "group relative flex min-w-[240px] flex-col overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm transition-all duration-300 hover:shadow-md hover:border-primary/30",
         className
       )}
-      style={{
-        boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.4)",
-      }}
     >
       <Link href={href} className="absolute inset-0 z-10">
         <span className="sr-only">View {title}</span>
       </Link>
       
-      <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[1.2rem] bg-muted/30">
-        {/* Replace with real image when data is mapped */}
-        <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/30 font-bold text-xl">
-          Image Placeholder
-        </div>
-        <div className="absolute top-2 left-2 z-20 rounded-lg border border-white/20 bg-black/40 px-2 py-1 text-[10px] font-semibold text-white backdrop-blur-md">
+      <div className="relative aspect-[4/3] w-full overflow-hidden rounded-lg bg-muted/40 flex items-center justify-center">
+        {imageUrl ? (
+          <Image src={imageUrl} alt={title} fill className="object-cover" sizes="(max-width: 768px) 100vw, 33vw" />
+        ) : (
+          <div className="text-muted-foreground/40 font-medium text-sm">Image Pending</div>
+        )}
+        <div className="absolute top-2 left-2 z-20 rounded border border-white/40 bg-white/80 px-2 py-0.5 text-[10px] font-semibold text-slate-800 backdrop-blur-md dark:border-black/40 dark:bg-black/60 dark:text-slate-200">
           {category}
         </div>
       </div>
@@ -67,13 +63,12 @@ export default function ProductCard3D({
           </div>
         </div>
         
-        <motion.button
-          whileTap={{ scale: 0.95 }}
-          className="mt-3 relative z-20 w-full rounded-xl bg-primary/10 py-2.5 text-xs font-bold text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
+        <button
+          className="mt-4 relative z-20 w-full rounded-md bg-primary/10 py-2.5 text-xs font-semibold text-primary transition-colors hover:bg-primary hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
         >
           View Plans
-        </motion.button>
+        </button>
       </div>
-    </motion.div>
+    </div>
   );
 }

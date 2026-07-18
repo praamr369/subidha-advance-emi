@@ -9,6 +9,12 @@ from subscriptions.models import PublicLead, Subscription
 from subscriptions.models_online_request import OnlineRequest
 from billing.models import DirectSale
 
+try:
+    from requests.models import ProductRequest, SubscriptionRequest
+except ImportError:
+    ProductRequest = None
+    SubscriptionRequest = None
+
 
 def get_date_range(days: int = 30) -> tuple[datetime, datetime]:
     """Get date range for analytics (last N days)"""
@@ -276,4 +282,87 @@ def get_analytics_summary(days: int = 30) -> dict:
         'products': get_product_performance(days),
         'timeline': get_timeline_analytics(days),
         'by_request_type': get_request_type_analytics(days),
+    }
+
+
+def get_dashboard_metrics() -> dict:
+    """Get unified CRM dashboard metrics (current counts, not time-filtered)"""
+    # Stage counts
+    leads_count = PublicLead.objects.count()
+    online_requests_count = OnlineRequest.objects.count()
+    product_requests_count = ProductRequest.objects.count() if ProductRequest else 0
+    subscription_requests_count = SubscriptionRequest.objects.count() if SubscriptionRequest else 0
+    subscriptions_count = Subscription.objects.count()
+
+    try:
+        direct_sales_count = DirectSale.objects.count()
+    except Exception:
+        direct_sales_count = 0
+
+    # Revenue metrics
+    try:
+        total_revenue_subscriptions = (
+            Subscription.objects
+            .aggregate(total=Sum('price'))['total'] or Decimal(0)
+        )
+    except Exception:
+        total_revenue_subscriptions = Decimal(0)
+
+    try:
+        total_revenue_direct_sales = (
+            DirectSale.objects
+            .aggregate(total=Sum('amount'))['total'] or Decimal(0)
+        )
+    except Exception:
+        total_revenue_direct_sales = Decimal(0)
+
+    total_revenue = float(total_revenue_subscriptions + total_revenue_direct_sales)
+
+    # Conversion rates
+    total_conversions = subscriptions_count + direct_sales_count
+    lead_to_sale_conversion = (
+        round((total_conversions / leads_count * 100), 2)
+        if leads_count > 0 else 0
+    )
+
+    avg_revenue_per_lead = (
+        round(total_revenue / leads_count, 2)
+        if leads_count > 0 else 0
+    )
+
+    return {
+        'leads': {
+            'stage': 'Leads',
+            'count': leads_count,
+        },
+        'onlineRequests': {
+            'stage': 'Online Requests',
+            'count': online_requests_count,
+        },
+        'productRequests': {
+            'stage': 'Product Requests',
+            'count': product_requests_count,
+        },
+        'subscriptionRequests': {
+            'stage': 'Subscription Requests',
+            'count': subscription_requests_count,
+        },
+        'subscriptions': {
+            'stage': 'Active Subscriptions',
+            'count': subscriptions_count,
+            'revenue': float(total_revenue_subscriptions),
+        },
+        'directSales': {
+            'stage': 'Direct Sales',
+            'count': direct_sales_count,
+            'revenue': float(total_revenue_direct_sales),
+        },
+        'roi': {
+            'totalLeads': leads_count,
+            'totalConversions': total_conversions,
+            'conversionRate': lead_to_sale_conversion,
+            'totalRevenue': total_revenue,
+            'avgRevenuePerLead': avg_revenue_per_lead,
+            'roi': lead_to_sale_conversion,
+        },
     }

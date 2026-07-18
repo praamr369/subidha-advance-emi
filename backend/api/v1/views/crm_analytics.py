@@ -9,6 +9,7 @@ from subscriptions.services.crm_analytics_service import (
     get_timeline_analytics,
     get_request_type_analytics,
     get_analytics_summary,
+    get_dashboard_metrics,
 )
 
 
@@ -70,3 +71,11 @@ class CRMAnalyticsSummaryView(APIView):
 
         analytics = get_analytics_summary(days)
         return Response(analytics)
+
+
+class CRMDashboardMetricsView(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        metrics = get_dashboard_metrics()
+        return Response(metrics)

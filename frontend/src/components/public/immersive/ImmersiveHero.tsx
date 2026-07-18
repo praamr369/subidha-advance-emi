@@ -1,10 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { ArrowRight, ChevronDown, ReceiptText, ShieldCheck, Sparkles } from "lucide-react";
 
-import AnimatedHeroScene from "@/components/public/ui/AnimatedHeroScene";
 import { brandConfig } from "@/config/brand";
 import { ROUTES } from "@/lib/routes";
 
@@ -149,7 +149,19 @@ export default function ImmersiveHero({ title, subtitle, companyName, tagline, s
             className="imx-layer relative"
             style={{ ["--imx-depth" as string]: 8, ["--imx-tilt" as string]: 7, ["--imx-drift" as string]: 12 }}
           >
-            <AnimatedHeroScene />
+            <div className="relative overflow-hidden rounded-[1.6rem] shadow-[0_24px_54px_-24px_rgba(15,23,42,0.6)]">
+              <Image
+                src="/images/hero_living_room.jpg"
+                alt="Modern living room with elegant sofa"
+                width={800}
+                height={533}
+                priority
+                quality={90}
+                sizes="(max-width: 1024px) 100vw, 46vw"
+                className="h-full w-full object-cover min-h-[20rem] lg:min-h-[30rem] transition-transform duration-700 hover:scale-[1.02]"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
+            </div>
           </div>
 
           <div
