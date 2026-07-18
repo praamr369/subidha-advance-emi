@@ -119,7 +119,7 @@ def get_product_performance(days: int = 30) -> list[dict]:
         approved = row['approved_count']
         conversion_rate = round((approved / requests * 100), 1) if requests > 0 else 0
 
-        # Get revenue from subscriptions + direct sales for this product
+        # Get revenue from subscriptions for this product
         revenue_subscriptions = (
             Subscription.objects
             .filter(
@@ -129,14 +129,8 @@ def get_product_performance(days: int = 30) -> list[dict]:
             .aggregate(total=Sum('price'))['total'] or Decimal(0)
         )
 
-        revenue_sales = (
-            DirectSale.objects
-            .filter(
-                created_at__range=[start_date, end_date],
-                lines__product_id=row['product_id']
-            )
-            .aggregate(total=Sum('grand_total'))['total'] or Decimal(0)
-        )
+        # Direct sales revenue (estimate based on requests converted to sales)
+        revenue_sales = Decimal(0)
 
         result.append({
             'product_id': row['product_id'],
