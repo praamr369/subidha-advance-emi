@@ -110,7 +110,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("CRM & Requests", "KYC Expiry Notifications", ROUTES.admin.kycExpiryNotifications, "Preview and send email reminders to customers with expiring KYC documents."),
   item("CRM & Requests", "Customer Disputes", ROUTES.admin.crmDisputes, "Manage customer complaints and dispute resolution workflow."),
   // Phase 6/7: canonical /admin/requests/* alias routes — thin server redirects to existing legacy pages.
-  item("CRM & Requests", "Online Enquiries", ROUTES.admin.requestsOnlineEnquiries, "Public enquiry queue. Request intake — no procurement or payment posting from this page."),
+  // Online Enquiries removed: unified into CRM Leads + Online Requests workflow (Phase 1 simplification)
   item("CRM & Requests", "Support", ROUTES.admin.requestsSupport, "Customer support intake. Request intake — service execution remains in Service Desk."),
   item("CRM & Requests", "Subscription Requests", ROUTES.admin.requestsSubscriptions, "Controlled approval queue for subscription requests. No silent contract/payment creation.", { badgeSource: "queue.subscription_requests_pending" }),
   item("CRM & Requests", "Product Requests", ROUTES.admin.subscriptionRequests, "Controlled approval queue for product requests (e.g. direct sale requests).", { badgeSource: "queue.product_requests_pending" }),
@@ -424,7 +424,7 @@ export const ADMIN_ROUTE_ALIASES: Record<string, string> = {
   "/admin/billing/direct-sales": ROUTES.admin.billingDirectSaleWorkspace,
   "/admin/sales": ROUTES.admin.billingDirectSaleWorkspace,
   // ── requests/ is now canonical — old top-level paths are legacy aliases ───
-  "/admin/online-enquiries": ROUTES.admin.requestsOnlineEnquiries,
+  // Online Enquiries removed: unified into CRM Leads + Online Requests workflow
   "/admin/support-requests": ROUTES.admin.requestsSupport,
   "/admin/subscription-requests": ROUTES.admin.requestsSubscriptions,
 };
