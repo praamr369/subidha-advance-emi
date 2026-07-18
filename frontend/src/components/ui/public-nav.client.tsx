@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X, MessageCircle } from "lucide-react";
 import { useMemo, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 
 import BrandLockup from "@/components/public/BrandLockup";
 import LanguageSwitcher from "@/components/public/LanguageSwitcher";
@@ -156,76 +157,81 @@ export default function PublicNavClient({
           {trustBadge}
         </div>
 
-        <div
-          id={MOBILE_MENU_ID}
-          className={cn(
-            "grid max-h-[calc(100dvh-5.5rem)] gap-3 overflow-y-auto overscroll-contain rounded-[1.4rem] border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_82%,transparent)] p-2 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.68)] backdrop-blur lg:hidden",
-            mobileOpen ? "grid" : "hidden"
-          )}
-        >
-          <div className="rounded-xl border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_88%,transparent)] p-3">
-            <LanguageSwitcher value={language} />
-            <ThemeToggle variant="public" className="mt-2" />
-            <div className="mt-2 text-xs font-semibold text-muted-foreground">{trustBadge}</div>
-          </div>
-          <div className="rounded-xl border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_88%,transparent)] p-3">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              {dictionary.navigate}
-            </div>
-            <div className="mt-2 grid gap-1">
-              {links.map((link) => {
-                const active = isActivePath(pathname, link.href);
-                return (
+        <AnimatePresence>
+          {mobileOpen && (
+            <motion.div
+              id={MOBILE_MENU_ID}
+              initial={{ opacity: 0, y: -20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.95 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              className="grid max-h-[calc(100dvh-5.5rem)] gap-3 overflow-y-auto overscroll-contain rounded-[1.4rem] border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_82%,transparent)] p-2 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.68)] backdrop-blur lg:hidden origin-top"
+            >
+              <div className="rounded-xl border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_88%,transparent)] p-3">
+                <LanguageSwitcher value={language} />
+                <ThemeToggle variant="public" className="mt-2" />
+                <div className="mt-2 text-xs font-semibold text-muted-foreground">{trustBadge}</div>
+              </div>
+              <div className="rounded-xl border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_88%,transparent)] p-3">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  {dictionary.navigate}
+                </div>
+                <div className="mt-2 grid gap-1">
+                  {links.map((link) => {
+                    const active = isActivePath(pathname, link.href);
+                    return (
+                      <Link
+                        key={link.href}
+                        href={link.href}
+                        onClick={() => setMobileOpen(false)}
+                        aria-current={active ? "page" : undefined}
+                        className={cn(
+                          "min-h-11 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2",
+                          active
+                            ? "bg-primary text-primary-foreground shadow-[0_10px_26px_-20px_rgba(15,23,42,0.8)] dark:shadow-[0_10px_26px_-20px_rgba(0,0,0,0.55)]"
+                            : "text-foreground hover:bg-muted/50"
+                        )}
+                      >
+                        {link.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+    
+              <div className="grid gap-2 rounded-xl border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_88%,transparent)] p-3">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  {dictionary.quickActions}
+                </div>
+                {showWhatsApp ? (
                   <Link
-                    key={link.href}
-                    href={link.href}
+                    href={whatsappLink as string}
                     onClick={() => setMobileOpen(false)}
-                    aria-current={active ? "page" : undefined}
+                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-card-elevated)] px-4 text-sm font-semibold text-foreground shadow-[0_16px_32px_-26px_rgba(15,23,42,0.72)] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2 dark:shadow-[0_16px_32px_-26px_rgba(0,0,0,0.5)]"
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                    {dictionary.whatsapp}
+                  </Link>
+                ) : null}
+                {actions.map((action) => (
+                  <Link
+                    key={action.href}
+                    href={action.href}
+                    onClick={() => setMobileOpen(false)}
                     className={cn(
-                      "min-h-11 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2",
-                      active
-                        ? "bg-primary text-primary-foreground shadow-[0_10px_26px_-20px_rgba(15,23,42,0.8)] dark:shadow-[0_10px_26px_-20px_rgba(0,0,0,0.55)]"
-                        : "text-foreground hover:bg-muted/50"
+                      "inline-flex min-h-11 items-center justify-center rounded-xl border px-4 text-sm font-semibold shadow-[0_16px_32px_-26px_rgba(15,23,42,0.72)] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2 dark:shadow-[0_16px_32px_-26px_rgba(0,0,0,0.5)]",
+                      action.variant === "primary"
+                        ? "border-primary/25 bg-primary text-primary-foreground"
+                        : "border-[var(--border)] bg-[var(--surface-card-elevated)] text-foreground"
                     )}
                   >
-                    {link.label}
+                    {action.label}
                   </Link>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="grid gap-2 rounded-xl border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_88%,transparent)] p-3">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              {dictionary.quickActions}
-            </div>
-            {showWhatsApp ? (
-              <Link
-                href={whatsappLink as string}
-                onClick={() => setMobileOpen(false)}
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-card-elevated)] px-4 text-sm font-semibold text-foreground shadow-[0_16px_32px_-26px_rgba(15,23,42,0.72)] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2 dark:shadow-[0_16px_32px_-26px_rgba(0,0,0,0.5)]"
-              >
-                <MessageCircle className="h-4 w-4" />
-                {dictionary.whatsapp}
-              </Link>
-            ) : null}
-            {actions.map((action) => (
-              <Link
-                key={action.href}
-                href={action.href}
-                onClick={() => setMobileOpen(false)}
-                className={cn(
-                  "inline-flex min-h-11 items-center justify-center rounded-xl border px-4 text-sm font-semibold shadow-[0_16px_32px_-26px_rgba(15,23,42,0.72)] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2 dark:shadow-[0_16px_32px_-26px_rgba(0,0,0,0.5)]",
-                  action.variant === "primary"
-                    ? "border-primary/25 bg-primary text-primary-foreground"
-                    : "border-[var(--border)] bg-[var(--surface-card-elevated)] text-foreground"
-                )}
-              >
-                {action.label}
-              </Link>
-            ))}
-          </div>
-        </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </nav>
   );

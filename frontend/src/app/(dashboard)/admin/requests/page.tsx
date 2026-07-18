@@ -23,13 +23,6 @@ const REQUEST_GROUPS = [
     description: "Inbound requests from public forms or customer-facing channels. Request intake only.",
     items: [
       {
-        label: "Online Enquiries",
-        description:
-          "Public purchase or service enquiries submitted through the website. No procurement or payment posting from this page.",
-        href: ROUTES.admin.onlineEnquiries,
-        badge: "Request intake",
-      },
-      {
         label: "Support Requests",
         description:
           "Customer-submitted support and dispute intake with receipt and subscription context. Service execution remains in Service Desk.",

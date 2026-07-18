@@ -1,3 +1,6 @@
+"use client";
+
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 type LuckyIdGridProps = {
@@ -34,11 +37,16 @@ export default function LuckyIdGrid({ highlightSlot, className }: LuckyIdGridPro
         role="list"
         aria-label="Lucky ID slot grid (explanatory)"
       >
-        {cells.map((n) => {
+        {cells.map((n, i) => {
           const id = String(n).padStart(2, "0");
           const isHighlighted = highlightSlot !== null && highlightSlot !== undefined && n === highlightSlot;
           return (
-            <div
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true, margin: "-50px" }}
+              transition={{ delay: i * 0.01, duration: 0.3 }}
+              whileHover={{ y: -2, scale: 1.05 }}
               key={id}
               role="listitem"
               aria-label={`Lucky ID ${id}`}
@@ -50,7 +58,7 @@ export default function LuckyIdGrid({ highlightSlot, className }: LuckyIdGridPro
               )}
             >
               {id}
-            </div>
+            </motion.div>
           );
         })}
       </div>

@@ -15,6 +15,9 @@ import SectionHeader from "@/components/public/SectionHeader";
 import PublicTrustStrip from "@/components/public/PublicTrustStrip";
 import TrustPillars from "@/components/public/TrustPillars";
 import WinnerSpotlight from "@/components/public/WinnerSpotlight";
+import AnimatedStatsStrip from "@/components/public/ui/AnimatedStatsStrip";
+import EMICalculatorWidget from "@/components/public/ui/EMICalculatorWidget";
+import WhatsAppFab from "@/components/public/ui/WhatsAppFab";
 import { asLocale, getPublicDictionary, getText, publicContent } from "@/lib/public-i18n";
 import { getPublicLanguage } from "@/lib/public-i18n.server";
 import { getPublicLatestWinner, getPublicStats, listPublicProducts } from "@/lib/public-api";
@@ -88,19 +91,14 @@ export default async function PublicHome() {
           <PublicSectionShell className="space-y-4">
             <SectionHeader eyebrow="Live public stats" title="Live public business signals" description="These indicators come from live public APIs and reflect production records." />
             {stats ? (
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                {[
+              <AnimatedStatsStrip
+                stats={[
                   { label: "Published batches", value: stats.total_batches },
                   { label: "Total subscriptions", value: stats.total_subscriptions },
                   { label: "Active subscriptions", value: stats.active_subscriptions },
                   { label: "Published winners", value: stats.total_winners },
-                ].map((item) => (
-                  <div key={item.label} className="public-card p-5">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{item.label}</div>
-                    <div className="mt-4 text-3xl font-semibold tracking-tight text-foreground">{item.value.toLocaleString("en-IN")}</div>
-                  </div>
-                ))}
-              </div>
+                ]}
+              />
             ) : (
               <div className="public-card-sm px-5 py-4 text-sm text-muted-foreground">Live public stats are currently unavailable.</div>
             )}
@@ -138,6 +136,15 @@ export default async function PublicHome() {
 
           <PublicSectionShell className="space-y-4">
             <SectionHeader
+              eyebrow="EMI Calculator"
+              title="Estimate your payments"
+              description="Calculate your monthly EMI easily with 0% interest on our Lucky Plan."
+            />
+            <EMICalculatorWidget />
+          </PublicSectionShell>
+
+          <PublicSectionShell className="space-y-4">
+            <SectionHeader
               eyebrow="Common questions"
               title="Quick answers"
               description="A selection of the most-asked questions. Visit the FAQ page for the full list."
@@ -159,6 +166,7 @@ export default async function PublicHome() {
               { href: ROUTES.public.apply, label: dictionary.common.apply, variant: "primary" },
             ]}
           />
+          <WhatsAppFab href={profile.resolved_whatsapp_link as string} />
         </>
       }
     />

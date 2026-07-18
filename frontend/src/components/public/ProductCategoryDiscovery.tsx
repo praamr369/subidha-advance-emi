@@ -4,8 +4,18 @@ import { ArrowRight, Boxes, Image as ImageIcon, PackageCheck } from "lucide-reac
 import GeneratedMarketingVisual from "@/components/public/GeneratedMarketingVisual";
 import PublicSectionShell from "@/components/public/PublicSectionShell";
 import SectionHeader from "@/components/public/SectionHeader";
+import { SofaIcon, TvIcon, BedIcon, FridgeIcon, WashingMachineIcon } from "@/components/public/ui/SvgIcons";
 import { PUBLIC_MARKETING_ASSETS } from "@/lib/public-marketing-assets";
 import { ROUTES } from "@/lib/routes";
+
+function getCategoryIcon(name: string, className?: string) {
+  const n = name.toLowerCase();
+  if (n.includes("bed") || n.includes("mattress") || n.includes("wardrobe")) return <BedIcon className={className} />;
+  if (n.includes("tv") || n.includes("television") || n.includes("electronics")) return <TvIcon className={className} />;
+  if (n.includes("fridge") || n.includes("refrigerator")) return <FridgeIcon className={className} />;
+  if (n.includes("wash")) return <WashingMachineIcon className={className} />;
+  return <SofaIcon className={className} />;
+}
 
 export type ProductCategorySummary = {
   name: string;
@@ -36,7 +46,7 @@ export default function ProductCategoryDiscovery({ categories }: ProductCategory
             <article key={category.name} className="public-card public-card-animated p-5">
               <div className="flex items-start justify-between gap-3">
                 <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--primary)_13%,var(--surface-card-elevated)_87%)] text-primary shadow-[inset_0_1px_0_var(--hairline-shine)]">
-                  <Boxes className="h-5 w-5" />
+                  {getCategoryIcon(category.name, "h-5 w-5")}
                 </span>
                 <span className="rounded-full border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_82%,transparent)] px-3 py-1 text-xs font-semibold text-muted-foreground">
                   {category.count.toLocaleString("en-IN")} items

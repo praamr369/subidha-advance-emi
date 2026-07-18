@@ -15,10 +15,11 @@ import PublicStructuredData from "@/components/public/PublicStructuredData";
 import PublicVisualShell from "@/components/public/PublicVisualShell";
 import PublicFooter from "@/components/ui/public-footer";
 import PublicNav from "@/components/ui/public-nav";
+import PublicBottomNav from "@/components/ui/public-bottom-nav";
 
 export default function PublicLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="public-app flex min-h-screen flex-col">
+    <div className="public-app flex min-h-screen flex-col pb-16 lg:pb-0">
       <PublicStructuredData />
       <a
         href="#main-content"
@@ -30,6 +31,7 @@ export default function PublicLayout({ children }: { children: ReactNode }) {
       <PublicVisualShell>{children}</PublicVisualShell>
       <PublicOperationalDisclosure />
       <PublicFooter />
+      <PublicBottomNav />
     </div>
   );
 }
