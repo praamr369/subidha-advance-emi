@@ -5,15 +5,10 @@ from django.db.models import Count, Q, Sum, Avg
 from django.utils import timezone
 from decimal import Decimal
 
-from subscriptions.models import PublicLead, Subscription
+from subscriptions.models import PublicLead, Subscription, ProductRequest
 from subscriptions.models_online_request import OnlineRequest
 from billing.models import DirectSale
-
-try:
-    from requests.models import ProductRequest, SubscriptionRequest
-except ImportError:
-    ProductRequest = None
-    SubscriptionRequest = None
+from requests.models import SubscriptionRequest
 
 
 def get_date_range(days: int = 30) -> tuple[datetime, datetime]:
@@ -290,31 +285,20 @@ def get_dashboard_metrics() -> dict:
     # Stage counts
     leads_count = PublicLead.objects.count()
     online_requests_count = OnlineRequest.objects.count()
-    product_requests_count = ProductRequest.objects.count() if ProductRequest else 0
-    subscription_requests_count = SubscriptionRequest.objects.count() if SubscriptionRequest else 0
+    product_requests_count = ProductRequest.objects.count()
+    subscription_requests_count = SubscriptionRequest.objects.count()
     subscriptions_count = Subscription.objects.count()
-
-    try:
-        direct_sales_count = DirectSale.objects.count()
-    except Exception:
-        direct_sales_count = 0
+    direct_sales_count = DirectSale.objects.count()
 
     # Revenue metrics
-    try:
-        total_revenue_subscriptions = (
-            Subscription.objects
-            .aggregate(total=Sum('price'))['total'] or Decimal(0)
-        )
-    except Exception:
-        total_revenue_subscriptions = Decimal(0)
-
-    try:
-        total_revenue_direct_sales = (
-            DirectSale.objects
-            .aggregate(total=Sum('amount'))['total'] or Decimal(0)
-        )
-    except Exception:
-        total_revenue_direct_sales = Decimal(0)
+    total_revenue_subscriptions = (
+        Subscription.objects
+        .aggregate(total=Sum('price'))['total'] or Decimal(0)
+    )
+    total_revenue_direct_sales = (
+        DirectSale.objects
+        .aggregate(total=Sum('amount'))['total'] or Decimal(0)
+    )
 
     total_revenue = float(total_revenue_subscriptions + total_revenue_direct_sales)
 

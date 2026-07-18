@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPAuditNote from "@/components/erp/ERPAuditNote";
@@ -11,10 +11,28 @@ import {
   type CrmWorkspaceSectionCard,
 } from "@/components/workspace/CrmOperationalWorkspace";
 import { ROUTES } from "@/lib/routes";
+import { apiFetch } from "@/lib/api";
+import { formatRupee } from "@/lib/utils/currency";
 import { getAdminCrmWorkspace, type CrmWorkspacePayload } from "@/services/admin-erp";
 import { listCustomers } from "@/services/customers";
 import { getCrmOverview, type CrmOverviewResponse } from "@/services/crm";
 import { getCrmFunnel, LEAD_STAGE_LABELS, type CrmFunnelResponse } from "@/services/crm-module";
+
+interface DashboardMetrics {
+  leads: { stage: string; count: number };
+  onlineRequests: { stage: string; count: number };
+  productRequests: { stage: string; count: number };
+  subscriptionRequests: { stage: string; count: number };
+  subscriptions: { stage: string; count: number; revenue: number };
+  directSales: { stage: string; count: number; revenue: number };
+  roi: {
+    totalLeads: number;
+    totalConversions: number;
+    conversionRate: number;
+    totalRevenue: number;
+    avgRevenuePerLead: number;
+  };
+}
 
 function findPipelineCount(payload: CrmWorkspacePayload | null, key: string): number {
   const row = payload?.crm_pipeline?.find((entry) => entry.key === key);
@@ -90,7 +108,17 @@ export default function AdminCrmOverviewPage() {
   const [overview, setOverview] = useState<CrmOverviewResponse | null>(null);
   const [customerCount, setCustomerCount] = useState<number | null>(null);
   const [funnel, setFunnel] = useState<CrmFunnelResponse | null>(null);
+  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const loadMetrics = useCallback(async () => {
+    try {
+      const data: DashboardMetrics = await apiFetch("/api/v1/admin/crm/analytics/dashboard/");
+      setMetrics(data);
+    } catch (err) {
+      console.error("Error loading dashboard metrics:", err);
+    }
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -118,8 +146,9 @@ export default function AdminCrmOverviewPage() {
     }
 
     void load();
+    void loadMetrics();
     return () => { active = false; };
-  }, []);
+  }, [loadMetrics]);
 
   const cards = useMemo<CrmWorkspaceSectionCard[]>(() => {
     const customersLoaded = customerCount !== null;
@@ -192,28 +221,128 @@ export default function AdminCrmOverviewPage() {
   return (
     <ERPPageShell
       eyebrow="CRM"
-      title="CRM Workspace"
-      subtitle="Operational CRM hub with explicit separation between registered customers and CRM party records."
+      title="Unified CRM Dashboard"
+      subtitle="Complete workflow: Leads → Online Requests → Product/Subscription Requests → Sales with ROI tracking."
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "CRM" },
       ]}
       actions={[
         { href: ROUTES.admin.crmLeads, label: "Leads", variant: "secondary" },
-        { href: ROUTES.admin.crmParties, label: "Parties", variant: "secondary" },
+        { href: "/admin/crm/analytics", label: "Analytics", variant: "secondary" },
         { href: ROUTES.admin.crmPipeline, label: "Pipeline", variant: "primary" },
       ]}
-      statusBadge={{ label: "Admin Only", tone: "info" }}
+      statusBadge={{ label: "Real-time tracking", tone: "success" }}
       stats={[
         { label: "Registered Customers", value: customerCount ?? "—", tone: "info" },
-        { label: "Active Leads", value: funnel ? funnel.summary.total_leads : (overview?.summary.lead_count ?? "—"), tone: "default" },
-        { label: "Due Follow-ups", value: overview?.summary.due_follow_up_count ?? "—", tone: typeof overview?.summary.due_follow_up_count === "number" && overview.summary.due_follow_up_count > 0 ? "warning" : "success" },
-        { label: "CRM Parties", value: overview?.summary.party_count ?? "—", tone: "default" },
+        { label: "Active Leads", value: metrics?.leads.count ?? (funnel ? funnel.summary.total_leads : (overview?.summary.lead_count ?? "—")), tone: "default" },
+        { label: "Conversions", value: metrics?.roi.totalConversions ?? "—", tone: "default" },
+        { label: "Revenue", value: metrics?.roi.totalRevenue ? formatRupee(metrics.roi.totalRevenue) : "—", tone: "success" },
       ]}
     >
       {error ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
       ) : null}
+
+      {/* Unified Dashboard Metrics */}
+      {metrics && (
+        <ERPSectionShell
+          title="Conversion Flow"
+          description="Lead-to-sale journey at a glance"
+        >
+          <div className="space-y-3">
+            <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border">
+              <span className="font-medium text-foreground">Leads Created</span>
+              <div className="text-2xl font-bold text-primary">{metrics.leads.count}</div>
+            </div>
+
+            <div className="text-center text-xs text-muted-foreground">↓</div>
+
+            <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border">
+              <span className="font-medium text-foreground">Online Requests</span>
+              <div className="text-right">
+                <div className="text-2xl font-bold text-blue-600">{metrics.onlineRequests.count}</div>
+                <div className="text-xs text-muted-foreground">{metrics.leads.count > 0 ? ((metrics.onlineRequests.count / metrics.leads.count * 100).toFixed(1)) : "0"}% of leads</div>
+              </div>
+            </div>
+
+            <div className="text-center text-xs text-muted-foreground">↓</div>
+
+            <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border">
+              <span className="font-medium text-foreground">Product/Sub Requests</span>
+              <div className="text-right">
+                <div className="text-2xl font-bold text-violet-600">{metrics.productRequests.count + metrics.subscriptionRequests.count}</div>
+                <div className="text-xs text-muted-foreground">{metrics.onlineRequests.count > 0 ? (((metrics.productRequests.count + metrics.subscriptionRequests.count) / metrics.onlineRequests.count * 100).toFixed(1)) : "0"}% of requests</div>
+              </div>
+            </div>
+
+            <div className="text-center text-xs text-muted-foreground">↓</div>
+
+            <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border">
+              <span className="font-medium text-foreground">Active Subscriptions</span>
+              <div className="text-right">
+                <div className="text-2xl font-bold text-emerald-600">{metrics.subscriptions.count}</div>
+                <div className="text-xs text-muted-foreground">{metrics.roi.conversionRate.toFixed(1)}% overall conversion</div>
+              </div>
+            </div>
+
+            <div className="text-center text-xs text-muted-foreground">+</div>
+
+            <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border">
+              <span className="font-medium text-foreground">Direct Sales</span>
+              <div className="text-right">
+                <div className="text-2xl font-bold text-orange-600">{metrics.directSales.count}</div>
+              </div>
+            </div>
+          </div>
+        </ERPSectionShell>
+      )}
+
+      {/* ROI Summary */}
+      {metrics && (
+        <ERPSectionShell
+          title="ROI Summary"
+          description="Business metrics and performance"
+        >
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="rounded-lg border border-border bg-card p-4">
+              <div className="text-xs text-muted-foreground uppercase tracking-[0.12em]">
+                Lead → Sale Conversion
+              </div>
+              <div className="text-3xl font-bold text-primary mt-2">
+                {metrics.roi.conversionRate.toFixed(2)}%
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">
+                {metrics.roi.totalConversions} of {metrics.roi.totalLeads} leads
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-border bg-card p-4">
+              <div className="text-xs text-muted-foreground uppercase tracking-[0.12em]">
+                Total Revenue
+              </div>
+              <div className="text-3xl font-bold text-emerald-600 mt-2">
+                {formatRupee(metrics.roi.totalRevenue)}
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">
+                From {metrics.roi.totalConversions} sales
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-border bg-card p-4">
+              <div className="text-xs text-muted-foreground uppercase tracking-[0.12em]">
+                Avg Revenue/Lead
+              </div>
+              <div className="text-3xl font-bold text-blue-600 mt-2">
+                {formatRupee(metrics.roi.avgRevenuePerLead)}
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">
+                Per converted lead
+              </div>
+            </div>
+          </div>
+        </ERPSectionShell>
+      )}
 
       <ERPSectionShell title="CRM desk" description="Customer intelligence routing without mixing financial mutations into the CRM layer.">
         <ERPAuditNote title="Operational separation" tone="info">
