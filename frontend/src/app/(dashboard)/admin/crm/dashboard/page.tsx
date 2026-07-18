@@ -32,12 +32,27 @@ export default function CrmDashboardPage() {
 
   const loadMetrics = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
-      const data: DashboardMetrics = await apiFetch("/api/v1/admin/crm/analytics/dashboard/");
+      const response = await fetch("/api/v1/admin/crm/analytics/dashboard/", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      const data: DashboardMetrics = await response.json();
       setMetrics(data);
       setError(null);
     } catch (err) {
-      setError("Failed to load dashboard metrics");
+      const errorMessage = err instanceof Error ? err.message : "Failed to load dashboard metrics";
+      setError(errorMessage);
+      console.error("Dashboard metrics error:", err);
       setMetrics(null);
     } finally {
       setLoading(false);
@@ -94,7 +109,7 @@ export default function CrmDashboardPage() {
             <div className="space-y-3">
               <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border">
                 <span className="font-medium text-foreground">Leads Created</span>
-                <div className="text-2xl font-bold text-primary">{metrics.leads.count}</div>
+                <div className="text-2xl font-bold text-primary">{metrics.leads?.count ?? 0}</div>
               </div>
 
               <div className="text-center text-xs text-muted-foreground">↓</div>
@@ -102,10 +117,10 @@ export default function CrmDashboardPage() {
               <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border">
                 <span className="font-medium text-foreground">Online Requests</span>
                 <div className="text-right">
-                  <div className="text-2xl font-bold text-blue-600">{metrics.onlineRequests.count}</div>
+                  <div className="text-2xl font-bold text-blue-600">{metrics.onlineRequests?.count ?? 0}</div>
                   <div className="text-xs text-muted-foreground">
-                    {metrics.leads.count > 0
-                      ? ((metrics.onlineRequests.count / metrics.leads.count * 100).toFixed(1))
+                    {(metrics.leads?.count ?? 0) > 0
+                      ? (((metrics.onlineRequests?.count ?? 0) / (metrics.leads?.count ?? 1) * 100).toFixed(1))
                       : "0"}% of leads
                   </div>
                 </div>
@@ -117,11 +132,11 @@ export default function CrmDashboardPage() {
                 <span className="font-medium text-foreground">Product/Sub Requests</span>
                 <div className="text-right">
                   <div className="text-2xl font-bold text-violet-600">
-                    {metrics.productRequests.count + metrics.subscriptionRequests.count}
+                    {(metrics.productRequests?.count ?? 0) + (metrics.subscriptionRequests?.count ?? 0)}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    {metrics.onlineRequests.count > 0
-                      ? (((metrics.productRequests.count + metrics.subscriptionRequests.count) / metrics.onlineRequests.count * 100).toFixed(1))
+                    {(metrics.onlineRequests?.count ?? 0) > 0
+                      ? ((((metrics.productRequests?.count ?? 0) + (metrics.subscriptionRequests?.count ?? 0)) / (metrics.onlineRequests?.count ?? 1) * 100).toFixed(1))
                       : "0"}% of requests
                   </div>
                 </div>
@@ -132,9 +147,9 @@ export default function CrmDashboardPage() {
               <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border">
                 <span className="font-medium text-foreground">Active Subscriptions</span>
                 <div className="text-right">
-                  <div className="text-2xl font-bold text-emerald-600">{metrics.subscriptions.count}</div>
+                  <div className="text-2xl font-bold text-emerald-600">{metrics.subscriptions?.count ?? 0}</div>
                   <div className="text-xs text-muted-foreground">
-                    {metrics.roi.conversionRate.toFixed(1)}% overall conversion
+                    {(metrics.roi?.conversionRate ?? 0).toFixed(1)}% overall conversion
                   </div>
                 </div>
               </div>
@@ -144,7 +159,7 @@ export default function CrmDashboardPage() {
               <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border">
                 <span className="font-medium text-foreground">Direct Sales</span>
                 <div className="text-right">
-                  <div className="text-2xl font-bold text-orange-600">{metrics.directSales.count}</div>
+                  <div className="text-2xl font-bold text-orange-600">{metrics.directSales?.count ?? 0}</div>
                 </div>
               </div>
             </div>
@@ -161,10 +176,10 @@ export default function CrmDashboardPage() {
                   Lead → Sale Conversion
                 </div>
                 <div className="text-3xl font-bold text-primary mt-2">
-                  {metrics.roi.conversionRate.toFixed(2)}%
+                  {((metrics.roi?.conversionRate) ?? 0).toFixed(2)}%
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  {metrics.roi.totalConversions} of {metrics.roi.totalLeads} leads
+                  {metrics.roi?.totalConversions ?? 0} of {metrics.roi?.totalLeads ?? 0} leads
                 </div>
               </div>
 
@@ -173,10 +188,10 @@ export default function CrmDashboardPage() {
                   Total Revenue
                 </div>
                 <div className="text-3xl font-bold text-emerald-600 mt-2">
-                  {formatRupee(metrics.roi.totalRevenue)}
+                  {formatRupee(metrics.roi?.totalRevenue ?? 0)}
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  From {metrics.roi.totalConversions} sales
+                  From {metrics.roi?.totalConversions ?? 0} sales
                 </div>
               </div>
 
@@ -185,7 +200,7 @@ export default function CrmDashboardPage() {
                   Avg Revenue/Lead
                 </div>
                 <div className="text-3xl font-bold text-blue-600 mt-2">
-                  {formatRupee(metrics.roi.avgRevenuePerLead)}
+                  {formatRupee(metrics.roi?.avgRevenuePerLead ?? 0)}
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
                   Per converted lead
@@ -205,10 +220,10 @@ export default function CrmDashboardPage() {
                   Subscription Revenue
                 </div>
                 <div className="text-2xl font-bold text-emerald-600 mt-2">
-                  {formatRupee(metrics.subscriptions.revenue)}
+                  {formatRupee(metrics.subscriptions?.revenue ?? 0)}
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  {metrics.subscriptions.count} active subscriptions
+                  {metrics.subscriptions?.count ?? 0} active subscriptions
                 </div>
               </div>
 
@@ -217,10 +232,10 @@ export default function CrmDashboardPage() {
                   Direct Sales Revenue
                 </div>
                 <div className="text-2xl font-bold text-orange-600 mt-2">
-                  {formatRupee(metrics.directSales.revenue)}
+                  {formatRupee(metrics.directSales?.revenue ?? 0)}
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  {metrics.directSales.count} direct sales
+                  {metrics.directSales?.count ?? 0} direct sales
                 </div>
               </div>
             </div>

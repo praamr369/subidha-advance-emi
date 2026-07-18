@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from django.db.models import Count, Q, Sum, Avg
+from django.db.models import Count, Q, Sum, Avg, F
 from django.utils import timezone
 from decimal import Decimal
 
@@ -281,71 +281,101 @@ def get_analytics_summary(days: int = 30) -> dict:
 
 def get_dashboard_metrics() -> dict:
     """Get unified CRM dashboard metrics (current counts, not time-filtered)"""
-    # Stage counts
-    leads_count = PublicLead.objects.count()
-    online_requests_count = OnlineRequest.objects.count()
-    product_requests_count = ProductRequest.objects.count()
-    subscription_requests_count = SubscriptionRequest.objects.count()
-    subscriptions_count = Subscription.objects.count()
-    direct_sales_count = DirectSale.objects.count()
+    try:
+        # Stage counts - use count() for accuracy
+        leads_count = PublicLead.objects.count()
+        online_requests_count = OnlineRequest.objects.count()
+        product_requests_count = ProductRequest.objects.count()
+        subscription_requests_count = SubscriptionRequest.objects.count()
+        subscriptions_count = Subscription.objects.filter(status__in=['ACTIVE', 'PROCESSING']).count()
+        direct_sales_count = DirectSale.objects.filter(status__in=['CONFIRMED', 'INVOICED', 'COMPLETED']).count()
 
-    # Revenue metrics
-    total_revenue_subscriptions = (
-        Subscription.objects
-        .aggregate(total=Sum('price'))['total'] or Decimal(0)
-    )
-    total_revenue_direct_sales = (
-        DirectSale.objects
-        .aggregate(total=Sum('amount'))['total'] or Decimal(0)
-    )
+        # Revenue metrics - only count active/completed records
+        total_revenue_subscriptions_result = (
+            Subscription.objects
+            .filter(status__in=['ACTIVE', 'PROCESSING'])
+            .aggregate(total=Sum('price'))
+        )
+        total_revenue_subscriptions = (
+            total_revenue_subscriptions_result['total'] or Decimal(0)
+        )
 
-    total_revenue = float(total_revenue_subscriptions + total_revenue_direct_sales)
+        total_revenue_direct_sales_result = (
+            DirectSale.objects
+            .filter(status__in=['CONFIRMED', 'INVOICED', 'COMPLETED'])
+            .aggregate(total=Sum('amount'))
+        )
+        total_revenue_direct_sales = (
+            total_revenue_direct_sales_result['total'] or Decimal(0)
+        )
 
-    # Conversion rates
-    total_conversions = subscriptions_count + direct_sales_count
-    lead_to_sale_conversion = (
-        round((total_conversions / leads_count * 100), 2)
-        if leads_count > 0 else 0
-    )
+        # Ensure Decimal conversion
+        total_revenue_subscriptions = float(total_revenue_subscriptions) if total_revenue_subscriptions else 0.0
+        total_revenue_direct_sales = float(total_revenue_direct_sales) if total_revenue_direct_sales else 0.0
+        total_revenue = total_revenue_subscriptions + total_revenue_direct_sales
 
-    avg_revenue_per_lead = (
-        round(total_revenue / leads_count, 2)
-        if leads_count > 0 else 0
-    )
+        # Conversion rates
+        total_conversions = subscriptions_count + direct_sales_count
 
-    return {
-        'leads': {
-            'stage': 'Leads',
-            'count': leads_count,
-        },
-        'onlineRequests': {
-            'stage': 'Online Requests',
-            'count': online_requests_count,
-        },
-        'productRequests': {
-            'stage': 'Product Requests',
-            'count': product_requests_count,
-        },
-        'subscriptionRequests': {
-            'stage': 'Subscription Requests',
-            'count': subscription_requests_count,
-        },
-        'subscriptions': {
-            'stage': 'Active Subscriptions',
-            'count': subscriptions_count,
-            'revenue': float(total_revenue_subscriptions),
-        },
-        'directSales': {
-            'stage': 'Direct Sales',
-            'count': direct_sales_count,
-            'revenue': float(total_revenue_direct_sales),
-        },
-        'roi': {
-            'totalLeads': leads_count,
-            'totalConversions': total_conversions,
-            'conversionRate': lead_to_sale_conversion,
-            'totalRevenue': total_revenue,
-            'avgRevenuePerLead': avg_revenue_per_lead,
-            'roi': lead_to_sale_conversion,
-        },
-    }
+        if leads_count > 0:
+            lead_to_sale_conversion = round((total_conversions / leads_count * 100), 2)
+            avg_revenue_per_lead = round(total_revenue / leads_count, 2)
+        else:
+            lead_to_sale_conversion = 0.0
+            avg_revenue_per_lead = 0.0
+
+        return {
+            'leads': {
+                'stage': 'Leads',
+                'count': leads_count,
+            },
+            'onlineRequests': {
+                'stage': 'Online Requests',
+                'count': online_requests_count,
+            },
+            'productRequests': {
+                'stage': 'Product Requests',
+                'count': product_requests_count,
+            },
+            'subscriptionRequests': {
+                'stage': 'Subscription Requests',
+                'count': subscription_requests_count,
+            },
+            'subscriptions': {
+                'stage': 'Active Subscriptions',
+                'count': subscriptions_count,
+                'revenue': round(total_revenue_subscriptions, 2),
+            },
+            'directSales': {
+                'stage': 'Direct Sales',
+                'count': direct_sales_count,
+                'revenue': round(total_revenue_direct_sales, 2),
+            },
+            'roi': {
+                'totalLeads': leads_count,
+                'totalConversions': total_conversions,
+                'conversionRate': lead_to_sale_conversion,
+                'totalRevenue': round(total_revenue, 2),
+                'avgRevenuePerLead': avg_revenue_per_lead,
+            },
+        }
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error calculating dashboard metrics: {str(e)}")
+        # Return safe default values on error
+        return {
+            'leads': {'stage': 'Leads', 'count': 0},
+            'onlineRequests': {'stage': 'Online Requests', 'count': 0},
+            'productRequests': {'stage': 'Product Requests', 'count': 0},
+            'subscriptionRequests': {'stage': 'Subscription Requests', 'count': 0},
+            'subscriptions': {'stage': 'Active Subscriptions', 'count': 0, 'revenue': 0.0},
+            'directSales': {'stage': 'Direct Sales', 'count': 0, 'revenue': 0.0},
+            'roi': {
+                'totalLeads': 0,
+                'totalConversions': 0,
+                'conversionRate': 0.0,
+                'totalRevenue': 0.0,
+                'avgRevenuePerLead': 0.0,
+            },
+        }
