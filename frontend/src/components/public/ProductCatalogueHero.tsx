@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, PackageCheck, ReceiptText, ShieldCheck, Sparkles } from "lucide-react";
 
-import GeneratedMarketingVisual from "@/components/public/GeneratedMarketingVisual";
-import { PUBLIC_MARKETING_ASSETS } from "@/lib/public-marketing-assets";
+import Image from "next/image";
 import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
@@ -91,12 +90,16 @@ export default function ProductCatalogueHero({
         </div>
 
         <div className="relative">
-          <GeneratedMarketingVisual
-            asset={PUBLIC_MARKETING_ASSETS.productWall}
-            priority
-            sizes="(max-width: 1024px) 100vw, 44vw"
-            className="min-h-[22rem] lg:min-h-[30rem]"
-          />
+          <div className="relative w-full overflow-hidden rounded-[1.6rem] shadow-[0_24px_54px_-24px_rgba(15,23,42,0.6)]">
+            <Image
+              src="/images/category_sofa.jpg"
+              alt="Product Catalogue"
+              width={800}
+              height={533}
+              priority
+              className="w-full object-cover min-h-[22rem] lg:min-h-[30rem]"
+            />
+          </div>
           <div className="pointer-events-none absolute -left-3 top-8 hidden rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_84%,transparent)] px-4 py-3 shadow-[0_22px_54px_-38px_rgba(15,23,42,0.74)] backdrop-blur md:block">
             <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Furniture + appliances</div>
             <div className="mt-1 text-sm font-semibold text-foreground">Category discovery</div>

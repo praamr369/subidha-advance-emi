@@ -192,6 +192,52 @@ class OnlineRequest(models.Model):
         help_text='Lease-specific profile (if subscription is LEASE type)',
     )
 
+    # Unified CRM Pipeline Fields
+    approval_status = models.CharField(
+        max_length=20,
+        choices=[
+            ('DRAFT', 'Draft - Awaiting Quote'),
+            ('QUOTED', 'Quoted - Awaiting Approval'),
+            ('APPROVED', 'Approved - Contract Created'),
+            ('CONVERTED', 'Converted - Sale/Subscription Active'),
+            ('REJECTED', 'Rejected'),
+            ('LOST', 'Lost Lead'),
+        ],
+        default='DRAFT',
+        db_index=True,
+        help_text='Unified workflow status (separate from status field)',
+    )
+
+    # Approval Decision
+    approved_entity_type = models.CharField(
+        max_length=20,
+        choices=[
+            ('DIRECT_SALE', 'Direct Sale'),
+            ('SUBSCRIPTION', 'EMI/Subscription'),
+            ('RENT', 'Rent Contract'),
+            ('LEASE', 'Lease Contract'),
+        ],
+        null=True,
+        blank=True,
+        help_text='Which contract type was approved',
+    )
+
+    auto_conversion_enabled = models.BooleanField(
+        default=True,
+        help_text='Auto-create contract on approval',
+    )
+
+    conversion_notes = models.TextField(
+        blank=True,
+        help_text='Notes about conversion/approval',
+    )
+
+    expected_close_date = models.DateField(
+        null=True,
+        blank=True,
+        help_text='Expected sale close date',
+    )
+
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)

@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { ArrowRight, ClipboardCheck, PackageCheck, Undo2, Wallet } from "lucide-react";
 
-import GeneratedMarketingVisual from "@/components/public/GeneratedMarketingVisual";
+import Image from "next/image";
 import PublicSectionShell from "@/components/public/PublicSectionShell";
 import SectionHeader from "@/components/public/SectionHeader";
-import { PUBLIC_MARKETING_ASSETS } from "@/lib/public-marketing-assets";
 import { ROUTES } from "@/lib/routes";
 
 type RentLeaseMode = "rent" | "lease";
@@ -60,7 +59,15 @@ export default function RentLeaseWorkflowPreview({ mode }: RentLeaseWorkflowPrev
     <PublicSectionShell className="grid gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-center">
       <div className="space-y-5">
         <SectionHeader eyebrow={copy.eyebrow} title={copy.title} description={copy.description} />
-        <GeneratedMarketingVisual asset={PUBLIC_MARKETING_ASSETS.rentLeaseRoom} className="min-h-[18rem]" />
+        <div className="relative w-full overflow-hidden rounded-[1.6rem] shadow-[0_24px_54px_-24px_rgba(15,23,42,0.6)]">
+          <Image
+            src="/images/banner_rent.jpg"
+            alt="Rent Lease Workflow"
+            width={800}
+            height={533}
+            className="w-full object-cover min-h-[18rem]"
+          />
+        </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
