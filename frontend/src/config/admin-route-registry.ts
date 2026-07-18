@@ -99,10 +99,9 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   // /admin/requests/* canonical hub (Phase 6 thin aliases → existing legacy pages):
   item("CRM & Requests", "Requests Hub", ROUTES.admin.requestsHub, "Unified request intake hub. Request intake only — no financial posting from this page."),
   item("CRM & Requests", "CRM Workspace", ROUTES.admin.crmWorkspace, "Operational CRM hub with customer profiles, lead management, follow-ups, and KYC queue."),
-  item("CRM & Requests", "CRM Dashboard", ROUTES.admin.crmDashboard, "Analytics dashboard: funnel visualization, ROI metrics, conversion tracking, and revenue analysis."),
+  item("CRM & Requests", "CRM Analytics", "/admin/crm/analytics", "Unified analytics: current metrics, conversion funnel, product performance, and historical trends with customizable date ranges."),
   item("CRM & Requests", "Leads", ROUTES.admin.crmLeads, "Lead register."),
   item("CRM & Requests", "Pipeline", ROUTES.admin.crmPipeline, "Lead pipeline."),
-  item("CRM & Requests", "Analytics", "/admin/crm/analytics", "Conversion funnel, product performance, and timeline trends."),
   item("CRM & Requests", "Follow-ups", ROUTES.admin.crmFollowUps, "Follow-up tasks."),
   item("CRM & Requests", "KYC", ROUTES.admin.crmKyc, "KYC review queue.", {
     badgeSource: "queue.customer_kyc_pending",

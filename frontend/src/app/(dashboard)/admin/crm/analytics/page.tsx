@@ -9,9 +9,9 @@ import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
-import StatusBadge from "@/components/ui/status-badge";
 import { ROUTES } from "@/lib/routes";
 import { formatRupee } from "@/lib/utils/currency";
+import { apiFetch } from "@/lib/api";
 import {
   getFunnelAnalytics,
   getProductPerformance,
@@ -23,7 +23,25 @@ import {
   RequestTypeAnalytics,
 } from "@/services/crm-analytics";
 
+// Current metrics interface
+interface DashboardMetrics {
+  leads: { stage: string; count: number };
+  onlineRequests: { stage: string; count: number };
+  productRequests: { stage: string; count: number };
+  subscriptionRequests: { stage: string; count: number };
+  subscriptions: { stage: string; count: number; revenue: number };
+  directSales: { stage: string; count: number; revenue: number };
+  roi: {
+    totalLeads: number;
+    totalConversions: number;
+    conversionRate: number;
+    totalRevenue: number;
+    avgRevenuePerLead: number;
+  };
+}
+
 type Analytics = {
+  metrics: DashboardMetrics | null;
   funnel: FunnelAnalytics | null;
   products: ProductPerformance[];
   timeline: TimelineAnalytics | null;
@@ -76,6 +94,7 @@ function ProgressBar({ percentage, label }: { percentage: number; label: string 
 
 export default function CRMAnalyticsPage() {
   const [analytics, setAnalytics] = useState<Analytics>({
+    metrics: null,
     funnel: null,
     products: [],
     timeline: null,
@@ -89,7 +108,8 @@ export default function CRMAnalyticsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [funnel, products, timeline, byType] = await Promise.all([
+      const [metrics, funnel, products, timeline, byType] = await Promise.all([
+        apiFetch<DashboardMetrics>("/api/v1/admin/crm/analytics/dashboard/"),
         getFunnelAnalytics(days),
         getProductPerformance(days),
         getTimelineAnalytics(days),
@@ -97,6 +117,7 @@ export default function CRMAnalyticsPage() {
       ]);
 
       setAnalytics({
+        metrics: metrics || null,
         funnel,
         products: products.products || [],
         timeline,
@@ -118,17 +139,129 @@ export default function CRMAnalyticsPage() {
   return (
     <ERPPageShell
       eyebrow="CRM"
-      title="Analytics Dashboard"
-      subtitle="Conversion funnel, product performance, and timeline trends."
+      title="Unified CRM Analytics"
+      subtitle="Current metrics, conversion funnel, product performance, and historical trends."
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "CRM", href: ROUTES.admin.crmWorkspace },
         { label: "Analytics" },
       ]}
-      actions={[{ href: ROUTES.admin.crmLeads, label: "Back to Leads", variant: "secondary" }]}
-      statusBadge={{ label: "Analytics Only", tone: "info" as const }}
+      actions={[{ href: ROUTES.admin.crmLeads, label: "Leads", variant: "secondary" }]}
+      statusBadge={{ label: "Unified Analytics", tone: "success" as const }}
     >
-      {/* Date Range Selector */}
+      {loading && <ERPLoadingState label="Loading analytics..." />}
+      {error && <ERPErrorState title="Analytics Error" description={error} />}
+
+      {!loading && !error && analytics.metrics ? (
+        <>
+          {/* Current Metrics Summary */}
+          <ERPSectionShell
+            title="Current Metrics"
+            description="Real-time stage counts and ROI indicators"
+          >
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {/* Leads */}
+              <div className="rounded-lg border border-border bg-card p-4">
+                <div className="text-xs text-muted-foreground uppercase tracking-[0.12em]">
+                  Total Leads
+                </div>
+                <div className="text-3xl font-bold text-primary mt-2">
+                  {analytics.metrics.leads.count}
+                </div>
+              </div>
+
+              {/* Online Requests */}
+              <div className="rounded-lg border border-border bg-card p-4">
+                <div className="text-xs text-muted-foreground uppercase tracking-[0.12em]">
+                  Online Requests
+                </div>
+                <div className="text-3xl font-bold text-blue-600 mt-2">
+                  {analytics.metrics.onlineRequests.count}
+                </div>
+              </div>
+
+              {/* Product Requests */}
+              <div className="rounded-lg border border-border bg-card p-4">
+                <div className="text-xs text-muted-foreground uppercase tracking-[0.12em]">
+                  Product Requests
+                </div>
+                <div className="text-3xl font-bold text-violet-600 mt-2">
+                  {analytics.metrics.productRequests.count}
+                </div>
+              </div>
+
+              {/* Subscriptions */}
+              <div className="rounded-lg border border-border bg-card p-4">
+                <div className="text-xs text-muted-foreground uppercase tracking-[0.12em]">
+                  Active Subscriptions
+                </div>
+                <div className="text-3xl font-bold text-emerald-600 mt-2">
+                  {analytics.metrics.subscriptions.count}
+                </div>
+                <div className="text-xs text-muted-foreground mt-2">
+                  Revenue: {formatRupee(analytics.metrics.subscriptions.revenue)}
+                </div>
+              </div>
+
+              {/* Direct Sales */}
+              <div className="rounded-lg border border-border bg-card p-4">
+                <div className="text-xs text-muted-foreground uppercase tracking-[0.12em]">
+                  Direct Sales
+                </div>
+                <div className="text-3xl font-bold text-orange-600 mt-2">
+                  {analytics.metrics.directSales.count}
+                </div>
+                <div className="text-xs text-muted-foreground mt-2">
+                  Revenue: {formatRupee(analytics.metrics.directSales.revenue)}
+                </div>
+              </div>
+
+              {/* Conversion Rate */}
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 dark:border-emerald-800/40 dark:bg-emerald-900/20 p-4">
+                <div className="text-xs text-emerald-700 dark:text-emerald-300 uppercase tracking-[0.12em] font-semibold">
+                  Lead to Sale Conversion
+                </div>
+                <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400 mt-2">
+                  {analytics.metrics.roi.conversionRate.toFixed(2)}%
+                </div>
+                <div className="text-xs text-emerald-700 dark:text-emerald-300 mt-2">
+                  {analytics.metrics.roi.totalConversions} of {analytics.metrics.roi.totalLeads} leads
+                </div>
+              </div>
+            </div>
+
+            {/* ROI Summary Grid */}
+            <div className="mt-6 grid gap-4 md:grid-cols-3">
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                <div className="text-xs text-muted-foreground uppercase tracking-[0.12em]">
+                  Total Revenue
+                </div>
+                <div className="text-2xl font-bold text-primary mt-2">
+                  {formatRupee(analytics.metrics.roi.totalRevenue)}
+                </div>
+              </div>
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                <div className="text-xs text-muted-foreground uppercase tracking-[0.12em]">
+                  Avg Revenue per Lead
+                </div>
+                <div className="text-2xl font-bold text-primary mt-2">
+                  {formatRupee(analytics.metrics.roi.avgRevenuePerLead)}
+                </div>
+              </div>
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                <div className="text-xs text-muted-foreground uppercase tracking-[0.12em]">
+                  Total Conversions
+                </div>
+                <div className="text-2xl font-bold text-primary mt-2">
+                  {analytics.metrics.roi.totalConversions}
+                </div>
+              </div>
+            </div>
+          </ERPSectionShell>
+        </>
+      ) : null}
+
+      {/* Date Range Selector for Historical Analytics */}
       <div className="mb-6 flex gap-2">
         {[7, 30, 90].map((d) => (
           <button
@@ -145,11 +278,14 @@ export default function CRMAnalyticsPage() {
         ))}
       </div>
 
-      {loading && <ERPLoadingState label="Loading analytics..." />}
-      {error && <ERPErrorState title="Analytics Error" description={error} />}
-
       {!loading && !error && funnel ? (
         <>
+          {/* Historical Trends Header */}
+          <div className="my-8 pt-6 border-t border-border">
+            <h2 className="text-lg font-semibold">Historical Trends (Last {days} Days)</h2>
+            <p className="text-sm text-muted-foreground mt-1">Detailed analytics showing how leads progress through your sales funnel</p>
+          </div>
+
           {/* Conversion Funnel */}
           <ERPSectionShell
             title="Conversion Funnel"
