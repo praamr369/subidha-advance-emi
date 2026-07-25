@@ -19,6 +19,7 @@ class LeadSerializer(serializers.ModelSerializer):
     converted_customer_name = serializers.CharField(source="converted_customer.name", read_only=True, default=None)
     product_name = serializers.CharField(source="interested_product.name", read_only=True, default=None)
     public_lead_id = serializers.IntegerField(read_only=True, default=None)
+    registered_customer = serializers.SerializerMethodField()
 
     class Meta:
         model = Lead
@@ -40,6 +41,7 @@ class LeadSerializer(serializers.ModelSerializer):
             "next_follow_up_at",
             "converted_customer",
             "converted_customer_name",
+            "registered_customer",
             "public_lead_id",
             "created_at",
             "updated_at",
@@ -50,10 +52,24 @@ class LeadSerializer(serializers.ModelSerializer):
             "assigned_to_full_name",
             "converted_customer_name",
             "product_name",
+            "registered_customer",
             "public_lead_id",
             "created_at",
             "updated_at",
         ]
+
+    def get_registered_customer(self, obj):
+        """Whether this lead is already a registered customer — via its linked
+        converted_customer, or (fallback) a phone match. The phone map is bulk-
+        loaded into serializer context by the view to avoid N+1 queries."""
+        cc = obj.converted_customer
+        if cc is not None:
+            return {"id": cc.id, "name": cc.name, "kyc_status": cc.kyc_status, "matched_by": "converted"}
+        phone_map = (self.context or {}).get("registered_by_phone") or {}
+        match = phone_map.get(obj.phone)
+        if match:
+            return {**match, "matched_by": "phone"}
+        return None
 
     def get_assigned_to_full_name(self, obj):
         user = obj.assigned_to
@@ -80,6 +96,21 @@ class LeadUpdateSerializer(serializers.Serializer):
 
 class LeadStageUpdateSerializer(serializers.Serializer):
     stage = serializers.ChoiceField(choices=LeadStage.choices)
+    # Feedback captured at the moment of transition. Persisted as a completed
+    # follow-up activity so it shows on the lead timeline, and mirrored into the
+    # stage-move audit log. Required for LOST (a lost-reason is mandatory).
+    note = serializers.CharField(
+        required=False, allow_blank=True, max_length=1000, trim_whitespace=True
+    )
+    # Optional: schedule the next touchpoint as part of the same action.
+    next_follow_up_at = serializers.DateTimeField(required=False, allow_null=True)
+
+    def validate(self, attrs):
+        if attrs.get("stage") == LeadStage.LOST and not (attrs.get("note") or "").strip():
+            raise serializers.ValidationError(
+                {"note": "A reason is required when marking a lead as Lost."}
+            )
+        return attrs
 
 
 class LeadAssignSerializer(serializers.Serializer):
@@ -98,6 +129,7 @@ class LeadConvertSerializer(serializers.Serializer):
 class FollowUpTaskSerializer(serializers.ModelSerializer):
     is_overdue = serializers.SerializerMethodField()
     lead_name = serializers.CharField(source="lead.name", read_only=True, default=None)
+    lead_phone = serializers.CharField(source="lead.phone", read_only=True, default=None)
     assigned_to_username = serializers.CharField(source="assigned_to.username", read_only=True, default=None)
 
     class Meta:
@@ -106,6 +138,7 @@ class FollowUpTaskSerializer(serializers.ModelSerializer):
             "id",
             "lead",
             "lead_name",
+            "lead_phone",
             "customer",
             "assigned_to",
             "assigned_to_username",
@@ -116,7 +149,7 @@ class FollowUpTaskSerializer(serializers.ModelSerializer):
             "is_overdue",
             "created_at",
         ]
-        read_only_fields = ["id", "completed_at", "created_at", "is_overdue", "lead_name", "assigned_to_username"]
+        read_only_fields = ["id", "completed_at", "created_at", "is_overdue", "lead_name", "lead_phone", "assigned_to_username"]
 
     def get_is_overdue(self, obj):
         from django.utils import timezone

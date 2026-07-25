@@ -481,3 +481,104 @@ def reject_subscription_request(
         },
     )
     return request_obj
+
+
+# Funnel hold states an admin may set when a request can't be approved yet.
+_HOLD_STATUSES = (
+    SubscriptionRequestStatus.ON_HOLD_LUCKY_UNAVAILABLE,
+    SubscriptionRequestStatus.ON_HOLD_PRODUCT_NOT_READY,
+)
+# Terminal states that can no longer move through the funnel.
+_FINALIZED_STATUSES = (
+    SubscriptionRequestStatus.APPROVED,
+    SubscriptionRequestStatus.REJECTED,
+    SubscriptionRequestStatus.CANCELLED,
+)
+
+
+def _guard_not_finalized(request_obj: SubscriptionRequest, verb: str) -> None:
+    if request_obj.status in _FINALIZED_STATUSES:
+        label = SubscriptionRequestStatus(request_obj.status).label
+        raise ValueError(f"{label} request cannot be {verb}.")
+
+
+@transaction.atomic
+def hold_subscription_request(
+    *,
+    request_obj: SubscriptionRequest,
+    performed_by,
+    hold_status: str,
+    review_note: str = "",
+) -> SubscriptionRequest:
+    """Park a request in a funnel hold stage (lucky ID unavailable / product not
+    ready). The request stays actionable and can later be approved or rejected."""
+    if hold_status not in _HOLD_STATUSES:
+        raise ValidationError(
+            {"hold_status": "Hold status must be a lucky-unavailable or product-not-ready hold."}
+        )
+    _guard_not_finalized(request_obj, "put on hold")
+
+    request_obj.status = hold_status
+    request_obj.reviewed_by = performed_by
+    request_obj.reviewed_at = timezone.now()
+    request_obj.review_note = review_note or ""
+    request_obj.save(
+        update_fields=[
+            "status",
+            "reviewed_by",
+            "reviewed_at",
+            "review_note",
+            "updated_at",
+        ]
+    )
+    log_audit(
+        action_type=AuditLog.ActionType.SUBSCRIPTION_REQUEST_HELD,
+        instance=request_obj,
+        performed_by=performed_by,
+        metadata={
+            "hold_status": hold_status,
+            "customer_id": request_obj.customer_id,
+            "partner_id": request_obj.partner_id,
+            "product_id": request_obj.product_id,
+            "batch_id": request_obj.batch_id,
+        },
+    )
+    return request_obj
+
+
+@transaction.atomic
+def request_amendment_subscription_request(
+    *,
+    request_obj: SubscriptionRequest,
+    performed_by,
+    review_note: str = "",
+) -> SubscriptionRequest:
+    """Flag a request as needing changes from the requester. The requester
+    revises and resubmits; no admin edit of the captured snapshot happens here."""
+    _guard_not_finalized(request_obj, "sent back for amendment")
+
+    request_obj.status = SubscriptionRequestStatus.AMENDMENT_REQUESTED
+    request_obj.reviewed_by = performed_by
+    request_obj.reviewed_at = timezone.now()
+    request_obj.review_note = review_note or ""
+    request_obj.save(
+        update_fields=[
+            "status",
+            "reviewed_by",
+            "reviewed_at",
+            "review_note",
+            "updated_at",
+        ]
+    )
+    log_audit(
+        action_type=AuditLog.ActionType.SUBSCRIPTION_REQUEST_AMENDMENT_REQUESTED,
+        instance=request_obj,
+        performed_by=performed_by,
+        metadata={
+            "customer_id": request_obj.customer_id,
+            "partner_id": request_obj.partner_id,
+            "product_id": request_obj.product_id,
+            "batch_id": request_obj.batch_id,
+        },
+    )
+    return request_obj

@@ -737,6 +737,37 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
         # billing_invoices per customer row (function-level import avoids any
         # cross-app circular import at module load).
         from billing.models import BillingInvoice, DirectSale
+        from subscriptions.models import (
+            SubscriptionDelivery,
+            DeliveryStatus,
+            CustomerSupportRequest,
+            SupportRequestStatus,
+        )
+
+        active_delivery_sq = (
+            SubscriptionDelivery.objects.filter(subscription__customer_id=OuterRef("pk"))
+            .filter(
+                status__in=[
+                    DeliveryStatus.PENDING,
+                    DeliveryStatus.SCHEDULED,
+                    DeliveryStatus.DISPATCHED,
+                    DeliveryStatus.OUT_FOR_DELIVERY,
+                    DeliveryStatus.RETURN_REQUESTED,
+                    DeliveryStatus.BLOCKED_STOCK_UNAVAILABLE,
+                ]
+            )
+            .values("subscription__customer_id")
+            .annotate(total=Count("id"))
+            .values("total")[:1]
+        )
+
+        open_support_sq = (
+            CustomerSupportRequest.objects.filter(customer_id=OuterRef("pk"))
+            .exclude(status=SupportRequestStatus.CLOSED)
+            .values("customer_id")
+            .annotate(total=Count("id"))
+            .values("total")[:1]
+        )
 
         gstin_from_sales_sq = (
             DirectSale.objects.filter(customer_id=OuterRef("pk"))
@@ -755,6 +786,8 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
         queryset = queryset.annotate(
             gstin_from_sales=Subquery(gstin_from_sales_sq),
             gstin_from_invoices=Subquery(gstin_from_invoices_sq),
+            active_delivery_count=Coalesce(Subquery(active_delivery_sq), zero_count),
+            open_service_ticket_count=Coalesce(Subquery(open_support_sq), zero_count),
         )
 
         search = (
@@ -1245,6 +1278,20 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
         else:
             next_state = str(requested_state).strip().lower() in {"true", "1", "yes"}
 
+        if not next_state:
+            # Check for existing audit logs before allowing deactivation
+            from subscriptions.models import AuditLog
+            has_logs = AuditLog.objects.filter(
+                models.Q(performed_by=customer.user) | 
+                models.Q(object_id=str(customer.user.id), model_name='User') |
+                models.Q(object_id=str(customer.id), model_name='Customer')
+            ).exists()
+            if has_logs:
+                return Response(
+                    {"detail": "Cannot deactivate account with existing audit logs (financial, accounting, inventory, lead, subscriptions, etc)."},
+                    status=400
+                )
+
         customer.user.is_active = next_state
         customer.user.save(update_fields=["is_active"])
         AuditLog.objects.create(
@@ -1263,27 +1310,68 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
         )
         return Response({"is_active": customer.user.is_active})
 
+    @action(detail=True, methods=["get", "post"], url_path="documents", parser_classes=[MultiPartParser, FormParser, JSONParser])
+    def documents(self, request, pk=None):
+        customer = self.get_object()
+
+        def _file_url(file_field):
+            if not file_field:
+                return None
+            try:
+                url = file_field.url
+            except Exception:
+                return None
+            return request.build_absolute_uri(url)
+
+        if request.method == "GET":
+            from subscriptions.models import CustomerKycDocument, SubscriptionDocument
+            kyc_docs = CustomerKycDocument.objects.filter(customer=customer).select_related("uploaded_by").order_by("-created_at")
+            sub_docs = SubscriptionDocument.objects.filter(subscription__customer=customer).select_related("uploaded_by").order_by("-created_at")
+            
+            results = []
+            for doc in kyc_docs:
+                results.append({
+                    "id": f"kyc_{doc.id}",
+                    "document_type": doc.document_type,
+                    "verification_status": doc.status,
+                    "notes": doc.notes,
+                    "file_url": _file_url(doc.file),
+                    "uploaded_by_username": getattr(getattr(doc, "uploaded_by", None), "username", None),
+                    "created_at": doc.created_at,
+                    "source": "kyc"
+                })
+            for doc in sub_docs:
+                results.append({
+                    "id": f"sub_{doc.id}",
+                    "document_type": doc.document_type,
+                    "verification_status": doc.verification_status,
+                    "notes": doc.notes,
+                    "file_url": _file_url(doc.file),
+                    "uploaded_by_username": getattr(getattr(doc, "uploaded_by", None), "username", None),
+                    "created_at": doc.created_at,
+                    "source": "subscription",
+                    "subscription_id": doc.subscription_id
+                })
+                
+            results.sort(key=lambda x: x["created_at"], reverse=True)
+            return Response({"count": len(results), "results": results})
+
+        # POST: Upload a KYC document directly to the customer profile
+        from api.v1.serializers.customer import CustomerKycDocumentUploadSerializer
+        serializer = CustomerKycDocumentUploadSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        doc = serializer.save(customer=customer, uploaded_by=request.user)
+        if customer.kyc_status != "VERIFIED":
+            customer.kyc_status = "VERIFIED"
+            customer.save(update_fields=["kyc_status"])
+        return Response({"detail": "KYC document uploaded successfully.", "id": doc.id})
+
     @action(detail=True, methods=['post'], url_path='change-user-password')
     def change_user_password(self, request, pk=None):
-        customer = self.get_object()
-        if not customer.user:
-            return Response({"detail": "No user linked to this customer."}, status=400)
-        password = request.data.get('password')
-        if not password or len(password) < 8:
-            return Response({"detail": "Password must be at least 8 characters."}, status=400)
-        customer.user.set_password(password)
-        customer.user.save(update_fields=["password"])
-        AuditLog.objects.create(
-            action_type=AuditLog.ActionType.USER_PASSWORD_RESET,
-            model_name="User",
-            object_id=customer.user_id,
-            performed_by=request.user,
-            metadata={
-                "origin": "ADMIN_CUSTOMER_WORKFLOW",
-                "customer_id": customer.id,
-            },
+        return Response(
+            {"detail": "Security Upgrade: Cannot change password for non-staff users. Please instruct them to use the password reset flow."},
+            status=403
         )
-        return Response({"detail": "Password changed successfully."})
 
 # =====================================================
 # EMI
@@ -3190,6 +3278,9 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
     def get_serializer_class(self):
         if self.action == "cancel_subscription":
             return OperationalCancellationActionSerializer
+        if self.action == "generate_rent_lease_ledger":
+            from api.v1.serializers.subscription import RentLeaseGenerateScheduleSerializer
+            return RentLeaseGenerateScheduleSerializer
         if self.action == "retrieve":
             return SubscriptionAdminDetailSerializer
         return SubscriptionAdminSerializer
@@ -3234,6 +3325,40 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
 
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
+
+    @action(detail=True, methods=["post"], url_path="generate-rent-lease-ledger")
+    def generate_rent_lease_ledger(self, request, pk=None):
+        subscription = self.get_object()
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        from subscriptions.services.rent_lease_billing_service import generate_monthly_demands_for_subscription
+
+        if subscription.plan_type not in ("RENT", "LEASE"):
+            return Response({"detail": "Only Rent and Lease contracts support ledger generation."}, status=status.HTTP_400_BAD_REQUEST)
+
+        start_date = serializer.validated_data["start_date"]
+        subscription.start_date = start_date
+        subscription.save(update_fields=["start_date"])
+
+        try:
+            generate_monthly_demands_for_subscription(
+                subscription=subscription,
+                generate_full_schedule=True,
+                performed_by=request.user
+            )
+        except Exception as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        refreshed = get_subscription_detail_queryset().get(pk=subscription.pk)
+        return Response(
+            {
+                "updated": True,
+                "subscription": SubscriptionAdminDetailSerializer(
+                    refreshed,
+                    context={"request": request},
+                ).data,
+            }
+        )
 
     @action(detail=True, methods=["post"], url_path="cancel")
     def cancel_subscription(self, request, pk=None):
@@ -3615,6 +3740,25 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
                 "document_type": doc.document_type,
             },
         )
+        
+        if doc.document_type == "CUSTOMER_KYC_ID" and subscription.customer:
+            customer = subscription.customer
+            from subscriptions.models import CustomerKycDocument
+            
+            # The frontend can send category via notes for now if we don't want to change serializer
+            # But wait, request.data is available.
+            category = request.data.get("category", "ID_PROOF")
+            if category not in ["ID_PROOF", "ADDRESS_PROOF"]:
+                category = "ID_PROOF"
+
+            CustomerKycDocument.objects.create(
+                customer=customer,
+                document_type="OTHER",
+                category=category,
+                file=doc.file,
+                status="PENDING",
+                uploaded_by=request.user,
+            )
 
         return Response(
             {
@@ -3629,6 +3773,33 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
             },
             status=status.HTTP_201_CREATED,
         )
+
+    @action(detail=True, methods=["post"], url_path=r"documents/(?P<document_id>\d+)/verify")
+    def verify_document(self, request, pk=None, document_id=None):
+        subscription = self.get_object()
+        from subscriptions.models import SubscriptionDocument
+        from subscriptions.services.document_vault_service import verify_document as svc_verify
+
+        doc = get_object_or_404(SubscriptionDocument, pk=document_id, subscription=subscription)
+        notes = request.data.get("notes", "").strip()
+        svc_verify(doc, verified_by=request.user, notes=notes)
+        return Response({"detail": "Document verified successfully."})
+
+    @action(detail=True, methods=["post"], url_path=r"documents/(?P<document_id>\d+)/reject")
+    def reject_document(self, request, pk=None, document_id=None):
+        subscription = self.get_object()
+        from subscriptions.models import SubscriptionDocument
+        from subscriptions.services.document_vault_service import reject_document as svc_reject
+
+        doc = get_object_or_404(SubscriptionDocument, pk=document_id, subscription=subscription)
+        reason = request.data.get("reason", "").strip()
+        if not reason:
+            return Response(
+                {"reason": ["Reason is required when rejecting a document."]},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        svc_reject(doc, rejected_by=request.user, reason=reason)
+        return Response({"detail": "Document rejected successfully."})
 
     @action(detail=True, methods=["post"], url_path="return-assessment")
     def return_assessment(self, request, pk=None):

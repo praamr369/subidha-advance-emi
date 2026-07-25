@@ -1,4 +1,5 @@
 import { Plus, CheckCircle, AlertCircle, RefreshCw, TrendingUp, FileText, Lock, Eye } from "lucide-react";
+import { ROUTES } from "@/lib/routes";
 
 export type ModuleData = {
   kpi?: { label: string; value: string | number; trend?: "up" | "down" | "neutral" };
@@ -12,9 +13,9 @@ export const ADMIN_MODULE_DATA: Record<string, ModuleData> = {
   finance: {
     kpi: { label: "Today's Collections", value: "₹17,500", trend: "up" },
     workflows: [
-      { id: "1", label: "New Journal Entry", icon: Plus, action: "/admin/finance/journal/new" },
-      { id: "2", label: "Reconcile Accounts", icon: CheckCircle, action: "/admin/finance/reconciliation" },
-      { id: "3", label: "Review Reversals", icon: AlertCircle, action: "/admin/finance/reversals" },
+      { id: "1", label: "Smart Collect", icon: Plus, action: ROUTES.admin.financeCollect },
+      { id: "2", label: "Reconcile", icon: CheckCircle, action: "/admin/finance/reconciliation" },
+      { id: "3", label: "Daily Close", icon: AlertCircle, action: ROUTES.admin.financeDailyClose },
     ],
     requests: [
       { id: "1", label: "Approvals", count: 5, status: "critical" },
@@ -219,7 +220,7 @@ export const ADMIN_MODULE_DATA: Record<string, ModuleData> = {
   operations: {
     kpi: { label: "Open Tasks", value: "78", trend: "down" },
     workflows: [
-      { id: "1", label: "Daily Close", icon: CheckCircle, action: "/admin/operations/daily-close" },
+      { id: "1", label: "Daily Close", icon: CheckCircle, action: "/admin/finance/daily-close" },
       { id: "2", label: "Assignments", icon: Plus, action: "/admin/operations/assign" },
       { id: "3", label: "Reports", icon: FileText, action: "/admin/operations/reports" },
     ],
@@ -228,7 +229,7 @@ export const ADMIN_MODULE_DATA: Record<string, ModuleData> = {
       { id: "2", label: "Overdue", count: 8, status: "active" },
     ],
     quickActions: [
-      { label: "Today's Work", href: "/admin/operations/today-work" },
+      { label: "Today", href: ROUTES.admin.today },
       { label: "Command Center", href: "/admin/operations/command-center" },
     ],
   },

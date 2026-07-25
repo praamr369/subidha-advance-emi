@@ -53,6 +53,10 @@ from api.v1.views.product_requests import (
     CustomerProductRequestListView,
     CustomerProductRequestOptionsView,
 )
+from api.v1.views.crm_workbench import (
+    CustomerWorkbenchListView,
+    CustomerWorkbenchDetailView,
+)
 from api.v1.views.customer_support_tickets import (
     CustomerSupportTicketCommentView,
     CustomerSupportTicketDetailView,
@@ -127,4 +131,8 @@ urlpatterns = [
     path("catalog/", CustomerCatalogListView.as_view()),
     path("catalog/<int:pk>/", CustomerCatalogDetailView.as_view()),
     path("catalog/facets/", CustomerCatalogFacetsView.as_view()),
+
+    # Workbench
+    path("crm/workbench/", CustomerWorkbenchListView.as_view(), name="customer-workbench-list"),
+    path("crm/workbench/<int:pk>/", CustomerWorkbenchDetailView.as_view(), name="customer-workbench-detail"),
 ]

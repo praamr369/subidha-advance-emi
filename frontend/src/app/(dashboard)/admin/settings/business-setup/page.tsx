@@ -360,6 +360,47 @@ export default function BusinessSetupPage() {
             </div>
           </section>
 
+          {/* ── Solopreneur Control Room & Operational Posture Dashboard ── */}
+          {payload?.operational_posture ? (
+            <section className="rounded-xl border border-primary/20 bg-gradient-to-r from-card via-card to-primary/5 p-5 shadow-sm">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-border pb-4">
+                <div>
+                  <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+                    Solopreneur Control Room & Operational Posture
+                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                      payload.summary.blocker_count === 0 ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                    }`}>
+                      {payload.summary.blocker_count === 0 ? "100% OPERATIONAL READY" : `${payload.summary.blocker_count} CORE BLOCKER(S)`}
+                    </span>
+                  </h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">Unified ERP/POS master health monitoring without department segregation.</p>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Last evaluated: {typeof (payload.operational_posture as any).last_evaluated === "string" ? new Date((payload.operational_posture as any).last_evaluated).toLocaleTimeString() : "Just now"}
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-3 grid-cols-2 sm:grid-cols-3 xl:grid-cols-6">
+                {[
+                  { label: "Active Admins", value: (payload.operational_posture as any).admin_count ?? 0, ready: ((payload.operational_posture as any).admin_count ?? 0) > 0 },
+                  { label: "Branches / Counters", value: `${(payload.operational_posture as any).branch_count ?? 0} / ${(payload.operational_posture as any).counter_count ?? 0}`, ready: ((payload.operational_posture as any).counter_count ?? 0) > 0 },
+                  { label: "Chart Accounts", value: (payload.operational_posture as any).active_chart_accounts_count ?? 0, ready: ((payload.operational_posture as any).active_chart_accounts_count ?? 0) > 0 },
+                  { label: "Products / Batches", value: `${(payload.operational_posture as any).product_count ?? 0} / ${(payload.operational_posture as any).batch_count ?? 0}`, ready: ((payload.operational_posture as any).product_count ?? 0) > 0 },
+                  { label: "Tax / GST Profile", value: (payload.operational_posture as any).has_tax_profile ? "Configured" : "Non-GST / Optional", ready: true },
+                  { label: "Print Branding", value: (payload.operational_posture as any).has_print_branding ? "Ready" : "Default", ready: true },
+                ].map((stat, idx) => (
+                  <div key={`${stat.label}-${idx}`} className="rounded-xl border border-border bg-background/80 p-3.5 shadow-sm transition hover:border-primary/40">
+                    <div className="text-xs font-medium text-muted-foreground">{stat.label}</div>
+                    <div className="mt-1.5 text-lg font-semibold text-foreground flex items-center justify-between">
+                      <span>{stat.value}</span>
+                      <span className={`inline-block size-2 rounded-full ${stat.ready ? "bg-emerald-500" : "bg-amber-500"}`} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
           {/* ── Itemized checklist accordion ── */}
           <section className="rounded-xl border border-border bg-card shadow-sm">
             <div className="border-b border-border px-5 py-4 text-sm font-semibold text-foreground">
@@ -416,7 +457,7 @@ export default function BusinessSetupPage() {
         <p className="mt-1 text-sm text-muted-foreground">Real setup routes only — no placeholder links.</p>
         <div className="mt-4 grid gap-2 md:grid-cols-3 xl:grid-cols-5">
           {primaryActions.map((action) => (
-            <Link key={action.href} href={action.href} className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground hover:border-foreground/30">
+            <Link key={`${action.label}-${action.href}`} href={action.href} className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground hover:border-foreground/30">
               {action.label}
             </Link>
           ))}

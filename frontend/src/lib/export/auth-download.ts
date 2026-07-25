@@ -9,7 +9,12 @@ import {
 import { refreshTokenRequest } from "@/services/auth.service";
 
 function buildApiUrl(path: string): string {
-  return `${API_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const base = API_BASE_URL.replace(/\/+$/, "");
+  if (base.endsWith("/api/v1") && normalizedPath.startsWith("/api/v1")) {
+    return `${base}${normalizedPath.slice("/api/v1".length) || ""}`;
+  }
+  return `${base}${normalizedPath}`;
 }
 
 function resolveFilename(
@@ -108,4 +113,28 @@ export async function downloadAuthenticatedFile(
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+export async function openAuthenticatedFile(
+  path: string
+): Promise<void> {
+  let response = await fetchDownload(path, getAccessToken());
+
+  if (response.status === 401) {
+    const refreshed = await refreshAccessToken();
+    if (!refreshed) {
+      throw new Error("Authentication expired.");
+    }
+    response = await fetchDownload(path, refreshed);
+  }
+
+  if (!response.ok) {
+    throw await resolveError(response);
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  window.open(url, "_blank");
+  // We can't immediately revoke the URL because the new tab needs time to load it.
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
 }

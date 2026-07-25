@@ -224,6 +224,7 @@ class PimProductViewSet(viewsets.ModelViewSet):
                         "base_price": sp.base_price,
                         "description": sp.description or "",
                         "category": cat,
+                        "source_product": sp,
                         "is_active": sp.is_active,
                         "is_published": False,
                     },
@@ -231,6 +232,9 @@ class PimProductViewSet(viewsets.ModelViewSet):
                 if was_created:
                     created += 1
                 else:
+                    if pim.source_product_id != sp.id:
+                        pim.source_product = sp
+                        pim.save(update_fields=["source_product"])
                     changed = []
                     if str(pim.base_price) != str(sp.base_price):
                         pim.base_price = sp.base_price

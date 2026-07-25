@@ -12,6 +12,7 @@ import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { ROUTES } from "@/lib/routes";
 import { formatRupee } from "@/lib/utils/currency";
 import { apiFetch } from "@/lib/api";
+import KanbanBoard, { type KanbanLead } from "@/components/crm/KanbanBoard";
 import {
   getFunnelAnalytics,
   getProductPerformance,
@@ -100,6 +101,9 @@ export default function CRMAnalyticsPage() {
     timeline: null,
     byType: null,
   });
+  const [activeTab, setActiveTab] = useState<"analytics" | "pipeline">("analytics");
+  const [pipelineLeads, setPipelineLeads] = useState<KanbanLead[]>([]);
+  const [pipelineLoading, setPipelineLoading] = useState(false);
   const [days, setDays] = useState(30);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -131,8 +135,30 @@ export default function CRMAnalyticsPage() {
   }, [days]);
 
   useEffect(() => {
-    void loadAnalytics();
-  }, [loadAnalytics]);
+    if (activeTab === "analytics") {
+      void loadAnalytics();
+    } else if (activeTab === "pipeline" && pipelineLeads.length === 0) {
+      setPipelineLoading(true);
+      apiFetch('/api/v1/crm-pipeline/pipeline/')
+        .then((data: any) => setPipelineLeads(Array.isArray(data) ? data : (data.results || [])))
+        .catch(console.error)
+        .finally(() => setPipelineLoading(false));
+    }
+  }, [loadAnalytics, activeTab, pipelineLeads.length]);
+
+  const handleStageChange = async (leadId: number, newStage: string) => {
+    try {
+      await apiFetch(`/api/v1/crm-pipeline/pipeline/${leadId}/stage/`, {
+        method: 'PATCH',
+        body: JSON.stringify({ stage: newStage }),
+      });
+      setPipelineLeads(pipelineLeads.map(l =>
+        l.id === leadId ? { ...l, current_stage: newStage } : l
+      ));
+    } catch (err) {
+      console.error('Failed to update stage:', err);
+    }
+  };
 
   const funnel = analytics.funnel?.funnel;
 
@@ -152,9 +178,34 @@ export default function CRMAnalyticsPage() {
       {loading && <ERPLoadingState label="Loading analytics..." />}
       {error && <ERPErrorState title="Analytics Error" description={error} />}
 
-      {!loading && !error && analytics.metrics ? (
+      <div className="flex gap-2 mb-6 border-b border-border">
+        <button
+          onClick={() => setActiveTab("analytics")}
+          className={`px-4 py-3 font-medium text-sm transition-colors ${
+            activeTab === "analytics"
+              ? "text-primary border-b-2 border-primary"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          📊 CRM Analytics
+        </button>
+        <button
+          onClick={() => setActiveTab("pipeline")}
+          className={`px-4 py-3 font-medium text-sm transition-colors ${
+            activeTab === "pipeline"
+              ? "text-primary border-b-2 border-primary"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          🎯 Kanban Pipeline
+        </button>
+      </div>
+
+      {activeTab === "analytics" && (
         <>
-          {/* Current Metrics Summary */}
+          {!loading && !error && analytics.metrics ? (
+            <>
+              {/* Current Metrics Summary */}
           <ERPSectionShell
             title="Current Metrics"
             description="Real-time stage counts and ROI indicators"
@@ -258,11 +309,11 @@ export default function CRMAnalyticsPage() {
               </div>
             </div>
           </ERPSectionShell>
-        </>
-      ) : null}
+            </>
+          ) : null}
 
       {/* Date Range Selector for Historical Analytics */}
-      <div className="mb-6 flex gap-2">
+      <div className="my-6 flex gap-2">
         {[7, 30, 90].map((d) => (
           <button
             key={d}
@@ -535,6 +586,28 @@ export default function CRMAnalyticsPage() {
           description="Start creating leads and requests to see analytics."
         />
       ) : null}
+      </>
+      )}
+
+      {activeTab === "pipeline" && (
+        <div className="mt-4">
+          {pipelineLoading ? (
+            <ERPLoadingState label="Loading pipeline..." />
+          ) : pipelineLeads.length === 0 ? (
+            <ERPEmptyState
+              title="No leads in pipeline"
+              description="No active leads were found to display on the board."
+              icon="leads"
+            />
+          ) : (
+            <KanbanBoard
+              leads={pipelineLeads}
+              onStageChange={handleStageChange}
+              onLeadClick={() => {}}
+            />
+          )}
+        </div>
+      )}
     </ERPPageShell>
   );
 }

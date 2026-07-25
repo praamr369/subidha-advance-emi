@@ -24,7 +24,7 @@ export default function BusinessSetupLinks() {
     <div className="flex flex-wrap gap-2">
       {links.map((link) => (
         <Link
-          key={link.href}
+          key={`${link.label}-${link.href}`}
           href={link.href}
           className="rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:border-ring hover:text-foreground"
         >

@@ -64,7 +64,7 @@ export const RichTooltip: React.FC<{
   delay?: number;
 }> = ({ children, content, delay = 300 }) => {
   const [show, setShow] = useState(false);
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleMouseEnter = () => {
     timeoutRef.current = setTimeout(() => setShow(true), delay);

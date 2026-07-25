@@ -1,8 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
+import EmptyState from "@/components/feedback/EmptyState";
+import ErrorState from "@/components/feedback/ErrorState";
+import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
@@ -54,29 +57,26 @@ export default function AdminComplianceKycPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        const [queuePayload, expiryPayload] = await Promise.all([
-          listKycReviewQueue(),
-          listKycReviewQueue({ expires_within_days: 60 }),
-        ]);
-        if (!active) return;
-        setQueue(queuePayload);
-        setExpiryQueue(expiryPayload);
-        setError(null);
-      } catch (err) {
-        if (!active) return;
-        setError(err instanceof Error ? err.message : "Failed to load KYC compliance data.");
-      } finally {
-        if (active) setLoading(false);
-      }
-    })();
-    return () => {
-      active = false;
-    };
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [queuePayload, expiryPayload] = await Promise.all([
+        listKycReviewQueue(),
+        listKycReviewQueue({ expires_within_days: 60 }),
+      ]);
+      setQueue(queuePayload);
+      setExpiryQueue(expiryPayload);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load KYC compliance data.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   const stats = useMemo(() => {
     const summary = queue?.summary;
@@ -129,9 +129,9 @@ export default function AdminComplianceKycPage() {
 
         <WorkspaceSection title="Operational snapshot" description="Queue pressure and expiry pressure across all KYC owner types.">
           {loading ? (
-            <p className="text-sm text-muted-foreground">Loading KYC queue snapshot...</p>
+            <LoadingBlock label="Loading KYC queue snapshot…" />
           ) : error ? (
-            <p className="text-sm text-destructive">{error}</p>
+            <ErrorState message={error} onRetry={() => void load()} />
           ) : (
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {stats.map((card) => (
@@ -195,7 +195,7 @@ export default function AdminComplianceKycPage() {
 
         <WorkspaceSection title="Review queue" description="Latest documents that are pending review, approved, or close to expiry.">
           {loading ? (
-            <p className="text-sm text-muted-foreground">Loading queue rows...</p>
+            <LoadingBlock label="Loading queue rows…" />
           ) : queueRows.length ? (
             <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
               <table className="min-w-full divide-y divide-border text-sm">
@@ -241,9 +241,10 @@ export default function AdminComplianceKycPage() {
               </table>
             </div>
           ) : (
-            <div className="rounded-xl border border-dashed border-border bg-muted/20 p-6 text-sm text-muted-foreground">
-              No review queue rows are currently available.
-            </div>
+            <EmptyState
+              title="No review queue rows"
+              description="No KYC documents are pending review, approved, or nearing expiry right now."
+            />
           )}
         </WorkspaceSection>
       </div>

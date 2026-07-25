@@ -68,16 +68,16 @@ export function ChartAccountsPanel() {
   return (
     <div className="space-y-6">
       <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-        <h2 className="text-xl font-semibold text-foreground">Chart accounts</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Chart accounts live under the Accounting module. This setup page shows readiness and guides first-run setup without duplicating accounting masters.</p>
+        <h2 className="text-xl font-semibold text-foreground">Income & Expense Categories</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Categories live under the Finance module. This setup page shows readiness and guides first-run setup without duplicating finance categories.</p>
       </div>
 
       {!error && status ? (
         <div className="grid gap-3 md:grid-cols-4">
-          <div className="rounded-xl border border-border bg-card p-4 shadow-sm"><div className="text-xs font-medium text-muted-foreground">Active chart accounts</div><div className="mt-1 text-lg font-semibold tabular-nums text-foreground">{chartActiveTotal}</div><div className="mt-2 text-xs text-muted-foreground">Total {toNumber(status.chart_accounts_total)} · Roots {chartRootsAll}</div></div>
-          <div className="rounded-xl border border-border bg-card p-4 shadow-sm"><div className="text-xs font-medium text-muted-foreground">Active child chart accounts</div><div className="mt-1 text-lg font-semibold tabular-nums text-foreground">{chartChildrenActive}</div><div className="mt-2 text-xs text-muted-foreground">All child rows incl. inactive: {chartChildrenAll}</div></div>
-          <div className="rounded-xl border border-border bg-card p-4 shadow-sm"><div className="text-xs font-medium text-muted-foreground">Posting leaf accounts</div><div className="mt-1 text-lg font-semibold tabular-nums text-foreground">{postingLeafCount}</div><div className="mt-2 text-xs text-muted-foreground">Manual/system posting-ready ledgers.</div></div>
-          <div className="rounded-xl border border-border bg-card p-4 shadow-sm"><div className="text-xs font-medium text-muted-foreground">Control/group accounts</div><div className="mt-1 text-lg font-semibold tabular-nums text-foreground">{controlCount}</div><div className="mt-2 text-xs text-muted-foreground">Non-posting grouping/control rows.</div></div>
+          <div className="rounded-xl border border-border bg-card p-4 shadow-sm"><div className="text-xs font-medium text-muted-foreground">Active Categories</div><div className="mt-1 text-lg font-semibold tabular-nums text-foreground">{chartActiveTotal}</div><div className="mt-2 text-xs text-muted-foreground">Total {toNumber(status.chart_accounts_total)} · Roots {chartRootsAll}</div></div>
+          <div className="rounded-xl border border-border bg-card p-4 shadow-sm"><div className="text-xs font-medium text-muted-foreground">Active Sub-Categories</div><div className="mt-1 text-lg font-semibold tabular-nums text-foreground">{chartChildrenActive}</div><div className="mt-2 text-xs text-muted-foreground">All sub-categories incl. inactive: {chartChildrenAll}</div></div>
+          <div className="rounded-xl border border-border bg-card p-4 shadow-sm"><div className="text-xs font-medium text-muted-foreground">Manual Entry Categories</div><div className="mt-1 text-lg font-semibold tabular-nums text-foreground">{postingLeafCount}</div><div className="mt-2 text-xs text-muted-foreground">Ready for manual or system entry.</div></div>
+          <div className="rounded-xl border border-border bg-card p-4 shadow-sm"><div className="text-xs font-medium text-muted-foreground">Grouping/Control Categories</div><div className="mt-1 text-lg font-semibold tabular-nums text-foreground">{controlCount}</div><div className="mt-2 text-xs text-muted-foreground">Non-posting grouping/control rows.</div></div>
           <div className="rounded-xl border border-border bg-card p-4 shadow-sm md:col-span-4"><div className="text-xs font-medium text-muted-foreground">Mappings and journal readiness</div><div className="mt-1 text-sm text-foreground">{mappingsLine}</div><div className="mt-1 text-xs text-muted-foreground">{journalLine}</div></div>
         </div>
       ) : null}
@@ -86,9 +86,9 @@ export function ChartAccountsPanel() {
 
       <div className="space-y-4">
         <div className="flex flex-wrap gap-2">
-          <Link href="/admin/accounting/chart-of-accounts" className="rounded-xl bg-primary px-3 py-2 text-sm font-medium text-primary-foreground">Open Chart of Accounts</Link>
+          <Link href="/admin/accounting/chart-of-accounts" className="rounded-xl bg-primary px-3 py-2 text-sm font-medium text-primary-foreground">Manage Categories</Link>
           <Link href="/admin/accounting/setup" className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium text-foreground">Accounting setup</Link>
-          <Link href="/admin/accounting/books" className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium text-foreground">Open Books</Link>
+          <Link href="/admin/accounting/books" className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium text-foreground">View Ledger</Link>
           <button type="button" onClick={() => void loadPage()} className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium text-foreground">Refresh</button>
         </div>
           <div className="grid gap-3 md:grid-cols-5">
@@ -97,18 +97,18 @@ export function ChartAccountsPanel() {
             ))}
           </div>
           <div className="rounded-xl border border-border bg-card p-4 text-sm">
-            <div className="font-semibold text-foreground">Active register preview</div>
+            <div className="font-semibold text-foreground">Category List Preview</div>
             <p className="mt-1 text-muted-foreground">Showing up to 100 active accounts from the canonical accounting API.</p>
             <div className="mt-3 grid gap-2 md:grid-cols-2">
               {accounts.slice(0, 12).map((account) => (
-                <div key={account.id} className="rounded-lg border border-border bg-background p-3"><div className="flex flex-wrap items-center justify-between gap-2"><strong>{account.code}</strong><span className={badgeClass(account.allow_manual_posting ? "green" : "slate")}>{account.allow_manual_posting ? "Posting" : "Control"}</span></div><div className="mt-1 text-xs text-muted-foreground">{account.name} · {account.account_type}</div></div>
+                <div key={account.id} className="rounded-lg border border-border bg-background p-3"><div className="flex flex-wrap items-center justify-between gap-2"><strong>{account.code}</strong><span className={badgeClass(account.allow_manual_posting ? "green" : "slate")}>{account.allow_manual_posting ? "Manual Entry" : "Control"}</span></div><div className="mt-1 text-xs text-muted-foreground">{account.name} · {account.account_type}</div></div>
               ))}
-              {!loading && accounts.length === 0 ? <div className="rounded-lg border border-dashed border-border p-3 text-sm text-muted-foreground">No active chart account rows returned.</div> : null}
+              {!loading && accounts.length === 0 ? <div className="rounded-lg border border-dashed border-border p-3 text-sm text-muted-foreground">No active categories returned.</div> : null}
             </div>
           </div>
         </div>
       <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-        <p className="text-sm text-muted-foreground">Configure chart accounts first, then finance accounts. Finance accounts must map to active ASSET chart accounts; income, liability, inventory, and expense accounts remain ledger-only posting destinations.</p>
+        <p className="text-sm text-muted-foreground">Configure Income & Expense Categories first, then Bank & Cash Accounts. Bank & Cash accounts must map to active ASSET categories; income, liability, inventory, and expense categories remain ledger-only manual entry destinations.</p>
       </div>
     </div>
   );

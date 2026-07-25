@@ -10,6 +10,9 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from subscriptions.models import AuditLog
+from subscriptions.services.audit_service import log_audit
+
 from accounting.models import CreditNote, DebitNote, ExportPackJob, TaxInvoice
 from accounts.capabilities import require_capability
 from accounting.services.bridge_run_service import run_bridge_postings
@@ -307,6 +310,17 @@ class ItrExportPackListCreateView(AdminAccountingReportView):
             created_by=request.user,
         )
         job = generate_itr_export_pack(job_id=job.id)
+        log_audit(
+            action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
+            instance=job,
+            performed_by=request.user,
+            metadata={
+                "event": "ITR_EXPORT_PACK_GENERATED",
+                "financial_year": serializer.validated_data.get("financial_year", ""),
+                "start_date": str(serializer.validated_data.get("start_date")),
+                "end_date": str(serializer.validated_data.get("end_date")),
+            },
+        )
         payload = ExportPackJobSerializer(job)
         return Response(payload.data, status=status.HTTP_201_CREATED)
 
@@ -328,6 +342,17 @@ class GstExportPackListCreateView(AdminAccountingReportView):
             created_by=request.user,
         )
         job = generate_gst_export_pack(job_id=job.id)
+        log_audit(
+            action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
+            instance=job,
+            performed_by=request.user,
+            metadata={
+                "event": "GST_EXPORT_PACK_GENERATED",
+                "financial_year": serializer.validated_data.get("financial_year", ""),
+                "start_date": str(serializer.validated_data.get("start_date")),
+                "end_date": str(serializer.validated_data.get("end_date")),
+            },
+        )
         payload = ExportPackJobSerializer(job)
         return Response(payload.data, status=status.HTTP_201_CREATED)
 
@@ -366,4 +391,19 @@ class BridgeRunView(AdminAccountingReportView):
             )
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)}) from exc
+
+        # Dry runs post nothing, so they are not recorded as state changes.
+        if not serializer.validated_data.get("dry_run", False):
+            log_audit(
+                action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
+                instance=request.user,
+                performed_by=request.user,
+                metadata={
+                    "event": "ACCOUNTING_BRIDGE_POSTINGS_RUN",
+                    "start_date": str(serializer.validated_data["start_date"]),
+                    "end_date": str(serializer.validated_data["end_date"]),
+                    "purposes": serializer.validated_data.get("purposes"),
+                    "result": result,
+                },
+            )
         return Response(result, status=status.HTTP_200_OK)

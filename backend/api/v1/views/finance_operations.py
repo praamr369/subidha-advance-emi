@@ -195,3 +195,15 @@ class AdminFinanceAccountOperationalSummaryView(APIView):
 
     def get(self, request, *args, **kwargs):
         return Response(ReconciliationOverviewService.build_finance_account_operational_summary())
+
+
+class AdminMoneyInHandView(APIView):
+    """Authoritative live cash/bank/UPI balances from the posted ledger."""
+
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request, *args, **kwargs):
+        from accounting.services.reporting_service import build_money_in_hand
+
+        branch_id = request.query_params.get("branch_id")
+        return Response(build_money_in_hand(branch_id=int(branch_id) if branch_id else None))

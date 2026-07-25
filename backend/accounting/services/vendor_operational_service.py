@@ -6,6 +6,7 @@ from django.db.models import Count, Q, Sum
 from django.db.models.functions import Coalesce
 
 from accounting.models import Vendor, VendorSettlementStatus
+from accounting.services.vendor_ledger_service import get_vendor_outstanding
 from inventory.models import PurchaseBillStatus
 
 
@@ -52,7 +53,12 @@ def build_vendor_operational_summary(vendor: Vendor) -> dict[str, object]:
 
     posted_purchase_total = Decimal(str(purchase_summary["posted_total"] or "0.00"))
     posted_settlement_total = Decimal(str(settlement_summary["posted_total"] or "0.00"))
-    outstanding_payable = posted_purchase_total - posted_settlement_total
+    # Outstanding payable must be the real amount owed, matching the dedicated
+    # vendor outstanding view. The previous posted-only formula ignored APPROVED
+    # (not-yet-ledger-posted) purchase bills, so the finance KPI read 0 while the
+    # outstanding page correctly showed the real payable. Delegate to the single
+    # source of truth so the two surfaces can never contradict.
+    outstanding_payable = Decimal(str(get_vendor_outstanding(vendor).get("outstanding") or "0.00"))
     if outstanding_payable < Decimal("0.00"):
         outstanding_payable = Decimal("0.00")
 

@@ -23,11 +23,18 @@ class CategoryAttributeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CategoryAttribute
+        # `category` is required (an attribute belongs to a category); `subcategory`
+        # is optional. Both must be writable so the manage page can create an
+        # attribute on a chosen category/subcategory.
         fields = [
-            "id", "name", "slug", "data_type", "is_required",
+            "id", "category", "subcategory", "name", "slug", "data_type", "is_required",
             "is_variant_defining", "min_value", "max_value",
             "display_order", "options",
         ]
+        extra_kwargs = {
+            "slug": {"read_only": True},
+            "subcategory": {"required": False, "allow_null": True},
+        }
 
 
 class ProductSubcategorySerializer(serializers.ModelSerializer):
@@ -35,7 +42,13 @@ class ProductSubcategorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProductSubcategory
-        fields = ["id", "name", "slug", "display_order", "attributes"]
+        # `category` must be writable — a subcategory belongs to a category (NOT
+        # NULL). It was previously omitted, so POSTs silently dropped it and hit an
+        # integrity error on category_id. `slug` is read-only: the model derives it
+        # from name in save(), and marking it read-only keeps the model's
+        # unique_together (category, slug) from forcing slug into the request body.
+        fields = ["id", "category", "name", "slug", "display_order", "attributes"]
+        extra_kwargs = {"slug": {"read_only": True}}
 
     def get_attributes(self, obj):
         attrs = CategoryAttribute.objects.filter(subcategory=obj, is_active=True).prefetch_related("options")
@@ -49,6 +62,7 @@ class ProductCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductCategory
         fields = ["id", "name", "slug", "icon", "display_order", "subcategories", "attributes"]
+        extra_kwargs = {"slug": {"required": False, "allow_blank": True}}
 
     def get_attributes(self, obj):
         attrs = CategoryAttribute.objects.filter(category=obj, subcategory__isnull=True, is_active=True).prefetch_related("options")

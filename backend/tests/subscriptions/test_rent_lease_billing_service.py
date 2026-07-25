@@ -56,14 +56,13 @@ class RentLeaseBillingServiceTests(TestCase):
             security_deposit_percent=Decimal("20.00"),
             performed_by=self.admin,
         )
+        # Demands are auto-generated on contract creation.
         first = generate_monthly_demands_for_subscription(subscription=subscription, performed_by=self.admin)
-        second = generate_monthly_demands_for_subscription(subscription=subscription, performed_by=self.admin)
-        self.assertGreaterEqual(first["created_count"], 1)
-        self.assertEqual(second["created_count"], 0)
+        self.assertEqual(first["created_count"], 0)
         monthly_count = RentLeaseBillingDemand.objects.filter(
             subscription=subscription, demand_type=RentLeaseDemandType.RENT_MONTHLY
         ).count()
-        self.assertEqual(monthly_count, first["created_count"])
+        self.assertGreaterEqual(monthly_count, 1)
 
     def test_lease_invoice_generation_is_idempotent(self):
         subscription = create_lease_contract(
@@ -74,10 +73,9 @@ class RentLeaseBillingServiceTests(TestCase):
             security_deposit_percent=Decimal("22.00"),
             performed_by=self.admin,
         )
+        # Demands are auto-generated on contract creation.
         first = generate_monthly_demands_for_subscription(subscription=subscription, performed_by=self.admin)
-        second = generate_monthly_demands_for_subscription(subscription=subscription, performed_by=self.admin)
-        self.assertGreaterEqual(first["created_count"], 1)
-        self.assertEqual(second["created_count"], 0)
+        self.assertEqual(first["created_count"], 0)
         self.assertTrue(
             RentLeaseBillingDemand.objects.filter(
                 subscription=subscription,

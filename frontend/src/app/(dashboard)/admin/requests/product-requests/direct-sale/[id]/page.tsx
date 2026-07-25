@@ -12,6 +12,7 @@ import ProductRequestCard from "@/domains/product-requests/components/ProductReq
 import { useRequestKeyboardShortcuts } from "@/hooks/useRequestKeyboardShortcuts";
 import {
   decideAdminProductRequest,
+  cancelAdminProductRequest,
   getProductRequest,
   getProductRequestOptions,
   type ProductRequestCustomerOption,
@@ -59,6 +60,7 @@ export default function DirectSaleRequestDetailPage() {
   const [unitPrice, setUnitPrice] = useState("");
   const [reviewNote, setReviewNote] = useState("");
   const [rejectReason, setRejectReason] = useState("");
+  const [cancelReason, setCancelReason] = useState("");
   const [step, setStep] = useState<"customer" | "pricing" | "review">(
     "customer",
   );
@@ -195,6 +197,23 @@ export default function DirectSaleRequestDetailPage() {
       };
       await decideAdminProductRequest(requestId, payload);
       setSuccessMessage("Direct sale request rejected.");
+    } catch (err) {
+      setActionError(toErrorMessage(err));
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleCancel() {
+    if (!request) return;
+    setActionLoading(true);
+    setActionError(null);
+    setSuccessMessage(null);
+
+    try {
+      await cancelAdminProductRequest(requestId, cancelReason.trim());
+      setSuccessMessage("Direct sale request has been cancelled.");
+      await loadRequest();
     } catch (err) {
       setActionError(toErrorMessage(err));
     } finally {
@@ -480,21 +499,46 @@ export default function DirectSaleRequestDetailPage() {
                   title="Request Finalized"
                   description="This request has been resolved."
                 >
-                  <div className="space-y-2 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">Status:</span>
-                      <span className="ml-2 font-medium">{request.status}</span>
-                    </div>
-                    {request.approved_direct_sale_id && (
+                  <div className="space-y-4">
+                    <div className="space-y-2 text-sm">
                       <div>
-                        <Link
-                          href={`/admin/billing/invoices/${request.approved_direct_sale_id}`}
-                          className="text-primary hover:underline"
-                        >
-                          View Draft Invoice →
-                        </Link>
+                        <span className="text-muted-foreground">Status:</span>
+                        <span className="ml-2 font-medium">{request.status}</span>
                       </div>
-                    )}
+                      {request.approved_direct_sale_id && (
+                        <div>
+                          <Link
+                            href={`/admin/billing/invoices/${request.approved_direct_sale_id}`}
+                            className="text-primary hover:underline"
+                          >
+                            View Draft Invoice →
+                          </Link>
+                        </div>
+                      )}
+                    </div>
+                    {request.status === "APPROVED" ? (
+                      <div className="border-t border-border pt-4 mt-2">
+                        <label className="block space-y-2 text-sm">
+                          <span className="font-medium text-red-600">Cancel Request</span>
+                          <span className="block text-muted-foreground">If the customer has backed out before invoicing or delivery, you can cancel this approved request.</span>
+                          <textarea
+                            value={cancelReason}
+                            onChange={(e) => setCancelReason(e.target.value)}
+                            rows={2}
+                            placeholder="Reason for cancellation..."
+                            className="w-full rounded-xl border border-border bg-background px-3 py-2"
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => void handleCancel()}
+                          disabled={actionLoading || !cancelReason.trim()}
+                          className="mt-3 h-10 rounded-xl bg-red-600 px-4 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                        >
+                          {actionLoading ? "Processing..." : "Cancel Approved Request"}
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
                 </DetailPanel>
               )}

@@ -24,14 +24,21 @@ from api.v1.views.partner_dashboard import (
     _partner_customer_queryset,
     _serialize_partner_customers,
 )
-from subscriptions.models import Customer, LuckyIdStatus, SubscriptionRequest
+from subscriptions.models import (
+    Customer,
+    LuckyIdStatus,
+    SubscriptionRequest,
+    SubscriptionRequestStatus,
+)
 from subscriptions.services.subscription_request_service import (
     approve_subscription_request,
     available_lucky_numbers_for_batch,
     cancel_subscription_request,
     create_customer_subscription_request,
     create_partner_subscription_request,
+    hold_subscription_request,
     reject_subscription_request,
+    request_amendment_subscription_request,
     requestable_batch_queryset,
     requestable_product_queryset,
     subscription_request_base_queryset,
@@ -616,6 +623,118 @@ class AdminSubscriptionRequestRejectView(APIView):
         return Response(
             {
                 "detail": "Subscription request rejected successfully.",
+                "result": SubscriptionRequestReadSerializer(
+                    response_obj,
+                    context={"request": request},
+                ).data,
+            }
+        )
+
+
+_ALLOWED_HOLD_STATUSES = {
+    SubscriptionRequestStatus.ON_HOLD_LUCKY_UNAVAILABLE.value,
+    SubscriptionRequestStatus.ON_HOLD_PRODUCT_NOT_READY.value,
+}
+
+
+class AdminSubscriptionRequestHoldView(APIView):
+    """Park a request in a funnel hold stage (lucky ID unavailable / product not
+    ready) without approving or rejecting it."""
+
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    @transaction.atomic
+    def post(self, request, pk):
+        try:
+            request_obj = (
+                subscription_request_lock_queryset()
+                .select_for_update()
+                .get(pk=pk)
+            )
+        except SubscriptionRequest.DoesNotExist:
+            return Response(
+                {"detail": "Subscription request not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        hold_status = request.data.get("hold_status")
+        if hold_status not in _ALLOWED_HOLD_STATUSES:
+            return Response(
+                {
+                    "hold_status": (
+                        "Provide hold_status as ON_HOLD_LUCKY_UNAVAILABLE or "
+                        "ON_HOLD_PRODUCT_NOT_READY."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = SubscriptionRequestDecisionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            hold_subscription_request(
+                request_obj=request_obj,
+                performed_by=request.user,
+                hold_status=hold_status,
+                review_note=serializer.get_note(),
+            )
+        except (ValidationError, ValueError) as exc:
+            return Response(
+                _validation_error_payload(exc),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        response_obj = _reload_request_for_response(request_obj.id)
+        return Response(
+            {
+                "detail": "Subscription request put on hold.",
+                "result": SubscriptionRequestReadSerializer(
+                    response_obj,
+                    context={"request": request},
+                ).data,
+            }
+        )
+
+
+class AdminSubscriptionRequestAmendmentView(APIView):
+    """Send a request back to the requester for changes (no admin snapshot edit)."""
+
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    @transaction.atomic
+    def post(self, request, pk):
+        try:
+            request_obj = (
+                subscription_request_lock_queryset()
+                .select_for_update()
+                .get(pk=pk)
+            )
+        except SubscriptionRequest.DoesNotExist:
+            return Response(
+                {"detail": "Subscription request not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = SubscriptionRequestDecisionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            request_amendment_subscription_request(
+                request_obj=request_obj,
+                performed_by=request.user,
+                review_note=serializer.get_note(),
+            )
+        except (ValidationError, ValueError) as exc:
+            return Response(
+                _validation_error_payload(exc),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        response_obj = _reload_request_for_response(request_obj.id)
+        return Response(
+            {
+                "detail": "Amendment requested from the requester.",
                 "result": SubscriptionRequestReadSerializer(
                     response_obj,
                     context={"request": request},

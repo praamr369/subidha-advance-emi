@@ -1207,6 +1207,21 @@ export async function listAdminCustomerKycDocuments(
   };
 }
 
+export async function uploadAdminCustomerKycDocument(
+  customerId: number | string,
+  input: { file: File; document_type: string; category?: string; notes?: string }
+): Promise<{ id: number; status: string; document_type: string }> {
+  const form = new FormData();
+  form.append("file", input.file);
+  form.append("document_type", input.document_type);
+  if (input.category) form.append("category", input.category);
+  if (input.notes) form.append("notes", input.notes);
+  return apiFetch<{ id: number; status: string; document_type: string }>(
+    `/admin/customers/${customerId}/kyc-documents/upload/`,
+    { method: "POST", body: form }
+  );
+}
+
 export async function approveAdminCustomerKycDocument(
   customerId: number | string,
   documentId: number

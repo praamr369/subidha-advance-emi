@@ -19,6 +19,8 @@ export type FinanceOperationalSummaryRow = {
   advance_total: string;
   advance_count: number;
   unapplied_advance_total: string;
+  security_deposit_total?: string;
+  security_deposit_count?: number;
   incoming_transfer_total: string;
   incoming_transfer_count: number;
   outgoing_transfer_total: string;
@@ -36,6 +38,7 @@ export type ReconciliationOverviewResponse = {
   pending_finance_accounts: number;
   pending_settlement_amount: string;
   unapplied_advance_total: string;
+  security_deposit_total?: string;
   flagged_reconciliation_count: number;
   pending_accounts: FinanceOperationalSummaryRow[];
 };
@@ -116,6 +119,52 @@ export async function getFinanceOperationalSummary() {
 
 export async function getReconciliationOverview() {
   return apiFetch<ReconciliationOverviewResponse>("/admin/reconciliation/overview/");
+}
+
+export type MoneyInHandAccount = {
+  finance_account_id: number;
+  finance_account_name: string;
+  kind: string;
+  total_debit: string;
+  total_credit: string;
+  net_balance: string;
+};
+
+export type MoneySourceBreakdown = {
+  source_type: string;
+  label: string;
+  amount: string;
+};
+
+export type MoneyReceiptRow = {
+  entry_date: string | null;
+  source_type: string;
+  source_label: string;
+  finance_account_name: string | null;
+  kind: string;
+  reference: string | null;
+  description: string;
+  amount: string;
+};
+
+export type MoneyInHandResponse = {
+  cash: string;
+  bank: string;
+  upi: string;
+  total: string;
+  accounts: MoneyInHandAccount[];
+  income_by_source: MoneySourceBreakdown[];
+  outflow_by_source: MoneySourceBreakdown[];
+  total_income: string;
+  total_outflow: string;
+  recent_receipts: MoneyReceiptRow[];
+};
+
+// Authoritative live cash/bank/UPI balances from the posted ledger — reflects
+// every rail (EMI, rent/lease, direct sale, deposits, transfers), unlike the
+// Payment-only operational summary.
+export async function getMoneyInHand() {
+  return apiFetch<MoneyInHandResponse>("/admin/finance/money-in-hand/");
 }
 
 export async function listFinanceTransfers(params: { page?: number; page_size?: number; status?: string; finance_account_id?: number | string } = {}) {

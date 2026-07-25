@@ -889,6 +889,13 @@ def _existing_bridge_for(*, source_model: str, source_id: str, purpose: str) -> 
 
 
 def _candidate_status_payload(*, event_key: str, event_label: str, module: str, source_model: str, raw_status: str, lines: list[dict[str, Any]], line_warnings: list[str], period: AccountingPeriod | None, source_date: date | None, journal: JournalEntry | None, reconciliation_item: ReconciliationItem | None, source_workflow_exists: bool, classification_reason: str | None = None, approval_required: bool = False) -> dict[str, Any]:
+    if raw_status == "SKIPPED_NOT_APPLICABLE" and not journal:
+        # A not-applicable source row is terminal — it never posts a journal, so
+        # its status must not depend on date/period/finance-account readiness.
+        # Resolve it before the readiness guards below, otherwise a lifecycle
+        # marker with no source date (e.g. a deposit DEMAND_CREATED row) is
+        # wrongly reported as BLOCKED rather than skipped.
+        return {"status": "SKIPPED_NOT_APPLICABLE", "canonical_status": "SKIPPED_NOT_APPLICABLE", "can_post": False, "can_preview": False, "can_reconcile": False, "blocker_code": "SKIPPED_NOT_APPLICABLE", "blocker_reason": classification_reason or "Source item is not applicable for bridge posting.", "recommended_action": "No bridge posting action is required for this source item.", "setup_href": None}
     if source_date is None:
         return {"status": "BLOCKED_BY_PERIOD", "canonical_status": "BLOCKED_BY_PERIOD", "can_post": False, "can_preview": False, "can_reconcile": False, "blocker_code": "SOURCE_DATE_MISSING", "blocker_reason": classification_reason or NO_SAFE_RETURN_DATE_BLOCKER, "recommended_action": "Fix the source workflow date before bridge posting.", "setup_href": "/admin/accounting/periods"}
     period_readiness = build_accounting_bridge_posting_period_readiness(reference_date=source_date, financial_year=getattr(period, "financial_year", None), period=period)

@@ -66,7 +66,7 @@ const SOURCE_MODEL_OPTIONS = [
 ];
 
 const SAFETY_COPY =
-  "Validation is read-only. Posting remains explicit, admin-only, idempotent, period-gated, numbering-gated, and reconciliation-controlled.";
+  "Review and approve all entries. Nothing is posted to the final accounting books without your explicit approval.";
 
 function cx(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(" ");
@@ -270,7 +270,7 @@ function RowsTable({ title, description, rows, selected, onToggle, onPreview, on
                         <p className="max-w-xs text-xs text-muted-foreground">{actionCopy(row)}</p>
                         <div className="flex flex-wrap gap-2">
                           {id && rowCanPreview(row) ? <button type="button" onClick={() => onPreview(row)} className="rounded-lg border px-3 py-1.5 text-xs font-semibold hover:bg-muted">Preview</button> : null}
-                          {id && rowCanPost(row) ? <button type="button" onClick={() => onPost(row)} className="rounded-lg bg-foreground px-3 py-1.5 text-xs font-semibold text-background hover:bg-foreground/90">Post</button> : null}
+                          {id && rowCanPost(row) ? <button type="button" onClick={() => onPost(row)} className="rounded-lg bg-foreground px-3 py-1.5 text-xs font-semibold text-background hover:bg-foreground/90">Approve</button> : null}
                         </div>
                       </div>
                     </td>
@@ -299,8 +299,8 @@ function ControlTowerInventory({ payload }: { payload: AccountingBridgeReconcili
   return (
     <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
       <div className="mb-4">
-        <h2 className="text-lg font-semibold text-foreground">Reconciliation Control Tower</h2>
-        <p className="text-sm text-muted-foreground">Daily operator view. Empty source definitions and validation-only references are hidden from the main workflow.</p>
+        <h2 className="text-lg font-semibold text-foreground">Daily Control Center</h2>
+        <p className="text-sm text-muted-foreground">Operator overview of today's pending tasks. Background system checks are hidden to keep things simple.</p>
       </div>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         <SummaryCard label="Readiness" value={readinessState} detail="Backend state" tone={statusClass(readinessState)} />
@@ -310,8 +310,8 @@ function ControlTowerInventory({ payload }: { payload: AccountingBridgeReconcili
         <SummaryCard label="Boundaries" value={sourceContract + unsupported} detail={`${sourceContract} source-contract · ${unsupported} unsupported`} tone="border-border bg-muted/50 text-foreground" />
       </div>
       <div className="mt-4 rounded-xl border border-border bg-background p-4 text-sm text-muted-foreground">
-        <div className="font-semibold text-foreground">Operational Guardrails</div>
-        <div className="mt-2 grid gap-2 md:grid-cols-2 xl:grid-cols-4"><span>Explicit manual posting</span><span>Strict source tracking</span><span>Immutable history</span><span>No auto-reconcile</span></div>
+        <div className="font-semibold text-foreground">System Protections</div>
+        <div className="mt-2 grid gap-2 md:grid-cols-2 xl:grid-cols-4"><span>Manual approvals only</span><span>Secure data tracking</span><span>Permanent history</span><span>No automatic processing</span></div>
       </div>
       {activeCount ? null : <div className="mt-4 rounded-xl border border-dashed p-5 text-sm text-muted-foreground">No current bridge source rows require operator action.</div>}
     </section>
@@ -355,8 +355,8 @@ function ProductionValidation({ payload }: { payload: AccountingBridgeReconcilia
   return (
     <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
       <div className="mb-4">
-        <h2 className="text-lg font-semibold text-foreground">{validation.title ?? "Production Accounting Validation"}</h2>
-        <p className="text-sm text-muted-foreground">Only workflows with current source rows, blockers, or exceptions are shown to operators.</p>
+        <h2 className="text-lg font-semibold text-foreground">{validation.title ?? "Pre-Posting Checks"}</h2>
+        <p className="text-sm text-muted-foreground">Only tasks that require your attention (like pending approvals or errors) are shown here.</p>
       </div>
       <div className="mb-4 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
         <SummaryCard label="Workflows checked" value={validation.workflow_count ?? workflows.length} />
@@ -379,6 +379,7 @@ export function BridgeReconciliationPanel() {
   const [error, setError] = useState<string | null>(null);
   const [operationMessage, setOperationMessage] = useState<string | null>(null);
   const [postingNote, setPostingNote] = useState("");
+  const [activeTableTab, setActiveTableTab] = useState<"ready" | "attention" | "info">("ready");
 
   const load = useCallback(async (nextFilters: AccountingBridgeReconciliationFilters = filters) => {
     setLoading(true);
@@ -418,6 +419,10 @@ export function BridgeReconciliationPanel() {
       else next.add(id);
       return next;
     });
+  }
+
+  function selectAllReady() {
+    setSelected(new Set(concreteRows.map(row => candidateId(row)).filter((id): id is string => Boolean(id))));
   }
 
   async function handlePreview(row: AccountingBridgeReconciliationRow) {
@@ -470,15 +475,30 @@ export function BridgeReconciliationPanel() {
     }
   }
 
-  const BRIDGE_RECON_SUBTITLE = "Post unposted bridge candidates to accounting journals. All posting is explicit — no auto-post or auto-reconcile.";
-  if (loading && !payload) return <div className="space-y-6"><div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">Loading accounting bridge reconciliation…</div></div>;
+  const BRIDGE_RECON_SUBTITLE = "Review and approve transactions before they enter the final accounting books. No automatic posting happens without your approval.";
+  if (loading && !payload) return <div className="space-y-6"><div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">Loading pending tasks…</div></div>;
   if (error && !payload) return <div className="space-y-6"><div className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-900">{error}</div></div>;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <p className="flex-1 text-xs text-muted-foreground">{SAFETY_COPY}</p>
-        <button type="button" onClick={() => load(filters)} className="h-9 rounded-xl border border-border bg-card px-4 text-sm font-semibold hover:bg-muted">Refresh</button>
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center gap-2">
+          <p className="flex-1 text-xs text-muted-foreground">{SAFETY_COPY}</p>
+          <button type="button" onClick={() => load(filters)} className="h-9 rounded-xl border border-border bg-card px-4 text-sm font-semibold hover:bg-muted">Refresh</button>
+        </div>
+        
+        {/* Operator Guide */}
+        <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4 shadow-sm text-sm text-blue-900">
+          <h3 className="font-semibold mb-2 flex items-center gap-2">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            Operator Guide
+          </h3>
+          <ul className="list-disc pl-5 space-y-1 opacity-90">
+            <li><strong>Ready for Approval:</strong> These are tasks that have no errors and are waiting for you to approve them.</li>
+            <li><strong>Needs Attention:</strong> These tasks cannot be posted because they are missing setup information (like bank accounts) or have other blockers.</li>
+            <li><strong>Bulk Approval:</strong> If you have multiple ready tasks, you can select them using checkboxes and approve them all at once!</li>
+          </ul>
+        </div>
       </div>
 
       {payload ? (
@@ -513,20 +533,34 @@ export function BridgeReconciliationPanel() {
           {showOperationalTables ? (
             <>
               <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
-                <h2 className="text-lg font-semibold text-foreground">Selected-row batch panel</h2>
-                <p className="mt-1 text-sm text-muted-foreground">{selectedRows.length} selected concrete source item(s). Only concrete READY_UNPOSTED source rows with posting permission can be batch-posted.</p>
-                <textarea value={postingNote} onChange={(event) => setPostingNote(event.target.value)} placeholder="Optional posting note" className="mt-4 min-h-20 w-full rounded-lg border bg-background px-3 py-2 text-sm" />
-                <div className="mt-4 flex flex-wrap gap-2"><button type="button" disabled={!selectedRows.length} onClick={handleBatchPreview} className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">Preview selected</button><button type="button" disabled={!selectedCanPost} onClick={handleBatchPost} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Post selected</button></div>
+                <h2 className="text-lg font-semibold text-foreground">Bulk Approval Panel</h2>
+                <p className="mt-1 text-sm text-muted-foreground">{selectedRows.length} selected row(s). Only tasks that are ready can be approved together.</p>
+                <textarea value={postingNote} onChange={(event) => setPostingNote(event.target.value)} placeholder="Optional note for these approvals" className="mt-4 min-h-20 w-full rounded-lg border bg-background px-3 py-2 text-sm" />
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button type="button" onClick={selectAllReady} className="rounded-lg border px-4 py-2 text-sm font-semibold hover:bg-muted">Select All Ready</button>
+                  <button type="button" disabled={!selectedRows.length} onClick={handleBatchPreview} className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">Preview Selected</button>
+                  <button type="button" disabled={!selectedCanPost} onClick={handleBatchPost} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Approve Selected</button>
+                </div>
                 {operationMessage ? <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">{operationMessage}</div> : null}
               </section>
-              <RowsTable title="Concrete source candidates" description="Real bridge candidate rows from the backend payload. Preview/post remains explicit and row controlled." rows={concreteRows} selected={selected} onToggle={toggleSelected} onPreview={handlePreview} onPost={handlePost} showSelection />
-              <RowsTable title="Blocked / exception rows" description="Rows that require setup, approval, or reconciliation action before posting can continue." rows={blockedRows} selected={selected} onToggle={toggleSelected} onPreview={handlePreview} onPost={handlePost} />
-              <RowsTable title="Unsupported / deferred boundaries" description="Unsupported and source-contract-only rows remain visible but non-postable." rows={boundaryRows} selected={selected} onToggle={toggleSelected} onPreview={handlePreview} onPost={handlePost} />
+              
+              <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+                <div className="flex border-b border-border bg-muted/20">
+                  <button onClick={() => setActiveTableTab("ready")} className={cx("flex-1 px-4 py-3 text-sm font-semibold border-b-2 transition-colors", activeTableTab === "ready" ? "border-primary text-primary bg-background" : "border-transparent text-muted-foreground hover:bg-muted/50")}>Ready for Approval ({concreteRows.length})</button>
+                  <button onClick={() => setActiveTableTab("attention")} className={cx("flex-1 px-4 py-3 text-sm font-semibold border-b-2 transition-colors", activeTableTab === "attention" ? "border-amber-500 text-amber-700 bg-background" : "border-transparent text-muted-foreground hover:bg-muted/50")}>Needs Attention ({blockedRows.length})</button>
+                  <button onClick={() => setActiveTableTab("info")} className={cx("flex-1 px-4 py-3 text-sm font-semibold border-b-2 transition-colors", activeTableTab === "info" ? "border-blue-500 text-blue-700 bg-background" : "border-transparent text-muted-foreground hover:bg-muted/50")}>Information Only ({boundaryRows.length})</button>
+                </div>
+                <div className="p-1">
+                  {activeTableTab === "ready" && <RowsTable title="Ready for Approval" description="These transactions are ready. You can preview them or approve them to post to the books." rows={concreteRows} selected={selected} onToggle={toggleSelected} onPreview={handlePreview} onPost={handlePost} showSelection />}
+                  {activeTableTab === "attention" && <RowsTable title="Needs Attention / Errors" description="These tasks cannot be approved yet because they require setup changes or have missing data." rows={blockedRows} selected={selected} onToggle={toggleSelected} onPreview={handlePreview} onPost={handlePost} />}
+                  {activeTableTab === "info" && <RowsTable title="Information Only" description="These items are shown for your records but do not require posting approval here." rows={boundaryRows} selected={selected} onToggle={toggleSelected} onPreview={handlePreview} onPost={handlePost} />}
+                </div>
+              </div>
             </>
           ) : (
             <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
-              <h2 className="text-lg font-semibold text-foreground">Operational bridge queue</h2>
-              <p className="mt-1 text-sm text-muted-foreground">No concrete candidates, blocked rows, exceptions, unsupported rows, or deferred source rows are present in the backend payload.</p>
+              <h2 className="text-lg font-semibold text-foreground">Operational Posting Queue</h2>
+              <p className="mt-1 text-sm text-muted-foreground">No tasks, blocked rows, exceptions, or deferred entries are present.</p>
             </section>
           )}
         </>

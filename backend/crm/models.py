@@ -355,6 +355,9 @@ class Lead(CrmTimeStampedModel):
         related_name="crm_assigned_leads",
     )
     next_follow_up_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    # When the lead last entered its current stage. Used for accurate stage-age
+    # and stalled-lead SLA reporting. Auto-stamped on create and on stage change.
+    stage_changed_at = models.DateTimeField(null=True, blank=True, db_index=True)
     converted_customer = models.ForeignKey(
         "subscriptions.Customer",
         on_delete=models.SET_NULL,
@@ -379,6 +382,8 @@ class Lead(CrmTimeStampedModel):
         raw_source = (self.source or "").strip().upper()
         self.source = raw_source if raw_source in LeadSource.values else LeadSource.OTHER
         self.notes = (self.notes or "").strip()
+        if self.stage_changed_at is None:
+            self.stage_changed_at = timezone.now()
         self.full_clean()
         super().save(*args, **kwargs)
 

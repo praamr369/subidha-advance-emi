@@ -357,6 +357,126 @@ def build_party_detail_payload(party: PartyMaster) -> dict[str, Any]:
     )
     next_follow_up_at = open_follow_ups[0].next_follow_up_at if open_follow_ups else None
 
+    # ------------------------------------------------------------------
+    # Operational rollups: financial position + urgency alerts, derived
+    # purely from the lists already fetched above (no extra queries). These
+    # let an operator see at a glance what needs action on this party.
+    # ------------------------------------------------------------------
+    from decimal import Decimal
+
+    def _dec(value) -> Decimal:
+        try:
+            return Decimal(str(value or 0))
+        except Exception:  # noqa: BLE001 - defensive against bad data
+            return Decimal("0")
+
+    # Cancelled / void / draft documents are not real receivables.
+    _void_invoice = {"CANCELLED", "VOID", "DRAFT", "REVERSED"}
+    _void_sale = {"CANCELLED", "VOID", "DRAFT"}
+    billable_invoices = [inv for inv in invoices if inv.status not in _void_invoice]
+    total_invoiced = sum((_dec(inv.grand_total) for inv in billable_invoices), Decimal("0"))
+    total_received = sum((_dec(rcpt.amount) for rcpt in receipts), Decimal("0"))
+    outstanding = total_invoiced - total_received
+    if outstanding < 0:
+        outstanding = Decimal("0")
+    total_direct_sales = sum(
+        (_dec(sale.grand_total) for sale in direct_sales if sale.status not in _void_sale),
+        Decimal("0"),
+    )
+
+    today = timezone.now().date()
+    _delivery_done = {"DELIVERED", "CANCELLED", "RETURNED"}
+    _delivery_urgent = {"FAILED", "BLOCKED_STOCK_UNAVAILABLE", "RETURN_REQUESTED"}
+    _service_done = {"RESOLVED", "CLOSED", "REJECTED"}
+    _support_done = {"RESOLVED", "CLOSED", "CANCELLED"}
+
+    pending_deliveries = [d for d in deliveries if d.status not in _delivery_done]
+    urgent_deliveries = [d for d in deliveries if d.status in _delivery_urgent]
+    open_service_cases = [c for c in service_cases if c.status not in _service_done]
+    open_support = [s for s in support_requests if getattr(s, "status", "") not in _support_done]
+    due_reminders = [
+        r for r in reminders
+        if r.status == "PENDING" and r.due_date and r.due_date <= today
+    ]
+    pending_kyc_customers = [c for c in customers if getattr(c, "kyc_status", "") == "PENDING"]
+
+    alerts: list[dict[str, Any]] = []
+    if outstanding > 0:
+        alerts.append({
+            "level": "high",
+            "module": "BILLING",
+            "label": "Outstanding balance",
+            "detail": f"₹{outstanding} unpaid across {len(billable_invoices)} invoice(s)",
+            "count": None,
+            "amount": str(outstanding),
+        })
+    if urgent_deliveries:
+        alerts.append({
+            "level": "high",
+            "module": "DELIVERY",
+            "label": "Deliveries need attention",
+            "detail": f"{len(urgent_deliveries)} failed/blocked, {len(pending_deliveries)} pending in total",
+            "count": len(urgent_deliveries),
+            "amount": None,
+        })
+    elif pending_deliveries:
+        alerts.append({
+            "level": "medium",
+            "module": "DELIVERY",
+            "label": "Deliveries pending",
+            "detail": f"{len(pending_deliveries)} awaiting dispatch/handover",
+            "count": len(pending_deliveries),
+            "amount": None,
+        })
+    if pending_kyc_customers:
+        alerts.append({
+            "level": "high",
+            "module": "KYC",
+            "label": "KYC pending",
+            "detail": f"{len(pending_kyc_customers)} linked customer(s) awaiting verification",
+            "count": len(pending_kyc_customers),
+            "amount": None,
+        })
+    if open_service_cases:
+        alerts.append({
+            "level": "medium",
+            "module": "SERVICE",
+            "label": "Open service cases",
+            "detail": f"{len(open_service_cases)} unresolved",
+            "count": len(open_service_cases),
+            "amount": None,
+        })
+    if open_support:
+        alerts.append({
+            "level": "medium",
+            "module": "SUPPORT",
+            "label": "Open support requests",
+            "detail": f"{len(open_support)} awaiting response",
+            "count": len(open_support),
+            "amount": None,
+        })
+    if due_reminders:
+        alerts.append({
+            "level": "medium",
+            "module": "REMINDER",
+            "label": "Reminders due",
+            "detail": f"{len(due_reminders)} due on/before today",
+            "count": len(due_reminders),
+            "amount": None,
+        })
+    if len(open_follow_ups) > 0:
+        alerts.append({
+            "level": "info",
+            "module": "CRM",
+            "label": "Open follow-ups",
+            "detail": f"{len(open_follow_ups)} scheduled",
+            "count": len(open_follow_ups),
+            "amount": None,
+        })
+
+    _alert_rank = {"high": 0, "medium": 1, "info": 2}
+    alerts.sort(key=lambda a: _alert_rank.get(a["level"], 3))
+
     return {
         "party": {
             "id": party.id,
@@ -385,6 +505,7 @@ def build_party_detail_payload(party: PartyMaster) -> dict[str, Any]:
         ],
         "summary": {
             "lead_count": len(leads),
+            "open_lead_count": len([l for l in leads if getattr(l, "status", "") in ("NEW", "IN_PROGRESS", "CONTACTED")]),
             "customer_count": len(customers),
             "partner_count": len(partners),
             "vendor_count": len(vendors),
@@ -403,7 +524,20 @@ def build_party_detail_payload(party: PartyMaster) -> dict[str, Any]:
             "reminder_count": len(reminders),
             "interaction_count": len(interactions),
             "open_follow_up_count": len([item for item in interactions if item.status == "OPEN"]),
+            "pending_delivery_count": len(pending_deliveries),
+            "urgent_delivery_count": len(urgent_deliveries),
+            "open_service_case_count": len(open_service_cases),
+            "open_support_count": len(open_support),
+            "due_reminder_count": len(due_reminders),
+            "pending_kyc_count": len(pending_kyc_customers),
         },
+        "financials": {
+            "total_invoiced": str(total_invoiced),
+            "total_received": str(total_received),
+            "outstanding": str(outstanding),
+            "total_direct_sales": str(total_direct_sales),
+        },
+        "alerts": alerts,
         "related": {
             "leads": [
                 {

@@ -138,6 +138,16 @@ class SubscriptionRequestStatus(models.TextChoices):
     APPROVED = "APPROVED", "Approved"
     REJECTED = "REJECTED", "Rejected"
     CANCELLED = "CANCELLED", "Cancelled"
+    # Funnel "can't approve yet" hold states — request stays actionable.
+    ON_HOLD_LUCKY_UNAVAILABLE = (
+        "ON_HOLD_LUCKY_UNAVAILABLE",
+        "On Hold – Lucky ID Unavailable",
+    )
+    ON_HOLD_PRODUCT_NOT_READY = (
+        "ON_HOLD_PRODUCT_NOT_READY",
+        "On Hold – Product Not Ready",
+    )
+    AMENDMENT_REQUESTED = "AMENDMENT_REQUESTED", "Amendment Requested"
 
 
 class ProductRequestType(models.TextChoices):
@@ -734,11 +744,12 @@ class Product(TimeStampedModel):
         if self.subcategory_master_id and self.category_master_id:
             if self.subcategory_master.category_id != self.category_master_id:
                 errors["subcategory_master"] = "Subcategory must belong to the selected category."
-        from catalog.services.product_spec_validation_service import validate_product_base_specs
-        try:
-            validate_product_base_specs(category=self.catalog_category, values=self.base_specs)
-        except ValidationError as exc:
-            errors.update(exc.message_dict)
+        # Legacy catalog spec validation retired: the catalog.CatalogCategory spec
+        # system is unused, and structured product attributes now live in
+        # products_pim (the linked PIM record + attribute editor). base_specs is a
+        # free-form JSON field; it just needs to be a dict.
+        if not isinstance(self.base_specs, dict):
+            errors["base_specs"] = "Base specifications must be a JSON object."
         if self.plan_type_default not in PlanType.values:
             errors["plan_type_default"] = "Unsupported default plan type."
         # Products with no modes are allowed when:
@@ -1104,7 +1115,7 @@ class SubscriptionRequest(TimeStampedModel):
     )
 
     status = models.CharField(
-        max_length=20,
+        max_length=32,
         choices=SubscriptionRequestStatus.choices,
         default=SubscriptionRequestStatus.SUBMITTED,
         db_index=True,
@@ -4210,6 +4221,14 @@ class AuditLog(models.Model):
         SUBSCRIPTION_REQUEST_CANCELLED = (
             "SUBSCRIPTION_REQUEST_CANCELLED",
             "Subscription Request Cancelled",
+        )
+        SUBSCRIPTION_REQUEST_HELD = (
+            "SUBSCRIPTION_REQUEST_HELD",
+            "Subscription Request Put On Hold",
+        )
+        SUBSCRIPTION_REQUEST_AMENDMENT_REQUESTED = (
+            "SUBSCRIPTION_REQUEST_AMENDMENT_REQUESTED",
+            "Subscription Request Amendment Requested",
         )
         PRODUCT_REQUEST_APPROVED = (
             "PRODUCT_REQUEST_APPROVED",

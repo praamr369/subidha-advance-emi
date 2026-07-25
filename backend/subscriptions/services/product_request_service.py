@@ -331,8 +331,8 @@ def reject_product_request_for_admin(
 @transaction.atomic
 def cancel_product_request(*, request_id: int, user: User) -> ProductRequest:
     req = ProductRequest.objects.select_for_update().get(id=request_id)
-    if req.status != ProductRequestStatus.SUBMITTED:
-        raise ValidationError({"detail": "Only submitted requests can be cancelled."})
+    if req.status not in [ProductRequestStatus.SUBMITTED, ProductRequestStatus.APPROVED]:
+        raise ValidationError({"detail": "Only submitted or approved requests can be cancelled."})
     
     if req.requester_id != user.id:
         raise ValidationError({"detail": "You do not have permission to cancel this request."})
@@ -346,8 +346,8 @@ def cancel_product_request(*, request_id: int, user: User) -> ProductRequest:
 def cancel_product_request_for_admin(*, request_id: int, admin: User, review_note: str = "") -> ProductRequest:
     """Admin can cancel any SUBMITTED request."""
     req = ProductRequest.objects.select_for_update().get(id=request_id)
-    if req.status != ProductRequestStatus.SUBMITTED:
-        raise ValidationError({"detail": "Only submitted requests can be cancelled."})
+    if req.status not in [ProductRequestStatus.SUBMITTED, ProductRequestStatus.APPROVED]:
+        raise ValidationError({"detail": "Only submitted or approved requests can be cancelled."})
 
     req.status = ProductRequestStatus.CANCELLED
     req.reviewed_by = admin

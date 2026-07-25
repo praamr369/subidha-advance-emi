@@ -63,7 +63,7 @@ export const VALID_TRANSITIONS: Record<LeadStage, LeadStage[]> = {
   INTERESTED: ["KYC_PENDING", "LOST"],
   KYC_PENDING: ["READY_TO_CONVERT", "LOST"],
   READY_TO_CONVERT: ["CONVERTED", "LOST"],
-  CONVERTED: [],
+  CONVERTED: ["LOST"],
   LOST: ["NEW"],
 };
 
@@ -85,6 +85,12 @@ export type InternalLeadRow = {
   next_follow_up_at?: string | null;
   converted_customer?: number | null;
   converted_customer_name?: string | null;
+  registered_customer?: {
+    id: number;
+    name: string;
+    kyc_status: string;
+    matched_by: "converted" | "phone";
+  } | null;
   public_lead_id?: number | null;
   created_at: string;
   updated_at?: string | null;
@@ -94,6 +100,7 @@ export type FollowUpTask = {
   id: number;
   lead: number;
   lead_name?: string | null;
+  lead_phone?: string | null;
   customer?: number | null;
   assigned_to?: number | null;
   assigned_to_username?: string | null;
@@ -139,12 +146,45 @@ export type StaffUser = {
   role: string;
 };
 
+export type LeadQualification = {
+  score: number;
+  band: "hot" | "warm" | "cold";
+  age_days: number | null;
+  days_in_stage: number | null;
+  sla: {
+    next_follow_up_at: string | null;
+    is_overdue: boolean;
+    hours_until: number | null;
+    state: "overdue" | "due_soon" | "scheduled" | "none";
+  };
+  converted_customer: {
+    id: number;
+    name: string;
+    phone: string;
+    kyc_status: string;
+  } | null;
+  conversion_orphaned?: boolean;
+  duplicate_customer: {
+    id: number;
+    name: string;
+    phone: string;
+    kyc_status: string;
+    is_converted_target: boolean;
+  } | null;
+  readiness: {
+    items: Array<{ key: string; label: string; done: boolean }>;
+    ready: boolean;
+  };
+  engagement: { task_count: number; opportunity_count: number };
+};
+
 export type InternalLeadDetail = {
   lead: InternalLeadRow;
   follow_up_tasks: FollowUpTask[];
   opportunities: Opportunity[];
   overdue_task_count: number;
   open_task_count: number;
+  qualification?: LeadQualification;
 };
 
 export type PaginationMeta = {
@@ -234,6 +274,31 @@ export function getInternalLeadDetail(id: number | string) {
   return apiFetch<InternalLeadDetail>(`/admin/crm/internal/leads/${id}/`);
 }
 
+export type LeadReconcileReport = {
+  lead_id: number;
+  changed: boolean;
+  action: "already_consistent" | "stage_advanced" | "linked_and_converted" | "no_customer_match";
+  customer_id?: number;
+  customer_name?: string;
+  stage?: string;
+};
+
+/** Manual reconcile of one lead — links an existing customer / advances stage. */
+export function reconcileLead(id: number | string) {
+  return apiFetch<{ report: LeadReconcileReport; lead: InternalLeadRow }>(
+    `/admin/crm/internal/leads/${id}/reconcile/`,
+    { method: "POST" }
+  );
+}
+
+/** Automatic reconcile — sweep every drifted lead. */
+export function reconcileAllLeads() {
+  return apiFetch<{ scanned: number; reconciled: number; results: LeadReconcileReport[] }>(
+    `/admin/crm/internal/leads/reconcile-all/`,
+    { method: "POST" }
+  );
+}
+
 export function updateInternalLead(
   id: number | string,
   payload: {
@@ -254,10 +319,17 @@ export function updateInternalLead(
   });
 }
 
-export function moveLeadStage(id: number | string, stage: LeadStage) {
+export function moveLeadStage(
+  id: number | string,
+  stage: LeadStage,
+  options: { note?: string; next_follow_up_at?: string | null } = {}
+) {
+  const body: Record<string, unknown> = { stage };
+  if (options.note && options.note.trim()) body.note = options.note.trim();
+  if (options.next_follow_up_at) body.next_follow_up_at = options.next_follow_up_at;
   return apiFetch<InternalLeadRow>(`/admin/crm/internal/leads/${id}/stage/`, {
     method: "POST",
-    body: JSON.stringify({ stage }),
+    body: JSON.stringify(body),
   });
 }
 
@@ -296,6 +368,15 @@ export function getInternalCrmFollowUps(params: {
   );
 }
 
+export function getInternalCrmFollowUpsDue(params: {
+  page?: number;
+  page_size?: number;
+} = {}) {
+  return apiFetch<PaginationMeta & { overdue_count: number; results: FollowUpTask[] }>(
+    `/admin/crm/follow-ups/due/${buildQuery(params)}`
+  );
+}
+
 export function getLeadTasks(leadId: number | string) {
   return apiFetch<{ count: number; overdue_count: number; results: FollowUpTask[] }>(
     `/admin/crm/internal/leads/${leadId}/tasks/`
@@ -328,6 +409,13 @@ export function cancelFollowUpTask(id: number | string) {
   return apiFetch<FollowUpTask>(`/admin/crm/internal/follow-ups/${id}/cancel/`, {
     method: "POST",
     body: JSON.stringify({}),
+  });
+}
+
+export function snoozeFollowUpTask(id: number | string, days: number) {
+  return apiFetch<FollowUpTask>(`/admin/crm/internal/follow-ups/${id}/snooze/`, {
+    method: "POST",
+    body: JSON.stringify({ days }),
   });
 }
 

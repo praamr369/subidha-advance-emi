@@ -9,7 +9,6 @@ import {
   ChevronRight,
   Info,
   KeyRound,
-  Shield,
   User,
   XCircle,
 } from "lucide-react";
@@ -18,6 +17,13 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import KycDocumentPanel from "@/components/kyc/KycDocumentPanel";
 import ERPPageShell from "@/components/erp/ERPPageShell";
+import { Party360Embed, UniversalQuickWidgetsEmbed } from "@/components/profile/Profile360";
+import { ProfilePayablesPanel } from "@/components/profile/ProfilePayablesPanel";
+import { WorkbenchFilterChips } from "@/components/workbench/WorkbenchFilterChips";
+import {
+  DetailItem as DetailValue,
+  WorkspaceSection as SectionCard,
+} from "@/components/ui/workspace";
 import { apiFetch } from "@/lib/api";
 
 type PartnerDetail = {
@@ -31,7 +37,15 @@ type PartnerDetail = {
   total_commission: string | number;
 };
 
-type Tab = "overview" | "account" | "kyc";
+type Segment = "overview" | "operations" | "payouts" | "account" | "kyc";
+
+const SEGMENTS: { key: Segment; label: string }[] = [
+  { key: "overview", label: "Overview & Actions" },
+  { key: "operations", label: "Operations 360" },
+  { key: "payouts", label: "Commissions & Payouts" },
+  { key: "account", label: "Account Actions" },
+  { key: "kyc", label: "KYC Documents" },
+];
 
 function toNum(v: unknown, fallback = 0): number {
   const n = Number(v);
@@ -45,42 +59,6 @@ function toErrorMessage(error: unknown): string {
 
 function formatRupee(v: string | number | undefined): string {
   return `₹${toNum(v).toFixed(2)}`;
-}
-
-function StatCard({
-  label,
-  value,
-}: {
-  label: string;
-  value: string | number;
-}) {
-  return (
-    <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        {label}
-      </div>
-      <div className="mt-2 text-xl font-semibold text-card-foreground">
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function InfoRow({
-  label,
-  value,
-}: {
-  label: string;
-  value: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        {label}
-      </span>
-      <span className="text-sm text-foreground">{value || "—"}</span>
-    </div>
-  );
 }
 
 function Notice({
@@ -98,11 +76,7 @@ function Notice({
     info: "border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300",
   };
   const Icon =
-    tone === "success"
-      ? CheckCircle2
-      : tone === "error"
-        ? AlertCircle
-        : Info;
+    tone === "success" ? CheckCircle2 : tone === "error" ? AlertCircle : Info;
 
   return (
     <div
@@ -121,7 +95,7 @@ export default function AdminPartnerDetailPage() {
   const [partner, setPartner] = useState<PartnerDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>("overview");
+  const [segment, setSegment] = useState<Segment>("overview");
 
   // username change
   const [newUsername, setNewUsername] = useState("");
@@ -179,20 +153,6 @@ export default function AdminPartnerDetailPage() {
     }
   }, [loadPage, newUsername, partner?.id, usernameReason]);
 
-  const TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
-    { key: "overview", label: "Overview", icon: <User className="size-4" /> },
-    {
-      key: "account",
-      label: "Account Actions",
-      icon: <Shield className="size-4" />,
-    },
-    {
-      key: "kyc",
-      label: "KYC Documents",
-      icon: <KeyRound className="size-4" />,
-    },
-  ];
-
   return (
     <ERPPageShell
       eyebrow="Partners"
@@ -204,6 +164,11 @@ export default function AdminPartnerDetailPage() {
         { label: partner ? partner.username : `#${partnerId}` },
       ]}
       actions={[
+        {
+          href: `/admin/requests/subscriptions?requester_role=PARTNER&q=${partner?.username}`,
+          label: "View Subscription Requests",
+          variant: "primary",
+        },
         { href: "/admin/partners", label: "All Partners", variant: "secondary" },
         {
           href: `/admin/subscriptions?partner=${partnerId}`,
@@ -220,11 +185,7 @@ export default function AdminPartnerDetailPage() {
         { label: "Partner ID", value: partner?.id ?? "—" },
         {
           label: "Status",
-          value: partner
-            ? partner.is_active
-              ? "Active"
-              : "Inactive"
-            : "—",
+          value: partner ? (partner.is_active ? "Active" : "Inactive") : "—",
         },
         { label: "Referred", value: partner?.referred_customers ?? "—" },
         { label: "Active Subs", value: partner?.active_subscriptions ?? "—" },
@@ -246,134 +207,127 @@ export default function AdminPartnerDetailPage() {
 
       {!loading && partner ? (
         <div className="space-y-6">
-          {/* Tab bar */}
-          <div className="flex gap-1 rounded-xl border border-border bg-muted/30 p-1">
-            {TABS.map(({ key, label, icon }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setTab(key)}
-                className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition ${
-                  tab === key
-                    ? "bg-background shadow-sm text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {icon}
-                {label}
-              </button>
-            ))}
+          {/* Segmented workbench navigation */}
+          <div className="sticky top-0 z-10 -mx-2 bg-background/95 px-2 py-3 backdrop-blur sm:-mx-6 sm:px-6">
+            <WorkbenchFilterChips
+              active={segment}
+              onSelect={(key) => setSegment(key as Segment)}
+              chips={SEGMENTS}
+            />
           </div>
 
-          {/* Overview */}
-          {tab === "overview" ? (
-            <div className="space-y-5">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <StatCard
-                  label="Referred Customers"
-                  value={partner.referred_customers}
-                />
-                <StatCard
-                  label="Active Subscriptions"
-                  value={partner.active_subscriptions}
-                />
-                <StatCard
-                  label="Total Commission"
-                  value={formatRupee(partner.total_commission)}
-                />
-              </div>
+          {/* Overview & Actions */}
+          {segment === "overview" && (
+            <div className="space-y-6">
+              <UniversalQuickWidgetsEmbed role="PARTNER" sourceId={partner.id} />
 
-              <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-                <h3 className="mb-4 text-sm font-semibold text-card-foreground">
-                  Partner Information
-                </h3>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <InfoRow label="Partner ID" value={`#${partner.id}`} />
-                  <InfoRow label="Username" value={partner.username} />
-                  <InfoRow label="Email" value={partner.email} />
-                  <InfoRow label="Phone" value={partner.phone} />
-                  <InfoRow
-                    label="Account Status"
-                    value={
-                      partner.is_active ? (
-                        <span className="inline-flex items-center gap-1 text-emerald-600">
-                          <CheckCircle2 className="size-3.5" /> Active
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-red-500">
-                          <XCircle className="size-3.5" /> Inactive
-                        </span>
-                      )
-                    }
-                  />
-                </div>
-              </div>
+              <div className="grid gap-6 xl:grid-cols-2">
+                <SectionCard
+                  title="Partner Information"
+                  description="Primary partner facts used for admin operations."
+                >
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <DetailValue label="Partner ID" value={`#${partner.id}`} />
+                    <DetailValue label="Username" value={partner.username} />
+                    <DetailValue label="Email" value={partner.email || "—"} />
+                    <DetailValue label="Phone" value={partner.phone || "—"} />
+                    <DetailValue
+                      label="Account Status"
+                      value={
+                        partner.is_active ? (
+                          <span className="inline-flex items-center gap-1 text-emerald-600">
+                            <CheckCircle2 className="size-3.5" /> Active
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-red-500">
+                            <XCircle className="size-3.5" /> Inactive
+                          </span>
+                        )
+                      }
+                    />
+                    <DetailValue
+                      label="Total Commission"
+                      value={formatRupee(partner.total_commission)}
+                    />
+                  </div>
+                </SectionCard>
 
-              <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-                <h3 className="mb-4 text-sm font-semibold text-card-foreground">
-                  Quick Navigation
-                </h3>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {[
-                    {
-                      label: "Subscriptions",
-                      desc: "View all subscriptions linked to this partner",
-                      href: `/admin/subscriptions?partner=${partner.id}`,
-                    },
-                    {
-                      label: "Commission History",
-                      desc: "Commission ledger and payout records",
-                      href: `/admin/finance/commissions?partner=${partner.id}`,
-                    },
-                    {
-                      label: "Collection Requests",
-                      desc: "Partner-submitted field collection reports",
-                      href: `/admin/partners/collection-requests?partner=${partner.id}`,
-                    },
-                    {
-                      label: "All Partners",
-                      desc: "Back to the full partner register",
-                      href: "/admin/partners",
-                    },
-                  ].map(({ label, desc, href }) => (
-                    <Link
-                      key={href}
-                      href={href}
-                      className="flex items-center justify-between rounded-xl border border-border bg-background p-4 transition hover:bg-muted"
-                    >
-                      <div>
-                        <div className="text-sm font-medium text-foreground">
-                          {label}
+                <SectionCard
+                  title="Quick Navigation"
+                  description="Jump to the partner's linked operational registers."
+                >
+                  <div className="grid grid-cols-1 gap-2">
+                    {[
+                      {
+                        label: "Subscription Requests",
+                        desc: "View Advance EMI requests submitted by this partner",
+                        href: `/admin/requests/subscriptions?requester_role=PARTNER&q=${partner.username}`,
+                      },
+                      {
+                        label: "Subscriptions",
+                        desc: "View all subscriptions linked to this partner",
+                        href: `/admin/subscriptions?partner=${partner.id}`,
+                      },
+                      {
+                        label: "Commission History",
+                        desc: "Commission ledger and payout records",
+                        href: `/admin/finance/commissions?partner=${partner.id}`,
+                      },
+                      {
+                        label: "Collection Requests",
+                        desc: "Partner-submitted field collection reports",
+                        href: `/admin/partners/collection-requests?partner=${partner.id}`,
+                      },
+                      {
+                        label: "All Partners",
+                        desc: "Back to the full partner register",
+                        href: "/admin/partners",
+                      },
+                    ].map(({ label, desc, href }) => (
+                      <Link
+                        key={href}
+                        href={href}
+                        className="flex items-center justify-between rounded-xl border border-border bg-background p-4 transition hover:bg-muted"
+                      >
+                        <div>
+                          <div className="text-sm font-medium text-foreground">
+                            {label}
+                          </div>
+                          <div className="mt-0.5 text-xs text-muted-foreground">
+                            {desc}
+                          </div>
                         </div>
-                        <div className="mt-0.5 text-xs text-muted-foreground">
-                          {desc}
-                        </div>
-                      </div>
-                      <ChevronRight className="size-4 text-muted-foreground" />
-                    </Link>
-                  ))}
-                </div>
+                        <ChevronRight className="size-4 text-muted-foreground" />
+                      </Link>
+                    ))}
+                  </div>
+                </SectionCard>
               </div>
             </div>
-          ) : null}
+          )}
+
+          {/* Operations 360 — full cross-module alerts, financials & tables */}
+          {segment === "operations" && (
+            <Party360Embed role="PARTNER" sourceId={partner.id} />
+          )}
+
+          {/* Commissions & Payouts — party-scoped payables queue with journal posting */}
+          {segment === "payouts" && (
+            <ProfilePayablesPanel
+              partyType="PARTNER"
+              partyId={partner.id}
+              title="Commissions & Payouts"
+              description="Pending commission payouts for this partner. Paying posts a real Commission Payable → Finance Account journal."
+            />
+          )}
 
           {/* Account Actions */}
-          {tab === "account" ? (
-            <div className="space-y-5">
-              {/* Change Username */}
-              <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-                <div className="mb-1 flex items-center gap-2">
-                  <User className="size-4 text-muted-foreground" />
-                  <h3 className="text-sm font-semibold text-card-foreground">
-                    Change Username
-                  </h3>
-                </div>
-                <p className="mb-4 text-xs text-muted-foreground">
-                  Changes the partner&apos;s login username only. Customer IDs,
-                  subscription history, and financial records are unaffected.
-                  The partner will need to sign in again after this change.
-                </p>
-
+          {segment === "account" && (
+            <div className="space-y-6">
+              <SectionCard
+                title="Change Username"
+                description="Changes the partner's login username only. Customer IDs, subscription history, and financial records are unaffected. The partner will need to sign in again after this change."
+              >
                 <div className="mb-3 rounded-xl border border-border bg-muted/40 px-4 py-3">
                   <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     Current Username
@@ -385,9 +339,7 @@ export default function AdminPartnerDetailPage() {
 
                 {usernameNotice ? (
                   <div className="mb-4">
-                    <Notice tone={usernameNotice.tone}>
-                      {usernameNotice.msg}
-                    </Notice>
+                    <Notice tone={usernameNotice.tone}>{usernameNotice.msg}</Notice>
                   </div>
                 ) : null}
 
@@ -438,22 +390,12 @@ export default function AdminPartnerDetailPage() {
                     {usernameSaving ? "Saving…" : "Change Username"}
                   </button>
                 </div>
-              </div>
+              </SectionCard>
 
-              {/* Password Reset */}
-              <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-                <div className="mb-1 flex items-center gap-2">
-                  <KeyRound className="size-4 text-muted-foreground" />
-                  <h3 className="text-sm font-semibold text-card-foreground">
-                    Password Reset
-                  </h3>
-                </div>
-                <p className="mb-4 text-xs text-muted-foreground">
-                  Partners reset their own password using the Forgot Password
-                  flow on the login page. Admin-side forced password reset is
-                  available through the Django Admin panel for emergency access.
-                </p>
-
+              <SectionCard
+                title="Password Reset"
+                description="Partners reset their own password using the Forgot Password flow on the login page. Admin-side forced password reset is available through the Django Admin panel for emergency access."
+              >
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <a
                     href="/login"
@@ -466,7 +408,7 @@ export default function AdminPartnerDetailPage() {
                         Partner Login Page
                       </div>
                       <div className="mt-0.5 text-xs text-muted-foreground">
-                        Share this link — has "Forgot password" built in
+                        Share this link — has &quot;Forgot password&quot; built in
                       </div>
                     </div>
                     <ChevronRight className="size-4 text-muted-foreground" />
@@ -492,27 +434,18 @@ export default function AdminPartnerDetailPage() {
 
                 <div className="mt-4">
                   <Notice tone="info">
-                    For security, admin-forced password resets are not exposed
-                    in this interface. If the partner is locked out, use the
-                    Django Admin link above or ask them to use Forgot Password
-                    on the login page.
+                    For security, admin-forced password resets are not exposed in
+                    this interface. If the partner is locked out, use the Django
+                    Admin link above or ask them to use Forgot Password on the
+                    login page.
                   </Notice>
                 </div>
-              </div>
+              </SectionCard>
 
-              {/* Danger zone — deactivate */}
-              <div className="rounded-xl border border-red-200 bg-card p-5 shadow-sm dark:border-red-900">
-                <div className="mb-1 flex items-center gap-2">
-                  <XCircle className="size-4 text-red-500" />
-                  <h3 className="text-sm font-semibold text-card-foreground">
-                    Account Status
-                  </h3>
-                </div>
-                <p className="mb-3 text-xs text-muted-foreground">
-                  Deactivating a partner prevents login and hides them from
-                  active partner lists. Their historical records and
-                  subscriptions are preserved. Manage via Django Admin.
-                </p>
+              <SectionCard
+                title="Account Status"
+                description="Deactivating a partner prevents login and hides them from active partner lists. Their historical records and subscriptions are preserved. Manage via Django Admin."
+              >
                 <div className="flex items-center gap-3">
                   <span
                     className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${
@@ -537,14 +470,14 @@ export default function AdminPartnerDetailPage() {
                     Edit in Django Admin →
                   </a>
                 </div>
-              </div>
+              </SectionCard>
             </div>
-          ) : null}
+          )}
 
           {/* KYC Documents */}
-          {tab === "kyc" ? (
+          {segment === "kyc" && (
             <KycDocumentPanel mode="admin" owner="partner" ownerId={partner.id} />
-          ) : null}
+          )}
         </div>
       ) : null}
     </ERPPageShell>

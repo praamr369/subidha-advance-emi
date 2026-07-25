@@ -443,6 +443,11 @@ export default function AdminAccountingPage() {
   const currentOpenPeriod = data?.bridgeReadiness?.accounting_period_readiness?.current_period?.code ?? data?.accountingReadiness?.accounting_period_readiness?.current_period?.code;
   const periodCloseStatus = data?.bridgeReadiness?.accounting_period_readiness?.current_period?.status ?? (data?.accountingReadiness?.accounting_period_readiness?.posting_controls_ready === false ? "Blocked" : data?.accountingReadiness?.accounting_period_readiness?.current_period?.status);
 
+  const [activeTab, setActiveTab] = useState<"readiness" | "books" | "tax" | "reconciliation" | "close">("readiness");
+
+  const accountingLaneLinkClass =
+    "inline-flex items-center gap-2 rounded-xl border border-border bg-background px-4 py-3 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted hover:border-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
+
   return (
     <ERPPageShell
       eyebrow="Accounting & Finance"
@@ -454,103 +459,250 @@ export default function AdminAccountingPage() {
       statusBadge={{ label: data?.accountingReadiness?.status === "READY" ? "Bridge ready" : setupBlocked ? "Setup blocked" : "Read-only cockpit", tone: data?.accountingReadiness?.status === "READY" ? "success" : setupBlocked ? "warning" : "info" }}
     >
       <div className="space-y-6">
+        {/* Tab switcher */}
+        <div className="flex flex-wrap gap-1 p-1 rounded-xl bg-muted/60 w-fit">
+          <button
+            type="button"
+            onClick={() => setActiveTab("readiness")}
+            className={`px-4 py-2.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${activeTab === "readiness" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            <ShieldCheck className="h-4 w-4" /> Module Readiness
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("books")}
+            className={`px-4 py-2.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${activeTab === "books" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            <ScrollText className="h-4 w-4" /> Books & Journals
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("tax")}
+            className={`px-4 py-2.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${activeTab === "tax" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            <ReceiptText className="h-4 w-4" /> Tax & Compliance
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("reconciliation")}
+            className={`px-4 py-2.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${activeTab === "reconciliation" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            <Repeat2 className="h-4 w-4" /> Reconciliation
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("close")}
+            className={`px-4 py-2.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${activeTab === "close" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            <FileBarChart className="h-4 w-4" /> Close & Reports
+          </button>
+        </div>
+
         {loading ? <ERPLoadingState label="Loading accounting and finance cockpit..." /> : null}
         {!loading && error ? <ERPErrorState title="Unable to load accounting cockpit" description={error} onRetry={() => void loadPage("initial")} /> : null}
-        {!loading && !error && data ? (
-          <>
-            <ERPSectionShell
-              title="Accounting Control Center"
-              description="Active blockers, primary actions, and daily finance workflows."
-              actions={
-                <button type="button" onClick={() => void loadPage("refresh")} disabled={refreshing}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60">
-                  <RefreshCw className={cn("h-3.5 w-3.5", refreshing ? "animate-spin" : "")} aria-hidden />
-                  {refreshing ? "Refreshing…" : "Refresh"}
-                </button>
-              }
-            >
-              <div className="grid gap-3 lg:grid-cols-[3fr_2fr]">
-                {/* Left: live counters + quick links */}
-                <div className="rounded-xl border border-border bg-card p-4">
-                  <p className="mb-2.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Live counters</p>
-                  <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 xl:grid-cols-5">
-                    {([
-                      { label: "Readiness", value: displayMetric(bridgeStatusValue), tone: "status" },
-                      { label: "Chart accounts", value: displayMetric(data.chartAccountsCount), tone: "neutral" },
-                      { label: "Finance accounts", value: displayMetric(data.financeAccountsCount), tone: "neutral" },
-                      { label: "Mapping blockers", value: displayMetric(mappingBlockerCount), tone: "count-bad" },
-                      { label: "Collection-ready", value: displayMetric(collectionReadyAccountsCount), tone: "count-good" },
-                      { label: "Open period", value: displayMetric(currentOpenPeriod), tone: "neutral" },
-                      { label: "Period status", value: displayMetric(periodCloseStatus), tone: "status" },
-                      { label: "Recon exceptions", value: displayMetric(reconciliationExceptionCount), tone: "count-bad" },
-                      { label: "Ready unposted", value: displayMetric(readyUnpostedCount), tone: "count-bad" },
-                      { label: "Bridge blockers", value: displayMetric(bridgeBlockerCount), tone: "count-bad" },
-                    ] as { label: string; value: string; tone: MetricTone }[]).map(({ label, value, tone }) => (
-                      <div key={label} className={cn("rounded-lg border px-2.5 py-2", metricToneCls(value, tone))}>
-                        <div className="text-[10px] font-semibold uppercase tracking-wide opacity-60">{label}</div>
-                        <div className="mt-0.5 text-sm font-bold">{value}</div>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="mb-2 mt-4 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Quick navigation</p>
-                  <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 xl:grid-cols-4">
-                    {([
-                      { label: "Setup", Icon: Settings2, href: ROUTES.admin.accountingSetup },
-                      { label: "Bridge Readiness", Icon: Scale, href: ROUTES.admin.accountingBridges },
-                      { label: "Mapping Audit", Icon: ShieldCheck, href: "/admin/accounting/setup/mapping-audit" },
-                      { label: "Reconciliation", Icon: Repeat2, href: ROUTES.admin.accountingBridgeReconciliation },
-                      { label: "Periods", Icon: Calendar, href: ROUTES.admin.accountingPeriods },
-                      { label: "Numbering", Icon: FileText, href: ROUTES.admin.settingsBusinessSetupDocumentNumbering },
-                      { label: "Finance Accounts", Icon: Landmark, href: ROUTES.admin.accountingFinanceAccounts },
-                    ] as { label: string; Icon: LucideIcon; href: string }[]).map(({ label, Icon, href }) => (
-                      <Link key={label} href={href}
-                        className="flex items-center gap-2 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:border-border hover:bg-muted">
-                        <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                        {label}
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-                {/* Right: fix-first blockers */}
-                <div className="rounded-xl border border-border bg-card p-4">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Fix first</p>
-                  {fixFirst.length === 0 ? (
-                    <div className="mt-3 flex items-start gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-900">
-                      <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden />
-                      <span>No active blocker — accounting setup, bridge, numbering, and reconciliation are all clear.</span>
-                    </div>
-                  ) : (
-                    <div className="mt-3 space-y-1.5">
-                      {fixFirst.map((item, index) => (
-                        <div key={item.label} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex items-start gap-2">
-                              <span className="mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-amber-400 text-[10px] font-bold text-white">{index + 1}</span>
-                              <div>
-                                <div className="text-xs font-semibold text-amber-950">{item.label}</div>
-                                <div className="mt-0.5 text-[11px] leading-4 text-amber-800">{item.detail}</div>
-                              </div>
+        
+        {/* Tab content wrapper */}
+        <div className="bg-background rounded-2xl border border-border p-6 shadow-sm">
+          {!loading && !error && data ? (
+            <>
+              {activeTab === "readiness" && (
+                <div className="space-y-6">
+                  <ERPSectionShell
+                    title="Accounting Control Center"
+                    description="Active blockers, primary actions, and daily finance workflows."
+                    actions={
+                      <button type="button" onClick={() => void loadPage("refresh")} disabled={refreshing}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60">
+                        <RefreshCw className={cn("h-3.5 w-3.5", refreshing ? "animate-spin" : "")} aria-hidden />
+                        {refreshing ? "Refreshing…" : "Refresh"}
+                      </button>
+                    }
+                  >
+                    <div className="grid gap-3 lg:grid-cols-[3fr_2fr]">
+                      {/* Left: live counters + quick links */}
+                      <div className="rounded-xl border border-border bg-card p-4">
+                        <p className="mb-2.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Live counters</p>
+                        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 xl:grid-cols-5">
+                          {([
+                            { label: "Readiness", value: displayMetric(bridgeStatusValue), tone: "status" },
+                            { label: "Chart accounts", value: displayMetric(data.chartAccountsCount), tone: "neutral" },
+                            { label: "Finance accounts", value: displayMetric(data.financeAccountsCount), tone: "neutral" },
+                            { label: "Mapping blockers", value: displayMetric(mappingBlockerCount), tone: "count-bad" },
+                            { label: "Collection-ready", value: displayMetric(collectionReadyAccountsCount), tone: "count-good" },
+                            { label: "Open period", value: displayMetric(currentOpenPeriod), tone: "neutral" },
+                            { label: "Period status", value: displayMetric(periodCloseStatus), tone: "status" },
+                            { label: "Recon exceptions", value: displayMetric(reconciliationExceptionCount), tone: "count-bad" },
+                            { label: "Ready unposted", value: displayMetric(readyUnpostedCount), tone: "count-bad" },
+                            { label: "Bridge blockers", value: displayMetric(bridgeBlockerCount), tone: "count-bad" },
+                          ] as { label: string; value: string; tone: MetricTone }[]).map(({ label, value, tone }) => (
+                            <div key={label} className={cn("rounded-lg border px-2.5 py-2", metricToneCls(value, tone))}>
+                              <div className="text-[10px] font-semibold uppercase tracking-wide opacity-60">{label}</div>
+                              <div className="mt-0.5 text-sm font-bold">{value}</div>
                             </div>
-                            <Link href={item.href} className="shrink-0 text-[11px] font-semibold text-primary underline underline-offset-4 transition hover:opacity-75">Fix →</Link>
-                          </div>
+                          ))}
                         </div>
-                      ))}
+                        <p className="mb-2 mt-4 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Quick navigation</p>
+                        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 xl:grid-cols-4">
+                          {([
+                            { label: "Setup", Icon: Settings2, href: ROUTES.admin.accountingSetup },
+                            { label: "Bridge Readiness", Icon: Scale, href: ROUTES.admin.accountingBridges },
+                            { label: "Mapping Audit", Icon: ShieldCheck, href: "/admin/accounting/setup/mapping-audit" },
+                            { label: "Reconciliation", Icon: Repeat2, href: ROUTES.admin.accountingBridgeReconciliation },
+                            { label: "Periods", Icon: Calendar, href: ROUTES.admin.accountingPeriods },
+                            { label: "Numbering", Icon: FileText, href: ROUTES.admin.settingsBusinessSetupDocumentNumbering },
+                            { label: "Finance Accounts", Icon: Landmark, href: ROUTES.admin.accountingFinanceAccounts },
+                          ] as { label: string; Icon: LucideIcon; href: string }[]).map(({ label, Icon, href }) => (
+                            <Link key={label} href={href}
+                              className="flex items-center gap-2 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:border-border hover:bg-muted">
+                              <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                              {label}
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                      {/* Right: fix-first blockers */}
+                      <div className="rounded-xl border border-border bg-card p-4">
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Fix first</p>
+                        {fixFirst.length === 0 ? (
+                          <div className="mt-3 flex items-start gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-900">
+                            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden />
+                            <span>No active blocker — accounting setup, bridge, numbering, and reconciliation are all clear.</span>
+                          </div>
+                        ) : (
+                          <div className="mt-3 space-y-1.5">
+                            {fixFirst.map((item, index) => (
+                              <div key={item.label} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="flex items-start gap-2">
+                                    <span className="mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-amber-400 text-[10px] font-bold text-white">{index + 1}</span>
+                                    <div>
+                                      <div className="text-xs font-semibold text-amber-950">{item.label}</div>
+                                      <div className="mt-0.5 text-[11px] leading-4 text-amber-800">{item.detail}</div>
+                                    </div>
+                                  </div>
+                                  <Link href={item.href} className="shrink-0 text-[11px] font-semibold text-primary underline underline-offset-4 transition hover:opacity-75">Fix →</Link>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  )}
-                </div>
-              </div>
-            </ERPSectionShell>
-            {MODULE_GROUPS.map((group) => (
-              <ERPSectionShell key={group.title} title={group.title} description={group.description}>
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                  {group.modules.map((module) => (
-                    <ModuleCard key={module.key} module={module} setupBlocked={setupBlocked} readiness={data.accountingReadiness} setupBlockers={setupBlockers.length > 0 ? setupBlockers : ["Accounting setup readiness is blocked."]} />
+                  </ERPSectionShell>
+                  {MODULE_GROUPS.map((group) => (
+                    <ERPSectionShell key={group.title} title={group.title} description={group.description}>
+                      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                        {group.modules.map((module) => (
+                          <ModuleCard key={module.key} module={module} setupBlocked={setupBlocked} readiness={data.accountingReadiness} setupBlockers={setupBlockers.length > 0 ? setupBlockers : ["Accounting setup readiness is blocked."]} />
+                        ))}
+                      </div>
+                    </ERPSectionShell>
                   ))}
                 </div>
-              </ERPSectionShell>
-            ))}
-          </>
-        ) : null}
+              )}
+
+              {activeTab === "books" && (
+                <div className="space-y-6">
+                  <div className="rounded-xl border border-sky-200 bg-sky-50/50 p-4 text-sm text-sky-800">
+                    <strong>Books & Journals</strong>: Manage raw accounting entries, manual journals, and the overarching General Ledger.
+                  </div>
+                  <nav className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <Link href={ROUTES.admin.accountingChartOfAccounts ?? "/admin/accounting/chart-of-accounts"} className={accountingLaneLinkClass}>
+                      <BookOpenText className="h-5 w-5 text-sky-600" />
+                      Chart of Accounts
+                    </Link>
+                    <Link href={ROUTES.admin.accountingJournals ?? "/admin/accounting/journals"} className={accountingLaneLinkClass}>
+                      <ScrollText className="h-5 w-5 text-indigo-600" />
+                      Manual Journals
+                    </Link>
+                    <Link href={ROUTES.admin.accountingBooks ?? "/admin/accounting/books"} className={accountingLaneLinkClass}>
+                      <Landmark className="h-5 w-5 text-purple-600" />
+                      General Ledger
+                    </Link>
+                    <Link href={ROUTES.admin.accountingPeriods ?? "/admin/accounting/periods"} className={accountingLaneLinkClass}>
+                      <Calendar className="h-5 w-5 text-slate-600" />
+                      Accounting Periods
+                    </Link>
+                  </nav>
+                </div>
+              )}
+
+              {activeTab === "tax" && (
+                <div className="space-y-6">
+                  <div className="rounded-xl border border-violet-200 bg-violet-50/50 p-4 text-sm text-violet-800">
+                    <strong>Tax & Compliance</strong>: Generate and review GST Tax Invoices, TDS, and legal document settings.
+                  </div>
+                  <nav className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <Link href={ROUTES.admin.accountingTaxInvoices ?? "/admin/accounting/tax-invoices"} className={accountingLaneLinkClass}>
+                      <ReceiptText className="h-5 w-5 text-violet-600" />
+                      GST Documents
+                    </Link>
+                    <Link href={ROUTES.admin.complianceKyc ?? "/admin/compliance/tax-readiness"} className={accountingLaneLinkClass}>
+                      <ShieldCheck className="h-5 w-5 text-blue-600" />
+                      Tax Readiness
+                    </Link>
+                    <Link href={ROUTES.admin.settingsLegalControls ?? "/admin/settings/legal-controls"} className={accountingLaneLinkClass}>
+                      <Settings2 className="h-5 w-5 text-slate-600" />
+                      Legal Controls
+                    </Link>
+                  </nav>
+                </div>
+              )}
+
+              {activeTab === "reconciliation" && (
+                <div className="space-y-6">
+                  <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 text-sm text-amber-800">
+                    <strong>Reconciliation Hub</strong>: Ensure underlying operational truth exactly matches posted journal evidence.
+                  </div>
+                  <nav className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <Link href={ROUTES.admin.accountingBridgeReconciliation ?? "/admin/accounting/bridge-reconciliation"} className={accountingLaneLinkClass}>
+                      <Repeat2 className="h-5 w-5 text-amber-600" />
+                      Bridge Reconciliation
+                    </Link>
+                    <Link href={ROUTES.admin.financeCanonicalReconciliation ?? "/admin/finance/reconciliation"} className={accountingLaneLinkClass}>
+                      <ShieldCheck className="h-5 w-5 text-emerald-600" />
+                      Canonical Checks
+                    </Link>
+                    <Link href="/admin/accounting/setup/mapping-audit" className={accountingLaneLinkClass}>
+                      <Scale className="h-5 w-5 text-purple-600" />
+                      Mapping Audit
+                    </Link>
+                    <Link href={ROUTES.admin.accountingBridges ?? "/admin/accounting/bridges"} className={accountingLaneLinkClass}>
+                      <FileText className="h-5 w-5 text-slate-600" />
+                      Bridge Events
+                    </Link>
+                  </nav>
+                </div>
+              )}
+
+              {activeTab === "close" && (
+                <div className="space-y-6">
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 text-sm text-emerald-800">
+                    <strong>Close & Reports</strong>: Run daily cockpit summaries and extract standard accounting report packs.
+                  </div>
+                  <nav className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <Link href={ROUTES.admin.accountingTrialBalance ?? "/admin/accounting/trial-balance"} className={accountingLaneLinkClass}>
+                      <FileBarChart className="h-5 w-5 text-emerald-600" />
+                      Trial Balance
+                    </Link>
+                    <Link href={ROUTES.admin.accountingProfitLoss ?? "/admin/accounting/profit-loss"} className={accountingLaneLinkClass}>
+                      <TrendingUp className="h-5 w-5 text-blue-600" />
+                      Profit & Loss
+                    </Link>
+                    <Link href={ROUTES.admin.accountingBalanceSheet ?? "/admin/accounting/balance-sheet"} className={accountingLaneLinkClass}>
+                      <Building2 className="h-5 w-5 text-indigo-600" />
+                      Balance Sheet
+                    </Link>
+                    <Link href={ROUTES.admin.accountingItrPack ?? "/admin/accounting/itr-pack"} className={accountingLaneLinkClass}>
+                      <FileText className="h-5 w-5 text-slate-600" />
+                      ITR Export
+                    </Link>
+                  </nav>
+                </div>
+              )}
+            </>
+          ) : null}
+        </div>
       </div>
     </ERPPageShell>
   );

@@ -1,3 +1,4 @@
+from decimal import Decimal
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import serializers as drf_serializers
@@ -337,7 +338,7 @@ class AdminPartnerCollectionRequestReopenView(APIView):
 
 
 class _EditRequestSerializer(drf_serializers.Serializer):
-    amount = drf_serializers.DecimalField(max_digits=12, decimal_places=2, required=False, min_value=0.01)
+    amount = drf_serializers.DecimalField(max_digits=12, decimal_places=2, required=False, min_value=Decimal("0.01"))
     payment_date = drf_serializers.DateField(required=False)
     reference_no = drf_serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=100)
     notes = drf_serializers.CharField(required=False, allow_blank=True, allow_null=True)

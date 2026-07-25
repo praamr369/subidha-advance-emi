@@ -10,6 +10,9 @@ import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import KycDocumentPanel from "@/components/kyc/KycDocumentPanel";
+import { Party360Embed, UniversalQuickWidgetsEmbed } from "@/components/profile/Profile360";
+import { ProfilePayablesPanel } from "@/components/profile/ProfilePayablesPanel";
+import { WorkbenchFilterChips } from "@/components/workbench/WorkbenchFilterChips";
 import ActionButton from "@/components/ui/ActionButton";
 import {
   DataTableShell,
@@ -63,7 +66,7 @@ import {
 import { listFinanceAccounts, type FinanceAccount } from "@/services/accounting";
 
 const EMPLOYMENT_TYPES = ["PERMANENT_MONTHLY", "TEMPORARY", "DAILY_WAGE", "HOURLY", "PIECE_RATE", "MANUFACTURING", "SERVICE"];
-const DETAIL_TABS = ["Overview", "Employment", "Attendance", "Payroll", "Documents", "KYC", "Access", "Timeline"] as const;
+const DETAIL_TABS = ["Overview", "360 View", "Employment", "Attendance", "Payroll", "Payables", "Documents", "KYC", "Access", "Timeline"] as const;
 type DetailTab = (typeof DETAIL_TABS)[number];
 
 type StaffAuditEntry = AdminAuditEntry & { source_label: string };
@@ -742,15 +745,18 @@ export default function AdminHrStaffProfilePage() {
         />
       </QuickActionGrid>
 
-      <div className="flex flex-wrap gap-2 rounded-xl border border-border bg-card p-2">
-        {DETAIL_TABS.map((tab) => (
-          <button key={tab} type="button" onClick={() => setActiveTab(tab)} className={`rounded-xl px-3 py-2 text-sm font-semibold ${activeTab === tab ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-muted"}`}>
-            {tab}
-          </button>
-        ))}
+      <div className="sticky top-0 z-10 -mx-2 bg-background/95 px-2 py-3 backdrop-blur sm:-mx-6 sm:px-6">
+        <WorkbenchFilterChips
+          active={activeTab}
+          onSelect={(key) => setActiveTab(key as DetailTab)}
+          chips={DETAIL_TABS.map((tab) => ({ key: tab, label: tab }))}
+        />
       </div>
 
       {activeTab === "Overview" ? <DetailPanel title="Overview" description="Identity, readiness, and operational warnings.">
+        <div className="mb-5">
+          <UniversalQuickWidgetsEmbed role="STAFF" sourceId={staff.id} />
+        </div>
         <div className="mb-4 flex flex-wrap gap-2">
           <ReadinessBadge ready={staff.profile_ready} label="Profile ready" />
           <ReadinessBadge ready={staff.employment_ready} label="Employment ready" />
@@ -777,6 +783,17 @@ export default function AdminHrStaffProfilePage() {
           <Detail label="KYC reference" value={`${staff.kyc_id_type || "KYC"} ${mask(staff.kyc_id_number)}`} />
         </div>
       </DetailPanel> : null}
+
+      {activeTab === "360 View" ? <Party360Embed role="STAFF" sourceId={staff.id} /> : null}
+
+      {activeTab === "Payables" ? (
+        <ProfilePayablesPanel
+          partyType="EMPLOYEE"
+          partyId={staff.id}
+          title="Salary & Expense Payables"
+          description="Approved salary sheets and expense claims for this employee. Paying posts a real Salary/Expense Payable → Finance Account journal."
+        />
+      ) : null}
 
       {activeTab === "Employment" ? <DetailPanel title="Employment">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

@@ -11,6 +11,12 @@ import PartyKycPanel from "@/components/kyc/PartyKycPanel";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { DetailItem, WorkspaceSection } from "@/components/ui/workspace";
 import {
+  ProfileAlerts,
+  ProfileFinancials,
+  ProfileModuleSections,
+  UniversalQuickWidgets,
+} from "@/components/profile/Profile360";
+import {
   buildAdminBillingDocumentRoute,
   buildAdminDeliveryRoute,
   buildAdminServiceDeskCaseRoute,
@@ -286,6 +292,11 @@ export default function AdminCrmPartyDetailPage() {
               </div>
             ) : null}
 
+            {/* Operational urgency + financial position (shared 360 components) */}
+            <UniversalQuickWidgets payload={payload} />
+            <ProfileAlerts alerts={payload.alerts} />
+            <ProfileFinancials financials={payload.financials} />
+
             <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
               <WorkspaceSection
                 title="Party Summary"
@@ -343,6 +354,9 @@ export default function AdminCrmPartyDetailPage() {
             >
               <PartyKycPanel partyId={payload.party.id} />
             </WorkspaceSection>
+
+            {/* All cross-module identity + operational data tables (shared 360) */}
+            <ProfileModuleSections payload={payload} />
 
             <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
               <WorkspaceSection

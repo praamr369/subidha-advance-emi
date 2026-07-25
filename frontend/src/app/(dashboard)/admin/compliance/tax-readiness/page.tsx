@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
+import ErrorState from "@/components/feedback/ErrorState";
+import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
@@ -12,26 +14,27 @@ export default function AdminComplianceTaxReadinessPage() {
   const [readiness, setReadiness] = useState<ComplianceTaxReadiness | null>(null);
   const [summary, setSummary] = useState<TurnoverSummary | null>(null);
   const [alerts, setAlerts] = useState<ComplianceAlert[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        const [r, t] = await Promise.all([getComplianceTaxReadiness(), getComplianceTurnoverSummary()]);
-        if (!active) return;
-        setReadiness(r);
-        setSummary(t.summary);
-        setAlerts(t.alerts);
-      } catch (err) {
-        if (!active) return;
-        setError(err instanceof Error ? err.message : "Failed to load readiness.");
-      }
-    })();
-    return () => {
-      active = false;
-    };
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [r, t] = await Promise.all([getComplianceTaxReadiness(), getComplianceTurnoverSummary()]);
+      setReadiness(r);
+      setSummary(t.summary);
+      setAlerts(t.alerts);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load readiness.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   return (
     <ERPPageShell
@@ -46,8 +49,11 @@ export default function AdminComplianceTaxReadinessPage() {
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <WorkspaceSection title="Readiness" description="Product and party tax master completeness for future GST activation.">
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        {readiness ? (
+        {loading ? (
+          <LoadingBlock label="Loading tax readiness…" />
+        ) : error ? (
+          <ErrorState message={error} onRetry={() => void load()} />
+        ) : readiness ? (
           <div className="grid gap-2 text-sm">
             <p>Current tax mode: {readiness.tax_mode.mode}</p>
             <p>Product tax profiles: {readiness.product_readiness.active_product_tax_profiles} / {readiness.product_readiness.total_products}</p>
@@ -55,12 +61,12 @@ export default function AdminComplianceTaxReadinessPage() {
             <p>Missing HSN: {readiness.product_readiness.missing_hsn_code}</p>
             <p>Party tax profiles: {readiness.party_readiness.active_party_tax_profiles}</p>
           </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">Loading...</p>
-        )}
+        ) : null}
       </WorkspaceSection>
       <WorkspaceSection title="Turnover & Alerts" description="Threshold alerts are configurable and advisory.">
-        {summary ? (
+        {loading ? (
+          <LoadingBlock label="Loading turnover summary…" />
+        ) : summary ? (
           <div className="grid gap-2 text-sm">
             <p>Aggregate turnover: {summary.aggregate_turnover}</p>
             <p>Direct sale turnover: {summary.direct_sale_turnover}</p>
@@ -79,7 +85,7 @@ export default function AdminComplianceTaxReadinessPage() {
             ) : null}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">Loading turnover summary...</p>
+          <p className="text-sm text-muted-foreground">Turnover summary is unavailable.</p>
         )}
       </WorkspaceSection>
     </ERPPageShell>

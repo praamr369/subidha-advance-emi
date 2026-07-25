@@ -945,11 +945,27 @@ export type FinanceBookRow = {
   credit_amount: string;
 };
 
+export type FinanceBookAccountBalance = {
+  finance_account_id: number;
+  finance_account_name: string;
+  kind: string;
+  total_debit: string;
+  total_credit: string;
+  net_balance: string;
+};
+
 export type FinanceBookReport = {
   start_date: string | null;
   end_date: string | null;
   finance_account_kinds: string[];
   rows: FinanceBookRow[];
+  summary?: {
+    total_debit: string;
+    total_credit: string;
+    net_balance: string;
+    row_count: number;
+  } | null;
+  accounts?: FinanceBookAccountBalance[];
 };
 
 export type SalesBookRow = {
@@ -1307,6 +1323,13 @@ export function postExpenseVoucher(id: number) {
 export function listEmployees(params: Record<string, string | number | undefined | null> = {}) {
   return apiFetch<AccountingPaginatedResponse<EmployeeProfile>>(
     `/accounting/employees/${buildQuery(params)}`
+  );
+}
+
+/** Employees moved to /admin/hr/staff/ — use this for the module-level salary/staff-ledger pages. */
+export function listEmployeesSafe(params: Record<string, string | number | undefined | null> = {}) {
+  return apiFetch<AccountingPaginatedResponse<EmployeeProfile>>(
+    `/admin/hr/staff/${buildQuery(params)}`
   );
 }
 
@@ -2286,6 +2309,7 @@ export type CloseCockpitBlocker = {
   severity: "CRITICAL" | "WARNING" | "INFO";
   title: string;
   description: string;
+  action_url?: string;
   source_area: string;
 };
 
@@ -2545,4 +2569,32 @@ export async function createFixedAsset(payload: Partial<FixedAsset>): Promise<Fi
     method: 'POST',
     body: JSON.stringify(payload),
   })
+}
+
+// Solopreneur Endpoints
+export type LedgerHealthResponse = {
+  status: "OK" | "WARNING";
+  is_balanced: boolean;
+  total_debit: string;
+  total_credit: string;
+  difference: string;
+  checks: { key: string; passed: boolean; count?: number }[];
+};
+
+export async function fetchSolopreneurLedgerHealth(): Promise<LedgerHealthResponse> {
+  return apiFetch<LedgerHealthResponse>("/admin/accounting/ledger-health/");
+}
+
+export type SolopreneurCloseResponse = {
+  status: "SUCCESS" | "PARTIAL_SUCCESS";
+  processed: number;
+  errors: number;
+  details: any;
+};
+
+export async function postSolopreneurDailyClose(as_of?: string): Promise<SolopreneurCloseResponse> {
+  return apiFetch<SolopreneurCloseResponse>("/admin/accounting/solopreneur-close/", {
+    method: "POST",
+    body: JSON.stringify({ as_of }),
+  });
 }

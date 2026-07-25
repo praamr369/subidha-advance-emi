@@ -18,11 +18,22 @@ import {
   approveAdminSubscriptionRequest,
   getSubscriptionRequest,
   getSubscriptionRequestOptions,
+  holdAdminSubscriptionRequest,
   rejectAdminSubscriptionRequest,
+  requestAmendmentAdminSubscriptionRequest,
   type SubscriptionRequestCustomerOption,
+  type SubscriptionRequestHoldStatus,
   type SubscriptionRequestOptions,
   type SubscriptionRequestRecord,
 } from "@/services/subscription-requests";
+
+// A request stays actionable while it's submitted or parked in a funnel stage.
+const ACTIONABLE_STATUSES = new Set([
+  "SUBMITTED",
+  "ON_HOLD_LUCKY_UNAVAILABLE",
+  "ON_HOLD_PRODUCT_NOT_READY",
+  "AMENDMENT_REQUESTED",
+]);
 
 type ResolutionMode = "existing" | "create";
 
@@ -125,7 +136,7 @@ export default function AdminSubscriptionRequestDetailPage() {
   }, [loadRequest]);
 
   useEffect(() => {
-    if (!request || request.status !== "SUBMITTED") return;
+    if (!request || !ACTIONABLE_STATUSES.has(request.status)) return;
     void loadOptions(request);
   }, [loadOptions, request]);
 
@@ -215,6 +226,45 @@ export default function AdminSubscriptionRequestDetailPage() {
     }
   }
 
+  async function handleHold(holdStatus: SubscriptionRequestHoldStatus) {
+    if (!request) return;
+    setActionLoading(true);
+    setActionError(null);
+    setSuccessMessage(null);
+
+    try {
+      const response = await holdAdminSubscriptionRequest(request.id, {
+        hold_status: holdStatus,
+        note: reviewNote.trim() || undefined,
+      });
+      if (response.result) setRequest(response.result);
+      setSuccessMessage(response.detail || "Subscription request put on hold.");
+    } catch (err) {
+      setActionError(toErrorMessage(err));
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleAmendment() {
+    if (!request) return;
+    setActionLoading(true);
+    setActionError(null);
+    setSuccessMessage(null);
+
+    try {
+      const response = await requestAmendmentAdminSubscriptionRequest(request.id, {
+        note: reviewNote.trim() || rejectReason.trim() || undefined,
+      });
+      if (response.result) setRequest(response.result);
+      setSuccessMessage(response.detail || "Amendment requested from the requester.");
+    } catch (err) {
+      setActionError(toErrorMessage(err));
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
   return (
     <ERPPageShell
       eyebrow="Sales"
@@ -222,12 +272,12 @@ export default function AdminSubscriptionRequestDetailPage() {
       subtitle="Approve or reject customer and partner subscription intake without bypassing the canonical EMI subscription creation path."
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
-        { label: "Subscription Requests", href: "/admin/subscription-requests" },
+        { label: "Subscription Requests", href: "/admin/requests/subscriptions" },
         { label: request ? `Request #${request.id}` : "Detail" },
       ]}
       actions={[
         {
-          href: "/admin/subscription-requests",
+          href: "/admin/requests/subscriptions",
           label: "Back to Queue",
           variant: "secondary",
         },
@@ -315,10 +365,10 @@ export default function AdminSubscriptionRequestDetailPage() {
               ) : null}
             </DetailPanel>
 
-            {request.status === "SUBMITTED" ? (
+            {ACTIONABLE_STATUSES.has(request.status) ? (
               <FormSection
                 title="Review action"
-                description="This action is the only point where a real subscription may be created. No EMI rows, lucky assignment, or payments exist before approval."
+                description="This action is the only point where a real subscription may be created. No EMI rows, lucky assignment, or payments exist before approval. Use the funnel actions to park a request that can't be approved yet."
               >
 
                 {!request.customer_id ? (
@@ -456,6 +506,30 @@ export default function AdminSubscriptionRequestDetailPage() {
                       description: "Create subscription and approve this request",
                       color: "success" as const,
                       onClick: () => setShowApproveDialog(true),
+                      disabled: actionLoading,
+                    },
+                    {
+                      id: "hold-lucky",
+                      label: "Hold · Lucky ID Unavailable",
+                      description: "Park until a lucky ID frees up in this batch",
+                      color: "warning" as const,
+                      onClick: () => void handleHold("ON_HOLD_LUCKY_UNAVAILABLE"),
+                      disabled: actionLoading,
+                    },
+                    {
+                      id: "hold-product",
+                      label: "Hold · Product Not Ready",
+                      description: "Park until the rent/lease product is ready",
+                      color: "warning" as const,
+                      onClick: () => void handleHold("ON_HOLD_PRODUCT_NOT_READY"),
+                      disabled: actionLoading,
+                    },
+                    {
+                      id: "amendment",
+                      label: "Request Amendment",
+                      description: "Send back to the requester for changes",
+                      color: "primary" as const,
+                      onClick: () => void handleAmendment(),
                       disabled: actionLoading,
                     },
                     {

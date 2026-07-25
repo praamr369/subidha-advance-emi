@@ -1037,7 +1037,7 @@ class VendorBillLineSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = ["id", "taxable_value", "line_total", "created_at", "updated_at"]
 
 
 class VendorBillSerializer(serializers.ModelSerializer):
@@ -1089,11 +1089,30 @@ class VendorBillSerializer(serializers.ModelSerializer):
         outstanding = Decimal(str(obj.grand_total or "0.00")) - paid
         return f"{max(outstanding, Decimal('0.00')).quantize(Decimal('0.01')):.2f}"
 
+    @staticmethod
+    def _compute_line_totals(line: dict) -> dict:
+        """Derive taxable_value/line_total from quantity, unit_cost, and tax_amount.
+
+        The client only ever submits quantity/unit_cost/tax_amount; trusting a
+        client-supplied taxable_value/line_total would let a bill post with an
+        arbitrary (or missing) amount, so these are always recomputed here.
+        """
+        quantity = Decimal(str(line.get("quantity") or "0"))
+        unit_cost = _money(line.get("unit_cost"))
+        tax_amount = _money(line.get("tax_amount"))
+        taxable_value = (quantity * unit_cost).quantize(Decimal("0.01"))
+        return {
+            **line,
+            "taxable_value": taxable_value,
+            "tax_amount": tax_amount,
+            "line_total": taxable_value + tax_amount,
+        }
+
     def create(self, validated_data):
-        lines = validated_data.pop("lines", [])
-        subtotal = sum((_money(line.get("taxable_value")) for line in lines), Decimal("0.00"))
-        tax_total = sum((_money(line.get("tax_amount")) for line in lines), Decimal("0.00"))
-        grand_total = sum((_money(line.get("line_total")) for line in lines), Decimal("0.00"))
+        lines = [self._compute_line_totals(line) for line in validated_data.pop("lines", [])]
+        subtotal = sum((line["taxable_value"] for line in lines), Decimal("0.00"))
+        tax_total = sum((line["tax_amount"] for line in lines), Decimal("0.00"))
+        grand_total = sum((line["line_total"] for line in lines), Decimal("0.00"))
         bill = VendorBill.objects.create(
             subtotal=subtotal,
             tax_total=tax_total,
@@ -1106,13 +1125,15 @@ class VendorBillSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         if instance.status != "DRAFT":
             raise serializers.ValidationError("Only draft vendor bills can be edited.")
-        lines = validated_data.pop("lines", None)
+        raw_lines = validated_data.pop("lines", None)
         for key, value in validated_data.items():
             setattr(instance, key, value)
-        if lines is not None:
-            instance.subtotal = sum((_money(line.get("taxable_value")) for line in lines), Decimal("0.00"))
-            instance.tax_total = sum((_money(line.get("tax_amount")) for line in lines), Decimal("0.00"))
-            instance.grand_total = sum((_money(line.get("line_total")) for line in lines), Decimal("0.00"))
+        lines = None
+        if raw_lines is not None:
+            lines = [self._compute_line_totals(line) for line in raw_lines]
+            instance.subtotal = sum((line["taxable_value"] for line in lines), Decimal("0.00"))
+            instance.tax_total = sum((line["tax_amount"] for line in lines), Decimal("0.00"))
+            instance.grand_total = sum((line["line_total"] for line in lines), Decimal("0.00"))
         instance.save()
         if lines is not None:
             instance.lines.all().delete()

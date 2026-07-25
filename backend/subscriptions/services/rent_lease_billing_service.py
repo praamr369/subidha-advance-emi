@@ -203,7 +203,7 @@ def ensure_security_deposit_demand(*, subscription: Subscription, performed_by=N
 
 @transaction.atomic
 def generate_monthly_demands_for_subscription(
-    *, subscription: Subscription, through_date: date | None = None, performed_by=None
+    *, subscription: Subscription, through_date: date | None = None, generate_full_schedule: bool = False, performed_by=None
 ) -> dict:
     if subscription.plan_type not in (PlanType.RENT, PlanType.LEASE):
         raise ValidationError("Monthly rent/lease demands are only supported for RENT/LEASE contracts.")
@@ -217,7 +217,7 @@ def generate_monthly_demands_for_subscription(
 
     for month_idx in range(tenure):
         period_start = _add_months(start_date, month_idx)
-        if period_start > through:
+        if not generate_full_schedule and period_start > through:
             break
         period_end = _add_months(period_start, 1)
         due_date = period_start

@@ -3,10 +3,13 @@ import { apiFetch } from "@/lib/api";
 export type PayableType =
   | "salary"
   | "vendor_settlement"
+  | "vendor_outstanding"
   | "commission"
   | "expense_claim"
   | "credit_refund"
   | "payout_batch";
+
+export type PayablePartyType = "EMPLOYEE" | "VENDOR" | "PARTNER";
 
 export interface PayableItem {
   id: string;
@@ -83,11 +86,16 @@ export async function getUnifiedPayables(params?: {
   payable_type?: string;
   search?: string;
   status_category?: string;
+  party_type?: PayablePartyType;
+  party_id?: number | string;
 }): Promise<UnifiedPayableData> {
   const qs = new URLSearchParams();
   if (params?.payable_type) qs.set("payable_type", params.payable_type);
   if (params?.search) qs.set("search", params.search);
   if (params?.status_category) qs.set("status_category", params.status_category);
+  if (params?.party_type) qs.set("party_type", params.party_type);
+  if (params?.party_id != null && params.party_id !== "")
+    qs.set("party_id", String(params.party_id));
   const suffix = qs.toString() ? `?${qs}` : "";
   return apiFetch<UnifiedPayableData>(`/admin/payables/${suffix}`);
 }

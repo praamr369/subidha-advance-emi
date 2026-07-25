@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lead Stage Workbench - Advanced UI</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            padding: 40px 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { margin-bottom: 30px; color: #1a1a1a; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 40px; }
+        .card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .card h2 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #1a1a1a;
+        }
+        .timeline {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 30px;
+            position: relative;
+        }
+        .timeline::before {
+            content: '';
+            position: absolute;
+            top: 24px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(to right, #3b82f6, #a855f7, #eab308, #f97316, #14b8a6, #22c55e);
+            z-index: -1;
+        }
+        .stage {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+        }
+        .stage-dot {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: 2px solid;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        .stage.current .stage-dot {
+            box-shadow: 0 0 0 4px rgba(255,255,255,0.8);
+        }
+        .stage.current .stage-dot {
+            border-color: #3b82f6;
+            background: #eff6ff;
+            color: #1e40af;
+        }
+        .stage:nth-child(1) .stage-dot { border-color: #3b82f6; background: #eff6ff; color: #1e40af; }
+        .stage:nth-child(2) .stage-dot { border-color: #a855f7; background: #faf5ff; color: #6d28d9; }
+        .stage:nth-child(3) .stage-dot { border-color: #eab308; background: #fefce8; color: #713f12; }
+        .stage:nth-child(4) .stage-dot { border-color: #f97316; background: #fff7ed; color: #7c2d12; }
+        .stage:nth-child(5) .stage-dot { border-color: #14b8a6; background: #f0fdfa; color: #0d3f35; }
+        .stage:nth-child(6) .stage-dot { border-color: #22c55e; background: #f0fdf4; color: #15803d; }
+        .stage-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-align: center;
+            color: #666;
+            max-width: 90px;
+        }
+        .stage.current .stage-label {
+            font-weight: 700;
+            color: #1a1a1a;
+        }
+        .stage-info {
+            background: #f9f9f9;
+            border-left: 4px solid #3b82f6;
+            padding: 16px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        .stage-info dt {
+            font-size: 11px;
+            color: #666;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        .stage-info dd {
+            font-size: 14px;
+            font-weight: 500;
+            color: #1a1a1a;
+        }
+        .transition-cards {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .transition-card {
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: white;
+        }
+        .transition-card:hover {
+            border-color: #3b82f6;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+        }
+        .transition-card h3 {
+            font-size: 13px;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 6px;
+        }
+        .transition-card p {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+        .transition-risks {
+            font-size: 11px;
+            color: #f59e0b;
+            padding-top: 8px;
+            border-top: 1px solid #f3e8ff;
+        }
+        .transition-risks strong {
+            display: block;
+            margin-bottom: 4px;
+        }
+        .transition-risks li {
+            margin-left: 16px;
+            margin-top: 2px;
+        }
+        .wizard {
+            background: #fffbeb;
+            border: 2px solid #fbbf24;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        .wizard-header {
+            margin-bottom: 20px;
+        }
+        .wizard-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 8px;
+        }
+        .wizard-progress {
+            display: flex;
+            gap: 6px;
+            height: 4px;
+        }
+        .wizard-progress div {
+            flex: 1;
+            background: #e5e7eb;
+            border-radius: 2px;
+        }
+        .wizard-progress div.active {
+            background: #f59e0b;
+        }
+        .wizard-progress div.completed {
+            background: #10b981;
+        }
+        .wizard-step {
+            margin-bottom: 16px;
+        }
+        .wizard-step label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+        .wizard-step label:hover {
+            background: rgba(0,0,0,0.02);
+        }
+        .wizard-step input {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        .features {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 30px;
+        }
+        .features h2 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #1a1a1a;
+        }
+        .feature-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+        .feature {
+            border-left: 4px solid #3b82f6;
+            padding-left: 16px;
+        }
+        .feature h3 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 6px;
+        }
+        .feature p {
+            font-size: 13px;
+            color: #666;
+            line-height: 1.5;
+        }
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .comparison-section {
+            padding: 20px;
+            border-right: 1px solid #e0e0e0;
+        }
+        .comparison-section:last-child {
+            border-right: none;
+        }
+        .comparison-section h3 {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #1a1a1a;
+        }
+        .comparison-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            font-size: 13px;
+            margin-bottom: 12px;
+            color: #666;
+        }
+        .comparison-item .icon {
+            font-size: 14px;
+            margin-top: 2px;
+            flex-shrink: 0;
+        }
+        .icon-check { color: #10b981; }
+        .icon-x { color: #ef4444; }
+        @media (max-width: 768px) {
+            .grid { grid-template-columns: 1fr; }
+            .transition-cards { grid-template-columns: 1fr; }
+            .comparison { grid-template-columns: 1fr; }
+            .comparison-section { border-right: none; border-bottom: 1px solid #e0e0e0; }
+            .comparison-section:last-child { border-bottom: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Lead Stage Workbench - Advanced UI Mockup</h1>
+
+        <div class="features">
+            <h2>✨ Key Features</h2>
+            <div class="feature-list">
+                <div class="feature">
+                    <h3>📊 Visual Workflow Timeline</h3>
+                    <p>Color-coded stages showing the complete lead journey from NEW to CONVERTED with visual progress indicator.</p>
+                </div>
+                <div class="feature">
+                    <h3>✅ Stage Requirements</h3>
+                    <p>Each stage displays its specific requirements upfront, ensuring operators know what must be done.</p>
+                </div>
+                <div class="feature">
+                    <h3>🎯 Precision Transitions</h3>
+                    <p>Each transition card shows description, risks, and validation requirements before moving forward.</p>
+                </div>
+                <div class="feature">
+                    <h3>🧙 Step-by-Step Wizard</h3>
+                    <p>Multi-step workflows for complex transitions with validation checklists and form fields.</p>
+                </div>
+                <div class="feature">
+                    <h3>⚠️ Risk Warnings</h3>
+                    <p>Important transitions show consideration warnings to prevent errors and ensure data quality.</p>
+                </div>
+                <div class="feature">
+                    <h3>🔄 Enterprise Grade</h3>
+                    <p>Professional UI with proper visual hierarchy, accessibility, and consistent design language.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <h2>📍 Current View: Lead Stage Workbench</h2>
+
+                <div class="timeline">
+                    <div class="stage">
+                        <div class="stage-dot">◯</div>
+                        <div class="stage-label">NEW</div>
+                    </div>
+                    <div class="stage">
+                        <div class="stage-dot">●</div>
+                        <div class="stage-label">CONTACTED</div>
+                    </div>
+                    <div class="stage current">
+                        <div class="stage-dot">◉</div>
+                        <div class="stage-label">INTERESTED</div>
+                    </div>
+                    <div class="stage">
+                        <div class="stage-dot">◈</div>
+                        <div class="stage-label">KYC PENDING</div>
+                    </div>
+                    <div class="stage">
+                        <div class="stage-dot">◆</div>
+                        <div class="stage-label">READY TO CONVERT</div>
+                    </div>
+                    <div class="stage">
+                        <div class="stage-dot">✓</div>
+                        <div class="stage-label">CONVERTED</div>
+                    </div>
+                </div>
+
+                <div class="stage-info">
+                    <dt>Current Stage</dt>
+                    <dd>Interested</dd>
+                    <dt style="margin-top: 8px;">Requirements</dt>
+                    <dd>Interest confirmed via communication</dd>
+                </div>
+
+                <div class="transition-cards">
+                    <div class="transition-card">
+                        <h3>→ KYC PENDING</h3>
+                        <p>Initiate KYC verification process</p>
+                        <div class="transition-risks">
+                            <strong>⚠ Considerations:</strong>
+                            <ul>
+                                <li>Verify contact info complete</li>
+                                <li>Ensure follow-up task scheduled</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="transition-card" style="border-color: #dc2626;">
+                        <h3 style="color: #dc2626;">✕ Mark as Lost</h3>
+                        <p>Lead has declined or gone unresponsive</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>🧙 Step-by-Step Transition Wizard</h2>
+
+                <div class="wizard">
+                    <div class="wizard-header">
+                        <div class="wizard-title">Step 1 of 2: Communication Log</div>
+                        <div class="wizard-progress">
+                            <div class="active"></div>
+                            <div></div>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #fcd34d;">
+                        <div style="font-size: 12px; color: #92400e; margin-bottom: 12px;">Document your interaction with the lead</div>
+                        <label style="display: block; margin-bottom: 12px;">
+                            <strong style="font-size: 12px; color: #1a1a1a;">Communication Method</strong>
+                            <select style="width: 100%; padding: 6px 8px; margin-top: 4px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+                                <option>Select method...</option>
+                                <option>Phone Call</option>
+                                <option>Email</option>
+                                <option>In Person</option>
+                            </select>
+                        </label>
+                    </div>
+
+                    <div style="margin-bottom: 16px;">
+                        <div style="font-size: 11px; color: #666; text-transform: uppercase; font-weight: 600; margin-bottom: 8px;">Verification Checklist</div>
+                        <div class="wizard-step">
+                            <label>
+                                <input type="checkbox">
+                                <span>Lead contact information is complete</span>
+                            </label>
+                        </div>
+                        <div class="wizard-step">
+                            <label>
+                                <input type="checkbox">
+                                <span>Interest has been qualified</span>
+                            </label>
+                        </div>
+                        <div class="wizard-step">
+                            <label>
+                                <input type="checkbox" checked>
+                                <span>Next follow-up scheduled</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 8px; padding-top: 12px; border-top: 1px solid #fcd34d;">
+                        <button style="flex: 1; padding: 8px 16px; background: #f59e0b; color: white; border: none; border-radius: 6px; font-weight: 500; font-size: 12px; cursor: pointer;">Next →</button>
+                        <button style="padding: 8px 16px; background: white; border: 1px solid #d1d5db; border-radius: 6px; font-weight: 500; font-size: 12px; cursor: pointer;">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="features">
+            <h2>📈 Before & After Comparison</h2>
+            <div class="comparison">
+                <div class="comparison-section">
+                    <h3>❌ Previous Implementation</h3>
+                    <div class="comparison-item">
+                        <span class="icon icon-x">✕</span>
+                        <span>Simple button grid layout</span>
+                    </div>
+                    <div class="comparison-item">
+                        <span class="icon icon-x">✕</span>
+                        <span>No visual workflow context</span>
+                    </div>
+                    <div class="comparison-item">
+                        <span class="icon icon-x">✕</span>
+                        <span>Minimal stage information</span>
+                    </div>
+                    <div class="comparison-item">
+                        <span class="icon icon-x">✕</span>
+                        <span>Basic confirmation only</span>
+                    </div>
+                    <div class="comparison-item">
+                        <span class="icon icon-x">✕</span>
+                        <span>No validation guidance</span>
+                    </div>
+                    <div class="comparison-item">
+                        <span class="icon icon-x">✕</span>
+                        <span>Limited enterprise features</span>
+                    </div>
+                </div>
+                <div class="comparison-section">
+                    <h3>✅ New Implementation</h3>
+                    <div class="comparison-item">
+                        <span class="icon icon-check">✓</span>
+                        <span>Visual workflow timeline</span>
+                    </div>
+                    <div class="comparison-item">
+                        <span class="icon icon-check">✓</span>
+                        <span>Complete workflow visualization</span>
+                    </div>
+                    <div class="comparison-item">
+                        <span class="icon icon-check">✓</span>
+                        <span>Detailed stage requirements</span>
+                    </div>
+                    <div class="comparison-item">
+                        <span class="icon icon-check">✓</span>
+                        <span>Multi-step validation wizard</span>
+                    </div>
+                    <div class="comparison-item">
+                        <span class="icon icon-check">✓</span>
+                        <span>Step-by-step guidance</span>
+                    </div>
+                    <div class="comparison-item">
+                        <span class="icon icon-check">✓</span>
+                        <span>Professional, enterprise-grade UI</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

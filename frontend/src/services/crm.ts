@@ -85,6 +85,7 @@ export type PartyDetailResponse = {
   }>;
   summary: {
     lead_count: number;
+    open_lead_count?: number;
     customer_count: number;
     partner_count: number;
     vendor_count: number;
@@ -102,7 +103,27 @@ export type PartyDetailResponse = {
     reminder_count: number;
     interaction_count: number;
     open_follow_up_count: number;
+    pending_delivery_count?: number;
+    urgent_delivery_count?: number;
+    open_service_case_count?: number;
+    open_support_count?: number;
+    due_reminder_count?: number;
+    pending_kyc_count?: number;
   };
+  financials?: {
+    total_invoiced: string;
+    total_received: string;
+    outstanding: string;
+    total_direct_sales: string;
+  };
+  alerts?: Array<{
+    level: "high" | "medium" | "info";
+    module: string;
+    label: string;
+    detail: string;
+    count: number | null;
+    amount: string | null;
+  }>;
   related: {
     leads: CrmLeadSnapshot[];
     customers: Array<Record<string, unknown>>;

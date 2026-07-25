@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 
+import EmptyState from "@/components/feedback/EmptyState";
+import ErrorState from "@/components/feedback/ErrorState";
+import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -197,11 +200,14 @@ export default function TCSPage() {
         ))}
       </div>
 
-      {loading && <div className="text-sm text-muted-foreground py-8 text-center">Loading…</div>}
-      {error && <div className="text-sm text-red-600 py-4">{error}</div>}
+      {loading && <LoadingBlock label="Loading TCS collections…" />}
+      {!loading && error && <ErrorState message={error} onRetry={() => void load()} />}
 
-      {!loading && rows.length === 0 && (
-        <div className="text-sm text-muted-foreground text-center py-12">No TCS collection records found.</div>
+      {!loading && !error && rows.length === 0 && (
+        <EmptyState
+          title="No TCS collection records"
+          description="No TCS collections match the selected financial year, quarter, and status filters."
+        />
       )}
 
       {rows.length > 0 && (

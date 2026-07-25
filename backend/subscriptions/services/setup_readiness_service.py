@@ -4,6 +4,7 @@ from typing import Any
 
 from django.apps import apps
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 
 from accounting.models import (
     AccountingPostingProfile,
@@ -433,6 +434,28 @@ def get_setup_readiness() -> dict[str, Any]:
         "finance_accounts": finance_rows,
         "launch_checklist": launch_checklist,
         "categories": [{"key": key, "label": label, **category_summary[key]} for key, label in CATEGORY_LABELS.items()],
+        "operational_posture": {
+            "control_room_status": "OPERATIONAL_READY" if blocker_count == 0 else "ATTENTION_REQUIRED",
+            "total_sections": len(sections),
+            "ready_sections": ready_count,
+            "blocked_sections": blocker_count,
+            "warning_sections": warning_count,
+            "admin_count": admin_users.count(),
+            "cashier_count": cashier_users.count(),
+            "branch_count": active_branches.count(),
+            "counter_count": active_counters.count(),
+            "product_count": active_products.count(),
+            "batch_count": batches.count(),
+            "lucky_id_count": lucky_ids.count(),
+            "active_chart_accounts_count": active_chart_accounts.count(),
+            "collection_mappings_count": collection_mappings.count(),
+            "posting_profiles_count": posting_profiles_count,
+            "has_tax_profile": bool(active_tax_profile),
+            "has_print_branding": bool(active_print_settings),
+            "has_print_terms": document_terms_configured,
+            "numbering_verified": numbering_ready,
+            "last_evaluated": timezone.now().isoformat(),
+        },
         "read_only": True,
         "mutation_policy": "This endpoint is read-only. It does not seed, repair, approve, post, reconcile, reset, create StockLedger, create salary payments, create payslips, or mutate historical records.",
     }

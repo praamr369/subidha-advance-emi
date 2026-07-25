@@ -5,6 +5,9 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from subscriptions.models import AuditLog
+from subscriptions.services.audit_service import log_audit
+
 from accounting.models import (
     AccountingBridgePosting,
     AccountingPeriod,
@@ -605,6 +608,20 @@ class _AccountingImportView(AdminAccountingPhase3ReportView):
             raise ValidationError({"file": "CSV file is required."})
         return uploaded
 
+    def _log_import(self, request, *, dataset, payload):
+        """Record a committed master-data import. Preview endpoints do not call this."""
+        log_audit(
+            action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
+            instance=request.user,
+            performed_by=request.user,
+            metadata={
+                "event": "ACCOUNTING_MASTER_IMPORT_POSTED",
+                "dataset": dataset,
+                "filename": getattr(request.FILES.get("file"), "name", ""),
+                "result": payload,
+            },
+        )
+
 
 class ChartOfAccountsImportPreviewView(_AccountingImportView):
     def post(self, request):
@@ -624,6 +641,7 @@ class ChartOfAccountsImportPostView(_AccountingImportView):
             )
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)}) from exc
+        self._log_import(request, dataset="CHART_OF_ACCOUNTS", payload=payload)
         return Response(payload, status=status.HTTP_200_OK)
 
 
@@ -645,6 +663,7 @@ class VendorImportPostView(_AccountingImportView):
             )
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)}) from exc
+        self._log_import(request, dataset="VENDORS", payload=payload)
         return Response(payload, status=status.HTTP_200_OK)
 
 
@@ -666,6 +685,7 @@ class EmployeeImportPostView(_AccountingImportView):
             )
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)}) from exc
+        self._log_import(request, dataset="EMPLOYEES", payload=payload)
         return Response(payload, status=status.HTTP_200_OK)
 
 
@@ -682,6 +702,21 @@ class _BridgeRunView(AdminAccountingPhase3ReportView):
             )
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)}) from exc
+
+        # Dry runs post nothing, so they are not recorded as state changes.
+        if not serializer.validated_data.get("dry_run"):
+            log_audit(
+                action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
+                instance=request.user,
+                performed_by=request.user,
+                metadata={
+                    "event": "ACCOUNTING_BRIDGE_RUN_POSTED",
+                    "bridge": self.service.__name__,
+                    "start_date": str(serializer.validated_data.get("start_date")),
+                    "end_date": str(serializer.validated_data.get("end_date")),
+                    "result": payload,
+                },
+            )
         return Response(payload, status=status.HTTP_200_OK)
 
 

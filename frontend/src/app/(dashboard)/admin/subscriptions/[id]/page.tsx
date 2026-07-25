@@ -31,6 +31,8 @@ import { apiFetch, toArray } from "@/lib/api";
 import { formatPlanTypeLabel } from "@/lib/plan-labels";
 import { cn } from "@/lib/utils";
 import GuarantorSection from "@/components/subscriptions/GuarantorSection";
+import { SubscriptionDocumentUploadPanel } from "@/components/subscriptions/SubscriptionDocumentUploadPanel";
+import { GenerateRentLeaseLedgerModal } from "./GenerateRentLeaseLedgerModal";
 import {
   normalizeDeliveryRecord,
   type DeliveryRecord,
@@ -164,6 +166,17 @@ type LeaseProfile = RentProfile & {
   ownership_transfer_allowed: boolean;
 };
 
+type RentLeaseDemandRow = {
+  id: number;
+  demand_type: string;
+  due_date: string | null;
+  amount: string;
+  status: string;
+  paid_amount: string;
+  waived_amount: string;
+  reversed_amount: string;
+};
+
 type SubscriptionDetailRecord = {
   id: number;
   customer_id: number | null;
@@ -202,6 +215,7 @@ type SubscriptionDetailRecord = {
   delivery_summary: DeliveryRecord | null;
   deliveries: DeliveryRecord[];
   emis: EmiRow[];
+  rent_lease_demands: RentLeaseDemandRow[];
   rent_profile: RentProfile | null;
   lease_profile: LeaseProfile | null;
   documents: ContractDocument[];
@@ -519,6 +533,19 @@ function normalizeAuditEvent(raw: Record<string, unknown>): AuditEvent {
   };
 }
 
+function normalizeRentLeaseDemandRow(raw: Record<string, unknown>): RentLeaseDemandRow {
+  return {
+    id: toNumber(raw.id),
+    demand_type: toStringValue(raw.demand_type).trim() || "UNKNOWN",
+    due_date: toNullableString(raw.due_date),
+    amount: String(raw.amount ?? "0.00"),
+    status: toStringValue(raw.status).trim() || "UNKNOWN",
+    paid_amount: String(raw.paid_amount ?? "0.00"),
+    waived_amount: String(raw.waived_amount ?? "0.00"),
+    reversed_amount: String(raw.reversed_amount ?? "0.00"),
+  };
+}
+
 function normalizeSubscriptionDetail(
   raw: Record<string, unknown>
 ): SubscriptionDetailRecord {
@@ -573,6 +600,7 @@ function normalizeSubscriptionDetail(
       normalizeDeliveryRecord
     ),
     emis: toArray<Record<string, unknown>>(raw.emis).map(normalizeEmiRow),
+    rent_lease_demands: toArray<Record<string, unknown>>(raw.rent_lease_demands).map(normalizeRentLeaseDemandRow),
     rent_profile: normalizeRentProfile(raw.rent_profile),
     lease_profile: normalizeLeaseProfile(raw.lease_profile),
     documents: toArray<Record<string, unknown>>(raw.documents).map(normalizeContractDocument),
@@ -641,6 +669,7 @@ export default function AdminSubscriptionDetailPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
 
   const loadPage = useCallback(
     async (mode: "initial" | "refresh" = "initial") => {
@@ -1306,6 +1335,57 @@ export default function AdminSubscriptionDetailPage() {
                       value={money(winnerSummary?.waived_amount ?? financialSummary.waived_amount)}
                     />
                   </div>
+
+                  <div className="mt-6 pt-5 border-t border-border">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-3">
+                      Contract Documents
+                    </div>
+                    {contractDocuments.length > 0 ? (
+                      <div className="grid gap-2 mb-5">
+                        {contractDocuments.slice(0, 10).map((doc) => (
+                          <div
+                            key={doc.id}
+                            className="flex flex-col gap-1 rounded-xl border border-border bg-background px-4 py-3"
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="text-sm font-medium text-foreground">
+                                {doc.document_type.replace(/_/g, " ")}
+                              </div>
+                              <ERPStatusBadge status={doc.verification_status} size="sm" />
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              Uploaded {formatDateTime(doc.created_at)} · {doc.uploaded_by_username || "—"}
+                            </div>
+                            {doc.file_url ? (
+                              <a
+                                href={doc.file_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-sm font-medium text-sky-700 hover:underline"
+                              >
+                                Open file
+                              </a>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="mb-5 rounded-xl border border-border bg-muted px-4 py-3 text-sm text-muted-foreground">
+                        No documents uploaded yet.
+                      </div>
+                    )}
+                    
+                    <SubscriptionDocumentUploadPanel 
+                      subscriptionId={subscription.id} 
+                      allowedDocTypes={[
+                        "CUSTOMER_SIGNATURE", 
+                        "CUSTOMER_KYC_ID",
+                        "ADVANCE_EMI_CONTRACT_PDF",
+                        "PAYMENT_RECEIPT_PDF"
+                      ]} 
+                      description="Upload signed contract or scheme consent to clear readiness blockers."
+                    />
+                  </div>
                 </DetailPanel>
               ) : (
                 <DetailPanel
@@ -1429,6 +1509,38 @@ export default function AdminSubscriptionDetailPage() {
                             No documents uploaded yet. Upload KYC ID and signature from the create flow or via subscription documents endpoint.
                           </div>
                         )}
+                      </div>
+                      
+                      <SubscriptionDocumentUploadPanel 
+                        subscriptionId={subscription.id} 
+                        allowedDocTypes={[
+                          "RENT_CONTRACT_PDF",
+                          "LEASE_CONTRACT_PDF",
+                          "SECURITY_DEPOSIT_RECEIPT_PDF",
+                          "ASSET_HANDOVER_ACKNOWLEDGEMENT",
+                        ]}
+                        description="Upload essential documents for this active contract to complete the handover and security deposit workflows."
+                      />
+
+                      <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-border pt-5">
+                        <Link
+                          href={`/admin/subscriptions/${subscription.id}/contract/print`}
+                          className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium shadow-sm transition hover:bg-muted"
+                        >
+                          Print Rent/Lease Contract
+                        </Link>
+                        <Link
+                          href={`/admin/finance/collect?subscription=${subscription.id}&context=security_deposit`}
+                          className="inline-flex h-9 items-center justify-center rounded-md bg-sky-700 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-sky-800"
+                        >
+                          Collect Security Deposit
+                        </Link>
+                        <Link
+                          href={`/admin/delivery/create?subscription=${subscription.id}`}
+                          className="inline-flex h-9 items-center justify-center rounded-md border border-sky-200 bg-sky-50 text-sky-800 px-4 text-sm font-medium shadow-sm transition hover:bg-sky-100"
+                        >
+                          Ready for Delivery Handover
+                        </Link>
                       </div>
                     </>
                   ) : (
@@ -1763,6 +1875,58 @@ export default function AdminSubscriptionDetailPage() {
               </DetailPanel>
             ) : null}
 
+            {!isEmiSubscription ? (
+              <DetailPanel
+                title="Rent/Lease Ledger"
+                description="Upcoming and past demands for rent or lease. Demands track due dates, amounts, and statuses."
+                className="rounded-[28px]"
+              >
+                <div className="mb-4">
+                  <button
+                    onClick={() => setScheduleModalOpen(true)}
+                    className="inline-flex h-9 items-center justify-center rounded-md bg-sky-700 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-sky-800"
+                  >
+                    Generate Schedule
+                  </button>
+                </div>
+                {subscription.rent_lease_demands.length === 0 ? (
+                  <ERPEmptyState
+                    title="No demands generated"
+                    description="This subscription does not have a generated schedule yet."
+                  />
+                ) : (
+                  <DataTableShell>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full border-separate border-spacing-0">
+                        <thead>
+                          <tr className="text-left">
+                            <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Type</th>
+                            <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Due Date</th>
+                            <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Amount</th>
+                            <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Paid</th>
+                            <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {subscription.rent_lease_demands.map((demand) => (
+                            <tr key={demand.id} className="align-top">
+                              <td className="border-b border-border px-4 py-3 text-sm text-foreground">{demand.demand_type.replace("_", " ")}</td>
+                              <td className="border-b border-border px-4 py-3 text-sm text-foreground">{formatDate(demand.due_date)}</td>
+                              <td className="border-b border-border px-4 py-3 text-sm text-foreground">{money(demand.amount)}</td>
+                              <td className="border-b border-border px-4 py-3 text-sm text-foreground">{money(demand.paid_amount)}</td>
+                              <td className="border-b border-border px-4 py-3 text-sm text-foreground">
+                                <ERPStatusBadge status={demand.status} />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </DataTableShell>
+                )}
+              </DetailPanel>
+            ) : null}
+
             <section className="grid gap-6 xl:grid-cols-2">
               {isEmiSubscription ? (
                 <DetailPanel
@@ -1902,6 +2066,14 @@ export default function AdminSubscriptionDetailPage() {
           <div className="mt-6">
             <GuarantorSection subscriptionId={subscription.id} />
           </div>
+        ) : null}
+
+        {subscription ? (
+          <GenerateRentLeaseLedgerModal
+            subscriptionId={subscription.id}
+            open={scheduleModalOpen}
+            onOpenChange={setScheduleModalOpen}
+          />
         ) : null}
       </div>
     </ERPPageShell>

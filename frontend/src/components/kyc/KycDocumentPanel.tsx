@@ -561,7 +561,11 @@ export default function KycDocumentPanel(props: KycDocumentPanelProps) {
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium text-foreground">{doc.document_type || "Document"}</span>
+                        <span className="font-medium text-foreground">
+                          {doc.document_type === "OTHER" && doc.category && doc.category !== "UNSPECIFIED"
+                            ? doc.category.replace(/_/g, " ")
+                            : doc.document_type || "Document"}
+                        </span>
                         <StatusPill status={doc.status} />
                       </div>
                       <div className="mt-1 text-xs text-muted-foreground">
@@ -582,9 +586,21 @@ export default function KycDocumentPanel(props: KycDocumentPanelProps) {
                       ) : null}
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <a href={downloadHref(doc.id)} target="_blank" rel="noreferrer" className={btnGhost}>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const path = downloadHref(doc.id);
+                          try {
+                            const { openAuthenticatedFile } = await import("@/lib/export/auth-download");
+                            await openAuthenticatedFile(path);
+                          } catch (e) {
+                            alert("Failed to open file: " + (e instanceof Error ? e.message : String(e)));
+                          }
+                        }}
+                        className={btnGhost}
+                      >
                         View file
-                      </a>
+                      </button>
                       {props.mode === "admin" ? (
                         <>
                           <button

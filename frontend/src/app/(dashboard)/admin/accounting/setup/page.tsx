@@ -17,13 +17,13 @@ export default function UnifiedAccountingWorkbenchPage() {
 
   return (
     <ERPPageShell
-      eyebrow="Accounting"
-      title="Accounting Setup Workbench"
-      subtitle="Unified control center for Chart of Accounts, Finance Accounts, Mappings, and Bridge Reconciliation."
+      eyebrow="Finance Setup"
+      title="Finance Setup & Approvals"
+      subtitle="Unified control center for Income & Expense Categories, Bank & Cash Accounts, Automatic Rules, and Daily Approvals."
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
-        { label: "Accounting", href: ROUTES.admin.accounting },
-        { label: "Setup Workbench" },
+        { label: "Finance & Setup", href: ROUTES.admin.accounting },
+        { label: "Finance Setup & Approvals" },
       ]}
       statusBadge={{ label: "Enterprise Workflow", tone: "info" }}
     >
@@ -32,11 +32,11 @@ export default function UnifiedAccountingWorkbenchPage() {
         <div className="rounded-2xl border border-border/60 bg-gradient-to-b from-card to-card/50 p-2 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.1),inset_0_1px_1px_rgba(255,255,255,0.05)] backdrop-blur-md">
           <nav className="flex flex-wrap gap-2">
             {[
-              { id: "chart-accounts", label: "Chart of Accounts" },
-              { id: "finance-accounts", label: "Finance Accounts" },
-              { id: "mappings", label: "System Mappings" },
-              { id: "bridge-readiness", label: "Bridge Readiness" },
-              { id: "bridge-recon", label: "Reconciliation" },
+              { id: "chart-accounts", label: "Income & Expense Categories" },
+              { id: "finance-accounts", label: "Bank & Cash Accounts" },
+              { id: "mappings", label: "Automatic Rules" },
+              { id: "bridge-readiness", label: "Pre-Check Errors" },
+              { id: "bridge-recon", label: "Daily Approvals & Postings" },
             ].map((tab) => {
               const isActive = activeTab === tab.id;
               return (

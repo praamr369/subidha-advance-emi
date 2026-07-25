@@ -8,10 +8,9 @@ import ERPAuditNote from "@/components/erp/ERPAuditNote";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import {
   CrmOperationalWorkspace,
-  type CrmWorkspaceSectionCard,
 } from "@/components/workspace/CrmOperationalWorkspace";
 import { ROUTES } from "@/lib/routes";
-import { getAdminCrmWorkspace, type CrmWorkspacePayload } from "@/services/admin-erp";
+import { getAdminCrmWorkspace, getAdminWorkbenchItems, type CrmWorkspacePayload, type WorkbenchItem } from "@/services/admin-erp";
 import { listCustomers } from "@/services/customers";
 import { getCrmOverview, type CrmOverviewResponse } from "@/services/crm";
 import { getCrmFunnel, LEAD_STAGE_LABELS, type CrmFunnelResponse } from "@/services/crm-module";
@@ -87,6 +86,8 @@ function SourceBreakdown({ rows }: { rows: CrmFunnelResponse["source_breakdown"]
 
 export default function AdminCrmOverviewPage() {
   const [workspace, setWorkspace] = useState<CrmWorkspacePayload | null>(null);
+  const [assignedTasks, setAssignedTasks] = useState<WorkbenchItem[] | null>(null);
+  const [taskError, setTaskError] = useState<string | null>(null);
   const [overview, setOverview] = useState<CrmOverviewResponse | null>(null);
   const [customerCount, setCustomerCount] = useState<number | null>(null);
   const [funnel, setFunnel] = useState<CrmFunnelResponse | null>(null);
@@ -95,8 +96,9 @@ export default function AdminCrmOverviewPage() {
   useEffect(() => {
     let active = true;
     async function load() {
-      const [workspaceResult, overviewResult, customerResult, funnelResult] = await Promise.allSettled([
+      const [workspaceResult, tasksResult, overviewResult, customerResult, funnelResult] = await Promise.allSettled([
         getAdminCrmWorkspace(),
+        getAdminWorkbenchItems({ status: "OPEN" }),
         getCrmOverview(),
         listCustomers({ page: 1 }),
         getCrmFunnel(),
@@ -106,6 +108,9 @@ export default function AdminCrmOverviewPage() {
 
       if (workspaceResult.status === "fulfilled") setWorkspace(workspaceResult.value);
       else { setWorkspace(null); setError("CRM workspace status is unavailable."); }
+
+      if (tasksResult.status === "fulfilled") setAssignedTasks(tasksResult.value.results);
+      else { setAssignedTasks(null); setTaskError("Could not load workbench tasks."); }
 
       if (overviewResult.status === "fulfilled") setOverview(overviewResult.value);
       else setOverview(null);
@@ -121,74 +126,6 @@ export default function AdminCrmOverviewPage() {
     return () => { active = false; };
   }, []);
 
-  const cards = useMemo<CrmWorkspaceSectionCard[]>(() => {
-    const customersLoaded = customerCount !== null;
-    const partyCount = overview?.summary.party_count;
-    const leadsCount = overview?.summary.lead_count;
-    const followupsCount = overview?.summary.due_follow_up_count;
-    const supportCount = findPipelineCount(workspace, "support_open");
-    const kycCount = findPipelineCount(workspace, "pending_kyc");
-
-    return [
-      {
-        key: "registered-customers",
-        label: "Registered Customers",
-        purpose: "Canonical customer profiles used by direct-sale existing-customer selection.",
-        href: ROUTES.admin.customers,
-        count: customersLoaded ? customerCount : null,
-        status: customersLoaded ? "ready" : "loading",
-        statusMessage: customersLoaded ? `${customerCount} customer profiles.` : "Loading customer register status...",
-      },
-      {
-        key: "crm-parties",
-        label: "CRM Parties",
-        purpose: "Party 360 entries linked across customer, lead, partner, vendor, and staff roles.",
-        href: ROUTES.admin.crmParties,
-        count: typeof partyCount === "number" ? partyCount : null,
-        status: typeof partyCount === "number" ? "ready" : "loading",
-        statusMessage: typeof partyCount === "number" ? `${partyCount} party records.` : "Loading party directory status...",
-      },
-      {
-        key: "leads",
-        label: "Leads / Enquiries",
-        purpose: "Lead pipeline and enquiry conversion workflow.",
-        href: ROUTES.admin.crmLeads,
-        count: funnel ? funnel.summary.total_leads : (typeof leadsCount === "number" ? leadsCount : null),
-        status: funnel ? "ready" : "loading",
-        statusMessage: funnel
-          ? `${funnel.summary.total_leads} leads · ${funnel.summary.overall_conversion_rate}% conversion rate.`
-          : "Loading leads status...",
-      },
-      {
-        key: "followups",
-        label: "Follow-ups",
-        purpose: "Open interaction follow-up queue and due-call reminders.",
-        href: ROUTES.admin.crmFollowUps,
-        count: typeof followupsCount === "number" ? followupsCount : null,
-        status: typeof followupsCount === "number" ? "ready" : "loading",
-        statusMessage: typeof followupsCount === "number" ? `${followupsCount} due follow-ups.` : "Loading follow-up queue status...",
-      },
-      {
-        key: "kyc",
-        label: "KYC",
-        purpose: "Pending customer KYC verification queue for operational controls.",
-        href: ROUTES.admin.crmKyc,
-        count: workspace ? kycCount : null,
-        status: workspace ? "ready" : "loading",
-        statusMessage: workspace ? `${kycCount} KYC records pending review.` : "Loading KYC queue status...",
-      },
-      {
-        key: "support",
-        label: "Support / Service Cases",
-        purpose: "Customer service and support escalation queue.",
-        href: ROUTES.admin.supportRequests,
-        count: workspace ? supportCount : null,
-        status: workspace ? "ready" : "loading",
-        statusMessage: workspace ? `${supportCount} open support/service cases.` : "Loading support queue status...",
-      },
-    ];
-  }, [customerCount, overview, workspace, funnel]);
-
   return (
     <ERPPageShell
       eyebrow="CRM"
@@ -201,19 +138,70 @@ export default function AdminCrmOverviewPage() {
       actions={[
         { href: ROUTES.admin.crmLeads, label: "Leads", variant: "secondary" },
         { href: "/admin/crm/dashboard", label: "Dashboard", variant: "secondary" },
-        { href: ROUTES.admin.crmPipeline, label: "Pipeline", variant: "primary" },
+        { href: ROUTES.admin.crmAnalytics, label: "Pipeline", variant: "primary" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
       stats={[
-        { label: "Registered Customers", value: customerCount ?? "—", tone: "info" },
-        { label: "Active Leads", value: funnel ? funnel.summary.total_leads : (overview?.summary.lead_count ?? "—"), tone: "default" },
-        { label: "Due Follow-ups", value: overview?.summary.due_follow_up_count ?? "—", tone: typeof overview?.summary.due_follow_up_count === "number" && overview.summary.due_follow_up_count > 0 ? "warning" : "success" },
-        { label: "CRM Parties", value: overview?.summary.party_count ?? "—", tone: "default" },
+        { label: "Registered Customers", value: customerCount ?? "—", tone: "info", hint: "Active accounts" },
+        {
+          label: "Active Leads",
+          value: funnel ? funnel.summary.active : (overview?.summary.lead_count ?? "—"),
+          tone: "default",
+          hint: funnel ? `${funnel.summary.converted} converted of ${funnel.summary.total_leads}` : undefined,
+        },
+        {
+          label: "Due Follow-ups",
+          value: overview?.summary.due_follow_up_count ?? "—",
+          tone: typeof overview?.summary.due_follow_up_count === "number" && overview.summary.due_follow_up_count > 0 ? "warning" : "success",
+          hint: typeof overview?.summary.due_follow_up_count === "number" && overview.summary.due_follow_up_count > 0 ? "Needs action today" : "All caught up",
+        },
+        {
+          label: "Conversion Rate",
+          value: funnel ? `${funnel.summary.overall_conversion_rate}%` : "—",
+          tone: funnel && funnel.summary.overall_conversion_rate >= 30 ? "success" : "default",
+          hint: "Leads → customers",
+        },
       ]}
     >
       {error ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
       ) : null}
+
+      {/* KPI CARDS PORTED FROM WORKBENCH */}
+      <ERPSectionShell title="Dashboard KPIs" description="Real-time metrics">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+          <div className="rounded-lg border border-border bg-gradient-to-br from-primary/5 to-primary/10 p-6">
+            <div className="text-sm text-muted-foreground font-medium">Total Customers</div>
+            <div className="text-4xl font-bold text-primary mt-2">{customerCount ?? "—"}</div>
+            <div className="text-xs text-muted-foreground mt-2">Active accounts</div>
+          </div>
+          <div className="rounded-lg border border-border bg-gradient-to-br from-blue-500/5 to-blue-500/10 p-6">
+            <div className="text-sm text-muted-foreground font-medium">Active Leads</div>
+            <div className="text-4xl font-bold text-blue-600 mt-2">{funnel ? funnel.summary.active : "—"}</div>
+            <div className="text-xs text-muted-foreground mt-2">In pipeline</div>
+          </div>
+          <div className="rounded-lg border border-border bg-gradient-to-br from-amber-500/5 to-amber-500/10 p-6">
+            <div className="text-sm text-muted-foreground font-medium">Due Follow-ups</div>
+            <div className="text-4xl font-bold text-amber-600 mt-2">{overview?.summary.due_follow_up_count ?? "—"}</div>
+            <div className="text-xs text-muted-foreground mt-2">Awaiting action</div>
+          </div>
+          <div className="rounded-lg border border-border bg-gradient-to-br from-green-500/5 to-green-500/10 p-6">
+            <div className="text-sm text-muted-foreground font-medium">Conversion Rate</div>
+            <div className="text-4xl font-bold text-green-600 mt-2">{funnel ? `${funnel.summary.overall_conversion_rate}%` : "—"}</div>
+            <div className="text-xs text-muted-foreground mt-2">Leads to customers</div>
+          </div>
+          <div className="rounded-lg border border-border bg-gradient-to-br from-purple-500/5 to-purple-500/10 p-6">
+            <div className="text-sm text-muted-foreground font-medium">CRM Parties</div>
+            <div className="text-4xl font-bold text-purple-600 mt-2">{overview?.summary.party_count ?? "—"}</div>
+            <div className="text-xs text-muted-foreground mt-2">Total directory records</div>
+          </div>
+          <div className="rounded-lg border border-border bg-gradient-to-br from-red-500/5 to-red-500/10 p-6">
+            <div className="text-sm text-muted-foreground font-medium">Pending Approvals</div>
+            <div className="text-4xl font-bold text-red-600 mt-2">{workspace ? (findPipelineCount(workspace, "pending_kyc") + findPipelineCount(workspace, "subscription_requests_pending")) : "—"}</div>
+            <div className="text-xs text-muted-foreground mt-2">Action items</div>
+          </div>
+        </div>
+      </ERPSectionShell>
 
       <ERPSectionShell title="CRM desk" description="Customer intelligence routing without mixing financial mutations into the CRM layer.">
         <ERPAuditNote title="Operational separation" tone="info">
@@ -234,7 +222,34 @@ export default function AdminCrmOverviewPage() {
           </p>
         </ERPAuditNote>
 
-        <CrmOperationalWorkspace cards={cards} />
+        <CrmOperationalWorkspace 
+          workspace={workspace} 
+          assignedTasks={assignedTasks} 
+          taskError={taskError} 
+        />
+      </ERPSectionShell>
+
+      <ERPSectionShell title="Consumer Requests & Warranty" description="Manage post-sale and post-subscription consumer requests.">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Link href="/admin/consumer/defect-claims" className="group flex items-center gap-3 rounded-lg border border-border bg-background px-4 py-3 text-sm font-medium transition-colors hover:border-primary hover:bg-primary/5">
+            <div className="flex flex-col">
+              <span>Defect Claims</span>
+              <span className="text-xs text-muted-foreground font-normal mt-0.5">Consumer-reported defects</span>
+            </div>
+          </Link>
+          <Link href="/admin/consumer/return-requests" className="group flex items-center gap-3 rounded-lg border border-border bg-background px-4 py-3 text-sm font-medium transition-colors hover:border-primary hover:bg-primary/5">
+            <div className="flex flex-col">
+              <span>Return Requests</span>
+              <span className="text-xs text-muted-foreground font-normal mt-0.5">Consumer return tickets</span>
+            </div>
+          </Link>
+          <Link href="/admin/warranty/claims" className="group flex items-center gap-3 rounded-lg border border-border bg-background px-4 py-3 text-sm font-medium transition-colors hover:border-primary hover:bg-primary/5">
+            <div className="flex flex-col">
+              <span>Warranty Claims</span>
+              <span className="text-xs text-muted-foreground font-normal mt-0.5">Manage warranty cases</span>
+            </div>
+          </Link>
+        </div>
       </ERPSectionShell>
 
       {/* Funnel analytics */}
@@ -291,7 +306,7 @@ export default function AdminCrmOverviewPage() {
               View All Leads
             </Link>
             <Link
-              href={ROUTES.admin.crmPipeline}
+              href={ROUTES.admin.crmAnalytics}
               className="rounded-xl border border-primary bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
             >
               Open Pipeline Board

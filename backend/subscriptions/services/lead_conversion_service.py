@@ -271,6 +271,12 @@ class LeadConversionService:
         if not lead:
             return None
 
+        # Check for existing customer mapping (explicit or by phone matching)
+        customer = lead.converted_customer
+        if not customer and phone:
+            # Try to find existing customer by phone (smart matching)
+            customer = Customer.objects.filter(phone=phone).first()
+
         return {
             "id": lead.id,
             "name": lead.name,
@@ -282,10 +288,14 @@ class LeadConversionService:
 
             # Conversion journey
             "customer": {
-                "id": lead.converted_customer.id,
-                "name": lead.converted_customer.name,
-                "phone": lead.converted_customer.phone,
-            } if lead.converted_customer else None,
+                "id": customer.id,
+                "name": customer.name,
+                "phone": customer.phone,
+                "email": customer.user.email if customer.user else None,
+                "kyc_status": customer.kyc_status or "PENDING",
+                "city": customer.city or "N/A",
+                "created_at": customer.created_at.isoformat() if customer.created_at else None,
+            } if customer else None,
 
             "online_request": {
                 "id": lead.converted_online_request.id,

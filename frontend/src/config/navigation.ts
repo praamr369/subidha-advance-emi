@@ -216,7 +216,7 @@ function flattenGroups(groups: NavGroup[]): NavItem[] {
 const ADMIN_MODULE_ICONS: Record<string, NavIconKey> = {
   "Command Center": "dashboard",
   "Profiles & Parties": "customers",
-  "CRM & Requests": "crm",
+  "CRM & Customers": "crm",
   "Sales & Contracts": "billing",
   "Lucky Plan Control": "luckyDraws",
   "Collections & Cashier": "collectPayment",

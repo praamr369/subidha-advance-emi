@@ -17,7 +17,15 @@ class AdminUnifiedPayableView(APIView):
         payable_type = request.query_params.get("payable_type")
         search = request.query_params.get("search")
         status_category = request.query_params.get("status_category")
-        data = get_unified_payables(payable_type=payable_type, search=search, status_category=status_category)
+        party_type = request.query_params.get("party_type")
+        party_id = request.query_params.get("party_id")
+        data = get_unified_payables(
+            payable_type=payable_type,
+            search=search,
+            status_category=status_category,
+            party_type=party_type,
+            party_id=party_id,
+        )
         return Response(data)
 
 class AdminPayableActionView(APIView):
@@ -40,12 +48,12 @@ class AdminPayableFinanceAccountsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
-        accounts = FinanceAccount.objects.filter(
+        accounts = FinanceAccount.objects.select_related("branch").filter(
             is_active=True,
             is_real_settlement_account=True,
             kind__in=["CASH", "BANK", "UPI"]
         )
-        
+
         results = []
         for a in accounts:
             results.append({

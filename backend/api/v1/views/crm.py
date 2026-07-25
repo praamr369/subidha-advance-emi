@@ -19,6 +19,7 @@ from crm.models import (
     PartyInteraction,
     PartyInteractionStatus,
     PartyLink,
+    PartyLinkRole,
     PartyMaster,
 )
 from crm.services.interaction_service import (
@@ -124,6 +125,7 @@ class CrmOverviewView(APIView):
                 "summary": {
                     "party_count": party_queryset.count(),
                     "lead_count": role_counts.get("LEAD", 0),
+                    "open_lead_count": PublicLead.objects.filter(id__in=PartyLink.objects.filter(role_type="LEAD", party__in=party_queryset).values_list("source_pk", flat=True), status__in=["NEW", "IN_PROGRESS", "CONTACTED"]).count(),
                     "customer_count": role_counts.get("CUSTOMER", 0),
                     "partner_count": role_counts.get("PARTNER", 0),
                     "vendor_count": role_counts.get("VENDOR", 0),
@@ -212,6 +214,40 @@ class PartyDirectoryDetailView(APIView):
         for field, value in updates.items():
             setattr(party, field, value)
         party.save(update_fields=[*updates.keys(), "updated_at"])
+        return Response(build_party_detail_payload(party))
+
+
+class PartyResolveView(APIView):
+    """Resolve the PartyMaster for a role-source record (customer/partner/vendor/
+    staff/lead) and return the full cross-module 360 payload. Lets each role's
+    own detail page reuse the aggregated Party-360 view without duplicating the
+    aggregation logic. Query params: role, source_id."""
+
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        role = (request.query_params.get("role") or "").strip().upper()
+        source_id = request.query_params.get("source_id")
+        if role not in PartyLinkRole.values:
+            return Response({"detail": "Invalid or missing role."}, status=400)
+        try:
+            source_pk = int(source_id)
+        except (TypeError, ValueError):
+            return Response({"detail": "Invalid or missing source_id."}, status=400)
+
+        # Best-effort: ensure links exist for freshly created source records.
+        seed_missing_party_links()
+        link = (
+            PartyLink.objects.filter(role_type=role, source_pk=source_pk)
+            .select_related("party")
+            .first()
+        )
+        if not link:
+            return Response({"detail": "No party linked to this record."}, status=404)
+        party = (
+            PartyMaster.objects.prefetch_related("links", "interactions")
+            .get(pk=link.party_id)
+        )
         return Response(build_party_detail_payload(party))
 
 

@@ -2,17 +2,19 @@
 
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 
 import DrawerShell from "@/components/ui/DrawerShell";
 import { workflowsForRole, type WorkflowDefinition, type WorkflowId } from "@/config/workflows";
 import type { NavigationRole } from "@/config/navigation";
-import AdminCustomerCreatePage from "@/domains/customers/pages/AdminCustomerCreatePage";
-import SubscriptionCreatePage from "@/domains/subscriptions/pages/SubscriptionCreatePage";
-import AdminPaymentCollectPage from "@/domains/payments/pages/AdminPaymentCollectPage";
-import PartnerCollectionCreatePage from "@/domains/partner/pages/PartnerCollectionCreatePage";
-import CustomerSubscriptionRequestCreatePage from "@/domains/subscription-requests/pages/CustomerSubscriptionRequestCreatePage";
 import ActionButton from "@/components/ui/ActionButton";
 import { cn } from "@/lib/utils";
+
+const AdminCustomerCreatePage = dynamic(() => import("@/domains/customers/pages/AdminCustomerCreatePage"), { ssr: false });
+const SubscriptionCreatePage = dynamic(() => import("@/domains/subscriptions/pages/SubscriptionCreatePage"), { ssr: false });
+const AdminPaymentCollectPage = dynamic(() => import("@/domains/payments/pages/AdminPaymentCollectPage"), { ssr: false });
+const PartnerCollectionCreatePage = dynamic(() => import("@/domains/partner/pages/PartnerCollectionCreatePage"), { ssr: false });
+const CustomerSubscriptionRequestCreatePage = dynamic(() => import("@/domains/subscription-requests/pages/CustomerSubscriptionRequestCreatePage"), { ssr: false });
 
 export type WorkflowLaunchContext = {
   query?: Record<string, string | number | boolean | null | undefined>;

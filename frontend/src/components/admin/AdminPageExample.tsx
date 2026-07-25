@@ -210,7 +210,7 @@ export const AdminPageExample: React.FC<AdminPageExampleProps> = ({
         </div>
       ),
       highlight: selectedItems.has(item.id || idx),
-      onSelect: (selected) => {
+      onSelect: (selected: boolean) => {
         const next = new Set(selectedItems);
         if (selected) next.add(item.id || idx);
         else next.delete(item.id || idx);

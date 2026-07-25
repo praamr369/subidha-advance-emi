@@ -687,6 +687,8 @@ def search_receivables(*, query: str = "", user=None, audience: str = "admin", l
         q_cleaned = query.strip()
         if q_cleaned.startswith("LEGACY-") and q_cleaned[7:].isdigit():
             qs = qs.filter(id=int(q_cleaned[7:]))
+        elif q_cleaned.startswith("outstanding:") and q_cleaned[12:].isdigit():
+            qs = qs.filter(id=int(q_cleaned[12:]))
         elif q_cleaned.isdigit():
             qs = qs.filter(Q(phone__icontains=q_cleaned) | Q(id=int(q_cleaned)))
         else:

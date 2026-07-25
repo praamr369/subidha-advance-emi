@@ -65,13 +65,18 @@ export default function AdminPaymentCollectPage({
   useEffect(() => {
     if (queryString) {
       let q = queryString.trim();
+      let contextStr: string | undefined = undefined;
+      
       if (q.startsWith("?")) {
         const params = new URLSearchParams(q);
         const sub = params.get("subscription");
         const out = params.get("outstanding");
+        const ctx = params.get("context");
+        
+        if (ctx) contextStr = ctx.toUpperCase();
         
         if (sub) {
-          q = sub;
+          q = `subscription:${sub}`;
         } else if (out) {
           q = `outstanding:${out}`;
         } else {
@@ -80,11 +85,11 @@ export default function AdminPaymentCollectPage({
       }
       
       setSearchQuery(q);
-      void handleSearch(q);
+      void handleSearch(q, contextStr);
     }
   }, [queryString]);
 
-  async function handleSearch(query: string) {
+  async function handleSearch(query: string, autoSelectContext?: string) {
     const trimmed = query.trim();
     setSearchError(null);
     setSuccessResponse(null);
@@ -98,6 +103,19 @@ export default function AdminPaymentCollectPage({
     try {
       const payload = await searchAdminReceivables(trimmed);
       setSearchResults(payload.results);
+
+      if (autoSelectContext === "SECURITY_DEPOSIT") {
+        const depositRow = payload.results.find((row) => 
+          row.result_type === "DEPOSIT" || row.secondary_badges?.includes("DEPOSIT") || row.source_type === "RENT" || row.source_type === "LEASE"
+        );
+        if (depositRow) {
+          handleSelectReceivable(depositRow);
+        } else if (payload.results.length === 1) {
+          handleSelectReceivable(payload.results[0]);
+        }
+      } else if (payload.results.length === 1 && (query.startsWith("subscription:") || query.startsWith("outstanding:"))) {
+        handleSelectReceivable(payload.results[0]);
+      }
     } catch (error) {
       setSearchResults([]);
       setSearchError(normalizeApiError(error).message || "Unable to search receivables.");
@@ -201,6 +219,14 @@ export default function AdminPaymentCollectPage({
             >
               Collect Another Payment
             </button>
+            {queryString && queryString.includes("subscription=") && (
+              <a
+                href={`/admin/subscriptions/${new URLSearchParams(queryString.startsWith("?") ? queryString : `?${queryString}`).get("subscription")}`}
+                className="inline-flex items-center rounded-md border border-indigo-300 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 shadow-sm hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+              >
+                Back to Contract
+              </a>
+            )}
           </div>
         </div>
       )}

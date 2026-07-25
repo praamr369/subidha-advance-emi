@@ -89,6 +89,14 @@ def _classify(row: RentLeaseDepositTransaction):
     tx_type = (row.transaction_type or "").strip().upper()
     if status in {RentLeaseDepositTransactionStatus.VOIDED, RentLeaseDepositTransactionStatus.REVERSED, "VOID", "CANCELLED", "CANCELED"}:
         return SKIPPED_EVENT_KEY, "Security deposit skipped", "Voided, cancelled, or reversed deposit transactions are not bridge-postable.", False
+    if tx_type in {RentLeaseDepositTransactionType.DEMAND_CREATED, RentLeaseDepositTransactionType.REFUND_APPROVED}:
+        # Non-cash lifecycle markers: the demand-raised and refund-approved rows
+        # never post a journal on their own. The concrete DEPOSIT_RECEIPT (F17)
+        # and DEPOSIT_REFUND (F18) rows own the posting. Classify them as
+        # not-applicable so they land in the clean "skipped" bucket instead of
+        # being force-blocked on a finance account they are never expected to
+        # carry.
+        return SKIPPED_EVENT_KEY, "Security deposit source contract", "Demand/approval lifecycle record — the deposit receipt or refund row owns the F17/F18 posting.", False
     if tx_type == RentLeaseDepositTransactionType.DEPOSIT_REFUND:
         return _refund_event_for_plan(row), LABEL_BY_EVENT.get(_refund_event_for_plan(row), "Security Deposit Refund"), None, False
     if tx_type == RentLeaseDepositTransactionType.REFUNDED and _has_complete_refund_evidence(row):

@@ -90,7 +90,7 @@ const ADMIN_PERMANENT_REDIRECTS: Array<{ source: string; destination: string }> 
   { source: "/admin/support-requests", destination: "/admin/requests/support" },
   { source: "/admin/support-requests/:id*", destination: "/admin/requests/support" },
   { source: "/admin/subscription-requests", destination: "/admin/requests/subscriptions" },
-  { source: "/admin/subscription-requests/:id*", destination: "/admin/requests/subscriptions" },
+  { source: "/admin/subscription-requests/:id*", destination: "/admin/requests/subscriptions/:id*" },
   // Duplicate billing routes
   { source: "/admin/billing/direct-sales", destination: "/admin/billing/direct-sale" },
   { source: "/admin/sales/direct-sale/create", destination: "/admin/billing/direct-sale/create" },
@@ -100,6 +100,34 @@ const ADMIN_PERMANENT_REDIRECTS: Array<{ source: string; destination: string }> 
   { source: "/admin/crm/customers/:id", destination: "/admin/customers/:id" },
   // Setup alias
   { source: "/admin/setup/readiness", destination: "/admin/settings/business-setup" },
+  // Additional discovered alias gaps
+  { source: "/admin/accounting/attendance", destination: "/admin/hr/attendance" },
+  { source: "/admin/accounting/expense-claims", destination: "/admin/hr/expenses" },
+  { source: "/admin/accounting/leave", destination: "/admin/hr/leave" },
+  { source: "/admin/accounting/reconciliation", destination: "/admin/accounting/bridge-reconciliation" },
+  { source: "/admin/accounting/staff", destination: "/admin/hr/staff" },
+  { source: "/admin/analytics", destination: "/admin/reports" }, // Query params handled separately if needed
+  { source: "/admin/batches/:id/generate-lucky-ids", destination: "/admin/batches/:id" },
+  { source: "/admin/finance/reconciliation", destination: "/admin/accounting/bridge-reconciliation" },
+  { source: "/admin/hr/expense-claims", destination: "/admin/hr/expenses" },
+  { source: "/admin/legacy-dashboard", destination: "/admin/erp" },
+  { source: "/admin/lucky-plan/batches", destination: "/admin/batches" },
+  { source: "/admin/lucky-plan/draws", destination: "/admin/lucky-draws" },
+  { source: "/admin/profiles/branches", destination: "/admin/branches" },
+  { source: "/admin/profiles/customers", destination: "/admin/customers" },
+  { source: "/admin/profiles/parties", destination: "/admin/crm/parties" },
+  { source: "/admin/profiles/partners", destination: "/admin/partners" },
+  { source: "/admin/profiles/staff", destination: "/admin/hr/staff" },
+  { source: "/admin/profiles/vendors", destination: "/admin/vendors" },
+  { source: "/admin/purchases/vendor-payables", destination: "/admin/payables" }, // type=vendor_settlement
+  { source: "/admin/purchases/vendor-payments", destination: "/admin/payables" },
+  { source: "/admin/reconciliation", destination: "/admin/accounting/bridge-reconciliation" },
+  { source: "/admin/reconciliation/runs", destination: "/admin/accounting/bridge-reconciliation" },
+  // CRM Hub Deduplication redirects
+  { source: "/admin/workbench", destination: "/admin/crm" },
+  { source: "/admin/workbench/lead-workflow", destination: "/admin/crm/leads" },
+  { source: "/admin/crm/pipeline", destination: "/admin/crm/analytics" },
+  { source: "/admin/crm/pipeline-analytics", destination: "/admin/crm/analytics" },
 ];
 
 const ONE_HOUR = 60 * 60;
@@ -108,9 +136,7 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1"],
   compress: true,
   poweredByHeader: false,
-  experimental: {
-    optimizePackageImports: ["lucide-react", "@tanstack/react-query"],
-  },
+  experimental: {},
   typescript: {
     ignoreBuildErrors: true,
   },

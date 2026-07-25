@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 # HR Routes (Session 4 Consolidation - 2026-06-24)
 from api.v1.routes import admin_hr_complete
-from api.v1.routes import workbench as workbench_routes
+from api.v1.routes import crm_workbench as workbench_routes
 from api.v1.routes import online_request as online_request_routes
 from api.v1.routes import crm_analytics as crm_analytics_routes
 
@@ -197,6 +197,7 @@ from api.v1.views.admin_partner_collection_requests import (
 from api.v1.views.finance_operations import (
     AdminAdvanceAllocationView,
     AdminFinanceAccountOperationalSummaryView,
+    AdminMoneyInHandView,
     AdminFinanceTransferView,
     AdminReconciliationOverviewView,
 )
@@ -492,16 +493,21 @@ from api.v1.views.admin_erp import (
 )
 from api.v1.views.admin_crm_module import (
     AdminCrmCustomerInteractionView,
-    AdminCrmFollowUpCallNoteView,
-    AdminCrmFollowUpCancelView,
-    AdminCrmFollowUpCompleteView,
-    AdminCrmFollowUpListView,
     AdminCrmFunnelView,
+    AdminCrmFollowUpListView,
+    AdminCrmFollowUpCallNoteView,
+    AdminCrmFollowUpCompleteView,
+    AdminCrmFollowUpCancelView,
+    AdminCrmFollowUpSnoozeView,
+    AdminCrmFollowUpDueView,
+    AdminCrmOpportunityStageView,
     AdminCrmLeadAssignView,
     AdminCrmLeadConvertView,
     AdminCrmLeadDetailView,
     AdminCrmLeadListCreateView,
     AdminCrmLeadOpportunityListCreateView,
+    AdminCrmLeadReconcileAllView,
+    AdminCrmLeadReconcileView,
     AdminCrmLeadStageUpdateView,
     AdminCrmLeadTaskListCreateView,
     AdminCrmOpportunityStageView,
@@ -567,8 +573,10 @@ from api.v1.views.admin_bi import (
     AdminBiSummaryView,
 )
 from api.v1.views.subscription_requests import (
+    AdminSubscriptionRequestAmendmentView,
     AdminSubscriptionRequestApproveView,
     AdminSubscriptionRequestDetailView,
+    AdminSubscriptionRequestHoldView,
     AdminSubscriptionRequestListView,
     AdminSubscriptionRequestOptionsView,
     AdminSubscriptionRequestRejectView,
@@ -621,6 +629,7 @@ from api.v1.views.reversal_control import (
 from api.v1.views.reversal_center import (
     AdminCustomerCreditsView,
     AdminCustomerRefundApproveView,
+    AdminCustomerReversalContextView,
     AdminCustomerRefundCreateView,
     AdminCustomerRefundPayView,
     AdminDirectSaleCancelView,
@@ -851,6 +860,8 @@ urlpatterns = [
     path("subscription-requests/<int:pk>/", AdminSubscriptionRequestDetailView.as_view()),
     path("subscription-requests/<int:pk>/approve/", AdminSubscriptionRequestApproveView.as_view()),
     path("subscription-requests/<int:pk>/reject/", AdminSubscriptionRequestRejectView.as_view()),
+    path("subscription-requests/<int:pk>/hold/", AdminSubscriptionRequestHoldView.as_view()),
+    path("subscription-requests/<int:pk>/amendment/", AdminSubscriptionRequestAmendmentView.as_view()),
     path("product-request-options/", AdminProductRequestOptionsView.as_view()),
     path("product-requests/", AdminProductRequestListView.as_view()),
     path("product-requests/<int:pk>/decision/", AdminProductRequestDecisionView.as_view()),
@@ -905,6 +916,7 @@ urlpatterns = [
     path("reconciliation/items/<int:pk>/resolve/", AdminReconciliationItemResolveView.as_view()),
     path("reconciliation/items/<int:pk>/reopen/", AdminReconciliationItemReopenView.as_view()),
     path("finance-accounts/operational-summary/", AdminFinanceAccountOperationalSummaryView.as_view()),
+    path("finance/money-in-hand/", AdminMoneyInHandView.as_view()),
     # Phase 4: finance dashboard + registers + document center
     path("finance/dashboard/", AdminFinanceDashboardView.as_view()),
     path("finance/collections/", AdminFinanceCollectionsView.as_view()),
@@ -1048,12 +1060,16 @@ urlpatterns = [
     path("crm/internal/leads/<int:pk>/stage/", AdminCrmLeadStageUpdateView.as_view()),
     path("crm/internal/leads/<int:pk>/assign/", AdminCrmLeadAssignView.as_view()),
     path("crm/internal/leads/<int:pk>/convert/", AdminCrmLeadConvertView.as_view()),
+    path("crm/internal/leads/<int:pk>/reconcile/", AdminCrmLeadReconcileView.as_view()),
+    path("crm/internal/leads/reconcile-all/", AdminCrmLeadReconcileAllView.as_view()),
     path("crm/internal/leads/<int:pk>/tasks/", AdminCrmLeadTaskListCreateView.as_view()),
     path("crm/internal/leads/<int:pk>/opportunities/", AdminCrmLeadOpportunityListCreateView.as_view()),
     path("crm/internal/follow-ups/", AdminCrmFollowUpListView.as_view()),
     path("crm/internal/follow-ups/<int:pk>/call-note/", AdminCrmFollowUpCallNoteView.as_view()),
     path("crm/internal/follow-ups/<int:pk>/complete/", AdminCrmFollowUpCompleteView.as_view()),
     path("crm/internal/follow-ups/<int:pk>/cancel/", AdminCrmFollowUpCancelView.as_view()),
+    path("crm/internal/follow-ups/<int:pk>/snooze/", AdminCrmFollowUpSnoozeView.as_view()),
+    path("crm/follow-ups/due/", AdminCrmFollowUpDueView.as_view()),
     path("crm/internal/opportunities/<int:pk>/stage/", AdminCrmOpportunityStageView.as_view()),
     path("crm/funnel/", AdminCrmFunnelView.as_view()),
     path("crm/internal/customers/<int:pk>/profile/", AdminCustomerCrmProfileView.as_view()),
@@ -1155,6 +1171,7 @@ urlpatterns = [
     path("billing/direct-sales/<int:pk>/returns/", AdminDirectSaleReturnCreateView.as_view()),
     path("billing/direct-sales/<int:pk>/exchange/", AdminDirectSaleExchangeCreateView.as_view()),
     path("billing/direct-sales/<int:pk>/return-eligibility/", AdminDirectSaleReturnEligibilityView.as_view()),
+    path("billing/reversal-context/", AdminCustomerReversalContextView.as_view()),
     path("billing/returns/", AdminReturnListView.as_view()),
     path("billing/returns/<int:pk>/", AdminReturnDetailView.as_view()),
     path("billing/returns/<int:pk>/approve/", AdminReturnApproveView.as_view()),

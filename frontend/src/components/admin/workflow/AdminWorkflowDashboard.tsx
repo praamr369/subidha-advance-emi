@@ -248,7 +248,7 @@ export default function AdminWorkflowDashboard() {
                     <div className="mt-4 flex flex-wrap gap-2">
                       {module.actions.map((action) => (
                         <Link
-                          key={action.href}
+                          key={`${action.label}-${action.href}`}
                           href={action.href}
                           className="inline-flex items-center gap-1 rounded-xl border border-border px-3 py-2 text-sm font-medium transition hover:bg-accent hover:text-accent-foreground"
                         >

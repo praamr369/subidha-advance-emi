@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from django.urls import reverse
 from django.utils import timezone
+from decimal import Decimal
 from rest_framework import serializers
 
 from accounts.models import User
@@ -45,21 +46,21 @@ class ProductBrochureSettingsUpdateSerializer(serializers.Serializer):
     monthly_rent = serializers.DecimalField(
         max_digits=12,
         decimal_places=2,
-        min_value=0,
+        min_value=Decimal("0.00"),
         required=False,
         allow_null=True,
     )
     lease_monthly_amount = serializers.DecimalField(
         max_digits=12,
         decimal_places=2,
-        min_value=0,
+        min_value=Decimal("0.00"),
         required=False,
         allow_null=True,
     )
     security_deposit = serializers.DecimalField(
         max_digits=12,
         decimal_places=2,
-        min_value=0,
+        min_value=Decimal("0.00"),
         required=False,
         allow_null=True,
     )
@@ -843,17 +844,17 @@ class BrochureQuotationLineWriteSerializer(serializers.Serializer):
     plan_type = serializers.ChoiceField(choices=BrochureQuotationLine.PlanType.choices)
     quantity = serializers.IntegerField(min_value=1, default=1)
     unit_price = serializers.DecimalField(
-        max_digits=12, decimal_places=2, min_value=0, required=False
+        max_digits=12, decimal_places=2, min_value=Decimal("0.00"), required=False
     )
     monthly_amount = serializers.DecimalField(
-        max_digits=12, decimal_places=2, min_value=0, required=False
+        max_digits=12, decimal_places=2, min_value=Decimal("0.00"), required=False
     )
     tenure_months = serializers.IntegerField(min_value=1, required=False, allow_null=True)
     security_deposit = serializers.DecimalField(
-        max_digits=12, decimal_places=2, min_value=0, required=False
+        max_digits=12, decimal_places=2, min_value=Decimal("0.00"), required=False
     )
     discount_amount = serializers.DecimalField(
-        max_digits=12, decimal_places=2, min_value=0, required=False, default=0
+        max_digits=12, decimal_places=2, min_value=Decimal("0.00"), required=False, default=0
     )
     availability_label = serializers.CharField(
         max_length=80, required=False, allow_blank=True
@@ -875,10 +876,10 @@ class BrochureQuotationCreateSerializer(serializers.Serializer):
     validity_date = serializers.DateField(required=False, allow_null=True)
     expected_delivery_date = serializers.DateField(required=False, allow_null=True)
     discount_amount = serializers.DecimalField(
-        max_digits=12, decimal_places=2, min_value=0, required=False, default=0
+        max_digits=12, decimal_places=2, min_value=Decimal("0.00"), required=False, default=0
     )
     delivery_charge = serializers.DecimalField(
-        max_digits=12, decimal_places=2, min_value=0, required=False, default=0
+        max_digits=12, decimal_places=2, min_value=Decimal("0.00"), required=False, default=0
     )
     terms_text = serializers.CharField(required=False, allow_blank=True)
     internal_note = serializers.CharField(required=False, allow_blank=True)
@@ -909,10 +910,10 @@ class BrochureQuotationUpdateSerializer(serializers.Serializer):
     validity_date = serializers.DateField(required=False, allow_null=True)
     expected_delivery_date = serializers.DateField(required=False, allow_null=True)
     discount_amount = serializers.DecimalField(
-        max_digits=12, decimal_places=2, min_value=0, required=False
+        max_digits=12, decimal_places=2, min_value=Decimal("0.00"), required=False
     )
     delivery_charge = serializers.DecimalField(
-        max_digits=12, decimal_places=2, min_value=0, required=False
+        max_digits=12, decimal_places=2, min_value=Decimal("0.00"), required=False
     )
     terms_text = serializers.CharField(required=False, allow_blank=True)
     internal_note = serializers.CharField(required=False, allow_blank=True)

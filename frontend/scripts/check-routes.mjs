@@ -46,7 +46,7 @@ const requiredAdminSidebarParents = [
   ["Inventory & Stock", "/admin/inventory"],
   ["Purchases & Vendors", "/admin/purchases"],
   ["Manufacturing", "/admin/manufacturing"],
-  ["CRM & Requests", "/admin/requests"],
+  ["CRM & Customers", "/admin/crm"],
   ["Delivery & Service", "/admin/deliveries"],
   ["HR & Staff", "/admin/hr"],
   ["BI & Reports", "/admin/bi"],

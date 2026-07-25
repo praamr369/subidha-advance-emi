@@ -53,6 +53,14 @@ type SubscriptionRow = {
   total_amount: string;
   monthly_amount: string;
   status: SubscriptionStatus;
+  financial_summary?: {
+    emi_total: string;
+    paid_amount: string;
+    waived_amount: string;
+    pending_amount: string;
+    outstanding_amount: string;
+  };
+  deposit_status?: string;
 };
 
 type SubscriptionListPayload = {
@@ -189,6 +197,13 @@ function normalizeSubscriptionRow(raw: Record<string, unknown>): SubscriptionRow
     total_amount: toMoneyString(raw.total_amount ?? raw.contract_value ?? raw.amount),
     monthly_amount: toMoneyString(raw.monthly_amount ?? raw.emi_amount ?? raw.installment_amount),
     status: normalizeStatus(raw),
+    financial_summary: raw.financial_summary ? {
+      emi_total: toMoneyString((raw.financial_summary as any).emi_total),
+      paid_amount: toMoneyString((raw.financial_summary as any).paid_amount),
+      waived_amount: toMoneyString((raw.financial_summary as any).waived_amount),
+      pending_amount: toMoneyString((raw.financial_summary as any).pending_amount),
+      outstanding_amount: toMoneyString((raw.financial_summary as any).outstanding_amount),
+    } : undefined,
   };
 }
 
@@ -543,6 +558,7 @@ export default function AdminSubscriptionsPage() {
         total_amount: row.total_amount,
         monthly_amount: row.monthly_amount,
         status: row.status,
+        deposit_status: row.deposit_status ?? "",
       })),
     [rows]
   );
@@ -797,6 +813,7 @@ export default function AdminSubscriptionsPage() {
                     { key: "total_amount", header: "total_amount" },
                     { key: "monthly_amount", header: "monthly_amount" },
                     { key: "status", header: "status" },
+                    { key: "deposit_status", header: "deposit_status" },
                   ],
                   exportRows
                 )
@@ -842,157 +859,152 @@ export default function AdminSubscriptionsPage() {
                   description="The current page has no results. Move to a previous page or change the filters."
                 />
               ) : (
-                <DataTableShell>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full border-separate border-spacing-0">
-                    <thead>
-                      <tr className="text-left">
-                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          Contract
-                        </th>
-                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          Customer (Profiles & Parties)
-                        </th>
-                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          Product / Plan type
-                        </th>
-                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground text-right">
-                          Contract value
-                        </th>
-                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          Status
-                        </th>
-                        <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          Navigate
-                        </th>
-                      </tr>
-                    </thead>
+                <div className="grid gap-4 xl:grid-cols-2">
+                  {rows.map((row) => (
+                    <div key={row.id} className="flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm transition hover:shadow-md">
+                      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border bg-muted/20 px-5 py-4">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-base font-semibold text-foreground">
+                              {row.subscription_number}
+                            </h4>
+                            <ERPStatusBadge status={row.status} size="sm" />
+                          </div>
+                          <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                            <span>Start: {formatDate(row.start_date)}</span>
+                            <span>·</span>
+                            <span>Tenure: {typeof row.tenure_months === "number" ? `${row.tenure_months} mo` : "—"}</span>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-semibold text-foreground">
+                            {formatRupee(row.total_amount)}
+                          </div>
+                          <div className="mt-1 text-xs text-muted-foreground flex items-center justify-end gap-1">
+                            <span>{row.plan_type || "Plan"} · {formatRupee(row.monthly_amount)}/mo</span>
+                            {(row.plan_type === "RENT" || row.plan_type === "LEASE") && (row.deposit_status === "SUBMITTED" || row.deposit_status === "PENDING") && (
+                              <>
+                                <span>·</span>
+                                <span className={cn(
+                                  "font-medium",
+                                  row.deposit_status === "SUBMITTED" ? "text-emerald-600" : "text-amber-600"
+                                )}>
+                                  {row.deposit_status === "SUBMITTED" ? "Deposit Paid" : "Deposit Pending"}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
 
-                    <tbody>
-                      {rows.map((row) => (
-                        <tr key={row.id} className="align-top">
-                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                            <div className="font-medium">{row.subscription_number}</div>
-                            <div className="mt-1 text-xs text-muted-foreground">
-                              Start {formatDate(row.start_date)}
-                            </div>
-                            <div className="mt-1 text-xs text-muted-foreground">
-                              Tenure {typeof row.tenure_months === "number" ? `${row.tenure_months} months` : "—"}
-                            </div>
-                          </td>
-
-                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                            <div className="font-medium">
+                      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 px-5 py-4">
+                        <div className="space-y-3">
+                          <div>
+                            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Customer</div>
+                            <div className="mt-1 text-sm font-medium">
                               <CustomerIntelligenceTrigger
                                 customerId={row.customer_id}
-                                customerName={row.customer_name || "Unknown customer"}
+                                customerName={row.customer_name || "Unknown"}
                                 scope="admin"
                               />
                             </div>
-                            <div className="mt-1 text-xs text-muted-foreground">
-                              {row.customer_phone || "No phone"}
+                            <div className="text-xs text-muted-foreground">{row.customer_phone || "No phone"}</div>
+                          </div>
+                          
+                          <div>
+                            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Product Context</div>
+                            <div className="mt-1 text-sm font-medium">{row.product_name || "Unknown product"}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {row.batch_code ? `Batch ${row.batch_code}` : "No Batch"}
+                              {typeof row.lucky_number === "number" ? ` · Lucky #${row.lucky_number}` : ""}
                             </div>
-                            <div className="mt-1 text-xs text-muted-foreground">
-                              {row.partner_name ? `Partner ${row.partner_name}` : "No partner"}
-                            </div>
-                          </td>
+                          </div>
+                        </div>
 
-                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                            <div className="font-medium">
-                              {row.product_name || "Unknown product"}
-                            </div>
-                            <div className="mt-1 text-xs text-muted-foreground">
-                              {row.product_code || "No product code"}
-                            </div>
-                            <div className="mt-1 text-xs text-muted-foreground">
-                              Plan: {row.plan_type || "—"}
-                            </div>
-                            {row.batch_code ? (
-                              <div className="mt-1 text-xs text-blue-700">
-                                Batch: {row.batch_code}
-                                {typeof row.lucky_number === "number" ? ` · Lucky #${row.lucky_number}` : ""}
-                                {" "}(Lucky Plan)
+                        <div className="space-y-3">
+                          <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Financial Ledger</div>
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div className="rounded-lg border border-border bg-muted/20 px-3 py-2">
+                              <div className="text-xs text-muted-foreground">Paid</div>
+                              <div className="font-semibold text-foreground">
+                                {formatRupee(row.financial_summary?.paid_amount || 0)}
                               </div>
-                            ) : (
-                              <div className="mt-1 text-xs text-muted-foreground">
-                                No batch / Lucky ID — Rent or Lease contract
+                            </div>
+                            <div className="rounded-lg border border-border bg-muted/20 px-3 py-2">
+                              <div className="text-xs text-muted-foreground">Outstanding</div>
+                              <div className="font-semibold text-foreground">
+                                {formatRupee(row.financial_summary?.outstanding_amount || row.total_amount)}
                               </div>
-                            )}
-                          </td>
-
-                          <td className="border-b border-border px-4 py-3 text-right text-sm text-foreground">
-                            <div className="font-semibold">
-                              {formatRupee(row.total_amount)}
                             </div>
-                            <div className="mt-1 text-xs text-muted-foreground">
-                              Monthly {formatRupee(row.monthly_amount)}
+                          </div>
+                          {Number(row.financial_summary?.waived_amount || 0) > 0 && (
+                            <div className="text-xs font-medium text-emerald-600">
+                              Waived: {formatRupee(row.financial_summary?.waived_amount || 0)}
                             </div>
-                            <div className="mt-1 text-xs text-muted-foreground">
-                              Payments → Collections & Cashier
-                            </div>
-                          </td>
+                          )}
+                        </div>
+                      </div>
 
-                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                            <ERPStatusBadge status={row.status} hideIcon />
-                          </td>
+                      <div className="border-t border-border bg-muted/10 px-5 py-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Link
+                            href={`/admin/subscriptions/${row.id}`}
+                            className="inline-flex h-8 items-center rounded-md bg-foreground px-3 text-xs font-medium text-background shadow-sm transition hover:opacity-90"
+                          >
+                            Open Details
+                          </Link>
+                          
+                          <button
+                            type="button"
+                            onClick={() => openWorkflow("admin.collectPayment", { query: { subscription: row.id } })}
+                            className="inline-flex h-8 items-center rounded-md border border-input bg-background px-3 text-xs font-medium shadow-sm transition hover:bg-muted"
+                          >
+                            Quick Collect
+                          </button>
 
-                          <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                            <div className="flex flex-col items-start gap-2">
-                              <Link
-                                href={`/admin/subscriptions/${row.id}`}
-                                className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                              >
-                                Open Subscription
-                              </Link>
+                          {row.status === "PENDING" && (
+                            <button
+                              type="button"
+                              className="inline-flex h-8 items-center rounded-md border border-blue-200 bg-blue-50 px-3 text-xs font-medium text-blue-700 shadow-sm transition hover:bg-blue-100"
+                              onClick={() => {
+                                // Activate placeholder - this would open the activate workflow
+                                router.push(`/admin/subscriptions/${row.id}`);
+                              }}
+                            >
+                              Activate Contract
+                            </button>
+                          )}
 
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  openWorkflow("admin.collectPayment", {
-                                    query: { subscription: row.id },
-                                  })
-                                }
-                                className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                              >
-                                Quick Collect
-                              </button>
+                          <Link
+                            href={`/admin/deliveries/create?subscription=${row.id}`}
+                            className="inline-flex h-8 items-center rounded-md border border-input bg-background px-3 text-xs font-medium shadow-sm transition hover:bg-muted"
+                          >
+                            Record Handover
+                          </Link>
 
-                              {typeof row.customer_id === "number" ? (
-                                <Link
-                                  href={`/admin/customers/${row.customer_id}`}
-                                  className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                                >
-                                  Customer
-                                </Link>
-                              ) : null}
+                          {(row.plan_type === "RENT" || row.plan_type === "LEASE") && (
+                            <Link
+                              href={`/admin/subscriptions/${row.id}?tab=ledger`}
+                              className="inline-flex h-8 items-center rounded-md border border-input bg-background px-3 text-xs font-medium shadow-sm transition hover:bg-muted"
+                            >
+                              Rent/Lease Mapping
+                            </Link>
+                          )}
 
-                              <Link
-                                href={`/admin/payments?subscription=${row.id}`}
-                                className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                              >
-                                Payments Register
-                              </Link>
-
-                              <Link
-                                href={`/admin/deliveries?subscription=${row.id}&portfolio=${
-                                  String(row.plan_type || "").toUpperCase() === "RENT"
-                                    ? "RENT"
-                                    : String(row.plan_type || "").toUpperCase() === "LEASE"
-                                      ? "LEASE"
-                                      : "ADVANCE_EMI"
-                                }`}
-                                className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                              >
-                                Delivery & Service
-                              </Link>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    </table>
-                  </div>
-                </DataTableShell>
+                          <button
+                            type="button"
+                            className="inline-flex h-8 items-center rounded-md border border-input bg-background px-3 text-xs font-medium shadow-sm transition hover:bg-muted"
+                            onClick={() => {
+                              router.push(`/admin/subscriptions/${row.id}/amend`);
+                            }}
+                          >
+                            Amend Contract
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
 
               {count > 0 ? (

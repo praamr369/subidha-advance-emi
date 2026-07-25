@@ -170,17 +170,18 @@ function actionLabel(event: AccountingBridgeReadinessEvent): string {
 function displayLabel(event: AccountingBridgeReadinessEvent): string {
   const status = normalizedStatus(event);
   if (isUnsupported(event)) return "Unsupported / future boundary";
-  if (isApprovalGated(event)) return "Approval required";
-  if (isBusinessReady(event)) return "Ready";
-  if (isPostableSetup(event)) return "Setup-ready profile";
-  if (status === "BLOCKED_BY_MAPPING") return "Setup/mapping missing";
+  if (isApprovalGated(event)) return "Approval workflow required";
+  if (isReconciled(event)) return "View Daily Approvals & Postings";
+  if (isPostableSetup(event)) return "Open Daily Approvals & Postings";
+  if (isWarning(event)) return "Review configuration warning";
   return status.replaceAll("_", " ");
 }
 
 function rowExplanation(event: AccountingBridgeReadinessEvent): string {
-  if (isUnsupported(event)) return "This is a future/unsupported source boundary. Do not mark it ready or create fake posting readiness.";
-  if (isApprovalGated(event)) return "Accounting setup exists, but controlled bridge posting approval is required.";
-  if (isPostableSetup(event) && !isReconciled(event)) return "This is a setup-ready profile. Actual source rows must still be posted and reconciled from the bridge reconciliation workspace when they exist.";
+  if (isUnsupported(event)) return "This business event is not supported by current accounting rules. Future updates may introduce support.";
+  if (isApprovalGated(event)) return "Accounting setup exists, but controlled posting approval is required.";
+  if (isPostableSetup(event) && !isReconciled(event)) return "This is a setup-ready profile. Actual source rows must still be posted and reconciled from the Daily Approvals & Postings workspace when they exist.";
+  if (isReconciled(event)) return "This profile is actively posting to ledger successfully.";
   return event.explanation || event.blocker_reason || event.blocking_reasons?.[0] || event.recommended_action || event.operator_action || "No blocker reported by backend.";
 }
 
@@ -428,20 +429,15 @@ export function BridgeReadinessPanel() {
         <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Accounting Bridge Readiness</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Daily Approvals & Postings Readiness</div>
               <h2 className="mt-1 text-xl font-semibold text-foreground">FY {periodReadiness?.active_financial_year?.code ?? "not configured"} · {bridgeStatus}</h2>
               <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">
-                This page summarizes accounting setup definitions only. It does not post, reconcile, approve, close, or mutate operational source records.
-              </p>
-              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">
-                Setup-ready profiles are not real pending source rows. Use Bridge Reconciliation only when actual concrete candidates exist.
+                The posting readiness matrix evaluates every business module capable of generating ledger entries. It verifies if operational bank/cash accounts and required ledger categories are mapped correctly.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Link href={BRIDGE_RECONCILIATION_HREF} className="rounded-xl border px-3 py-2 text-sm font-semibold">Open bridge reconciliation</Link>
-              <Link href={MAPPING_AUDIT_HREF} className="rounded-xl border px-3 py-2 text-sm font-semibold">Open Mapping Audit</Link>
-              <Link href={DOCUMENT_NUMBERING_HREF} className="rounded-xl border px-3 py-2 text-sm font-semibold">Open Document Numbering</Link>
-              <Link href={ROUTES.admin.accountingFinanceAccounts} className="rounded-xl border px-3 py-2 text-sm font-semibold">Open Finance Accounts</Link>
+              <Link href={MAPPING_AUDIT_HREF} className="inline-flex rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium text-foreground">Setup rules audit</Link>
+              <Link href={BRIDGE_RECONCILIATION_HREF} className="inline-flex rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium text-foreground">Daily Approvals & Postings</Link>
               <ActionButton variant="secondary" onClick={() => void load({ silent: true })} disabled={refreshing}>{refreshing ? "Refreshing..." : "Refresh"}</ActionButton>
             </div>
           </div>

@@ -33,7 +33,7 @@ def build_paginated_payload(
     default_page_size: int = DEFAULT_PAGE_SIZE,
 ):
     page, page_size = get_page_params(request, default_page_size=default_page_size)
-    count = queryset.count()
+    count = len(queryset) if isinstance(queryset, (list, tuple)) else getattr(queryset, "count", lambda: len(queryset))()
 
     payload = {
         "count": count,

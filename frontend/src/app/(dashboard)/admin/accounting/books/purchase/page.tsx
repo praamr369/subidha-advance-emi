@@ -30,7 +30,7 @@ export default function AccountingPurchaseBookPage() {
       columns={columns}
       actions={[
         { href: ROUTES.admin.accountingPurchaseBills, label: "Purchase Bills", variant: "secondary" },
-        { href: ROUTES.admin.accountingVendorSettlements, label: "Vendor Settlements", variant: "secondary" },
+        { href: ROUTES.admin.vendorsSettlements, label: "Vendor Settlements", variant: "secondary" },
         { href: ROUTES.admin.accountingBalanceSheet, label: "Balance Sheet", variant: "primary" },
       ]}
       directoryTitle="Accounting book map"

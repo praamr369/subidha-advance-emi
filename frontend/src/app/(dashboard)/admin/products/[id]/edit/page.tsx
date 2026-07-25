@@ -14,6 +14,7 @@ import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import ProductPimAttributesEditor from "@/components/products/ProductPimAttributesEditor";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import SmartSuggestField from "@/components/forms/SmartSuggestField";
 import CatalogSpecificationFields from "@/components/admin/products/CatalogSpecificationFields";
@@ -191,7 +192,11 @@ export default function AdminProductEditPage() {
         unit_of_measure: unit || "PCS",
         category,
         subcategory,
-        catalog_category: catalogCategoryId,
+        // NOTE: catalog_category (catalog.CatalogCategory) is deliberately NOT sent
+        // here. The spec picker loads PIM categories (products_pim.ProductCategory),
+        // a different table — sending its id as catalog_category caused a 400
+        // "Invalid pk". The product's PIM category is managed via the linked PIM
+        // record / the "PIM attributes" editor below, not this legacy FK.
         base_specs: baseSpecs,
         description,
         hsn_sac_code: hsnSacCode.trim().toUpperCase(),
@@ -218,7 +223,7 @@ export default function AdminProductEditPage() {
         payload.set("unit_of_measure", unit || "PCS");
         payload.set("category", category);
         payload.set("subcategory", subcategory);
-        if (catalogCategoryId) payload.set("catalog_category", String(catalogCategoryId)); else payload.set("catalog_category", "");
+        // catalog_category intentionally omitted — see note in the JSON branch above.
         payload.set("base_specs", JSON.stringify(baseSpecs));
         payload.set("description", description);
         payload.set("hsn_sac_code", hsnSacCode.trim().toUpperCase());
@@ -434,6 +439,15 @@ export default function AdminProductEditPage() {
               </ERPSectionShell>
             </aside>
           </form>
+        ) : null}
+
+        {product && productId ? (
+          <ERPSectionShell
+            title="PIM attributes"
+            description="Edit this product's rich attributes (specs, options, variants) right here. Pick a category to load its attribute set. Saves reflect in the PIM module — one product, one place to edit."
+          >
+            <ProductPimAttributesEditor productId={productId} />
+          </ERPSectionShell>
         ) : null}
 
         {showCostEditor && product && (

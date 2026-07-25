@@ -254,7 +254,7 @@ export default function AdminSubscriptionRequestsPage() {
               <SubscriptionRequestCard
                 key={request.id}
                 request={request}
-                href={`/admin/subscription-requests/${request.id}`}
+                href={`/admin/requests/subscriptions/${request.id}`}
                 showRequester
               />
             ))}

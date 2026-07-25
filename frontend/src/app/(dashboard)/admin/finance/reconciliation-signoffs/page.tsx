@@ -1,22 +1,17 @@
 ﻿"use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import EmptyState from "@/components/feedback/EmptyState";
+import ErrorState from "@/components/feedback/ErrorState";
+import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
-import { apiFetch } from "@/lib/api";
-
-type SignOff = {
-  id: number;
-  reconciliation_run: number;
-  run_period?: string;
-  status: "PENDING" | "SIGNED_OFF" | "REVOKED";
-  signed_off_by_name?: string;
-  signed_off_at: string | null;
-  open_item_count_at_sign_off: number;
-  revoked_by_name?: string;
-  revoked_at: string | null;
-  revocation_reason: string;
-};
+import {
+  listReconciliationSignOffs,
+  revokeReconciliationSignOff,
+  signOffReconciliation,
+  type ReconciliationSignOff,
+} from "@/services/finance-gaps";
 
 const STATUS_COLOR: Record<string, string> = {
   PENDING: "bg-yellow-100 text-yellow-700",
@@ -25,18 +20,25 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export default function ReconciliationSignOffsPage() {
-  const [items, setItems] = useState<SignOff[]>([]);
+  const [items, setItems] = useState<ReconciliationSignOff[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const reload = () => {
+  const reload = useCallback(async () => {
     setLoading(true);
-    apiFetch("/api/v1/admin/finance/reconciliation-signoffs/")
-      .then((d) => setItems(Array.isArray(d) ? d as SignOff[] : ((d as { results?: SignOff[] })?.results ?? [])))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  };
+    setError(null);
+    try {
+      setItems(await listReconciliationSignOffs());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load sign-off records.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  useEffect(reload, []);
+  useEffect(() => {
+    void reload();
+  }, [reload]);
 
   const kpis = [
     { label: "Total", value: items.length },
@@ -46,31 +48,41 @@ export default function ReconciliationSignOffsPage() {
   ];
 
   const signOff = async (id: number) => {
-    await apiFetch(`/api/v1/admin/finance/reconciliation-signoffs/${id}/sign-off/`, { method: "POST" });
-    reload();
+    try {
+      await signOffReconciliation(id);
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to sign off.");
+    }
   };
 
   const revoke = async (id: number) => {
     const reason = prompt("Revocation reason:");
     if (!reason) return;
-    await apiFetch(`/api/v1/admin/finance/reconciliation-signoffs/${id}/revoke/`, {
-      method: "POST",
-      body: JSON.stringify({ reason }),
-    });
-    reload();
+    try {
+      await revokeReconciliationSignOff(id, reason);
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to revoke sign-off.");
+    }
   };
 
   return (
     <ERPPageShell
       title="Reconciliation Sign-offs"
-      subtitle="CTRL-FIN-5 â€” Officer sign-off gate: zero open items required before sign-off"
+      subtitle="CTRL-FIN-5 — Officer sign-off gate: zero open items required before sign-off"
       stats={kpis}
     >
       <WorkspaceSection title="Sign-off records">
         {loading ? (
-          <p className="text-sm text-muted-foreground py-8 text-center">Loadingâ€¦</p>
+          <LoadingBlock label="Loading sign-off records…" />
+        ) : error ? (
+          <ErrorState message={error} onRetry={() => void reload()} />
         ) : items.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-8 text-center">No sign-off records found.</p>
+          <EmptyState
+            title="No sign-off records"
+            description="Reconciliation sign-off records will appear here once reconciliation runs are created."
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -88,8 +100,8 @@ export default function ReconciliationSignOffsPage() {
               <tbody>
                 {items.map((s) => (
                   <tr key={s.id} className="border-b hover:bg-muted/30">
-                    <td className="py-2 px-3 font-mono text-xs">#{s.reconciliation_run}</td>
-                    <td className="py-2 px-3 text-xs">{s.run_period ?? "â€”"}</td>
+                    <td className="py-2 px-3 font-mono text-xs">#{s.reconciliation_run_id}</td>
+                    <td className="py-2 px-3 text-xs">{s.created_at ? new Date(s.created_at).toLocaleDateString("en-IN") : "—"}</td>
                     <td className="py-2 px-3">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLOR[s.status] ?? ""}`}>
                         {s.status.replace("_", " ")}
@@ -100,9 +112,9 @@ export default function ReconciliationSignOffsPage() {
                         {s.open_item_count_at_sign_off}
                       </span>
                     </td>
-                    <td className="py-2 px-3 text-xs">{s.signed_off_by_name ?? "â€”"}</td>
+                    <td className="py-2 px-3 text-xs">{s.signed_off_by ?? "—"}</td>
                     <td className="py-2 px-3 text-xs text-muted-foreground">
-                      {s.signed_off_at ? new Date(s.signed_off_at).toLocaleString() : "â€”"}
+                      {s.signed_off_at ? new Date(s.signed_off_at).toLocaleString() : "—"}
                     </td>
                     <td className="py-2 px-3 flex gap-1">
                       {s.status === "PENDING" && (

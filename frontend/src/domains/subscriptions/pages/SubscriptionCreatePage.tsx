@@ -13,6 +13,8 @@ import { apiFetch, toArray } from "@/lib/api";
 import { formatPlanTypeLabel } from "@/lib/plan-labels";
 import { ROUTES } from "@/lib/routes";
 import CustomerSelector from "@/components/admin/customers/CustomerSelector";
+import ProductSelector from "@/components/admin/products/ProductSelector";
+import PartnerSelector from "@/components/admin/partners/PartnerSelector";
 import type { CustomerRecord } from "@/services/customers";
 import KycReadinessPanel from "@/domains/subscriptions/components/KycReadinessPanel";
 import type { ContractKycReadiness } from "@/services/kyc-readiness";
@@ -619,9 +621,7 @@ export default function SubscriptionCreatePage({
     setProductLoading(true);
     setError(null);
     try {
-      const payload = await apiFetch<unknown>(
-        `/admin/products/search/?q=${encodeURIComponent(productQuery.trim())}`
-      );
+      const payload = await apiFetch(`/admin/products/search/?q=${encodeURIComponent(productQuery.trim())}`);
       const normalized = toArray<Record<string, unknown>>(payload).map(normalizeProduct);
       const filtered = normalized.filter((item) => {
         // Phase 2: filter out DISCONTINUED products from selector
@@ -731,12 +731,9 @@ export default function SubscriptionCreatePage({
     setPartnerLoading(true);
     setError(null);
     try {
-      const payload = await apiFetch<unknown>(
-        `/admin/partners/?q=${encodeURIComponent(partnerQuery.trim())}`
-      );
-      setPartnerResults(
-        toArray<Record<string, unknown>>(payload).map(normalizePartner)
-      );
+      const payload = await apiFetch(`/admin/partners/search/?q=${encodeURIComponent(partnerQuery.trim())}`);
+      const normalized = toArray<Record<string, unknown>>(payload).map(normalizePartner);
+      setPartnerResults(normalized);
     } catch (err) {
       setError(toErrorMessage(err));
       setPartnerResults([]);
@@ -1179,8 +1176,30 @@ export default function SubscriptionCreatePage({
         });
       }
 
-      setSuccess(created);
-      onCreated?.(created.id);
+      let finalSuccess = created;
+
+      if (kycFiles.length > 0 || signatureFile) {
+        try {
+          setGlobalLoadingLabel("Uploading documents...");
+          for (const file of kycFiles) {
+            await uploadDocument(created.id, "CUSTOMER_KYC_ID", file, "Customer KYC ID");
+          }
+          if (signatureFile) {
+            await uploadDocument(created.id, "CUSTOMER_SIGNATURE", signatureFile, "Customer signature");
+          }
+          const refreshed = await apiFetch<CreatedSubscriptionResponse>(`/admin/subscriptions/${created.id}/`, {
+            cache: "no-store",
+          });
+          finalSuccess = refreshed;
+          setKycFiles([]);
+          setSignatureFile(null);
+        } catch (docErr) {
+          setDocUploadError(toErrorMessage(docErr));
+        }
+      }
+
+      setSuccess(finalSuccess);
+      onCreated?.(finalSuccess.id);
     } catch (err) {
       const message = toErrorMessage(err);
       if (
@@ -1367,154 +1386,50 @@ export default function SubscriptionCreatePage({
                 placeholder="Search customer by phone, name, or code…"
               />
             </div>
-
-            <SearchPanel<ProductOption>
-              title="Product"
-              description="Search by product name or product code. Press Enter to search."
-              query={productQuery}
-              setQuery={setProductQuery}
-              onSearch={runProductSearch}
-              loading={productLoading}
-              selected={product}
-              onClear={() => {
-                nextLuckyRequestToken();
-                setProduct(null);
-                setProductResults([]);
-                setBatch(null);
-                setLuckyId(null);
-                setBatchQuery("");
-                setLuckyQuery("");
-                setBatchResults([]);
-                setLuckyResults([]);
-                setAvailableLuckyCount(null);
-              }}
-              results={productResults}
-              renderSelected={(item) => (
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-foreground">
-                      {item.name} {item.product_code ? `(${item.product_code})` : ""}
-                    </span>
-                    {item.lifecycle_status && item.lifecycle_status !== "ACTIVE" && (
-                      <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${
-                        item.lifecycle_status === "DISCONTINUED" ? "bg-red-100 text-red-700" :
-                        item.lifecycle_status === "MAINTENANCE" ? "bg-yellow-100 text-yellow-700" :
-                        "bg-blue-100 text-blue-700"
-                      }`}>
-                        {item.lifecycle_status}
-                      </span>
-                    )}
-                    {item.stock_status && (
-                      <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${
-                        item.stock_status === "IN_STOCK" ? "bg-green-100 text-green-700" :
-                        item.stock_status === "LOW_STOCK" ? "bg-yellow-100 text-yellow-700" :
-                        "bg-red-100 text-red-700"
-                      }`}>
-                        {item.stock_status === "IN_STOCK" ? "In Stock" :
-                         item.stock_status === "LOW_STOCK" ? "Low Stock" :
-                         item.stock_status === "OUT_OF_STOCK" ? "Out of Stock" :
-                         "Fully Reserved"}
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    Base price {money(item.base_price)}
-                    {item.available_qty && ` · Available: ${item.available_qty}`}
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    Enabled modes {enabledPlanModes(item).join(" / ") || "—"}
-                  </div>
-                </div>
-              )}
-              renderOption={(item) => (
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-foreground">
-                      {item.name} {item.product_code ? `(${item.product_code})` : ""}
-                    </span>
-                    {item.lifecycle_status && item.lifecycle_status !== "ACTIVE" && (
-                      <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${
-                        item.lifecycle_status === "DISCONTINUED" ? "bg-red-100 text-red-700" :
-                        item.lifecycle_status === "MAINTENANCE" ? "bg-yellow-100 text-yellow-700" :
-                        "bg-blue-100 text-blue-700"
-                      }`}>
-                        {item.lifecycle_status}
-                      </span>
-                    )}
-                    {item.stock_status && (
-                      <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${
-                        item.stock_status === "IN_STOCK" ? "bg-green-100 text-green-700" :
-                        item.stock_status === "LOW_STOCK" ? "bg-yellow-100 text-yellow-700" :
-                        "bg-red-100 text-red-700"
-                      }`}>
-                        {item.stock_status === "IN_STOCK" ? "In Stock" :
-                         item.stock_status === "LOW_STOCK" ? "Low Stock" :
-                         item.stock_status === "OUT_OF_STOCK" ? "Out of Stock" :
-                         "Fully Reserved"}
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    Base price {money(item.base_price)} · {item.category || "—"} /{" "}
-                    {item.subcategory || "—"}
-                    {item.available_qty && ` · Avail: ${item.available_qty}`}
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    Enabled modes {enabledPlanModes(item).join(" / ") || "—"}
-                  </div>
-                </div>
-              )}
-              onSelect={(item) => {
-                setProduct(item);
-                setProductResults([]);
-                setError(null);
-                setSuccess(null);
-              }}
-              placeholder="Search product by name or code"
-            />
-
-            {isEmiPlan ? (
-              <SearchPanel<PartnerOption>
-                title="Partner (optional)"
-                description="Attach a partner to the contract when applicable. Press Enter to search."
-                query={partnerQuery}
-                setQuery={setPartnerQuery}
-                onSearch={runPartnerSearch}
-                loading={partnerLoading}
-                selected={partner}
-                onClear={() => {
-                  setPartner(null);
-                  setPartnerResults([]);
-                }}
-                results={partnerResults}
-                renderSelected={(item) => (
-                  <div>
-                    <div className="font-medium text-foreground">
-                      {item.username || `Partner #${item.id}`}
-                    </div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      {item.phone || "No phone"}
-                    </div>
-                  </div>
-                )}
-                renderOption={(item) => (
-                  <div>
-                    <div className="font-medium text-foreground">
-                      {item.username || `Partner #${item.id}`}
-                    </div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      {item.phone || "No phone"}
-                    </div>
-                  </div>
-                )}
+            <div className="space-y-1.5">
+              <div className="text-sm font-medium">Product</div>
+              <div className="text-xs text-muted-foreground mb-2">
+                Search by product name or code.
+              </div>
+              <ProductSelector
+                selected={product}
                 onSelect={(item) => {
-                  setPartner(item);
-                  setPartnerResults([]);
+                  nextLuckyRequestToken();
+                  setProduct(item);
                   setError(null);
                   setSuccess(null);
                 }}
-                placeholder="Search partner by username or phone"
+                onClear={() => {
+                  nextLuckyRequestToken();
+                  setProduct(null);
+                  setBatch(null);
+                  setLuckyId(null);
+                  setBatchQuery("");
+                  setLuckyQuery("");
+                  setBatchResults([]);
+                  setLuckyResults([]);
+                  setAvailableLuckyCount(null);
+                }}
               />
+            </div>
+            {isEmiPlan ? (
+              <div className="space-y-1.5">
+                <div className="text-sm font-medium">Partner (optional)</div>
+                <div className="text-xs text-muted-foreground mb-2">
+                  Attach a partner to the contract when applicable.
+                </div>
+                <PartnerSelector
+                  selected={partner}
+                  onSelect={(item) => {
+                    setPartner(item);
+                    setError(null);
+                    setSuccess(null);
+                  }}
+                  onClear={() => {
+                    setPartner(null);
+                  }}
+                />
+              </div>
             ) : null}
 
             <div className="rounded-xl border border-border bg-background p-4">
@@ -2064,83 +1979,72 @@ export default function SubscriptionCreatePage({
               />
             </div>
 
-            {!isEmiPlan ? (
-              <div className="mt-5 rounded-xl border border-border bg-background p-4">
-                <div className="flex flex-col gap-1">
-                  <div className="text-sm font-semibold text-foreground">KYC and signature uploads</div>
-                  <div className="text-xs text-muted-foreground">
-                    Upload at least one customer KYC document and the customer signature for this contract.
-                  </div>
+            <div className="mt-5 rounded-xl border border-border bg-background p-4">
+              {docUploadError ? (
+                <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                  <div className="font-medium">Document Upload Failed</div>
+                  <div className="mt-1">{docUploadError}</div>
+                  <div className="mt-2 text-xs opacity-90">Please retry uploading the documents below, or do it later from the contract detail page.</div>
                 </div>
+              ) : null}
 
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
-                  <div>
-                    <label htmlFor="kyc-id-files" className="text-xs font-medium text-muted-foreground">Customer KYC ID files</label>
-                    <input
-                      id="kyc-id-files"
-                      type="file"
-                      multiple
-                      onChange={(event) => {
-                        const files = Array.from(event.target.files ?? []);
-                        setKycFiles(files);
-                        setDocUploadError(null);
-                      }}
-                      className="mt-2 block w-full text-sm"
-                    />
-                    <div className="mt-2 text-xs text-muted-foreground">
-                      {kycFiles.length > 0 ? `${kycFiles.length} file(s) selected` : "No files selected"}
+              {(kycFiles.length > 0 || signatureFile || docUploadError) && (!Array.isArray(success.documents) || success.documents.length === 0) ? (
+                <div className="mb-6 border-b border-border pb-6">
+                  <div className="text-sm font-semibold text-foreground mb-4">Retry KYC and Signature Uploads</div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <label htmlFor="retry-kyc-id-files" className="text-xs font-medium text-muted-foreground">Customer KYC ID files</label>
+                      <input
+                        id="retry-kyc-id-files"
+                        type="file"
+                        multiple
+                        onChange={(event) => {
+                          const files = Array.from(event.target.files ?? []);
+                          setKycFiles(files);
+                          setDocUploadError(null);
+                        }}
+                        className="mt-2 block w-full text-sm"
+                      />
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        {kycFiles.length > 0 ? `${kycFiles.length} file(s) selected` : "No files selected"}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label htmlFor="retry-signature-file" className="text-xs font-medium text-muted-foreground">Customer signature file</label>
+                      <input
+                        id="retry-signature-file"
+                        type="file"
+                        onChange={(event) => {
+                          const file = (event.target.files ?? [])[0] ?? null;
+                          setSignatureFile(file);
+                          setDocUploadError(null);
+                        }}
+                        className="mt-2 block w-full text-sm"
+                      />
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        {signatureFile ? signatureFile.name : "No file selected"}
+                      </div>
                     </div>
                   </div>
 
-                  <div>
-                    <label htmlFor="signature-file" className="text-xs font-medium text-muted-foreground">Customer signature file</label>
-                    <input
-                      id="signature-file"
-                      type="file"
-                      onChange={(event) => {
-                        const file = (event.target.files ?? [])[0] ?? null;
-                        setSignatureFile(file);
-                        setDocUploadError(null);
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void handleUploadSelectedDocuments();
                       }}
-                      className="mt-2 block w-full text-sm"
-                    />
-                    <div className="mt-2 text-xs text-muted-foreground">
-                      {signatureFile ? signatureFile.name : "No file selected"}
-                    </div>
+                      disabled={docUploadBusy}
+                      className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {docUploadBusy ? "Uploading..." : "Retry Upload"}
+                    </button>
                   </div>
                 </div>
+              ) : null}
 
-                {docUploadError ? (
-                  <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-                    {docUploadError}
-                  </div>
-                ) : null}
-
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void handleUploadSelectedDocuments();
-                    }}
-                    disabled={docUploadBusy}
-                    className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {docUploadBusy ? "Uploading..." : "Upload Documents"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void refreshSuccess(success.id);
-                    }}
-                    disabled={docUploadBusy}
-                    className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    Refresh Contract Detail
-                  </button>
-                </div>
-
-                {Array.isArray(success.documents) && success.documents.length > 0 ? (
-                  <div className="mt-4 grid gap-2">
+              {Array.isArray(success.documents) && success.documents.length > 0 ? (
+                <div className="mt-4 grid gap-2">
                     <div className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                       Attached documents
                     </div>
@@ -2183,7 +2087,6 @@ export default function SubscriptionCreatePage({
                   </div>
                 )}
               </div>
-            ) : null}
 
             <div className="mt-5 flex flex-wrap gap-2">
               <Link
@@ -2222,56 +2125,102 @@ export default function SubscriptionCreatePage({
           </SectionCard>
         ) : null}
 
-        <SectionCard
-          title="Create contract"
-          description="Submit only after verifying customer, product, plan structure, and financial preview."
-        >
-          <div className={variant === "drawer" ? "popup-action-bar items-center" : "flex flex-wrap gap-3"}>
-            <button
-              type="button"
-              onClick={() => { void handleSubmit(); }}
-              disabled={!canActivate || submitting}
-              data-testid="activate-contract-button"
-              className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+        {success ? null : (
+          <>
+            <SectionCard
+              title="Step 3 · KYC Documents (Optional)"
+              description="Upload customer KYC and signature documents to complete the contract onboarding."
             >
-              {submitting
-                ? isEmiPlan
-                  ? "Creating Subscription..."
-                  : "Creating Contract..."
-                : isEmiPlan
-                  ? "Create Subscription"
-                  : "Activate Contract"}
-            </button>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label htmlFor="kyc-id-files" className="text-xs font-medium text-muted-foreground">Customer KYC ID files</label>
+                  <input
+                    id="kyc-id-files"
+                    type="file"
+                    multiple
+                    onChange={(event) => {
+                      const files = Array.from(event.target.files ?? []);
+                      setKycFiles(files);
+                      setDocUploadError(null);
+                    }}
+                    className="mt-2 block w-full text-sm"
+                  />
+                  <div className="mt-2 text-xs text-muted-foreground">
+                    {kycFiles.length > 0 ? `${kycFiles.length} file(s) selected` : "No files selected"}
+                  </div>
+                </div>
 
-            {!isEmiPlan ? (
-              <button
-                type="button"
-                onClick={() => { void handleSubmit({ saveAsDraft: true }); }}
-                disabled={!canSaveAsDraft || submitting}
-                data-testid="save-draft-button"
-                className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {submitting ? "Saving..." : "Save as Draft"}
-              </button>
-            ) : null}
+                <div>
+                  <label htmlFor="signature-file" className="text-xs font-medium text-muted-foreground">Customer signature file</label>
+                  <input
+                    id="signature-file"
+                    type="file"
+                    onChange={(event) => {
+                      const file = (event.target.files ?? [])[0] ?? null;
+                      setSignatureFile(file);
+                      setDocUploadError(null);
+                    }}
+                    className="mt-2 block w-full text-sm"
+                  />
+                  <div className="mt-2 text-xs text-muted-foreground">
+                    {signatureFile ? signatureFile.name : "No file selected"}
+                  </div>
+                </div>
+              </div>
+            </SectionCard>
 
-            <button
-              type="button"
-              onClick={resetForFreshCreate}
-              disabled={submitting}
-              className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+            <SectionCard
+              title="Create contract"
+              description="Submit only after verifying customer, product, plan structure, and financial preview."
             >
-              Reset Form
-            </button>
+              <div className={variant === "drawer" ? "popup-action-bar items-center" : "flex flex-wrap gap-3"}>
+                <button
+                  type="button"
+                  onClick={() => { void handleSubmit(); }}
+                  disabled={!canActivate || submitting}
+                  data-testid="activate-contract-button"
+                  className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {submitting
+                    ? isEmiPlan
+                      ? "Creating Subscription..."
+                      : "Creating Contract..."
+                    : isEmiPlan
+                      ? "Create Subscription"
+                      : "Activate Contract"}
+                </button>
 
-            <Link
-              href="/admin/subscriptions"
-              className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
-            >
-              Cancel
-            </Link>
-          </div>
-        </SectionCard>
+                {!isEmiPlan ? (
+                  <button
+                    type="button"
+                    onClick={() => { void handleSubmit({ saveAsDraft: true }); }}
+                    disabled={!canSaveAsDraft || submitting}
+                    data-testid="save-draft-button"
+                    className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {submitting ? "Saving..." : "Save as Draft"}
+                  </button>
+                ) : null}
+
+                <button
+                  type="button"
+                  onClick={resetForFreshCreate}
+                  disabled={submitting}
+                  className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Reset Form
+                </button>
+
+                <Link
+                  href="/admin/subscriptions"
+                  className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
+                >
+                  Cancel
+                </Link>
+              </div>
+            </SectionCard>
+          </>
+        )}
       </div>
     </ERPPageShell>
   );

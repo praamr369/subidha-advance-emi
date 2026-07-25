@@ -30,6 +30,21 @@ def _balance_for_account_type(account_type: str, debit_total: Decimal, credit_to
     return credit_total - debit_total
 
 
+def _balance_side_for_account_type(account_type: str, balance: Decimal) -> str:
+    """Label a positive `balance` (from `_balance_for_account_type`) with its natural DR/CR side.
+
+    ASSET/EXPENSE balances are debit-total minus credit-total, so a non-negative
+    balance sits on the debit side. LIABILITY/EQUITY/INCOME balances are the
+    reverse (credit-total minus debit-total), so a non-negative balance there
+    sits on the credit side.
+    """
+    natural_side = (
+        "DR" if account_type in {ChartOfAccountType.ASSET, ChartOfAccountType.EXPENSE} else "CR"
+    )
+    opposite_side = "CR" if natural_side == "DR" else "DR"
+    return natural_side if balance >= MONEY_ZERO else opposite_side
+
+
 def _posted_lines_queryset(*, start_date: date | None = None, end_date: date | None = None, as_of: date | None = None):
     queryset = JournalEntryLine.objects.select_related(
         "journal_entry",
@@ -89,7 +104,7 @@ def build_trial_balance(*, start_date: date | None = None, end_date: date | None
                 "debit_total": _money_string(row["debit_total"]),
                 "credit_total": _money_string(row["credit_total"]),
                 "balance": _money_string(balance),
-                "balance_side": "DR" if balance >= MONEY_ZERO else "CR",
+                "balance_side": _balance_side_for_account_type(row["account_type"], balance),
             }
         )
 
@@ -335,6 +350,110 @@ def build_cashbook(
     }
 
 
+# Plain-language labels for the money-movement source types that post to
+# cash/bank/UPI accounts. Unknown types fall back to a title-cased version, so a
+# new rail still shows up (just less pretty) rather than being hidden.
+MONEY_SOURCE_LABELS: dict[str, str] = {
+    "PAYMENT": "EMI collections",
+    "DIRECT_SALE": "Direct sales",
+    "RENT_LEASE": "Rent & lease",
+    "RENT": "Rent",
+    "LEASE": "Lease",
+    "SECURITY_DEPOSIT": "Security deposits",
+    "CUSTOMER_ADVANCE": "Customer advances",
+    "MONEY_MOVEMENT": "Account transfers",
+    "FINANCE_TRANSFER": "Account transfers",
+    "RECEIPT": "Receipts",
+    "VENDOR_PAYMENT": "Vendor payments",
+    "VENDOR_SETTLEMENT": "Vendor settlements",
+    "SALARY_PAYMENT": "Salary payouts",
+    "EXPENSE": "Expenses",
+    "COMMISSION_PAYOUT": "Commission payouts",
+}
+
+
+def _money_source_label(source_type: str | None) -> str:
+    if not source_type:
+        return "Other"
+    return MONEY_SOURCE_LABELS.get(source_type, source_type.replace("_", " ").title())
+
+
+def build_money_in_hand(*, branch_id: int | None = None) -> dict:
+    """Authoritative 'how much money do I hold right now' from the posted ledger.
+
+    Every rail that moves money — EMI, rent/lease, direct sale, deposits, finance
+    transfers — posts a journal to a cash/bank/UPI chart account, so the posted
+    ledger is the single source of truth. This deliberately does NOT read the
+    Payment model, which only covers one rail and misses the rest.
+
+    Also returns `income_by_source` — money IN (debits to cash/bank/UPI) grouped
+    by where it came from — and `outflow_by_source` — money OUT (credits) grouped
+    by where it went — so the operator can see, transparently, which rail every
+    rupee came from and every settlement went to.
+    """
+    per_kind: dict[str, Decimal] = {"CASH": MONEY_ZERO, "BANK": MONEY_ZERO, "UPI": MONEY_ZERO}
+    accounts: list[dict] = []
+    income_totals: dict[str, Decimal] = {}
+    outflow_totals: dict[str, Decimal] = {}
+    money_in_rows: list[dict] = []
+    for kind in ("CASH", "BANK", "UPI"):
+        book = build_finance_book(kinds=[kind], branch_id=branch_id)
+        per_kind[kind] = _money(book["summary"]["net_balance"])
+        accounts.extend(book["accounts"])
+        for row in book["rows"]:
+            source_type = row.get("source_type") or ""
+            debit = _money(row.get("debit_amount"))
+            credit = _money(row.get("credit_amount"))
+            if debit > MONEY_ZERO:
+                income_totals[source_type] = income_totals.get(source_type, MONEY_ZERO) + debit
+                money_in_rows.append(
+                    {
+                        "entry_date": row.get("entry_date"),
+                        "source_type": source_type or "OTHER",
+                        "source_label": _money_source_label(source_type),
+                        "finance_account_name": row.get("finance_account_name"),
+                        "kind": kind,
+                        "reference": row.get("source_reference") or row.get("entry_no"),
+                        "description": row.get("description") or "",
+                        "amount": _money_string(debit),
+                    }
+                )
+            if credit > MONEY_ZERO:
+                outflow_totals[source_type] = outflow_totals.get(source_type, MONEY_ZERO) + credit
+    total = per_kind["CASH"] + per_kind["BANK"] + per_kind["UPI"]
+    # Most recent money-in events across every rail, so "recent collections" shows
+    # real receipts (EMI, direct sale, rent/lease, deposits) not just Payment rows.
+    recent_receipts = sorted(
+        money_in_rows, key=lambda r: (r["entry_date"] or ""), reverse=True
+    )[:8]
+
+    def _breakdown(totals: dict[str, Decimal]) -> list[dict]:
+        return [
+            {
+                "source_type": source_type or "OTHER",
+                "label": _money_source_label(source_type),
+                "amount": _money_string(amount),
+            }
+            for source_type, amount in sorted(totals.items(), key=lambda item: item[1], reverse=True)
+            if amount > MONEY_ZERO
+        ]
+
+    total_income = sum(income_totals.values(), MONEY_ZERO)
+    total_outflow = sum(outflow_totals.values(), MONEY_ZERO)
+    return {
+        "cash": _money_string(per_kind["CASH"]),
+        "bank": _money_string(per_kind["BANK"]),
+        "upi": _money_string(per_kind["UPI"]),
+        "total": _money_string(total),
+        "accounts": accounts,
+        "income_by_source": _breakdown(income_totals),
+        "outflow_by_source": _breakdown(outflow_totals),
+        "total_income": _money_string(total_income),
+        "total_outflow": _money_string(total_outflow),
+        "recent_receipts": recent_receipts,
+    }
+
+
 def build_finance_book(
     *,
     kinds: list[str],
@@ -354,10 +473,31 @@ def build_finance_book(
         account.chart_account_id: account for account in finance_accounts
     }
     rows = []
+    total_debit = MONEY_ZERO
+    total_credit = MONEY_ZERO
+    # Per-account running net so the operator can see the balance held in each
+    # individual cash counter / bank / UPI account, not just the combined total.
+    per_account: dict[int, dict] = {}
     for line in _posted_lines_queryset(start_date=start_date, end_date=end_date).filter(
         chart_account_id__in=chart_account_ids
     ):
         matched_account = finance_account_by_chart_account_id[line.chart_account_id]
+        debit = _money(line.debit_amount)
+        credit = _money(line.credit_amount)
+        total_debit += debit
+        total_credit += credit
+        bucket = per_account.setdefault(
+            matched_account.id,
+            {
+                "finance_account_id": matched_account.id,
+                "finance_account_name": matched_account.name,
+                "kind": matched_account.kind,
+                "total_debit": MONEY_ZERO,
+                "total_credit": MONEY_ZERO,
+            },
+        )
+        bucket["total_debit"] += debit
+        bucket["total_credit"] += credit
         rows.append(
             {
                 "finance_account_id": matched_account.id,
@@ -378,12 +518,32 @@ def build_finance_book(
                 "credit_amount": _money_string(line.credit_amount),
             }
         )
+    # For cash/bank/UPI (asset) accounts, debit increases the balance and credit
+    # decreases it, so the net balance held is debit − credit.
+    accounts_summary = [
+        {
+            "finance_account_id": bucket["finance_account_id"],
+            "finance_account_name": bucket["finance_account_name"],
+            "kind": bucket["kind"],
+            "total_debit": _money_string(bucket["total_debit"]),
+            "total_credit": _money_string(bucket["total_credit"]),
+            "net_balance": _money_string(bucket["total_debit"] - bucket["total_credit"]),
+        }
+        for bucket in per_account.values()
+    ]
     return {
         "start_date": start_date.isoformat() if start_date else None,
         "end_date": end_date.isoformat() if end_date else None,
         "branch_id": branch_id,
         "finance_account_kinds": kinds,
         "rows": rows,
+        "summary": {
+            "total_debit": _money_string(total_debit),
+            "total_credit": _money_string(total_credit),
+            "net_balance": _money_string(total_debit - total_credit),
+            "row_count": len(rows),
+        },
+        "accounts": accounts_summary,
     }
 
 

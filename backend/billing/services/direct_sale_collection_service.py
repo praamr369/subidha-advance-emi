@@ -155,26 +155,45 @@ def get_direct_sale_receivable_position(*, direct_sale_id: int) -> dict[str, obj
         .order_by("-id")
         .first()
     )
+
+    inactive_sale_statuses = {
+        "CANCELLED",
+        "CANCELLED_PRE_INVOICE",
+        "CANCELLED_AFTER_DELIVERY",
+        "REVERSED_POST_INVOICE",
+        "RETURNED",
+        "ARCHIVED",
+        "EXCHANGED_CLOSED",
+    }
+    is_inactive = (sale.status or "").strip().upper() in inactive_sale_statuses
+
     if invoice is None:
+        outstanding = Decimal("0.00") if is_inactive else _money(sale.balance_total)
         return {
             "direct_sale": sale,
             "invoice": None,
             "posted_receipt_total": Decimal("0.00"),
             "collected_total": _money(sale.received_total),
-            "outstanding": _money(sale.balance_total),
+            "outstanding": outstanding,
             "collection_supported": False,
             "disabled_reason": "Linked billing invoice was not found for this direct sale.",
         }
 
     position = _current_receivable_position(sale=sale, invoice=invoice)
+    if is_inactive:
+        position["outstanding"] = Decimal("0.00")
+
     collection_supported = (
         sale.status == "INVOICED"
         and invoice.status == BillingDocumentStatus.POSTED
         and position["outstanding"] > Decimal("0.00")
+        and not is_inactive
     )
     disabled_reason = None
     if not collection_supported:
-        if position["outstanding"] <= Decimal("0.00"):
+        if is_inactive:
+            disabled_reason = "This direct sale is cancelled/reversed and has no collectible balance."
+        elif position["outstanding"] <= Decimal("0.00"):
             disabled_reason = "This direct sale has no outstanding balance."
         elif sale.status != "INVOICED":
             disabled_reason = "Only invoiced direct sales can accept later collections."

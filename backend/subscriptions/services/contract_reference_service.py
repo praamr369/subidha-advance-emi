@@ -447,31 +447,34 @@ def search_contract_references(
     queryset = _contract_reference_queryset(user=user, audience=audience)
     query = (query or "").strip()
     if query:
-        search_filter = (
-            Q(reference_no__icontains=query)
-            | Q(display_reference__icontains=query)
-            | Q(phone_snapshot__icontains=query)
-            | Q(customer_name_snapshot__icontains=query)
-            | Q(kyc_reference_snapshot__icontains=query)
-            | Q(batch_snapshot__icontains=query)
-            | Q(lucky_id_snapshot__icontains=query)
-            | Q(product_summary_snapshot__icontains=query)
-            | Q(subscription__subscription_number__icontains=query)
-            | Q(subscription__contract_reference__icontains=query)
-            | Q(direct_sale__sale_no__icontains=query)
-            | Q(invoice__document_no__icontains=query)
-        )
-        if query.isdigit():
-            numeric = int(query)
-            search_filter |= (
-                Q(customer_id=numeric)
-                | Q(subscription_id=numeric)
-                | Q(direct_sale_id=numeric)
-                | Q(subscription__partner_id=numeric)
-                | Q(subscription__lucky_id_id=numeric)
-                | Q(subscription__lucky_id__lucky_number=numeric)
+        if query.startswith("subscription:") and query[13:].isdigit():
+            queryset = queryset.filter(subscription_id=int(query[13:]))
+        else:
+            search_filter = (
+                Q(reference_no__icontains=query)
+                | Q(display_reference__icontains=query)
+                | Q(phone_snapshot__icontains=query)
+                | Q(customer_name_snapshot__icontains=query)
+                | Q(kyc_reference_snapshot__icontains=query)
+                | Q(batch_snapshot__icontains=query)
+                | Q(lucky_id_snapshot__icontains=query)
+                | Q(product_summary_snapshot__icontains=query)
+                | Q(subscription__subscription_number__icontains=query)
+                | Q(subscription__contract_reference__icontains=query)
+                | Q(direct_sale__sale_no__icontains=query)
+                | Q(invoice__document_no__icontains=query)
             )
-        queryset = queryset.filter(search_filter)
+            if query.isdigit():
+                numeric = int(query)
+                search_filter |= (
+                    Q(customer_id=numeric)
+                    | Q(subscription_id=numeric)
+                    | Q(direct_sale_id=numeric)
+                    | Q(subscription__partner_id=numeric)
+                    | Q(subscription__lucky_id_id=numeric)
+                    | Q(subscription__lucky_id__lucky_number=numeric)
+                )
+            queryset = queryset.filter(search_filter)
 
     return list(queryset.distinct().order_by("-source_created_at", "-id")[:limit])
 

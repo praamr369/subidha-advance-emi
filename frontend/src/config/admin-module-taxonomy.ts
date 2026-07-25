@@ -73,7 +73,7 @@ export const ADMIN_MODULE_TAXONOMY: AdminModuleDefinition[] = [
       // Core CRM routes
       ROUTES.admin.crm,
       ROUTES.admin.crmLeads,
-      ROUTES.admin.crmPipeline,
+      ROUTES.admin.crmAnalytics,
       ROUTES.admin.crmFollowUps,
       ROUTES.admin.crmKyc,
       // Phase 6: legacy request routes remain under CRM & Requests

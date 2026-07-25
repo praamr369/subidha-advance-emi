@@ -309,9 +309,9 @@ export default function AccountingPurchaseBillsPage() {
         { label: "Purchase Bills" },
       ]}
       actions={[
-        { href: ROUTES.admin.accountingVendors, label: "Vendor Register", variant: "secondary" },
+        { href: ROUTES.admin.vendors, label: "Vendor Register", variant: "secondary" },
         { href: ROUTES.admin.inventoryItems, label: "Inventory Items", variant: "secondary" },
-        { href: ROUTES.admin.accountingVendorSettlements, label: "Vendor Settlements", variant: "primary" },
+        { href: ROUTES.admin.vendorsSettlements, label: "Vendor Settlements", variant: "primary" },
       ]}
       stats={[
         { label: "Bills", value: String(rows.length), tone: "info" },

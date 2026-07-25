@@ -62,6 +62,7 @@ class CustomerEmiSerializer(serializers.ModelSerializer):
 class BaseSubscriptionSerializer(serializers.ModelSerializer):
     subscription_number = serializers.SerializerMethodField()
     delivery_status = serializers.SerializerMethodField()
+    deposit_status = serializers.SerializerMethodField()
     fulfillment_status = serializers.CharField(read_only=True)
     branch_id = serializers.IntegerField(source="branch.id", read_only=True)
     branch_code = serializers.CharField(source="branch.code", read_only=True)
@@ -142,6 +143,7 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
             "winner_month",
             "waived_amount",
             "delivery_status",
+            "deposit_status",
             "fulfillment_status",
             "created_at",
             "emi_count",
@@ -162,6 +164,18 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
     def get_delivery_status(self, obj):
         current_delivery = get_current_subscription_delivery(obj)
         return getattr(current_delivery, "status", None)
+
+    def get_deposit_status(self, obj):
+        if obj.plan_type not in ["RENT", "LEASE"]:
+            return "NOT_REQUIRED"
+        try:
+            from subscriptions.services.contract_activation_readiness_service import _deposit_readiness
+            deposit = _deposit_readiness(obj)
+            if deposit.get("required"):
+                return "SUBMITTED" if deposit.get("ready") else "PENDING"
+            return "NOT_REQUIRED"
+        except Exception:
+            return "UNKNOWN"
 
     def get_product_image(self, obj):
         return serialize_media_url(
@@ -385,3 +399,6 @@ class SubscriptionDetailSerializer(BaseSubscriptionSerializer):
 
 
 SubscriptionSerializer = SubscriptionListSerializer
+
+class RentLeaseGenerateScheduleSerializer(serializers.Serializer):
+    start_date = serializers.DateField(required=True)

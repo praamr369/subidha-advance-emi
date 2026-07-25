@@ -35,6 +35,7 @@ from billing.services.direct_sale_delivery_bridge_service import (
 )
 from billing.services.direct_sale_operational_state import get_direct_sale_operational_state
 from billing.services.invoice_delivery_service import get_invoice_delivery_readiness
+from core.services.operational_visibility import is_direct_sale_customer_active
 from billing.services.billing_service import (
     _ensure_credit_sequence,
     _ensure_debit_sequence,
@@ -1432,6 +1433,8 @@ class CustomerDirectSaleListSerializer(serializers.ModelSerializer):
         return getattr(invoice, "document_no", None) if invoice is not None else None
 
     def get_outstanding_amount(self, obj):
+        if not is_direct_sale_customer_active(obj):
+            return Decimal("0.00")
         outstanding = Decimal(str(obj.grand_total or "0.00")) - Decimal(str(obj.received_total or "0.00"))
         if outstanding < Decimal("0.00"):
             return Decimal("0.00")
@@ -1526,6 +1529,8 @@ class CustomerDirectSaleDetailSerializer(serializers.ModelSerializer):
         return getattr(invoice, "invoice_date", None) if invoice is not None else None
 
     def get_outstanding_amount(self, obj):
+        if not is_direct_sale_customer_active(obj):
+            return Decimal("0.00")
         outstanding = Decimal(str(obj.grand_total or "0.00")) - Decimal(str(obj.received_total or "0.00"))
         if outstanding < Decimal("0.00"):
             return Decimal("0.00")

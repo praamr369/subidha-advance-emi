@@ -19,6 +19,7 @@ import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
+import { WorkbenchFilterChips } from "@/components/workbench/WorkbenchFilterChips";
 import {
   DataTableShell,
   DetailPanel,
@@ -824,6 +825,20 @@ export default function AdminCollectionsPage() {
     ? ((todayCollectedAmount / todayGrossCollectedAmount) * 100).toFixed(1)
     : "0";
 
+  // Segment filter: focus the workspace on a single receivable queue.
+  const [segment, setSegment] = useState<"all" | "due" | "overdue" | "payments" | "direct">("all");
+  const segmentChips = useMemo(
+    () => [
+      { key: "all", label: "All" },
+      { key: "due", label: "Due Today", count: visibleDueTodayRows.length },
+      { key: "overdue", label: "Overdue", count: visibleOverdueRows.length },
+      { key: "payments", label: "Payments Today", count: visibleRecentPaymentsSummary.active_payments },
+      { key: "direct", label: "Direct Sales", count: directSaleRows.length },
+    ],
+    [visibleDueTodayRows.length, visibleOverdueRows.length, visibleRecentPaymentsSummary.active_payments, directSaleRows.length]
+  );
+  const showSegment = (key: typeof segment) => segment === "all" || segment === key;
+
   return (
     <ERPPageShell
       eyebrow="Collections Control"
@@ -1054,6 +1069,13 @@ export default function AdminCollectionsPage() {
               </div>
             </DetailPanel>
 
+            <WorkbenchFilterChips
+              chips={segmentChips}
+              active={segment}
+              onSelect={(key) => setSegment(key as typeof segment)}
+            />
+
+            {showSegment("direct") ? (
             <DetailPanel
               title="Direct-sale receivables"
               description="Outstanding invoiced direct sales stay separate from the EMI queue but remain collectible from the same operational control layer."
@@ -1111,14 +1133,18 @@ export default function AdminCollectionsPage() {
                 </div>
               )}
             </DetailPanel>
+            ) : null}
 
+            {showSegment("due") ? (
             <DetailPanel
               title="Due Today Queue"
               description="Pending EMI rows due today for same-day follow-up and collection."
             >
               <DueTodayTable rows={visibleDueTodayRows} />
             </DetailPanel>
+            ) : null}
 
+            {showSegment("payments") ? (
             <DetailPanel
               title="Recent Collections"
               description="Payments posted today for operational verification and quick review. Net collection excludes reversed payments."
@@ -1154,13 +1180,16 @@ export default function AdminCollectionsPage() {
 
               <RecentPaymentsTable rows={visibleRecentPayments} />
             </DetailPanel>
+            ) : null}
 
+            {showSegment("overdue") ? (
             <DetailPanel
               title="Overdue Preview"
               description="Preview of overdue pending EMI rows. Open the full overdue page for the full recovery workspace."
             >
               <OverduePreview rows={overduePreview} />
             </DetailPanel>
+            ) : null}
           </>
         )}
       </div>

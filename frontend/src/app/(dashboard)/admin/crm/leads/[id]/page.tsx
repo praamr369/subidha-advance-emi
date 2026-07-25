@@ -8,7 +8,13 @@ import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import { LeadQualificationPanel } from "@/components/lead/LeadQualification";
 import { ROUTES } from "@/lib/routes";
+import {
+  listAdminCustomerKycDocuments,
+  uploadAdminCustomerKycDocument,
+  type CustomerKycDocumentRecord,
+} from "@/services/customer";
 import {
   assignLead,
   cancelFollowUpTask,
@@ -159,6 +165,15 @@ const PLAN_TYPES: { value: LeadPlanType; label: string }[] = [
 ];
 const SOURCES = Object.entries(LEAD_SOURCE_LABELS).map(([value, label]) => ({ value, label }));
 
+const KYC_DOC_TYPES: { value: string; label: string }[] = [
+  { value: "AADHAAR", label: "Aadhaar Card" },
+  { value: "PAN", label: "PAN Card" },
+  { value: "PASSPORT", label: "Passport" },
+  { value: "DRIVING_LICENSE", label: "Driving License" },
+  { value: "VOTER_ID", label: "Voter ID" },
+  { value: "OTHER", label: "Other" },
+];
+
 export default function AdminCrmLeadDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -197,6 +212,20 @@ export default function AdminCrmLeadDetailPage() {
 
   const [stageBusy, setStageBusy] = useState(false);
   const [convertBusy, setConvertBusy] = useState(false);
+
+  // stage transition modal
+  const [pendingStage, setPendingStage] = useState<LeadStage | null>(null);
+  const [stageNote, setStageNote] = useState("");
+  const [stageFollowUp, setStageFollowUp] = useState("");
+  const [stageError, setStageError] = useState<string | null>(null);
+
+  // KYC (available once a customer is linked at KYC_PENDING)
+  const [kycDocs, setKycDocs] = useState<CustomerKycDocumentRecord[]>([]);
+  const [kycStatus, setKycStatus] = useState<string>("PENDING");
+  const [kycDocType, setKycDocType] = useState("AADHAAR");
+  const [kycFile, setKycFile] = useState<File | null>(null);
+  const [kycBusy, setKycBusy] = useState(false);
+  const [kycError, setKycError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -287,12 +316,31 @@ export default function AdminCrmLeadDetailPage() {
     }
   };
 
-  const handleStageMove = async (stage: LeadStage) => {
-    if (!detail) return;
+  const openStageModal = (stage: LeadStage) => {
+    setPendingStage(stage);
+    setStageNote("");
+    setStageFollowUp("");
+    setStageError(null);
+  };
+
+  const handleStageMove = async () => {
+    if (!detail || !pendingStage) return;
+    if (pendingStage === "LOST" && !stageNote.trim()) {
+      setStageError("A reason is required when marking a lead as Lost.");
+      return;
+    }
     setStageBusy(true);
+    setStageError(null);
     try {
-      const updated = await moveLeadStage(id, stage);
-      setDetail((prev) => prev ? { ...prev, lead: { ...prev.lead, stage: updated.stage } } : null);
+      await moveLeadStage(id, pendingStage, {
+        note: stageNote,
+        next_follow_up_at: stageFollowUp ? new Date(stageFollowUp).toISOString() : null,
+      });
+      setPendingStage(null);
+      // Reload so the new timeline activity + follow-up date appear.
+      await load();
+    } catch (err) {
+      setStageError(err instanceof Error ? err.message : "Failed to move stage.");
     } finally {
       setStageBusy(false);
     }
@@ -307,6 +355,43 @@ export default function AdminCrmLeadDetailPage() {
       router.push(`${ROUTES.admin.customers}/${result.customer_id}`);
     } finally {
       setConvertBusy(false);
+    }
+  };
+
+  const linkedCustomerId = detail?.lead.converted_customer ?? null;
+
+  const loadKyc = useCallback(async (customerId: number) => {
+    setKycError(null);
+    try {
+      const data = await listAdminCustomerKycDocuments(customerId);
+      setKycDocs(data.results);
+      setKycStatus(data.kyc_status);
+    } catch (err) {
+      setKycError(err instanceof Error ? err.message : "Could not load KYC documents.");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (linkedCustomerId && (detail?.lead.stage === "KYC_PENDING" || detail?.lead.stage === "READY_TO_CONVERT")) {
+      void loadKyc(linkedCustomerId);
+    }
+  }, [linkedCustomerId, detail?.lead.stage, loadKyc]);
+
+  const handleKycUpload = async () => {
+    if (!linkedCustomerId || !kycFile) return;
+    setKycBusy(true);
+    setKycError(null);
+    try {
+      await uploadAdminCustomerKycDocument(linkedCustomerId, {
+        file: kycFile,
+        document_type: kycDocType,
+      });
+      setKycFile(null);
+      await loadKyc(linkedCustomerId);
+    } catch (err) {
+      setKycError(err instanceof Error ? err.message : "Upload failed.");
+    } finally {
+      setKycBusy(false);
     }
   };
 
@@ -360,7 +445,11 @@ export default function AdminCrmLeadDetailPage() {
 
   const lead = detail?.lead;
   const canConvert = lead?.stage === "READY_TO_CONVERT";
-  const nextStages = lead ? VALID_TRANSITIONS[lead.stage] ?? [] : [];
+  const nextStages = lead ? [...(VALID_TRANSITIONS[lead.stage] ?? [])] : [];
+  if (lead?.converted_customer && !nextStages.includes("READY_TO_CONVERT") && lead.stage !== "CONVERTED" && lead.stage !== "LOST") {
+    nextStages.push("READY_TO_CONVERT");
+  }
+  const kycApproved = ["VERIFIED", "APPROVED", "EXCEPTION_APPROVED"].includes(kycStatus);
 
   return (
     <ERPPageShell
@@ -380,6 +469,9 @@ export default function AdminCrmLeadDetailPage() {
 
       {!loading && !error && detail && lead ? (
         <>
+          {/* ── Lead qualification intelligence (score / SLA / readiness / dup) ── */}
+          <LeadQualificationPanel qualification={detail.qualification} />
+
           {/* ── Identity + Stage ─────────────────────────────── */}
           <ERPSectionShell title="Lead profile" description="Contact details and current pipeline stage.">
             <div className="grid gap-6 md:grid-cols-2">
@@ -467,7 +559,9 @@ export default function AdminCrmLeadDetailPage() {
                     ) : null}
                     {lead.converted_customer ? (
                       <div>
-                        <div className="text-xs text-muted-foreground">Converted customer</div>
+                        <div className="text-xs text-muted-foreground">
+                          {lead.stage === "CONVERTED" ? "Converted customer" : "Linked customer (KYC)"}
+                        </div>
                         <a href={`${ROUTES.admin.customers}/${lead.converted_customer}`} className="text-primary hover:underline underline-offset-4">
                           {lead.converted_customer_name || `Customer #${lead.converted_customer}`}
                         </a>
@@ -527,20 +621,24 @@ export default function AdminCrmLeadDetailPage() {
               <div>
                 <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Move Stage</div>
                 <div className="flex flex-wrap gap-2">
-                  {nextStages.filter((s) => s !== "LOST").map((stage) => (
+                  {nextStages.filter((s) => s !== "LOST").map((stage) => {
+                    const kycBlocked = stage === "READY_TO_CONVERT" && !kycApproved;
+                    return (
+                      <button
+                        key={stage}
+                        disabled={stageBusy || kycBlocked}
+                        onClick={() => openStageModal(stage)}
+                        title={kycBlocked ? "KYC must be approved before Ready to Convert." : undefined}
+                        className="rounded-xl border border-border bg-background px-3 py-1.5 text-sm font-medium hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        → {LEAD_STAGE_LABELS[stage]}
+                      </button>
+                    );
+                  })}
+                  {lead.stage !== "LOST" ? (
                     <button
-                      key={stage}
                       disabled={stageBusy}
-                      onClick={() => void handleStageMove(stage)}
-                      className="rounded-xl border border-border bg-background px-3 py-1.5 text-sm font-medium hover:bg-muted disabled:opacity-50"
-                    >
-                      → {LEAD_STAGE_LABELS[stage]}
-                    </button>
-                  ))}
-                  {lead.stage !== "CONVERTED" && lead.stage !== "LOST" ? (
-                    <button
-                      disabled={stageBusy}
-                      onClick={() => void handleStageMove("LOST")}
+                      onClick={() => openStageModal("LOST")}
                       className="rounded-xl border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
                     >
                       Mark Lost
@@ -549,7 +647,7 @@ export default function AdminCrmLeadDetailPage() {
                   {lead.stage === "LOST" ? (
                     <button
                       disabled={stageBusy}
-                      onClick={() => void handleStageMove("NEW")}
+                      onClick={() => openStageModal("NEW")}
                       className="rounded-xl border border-border bg-background px-3 py-1.5 text-sm font-medium hover:bg-muted disabled:opacity-50"
                     >
                       Re-open (→ New)
@@ -565,9 +663,113 @@ export default function AdminCrmLeadDetailPage() {
                     {convertBusy ? "Converting…" : "Convert to Customer"}
                   </button>
                 ) : null}
+
               </div>
             </div>
           </ERPSectionShell>
+
+          {/* ── KYC (during KYC_PENDING / READY_TO_CONVERT) ──── */}
+          {(lead.stage === "KYC_PENDING" || lead.stage === "READY_TO_CONVERT") ? (
+            <ERPSectionShell
+              title="KYC Documents"
+              description="Collect and verify identity documents before converting this lead to a customer."
+            >
+              {!linkedCustomerId ? (
+                <div className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800">
+                  No customer record is linked yet. Re-enter the KYC stage to create the
+                  customer record used to hold these documents.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-muted-foreground">Overall KYC status:</span>
+                    <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold uppercase ${
+                      kycStatus === "APPROVED" ? "bg-green-100 text-green-700"
+                        : kycStatus === "REJECTED" ? "bg-red-100 text-red-700"
+                        : "bg-orange-100 text-orange-700"
+                    }`}>{kycStatus}</span>
+                  </div>
+
+                  {kycError ? (
+                    <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{kycError}</div>
+                  ) : null}
+
+                  {/* Upload */}
+                  <div className="rounded-xl border border-border bg-card p-4">
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div>
+                        <label className="block text-xs font-medium mb-1">Document type</label>
+                        <select
+                          value={kycDocType}
+                          onChange={(e) => setKycDocType(e.target.value)}
+                          className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm"
+                        >
+                          {KYC_DOC_TYPES.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
+                        </select>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-medium mb-1">File (PDF / image)</label>
+                        <input
+                          type="file"
+                          accept="image/*,application/pdf"
+                          onChange={(e) => setKycFile(e.target.files?.[0] ?? null)}
+                          className="w-full text-sm file:mr-3 file:rounded-lg file:border file:border-border file:bg-background file:px-3 file:py-1.5 file:text-sm"
+                        />
+                      </div>
+                    </div>
+                    <div className="mt-3">
+                      <button
+                        disabled={!kycFile || kycBusy}
+                        onClick={() => void handleKycUpload()}
+                        className="rounded-xl border border-primary bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                      >
+                        {kycBusy ? "Uploading…" : "Upload Document"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Existing docs */}
+                  {kycDocs.length === 0 ? (
+                    <ERPEmptyState title="No documents yet" description="Upload the first KYC document above." />
+                  ) : (
+                    <div className="overflow-x-auto rounded-xl border border-border">
+                      <table className="min-w-full text-sm">
+                        <thead className="bg-muted/50">
+                          <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground">
+                            <th className="px-4 py-2.5">Type</th>
+                            <th className="px-4 py-2.5">File</th>
+                            <th className="px-4 py-2.5">Status</th>
+                            <th className="px-4 py-2.5">Uploaded</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {kycDocs.map((doc) => (
+                            <tr key={doc.id} className="border-t border-border/60">
+                              <td className="px-4 py-3 font-medium">{doc.document_type}</td>
+                              <td className="px-4 py-3 text-muted-foreground">{doc.original_filename}</td>
+                              <td className="px-4 py-3">
+                                <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                                  doc.status === "APPROVED" ? "bg-green-100 text-green-700"
+                                    : doc.status === "REJECTED" ? "bg-red-100 text-red-700"
+                                    : "bg-blue-100 text-blue-700"
+                                }`}>{doc.status}</span>
+                              </td>
+                              <td className="px-4 py-3 text-muted-foreground">{formatDt(doc.created_at)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Review &amp; approval happens in the{" "}
+                    <a href={ROUTES.admin.crmKyc} className="text-primary hover:underline underline-offset-4">KYC queue</a>.
+                    Once documents are verified, move the lead to <span className="font-medium">Ready to Convert</span>.
+                  </p>
+                </div>
+              )}
+            </ERPSectionShell>
+          ) : null}
 
           {/* ── Follow-up tasks ──────────────────────────────── */}
           <ERPSectionShell
@@ -687,6 +889,92 @@ export default function AdminCrmLeadDetailPage() {
             )}
           </ERPSectionShell>
         </>
+      ) : null}
+
+      {/* ── Stage transition modal ───────────────────────────── */}
+      {pendingStage ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => !stageBusy && setPendingStage(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-base font-semibold text-foreground">
+              Move to {LEAD_STAGE_LABELS[pendingStage]}
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {pendingStage === "LOST"
+                ? "Record why this lead was lost. This is required and kept on the timeline."
+                : "Add feedback for this transition. It is saved to the lead activity timeline."}
+            </p>
+
+            {stageError ? (
+              <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                {stageError}
+              </div>
+            ) : null}
+
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="block text-xs font-medium mb-1">
+                  {pendingStage === "LOST" ? "Lost reason *" : "Feedback / call note"}
+                </label>
+                <textarea
+                  value={stageNote}
+                  onChange={(e) => setStageNote(e.target.value)}
+                  rows={3}
+                  autoFocus
+                  placeholder={
+                    pendingStage === "LOST"
+                      ? "e.g. Chose a competitor, budget not available…"
+                      : "e.g. Spoke with customer, confirmed interest in 3-seater sofa…"
+                  }
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm resize-none"
+                />
+              </div>
+              {pendingStage !== "LOST" && pendingStage !== "CONVERTED" ? (
+                <div>
+                  <label className="block text-xs font-medium mb-1">
+                    Next follow-up (optional)
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={stageFollowUp}
+                    onChange={(e) => setStageFollowUp(e.target.value)}
+                    className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm"
+                  />
+                </div>
+              ) : null}
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                onClick={() => setPendingStage(null)}
+                disabled={stageBusy}
+                className="rounded-xl border border-border px-4 py-1.5 text-sm hover:bg-muted disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => void handleStageMove()}
+                disabled={stageBusy || (pendingStage === "LOST" && !stageNote.trim())}
+                className={`rounded-xl px-4 py-1.5 text-sm font-medium text-white disabled:opacity-50 ${
+                  pendingStage === "LOST"
+                    ? "bg-red-600 hover:bg-red-700"
+                    : "bg-primary hover:opacity-90"
+                }`}
+              >
+                {stageBusy
+                  ? "Saving…"
+                  : pendingStage === "LOST"
+                    ? "Mark Lost"
+                    : `Move to ${LEAD_STAGE_LABELS[pendingStage]}`}
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </ERPPageShell>
   );

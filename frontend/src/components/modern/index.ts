@@ -9,5 +9,10 @@ export { ModernButton, type ModernButtonProps, type ButtonVariant, type ButtonSi
 export { ModernBadge, type ModernBadgeProps, type BadgeColor, type BadgeSize } from "./ModernBadge";
 
 // Export all components as a namespace
-import * as Modern from "./index";
-export default Modern;
+export * from "./ModernKPICard";
+export * from "./ModernDashboardShell";
+export * from "./ModernCard";
+export * from "./ModernStatsGrid";
+export * from "./ModernFormGroup";
+export * from "./ModernButton";
+export * from "./ModernBadge";

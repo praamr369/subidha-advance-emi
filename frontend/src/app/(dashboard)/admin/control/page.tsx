@@ -111,7 +111,7 @@ export default function AdminControlPage() {
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {MODULES.map(({ href, title, description, Icon, iconCls, dotCls }) => (
             <Link
-              key={href}
+              key={`${title}-${href}`}
               href={href}
               className="group relative flex min-h-[11rem] flex-col rounded-xl border border-border bg-card p-4 transition hover:border-ring hover:shadow-sm"
             >

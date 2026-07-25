@@ -24,7 +24,9 @@ import { CustomerTimelinePanel } from "@/components/customer-intelligence/Custom
 import KycDocumentPanel from "@/components/kyc/KycDocumentPanel";
 import { DetailPanel, KpiCard, QuickActionGrid } from "@/components/ui/operations";
 import ERPPageShell from "@/components/erp/ERPPageShell";
-import { DetailItem as DetailValue, WorkspaceSection as SectionCard } from "@/components/ui/workspace";
+import { DetailItem as DetailValue, WorkspaceSection as SectionCard, WorkspaceSection } from "@/components/ui/workspace";
+import { WorkbenchFilterChips } from "@/components/workbench/WorkbenchFilterChips";
+import { UniversalQuickWidgetsEmbed } from "@/components/profile/Profile360";
 import OtpDeliveryReadinessCard from "@/domains/customers/components/OtpDeliveryReadinessCard";
 import {
   buildForgotPasswordHref,
@@ -1307,6 +1309,7 @@ export default function AdminCustomerDetailPage() {
   const [customer, setCustomer] = useState<CustomerDetailRecord | null>(null);
   const [subscriptions, setSubscriptions] = useState<SubscriptionPreviewRow[]>([]);
   const [payments, setPayments] = useState<PaymentPreviewRow[]>([]);
+  const [segment, setSegment] = useState("overview");
   const [operationalProfile, setOperationalProfile] =
     useState<CustomerOperationalProfile | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
@@ -1711,29 +1714,34 @@ export default function AdminCustomerDetailPage() {
           label: "Active Subscriptions",
           value: String(activeSubscriptionCount),
           tone: activeSubscriptionCount > 0 ? "success" : undefined,
+          hint: "Active contract count",
         },
         {
           label: "Active Contract Value",
           value: formatRupee(totalContractValue),
           tone: "success",
+          hint: "Excludes cancelled/history",
         },
         {
           label: "Historical Contract Value",
           value: formatRupee(historicalContractValue),
+          hint: "Cancelled/archived contracts",
         },
         {
           label: "Active Payments",
           value: String(activePayments.length),
+          hint: "Non-reversed payments",
         },
         {
-          label: "KYC",
+          label: "KYC Status",
           value: customer?.kyc_status || "—",
           tone:
-            customer?.kyc_status === "VERIFIED"
+            customer?.kyc_status === "VERIFIED" || customer?.kyc_status === "APPROVED"
               ? "success"
               : customer?.kyc_status === "REJECTED"
               ? "danger"
               : "warning",
+          hint: "Identity verification posture",
         },
       ]}
       statusBadge={{
@@ -1824,53 +1832,22 @@ export default function AdminCustomerDetailPage() {
             )}
 
             {/* Advanced Stats Row */}
-            <QuickActionGrid className="sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-              <KpiCard
-                label="Active subscriptions"
-                value={String(activeSubscriptionCount)}
-                helper="Subscriptions with status ACTIVE"
+            <div className="sticky top-0 z-10 -mx-2 bg-background/95 px-2 py-3 backdrop-blur sm:-mx-6 sm:px-6 mb-6">
+              <WorkbenchFilterChips
+                active={segment}
+                onSelect={setSegment}
+                chips={[
+                  { key: "overview", label: "Overview & Actions" },
+                  { key: "contracts", label: "Active Contracts" },
+                  { key: "financials", label: "Financials & Collections" },
+                ]}
               />
-              <KpiCard
-                label="Active contract value"
-                value={formatRupee(totalContractValue)}
-                helper="Excludes cancelled/history-only subscriptions"
-              />
-              <KpiCard
-                label="Historical contract value"
-                value={formatRupee(historicalContractValue)}
-                helper="Cancelled/archived contracts preserved for audit"
-              />
-              <KpiCard
-                label="Active payments"
-                value={String(activePayments.length)}
-                helper="Non-reversed payments in preview"
-              />
-              <KpiCard
-                label="KYC status"
-                value={customer.kyc_status}
-                helper={
-                  customer.kyc_status === "VERIFIED" || customer.kyc_status === "APPROVED"
-                    ? "Verified or approved"
-                    : customer.kyc_status === "REJECTED"
-                      ? "Rejected — review required"
-                      : "Compliance posture"
-                }
-              />
-              <KpiCard
-                label="Active direct-sale outstanding"
-                value={formatRupee(
-                  operationalProfile?.direct_sales.summary.outstanding_total || "0.00"
-                )}
-                helper={`Open receivables ${operationalProfile?.direct_sales.summary.outstanding_count ?? 0} (active only)`}
-              />
-              <KpiCard
-                label="Receipts / invoices"
-                value={`${operationalProfile?.receipts_documents.summary.receipt_count ?? 0} / ${operationalProfile?.receipts_documents.summary.invoice_count ?? 0}`}
-                helper="Retail receipts and invoices linked to this profile"
-              />
-            </QuickActionGrid>
+            </div>
 
-            <div className="grid gap-6 xl:grid-cols-2">
+            {segment === "overview" && (
+              <>
+                <UniversalQuickWidgetsEmbed role="CUSTOMER" sourceId={customer.id} />
+                <div className="grid gap-6 xl:grid-cols-2">
               <SectionCard
                 title="Profile Overview"
                 description="Primary customer facts used for admin operations and profile verification."
@@ -2146,8 +2123,10 @@ export default function AdminCustomerDetailPage() {
             >
               <CustomerTimelinePanel customerId={customer.id} />
             </SectionCard>
+              </>
+            )}
 
-            {operationalProfile ? (
+            {segment === "financials" && operationalProfile ? (
               <div className="grid gap-6 xl:grid-cols-2">
                 <SectionCard
                   title="Customer Workflow Rails"
@@ -2354,7 +2333,7 @@ export default function AdminCustomerDetailPage() {
               </div>
             ) : null}
 
-            {operationalProfile ? (
+            {segment === "contracts" && operationalProfile ? (
               <>
                 <SectionCard
                   title="Contracts"
@@ -2426,8 +2405,10 @@ export default function AdminCustomerDetailPage() {
               </>
             ) : null}
 
-            <div className="rounded-xl border border-sky-200 bg-sky-50/60 px-4 py-3 text-sm text-sky-900">
-              <p className="font-semibold">Contract readiness is evaluated on each subscription detail.</p>
+            {segment === "contracts" && (
+              <>
+                <div className="rounded-xl border border-sky-200 bg-sky-50/60 px-4 py-3 text-sm text-sky-900">
+                  <p className="font-semibold">Contract readiness is evaluated on each subscription detail.</p>
               <p className="mt-1 text-xs">
                 Open an individual subscription to see its activation and handover readiness, blockers,
                 and category status. No readiness aggregation is performed here — each contract&apos;s
@@ -2452,9 +2433,13 @@ export default function AdminCustomerDetailPage() {
             >
               <SubscriptionsTable rows={historicalLinkedSubscriptions} />
             </SectionCard>
+              </>
+            )}
 
-            <SectionCard
-              title="Payment History"
+            {segment === "financials" && (
+              <>
+                <SectionCard
+                  title="Payment History"
               description="Recent payment activity linked to this customer."
               actionHref={`/admin/payments?customer=${customer.id}`}
               actionLabel="View All"
@@ -2590,9 +2575,22 @@ export default function AdminCustomerDetailPage() {
                               <div className="text-sm font-semibold text-foreground">
                                 Lead #{lead.id} · {lead.name || "Unnamed"}
                               </div>
-                              <div className="mt-1 text-xs text-muted-foreground">
-                                {lead.phone || "No phone"} · {lead.intent || "GENERAL"} · {lead.status || "NEW"} ·{" "}
-                                {lead.source || "UNKNOWN_SOURCE"}
+                              <div className="mt-1 flex flex-wrap items-center gap-2">
+                                <div className="text-xs text-muted-foreground">
+                                  {lead.phone || "No phone"} · {lead.intent || "GENERAL"} · {lead.source || "UNKNOWN_SOURCE"}
+                                </div>
+                                <StatusBadge
+                                  status={lead.status || "NEW"}
+                                  tone={
+                                    lead.status === "REJECTED" || lead.status === "CANCELLED" || lead.status === "DEAD"
+                                      ? "danger"
+                                      : lead.status === "CONVERTED" || lead.status === "WON"
+                                        ? "success"
+                                        : lead.status === "NEW" || lead.status === "OPEN"
+                                          ? "info"
+                                          : "warning"
+                                  }
+                                />
                               </div>
                               <div className="mt-1 text-xs text-muted-foreground">
                                 {lead.interested_product || "No product context"}
@@ -2666,7 +2664,13 @@ export default function AdminCustomerDetailPage() {
                     </div>
                   )}
                 </SectionCard>
-
+              </>
+            ) : null}
+          </>
+        )}
+            
+        {segment === "financials" && operationalProfile ? (
+              <>
                 <SectionCard
                   title="Receipts & Documents"
                   description="Retail receipts and subscription documents visible from the unified customer operations surface."

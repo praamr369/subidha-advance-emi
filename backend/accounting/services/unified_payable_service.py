@@ -19,14 +19,36 @@ from accounting.models import (
     UnifiedPayableIdempotency,
     UnifiedPayableIdempotencyStatus,
 )
-from subscriptions.models import CommissionPayoutBatch
+from subscriptions.models import AuditLog, CommissionPayoutBatch
+from subscriptions.services.audit_service import log_audit
 
-def get_unified_payables(payable_type=None, search=None, status_category=None):
+def get_unified_payables(payable_type=None, search=None, status_category=None, party_type=None, party_id=None):
+    """Aggregate every outgoing payable into one normalized queue.
+
+    ``party_type`` + ``party_id`` scope the queue to a single party for the
+    per-profile payout panels:
+      * EMPLOYEE -> salary + expense_claim for that employee
+      * VENDOR   -> vendor_settlement + vendor_outstanding for that vendor
+      * PARTNER  -> individual commissions for that partner
+    Bulk commission payout batches are not party-scoped, so they are excluded
+    whenever a specific party is requested.
+    """
     items = []
-    
+    # Normalize the party scope once so every block can guard against it.
+    party_id = int(party_id) if party_id not in (None, "") else None
+    party_type = (party_type or None) and str(party_type).upper()
+
+    def _party_ok(item_party_type: str) -> bool:
+        """A block runs unless a different party was explicitly requested."""
+        if party_id is None:
+            return True
+        return party_type == item_party_type
+
     # 1. Salary (SalarySheet)
-    if not payable_type or payable_type == "salary":
+    if (not payable_type or payable_type == "salary") and _party_ok("EMPLOYEE"):
         qs = SalarySheet.objects.all()
+        if party_id is not None:
+            qs = qs.filter(employee_id=party_id)
         if status_category == "DRAFT":
             qs = qs.filter(status=SalarySheetStatus.DRAFT)
         elif status_category == "READY_TO_PAY":
@@ -61,8 +83,10 @@ def get_unified_payables(payable_type=None, search=None, status_category=None):
             })
 
     # 2. Vendor Settlement (VendorSettlement)
-    if not payable_type or payable_type == "vendor_settlement":
+    if (not payable_type or payable_type == "vendor_settlement") and _party_ok("VENDOR"):
         qs = VendorSettlement.objects.all()
+        if party_id is not None:
+            qs = qs.filter(vendor_id=party_id)
         if status_category == "DRAFT":
             qs = qs.filter(status=VendorSettlementStatus.DRAFT)
         elif status_category == "READY_TO_PAY":
@@ -96,8 +120,8 @@ def get_unified_payables(payable_type=None, search=None, status_category=None):
                 "notes": v.notes,
             })
 
-    # 3. Commission Payout Batch
-    if not payable_type or payable_type == "payout_batch":
+    # 3. Commission Payout Batch (bulk — not scoped to a single party)
+    if (not payable_type or payable_type == "payout_batch") and party_id is None:
         qs = CommissionPayoutBatch.objects.all()
         if status_category == "DRAFT":
             qs = qs.filter(status=CommissionPayoutBatch.Status.DRAFT)
@@ -140,9 +164,11 @@ def get_unified_payables(payable_type=None, search=None, status_category=None):
             })
 
     # 3.5 Individual Commissions
-    if not payable_type or payable_type == "commission":
+    if (not payable_type or payable_type == "commission") and _party_ok("PARTNER"):
         from subscriptions.models import Commission, CommissionStatus
         qs = Commission.objects.select_related('partner').all()
+        if party_id is not None:
+            qs = qs.filter(partner_id=party_id)
         if status_category == "DRAFT":
             qs = qs.none()
         elif status_category == "READY_TO_PAY":
@@ -194,8 +220,10 @@ def get_unified_payables(payable_type=None, search=None, status_category=None):
             })
 
     # 4. Expense Claim
-    if not payable_type or payable_type == "expense_claim":
+    if (not payable_type or payable_type == "expense_claim") and _party_ok("EMPLOYEE"):
         qs = EmployeeExpenseClaim.objects.all()
+        if party_id is not None:
+            qs = qs.filter(employee_id=party_id)
         if status_category == "DRAFT":
             qs = qs.filter(status=ExpenseClaimStatus.DRAFT)
         elif status_category == "READY_TO_PAY":
@@ -230,11 +258,13 @@ def get_unified_payables(payable_type=None, search=None, status_category=None):
             })
 
     # 5. Vendor Outstanding Balances (as a payable type)
-    if not payable_type or payable_type == "vendor_outstanding":
+    if (not payable_type or payable_type == "vendor_outstanding") and _party_ok("VENDOR"):
         if status_category in ["READY_TO_PAY", "ALL", None]:
             from accounting.services.vendor_ledger_service import get_vendor_outstanding
             from accounting.models import Vendor
             vendors = Vendor.objects.all()
+            if party_id is not None:
+                vendors = vendors.filter(id=party_id)
             if search:
                 vendors = vendors.filter(Q(name__icontains=search) | Q(vendor_code__icontains=search))
             for v in vendors:
@@ -295,13 +325,15 @@ def execute_payable_action(payload, executed_by):
             elif action == "cancel":
                 sheet.status = SalarySheetStatus.DRAFT
             sheet.save(update_fields=["status"])
-            
+            audited_instance = sheet
+
         elif payable_type == "vendor_settlement":
             settlement = VendorSettlement.objects.select_for_update().get(id=payable_id)
             if action == "cancel":
                 settlement.status = VendorSettlementStatus.CANCELLED
             settlement.save(update_fields=["status"])
-            
+            audited_instance = settlement
+
         elif payable_type == "payout_batch":
             batch = CommissionPayoutBatch.objects.select_for_update().get(id=payable_id)
             if action == "approve" or action == "finalize":
@@ -309,6 +341,7 @@ def execute_payable_action(payload, executed_by):
             elif action == "cancel":
                 batch.status = CommissionPayoutBatch.Status.CANCELLED
             batch.save(update_fields=["status"])
+            audited_instance = batch
 
         elif payable_type == "commission":
             from subscriptions.models import Commission, CommissionStatus
@@ -316,6 +349,7 @@ def execute_payable_action(payload, executed_by):
             if action == "cancel":
                 commission.status = CommissionStatus.REVERSED
             commission.save(update_fields=["status"])
+            audited_instance = commission
 
         elif payable_type == "expense_claim":
             claim = EmployeeExpenseClaim.objects.select_for_update().get(id=payable_id)
@@ -326,8 +360,22 @@ def execute_payable_action(payload, executed_by):
             elif action == "cancel":
                 claim.status = ExpenseClaimStatus.CANCELLED
             claim.save(update_fields=["status"])
+            audited_instance = claim
         else:
             raise ValueError(f"Unsupported payable type: {payable_type}")
+
+        log_audit(
+            action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
+            instance=audited_instance,
+            performed_by=executed_by,
+            metadata={
+                "event": "UNIFIED_PAYABLE_ACTION_EXECUTED",
+                "payable_type": payable_type,
+                "payable_id": payable_id,
+                "action": action,
+                "resulting_status": getattr(audited_instance, "status", None),
+            },
+        )
 
         return {
             "success": True,
@@ -482,5 +530,21 @@ def execute_unified_payable(payload, executed_by, idempotency_key=None, fingerpr
         idem_row.status = UnifiedPayableIdempotencyStatus.COMPLETED
         idem_row.response_body = result
         idem_row.save(update_fields=["status", "response_body"])
+
+        log_audit(
+            action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
+            instance=idem_row,
+            performed_by=executed_by,
+            metadata={
+                "event": "UNIFIED_PAYABLE_PAYOUT_EXECUTED",
+                "payable_type": payable_type,
+                "payable_id": payable_id,
+                "amount": str(amount),
+                "finance_account_id": finance_account_id,
+                "payment_date": str(payment_date),
+                "reference_no": reference_no or "",
+                "idempotency_key": idempotency_key,
+            },
+        )
 
         return result

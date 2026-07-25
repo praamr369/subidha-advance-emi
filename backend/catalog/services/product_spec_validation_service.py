@@ -16,8 +16,11 @@ def validate_product_base_specs(*, category: CatalogCategory | None, values: obj
     if not isinstance(values, dict):
         raise ValidationError({"base_specs": "Base specifications must be a JSON object."})
     if category is None:
-        if values:
-            raise ValidationError({"catalog_category": "Choose a PIM category before entering specifications."})
+        # The catalog.CatalogCategory spec system is legacy and unused (0 rows) —
+        # structured product attributes now live in products_pim (the product's
+        # linked PIM record and its attribute editor). When no catalog category is
+        # set, treat product base_specs as a free-form JSON blob instead of
+        # blocking the save on a dead category table.
         return values
 
     definitions = {

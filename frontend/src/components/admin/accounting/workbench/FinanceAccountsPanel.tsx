@@ -72,15 +72,15 @@ export function FinanceAccountsPanel() {
   return (
     <div className="space-y-6">
       <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-        <h2 className="text-xl font-semibold text-foreground">Finance accounts setup</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Configure chart accounts and finance accounts using existing Accounting masters. Finance accounts are real cash/bank/UPI settlement instruments; posting profiles remain separate.</p>
+        <h2 className="text-xl font-semibold text-foreground">Bank & Cash Accounts Setup</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Configure Income & Expense Categories and Bank & Cash Accounts. Bank & Cash accounts are real cash/bank/UPI settlement instruments; manual entry profiles remain separate.</p>
       </div>
 
       {error ? <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</div> : null}
 
       <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div><div className="text-base font-semibold text-foreground">Live accounting readiness</div><p className="mt-2 text-sm text-muted-foreground">Settlement desks stay separate from ledger-only concepts. Use Books only for real inter-account transfers; use Bridge Reconciliation for system-generated source posting.</p></div>
+          <div><div className="text-base font-semibold text-foreground">Live System Readiness</div><p className="mt-2 text-sm text-muted-foreground">Settlement desks stay separate from ledger-only concepts. Use Ledger only for real inter-account transfers; use Daily Approvals & Postings for system-generated posting.</p></div>
           <span className={badgeClass(blockerCount > 0 ? "amber" : "green")}>{loading ? "LOADING" : setupStatus}</span>
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-3 text-sm">
@@ -92,41 +92,41 @@ export function FinanceAccountsPanel() {
         {booksReadiness?.blockers?.length ? <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-900"><div className="font-semibold">Books blockers</div><ul className="mt-2 list-disc space-y-1 pl-5">{booksReadiness.blockers.map((item) => <li key={item}>{item}</li>)}</ul></div> : null}
         {booksReadiness?.warnings?.length ? <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><div className="font-semibold">Finance account warnings</div><ul className="mt-2 list-disc space-y-1 pl-5">{booksReadiness.warnings.map((item) => <li key={item}>{item}</li>)}</ul></div> : null}
         <div className="mt-4 flex flex-wrap gap-2">
-          <Link className="rounded-xl bg-primary px-3 py-2 text-sm font-medium text-primary-foreground" href="/admin/accounting/setup">Open accounting setup</Link>
-          <Link className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground" href="/admin/settings/business-setup/chart-accounts">Chart accounts checklist</Link>
-          <Link className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground" href="/admin/accounting/books">Open books</Link>
+          <Link className="rounded-xl bg-primary px-3 py-2 text-sm font-medium text-primary-foreground" href="/admin/accounting/setup">Open Finance Setup</Link>
+          <Link className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground" href="/admin/settings/business-setup/chart-accounts">Categories Checklist</Link>
+          <Link className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground" href="/admin/accounting/books">Open Ledger</Link>
           <button type="button" className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground disabled:opacity-60" disabled={repairing} onClick={async () => { setRepairing(true); try { await repairSuggestedMappings(false); await loadPage(); } catch (err) { setError(err instanceof Error ? err.message : "Failed to repair suggested mappings."); } finally { setRepairing(false); } }}>{repairing ? "Repairing..." : "Repair suggested mappings"}</button>
         </div>
       </section>
 
       <section className="grid gap-5 md:grid-cols-4">
-        <div className="rounded-xl border border-border bg-card p-5 shadow-sm"><div className="text-sm font-medium text-muted-foreground">Active chart accounts</div><div className="mt-2 text-3xl font-semibold text-foreground">{checklist ? chartActiveTotal : "—"}</div><div className="mt-2 text-xs text-muted-foreground">Statement roots: {checklist ? chartRootsStmt : "—"}</div></div>
-        <div className="rounded-xl border border-border bg-card p-5 shadow-sm"><div className="text-sm font-medium text-muted-foreground">Child / sub accounts</div><div className="mt-2 text-3xl font-semibold text-foreground">{checklist ? chartChildren : "—"}</div><div className="mt-2 text-xs text-muted-foreground">Non-statement operational/control: {checklist ? nonStatement : "—"}</div></div>
-        <div className="rounded-xl border border-border bg-card p-5 shadow-sm"><div className="text-sm font-medium text-muted-foreground">Finance accounts</div><div className="mt-2 text-3xl font-semibold text-foreground">{loading ? "—" : financeAccounts}</div><div className="mt-2 text-xs text-muted-foreground">Cash {hasCash ? "✓" : "—"} · Bank {hasBank ? "✓" : "—"} · UPI {hasUpi ? "✓" : "—"}</div></div>
-        <div className="rounded-xl border border-border bg-card p-5 shadow-sm"><div className="text-sm font-medium text-muted-foreground">Movement eligible</div><div className="mt-2 text-3xl font-semibold text-foreground">{loading ? "—" : movementEligible}</div><div className="mt-2 text-xs text-muted-foreground">Requires real active settlement accounts mapped to posting-ready ASSET ledgers.</div></div>
+        <div className="rounded-xl border border-border bg-card p-5 shadow-sm"><div className="text-sm font-medium text-muted-foreground">Active Categories</div><div className="mt-2 text-3xl font-semibold text-foreground">{checklist ? chartActiveTotal : "—"}</div><div className="mt-2 text-xs text-muted-foreground">Statement roots: {checklist ? chartRootsStmt : "—"}</div></div>
+        <div className="rounded-xl border border-border bg-card p-5 shadow-sm"><div className="text-sm font-medium text-muted-foreground">Sub-Categories</div><div className="mt-2 text-3xl font-semibold text-foreground">{checklist ? chartChildren : "—"}</div><div className="mt-2 text-xs text-muted-foreground">Non-statement operational/control: {checklist ? nonStatement : "—"}</div></div>
+        <div className="rounded-xl border border-border bg-card p-5 shadow-sm"><div className="text-sm font-medium text-muted-foreground">Bank & Cash Accounts</div><div className="mt-2 text-3xl font-semibold text-foreground">{loading ? "—" : financeAccounts}</div><div className="mt-2 text-xs text-muted-foreground">Cash {hasCash ? "✓" : "—"} · Bank {hasBank ? "✓" : "—"} · UPI {hasUpi ? "✓" : "—"}</div></div>
+        <div className="rounded-xl border border-border bg-card p-5 shadow-sm"><div className="text-sm font-medium text-muted-foreground">Ready for Transfers</div><div className="mt-2 text-3xl font-semibold text-foreground">{loading ? "—" : movementEligible}</div><div className="mt-2 text-xs text-muted-foreground">Requires real active settlement accounts mapped to manual-entry-ready ASSET ledgers.</div></div>
       </section>
 
       <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
-        <div className="text-base font-semibold text-foreground">Finance account register</div>
-        <p className="mt-1 text-sm text-muted-foreground">This is a setup summary. Edit/create finance accounts in Accounting Setup; use Books only for inter-account transfers.</p>
+        <div className="text-base font-semibold text-foreground">Bank & Cash Accounts List</div>
+        <p className="mt-1 text-sm text-muted-foreground">This is a setup summary. Edit/create bank & cash accounts in Finance Setup; use Ledger only for inter-account transfers.</p>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           {(booksReadiness?.finance_accounts ?? []).map((account) => (
             <div key={account.id} className="rounded-xl border border-border bg-background p-4 text-sm">
-              <div className="flex flex-wrap items-start justify-between gap-2"><div><strong>{account.name}</strong><div className="mt-1 text-xs text-muted-foreground">{account.kind} · {account.chart_account_code || "No chart"} · {account.branch_code || "Default branch"}</div></div><div className="flex flex-wrap gap-2"><span className={badgeClass(account.collection_ready ? "green" : "amber")}>{account.collection_ready ? "Collection ready" : "Collection review"}</span><span className={badgeClass(account.movement_eligible ? "green" : "amber")}>{account.movement_eligible ? "Books ready" : "Books review"}</span></div></div>
+              <div className="flex flex-wrap items-start justify-between gap-2"><div><strong>{account.name}</strong><div className="mt-1 text-xs text-muted-foreground">{account.kind} · {account.chart_account_code || "No chart"} · {account.branch_code || "Default branch"}</div></div><div className="flex flex-wrap gap-2"><span className={badgeClass(account.collection_ready ? "green" : "amber")}>{account.collection_ready ? "Ready for Payments" : "Needs Review"}</span><span className={badgeClass(account.movement_eligible ? "green" : "amber")}>{account.movement_eligible ? "Ready for Ledger" : "Needs Review"}</span></div></div>
               {account.collection_blocker_reason ? <div className="mt-2 text-xs text-amber-900">{account.collection_blocker_reason}</div> : null}
             </div>
           ))}
-          {!loading && (booksReadiness?.finance_accounts ?? []).length === 0 ? <div className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">No active settlement finance account exposed by backend readiness.</div> : null}
+          {!loading && (booksReadiness?.finance_accounts ?? []).length === 0 ? <div className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">No active bank or cash accounts found.</div> : null}
         </div>
       </section>
 
       <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
         <div className="text-base font-semibold text-foreground">Minimum recommended setup</div>
         <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-muted-foreground">
-          <li>Create chart accounts first; finance accounts must map to active ASSET accounts.</li>
+          <li>Create Income & Expense Categories first; bank & cash accounts must map to active ASSET categories.</li>
           <li>Create at least one CASH account and at least one BANK or UPI account.</li>
-          <li>Use finance accounts in counters, billing, receipts, books, and reconciliation; do not hardcode bank details in receipts.</li>
-          <li>Use Accounting Bridge Reconciliation for source posting. Books is only for explicit inter-account movement.</li>
+          <li>Use bank & cash accounts in counters, billing, receipts, ledger, and approvals; do not hardcode bank details.</li>
+          <li>Use Daily Approvals & Postings for automatic posting. Ledger is only for manual inter-account movement.</li>
         </ul>
       </section>
     </div>
