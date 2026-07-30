@@ -128,3 +128,23 @@ backend/private_backups/
 *.dump
 *.sql
 local_setup_snapshot.json
+
+# Scratch / dev-only scripts
+scratch_*.py
+backend/scratch_*.py
+backend/create_*_simulation_*.py
+
+# Auto-generated session notes (not project docs)
+COMPLETE_PIM_DELIVERY.md
+EXACT_INTEGRATION_CODE.md
+FILES_CREATED.md
+FRONTEND_IMPROVEMENTS_SUMMARY.md
+PIM_FRONTEND_ROUTING.md
+PIM_IMPLEMENTATION_CHECKLIST.md
+PIM_IMPLEMENTATION_SUMMARY.md
+PIM_INTEGRATION_STEP_BY_STEP.md
+PIM_QUICK_START.md
+PIM_WORKBENCH_COMPLETE_GUIDE.md
+QUICK_DEBUG_CHECKLIST.md
+SAGWAN_BED_PIM_SETUP.md
+WHY_PRODUCT_EDIT_FAILED.md
