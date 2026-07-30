@@ -41,6 +41,7 @@ sudo -u postgres createdb "$REHEARSAL_DB"
 trap 'sudo -u postgres dropdb --if-exists "$REHEARSAL_DB"' EXIT
 sudo -u postgres pg_restore -d "$REHEARSAL_DB" "$LATEST_BACKUP/db.dump"
 sudo -u postgres psql -q -c "GRANT ALL ON DATABASE $REHEARSAL_DB TO $DB_NAME" || true
+sudo -u postgres psql -q -d "$REHEARSAL_DB" -c "GRANT ALL ON SCHEMA public TO $DB_NAME" || true
 git checkout -q "$NEW_COMMIT"
 cd "$APP_DIR/backend"
 "$PIP" install -q -r requirements.txt
