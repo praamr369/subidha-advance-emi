@@ -153,6 +153,8 @@ export type AdminDepositLatestTransaction = {
   finance_account_name?: string | null;
   status?: string;
   created_at?: string | null;
+  bridge_posted?: boolean;
+  posted_journal_entry_id?: number | null;
 };
 
 export type AdminDepositRow = AdminDepositActionPosture & {

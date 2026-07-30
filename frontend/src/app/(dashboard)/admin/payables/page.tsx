@@ -28,6 +28,7 @@ function today() {
 const TYPE_COLOR: Record<string, string> = {
   salary: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
   vendor_settlement: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
+  vendor_outstanding: "bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-900/30 dark:text-fuchsia-300",
   commission: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
   expense_claim: "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300",
   credit_refund: "bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300",
@@ -43,6 +44,7 @@ const KIND_COLOR: Record<string, string> = {
 const JOURNAL_EXPLANATION: Record<string, string> = {
   salary: "Accrual: DR Salary Expense / CR Salary Payable  →  Payment: DR Salary Payable / CR Finance Account",
   vendor_settlement: "DR Accounts Payable / CR Finance Account",
+  vendor_outstanding: "Creates & posts a vendor settlement: DR Accounts Payable / CR Finance Account",
   commission: "DR Partner Commission Payable / CR Finance Account",
   expense_claim: "Accrual: DR Expense / CR Accounts Payable  →  Payment: DR Accounts Payable / CR Finance Account",
   credit_refund: "DR Customer Receivable / CR Finance Account",
@@ -58,6 +60,10 @@ const SOURCE_LINKS: Record<string, { label: string; href: string }[]> = {
   vendor_settlement: [
     { label: "Vendors", href: "/admin/vendors" },
     { label: "Accounting Payables", href: "/admin/accounting/payables" },
+  ],
+  vendor_outstanding: [
+    { label: "Vendors", href: "/admin/vendors" },
+    { label: "Vendor Payables", href: "/admin/purchases/vendor-payables" },
   ],
   commission: [
     { label: "Commissions", href: "/admin/commissions" },
@@ -170,7 +176,7 @@ function PayModal({ item, accounts, onClose, onPaid }: PayModalProps) {
               <span className="text-xs text-gray-400 self-center">Source:</span>
               {sourceLinks.map((l) => (
                 <Link
-                  key={l.href}
+                  key={`${l.label}-${l.href}`}
                   href={l.href}
                   target="_blank"
                   className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline border border-blue-200 dark:border-blue-800 rounded-full px-2.5 py-0.5"
@@ -324,6 +330,7 @@ const TYPES = [
   { value: "", label: "All types" },
   { value: "salary", label: "Salary" },
   { value: "vendor_settlement", label: "Vendor Settlement" },
+  { value: "vendor_outstanding", label: "Vendor Outstanding" },
   { value: "commission", label: "Commission" },
   { value: "expense_claim", label: "Expense Claim" },
   { value: "credit_refund", label: "Customer Refund" },
@@ -386,6 +393,13 @@ export default function UnifiedPayablePage() {
     <ERPPageShell
       title="Unified Payables"
       subtitle="All outgoing payment obligations — salary, vendor, commission, payout, refund"
+      actions={[
+        {
+          label: "Add Manual Expense",
+          href: "/admin/accounting/expenses",
+          variant: "primary",
+        },
+      ]}
     >
       {/* Summary KPIs */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mt-2 mb-5">
@@ -567,7 +581,7 @@ export default function UnifiedPayablePage() {
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {MODULE_LINKS.map((link) => (
             <Link
-              key={link.href}
+              key={`${link.label}-${link.href}`}
               href={link.href}
               className={`rounded-xl border ${link.color} bg-gray-50 dark:bg-gray-800 px-3 py-3 hover:border-primary/50 hover:bg-primary/5 transition-colors`}
             >

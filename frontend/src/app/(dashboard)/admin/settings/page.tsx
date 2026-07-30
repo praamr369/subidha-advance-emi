@@ -88,15 +88,6 @@ const CONTROLS: SettingsDef[] = [
     dotCls: "bg-red-400",
   },
   {
-    title: "Policy Governance",
-    description:
-      "Draft, publish, archive, and legal-review workflows for public legal and policy pages.",
-    href: ROUTES.admin.settingsPolicies,
-    Icon: FileText,
-    iconCls: "bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300",
-    dotCls: "bg-indigo-400",
-  },
-  {
     title: "Legal & GST Controls",
     description:
       "Set waiver launch status, refund SLA, partner receipt approval, KYC masking, deposit inspection, and GST document gates.",
@@ -106,9 +97,9 @@ const CONTROLS: SettingsDef[] = [
     dotCls: "bg-cyan-400",
   },
   {
-    title: "Business Compliance",
-    description: "Admin-only compliance document register with public-safe disclosure controls.",
-    href: ROUTES.admin.settingsBusinessCompliance,
+    title: "Compliance & Policies",
+    description: "Manage internal legal proofs, identity documents, and public-facing policies in one unified dashboard.",
+    href: ROUTES.admin.settingsCompliancePolicies,
     Icon: Database,
     iconCls: "bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300",
     dotCls: "bg-teal-400",

@@ -1,28 +1,31 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import Link from "next/link";
+import { ArrowRight, FileText, CheckCircle2, Clock, AlertCircle } from "lucide-react";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
+import { WorkbenchFilterChips } from "@/components/workbench/WorkbenchFilterChips";
 import { ROUTES } from "@/lib/routes";
 import { formatRupee } from "@/lib/utils/currency";
+
 import {
   approveExpenseVoucher,
   createExpenseVoucher,
-  createVendor,
   listChartOfAccounts,
   listExpenses,
   listFinanceAccounts,
-  listVendors,
   postExpenseVoucher,
   type ChartOfAccount,
   type ExpenseVoucher,
   type FinanceAccount,
-  type Vendor,
 } from "@/services/accounting";
+import { listBranches, type BranchRecord } from "@/services/branch-control";
+import { getUnifiedPayables, type UnifiedPayableData } from "@/services/payables";
 
 function formatDate(value?: string | null): string {
   if (!value) return "—";
@@ -37,32 +40,29 @@ function formatDate(value?: string | null): string {
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) return error.message;
-  return "Failed to load expense register.";
+  return "Failed to load expense workbench.";
 }
 
 function fieldClassName() {
-  return "mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground";
+  return "mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all";
 }
 
 export default function AccountingExpensesPage() {
+  const [activeTab, setActiveTab] = useState("overview");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [vendors, setVendors] = useState<Vendor[]>([]);
+
   const [expenses, setExpenses] = useState<ExpenseVoucher[]>([]);
   const [expenseAccounts, setExpenseAccounts] = useState<ChartOfAccount[]>([]);
   const [financeAccounts, setFinanceAccounts] = useState<FinanceAccount[]>([]);
+  const [branches, setBranches] = useState<BranchRecord[]>([]);
+  const [unifiedData, setUnifiedData] = useState<UnifiedPayableData | null>(null);
 
-  const [vendorForm, setVendorForm] = useState({
-    name: "",
-    phone: "",
-    email: "",
-    address: "",
-  });
   const [expenseForm, setExpenseForm] = useState({
     expense_date: new Date().toISOString().slice(0, 10),
-    vendor: "",
+    branch: "",
     expense_account: "",
     gross_amount: "0.00",
     tax_amount: "0.00",
@@ -79,25 +79,26 @@ export default function AccountingExpensesPage() {
     else setRefreshing(true);
 
     try {
-      const [vendorsPayload, expensesPayload, chartPayload, financePayload] =
+      const [expensesPayload, chartPayload, financePayload, branchesPayload, unifiedPayload] =
         await Promise.all([
-          listVendors(),
           listExpenses(),
           listChartOfAccounts(),
           listFinanceAccounts(),
+          listBranches(),
+          getUnifiedPayables(),
         ]);
 
-      setVendors(vendorsPayload.results);
       setExpenses(expensesPayload.results);
       setExpenseAccounts(
         chartPayload.results.filter((account) => account.account_type === "EXPENSE")
       );
       setFinanceAccounts(financePayload.results);
+      setBranches(branchesPayload.results || []);
+      setUnifiedData(unifiedPayload);
       setError(null);
     } catch (err) {
       setError(toErrorMessage(err));
       if (mode === "initial") {
-        setVendors([]);
         setExpenses([]);
       }
     } finally {
@@ -110,19 +111,6 @@ export default function AccountingExpensesPage() {
     void loadPage("initial");
   }, []);
 
-  async function handleCreateVendor(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    try {
-      await createVendor(vendorForm);
-      setVendorForm({ name: "", phone: "", email: "", address: "" });
-      setNotice("Vendor created.");
-      await loadPage("refresh");
-    } catch (err) {
-      setNotice(null);
-      setError(toErrorMessage(err));
-    }
-  }
-
   async function handleCreateExpense(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const netAmount = parseFloat(expenseForm.net_amount);
@@ -133,7 +121,8 @@ export default function AccountingExpensesPage() {
     try {
       await createExpenseVoucher({
         expense_date: expenseForm.expense_date,
-        vendor: expenseForm.vendor ? Number(expenseForm.vendor) : null,
+        branch: expenseForm.branch ? Number(expenseForm.branch) : null,
+        vendor: null, // Vendors are explicitly managed via /admin/vendors
         expense_account: Number(expenseForm.expense_account),
         gross_amount: expenseForm.gross_amount,
         tax_amount: expenseForm.tax_amount,
@@ -148,7 +137,7 @@ export default function AccountingExpensesPage() {
       });
       setExpenseForm({
         expense_date: new Date().toISOString().slice(0, 10),
-        vendor: "",
+        branch: "",
         expense_account: "",
         gross_amount: "0.00",
         tax_amount: "0.00",
@@ -159,7 +148,8 @@ export default function AccountingExpensesPage() {
         bill_date: "",
         notes: "",
       });
-      setNotice("Expense voucher created.");
+      setNotice("Expense voucher created successfully.");
+      setActiveTab("register");
       await loadPage("refresh");
     } catch (err) {
       setNotice(null);
@@ -191,12 +181,15 @@ export default function AccountingExpensesPage() {
 
   const approvedCount = expenses.filter((item) => item.status === "APPROVED").length;
   const postedCount = expenses.filter((item) => item.status === "POSTED").length;
+  const draftCount = expenses.filter((item) => item.status === "DRAFT").length;
+  
+  const expenseTypeSummary = unifiedData?.type_summary.find(s => s.payable_type === 'expense_claim');
 
   return (
     <ERPPageShell
       eyebrow="Accounting"
-      title="Expenses"
-      subtitle="Vendor-side expense vouchers move from draft to approved to posted through the new accounting books, without mutating EMI payment history."
+      title="Expense Workbench"
+      subtitle="Track, approve, and register all general expenses across the organization."
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Accounting", href: ROUTES.admin.accounting },
@@ -206,376 +199,433 @@ export default function AccountingExpensesPage() {
         { href: ROUTES.admin.accountingChartOfAccounts, label: "Chart Setup", variant: "secondary" },
         { href: ROUTES.admin.accountingJournals, label: "Journals", variant: "secondary" },
       ]}
-      stats={[
-        { label: "Vendors", value: String(vendors.length), tone: "info" },
-        { label: "Expense Vouchers", value: String(expenses.length) },
-        { label: "Approved", value: String(approvedCount), tone: approvedCount > 0 ? "warning" : "success" },
-        { label: "Posted", value: String(postedCount), tone: "success" },
-      ]}
-      statusBadge={{ label: "Admin Only", tone: "info" }}
+      statusBadge={{ label: "Enterprise Workflow", tone: "info" }}
     >
       <div className="space-y-6">
-        <div className="flex justify-end">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <WorkbenchFilterChips
+            active={activeTab}
+            onSelect={setActiveTab}
+            chips={[
+              { key: "overview", label: "Overview" },
+              { key: "register", label: "Expense Register", count: draftCount + approvedCount },
+              { key: "create", label: "Add Expense" },
+            ]}
+          />
+
           <button
             type="button"
             onClick={() => void loadPage("refresh")}
             disabled={refreshing || loading}
             className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-60"
           >
-            {refreshing ? "Refreshing..." : "Refresh"}
+            {refreshing ? "Refreshing..." : "Refresh Data"}
           </button>
         </div>
 
         {notice ? (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4" />
             {notice}
           </div>
         ) : null}
 
-        {loading ? <LoadingBlock label="Loading expenses..." /> : null}
+        {loading ? <LoadingBlock label="Loading expense workbench..." /> : null}
 
         {!loading && error ? (
           <ErrorState
-            title="Unable to load expenses"
+            title="Unable to load data"
             description={error}
             onRetry={() => void loadPage("initial")}
           />
         ) : null}
 
-        {!loading && !error ? (
-          <>
-            <div className="grid gap-4 xl:grid-cols-2">
-              <WorkspaceSection
-                title="Create vendor"
-                description="Vendor master data stays separate from expense vouchers so GST and billing particulars can expand later without changing voucher history."
-              >
-                <form className="grid gap-3 md:grid-cols-2" onSubmit={handleCreateVendor}>
-                  <label className="text-sm text-muted-foreground">
-                    Name
-                    <input
-                      className={fieldClassName()}
-                      value={vendorForm.name}
-                      onChange={(event) =>
-                        setVendorForm((current) => ({
-                          ...current,
-                          name: event.target.value,
-                        }))
-                      }
-                      required
-                    />
-                  </label>
-                  <label className="text-sm text-muted-foreground">
-                    Phone
-                    <input
-                      className={fieldClassName()}
-                      value={vendorForm.phone}
-                      onChange={(event) =>
-                        setVendorForm((current) => ({
-                          ...current,
-                          phone: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-                  <label className="text-sm text-muted-foreground md:col-span-2">
-                    Email
-                    <input
-                      className={fieldClassName()}
-                      type="email"
-                      value={vendorForm.email}
-                      onChange={(event) =>
-                        setVendorForm((current) => ({
-                          ...current,
-                          email: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-                  <label className="text-sm text-muted-foreground md:col-span-2">
-                    Address
-                    <textarea
-                      className={fieldClassName()}
-                      value={vendorForm.address}
-                      onChange={(event) =>
-                        setVendorForm((current) => ({
-                          ...current,
-                          address: event.target.value,
-                        }))
-                      }
-                      rows={3}
-                    />
-                  </label>
-                  <div className="md:col-span-2">
-                    <button
-                      type="submit"
-                      className="rounded-xl bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:bg-foreground/90"
-                    >
-                      Create vendor
-                    </button>
-                  </div>
-                </form>
-              </WorkspaceSection>
+        {!loading && !error && activeTab === "overview" && (
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* KPI Section */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+                <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                  <FileText className="h-4 w-4" />
+                  <h3 className="text-sm font-semibold">Total Register Items</h3>
+                </div>
+                <div className="text-3xl font-bold">{expenses.length}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Draft: {draftCount} | Approved: {approvedCount} | Posted: {postedCount}
+                </p>
+              </div>
 
-              <WorkspaceSection
-                title="Create expense voucher"
-                description="Expense vouchers stay draft until approval and posting. Net amount is what reaches the accounting journal in this phase."
-              >
-                <form className="grid gap-3 md:grid-cols-2" onSubmit={handleCreateExpense}>
-                  <label className="text-sm text-muted-foreground">
-                    Expense date
-                    <input
-                      className={fieldClassName()}
-                      type="date"
-                      value={expenseForm.expense_date}
-                      onChange={(event) =>
-                        setExpenseForm((current) => ({
-                          ...current,
-                          expense_date: event.target.value,
-                        }))
-                      }
-                      required
-                    />
-                  </label>
-                  <label className="text-sm text-muted-foreground">
-                    Vendor
-                    <select
-                      className={fieldClassName()}
-                      value={expenseForm.vendor}
-                      onChange={(event) =>
-                        setExpenseForm((current) => ({
-                          ...current,
-                          vendor: event.target.value,
-                        }))
-                      }
-                    >
-                      <option value="">No vendor</option>
-                      {vendors.map((vendor) => (
-                        <option key={vendor.id} value={vendor.id}>
-                          {vendor.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="text-sm text-muted-foreground">
-                    Expense account
-                    <select
-                      className={fieldClassName()}
-                      value={expenseForm.expense_account}
-                      onChange={(event) =>
-                        setExpenseForm((current) => ({
-                          ...current,
-                          expense_account: event.target.value,
-                        }))
-                      }
-                      required
-                    >
-                      <option value="">Select expense account</option>
-                      {expenseAccounts.map((account) => (
-                        <option key={account.id} value={account.id}>
-                          {account.code} · {account.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="text-sm text-muted-foreground">
-                    Finance account
-                    <select
-                      className={fieldClassName()}
-                      value={expenseForm.finance_account}
-                      onChange={(event) =>
-                        setExpenseForm((current) => ({
-                          ...current,
-                          finance_account: event.target.value,
-                        }))
-                      }
-                    >
-                      <option value="">Select finance account</option>
-                      {financeAccounts.map((account) => (
-                        <option key={account.id} value={account.id}>
-                          {account.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="text-sm text-muted-foreground">
-                    Gross amount
-                    <input
-                      className={fieldClassName()}
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={expenseForm.gross_amount}
-                      onChange={(event) =>
-                        setExpenseForm((current) => ({
-                          ...current,
-                          gross_amount: event.target.value,
-                        }))
-                      }
-                      required
-                    />
-                  </label>
-                  <label className="text-sm text-muted-foreground">
-                    Tax amount
-                    <input
-                      className={fieldClassName()}
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={expenseForm.tax_amount}
-                      onChange={(event) =>
-                        setExpenseForm((current) => ({
-                          ...current,
-                          tax_amount: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-                  <label className="text-sm text-muted-foreground">
-                    Net amount
-                    <input
-                      className={fieldClassName()}
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={expenseForm.net_amount}
-                      onChange={(event) =>
-                        setExpenseForm((current) => ({
-                          ...current,
-                          net_amount: event.target.value,
-                        }))
-                      }
-                      required
-                    />
-                  </label>
-                  <label className="text-sm text-muted-foreground">
-                    Payment mode
-                    <select
-                      className={fieldClassName()}
-                      value={expenseForm.payment_mode}
-                      onChange={(event) =>
-                        setExpenseForm((current) => ({
-                          ...current,
-                          payment_mode: event.target.value,
-                        }))
-                      }
-                    >
-                      <option value="CASH">Cash</option>
-                      <option value="UPI">UPI</option>
-                      <option value="BANK">Bank</option>
-                    </select>
-                  </label>
-                  <label className="text-sm text-muted-foreground">
-                    Bill no
-                    <input
-                      className={fieldClassName()}
-                      value={expenseForm.bill_no}
-                      onChange={(event) =>
-                        setExpenseForm((current) => ({
-                          ...current,
-                          bill_no: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-                  <label className="text-sm text-muted-foreground">
-                    Bill date
-                    <input
-                      className={fieldClassName()}
-                      type="date"
-                      value={expenseForm.bill_date}
-                      onChange={(event) =>
-                        setExpenseForm((current) => ({
-                          ...current,
-                          bill_date: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-                  <label className="text-sm text-muted-foreground md:col-span-2">
-                    Notes
-                    <textarea
-                      className={fieldClassName()}
-                      value={expenseForm.notes}
-                      onChange={(event) =>
-                        setExpenseForm((current) => ({
-                          ...current,
-                          notes: event.target.value,
-                        }))
-                      }
-                      rows={3}
-                    />
-                  </label>
-                  <div className="md:col-span-2">
-                    <button
-                      type="submit"
-                      className="rounded-xl bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:bg-foreground/90"
-                    >
-                      Create expense voucher
-                    </button>
-                  </div>
-                </form>
-              </WorkspaceSection>
+              <div className="rounded-2xl border border-rose-200 bg-rose-50 dark:bg-rose-950/20 p-5 shadow-sm">
+                <div className="flex items-center gap-2 text-rose-700 dark:text-rose-400 mb-2">
+                  <AlertCircle className="h-4 w-4" />
+                  <h3 className="text-sm font-semibold">Pending Payables</h3>
+                </div>
+                <div className="text-3xl font-bold text-rose-700 dark:text-rose-400">
+                  {formatRupee(unifiedData?.total_outstanding || "0")}
+                </div>
+                <p className="text-xs text-rose-600/80 dark:text-rose-400/80 mt-1">
+                  All module payables combined
+                </p>
+              </div>
+              
+              <div className="rounded-2xl border border-blue-200 bg-blue-50 dark:bg-blue-950/20 p-5 shadow-sm">
+                 <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400 mb-2">
+                  <Clock className="h-4 w-4" />
+                  <h3 className="text-sm font-semibold">Expense Claims Queue</h3>
+                </div>
+                <div className="text-3xl font-bold text-blue-700 dark:text-blue-400">
+                  {formatRupee(expenseTypeSummary?.total || "0")}
+                </div>
+                <p className="text-xs text-blue-600/80 dark:text-blue-400/80 mt-1">
+                  {expenseTypeSummary?.count || 0} claims pending payment
+                </p>
+              </div>
+
+               <div className="rounded-2xl border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20 p-5 shadow-sm">
+                 <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 mb-2">
+                  <CheckCircle2 className="h-4 w-4" />
+                  <h3 className="text-sm font-semibold">Posted Expenses</h3>
+                </div>
+                <div className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">
+                  {postedCount}
+                </div>
+                <p className="text-xs text-emerald-600/80 dark:text-emerald-400/80 mt-1">
+                  Successfully hit accounting journals
+                </p>
+              </div>
             </div>
 
-            <WorkspaceSection
-              title="Expense vouchers"
-              description="Approval and posting remain explicit. Posted vouchers hold the journal entry reference generated by the accounting module."
-            >
-              {expenses.length === 0 ? (
-                <EmptyState
-                  title="No expense vouchers yet"
-                  description="Create the first vendor voucher above to start the expense register."
+            {/* Quick Navigation / Integrations */}
+            <WorkspaceSection title="Ecosystem Connections" description="Jump directly into connected modules.">
+              <div className="grid gap-3">
+                <Link
+                  href="/admin/payables"
+                  className="flex items-center justify-between rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary hover:bg-muted"
+                >
+                  <div>
+                    <h4 className="text-sm font-semibold text-foreground">Unified Payables</h4>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Execute and pay out all organization obligations from a single screen.
+                    </p>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                </Link>
+                <Link
+                  href="/admin/hr/expenses"
+                  className="flex items-center justify-between rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary hover:bg-muted"
+                >
+                  <div>
+                    <h4 className="text-sm font-semibold text-foreground">HR Staff Claims</h4>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Approve employee-submitted expenses (travel, meals, etc) before payout.
+                    </p>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                </Link>
+                <Link
+                  href="/admin/vendors"
+                  className="flex items-center justify-between rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary hover:bg-muted"
+                >
+                  <div>
+                    <h4 className="text-sm font-semibold text-foreground">Vendor Management</h4>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Create vendor profiles and manage dedicated purchase bills.
+                    </p>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                </Link>
+              </div>
+            </WorkspaceSection>
+          </div>
+        )}
+
+        {!loading && !error && activeTab === "create" && (
+          <WorkspaceSection
+            title="Register Manual Expense"
+            description="Create a manual general expense (e.g., electricity, rent). Expenses stay in draft until approved and posted."
+          >
+            <form className="grid gap-4 md:grid-cols-2" onSubmit={handleCreateExpense}>
+              <label className="text-sm font-medium text-foreground">
+                Expense Date
+                <input
+                  className={fieldClassName()}
+                  type="date"
+                  value={expenseForm.expense_date}
+                  onChange={(event) =>
+                    setExpenseForm((current) => ({
+                      ...current,
+                      expense_date: event.target.value,
+                    }))
+                  }
+                  required
                 />
-              ) : (
-                <div className="grid gap-2">
-                  {expenses.map((expense) => {
-                    const statusCls =
-                      expense.status === "POSTED"
-                        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                        : expense.status === "APPROVED"
-                          ? "border-sky-200 bg-sky-50 text-sky-800"
-                          : "border-amber-200 bg-amber-50 text-amber-800";
-                    return (
-                      <div key={expense.id} className="rounded-xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.04)] transition hover:shadow-[0_3px_10px_rgba(0,0,0,0.07)]">
-                        <div className="flex flex-wrap items-start justify-between gap-3 p-4">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-semibold text-foreground">{expense.voucher_no}</span>
-                              <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${statusCls}`}>{expense.status}</span>
-                            </div>
-                            <div className="mt-1 text-xs text-muted-foreground">
-                              {expense.vendor_name || "No vendor"} · {expense.expense_account_code} · {expense.payment_mode} · {formatDate(expense.expense_date)}
-                            </div>
+              </label>
+
+              <label className="text-sm font-medium text-foreground">
+                Branch mapping (Optional)
+                <select
+                  className={fieldClassName()}
+                  value={expenseForm.branch}
+                  onChange={(event) =>
+                    setExpenseForm((current) => ({
+                      ...current,
+                      branch: event.target.value,
+                    }))
+                  }
+                >
+                  <option value="">Head Office / Unassigned</option>
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.code} - {b.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="text-sm font-medium text-foreground">
+                Chart of Account Category
+                <select
+                  className={fieldClassName()}
+                  value={expenseForm.expense_account}
+                  onChange={(event) =>
+                    setExpenseForm((current) => ({
+                      ...current,
+                      expense_account: event.target.value,
+                    }))
+                  }
+                  required
+                >
+                  <option value="">Select expense category</option>
+                  {expenseAccounts.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.code} · {account.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="text-sm font-medium text-foreground">
+                Originating Finance Account
+                <select
+                  className={fieldClassName()}
+                  value={expenseForm.finance_account}
+                  onChange={(event) => {
+                    const accId = event.target.value;
+                    const account = financeAccounts.find((a) => a.id === Number(accId));
+                    setExpenseForm((current) => ({
+                      ...current,
+                      finance_account: accId,
+                      payment_mode: account ? account.kind : current.payment_mode,
+                    }));
+                  }}
+                >
+                  <option value="">Select bank/cash source</option>
+                  {financeAccounts.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="text-sm font-medium text-foreground">
+                Gross amount
+                <input
+                  className={fieldClassName()}
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={expenseForm.gross_amount}
+                  onChange={(event) =>
+                    setExpenseForm((current) => ({
+                      ...current,
+                      gross_amount: event.target.value,
+                    }))
+                  }
+                  required
+                />
+              </label>
+
+              <label className="text-sm font-medium text-foreground">
+                Tax amount
+                <input
+                  className={fieldClassName()}
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={expenseForm.tax_amount}
+                  onChange={(event) =>
+                    setExpenseForm((current) => ({
+                      ...current,
+                      tax_amount: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+
+              <label className="text-sm font-medium text-foreground">
+                Net amount
+                <input
+                  className={fieldClassName()}
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={expenseForm.net_amount}
+                  onChange={(event) =>
+                    setExpenseForm((current) => ({
+                      ...current,
+                      net_amount: event.target.value,
+                    }))
+                  }
+                  required
+                />
+              </label>
+
+              <label className="text-sm font-medium text-foreground">
+                Payment mode
+                <select
+                  className={fieldClassName()}
+                  value={expenseForm.payment_mode}
+                  onChange={(event) => {
+                    const mode = event.target.value;
+                    const defaultAcc = financeAccounts.find((a) => a.kind === mode);
+                    setExpenseForm((current) => ({
+                      ...current,
+                      payment_mode: mode,
+                      finance_account: defaultAcc ? String(defaultAcc.id) : current.finance_account,
+                    }));
+                  }}
+                >
+                  <option value="CASH">Cash</option>
+                  <option value="UPI">UPI</option>
+                  <option value="BANK">Bank Transfer</option>
+                </select>
+              </label>
+
+              <label className="text-sm font-medium text-foreground">
+                Bill / Reference no
+                <input
+                  className={fieldClassName()}
+                  value={expenseForm.bill_no}
+                  onChange={(event) =>
+                    setExpenseForm((current) => ({
+                      ...current,
+                      bill_no: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+
+              <label className="text-sm font-medium text-foreground">
+                Bill date
+                <input
+                  className={fieldClassName()}
+                  type="date"
+                  value={expenseForm.bill_date}
+                  onChange={(event) =>
+                    setExpenseForm((current) => ({
+                      ...current,
+                      bill_date: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+
+              <label className="text-sm font-medium text-foreground md:col-span-2">
+                Notes / Justification
+                <textarea
+                  className={fieldClassName()}
+                  value={expenseForm.notes}
+                  onChange={(event) =>
+                    setExpenseForm((current) => ({
+                      ...current,
+                      notes: event.target.value,
+                    }))
+                  }
+                  rows={3}
+                />
+              </label>
+
+              <div className="md:col-span-2 flex justify-end mt-2">
+                <button
+                  type="submit"
+                  className="rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground transition-all hover:bg-primary/90 shadow-sm"
+                >
+                  Submit Expense Voucher
+                </button>
+              </div>
+            </form>
+          </WorkspaceSection>
+        )}
+
+        {!loading && !error && activeTab === "register" && (
+          <WorkspaceSection
+            title="Expense Register"
+            description="All drafted and approved expenses ready for accounting journal execution."
+          >
+            {expenses.length === 0 ? (
+              <EmptyState
+                title="No expense vouchers yet"
+                description="Click 'Add Expense' to register a new organizational cost."
+              />
+            ) : (
+              <div className="grid gap-3">
+                {expenses.map((expense) => {
+                  const statusCls =
+                    expense.status === "POSTED"
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400"
+                      : expense.status === "APPROVED"
+                        ? "border-sky-200 bg-sky-50 text-sky-800 dark:bg-sky-950/30 dark:text-sky-400"
+                        : "border-amber-200 bg-amber-50 text-amber-800 dark:bg-amber-950/30 dark:text-amber-400";
+                  return (
+                    <div key={expense.id} className="rounded-xl border border-border bg-card p-0 shadow-sm transition-all hover:shadow-md">
+                      <div className="flex flex-wrap items-start justify-between gap-3 p-4">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-foreground">{expense.voucher_no}</span>
+                            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${statusCls}`}>
+                              {expense.status}
+                            </span>
                           </div>
-                          <div className="text-right">
-                            <div className="text-sm font-semibold tabular-nums text-foreground">{formatRupee(expense.net_amount)}</div>
+                          <div className="mt-2 flex flex-col gap-1 text-xs text-muted-foreground">
+                            <span className="font-medium text-foreground">{expense.expense_account_name || expense.expense_account_code}</span>
+                            <span>{expense.branch_code ? `Branch: ${expense.branch_code}` : "HQ"} · {expense.payment_mode} · {formatDate(expense.expense_date)}</span>
+                            {expense.notes && <span className="italic mt-1">"{expense.notes}"</span>}
                           </div>
                         </div>
-                        <div className="flex flex-wrap items-center gap-2 border-t border-border/60 px-4 py-2.5">
-                          {expense.status === "DRAFT" ? (
-                            <button type="button" onClick={() => void handleApproveExpense(expense.id)}
-                              className="inline-flex h-8 items-center rounded-lg border border-border bg-background px-3 text-xs font-semibold text-foreground transition hover:bg-muted">
-                              Approve
-                            </button>
-                          ) : null}
-                          {expense.status === "APPROVED" ? (
-                            <button type="button" onClick={() => void handlePostExpense(expense.id)}
-                              className="inline-flex h-8 items-center rounded-lg bg-foreground px-3 text-xs font-semibold text-background transition hover:opacity-90">
-                              Post
-                            </button>
-                          ) : null}
-                          {expense.posted_journal_entry_no ? (
-                            <span className="text-xs font-medium text-emerald-700">Journal {expense.posted_journal_entry_no}</span>
-                          ) : null}
+                        <div className="text-right">
+                          <div className="text-lg font-bold tabular-nums text-foreground">{formatRupee(expense.net_amount)}</div>
+                          <div className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wide">Net Amount</div>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </WorkspaceSection>
-          </>
-        ) : null}
+                      
+                      <div className="flex flex-wrap items-center gap-2 border-t border-border/40 bg-muted/20 px-4 py-3">
+                        {expense.status === "DRAFT" ? (
+                          <button type="button" onClick={() => void handleApproveExpense(expense.id)}
+                            className="inline-flex h-8 items-center rounded-lg bg-sky-100 text-sky-800 hover:bg-sky-200 dark:bg-sky-900/50 dark:text-sky-300 px-4 text-xs font-semibold transition-colors">
+                            Approve
+                          </button>
+                        ) : null}
+                        {expense.status === "APPROVED" ? (
+                          <button type="button" onClick={() => void handlePostExpense(expense.id)}
+                            className="inline-flex h-8 items-center rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 px-4 text-xs font-semibold transition-colors">
+                            Post to Journals
+                          </button>
+                        ) : null}
+                        {expense.posted_journal_entry_no ? (
+                          <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            Journal Ref: {expense.posted_journal_entry_no}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </WorkspaceSection>
+        )}
       </div>
     </ERPPageShell>
   );

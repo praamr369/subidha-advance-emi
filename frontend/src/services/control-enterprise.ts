@@ -218,3 +218,16 @@ export async function getMonthEndHistory(): Promise<MonthEndCloseRun[]> {
 export async function getDataQualityReport(): Promise<DQReport> {
   return apiFetch<DQReport>("/admin/data-quality/");
 }
+
+// ── Metrics ───────────────────────────────────────────────────────────────
+
+export type EnterpriseControlMetrics = {
+  pending_approvals: number;
+  active_exceptions: number;
+  cash_variances: number;
+  system_health: string;
+};
+
+export async function fetchEnterpriseControlMetrics(): Promise<EnterpriseControlMetrics> {
+  return apiFetch<EnterpriseControlMetrics>("/admin/control/metrics/");
+}

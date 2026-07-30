@@ -147,3 +147,157 @@ def create_emi_subscription(
             transition_batch_status(batch, BatchStatus.FULL)
 
     return subscription
+
+
+@transaction.atomic
+def create_rent_subscription(
+    *,
+    customer,
+    product,
+    monthly_rent_amount: Decimal,
+    tenure_months: int = 12,
+    partner=None,
+    start_date=None,
+    performed_by=None,
+):
+    """Create a RENT subscription."""
+
+    if start_date is None:
+        start_date = timezone.now().date()
+
+    if tenure_months <= 0:
+        raise ValidationError("Tenure must be greater than zero.")
+
+    monthly_rent = Decimal(monthly_rent_amount).quantize(
+        Decimal("0.01"),
+        rounding=ROUND_HALF_UP,
+    )
+    total_amount = (monthly_rent * tenure_months).quantize(
+        Decimal("0.01"),
+        rounding=ROUND_HALF_UP,
+    )
+
+    subscription = Subscription.objects.create(
+        customer=customer,
+        product=product,
+        partner=partner,
+        plan_type=PlanType.RENT,
+        tenure_months=tenure_months,
+        start_date=start_date,
+        total_amount=total_amount,
+        monthly_amount=monthly_rent,
+        status=SubscriptionStatus.ACTIVE,
+    )
+
+    from subscriptions.services.contract_number_service import assign_subscription_number
+    assign_subscription_number(subscription)
+    from subscriptions.services.contract_reference_service import (
+        ensure_contract_reference_for_subscription,
+    )
+    ensure_contract_reference_for_subscription(subscription)
+
+    log_audit(
+        action_type=AuditLog.ActionType.SUB_CREATED,
+        instance=subscription,
+        performed_by=performed_by,
+        metadata={
+            "customer_id": customer.id,
+            "plan_type": "RENT",
+            "total_amount": str(total_amount),
+            "monthly_amount": str(monthly_rent),
+            "tenure_months": tenure_months,
+        },
+    )
+    append_business_event(
+        event_type=BusinessEventType.CONTRACT_CREATED,
+        source_module="subscriptions.services.subscription_service.create_rent_subscription",
+        actor_user=performed_by,
+        customer=customer,
+        subscription=subscription,
+        payload={
+            "subscription_id": subscription.id,
+            "plan_type": "RENT",
+            "tenure_months": tenure_months,
+            "monthly_amount": str(monthly_rent),
+            "total_amount": str(total_amount),
+        },
+    )
+
+    return subscription
+
+
+@transaction.atomic
+def create_lease_subscription(
+    *,
+    customer,
+    product,
+    monthly_lease_amount: Decimal,
+    tenure_months: int = 24,
+    partner=None,
+    start_date=None,
+    performed_by=None,
+):
+    """Create a LEASE subscription."""
+
+    if start_date is None:
+        start_date = timezone.now().date()
+
+    if tenure_months <= 0:
+        raise ValidationError("Tenure must be greater than zero.")
+
+    monthly_lease = Decimal(monthly_lease_amount).quantize(
+        Decimal("0.01"),
+        rounding=ROUND_HALF_UP,
+    )
+    total_amount = (monthly_lease * tenure_months).quantize(
+        Decimal("0.01"),
+        rounding=ROUND_HALF_UP,
+    )
+
+    subscription = Subscription.objects.create(
+        customer=customer,
+        product=product,
+        partner=partner,
+        plan_type=PlanType.LEASE,
+        tenure_months=tenure_months,
+        start_date=start_date,
+        total_amount=total_amount,
+        monthly_amount=monthly_lease,
+        status=SubscriptionStatus.ACTIVE,
+    )
+
+    from subscriptions.services.contract_number_service import assign_subscription_number
+    assign_subscription_number(subscription)
+    from subscriptions.services.contract_reference_service import (
+        ensure_contract_reference_for_subscription,
+    )
+    ensure_contract_reference_for_subscription(subscription)
+
+    log_audit(
+        action_type=AuditLog.ActionType.SUB_CREATED,
+        instance=subscription,
+        performed_by=performed_by,
+        metadata={
+            "customer_id": customer.id,
+            "plan_type": "LEASE",
+            "total_amount": str(total_amount),
+            "monthly_amount": str(monthly_lease),
+            "tenure_months": tenure_months,
+        },
+    )
+    append_business_event(
+        event_type=BusinessEventType.CONTRACT_CREATED,
+        source_module="subscriptions.services.subscription_service.create_lease_subscription",
+        actor_user=performed_by,
+        customer=customer,
+        subscription=subscription,
+        payload={
+            "subscription_id": subscription.id,
+            "plan_type": "LEASE",
+            "tenure_months": tenure_months,
+            "monthly_amount": str(monthly_lease),
+            "total_amount": str(total_amount),
+        },
+    )
+
+    return subscription

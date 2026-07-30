@@ -25,6 +25,21 @@ _PREFIX_MAP = {
 DIRECT_SALE_PREFIX = "SALE"
 
 
+def get_subscription_prefix(subscription: Subscription) -> str:
+    import re
+    if subscription.plan_type == PlanType.EMI or str(subscription.plan_type).upper() == "EMI":
+        batch_id = getattr(subscription, "batch_id", None)
+        if batch_id and getattr(subscription, "batch", None):
+            b_code = str(subscription.batch.batch_code).strip().upper()
+            b_code_clean = re.sub(r'[^A-Z0-9]+', '', b_code)
+            if b_code_clean:
+                return f"EMI-{b_code_clean}"
+        return "ADV-EMI"
+    if subscription.plan_type in _PREFIX_MAP:
+        return _PREFIX_MAP[subscription.plan_type]
+    return "SUB"
+
+
 def _next_seq(prefix: str, year: int) -> int:
     """Return the next available sequence number for prefix+year, under SELECT FOR UPDATE."""
     pattern = f"{prefix}-{year}-%"
@@ -52,10 +67,10 @@ def assign_subscription_number(subscription: Subscription) -> str:
     if subscription.subscription_number:
         return subscription.subscription_number
 
-    if subscription.plan_type not in _PREFIX_MAP:
+    if subscription.plan_type not in _PREFIX_MAP and str(subscription.plan_type).upper() not in ["EMI", "RENT", "LEASE"]:
         raise ValueError(f"Cannot assign contract number for plan_type={subscription.plan_type!r}")
 
-    prefix = _PREFIX_MAP[subscription.plan_type]
+    prefix = get_subscription_prefix(subscription)
     year = timezone.localdate().year
 
     # Lock all subscriptions for this prefix/year to avoid race conditions.
@@ -64,16 +79,33 @@ def assign_subscription_number(subscription: Subscription) -> str:
     ).values_list("id", flat=True)
 
     seq = _next_seq(prefix, year)
-    number = f"{prefix}-{year}-{seq:06d}"
+    number = f"{prefix}-{year}-{seq:04d}"
 
     # Double-check uniqueness (defensive)
     while Subscription.objects.filter(subscription_number=number).exists():
         seq += 1
-        number = f"{prefix}-{year}-{seq:06d}"
+        number = f"{prefix}-{year}-{seq:04d}"
 
     Subscription.objects.filter(pk=subscription.pk).update(subscription_number=number)
     subscription.subscription_number = number
     return number
+
+
+def get_or_assign_subscription_number(subscription: Subscription) -> str:
+    """Return existing subscription_number, or lazily assign and return it if missing."""
+    if not subscription:
+        return ""
+    if getattr(subscription, "subscription_number", None):
+        return subscription.subscription_number
+    if getattr(subscription, "contract_reference", None):
+        return subscription.contract_reference
+    try:
+        return assign_subscription_number(subscription)
+    except Exception:
+        prefix = get_subscription_prefix(subscription)
+        year = getattr(subscription, "start_date", None)
+        year_val = year.year if year else timezone.localdate().year
+        return f"{prefix}-{year_val}-{subscription.id:04d}"
 
 
 @transaction.atomic

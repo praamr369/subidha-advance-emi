@@ -38,6 +38,8 @@ export type BusinessProfile = {
   legal_name: string;
   trade_name?: string;
   business_code?: string;
+  business_type?: string;
+  year_of_establishment?: number | null;
   primary_email?: string;
   primary_phone?: string;
   alternate_phone?: string;
@@ -52,6 +54,18 @@ export type BusinessProfile = {
   country?: string;
   gstin?: string;
   pan_number?: string;
+  cin_number?: string;
+  tan_number?: string;
+  udyam_number?: string;
+  trade_license_number?: string;
+  shop_act_number?: string;
+  authorized_signatory_name?: string;
+  authorized_signatory_designation?: string;
+  bank_name?: string;
+  bank_account_number?: string;
+  bank_ifsc_code?: string;
+  bank_branch?: string;
+  upi_id?: string;
   invoice_prefix?: string;
   receipt_prefix?: string;
   default_currency_code?: string;
@@ -81,14 +95,14 @@ export type EmailSMTPSettings = {
 };
 
 export type SetupChecklistItem = { key: string; label: string; level?: "required" | "recommended" | "optional" | string; status: string; detail: string; route?: string };
-export type SetupChecklist = { is_ready_for_go_live: boolean; percent_complete: number; items: SetupChecklistItem[]; counts?: Record<string, unknown> };
+export type SetupChecklist = { is_ready_for_go_live: boolean; percent_complete: number; items: SetupChecklistItem[]; counts?: Record<string, unknown>; control_room_summary?: { ready: boolean; completion_percentage: number; required_total: number; required_completed: number; all_total: number; all_completed: number; status_label: string } };
 export type SetupReadinessStatus = "READY" | "REQUIRED_PENDING" | "BLOCKED" | "WARNING" | "INFO" | "APPROVAL_GATED" | "FUTURE_UNSUPPORTED" | "NEEDS_SETUP" | "OPTIONAL" | "FUTURE" | string;
 export type SetupReadinessCategory = "CORE_REQUIRED" | "FINANCE_ACCOUNTING_REQUIRED" | "RENT_LEASE_REQUIRED" | "DIRECT_SALE_REQUIRED" | "SUBSCRIPTION_EMI_REQUIRED" | "INVENTORY_REQUIRED" | "STAFF_HR_PAYROLL_REQUIRED" | "CRM_REQUIRED" | "RESET_DRY_RUN_REQUIRED" | "OPTIONAL_OR_FUTURE" | "REQUIRED_FOR_COLLECTION" | "REQUIRED_FOR_ACCOUNTING_POSTING" | "REQUIRED_FOR_DOCUMENTS" | "REQUIRED_FOR_OPERATIONS" | "RECOMMENDED_FOR_GO_LIVE" | string;
 export type SetupReadinessSection = { key: string; title: string; status: SetupReadinessStatus; blockers: string[]; warnings: string[]; recommended_action: string; target_route: string; why_this_matters: string; category?: SetupReadinessCategory; category_label?: string; repairable?: boolean; optional_for_initial_start?: boolean; last_checked?: string | null; metadata?: Record<string, unknown> };
 export type SetupReadinessFinanceAccount = { id: number; name: string; kind: string; branch?: string | null; mapped_chart_account?: { id: number; code: string; name: string; account_type: string; allow_manual_posting?: boolean; is_active?: boolean } | null; posting_ready: boolean; collection_ready: boolean; blocker_reason?: string | null; recommended_action?: string | null };
 export type SetupLaunchChecklistItem = { key: string; label: string; ready: boolean; source_section: string; category?: SetupReadinessCategory };
 export type SetupReadinessCategorySummary = { key: SetupReadinessCategory; label: string; total: number; ready: number; blocked: number; info: number };
-export type SetupReadinessPayload = { summary: { overall_status: SetupReadinessStatus; ready_count: number; warning_count: number; blocker_count: number; next_recommended_action?: string; next_target_route?: string; core_operational_ready?: boolean; category_summary?: Record<string, { total: number; ready: number; blocked: number; info: number }> }; sections: SetupReadinessSection[]; finance_accounts: SetupReadinessFinanceAccount[]; launch_checklist: SetupLaunchChecklistItem[]; categories?: SetupReadinessCategorySummary[]; read_only?: boolean; mutation_policy?: string };
+export type SetupReadinessPayload = { summary: { overall_status: SetupReadinessStatus; ready_count: number; warning_count: number; blocker_count: number; next_recommended_action?: string; next_target_route?: string; core_operational_ready?: boolean; category_summary?: Record<string, { total: number; ready: number; blocked: number; info: number }> }; sections: SetupReadinessSection[]; finance_accounts: SetupReadinessFinanceAccount[]; launch_checklist: SetupLaunchChecklistItem[]; categories?: SetupReadinessCategorySummary[]; operational_posture?: Record<string, unknown>; read_only?: boolean; mutation_policy?: string };
 
 export type DocumentNumberingSequence = { key: string; name: string; series_code: string; document_type?: string; financial_year: string; active_financial_year_code?: string; financial_year_ref?: number | null; financial_year_name?: string; financial_year_date_range?: { start_date?: string; end_date?: string }; workflow_group?: string; doc_kind?: "invoice" | string; description?: string; required_for_go_live?: boolean; configured: boolean; prefix: string; pattern?: string; suffix?: string; reset_policy?: "NEVER" | "YEARLY" | "MONTHLY" | string; next_number: number; padding: number; preview_number?: string | null; next_number_preview: string | null; last_issued_number: string | null; issued_count?: number; max_issued_number?: number; min_safe_next_number?: number; duplicate_count?: number; inactive_duplicate_count?: number; setup_blockers?: string[]; status: "ready" | "needs_setup" | "duplicate_risk" | "blocked" | string; warnings?: string[]; blockers?: string[]; can_edit_prefix?: boolean; can_edit_next_number?: boolean; can_seed_default?: boolean; default_prefix?: string; default_pattern?: string; default_padding?: number };
 export type DocumentNumberingState = { financial_year: string; active_financial_year?: { id?: number; code?: string; name?: string; start_date?: string; end_date?: string } | null; active_financial_year_code?: string; active_financial_year_date_range?: { start_date?: string; end_date?: string }; current_period?: { id?: number; code?: string; name?: string; start_date?: string; end_date?: string; status?: string; is_locked?: boolean } | null; sequences: DocumentNumberingSequence[]; missing_required_profiles?: string[]; inactive_duplicate_profiles?: Record<string, number>; duplicate_issued_number_warnings?: Record<string, number>; setup_blockers?: string[]; checks: Record<string, boolean>; summary?: Record<string, number>; duplicate_issues: Record<string, number>; operator_rules?: string[] };
@@ -121,6 +135,8 @@ export async function listBackupJobs(): Promise<{ jobs: Array<Record<string, unk
 export async function getRestorePreview(payload: { restore_type?: "FULL_BACKUP_RESTORE_PREVIEW" | "SELECTED_SCOPE_RESTORE_PREVIEW" | "SETUP_SNAPSHOT_RESTORE_PREVIEW" | "LOCAL_SANDBOX_RESTORE_PREVIEW"; backup_job_id?: number; scopes?: string[]; snapshot_payload?: Record<string, unknown>; preserve_admin_username?: string }): Promise<Record<string, unknown>> { return apiFetch<Record<string, unknown>>("/admin/business-setup/restore/preview/", { method: "POST", body: payload }); }
 export async function executeRestore(payload: { restore_job_id: number; confirmation_phrase: string }): Promise<Record<string, unknown>> { return apiFetch<Record<string, unknown>>("/admin/business-setup/restore/", { method: "POST", body: payload }); }
 export async function listRestoreJobs(): Promise<{ jobs: Array<Record<string, unknown>> }> { return apiFetch<{ jobs: Array<Record<string, unknown>> }>("/admin/business-setup/restore-jobs/"); }
+
+export async function getServerDate(): Promise<{ server_date: string; server_datetime: string }> { return apiFetch<{ server_date: string; server_datetime: string }>("/admin/server-date/"); }
 
 export type PolicyGovernanceSeedResult = { status: string; seed_result?: Record<string, unknown>; public_published?: number; internal_accepted?: number; skipped?: number; errors?: string[]; safety_contract?: string };
 export async function previewSeedPolicyGovernance(): Promise<Record<string, unknown>> { return apiFetch<Record<string, unknown>>("/admin/setup/seed-policy-governance/"); }

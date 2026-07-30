@@ -8,3 +8,5 @@ export { default as RightInspector } from "./RightInspector";
 export { default as StatusBadge } from "./StatusBadge";
 export { default as WorkbenchDataGrid } from "./WorkbenchDataGrid";
 export { default as WorkbenchHeader } from "./WorkbenchHeader";
+export { default as WorkbenchSearch } from "./WorkbenchSearch";
+export * from "./WorkbenchKPI";

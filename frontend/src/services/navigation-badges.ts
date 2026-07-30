@@ -25,3 +25,8 @@ export async function getAdminNavigationBadges(): Promise<AdminNavigationBadges>
   });
   return _inflight;
 }
+
+export async function refreshAdminNavigationBadges(): Promise<AdminNavigationBadges> {
+  _inflight = null;
+  return getAdminNavigationBadges();
+}

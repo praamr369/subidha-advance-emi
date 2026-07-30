@@ -1,0 +1,31 @@
+postal_code,city,district,state,region,latitude,longitude
+110001,New Delhi,Central Delhi,Delhi,NCR,28.6328,77.2197
+110002,New Delhi,Central Delhi,Delhi,NCR,28.6355,77.2292
+110007,New Delhi,Central Delhi,Delhi,NCR,28.6437,77.2328
+400001,Mumbai,Mumbai,Maharashtra,Western,18.9649,72.8194
+400002,Mumbai,Mumbai,Maharashtra,Western,18.9711,72.8254
+400003,Mumbai,Mumbai,Maharashtra,Western,18.9700,72.8355
+560001,Bangalore,Bangalore Urban,Karnataka,Southern,12.9716,77.5946
+560002,Bangalore,Bangalore Urban,Karnataka,Southern,12.9689,77.6053
+560003,Bangalore,Bangalore Urban,Karnataka,Southern,12.9716,77.6191
+700001,Kolkata,Kolkata,West Bengal,Eastern,22.5726,88.3639
+700002,Kolkata,Kolkata,West Bengal,Eastern,22.5676,88.3731
+700003,Kolkata,Kolkata,West Bengal,Eastern,22.5631,88.3829
+600001,Chennai,Chennai,Tamil Nadu,Southern,13.0512,80.2678
+600002,Chennai,Chennai,Tamil Nadu,Southern,13.0585,80.2791
+600003,Chennai,Chennai,Tamil Nadu,Southern,13.0637,80.2883
+500001,Hyderabad,Hyderabad,Telangana,Southern,17.3850,78.4867
+500002,Hyderabad,Hyderabad,Telangana,Southern,17.3829,78.5115
+500003,Hyderabad,Hyderabad,Telangana,Southern,17.3664,78.5255
+751001,Bhubaneswar,Khordha,Odisha,Eastern,20.1609,85.8245
+751002,Bhubaneswar,Khordha,Odisha,Eastern,20.1744,85.8387
+751003,Bhubaneswar,Khordha,Odisha,Eastern,20.1846,85.8535
+201001,Noida,Gautam Budh Nagar,Uttar Pradesh,Northern,28.5921,77.3292
+201002,Noida,Gautam Budh Nagar,Uttar Pradesh,Northern,28.5973,77.3411
+201003,Noida,Gautam Budh Nagar,Uttar Pradesh,Northern,28.6145,77.3542
+302001,Jaipur,Jaipur,Rajasthan,Western,26.9124,75.7873
+302002,Jaipur,Jaipur,Rajasthan,Western,26.9355,75.8090
+302003,Jaipur,Jaipur,Rajasthan,Western,26.9461,75.8252
+411001,Pune,Pune,Maharashtra,Western,18.5204,73.8567
+411002,Pune,Pune,Maharashtra,Western,18.5320,73.8689
+411003,Pune,Pune,Maharashtra,Western,18.5345,73.8723

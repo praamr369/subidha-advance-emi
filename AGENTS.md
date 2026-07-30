@@ -358,7 +358,154 @@ Always report:
 - files changed
 - routes added/hidden
 - backend endpoints used
-- backend gaps found
-- tests run
 - test results
 - risks
+
+## Solopreneur / Single Admin Rule
+
+The business is operated by a single owner/admin acting as a "solopreneur."
+- The main **Admin Webapp** (desktop) must serve as the universal control center.
+- The admin must have frictionless access to **all modules** (finance, stock, inventory, money, collections, CRM, subscriptions) without excessive department-based segregation or artificial roadblocks.
+
+---
+
+## Local Dev Harness & Verification Workflow
+
+This is the single, self-contained reference for booting the app, using dev data
+safely, and verifying a change. Follow it instead of re-deriving commands each
+session — it keeps working context small.
+
+### 1. Stack facts (do not re-discover)
+
+| Piece | Value |
+| --- | --- |
+| Backend | Django, `backend/manage.py`, runs on **:8000** |
+| Backend venv | `backend/.venv/Scripts/python.exe` (Windows) |
+| Dev settings | `core.settings.development` (default; `DEBUG=True`) |
+| Test settings | `core.settings.test` (auto-selected when running tests) |
+| Dev database | **PostgreSQL** `subidha_core` @ `127.0.0.1:5432` (real dev data) |
+| DB config source | `DATABASE_URL` in `backend/.env`, auto-loaded by `core/settings/base.py` |
+| Frontend | Next.js, `frontend/`, runs on **:3000** |
+| Frontend → API | Falls back to `http://127.0.0.1:8000/api/v1` (no env override needed for local) |
+
+### 2. Booting the servers
+
+**Preferred (in-app browser preview):** use the `.claude/launch.json` configs —
+start `backend` and `frontend` via the preview tool, never a raw shell dev server.
+This gives console/network/log capture for verification.
+
+Manual equivalents (if launching outside the harness):
+
+```
+# Backend (from repo root)
+backend/.venv/Scripts/python.exe backend/manage.py runserver 8000
+
+# Frontend
+npm --prefix frontend run dev      # http://localhost:3000
+```
+
+The backend reads `backend/.env` automatically, so Postgres dev data is live on
+boot — no extra flags. If `DATABASE_URL` is unset, base settings fall back to a
+local `db.sqlite3`; for real dev work keep `DATABASE_URL` pointed at `subidha_core`.
+
+### 3. Using real dev data SAFELY
+
+The dev Postgres DB (`subidha_core`) holds real working test data. Treat it as
+mutable-but-precious:
+
+- **READ freely.** Browse the running app, hit read endpoints, query via
+  `manage.py shell` / `dbshell` to confirm state.
+- **WRITE only through the app's own flows** (admin UI, documented API endpoints,
+  or management commands). Never hand-edit rows to "fix" a test.
+- **Honor the append-only financial invariants** (see Core Product Rules): prefer
+  reversal/adjustment entries; never destructively mutate EMI or settled payments.
+- **Never run destructive scripts against dev without asking** — e.g.
+  `clear_operational_data.py`, `reset_script.py`, `sync_and_reset.py`, `flush`,
+  `migrate zero`, or dropping/recreating the DB. These wipe working data.
+- **Never deploy the dev DB to production.** Production is bootstrapped from a
+  config-only fixture (see `project_production_bootstrap`); dev data is test data.
+- For throwaway experiments that need writes, run against **test settings**
+  (isolated sqlite) instead of touching `subidha_core`.
+
+### 4. Verifying a change (do this before claiming "done")
+
+Run only the gate matching what you touched — don't run the full suite for a
+one-line change.
+
+**Frontend changes:**
+```
+cd frontend
+npm run typecheck        # tsc --noEmit — the fast primary gate
+npm run check:routes     # if routes/registry touched
+npm run lint             # if asked or for larger diffs
+npm run build:smoke      # before a release-level change only (slow)
+```
+
+**Backend changes:**
+```
+backend/.venv/Scripts/python.exe backend/manage.py check
+backend/.venv/Scripts/python.exe backend/manage.py makemigrations --check --dry-run
+backend/.venv/Scripts/python.exe backend/manage.py test <app.tests.Target>   # scoped
+```
+Note: the full backend test suite has ~20 known pre-existing failures and is NOT
+the gate — run the tests scoped to what you changed.
+
+**End-to-end (behavioral) verification — required for anything the browser can
+render:** boot the servers via `.claude/launch.json`, drive the actual flow in the
+in-app browser, and read console/network/server logs to confirm no errors. Share a
+screenshot or the relevant log lines as proof. Do not ask the owner to check
+manually.
+
+### 4b. Never create a duplicate admin page (mandatory pre-flight)
+
+The `/admin` tree has 450+ pages and a history of the same feature being built at
+several routes (e.g. `collect` / `collections` / `collection-center`;
+`reversals` / `reversal-workbench` / `reversal-control`; `products` /
+`pim/products`). Root cause: agents scaffold a new route without checking what
+already exists. Before creating ANY admin page:
+
+1. Search existing routes for the concept **and its synonyms**
+   (collect/collection, reversal/void/return, vendor/supplier, staff/employee):
+   ```
+   ls frontend/src/app/(dashboard)/admin  # then grep for the concept
+   ```
+2. Check the canonical route for that domain in
+   `frontend/src/config/admin-route-registry.ts`.
+3. Run `npm --prefix frontend run check:routes` — part of every route change.
+4. If a page already covers the job, **extend it or add a redirect alias**
+   (`redirect()` or `redirectToCanonicalPath()`) — do NOT create a new route.
+
+There are already 62 redirect aliases cleaning up past duplicates. Do not add to
+the pile. When in doubt, ask the owner which route is canonical.
+
+### 4c. Consolidating existing duplicates — ADDITIVE MERGE ONLY (never delete)
+
+Duplicate admin pages are NOT to be deleted. Each duplicate route often carries
+live workbench actions and workflows; deleting one destroys real functionality.
+Duplication originates in the backend (different modules own different route trees
+— e.g. the subscription module owns `/admin/products`, the product module owns
+`/admin/pim/products`). Consolidate on the frontend additively:
+
+**The canonical pattern (already implemented in `/admin/products`):**
+- Pick ONE canonical page per concept (the richest / most-used route).
+- Inside it, add a **tab switcher**; render each duplicate's workflow as a tab
+  panel under a single shared `ERPPageShell`. Every action from every duplicate
+  page must be reachable from the canonical page — full actions inline, not just
+  links out. (`/admin/products` = "Subscription Products" tab + embedded `PimPanel`
+  = "PIM Products" tab; both services coexist, zero features lost.)
+- Extract each duplicate's body into a reusable component/panel so the original
+  route can keep rendering it too — the old route stays alive.
+- Only AFTER the owner confirms the merged page covers everything may an old route
+  be converted to a redirect alias (see §4b) — and even then, prefer keeping it.
+
+**Never** delete a page, remove a workbench, or drop an action during a merge.
+Merge is additive: consolidate access, preserve every workflow.
+
+### 5. Always report (keeps context lean)
+
+- files changed
+- routes added/hidden, backend endpoints used
+- which verification gates ran + their result
+- any dev-data writes made and how (which flow)
+- residual risks
+- Assume the admin is trusted to control all operational fields single-handedly. Optimize the Admin UI for speed, comprehensive visibility, and unified operations.

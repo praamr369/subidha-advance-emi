@@ -36,6 +36,7 @@ export type VaultDocumentItem = {
 
 export type DocumentReadiness = {
   subscription_id: number;
+  customer_id: number | null;
   plan_type: string;
   is_direct_sale: boolean;
   required_documents: VaultDocumentItem[];
@@ -132,5 +133,55 @@ export async function fetchDocumentReadiness(
   const qs = params.toString();
   return apiFetch<DocumentReadiness>(
     `/admin/subscriptions/${subscriptionId}/document-readiness/${qs ? `?${qs}` : ""}`
+  );
+}
+
+export async function uploadSubscriptionDocument(
+  subscriptionId: number,
+  documentType: string,
+  file: File,
+  category?: string
+): Promise<{ id: number; detail: string }> {
+  const formData = new FormData();
+  formData.append("document_type", documentType);
+  if (category) {
+    formData.append("category", category);
+  }
+  formData.append("file", file);
+
+  return apiFetch<{ id: number; detail: string }>(
+    `/admin/subscriptions/${subscriptionId}/documents/`,
+    {
+      method: "POST",
+      body: formData,
+    }
+  );
+}
+
+export async function verifySubscriptionDocument(
+  subscriptionId: number,
+  documentId: number,
+  notes: string = ""
+): Promise<{ detail: string }> {
+  return apiFetch<{ detail: string }>(
+    `/admin/subscriptions/${subscriptionId}/documents/${documentId}/verify/`,
+    {
+      method: "POST",
+      body: JSON.stringify({ notes }),
+    }
+  );
+}
+
+export async function rejectSubscriptionDocument(
+  subscriptionId: number,
+  documentId: number,
+  reason: string
+): Promise<{ detail: string }> {
+  return apiFetch<{ detail: string }>(
+    `/admin/subscriptions/${subscriptionId}/documents/${documentId}/reject/`,
+    {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    }
   );
 }

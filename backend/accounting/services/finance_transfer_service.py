@@ -9,6 +9,8 @@ from django.db import transaction
 from accounting.models import MoneyMovement
 from accounting.services.finance_posting_service import FinancePostingService
 from accounting.services.money_movement_service import post_money_movement
+from subscriptions.models import AuditLog
+from subscriptions.services.audit_service import log_audit
 
 
 def _money(value) -> Decimal:
@@ -210,6 +212,22 @@ class FinanceTransferService:
         movement, created = post_money_movement(
             money_movement_id=movement.id,
             posted_by=performed_by,
+        )
+        log_audit(
+            action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
+            instance=movement,
+            performed_by=performed_by,
+            metadata={
+                "event": "FINANCE_TRANSFER_POSTED",
+                "movement_no": movement.movement_no,
+                "movement_date": str(movement_date),
+                "from_finance_account_id": from_finance_account_id,
+                "to_finance_account_id": to_finance_account_id,
+                "amount": str(normalized_amount),
+                "reference_no": (reference_no or "").strip(),
+                "posted_journal_entry_id": movement.posted_journal_entry_id,
+                "idempotency_key": candidate_key,
+            },
         )
         movement.finance_transfer_preview = preview
         return movement, created

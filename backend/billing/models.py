@@ -1333,3 +1333,15 @@ class PurchaseReturnLine(BillingTimeStampedModel):
     class Meta:
         db_table = "billing_purchase_return_lines"
         ordering = ["id"]
+
+
+class SmartCollectionRun(BillingTimeStampedModel):
+    idempotency_key = models.UUIDField(unique=True, editable=False)
+    customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name="smart_collections")
+    amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))])
+    status = models.CharField(max_length=50)
+    result_json = models.JSONField(default=dict)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True)
+
+    class Meta:
+        db_table = "billing_smart_collection_run"

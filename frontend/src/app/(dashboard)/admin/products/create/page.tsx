@@ -26,6 +26,7 @@ import SmartSuggestField from "@/components/forms/SmartSuggestField";
 import CatalogSpecificationFields from "@/components/admin/products/CatalogSpecificationFields";
 import { apiFetch } from "@/lib/api";
 import { getProductCatalogOptions, type ProductCatalogOptions } from "@/services/products";
+import { pimService } from "@/services/pim";
 import QuickCreateInventoryDrawer from "@/components/inventory/QuickCreateInventoryDrawer";
 
 type CreatedProductResponse = {
@@ -285,6 +286,7 @@ export default function AdminProductCreatePage() {
   const [isRentEnabled, setIsRentEnabled] = useState(false);
   const [isLeaseEnabled, setIsLeaseEnabled] = useState(false);
   const [isDirectSaleEnabled, setIsDirectSaleEnabled] = useState(true);
+  const [syncToPim, setSyncToPim] = useState(true);
 
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const [selectedImagePreview, setSelectedImagePreview] = useState<string | null>(
@@ -385,6 +387,9 @@ export default function AdminProductCreatePage() {
 
   // Services and add-ons can have zero price (quoted separately)
   const requiresPrice = itemType !== "SERVICE" && itemType !== "ADD_ON";
+  const isSaleItem = itemType === "FINISHED_GOOD" || itemType === "ADD_ON" || itemType === "ACCESSORY";
+  const isEmiEligible = itemType === "FINISHED_GOOD";
+
   const canSave = useMemo(() => {
     return (
       trimmedProductCode.length > 0 &&
@@ -511,10 +516,10 @@ export default function AdminProductCreatePage() {
       formData.append("item_type", itemType);
       formData.append("stock_type", stockType);
       formData.append("is_active", String(isActive));
-      formData.append("is_emi_enabled", String(isEmiEnabled));
-      formData.append("is_rent_enabled", String(isRentEnabled));
-      formData.append("is_lease_enabled", String(isLeaseEnabled));
-      formData.append("is_direct_sale_enabled", String(isDirectSaleEnabled));
+      formData.append("is_emi_enabled", String(isEmiEligible ? isEmiEnabled : false));
+      formData.append("is_rent_enabled", String(isEmiEligible ? isRentEnabled : false));
+      formData.append("is_lease_enabled", String(isEmiEligible ? isLeaseEnabled : false));
+      formData.append("is_direct_sale_enabled", String(isSaleItem ? isDirectSaleEnabled : false));
 
       if (selectedImageFile) {
         formData.append("image", selectedImageFile);
@@ -524,6 +529,15 @@ export default function AdminProductCreatePage() {
         method: "POST",
         body: formData,
       });
+
+      if (syncToPim) {
+        setLoadingLabel("Syncing to PIM Catalog...");
+        try {
+          await pimService.syncFromRegister({ product_ids: [payload.id] });
+        } catch (e) {
+          console.error("Failed to sync to PIM:", e);
+        }
+      }
 
       setCreated(payload);
       setFieldErrors({});
@@ -997,6 +1011,26 @@ export default function AdminProductCreatePage() {
                   <div className="flex items-start gap-3">
                     <input
                       type="checkbox"
+                      checked={syncToPim}
+                      onChange={(event) => setSyncToPim(event.target.checked)}
+                      disabled={saving}
+                      className="mt-1"
+                    />
+                    <div>
+                      <div className="text-sm font-medium text-foreground">
+                        Sync to PIM Catalog
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        Automatically publish this item to the Product Information Management (PIM) module.
+                      </div>
+                    </div>
+                  </div>
+                </label>
+
+                <label className="rounded-xl border border-border bg-background p-4">
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
                       checked={isActive}
                       onChange={(event) => setIsActive(event.target.checked)}
                       disabled={saving}
@@ -1012,79 +1046,90 @@ export default function AdminProductCreatePage() {
                     </div>
                   </div>
                 </label>
-
-                <label className="rounded-xl border border-border bg-background p-4">
-                  <div className="flex items-start gap-3">
-                    <input
-                      type="checkbox"
-                      checked={isEmiEnabled}
-                      onChange={(e) => { setIsEmiEnabled(e.target.checked); setError(null); }}
-                      disabled={saving}
-                      className="mt-1"
-                    />
-                    <div>
-                      <div className="text-sm font-medium text-foreground">EMI Enabled</div>
-                      <div className="mt-1 text-xs text-muted-foreground">Eligible for EMI subscription plans.</div>
-                      <FieldError message={fieldErrors.is_emi_enabled} />
-                    </div>
-                  </div>
-                </label>
-
-                <label className="rounded-xl border border-border bg-background p-4">
-                  <div className="flex items-start gap-3">
-                    <input
-                      type="checkbox"
-                      checked={isRentEnabled}
-                      onChange={(event) => {
-                        setIsRentEnabled(event.target.checked);
-                        setError(null);
-                      }}
-                      disabled={saving}
-                      className="mt-1"
-                    />
-                    <div>
-                      <div className="text-sm font-medium text-foreground">
-                        Rent Enabled
-                      </div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        Marks the product as rent-capable for later workflow expansion.
-                      </div>
-                    </div>
-                  </div>
-                </label>
-
-                <label className="rounded-xl border border-border bg-background p-4">
-                  <div className="flex items-start gap-3">
-                    <input
-                      type="checkbox"
-                      checked={isLeaseEnabled}
-                      onChange={(event) => { setIsLeaseEnabled(event.target.checked); setError(null); }}
-                      disabled={saving}
-                      className="mt-1"
-                    />
-                    <div>
-                      <div className="text-sm font-medium text-foreground">Lease Enabled</div>
-                      <div className="mt-1 text-xs text-muted-foreground">Eligible for lease contracts.</div>
-                    </div>
-                  </div>
-                </label>
-
-                <label className="rounded-xl border border-border bg-background p-4">
-                  <div className="flex items-start gap-3">
-                    <input
-                      type="checkbox"
-                      checked={isDirectSaleEnabled}
-                      onChange={(event) => { setIsDirectSaleEnabled(event.target.checked); setError(null); }}
-                      disabled={saving}
-                      className="mt-1"
-                    />
-                    <div>
-                      <div className="text-sm font-medium text-foreground">Direct Sale Enabled</div>
-                      <div className="mt-1 text-xs text-muted-foreground">Eligible for one-time direct billing without EMI.</div>
-                    </div>
-                  </div>
-                </label>
               </div>
+
+              {isSaleItem && (
+                <div className="mt-4 border-t border-border pt-4">
+                  <h4 className="mb-4 text-sm font-semibold text-foreground">Sales & Subscription Modes</h4>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {isEmiEligible && (
+                      <>
+                        <label className="rounded-xl border border-border bg-background p-4">
+                          <div className="flex items-start gap-3">
+                            <input
+                              type="checkbox"
+                              checked={isEmiEnabled}
+                              onChange={(e) => { setIsEmiEnabled(e.target.checked); setError(null); }}
+                              disabled={saving}
+                              className="mt-1"
+                            />
+                            <div>
+                              <div className="text-sm font-medium text-foreground">EMI Enabled</div>
+                              <div className="mt-1 text-xs text-muted-foreground">Eligible for EMI subscription plans.</div>
+                              <FieldError message={fieldErrors.is_emi_enabled} />
+                            </div>
+                          </div>
+                        </label>
+
+                        <label className="rounded-xl border border-border bg-background p-4">
+                          <div className="flex items-start gap-3">
+                            <input
+                              type="checkbox"
+                              checked={isRentEnabled}
+                              onChange={(event) => {
+                                setIsRentEnabled(event.target.checked);
+                                setError(null);
+                              }}
+                              disabled={saving}
+                              className="mt-1"
+                            />
+                            <div>
+                              <div className="text-sm font-medium text-foreground">
+                                Rent Enabled
+                              </div>
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                Marks the product as rent-capable for later workflow expansion.
+                              </div>
+                            </div>
+                          </div>
+                        </label>
+
+                        <label className="rounded-xl border border-border bg-background p-4">
+                          <div className="flex items-start gap-3">
+                            <input
+                              type="checkbox"
+                              checked={isLeaseEnabled}
+                              onChange={(event) => { setIsLeaseEnabled(event.target.checked); setError(null); }}
+                              disabled={saving}
+                              className="mt-1"
+                            />
+                            <div>
+                              <div className="text-sm font-medium text-foreground">Lease Enabled</div>
+                              <div className="mt-1 text-xs text-muted-foreground">Eligible for lease contracts.</div>
+                            </div>
+                          </div>
+                        </label>
+                      </>
+                    )}
+
+                    <label className="rounded-xl border border-border bg-background p-4">
+                      <div className="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={isDirectSaleEnabled}
+                          onChange={(event) => { setIsDirectSaleEnabled(event.target.checked); setError(null); }}
+                          disabled={saving}
+                          className="mt-1"
+                        />
+                        <div>
+                          <div className="text-sm font-medium text-foreground">Direct Sale Enabled</div>
+                          <div className="mt-1 text-xs text-muted-foreground">Eligible for one-time direct billing without EMI.</div>
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              )}
             </div>
           </FormSection>
         </div>

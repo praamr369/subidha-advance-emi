@@ -138,6 +138,48 @@ export async function listAdminReversals(params: Record<string, string | number 
   return apiFetch(`/admin/billing/returns/${query(params)}`);
 }
 
+export type CustomerReversalContext = {
+  customer: {
+    id: number;
+    name: string;
+    phone: string;
+    kyc_status: string;
+    credit_balance: string;
+  };
+  direct_sales: Array<{
+    id: number;
+    sale_no: string | null;
+    sale_date: string | null;
+    status: string;
+    grand_total: string;
+    received_total: string;
+    balance_total: string;
+    billing_invoice_id: number | null;
+    billing_invoice_no: string | null;
+  }>;
+  receipts: Array<{
+    id: number;
+    receipt_no: string | null;
+    receipt_date: string | null;
+    status: string;
+    amount: string;
+    direct_sale_id: number | null;
+    billing_invoice_id: number | null;
+  }>;
+  subscriptions: Array<{
+    id: number;
+    subscription_number: string | null;
+    plan_type: string;
+    status: string;
+    monthly_amount: string;
+    product_name: string | null;
+  }>;
+};
+
+export async function getAdminCustomerReversalContext(customerId: number | string): Promise<CustomerReversalContext> {
+  return apiFetch(`/admin/billing/reversal-context/?customer_id=${customerId}`);
+}
+
 export async function cancelAdminDirectSale(directSaleId: number, reason: string): Promise<{ updated: boolean }> {
   return apiFetch(`/admin/billing/direct-sales/${directSaleId}/cancel/`, {
     method: "POST",
@@ -255,7 +297,7 @@ export async function getAdminCustomerCredits(customerId: number): Promise<{
 
 export async function createAdminCustomerRefund(
   customerId: number,
-  payload: { amount: string | number; method: "CASH_REFUND" | "UPI_REFUND" | "BANK_REFUND"; finance_account_id: number; reason: string; direct_sale_return_id?: number }
+  payload: { amount: string | number; method: "CASH_REFUND" | "UPI_REFUND" | "BANK_REFUND"; finance_account_id?: number; reason: string; direct_sale_return_id?: number }
 ): Promise<{ id: number; refund_no: string; status: string }> {
   return apiFetch(`/admin/customers/${customerId}/refunds/`, { method: "POST", body: JSON.stringify(payload) });
 }

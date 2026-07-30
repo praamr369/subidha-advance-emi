@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { ArrowRight, BadgeCheck, ShieldCheck, Sparkles, Wallet } from "lucide-react";
 
-import GeneratedMarketingVisual from "@/components/public/GeneratedMarketingVisual";
+import Image from "next/image";
 import PublicSectionShell from "@/components/public/PublicSectionShell";
 import SectionHeader from "@/components/public/SectionHeader";
-import { PUBLIC_MARKETING_ASSETS } from "@/lib/public-marketing-assets";
 import { ROUTES } from "@/lib/routes";
 
 const mechanics = [
@@ -39,7 +38,15 @@ export default function LuckyPlanMechanicsPreview() {
           title="A simple public explanation for a controlled financial workflow"
           description="Customers can understand the Lucky Plan visually, while actual contracts, payments, draw reveal, waiver posting, and audit evidence stay inside the production system."
         />
-        <GeneratedMarketingVisual asset={PUBLIC_MARKETING_ASSETS.winnerDraw} className="min-h-[18rem]" />
+        <div className="relative w-full overflow-hidden rounded-[1.6rem] shadow-[0_24px_54px_-24px_rgba(15,23,42,0.6)]">
+          <Image
+            src="/images/banner_draw.jpg"
+            alt="Winner Draw"
+            width={800}
+            height={533}
+            className="w-full object-cover min-h-[18rem]"
+          />
+        </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">

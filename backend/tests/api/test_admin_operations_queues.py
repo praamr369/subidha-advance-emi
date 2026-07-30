@@ -36,6 +36,7 @@ class AdminOperationsQueueApiTests(APITestCase):
         keys = {row["key"] for row in ok.data["results"]}
         self.assertIn("partner_payment_requests_pending", keys)
         self.assertIn("subscription_requests_pending", keys)
+        self.assertIn("product_requests_pending", keys)
         self.assertIn("customer_kyc_pending", keys)
         self.assertIn("deposit_refunds_pending", keys)
         self.assertIn("reconciliation_pending", keys)

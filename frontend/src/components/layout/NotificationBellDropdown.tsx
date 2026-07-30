@@ -207,6 +207,9 @@ export default function NotificationBellDropdown({ role }: { role: NavigationRol
       } else {
         await markNotificationRead(id);
       }
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("subidha:badges-refresh"));
+      }
     } catch {
       if (previousList) {
         queryClient.setQueryData(listQueryKey, previousList);
@@ -230,6 +233,9 @@ export default function NotificationBellDropdown({ role }: { role: NavigationRol
     });
     try {
       await markAllNotificationsRead();
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("subidha:badges-refresh"));
+      }
       await queryClient.invalidateQueries({ queryKey });
     } catch {
       if (previousList) {

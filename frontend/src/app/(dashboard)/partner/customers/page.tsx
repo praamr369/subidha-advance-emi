@@ -3,17 +3,13 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { RefreshCw, Search } from "lucide-react";
+import { ChevronRight, RefreshCw, Search, Users } from "lucide-react";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import DataTable, { type Column } from "@/components/ui/DataTable";
 import PaginationControls from "@/components/ui/PaginationControls";
-import PortalPage from "@/components/ui/PortalPage";
 import StatusBadge from "@/components/ui/status-badge";
-import TableToolbar from "@/components/ui/TableToolbar";
-import { DataTableShell, DetailPanel, KpiCard, MobileSafeTable, QuickActionGrid, WorkflowCard } from "@/components/ui/operations";
 import {
   listPartnerCustomersRegister,
   listPartnerSubscriptionsRegister,
@@ -70,11 +66,8 @@ export default function PartnerCustomersPage() {
 
   const loadCustomers = useCallback(
     async (mode: "initial" | "refresh" = "initial") => {
-      if (mode === "initial") {
-        setLoading(true);
-      } else {
-        setRefreshing(true);
-      }
+      if (mode === "initial") setLoading(true);
+      else setRefreshing(true);
 
       try {
         const data: PartnerCustomerRegisterResponse = await listPartnerCustomersRegister({
@@ -119,14 +112,9 @@ export default function PartnerCustomersPage() {
         setRows([]);
         setCount(0);
         setNumPages(0);
-        setHasNext(false);
-        setHasPrevious(false);
       } finally {
-        if (mode === "initial") {
-          setLoading(false);
-        } else {
-          setRefreshing(false);
-        }
+        if (mode === "initial") setLoading(false);
+        else setRefreshing(false);
       }
     },
     [currentPage, kycStatus, q]
@@ -163,248 +151,133 @@ export default function PartnerCustomersPage() {
     router.replace(queryString ? `/partner/customers?${queryString}` : "/partner/customers");
   }
 
-  const pagePendingKyc = useMemo(
-    () => rows.filter((row) => String(row.kyc_status || "").toUpperCase() === "PENDING").length,
-    [rows]
-  );
-
-  const pageVerifiedKyc = useMemo(
-    () =>
-      rows.filter((row) => {
-        const token = String(row.kyc_status || "").toUpperCase();
-        return token === "APPROVED" || token === "VERIFIED";
-      }).length,
-    [rows]
-  );
-
-  const columns = useMemo<Column<PartnerCustomer>[]>(
-    () => [
-      {
-        key: "name",
-        title: "Customer",
-        sortable: true,
-        render: (row) => (
-          <div className="space-y-1">
-            <div className="font-medium text-foreground">{row.name}</div>
-            <div className="text-xs text-muted-foreground">Customer #{row.id}</div>
-          </div>
-        ),
-      },
-      {
-        key: "phone",
-        title: "Phone",
-        render: (row) => row.phone || "—",
-      },
-      {
-        key: "kyc_status",
-        title: "KYC",
-        sortable: true,
-        render: (row) => <StatusBadge status={row.kyc_status || "NOT_PROVIDED"} />,
-      },
-      {
-        key: "created_at",
-        title: "Created",
-        sortable: true,
-        sortAccessor: (row) => Date.parse(row.created_at || "") || 0,
-        render: (row) => formatDate(row.created_at),
-      },
-    ],
-    []
-  );
-
   return (
-    <PortalPage
-      eyebrow="Partner Customers"
-      title="Partner Customers"
-      subtitle="Customers associated with your own partner subscriptions, with search and KYC visibility aligned to the refined shared workflow pattern."
-      helperNote="This route is partner-scoped and read-only for customer master data. Use it to route into partner-visible subscriptions, payments, and collection follow-up only."
-      helperTone="info"
-      breadcrumbs={[
-        { label: "Partner", href: "/partner" },
-        { label: "Customers" },
-      ]}
-      actions={[
-        {
-          href: "/partner/subscriptions",
-          label: "Subscriptions",
-          variant: "secondary",
-        },
-        {
-          href: "/partner/collections",
-          label: "Collections",
-          variant: "secondary",
-        },
-      ]}
-      stats={[
-        { label: "Matching Customers", value: count },
-        { label: "Page Pending KYC", value: pagePendingKyc, tone: pagePendingKyc > 0 ? "warning" : undefined },
-        { label: "Page Verified KYC", value: pageVerifiedKyc, tone: "success" },
-        { label: "Search", value: q || "All" },
-      ]}
-      statusBadge={{ label: "Partner Customer Scope", tone: "info" }}
-    >
-      <div className="space-y-6">
-        <QuickActionGrid>
-          <KpiCard label="Matching Customers" value={count} />
-          <KpiCard label="Page Pending KYC" value={pagePendingKyc} helper="Current page only" />
-          <KpiCard label="Page Verified KYC" value={pageVerifiedKyc} helper="Current page only" />
-          <KpiCard label="Current Search" value={q || "All"} />
-        </QuickActionGrid>
-
-        <DetailPanel
-          title="Customer workflow"
-          description="Search by customer name or phone, then narrow the visible list by KYC state without exposing admin-only customer controls."
+    <div className="flex flex-col p-4 space-y-5">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-foreground">Customers</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Manage your registered customers
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void loadCustomers("refresh")}
+          disabled={refreshing}
+          className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground shadow-sm transition hover:bg-muted disabled:opacity-50"
         >
-          <WorkflowCard
-            title="Refresh partner customer scope"
-            description="Reload partner-visible customers using current filters."
-            action={
+          <RefreshCw className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
+        </button>
+      </div>
+
+      {/* Stats Summary */}
+      <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <Users className="size-5" />
+        </div>
+        <div>
+          <div className="text-xl font-bold text-foreground">{count}</div>
+          <div className="text-xs font-medium text-muted-foreground">Total Customers</div>
+        </div>
+      </div>
+
+      {/* Search & Filters */}
+      <form onSubmit={handleApplyFilters} className="space-y-3">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="text"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search name or phone..."
+            className="h-12 w-full rounded-2xl border border-border bg-background pl-10 pr-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+          />
+        </div>
+        <div className="flex gap-2">
+          <select
+            value={kycInput}
+            onChange={(e) => setKycInput(e.target.value as KycFilter)}
+            className="h-10 flex-1 rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+          >
+            <option value="">All KYC Status</option>
+            <option value="NOT_PROVIDED">Not Provided</option>
+            <option value="PENDING">Pending</option>
+            <option value="APPROVED">Approved</option>
+            <option value="VERIFIED">Verified</option>
+            <option value="REJECTED">Rejected</option>
+          </select>
+          <button
+            type="submit"
+            className="h-10 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground active:scale-95"
+          >
+            Apply
+          </button>
+          {(q || kycStatus) && (
             <button
               type="button"
-              onClick={() => void loadCustomers("refresh")}
-              disabled={refreshing || loading}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+              onClick={handleReset}
+              className="h-10 rounded-xl border border-border bg-card px-4 text-sm font-bold text-foreground active:scale-95"
             >
-              <RefreshCw className="h-4 w-4" />
-              {refreshing ? "Refreshing..." : "Refresh"}
+              Clear
             </button>
-            }
+          )}
+        </div>
+      </form>
+
+      {/* List */}
+      <div className="space-y-3">
+        {loading ? (
+          <LoadingBlock label="Loading customers..." />
+        ) : error ? (
+          <ErrorState title="Error" description={error} onRetry={() => void loadCustomers("initial")} />
+        ) : count === 0 ? (
+          <EmptyState
+            title="No customers found"
+            description={q || kycStatus ? "No customers matched your filters." : "You have no customers yet."}
           />
-          <TableToolbar
-            footer={
-              q || kycStatus ? (
-                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <span className="font-semibold uppercase tracking-[0.14em]">Active filters</span>
-                  {q ? <StatusBadge status="OPEN" label={`Search: ${q}`} hideIcon /> : null}
-                  {kycStatus ? <StatusBadge status={kycStatus} hideIcon /> : null}
-                </div>
-              ) : (
-                <div className="text-sm text-muted-foreground">
-                  Partner scope remains read-only here. Use this page to route into partner-visible detail, subscriptions, and payment collection follow-up.
-                </div>
-              )
-            }
-          >
-            <form
-              onSubmit={handleApplyFilters}
-              className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_auto]"
+        ) : (
+          rows.map((row) => (
+            <Link
+              key={row.id}
+              href={`/partner/customers/${row.id}`}
+              className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm transition active:scale-95"
             >
-              <label className="relative block">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  type="text"
-                  value={searchInput}
-                  onChange={(event) => setSearchInput(event.target.value)}
-                  placeholder="Search name or phone"
-                  className="h-10 w-full rounded-xl border border-border bg-background pl-9 pr-4 text-sm outline-none transition focus:border-ring"
-                />
-              </label>
-
-              <select
-                value={kycInput}
-                onChange={(event) => setKycInput(event.target.value as KycFilter)}
-                className="h-10 rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
-              >
-                <option value="">All KYC</option>
-                <option value="NOT_PROVIDED">Not Provided</option>
-                <option value="PENDING">Pending</option>
-                <option value="APPROVED">Approved</option>
-                <option value="VERIFIED">Verified</option>
-                <option value="REJECTED">Rejected</option>
-              </select>
-
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="submit"
-                  className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95"
-                >
-                  Apply
-                </button>
-                <button
-                  type="button"
-                  onClick={handleReset}
-                  className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
-                >
-                  Reset
-                </button>
+              <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-primary/10 text-lg font-bold text-primary">
+                {(row.name || "?").charAt(0).toUpperCase()}
               </div>
-            </form>
-          </TableToolbar>
-        </DetailPanel>
+              <div className="min-w-0 flex-1">
+                <div className="font-bold text-foreground truncate">{row.name}</div>
+                <div className="mt-0.5 text-xs font-medium text-muted-foreground">{row.phone || "—"}</div>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <StatusBadge status={row.kyc_status || "NOT_PROVIDED"} />
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                    Added {formatDate(row.created_at)}
+                  </span>
+                </div>
+              </div>
+              <ChevronRight className="size-5 shrink-0 text-muted-foreground/50" />
+            </Link>
+          ))
+        )}
 
-        {loading ? <LoadingBlock label="Loading customers..." /> : null}
-
-        {!loading && error ? (
-          <ErrorState
-            title="Failed to load customers"
-            description={error}
-            onRetry={() => void loadCustomers("initial")}
-          />
-        ) : null}
-
-        {!loading && !error ? (
-          <DetailPanel
-            title="Customer rows"
-            description="Open customer detail for partner-visible subscription and recent payment context."
-          >
-            {count === 0 ? (
-              <EmptyState
-                title="No customers found"
-                description={
-                  q || kycStatus
-                    ? "No partner-scoped customers matched the current filters."
-                    : "No customers are currently linked to this partner account."
-                }
-              />
-            ) : rows.length === 0 ? (
-              <EmptyState
-                title="No rows on this page"
-                description="The current page has no results. Move to a previous page or change the filters."
-              />
-            ) : (
-              <DataTableShell>
-                <MobileSafeTable className="border-none bg-transparent">
-                  <DataTable<PartnerCustomer>
-                    rows={rows}
-                    columns={columns}
-                    onRowClick={(row) => router.push(`/partner/customers/${row.id}`)}
-                    rowActions={(row) => (
-                      <div className="flex flex-wrap gap-2">
-                        <Link
-                          href={`/partner/customers/${row.id}`}
-                          className="inline-flex min-h-11 items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                        >
-                          View Detail
-                        </Link>
-                        <Link
-                          href={`/partner/subscriptions?customer=${row.id}`}
-                          className="inline-flex min-h-11 items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                        >
-                          Subscriptions
-                        </Link>
-                      </div>
-                    )}
-                  />
-                </MobileSafeTable>
-              </DataTableShell>
-            )}
-
-            {count > 0 ? (
-              <PaginationControls
-                count={count}
-                page={page}
-                pageSize={PAGE_SIZE}
-                numPages={numPages}
-                hasNext={hasNext}
-                hasPrevious={hasPrevious}
-                disabled={loading || refreshing}
-                onPrevious={() => replacePage(Math.max(page - 1, 1))}
-                onNext={() => replacePage(page + 1)}
-              />
-            ) : null}
-          </DetailPanel>
+        {/* Pagination */}
+        {count > 0 ? (
+          <div className="pt-4">
+            <PaginationControls
+              count={count}
+              page={page}
+              pageSize={PAGE_SIZE}
+              numPages={numPages}
+              hasNext={hasNext}
+              hasPrevious={hasPrevious}
+              disabled={loading || refreshing}
+              onPrevious={() => replacePage(Math.max(page - 1, 1))}
+              onNext={() => replacePage(page + 1)}
+            />
+          </div>
         ) : null}
       </div>
-    </PortalPage>
+    </div>
   );
 }

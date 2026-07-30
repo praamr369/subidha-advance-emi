@@ -102,6 +102,16 @@ export type SubscriptionRecord = {
     is_status_consistent?: boolean;
     warnings?: string[];
   }>;
+  rent_lease_demands?: Array<{
+    id: number;
+    demand_type: string;
+    due_date?: string | null;
+    amount: string;
+    status: string;
+    paid_amount?: string;
+    waived_amount?: string;
+    reversed_amount?: string;
+  }>;
 };
 
 export type SubscriptionQuery = {
@@ -128,4 +138,11 @@ export async function listSubscriptions(params: SubscriptionQuery = {}): Promise
 
 export function getSubscription(id: number | string): Promise<SubscriptionRecord> {
   return request(`/admin/subscriptions/${id}/`);
+}
+
+export function generateRentLeaseLedger(id: number | string, startDate: string): Promise<{ updated: boolean; subscription: SubscriptionRecord }> {
+  return request(`/admin/subscriptions/${id}/generate-rent-lease-ledger/`, {
+    method: "POST",
+    body: JSON.stringify({ start_date: startDate }),
+  });
 }

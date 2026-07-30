@@ -1,15 +1,53 @@
 "use client";
+
 import { formatRupee } from "@/lib/utils/currency";
-
 import { useCallback, useEffect, useState } from "react";
-
+import CustomerPageShell, { CPageSection } from "@/components/layout/CustomerPageShell";
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
-import ERPPageShell from "@/components/erp/ERPPageShell";
-import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import Link from "next/link";
 import { listCustomerReceipts, type FinanceReceiptRow } from "@/services/phase4-finance";
 
+function downloadHref(id: number | string) {
+  return `/api/v1/customer/receipts/${id}/pdf/`;
+}
+
+function formatDate(value?: string | null): string {
+  if (!value) return "—";
+  const d = Date.parse(value);
+  if (Number.isNaN(d)) return value;
+  return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function ReceiptCard({ row }: { row: FinanceReceiptRow }) {
+  return (
+    <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-bold text-foreground">{row.receipt_no || `RCT-${row.id}`}</div>
+          {row.subscription_number ? (
+            <div className="mt-0.5 text-xs text-muted-foreground">{row.subscription_number}</div>
+          ) : null}
+          <div className="mt-0.5 text-xs text-muted-foreground">
+            {formatDate(row.receipt_date)} · {row.payment_method || "—"}
+          </div>
+        </div>
+        <div className="flex flex-col items-end gap-2 shrink-0">
+          <span className="text-base font-bold text-foreground">{formatRupee(row.amount)}</span>
+          <a
+            href={downloadHref(row.id)}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-xl border border-border bg-background px-3 py-1 text-xs font-medium hover:bg-muted"
+          >
+            PDF
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function CustomerReceiptsPage() {
   const [loading, setLoading] = useState(true);
@@ -29,65 +67,37 @@ export default function CustomerReceiptsPage() {
     }
   }, []);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   return (
-    <ERPPageShell
+    <CustomerPageShell
       title="My Receipts"
-      subtitle="Immutable receipts for EMI, rent/lease, and direct-sale collections."
-      breadcrumbs={[{ label: "Dashboard", href: "/customer" }, { label: "Receipts" }]}
-      actions={[{ href: "/customer/documents", label: "Documents", variant: "secondary" }]}
+      subtitle="All payment receipts for your account"
+      backHref="/customer"
+      backLabel="Dashboard"
+      actions={
+        <Link
+          href="/customer/invoices"
+          className="rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted"
+        >
+          Invoices
+        </Link>
+      }
     >
-      <ERPSectionShell title="Receipt register" description="All receipts linked to your account only.">
-        {loading ? (
-          <ERPLoadingState label="Loading receipts..." />
-        ) : error ? (
-          <ERPErrorState title="Unable to load receipts" message={error} onRetry={() => void load()} />
-        ) : rows.length === 0 ? (
-          <ERPEmptyState title="No receipts yet" description="Receipts will appear once payments are collected." />
-        ) : (
-          <div className="overflow-x-auto rounded-[1.25rem] border border-border/70 bg-[var(--surface-card-elevated)] shadow-[inset_0_1px_0_var(--hairline-shine)]">
-            <table className="min-w-full text-sm">
-              <thead className="bg-[color-mix(in_oklab,var(--surface-muted)_55%,transparent)] text-left">
-                <tr>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                    Receipt
-                  </th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                    Date
-                  </th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                    Status
-                  </th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                    Method
-                  </th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground text-right">
-                    Amount
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.id} className="border-t border-border/70">
-                    <td className="px-4 py-3 font-semibold text-foreground">
-                      {row.receipt_no || `RCT-${row.id}`}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground">{row.receipt_date || "—"}</td>
-                    <td className="px-4 py-3 text-sm text-foreground">{row.status || "—"}</td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground">{row.payment_method || "—"}</td>
-                    <td className="px-4 py-3 text-right text-sm font-semibold text-foreground">
-                      {formatRupee(row.amount)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {loading ? <ERPLoadingState label="Loading receipts..." /> : null}
+      {!loading && error ? (
+        <ERPErrorState title="Unable to load receipts" message={error} onRetry={() => void load()} />
+      ) : null}
+      {!loading && !error && rows.length === 0 ? (
+        <ERPEmptyState title="No receipts yet" description="Receipts will appear once payments are collected." />
+      ) : null}
+      {!loading && !error && rows.length > 0 ? (
+        <CPageSection title={`${rows.length} receipt${rows.length !== 1 ? "s" : ""}`}>
+          <div className="space-y-3">
+            {rows.map((row) => <ReceiptCard key={row.id} row={row} />)}
           </div>
-        )}
-      </ERPSectionShell>
-    </ERPPageShell>
+        </CPageSection>
+      ) : null}
+    </CustomerPageShell>
   );
 }

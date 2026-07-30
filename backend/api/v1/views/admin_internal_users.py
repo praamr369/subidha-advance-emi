@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 
 from accounts.models import UserRole
 from api.v1.permissions import IsAdmin
+from crm.services.party_service import sync_party_for_partner
 from subscriptions.models import AuditLog
 
 User = get_user_model()
@@ -363,6 +364,12 @@ class AdminInternalUserCreateView(APIView):
         )
 
         if user.role == UserRole.PARTNER:
+            # Wire the party-master identity layer at creation time, mirroring the
+            # inline sync every other role gets (customer/vendor/staff/lead). This
+            # closes the de-dup timing window and preserves audit attribution rather
+            # than relying on the lazy seed_missing_party_links() heal on next read.
+            sync_party_for_partner(user, performed_by=request.user)
+
             _write_audit(
                 actor=request.user,
                 target_user=user,
@@ -423,6 +430,12 @@ class AdminInternalUserDetailView(APIView):
         _assert_not_self_role_demotion(request.user, user, next_role)
 
         updated_user = serializer.save()
+
+        if updated_user.role == UserRole.PARTNER:
+            # Keep the party-master snapshot (name/phone/email/active) in sync on
+            # edit, matching vendor/employee behaviour. The lazy seed heal only
+            # backfills missing links; it never refreshes an existing party.
+            sync_party_for_partner(updated_user, performed_by=request.user)
 
         _write_audit(
             actor=request.user,

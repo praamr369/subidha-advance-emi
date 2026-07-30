@@ -3,6 +3,9 @@ from rest_framework.routers import DefaultRouter
 
 # HR Routes (Session 4 Consolidation - 2026-06-24)
 from api.v1.routes import admin_hr_complete
+from api.v1.routes import crm_workbench as workbench_routes
+from api.v1.routes import online_request as online_request_routes
+from api.v1.routes import crm_analytics as crm_analytics_routes
 
 from api.v1.views.admin_money_in_out import AdminMoneyInOutView
 from api.v1.views.admin_unified_payable import (
@@ -21,9 +24,11 @@ from api.v1.views.admin_finance_gaps import (
 from api.v1.views.admin_business_setup import (
     AdminLocalSandboxResetView,
     AdminLocalSandboxSeedView,
+    AdminServerDateView,
     AdminSetupSnapshotExportView,
     AdminSetupSnapshotImportView,
     AdminBusinessProfileView,
+    AdminBusinessLogoUploadView,
     AdminEmailSmtpSettingsView,
     AdminEmailSmtpTestView,
     BusinessSetupBackupJobDetailView,
@@ -62,6 +67,13 @@ from api.v1.views.contract_references import (
     AdminUnifiedReceivablePreviewView,
     AdminReceivablesSearchView,
     AdminUnifiedReceivableCollectView,
+    AdminUnifiedReceivableWorkbenchView,
+)
+from api.v1.views.payables import (
+    AdminUnifiedPayableView,
+    AdminPayableActionView,
+    AdminPayableFinanceAccountsView,
+    AdminPayableExecuteView,
 )
 from api.v1.views.admin_deliveries import (
     AdminDirectSaleDeliveryCancelView,
@@ -176,12 +188,16 @@ from api.v1.views.admin_reconciliation import (
 )
 from api.v1.views.admin_partner_collection_requests import (
     AdminPartnerCollectionRequestApproveView,
+    AdminPartnerCollectionRequestEditView,
+    AdminPartnerCollectionRequestFlagView,
     AdminPartnerCollectionRequestListView,
     AdminPartnerCollectionRequestRejectView,
+    AdminPartnerCollectionRequestReopenView,
 )
 from api.v1.views.finance_operations import (
     AdminAdvanceAllocationView,
     AdminFinanceAccountOperationalSummaryView,
+    AdminMoneyInHandView,
     AdminFinanceTransferView,
     AdminReconciliationOverviewView,
 )
@@ -477,16 +493,21 @@ from api.v1.views.admin_erp import (
 )
 from api.v1.views.admin_crm_module import (
     AdminCrmCustomerInteractionView,
-    AdminCrmFollowUpCallNoteView,
-    AdminCrmFollowUpCancelView,
-    AdminCrmFollowUpCompleteView,
-    AdminCrmFollowUpListView,
     AdminCrmFunnelView,
+    AdminCrmFollowUpListView,
+    AdminCrmFollowUpCallNoteView,
+    AdminCrmFollowUpCompleteView,
+    AdminCrmFollowUpCancelView,
+    AdminCrmFollowUpSnoozeView,
+    AdminCrmFollowUpDueView,
+    AdminCrmOpportunityStageView,
     AdminCrmLeadAssignView,
     AdminCrmLeadConvertView,
     AdminCrmLeadDetailView,
     AdminCrmLeadListCreateView,
     AdminCrmLeadOpportunityListCreateView,
+    AdminCrmLeadReconcileAllView,
+    AdminCrmLeadReconcileView,
     AdminCrmLeadStageUpdateView,
     AdminCrmLeadTaskListCreateView,
     AdminCrmOpportunityStageView,
@@ -552,11 +573,22 @@ from api.v1.views.admin_bi import (
     AdminBiSummaryView,
 )
 from api.v1.views.subscription_requests import (
+    AdminSubscriptionRequestAmendmentView,
     AdminSubscriptionRequestApproveView,
     AdminSubscriptionRequestDetailView,
+    AdminSubscriptionRequestHoldView,
     AdminSubscriptionRequestListView,
     AdminSubscriptionRequestOptionsView,
     AdminSubscriptionRequestRejectView,
+)
+from api.v1.views.product_requests import (
+    AdminProductRequestCancelView,
+    AdminProductRequestDecisionView,
+    AdminProductRequestDetailView,
+    AdminProductRequestEditView,
+    AdminProductRequestListView,
+    AdminProductRequestOptionsView,
+    AdminProductRequestStockCheckView,
 )
 from api.v1.views.admin_opening_stock import (
     AdminOpeningStockBatchHistoryView,
@@ -597,6 +629,7 @@ from api.v1.views.reversal_control import (
 from api.v1.views.reversal_center import (
     AdminCustomerCreditsView,
     AdminCustomerRefundApproveView,
+    AdminCustomerReversalContextView,
     AdminCustomerRefundCreateView,
     AdminCustomerRefundPayView,
     AdminDirectSaleCancelView,
@@ -617,18 +650,12 @@ from api.v1.views.account_links import (
     AdminPartnerAccountLinkView,
     AdminPartyAccountLinkView,
 )
-from api.v1.views.online_enquiries import (
-    AdminOnlineEnquiryCreatePurchaseDraftView,
-    AdminOnlineEnquiryDetailView,
-    AdminOnlineEnquiryListView,
-    AdminOnlineEnquiryRequestVendorQuotesView,
-    AdminOnlineEnquirySelectVendorQuoteView,
-    AdminOnlineEnquirySuggestVendorsView,
-)
+# Online Enquiries removed - unified CRM pipeline (Phase 1)
 from api.v1.views.vendor_ops import (
     AdminFinanceOpeningBalanceView,
     AdminCustomerOpeningOutstandingDetailView,
     AdminCustomerOpeningOutstandingView,
+    AdminVendorOpeningBalanceView,
     AdminVendorAccountLinkView,
     AdminVendorCategoryViewSet,
     AdminVendorCategoryListCreateView,
@@ -729,7 +756,17 @@ urlpatterns = [
     path("receivables/search/", AdminReceivablesSearchView.as_view()),
     path("receivables/preview/", AdminUnifiedReceivablePreviewView.as_view()),
     path("receivables/collect/", AdminUnifiedReceivableCollectView.as_view()),
+    path("receivables/workbench/", AdminUnifiedReceivableWorkbenchView.as_view()),
+
+    # Payables
+    path("payables/", AdminUnifiedPayableView.as_view()),
+    path("payables/action/", AdminPayableActionView.as_view()),
+    path("payables/finance-accounts/", AdminPayableFinanceAccountsView.as_view()),
+    path("payables/execute/", AdminPayableExecuteView.as_view()),
+
     path("business-profile/", AdminBusinessProfileView.as_view()),
+    path("business-profile/logo/upload/", AdminBusinessLogoUploadView.as_view()),
+    path("business-setup/checklist/", BusinessSetupChecklistView.as_view()),
     path("settings/email-smtp/", AdminEmailSmtpSettingsView.as_view()),
     path("settings/email-smtp/test/", AdminEmailSmtpTestView.as_view()),
     path("public-site/profile/", AdminPublicBusinessProfileView.as_view()),
@@ -770,6 +807,7 @@ urlpatterns = [
     path("setup-snapshot/import/", AdminSetupSnapshotImportView.as_view()),
     path("local-sandbox/seed/", AdminLocalSandboxSeedView.as_view()),
     path("local-sandbox/reset/", AdminLocalSandboxResetView.as_view()),
+    path("server-date/", AdminServerDateView.as_view()),
     path("business-setup/dry-runs/options/", AdminDryRunOptionsView.as_view()),
     path("business-setup/dry-runs/run/", AdminDryRunRunView.as_view()),
     path("business-setup/dry-runs/history/", AdminDryRunHistoryView.as_view()),
@@ -822,6 +860,15 @@ urlpatterns = [
     path("subscription-requests/<int:pk>/", AdminSubscriptionRequestDetailView.as_view()),
     path("subscription-requests/<int:pk>/approve/", AdminSubscriptionRequestApproveView.as_view()),
     path("subscription-requests/<int:pk>/reject/", AdminSubscriptionRequestRejectView.as_view()),
+    path("subscription-requests/<int:pk>/hold/", AdminSubscriptionRequestHoldView.as_view()),
+    path("subscription-requests/<int:pk>/amendment/", AdminSubscriptionRequestAmendmentView.as_view()),
+    path("product-request-options/", AdminProductRequestOptionsView.as_view()),
+    path("product-requests/", AdminProductRequestListView.as_view()),
+    path("product-requests/<int:pk>/decision/", AdminProductRequestDecisionView.as_view()),
+    path("product-requests/<int:pk>/cancel/", AdminProductRequestCancelView.as_view()),
+    path("product-requests/<int:pk>/edit/", AdminProductRequestEditView.as_view()),
+    path("product-requests/<int:pk>/stock-check/", AdminProductRequestStockCheckView.as_view()),
+    path("product-requests/<int:pk>/", AdminProductRequestDetailView.as_view()),
     path("support-requests/", AdminSupportRequestListView.as_view()),
     path("support-requests/<int:pk>/", AdminSupportRequestDetailView.as_view()),
     path("support-requests/<int:pk>/status/", AdminSupportRequestStatusUpdateView.as_view()),
@@ -869,6 +916,7 @@ urlpatterns = [
     path("reconciliation/items/<int:pk>/resolve/", AdminReconciliationItemResolveView.as_view()),
     path("reconciliation/items/<int:pk>/reopen/", AdminReconciliationItemReopenView.as_view()),
     path("finance-accounts/operational-summary/", AdminFinanceAccountOperationalSummaryView.as_view()),
+    path("finance/money-in-hand/", AdminMoneyInHandView.as_view()),
     # Phase 4: finance dashboard + registers + document center
     path("finance/dashboard/", AdminFinanceDashboardView.as_view()),
     path("finance/collections/", AdminFinanceCollectionsView.as_view()),
@@ -919,6 +967,9 @@ urlpatterns = [
     path("collection-requests/", AdminPartnerCollectionRequestListView.as_view()),
     path("collection-requests/<int:pk>/approve/", AdminPartnerCollectionRequestApproveView.as_view()),
     path("collection-requests/<int:pk>/reject/", AdminPartnerCollectionRequestRejectView.as_view()),
+    path("collection-requests/<int:pk>/flag/", AdminPartnerCollectionRequestFlagView.as_view()),
+    path("collection-requests/<int:pk>/reopen/", AdminPartnerCollectionRequestReopenView.as_view()),
+    path("collection-requests/<int:pk>/edit/", AdminPartnerCollectionRequestEditView.as_view()),
     path("reports/revenue-aggregate/", AdminRevenueAggregateView.as_view()),
     path("reports/revenue-summary/", AdminRevenueSummaryView.as_view()),
     path("reports/emi-aggregate/", AdminEmiAggregateView.as_view()),
@@ -1009,12 +1060,16 @@ urlpatterns = [
     path("crm/internal/leads/<int:pk>/stage/", AdminCrmLeadStageUpdateView.as_view()),
     path("crm/internal/leads/<int:pk>/assign/", AdminCrmLeadAssignView.as_view()),
     path("crm/internal/leads/<int:pk>/convert/", AdminCrmLeadConvertView.as_view()),
+    path("crm/internal/leads/<int:pk>/reconcile/", AdminCrmLeadReconcileView.as_view()),
+    path("crm/internal/leads/reconcile-all/", AdminCrmLeadReconcileAllView.as_view()),
     path("crm/internal/leads/<int:pk>/tasks/", AdminCrmLeadTaskListCreateView.as_view()),
     path("crm/internal/leads/<int:pk>/opportunities/", AdminCrmLeadOpportunityListCreateView.as_view()),
     path("crm/internal/follow-ups/", AdminCrmFollowUpListView.as_view()),
     path("crm/internal/follow-ups/<int:pk>/call-note/", AdminCrmFollowUpCallNoteView.as_view()),
     path("crm/internal/follow-ups/<int:pk>/complete/", AdminCrmFollowUpCompleteView.as_view()),
     path("crm/internal/follow-ups/<int:pk>/cancel/", AdminCrmFollowUpCancelView.as_view()),
+    path("crm/internal/follow-ups/<int:pk>/snooze/", AdminCrmFollowUpSnoozeView.as_view()),
+    path("crm/follow-ups/due/", AdminCrmFollowUpDueView.as_view()),
     path("crm/internal/opportunities/<int:pk>/stage/", AdminCrmOpportunityStageView.as_view()),
     path("crm/funnel/", AdminCrmFunnelView.as_view()),
     path("crm/internal/customers/<int:pk>/profile/", AdminCustomerCrmProfileView.as_view()),
@@ -1116,6 +1171,7 @@ urlpatterns = [
     path("billing/direct-sales/<int:pk>/returns/", AdminDirectSaleReturnCreateView.as_view()),
     path("billing/direct-sales/<int:pk>/exchange/", AdminDirectSaleExchangeCreateView.as_view()),
     path("billing/direct-sales/<int:pk>/return-eligibility/", AdminDirectSaleReturnEligibilityView.as_view()),
+    path("billing/reversal-context/", AdminCustomerReversalContextView.as_view()),
     path("billing/returns/", AdminReturnListView.as_view()),
     path("billing/returns/<int:pk>/", AdminReturnDetailView.as_view()),
     path("billing/returns/<int:pk>/approve/", AdminReturnApproveView.as_view()),
@@ -1133,6 +1189,7 @@ urlpatterns = [
     path("opening-balances/customers/<int:pk>/", AdminCustomerOpeningOutstandingDetailView.as_view()),
     path("opening-balances/finance-accounts/<int:pk>/", AdminFinanceOpeningBalanceView.as_view()),
     path("opening-balances/vendors/", AdminVendorOpeningBalanceListView.as_view()),
+    path("opening-balances/vendors/<int:pk>/", AdminVendorOpeningBalanceView.as_view()),
     path("vendors/<int:pk>/products/", AdminVendorProductsView.as_view()),
     path("vendors/<int:pk>/purchases/", AdminVendorPurchasesView.as_view()),
     path("vendors/<int:pk>/purchase-returns/", AdminVendorPurchaseReturnsView.as_view()),
@@ -1140,12 +1197,7 @@ urlpatterns = [
     path("vendors/categories/", AdminVendorCategoryListCreateView.as_view()),
     path("vendor-sourcing/suggest/", AdminVendorSourcingSuggestView.as_view()),
     path("vendor-sourcing/request-quotes/", AdminVendorSourcingRequestQuotesView.as_view()),
-    path("online-enquiries/", AdminOnlineEnquiryListView.as_view()),
-    path("online-enquiries/<int:pk>/", AdminOnlineEnquiryDetailView.as_view()),
-    path("online-enquiries/<int:pk>/suggest-vendors/", AdminOnlineEnquirySuggestVendorsView.as_view()),
-    path("online-enquiries/<int:pk>/request-vendor-quotes/", AdminOnlineEnquiryRequestVendorQuotesView.as_view()),
-    path("online-enquiries/<int:pk>/select-vendor-quote/", AdminOnlineEnquirySelectVendorQuoteView.as_view()),
-    path("online-enquiries/<int:pk>/create-purchase-draft/", AdminOnlineEnquiryCreatePurchaseDraftView.as_view()),
+    # Online Enquiries removed - unified CRM pipeline (Phase 1)
     path("vendor-quotes/requests/", AdminVendorQuoteRequestListCreateView.as_view()),
     path("vendor-quotes/requests/<int:pk>/", AdminVendorQuoteRequestDetailView.as_view()),
     path("vendor-quotes/<int:pk>/accept/", AdminVendorQuoteAcceptView.as_view()),
@@ -1335,4 +1387,7 @@ urlpatterns = [
     # ── Deposit forfeiture invoices ───────────────────────────────────────────
     path("finance/forfeiture-invoices/", AdminForfeitureInvoiceListView.as_view()),
     path("finance/forfeiture-invoices/<int:pk>/issue/", AdminForfeitureInvoiceIssueView.as_view()),
-]
+
+    # ── CRM Analytics ─────────────────────────────────────────────────────────
+    path("crm/analytics/", include(crm_analytics_routes.urlpatterns)),
+] + workbench_routes.urlpatterns + online_request_routes.urlpatterns

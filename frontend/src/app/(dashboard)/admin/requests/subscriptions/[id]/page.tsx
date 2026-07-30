@@ -11,15 +11,29 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { DetailPanel, FormSection, MobileSafeTable } from "@/components/ui/operations";
 import SubscriptionRequestCard from "@/domains/subscription-requests/components/SubscriptionRequestCard";
+import ApprovalConfirmDialog from "@/domains/product-requests/components/ApprovalConfirmDialog";
+import { useRequestKeyboardShortcuts } from "@/hooks/useRequestKeyboardShortcuts";
+import { RequestStatusBadge, RequestWorkflowCard, RequestActionHistory } from "@/domains/request-services/components";
 import {
   approveAdminSubscriptionRequest,
   getSubscriptionRequest,
   getSubscriptionRequestOptions,
+  holdAdminSubscriptionRequest,
   rejectAdminSubscriptionRequest,
+  requestAmendmentAdminSubscriptionRequest,
   type SubscriptionRequestCustomerOption,
+  type SubscriptionRequestHoldStatus,
   type SubscriptionRequestOptions,
   type SubscriptionRequestRecord,
 } from "@/services/subscription-requests";
+
+// A request stays actionable while it's submitted or parked in a funnel stage.
+const ACTIONABLE_STATUSES = new Set([
+  "SUBMITTED",
+  "ON_HOLD_LUCKY_UNAVAILABLE",
+  "ON_HOLD_PRODUCT_NOT_READY",
+  "AMENDMENT_REQUESTED",
+]);
 
 type ResolutionMode = "existing" | "create";
 
@@ -82,6 +96,8 @@ export default function AdminSubscriptionRequestDetailPage() {
   const [luckyOverride, setLuckyOverride] = useState("");
   const [reviewNote, setReviewNote] = useState("");
   const [rejectReason, setRejectReason] = useState("");
+  const [showApproveDialog, setShowApproveDialog] = useState(false);
+  const [showRejectDialog, setShowRejectDialog] = useState(false);
 
   const loadRequest = useCallback(async () => {
     if (!requestId) {
@@ -120,9 +136,29 @@ export default function AdminSubscriptionRequestDetailPage() {
   }, [loadRequest]);
 
   useEffect(() => {
-    if (!request || request.status !== "SUBMITTED") return;
+    if (!request || !ACTIONABLE_STATUSES.has(request.status)) return;
     void loadOptions(request);
   }, [loadOptions, request]);
+
+  // Keyboard shortcuts
+  useRequestKeyboardShortcuts({
+    "Ctrl+Enter": () => {
+      if (request?.status === "SUBMITTED") {
+        setShowApproveDialog(true);
+      }
+    },
+    "D": () => {
+      if (request?.status === "SUBMITTED") {
+        setShowRejectDialog(true);
+      }
+    },
+    "R": () => void loadRequest(),
+    "Escape": () => {
+      setShowApproveDialog(false);
+      setShowRejectDialog(false);
+      setActionError(null);
+    },
+  });
 
   const selectedCustomer = useMemo<SubscriptionRequestCustomerOption | null>(
     () =>
@@ -190,6 +226,45 @@ export default function AdminSubscriptionRequestDetailPage() {
     }
   }
 
+  async function handleHold(holdStatus: SubscriptionRequestHoldStatus) {
+    if (!request) return;
+    setActionLoading(true);
+    setActionError(null);
+    setSuccessMessage(null);
+
+    try {
+      const response = await holdAdminSubscriptionRequest(request.id, {
+        hold_status: holdStatus,
+        note: reviewNote.trim() || undefined,
+      });
+      if (response.result) setRequest(response.result);
+      setSuccessMessage(response.detail || "Subscription request put on hold.");
+    } catch (err) {
+      setActionError(toErrorMessage(err));
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleAmendment() {
+    if (!request) return;
+    setActionLoading(true);
+    setActionError(null);
+    setSuccessMessage(null);
+
+    try {
+      const response = await requestAmendmentAdminSubscriptionRequest(request.id, {
+        note: reviewNote.trim() || rejectReason.trim() || undefined,
+      });
+      if (response.result) setRequest(response.result);
+      setSuccessMessage(response.detail || "Amendment requested from the requester.");
+    } catch (err) {
+      setActionError(toErrorMessage(err));
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
   return (
     <ERPPageShell
       eyebrow="Sales"
@@ -197,12 +272,12 @@ export default function AdminSubscriptionRequestDetailPage() {
       subtitle="Approve or reject customer and partner subscription intake without bypassing the canonical EMI subscription creation path."
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
-        { label: "Subscription Requests", href: "/admin/subscription-requests" },
+        { label: "Subscription Requests", href: "/admin/requests/subscriptions" },
         { label: request ? `Request #${request.id}` : "Detail" },
       ]}
       actions={[
         {
-          href: "/admin/subscription-requests",
+          href: "/admin/requests/subscriptions",
           label: "Back to Queue",
           variant: "secondary",
         },
@@ -230,8 +305,11 @@ export default function AdminSubscriptionRequestDetailPage() {
         { label: "Approved Subscription", value: request?.approved_subscription_number || "—" },
       ]}
     >
-      <div className="space-y-6">
-        {loading ? <ERPLoadingState label="Loading subscription request review..." /> : null}
+      {/* Desktop two-column layout */}
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+        {/* Main Content - Left Column (3/4 width) */}
+        <div className="xl:col-span-3 space-y-6">
+          {loading ? <ERPLoadingState label="Loading subscription request review..." /> : null}
 
         {!loading && error ? (
           <ERPErrorState
@@ -287,10 +365,10 @@ export default function AdminSubscriptionRequestDetailPage() {
               ) : null}
             </DetailPanel>
 
-            {request.status === "SUBMITTED" ? (
+            {ACTIONABLE_STATUSES.has(request.status) ? (
               <FormSection
                 title="Review action"
-                description="This action is the only point where a real subscription may be created. No EMI rows, lucky assignment, or payments exist before approval."
+                description="This action is the only point where a real subscription may be created. No EMI rows, lucky assignment, or payments exist before approval. Use the funnel actions to park a request that can't be approved yet."
               >
 
                 {!request.customer_id ? (
@@ -420,17 +498,49 @@ export default function AdminSubscriptionRequestDetailPage() {
                   </label>
                 </div>
 
-                <FormActions
-                  submitLabel="Approve Request"
-                  submitLoadingLabel="Processing..."
-                  onSubmitClick={() => void handleApprove()}
-                  submitting={actionLoading}
-                  danger={{
-                    label: actionLoading ? "Processing..." : "Reject Request",
-                    onClick: () => void handleReject(),
-                    disabled: actionLoading,
-                  }}
-                  align="left"
+                <RequestWorkflowCard
+                  actions={[
+                    {
+                      id: "approve",
+                      label: "Approve Request",
+                      description: "Create subscription and approve this request",
+                      color: "success" as const,
+                      onClick: () => setShowApproveDialog(true),
+                      disabled: actionLoading,
+                    },
+                    {
+                      id: "hold-lucky",
+                      label: "Hold · Lucky ID Unavailable",
+                      description: "Park until a lucky ID frees up in this batch",
+                      color: "warning" as const,
+                      onClick: () => void handleHold("ON_HOLD_LUCKY_UNAVAILABLE"),
+                      disabled: actionLoading,
+                    },
+                    {
+                      id: "hold-product",
+                      label: "Hold · Product Not Ready",
+                      description: "Park until the rent/lease product is ready",
+                      color: "warning" as const,
+                      onClick: () => void handleHold("ON_HOLD_PRODUCT_NOT_READY"),
+                      disabled: actionLoading,
+                    },
+                    {
+                      id: "amendment",
+                      label: "Request Amendment",
+                      description: "Send back to the requester for changes",
+                      color: "primary" as const,
+                      onClick: () => void handleAmendment(),
+                      disabled: actionLoading,
+                    },
+                    {
+                      id: "reject",
+                      label: "Reject Request",
+                      description: "Decline this request",
+                      color: "danger" as const,
+                      onClick: () => setShowRejectDialog(true),
+                      disabled: actionLoading,
+                    },
+                  ]}
                 />
               </FormSection>
             ) : (
@@ -438,11 +548,112 @@ export default function AdminSubscriptionRequestDetailPage() {
                 title="Request resolution"
                 description="This request is finalized and remains visible for audit history."
               >
-                <ERPStatusBadge status={request.status} />
+                <RequestStatusBadge status={request.status} size="lg" />
               </DetailPanel>
             )}
+
+            {/* Confirmation Dialogs */}
+            <ApprovalConfirmDialog
+              isOpen={showApproveDialog}
+              onClose={() => setShowApproveDialog(false)}
+              onApprove={() => {
+                void handleApprove();
+                setShowApproveDialog(false);
+              }}
+              onReject={() => setShowApproveDialog(false)}
+              title="Approve Subscription Request?"
+              description={`Confirm approval of request #${request?.id}. This will create a new EMI subscription${request?.customer_id ? "" : " and link to a customer"}.`}
+            />
+
+            <ApprovalConfirmDialog
+              isOpen={showRejectDialog}
+              onClose={() => setShowRejectDialog(false)}
+              onApprove={() => {
+                void handleReject();
+                setShowRejectDialog(false);
+              }}
+              onReject={() => setShowRejectDialog(false)}
+              title="Reject Subscription Request?"
+              description={`Confirm rejection of request #${request?.id}. This action cannot be undone.`}
+            />
           </>
         ) : null}
+        </div>
+
+        {/* Right Sidebar - Fixed Desktop Sidebar (1/4 width) */}
+        {request && (
+          <div className="xl:col-span-1">
+            <div className="sticky top-20 space-y-4">
+              {/* Status Overview Card */}
+              <div className="rounded-xl border border-border bg-card p-6">
+                <h3 className="text-sm font-semibold text-foreground mb-4">Request Status</h3>
+                <div className="inline-block rounded-full px-3 py-1.5 bg-blue-100 text-blue-800 font-semibold text-sm">
+                  {request.status}
+                </div>
+                <div className="mt-4 space-y-3 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Type:</span>
+                    <span className="font-semibold">Subscription</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Requester:</span>
+                    <span className="font-semibold text-xs">{request.requester_username || "—"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Lucky #:</span>
+                    <span className="font-semibold">{request.preferred_lucky_number || "—"}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Actions Card */}
+              {request.status === "SUBMITTED" && (
+                <div className="rounded-xl border border-border bg-card p-6">
+                  <h3 className="text-sm font-semibold text-foreground mb-4">Quick Actions</h3>
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => setShowApproveDialog(true)}
+                      disabled={actionLoading}
+                      className="w-full h-10 rounded-lg bg-emerald-600 text-white font-semibold text-sm hover:bg-emerald-700 transition disabled:opacity-50"
+                    >
+                      Approve (Ctrl+⏎)
+                    </button>
+                    <button
+                      onClick={() => setShowRejectDialog(true)}
+                      disabled={actionLoading}
+                      className="w-full h-10 rounded-lg bg-red-600 text-white font-semibold text-sm hover:bg-red-700 transition disabled:opacity-50"
+                    >
+                      Reject (D)
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Keyboard Shortcuts Card */}
+              <div className="rounded-xl border border-border bg-card p-6">
+                <h3 className="text-xs font-semibold text-foreground mb-3 uppercase">Keyboard Shortcuts</h3>
+                <div className="space-y-2 text-xs text-muted-foreground">
+                  <div className="flex justify-between">
+                    <span>Approve</span>
+                    <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">Ctrl+⏎</kbd>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Reject</span>
+                    <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">D</kbd>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Refresh</span>
+                    <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">R</kbd>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Close</span>
+                    <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">Esc</kbd>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </ERPPageShell>
   );

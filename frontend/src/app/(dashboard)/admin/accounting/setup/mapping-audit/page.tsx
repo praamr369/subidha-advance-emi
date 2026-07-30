@@ -379,11 +379,11 @@ export default function AccountingMappingAuditPage() {
 
   if (loading) return <ERPPageShell
       eyebrow="Accounting"
-      title="Accounting Mapping Audit"
-      subtitle="Operator remediation view for accounting mappings, blockers, unsupported workflows, and setup routes."
-      breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Accounting", href: ROUTES.admin.accounting }, { label: "Setup", href: ROUTES.admin.accountingSetup }, { label: "Mapping Audit" }]}
+      title="Automatic Rules Audit"
+      subtitle="Verify all background posting rules and fix any missing categories before month-end."
+      breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Accounting", href: ROUTES.admin.accounting }, { label: "Setup", href: ROUTES.admin.accountingSetup }, { label: "Rules Audit" }]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
-    ><LoadingBlock label="Loading mapping audit..." /></ERPPageShell>;
+    ><LoadingBlock label="Loading rules audit..." /></ERPPageShell>;
 
   const summary = payload?.summary ?? { total_events: 0, ready: 0, missing_mapping: 0, conflicts: 0, unsupported: 0, blocked_by_period: 0, blocked_by_numbering: 0 };
   const period = payload?.period_readiness ?? {};
@@ -391,9 +391,9 @@ export default function AccountingMappingAuditPage() {
   return (
     <ERPPageShell
       eyebrow="Accounting"
-      title="Accounting Mapping Audit"
-      subtitle="Operator remediation view for accounting mappings, blockers, unsupported workflows, and setup routes."
-      breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Accounting", href: ROUTES.admin.accounting }, { label: "Setup", href: ROUTES.admin.accountingSetup }, { label: "Mapping Audit" }]}
+      title="Automatic Rules Audit"
+      subtitle="Verify all background posting rules and fix any missing categories before month-end."
+      breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Accounting", href: ROUTES.admin.accounting }, { label: "Setup", href: ROUTES.admin.accountingSetup }, { label: "Rules Audit" }]}
       actions={[{ href: ROUTES.admin.accountingSetup, label: "Accounting Setup", variant: "secondary" }, { href: ROUTES.admin.accountingBridges, label: "Bridge Readiness", variant: "secondary" }, { href: ROUTES.admin.accountingPeriods, label: "Periods", variant: "secondary" }]}
       statusBadge={{ label: payload?.year_end_impact === "READY" ? "Year-End Ready" : "Year-End Blocked", tone: payload?.year_end_impact === "READY" ? "success" : "warning" }}
     >
@@ -404,9 +404,9 @@ export default function AccountingMappingAuditPage() {
         <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mapping audit remediation</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Rules Configuration</div>
               <h2 className="mt-1 text-xl font-semibold text-foreground">
-                Bridge impact:{" "}
+                Automatic Posting:{" "}
                 <span className={
                   payload?.bridge_impact === "READY" ? "text-emerald-700" :
                   payload?.bridge_impact === "READY_UNPOSTED" ? "text-blue-700" :
@@ -438,7 +438,7 @@ export default function AccountingMappingAuditPage() {
           </div>
           <div className="mt-4 grid gap-3 md:grid-cols-4">
             <Link href={ROUTES.admin.accountingFinanceAccounts} className="rounded-xl border border-border px-3 py-2 text-sm font-semibold">Open Finance Accounts</Link>
-            <Link href={ROUTES.admin.accountingChartOfAccounts} className="rounded-xl border border-border px-3 py-2 text-sm font-semibold">Open COA</Link>
+            <Link href={ROUTES.admin.accountingChartOfAccounts} className="rounded-xl border border-border px-3 py-2 text-sm font-semibold">Open Income/Expense Categories</Link>
             <Link href={ROUTES.admin.settingsBusinessSetupDocumentNumbering} className="rounded-xl border border-border px-3 py-2 text-sm font-semibold">Open Document Numbering</Link>
             <Link href={ROUTES.admin.accountingPeriods} className="rounded-xl border border-border px-3 py-2 text-sm font-semibold">Open Periods</Link>
           </div>

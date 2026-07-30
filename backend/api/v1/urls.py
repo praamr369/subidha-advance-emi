@@ -7,6 +7,11 @@ from brochures.urls import public_quotation_urlpatterns
 from api.v1.views.health import PublicApiDeepHealthView, PublicApiHealthView
 from api.v1.views.realtime import RealtimeTicketView, realtime_stream
 from api.v1.views.admin_payment_collection import IdempotentAdminPaymentCollectView
+from api.v1.views.unified_workbench import urlpatterns as workbench_urlpatterns
+from api.v1.views.workbench_dashboard import urlpatterns as workbench_dashboard_urlpatterns
+from api.v1.views.workbench_lead_workflow import urlpatterns as workbench_lead_urlpatterns
+from api.v1.views.lead_conversion_workflow import urlpatterns as lead_conversion_urlpatterns
+from api.v1.views.lead_subscription_tracker import urlpatterns as lead_subscription_urlpatterns
 from api.v1.views.accounting_bridge_reconciliation import (
     AccountingBridgeBatchPostView,
     AccountingBridgeBatchPreviewView,
@@ -55,6 +60,9 @@ from api.v1.views.admin_inventory_quick_create import (
     AdminQuickCreateRawMaterialView,
 )
 from api.v1.views.admin_product_register import AdminProductRegisterView
+from api.v1.views import (
+    admin_solopreneur_today,
+)
 from smart_fields.views import (
     SmartConfirmView,
     SmartHsnSuggestView,
@@ -69,6 +77,7 @@ urlpatterns = [
     path("realtime/stream/", realtime_stream),
     path("auth/", include("api.v1.routes.auth")),
     path("admin/payments/collect/", IdempotentAdminPaymentCollectView.as_view()),
+    path("admin/solopreneur/today/", admin_solopreneur_today.AdminSolopreneurTodayView.as_view()),
     path("admin/products/register/", AdminProductRegisterView.as_view()),
     path("admin/catalog/", include("api.v1.routes.catalog")),
     path("admin/smart/pincode/<str:pincode>/", SmartPincodeLookupView.as_view()),
@@ -139,6 +148,10 @@ urlpatterns = [
     path("admin/", include("api.v1.routes.admin_customer_timeline")),
     path("admin/", include("api.v1.routes.admin_financial_intelligence")),
     path("admin/", include("api.v1.routes.admin_accounting_close_cockpit")),
+    path("admin/", include("api.v1.routes.admin_solopreneur_finance")),
+    path("admin/", include("api.v1.routes.admin_smart_collection")),
+    path("admin/", include("api.v1.routes.admin_logistics")),
+    path("admin/", include("api.v1.routes.admin_solopreneur_today")),
     path("admin/", include("api.v1.routes.admin_growth_offers")),
     path("admin/", include("api.v1.routes.admin_growth_requests")),
     path("admin/", include("api.v1.routes.admin_partner_performance")),
@@ -159,6 +172,7 @@ urlpatterns = [
     path("manufacturing/", include("api.v1.routes.manufacturing")),
     path("billing/", include("api.v1.routes.billing")),
     path("crm/", include("api.v1.routes.crm")),
+    path("crm-pipeline/", include("api.v1.routes.crm_pipeline")),
     path("service-desk/", include("api.v1.routes.service_desk")),
     path("reminders/", include("api.v1.routes.reminders")),
     path("dashboards/", include("api.v1.routes.dashboard_surfaces")),
@@ -180,3 +194,9 @@ urlpatterns = [
     path("winner/", include("api.v1.route_modules.winner_urls")),
     path("pim/", include("products_pim.urls")),
 ]
+
+urlpatterns += workbench_urlpatterns
+urlpatterns += workbench_dashboard_urlpatterns
+urlpatterns += workbench_lead_urlpatterns
+urlpatterns += lead_conversion_urlpatterns
+urlpatterns += lead_subscription_urlpatterns

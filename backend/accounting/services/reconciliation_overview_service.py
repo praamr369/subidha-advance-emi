@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, Q, Sum, Case, When, DecimalField
 
 from accounting.models import FinanceAccount, MoneyMovement, MoneyMovementStatus
 from subscriptions.models import (
@@ -11,6 +11,9 @@ from subscriptions.models import (
     Payment,
     PaymentReconciliation,
     ReconciliationStatus,
+    RentLeaseDepositTransaction,
+    RentLeaseDepositTransactionStatus,
+    RentLeaseDepositTransactionType,
 )
 
 
@@ -58,6 +61,26 @@ class ReconciliationOverviewService:
             if row["finance_account_id"]
         }
 
+        deposit_rows = list(
+            RentLeaseDepositTransaction.objects.filter(
+                status=RentLeaseDepositTransactionStatus.ACTIVE,
+                transaction_type__in=[
+                    RentLeaseDepositTransactionType.COLLECTED,
+                    RentLeaseDepositTransactionType.DEPOSIT_RECEIPT,
+                ],
+            )
+            .values("finance_account_id")
+            .annotate(total=Sum("amount"), count=Count("id"))
+        )
+        deposit_by_account = {
+            row["finance_account_id"]: {
+                "security_deposit_total": _money(row["total"]),
+                "security_deposit_count": row["count"],
+            }
+            for row in deposit_rows
+            if row["finance_account_id"]
+        }
+
         outgoing_rows = list(
             MoneyMovement.objects.filter(status=MoneyMovementStatus.POSTED)
             .values("from_finance_account_id")
@@ -90,9 +113,14 @@ class ReconciliationOverviewService:
         for account in FinanceAccount.objects.select_related("chart_account", "branch").order_by("name", "id"):
             payments = payment_by_account.get(account.id, {})
             advances = advance_by_account.get(account.id, {})
+            deposits = deposit_by_account.get(account.id, {})
             incoming = incoming_by_account.get(account.id, {})
             outgoing = outgoing_by_account.get(account.id, {})
-            collected_total = _money(payments.get("payment_total")) + _money(advances.get("advance_total"))
+            collected_total = (
+                _money(payments.get("payment_total"))
+                + _money(advances.get("advance_total"))
+                + _money(deposits.get("security_deposit_total"))
+            )
             pending_settlement = collected_total - _money(outgoing.get("outgoing_total"))
             if pending_settlement < Decimal("0.00"):
                 pending_settlement = Decimal("0.00")
@@ -110,6 +138,8 @@ class ReconciliationOverviewService:
                     "advance_total": f"{_money(advances.get('advance_total')):.2f}",
                     "advance_count": advances.get("advance_count", 0),
                     "unapplied_advance_total": f"{_money(advances.get('unapplied_total')):.2f}",
+                    "security_deposit_total": f"{_money(deposits.get('security_deposit_total')):.2f}",
+                    "security_deposit_count": deposits.get("security_deposit_count", 0),
                     "incoming_transfer_total": f"{_money(incoming.get('incoming_total')):.2f}",
                     "incoming_transfer_count": incoming.get("incoming_count", 0),
                     "outgoing_transfer_total": f"{_money(outgoing.get('outgoing_total')):.2f}",
@@ -146,10 +176,12 @@ class ReconciliationOverviewService:
             ).aggregate(total=Sum("unapplied_amount"))["total"]
             or Decimal("0.00")
         )
+        security_deposit_total = sum(Decimal(row["security_deposit_total"]) for row in finance_summary)
         return {
             "pending_finance_accounts": len(pending_accounts),
             "pending_settlement_amount": f"{_money(sum(Decimal(row['pending_settlement_amount']) for row in pending_accounts)):.2f}",
             "unapplied_advance_total": f"{_money(unapplied_total):.2f}",
+            "security_deposit_total": f"{_money(security_deposit_total):.2f}",
             "flagged_reconciliation_count": flagged_reconciliations,
             "pending_accounts": pending_accounts,
         }

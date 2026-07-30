@@ -1,7 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
+import EmptyState from "@/components/feedback/EmptyState";
+import ErrorState from "@/components/feedback/ErrorState";
+import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
@@ -10,6 +13,7 @@ import type { PartyTaxProfile } from "@/types/compliance";
 
 export default function AdminCompliancePartyTaxProfilesPage() {
   const [rows, setRows] = useState<PartyTaxProfile[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -24,27 +28,22 @@ export default function AdminCompliancePartyTaxProfilesPage() {
     state_name: "",
   });
 
-  async function load() {
-    const payload = await listPartyTaxProfiles();
-    setRows(payload.results);
-  }
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const payload = await listPartyTaxProfiles();
+      setRows(payload.results);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load party tax profiles.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        const payload = await listPartyTaxProfiles();
-        if (!active) return;
-        setRows(payload.results);
-      } catch (err) {
-        if (!active) return;
-        setError(err instanceof Error ? err.message : "Failed to load party tax profiles.");
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, []);
+    void load();
+  }, [load]);
 
   return (
     <ERPPageShell
@@ -165,17 +164,27 @@ export default function AdminCompliancePartyTaxProfilesPage() {
             {saving ? "Saving..." : "Add Profile"}
           </button>
         </form>
-        <div className="space-y-2 text-sm">
-          {rows.map((row) => (
-            <div key={row.id} className="rounded border border-border p-2">
-              <p className="font-medium">{row.party_type} #{row.party_id} - {row.legal_name || "Unnamed"}</p>
-              <p>Tax type: {row.tax_type}</p>
-              <p>GSTIN: {row.gstin || "-"}</p>
-              <p>PAN: {row.pan || "-"}</p>
-            </div>
-          ))}
-          {!rows.length ? <p className="text-muted-foreground">No party tax profiles found.</p> : null}
-        </div>
+        {loading ? (
+          <LoadingBlock label="Loading party tax profiles…" />
+        ) : error && !rows.length ? (
+          <ErrorState message={error} onRetry={() => void load()} />
+        ) : rows.length ? (
+          <div className="space-y-2 text-sm">
+            {rows.map((row) => (
+              <div key={row.id} className="rounded border border-border p-2">
+                <p className="font-medium">{row.party_type} #{row.party_id} - {row.legal_name || "Unnamed"}</p>
+                <p>Tax type: {row.tax_type}</p>
+                <p>GSTIN: {row.gstin || "-"}</p>
+                <p>PAN: {row.pan || "-"}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            title="No party tax profiles yet"
+            description="Add a customer, supplier, partner, or vendor tax profile above to build GST-transition readiness."
+          />
+        )}
       </WorkspaceSection>
     </ERPPageShell>
   );

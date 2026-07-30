@@ -1151,7 +1151,17 @@ def create_customer_credit_from_credit_note(*, customer_id: int, credit_note_id:
 
 
 @transaction.atomic
-def create_customer_refund(*, customer_id: int, amount, method: str, finance_account_id: int, reason: str, direct_sale_return_id: int | None = None, performed_by=None):
+def _finance_account_for_refund_method(method: str):
+    """Auto-resolve the payout account from the refund method, mirroring the
+    two-account collection model: cash refund -> cash desk; any bank/UPI refund
+    -> the single Bank/UPI holding account."""
+    from subscriptions.services.payment_service import _fallback_finance_account_for_method
+
+    payment_method = "CASH" if method == RefundMethod.CASH_REFUND else "UPI"
+    return _fallback_finance_account_for_method(payment_method)
+
+
+def create_customer_refund(*, customer_id: int, amount, method: str, finance_account_id: int | None = None, reason: str, direct_sale_return_id: int | None = None, performed_by=None):
     reason = _require_reason(reason)
     amount = _money(amount)
     if amount <= Decimal("0.00"):
@@ -1163,6 +1173,12 @@ def create_customer_refund(*, customer_id: int, amount, method: str, finance_acc
 
     if method not in {RefundMethod.CASH_REFUND, RefundMethod.UPI_REFUND, RefundMethod.BANK_REFUND}:
         raise ValueError("Invalid refund method.")
+
+    if not finance_account_id:
+        resolved = _finance_account_for_refund_method(method)
+        if resolved is None:
+            raise ValueError("No active finance account is available for this refund method.")
+        finance_account_id = resolved.id
 
     seq = _fy_sequence("BILL_RFND", "RFND", timezone.localdate())
     refund = CustomerRefund.objects.create(

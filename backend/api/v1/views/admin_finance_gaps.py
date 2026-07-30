@@ -152,6 +152,10 @@ class AdminReconciliationSignOffActionView(APIView):
     def post(self, request, pk=None, action=None, *args, **kwargs):
         from reconciliation.models import ReconciliationSignOff, ReconciliationSignOffStatus
         from django.core.exceptions import ValidationError as DjangoValidationError
+        from django.db import transaction
+
+        from subscriptions.models import AuditLog
+        from subscriptions.services.audit_service import log_audit
 
         try:
             so = ReconciliationSignOff.objects.select_related(
@@ -175,7 +179,19 @@ class AdminReconciliationSignOffActionView(APIView):
             if note:
                 so.attestation_note = note
             try:
-                so.save()
+                with transaction.atomic():
+                    so.save()
+                    log_audit(
+                        action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
+                        instance=so,
+                        performed_by=request.user,
+                        metadata={
+                            "event": "RECONCILIATION_SIGN_OFF_RECORDED",
+                            "reconciliation_run_id": so.reconciliation_run_id,
+                            "open_item_count_at_sign_off": so.open_item_count_at_sign_off,
+                            "attestation_note": so.attestation_note or "",
+                        },
+                    )
             except DjangoValidationError as exc:
                 return Response(
                     {"detail": exc.messages[0] if exc.messages else str(exc)},
@@ -200,7 +216,18 @@ class AdminReconciliationSignOffActionView(APIView):
             so.revoked_at = now
             so.revocation_reason = reason
             try:
-                so.save()
+                with transaction.atomic():
+                    so.save()
+                    log_audit(
+                        action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
+                        instance=so,
+                        performed_by=request.user,
+                        metadata={
+                            "event": "RECONCILIATION_SIGN_OFF_REVOKED",
+                            "reconciliation_run_id": so.reconciliation_run_id,
+                            "revocation_reason": reason,
+                        },
+                    )
             except DjangoValidationError as exc:
                 return Response(
                     {"detail": exc.messages[0] if exc.messages else str(exc)},
@@ -267,7 +294,14 @@ class AdminForfeitureInvoiceIssueView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def post(self, request, pk=None, *args, **kwargs):
-        from subscriptions.models import DepositForfeitureTaxInvoice, DepositForfeitureStatus
+        from django.db import transaction
+
+        from subscriptions.models import (
+            AuditLog,
+            DepositForfeitureStatus,
+            DepositForfeitureTaxInvoice,
+        )
+        from subscriptions.services.audit_service import log_audit
 
         try:
             inv = DepositForfeitureTaxInvoice.objects.select_related(
@@ -282,7 +316,20 @@ class AdminForfeitureInvoiceIssueView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        inv.status = DepositForfeitureStatus.ISSUED
-        inv.save(update_fields=["status"])
+        with transaction.atomic():
+            inv.status = DepositForfeitureStatus.ISSUED
+            inv.save(update_fields=["status"])
+            log_audit(
+                action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
+                instance=inv,
+                performed_by=request.user,
+                metadata={
+                    "event": "DEPOSIT_FORFEITURE_INVOICE_ISSUED",
+                    "invoice_number": inv.invoice_number,
+                    "subscription_id": inv.subscription_id,
+                    "forfeited_amount": str(inv.forfeited_amount),
+                    "total_invoice_amount": str(inv.total_invoice_amount),
+                },
+            )
 
         return Response(_forfeiture_to_dict(inv), status=status.HTTP_200_OK)

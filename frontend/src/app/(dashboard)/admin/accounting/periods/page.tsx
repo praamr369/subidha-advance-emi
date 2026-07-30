@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import { accountingErrorMessage } from "@/components/accounting/shared";
+import ErrorState from "@/components/feedback/ErrorState";
+import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 import { ROUTES } from "@/lib/routes";
@@ -374,7 +376,7 @@ export default function AccountingPeriodsPage() {
     }
   }
 
-  if (loading) return <main className="p-6"><div className="rounded-xl border p-6 text-sm text-muted-foreground">Loading accounting periods…</div></main>;
+  if (loading) return <main className="p-6"><LoadingBlock label="Loading accounting periods…" /></main>;
 
   const openPeriodCount = periods.filter((period) => statusForPeriod(period) === "OPEN").length;
   const lockedPeriodCount = periods.filter((period) => statusForPeriod(period) === "LOCKED").length;
@@ -399,7 +401,13 @@ export default function AccountingPeriodsPage() {
         {openPeriodCount > 0 ? <button type="button" disabled={actionBusy === "bulk-lock"} onClick={() => void handleBulkLockOpen()} className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50">{actionBusy === "bulk-lock" ? "Locking…" : `Lock All ${openPeriodCount} Open Periods`}</button> : null}
       </div>
       {notice ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">{notice}</div> : null}
-      {error ? <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-900">{error}</div> : null}
+      {error ? (
+        periods.length === 0 ? (
+          <ErrorState message={error} onRetry={() => void loadPage("initial")} />
+        ) : (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-900">{error}</div>
+        )
+      ) : null}
       {bulkLockResult && bulkLockResult.error_count > 0 ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><span className="font-semibold">Bulk lock errors ({bulkLockResult.error_count}):</span> {bulkLockResult.errors.map((e) => `${e.code}: ${e.error}`).join(" | ")}</div> : null}
 
       {readiness && !readiness.is_ready ? (

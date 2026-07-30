@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Save, ArrowLeft, Layers } from "lucide-react";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
@@ -46,6 +46,7 @@ function buildAttrPayload(attrs: PimCategoryAttribute[], values: AttributeValues
 export default function PimProductForm({ productId }: Props) {
   const router = useRouter();
   const isEdit = Boolean(productId);
+  const pendingFetchRef = useRef<{ id: number; promise: Promise<PimProduct> } | null>(null);
 
   const [categories, setCategories] = useState<PimCategory[]>([]);
   const [subcategories, setSubcategories] = useState<PimSubcategory[]>([]);
@@ -89,12 +90,20 @@ export default function PimProductForm({ productId }: Props) {
       .catch(() => {});
   }, [categoryId, subcategoryId]);
 
-  // Load product data for edit mode
+  // Load product data for edit mode (shared promise avoids React Strict Mode double-fetch)
   useEffect(() => {
     if (!productId) { setLoading(false); return; }
+    let stale = false;
+    if (!pendingFetchRef.current || pendingFetchRef.current.id !== productId) {
+      pendingFetchRef.current = { id: productId, promise: pimService.getProductWithAttributes(productId) };
+    }
+    const fetchPromise = pendingFetchRef.current.promise;
     setLoading(true);
-    pimService.getProductWithAttributes(productId)
+    setError(null);
+    fetchPromise
       .then((p) => {
+        if (stale) return;
+        setError(null);
         setProduct(p);
         setCode(p.code);
         setName(p.name);
@@ -105,7 +114,6 @@ export default function PimProductForm({ productId }: Props) {
         setCostPrice(p.cost_price ?? "");
         setIsPublished(p.is_published);
         setVariants(p.variants ?? []);
-        // Pre-fill attribute values
         const prefilled: AttributeValues = {};
         for (const a of p.attributes ?? []) {
           prefilled[a.attribute] = {
@@ -117,8 +125,12 @@ export default function PimProductForm({ productId }: Props) {
         }
         setAttrValues(prefilled);
       })
-      .catch(() => setError("Failed to load product"))
-      .finally(() => setLoading(false));
+      .catch(() => { if (!stale) setError("Failed to load product"); })
+      .finally(() => {
+        if (!stale) setLoading(false);
+        if (pendingFetchRef.current?.id === productId) pendingFetchRef.current = null;
+      });
+    return () => { stale = true; };
   }, [productId]);
 
   const refreshVariants = useCallback(async () => {
@@ -318,8 +330,9 @@ export default function PimProductForm({ productId }: Props) {
           </p>
           <VariantManager
             productId={productId}
+            productCode={code}
             variants={variants}
-            variantAttributes={variantDefiningAttrs}
+            allAttributes={attributes}
             onRefresh={refreshVariants}
           />
         </section>

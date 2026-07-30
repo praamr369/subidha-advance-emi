@@ -102,3 +102,59 @@ export async function searchAdminGlobal(query: string): Promise<{ count: number;
   const encoded = encodeURIComponent(query);
   return apiFetch<{ count: number; results: AdminGlobalSearchResult[] }>(`/admin/global-search/?q=${encoded}`);
 }
+
+export type WorkbenchEntityType = "customer" | "lead" | "ticket" | "request";
+
+export type WorkbenchItem = {
+  id: number;
+  module: string;
+  source_id?: number;
+  entity_type?: WorkbenchEntityType | null;
+  entity_id?: number | null;
+  customer_id?: number | null;
+  customer_name?: string | null;
+  product_name?: string | null;
+  assigned_to_id?: number | null;
+  assigned_to_name?: string | null;
+  status: string;
+  priority: number;
+  title: string;
+  description: string;
+  deep_link?: string | null;
+  action_label?: string | null;
+  action_href?: string | null;
+  due_date?: string | null;
+  created_at: string;
+  updated_at: string;
+  result_data?: Record<string, unknown> | null;
+};
+
+export async function getAdminWorkbenchItems(params?: Record<string, string>): Promise<{ count: number; next: string | null; previous: string | null; results: WorkbenchItem[] }> {
+  const query = params ? new URLSearchParams(params).toString() : "";
+  return apiFetch(`/admin/crm/workbench/?${query}`);
+}
+
+export async function getAdminWorkbenchAssignedItems(): Promise<{ count: number; results: WorkbenchItem[] }> {
+  return apiFetch(`/admin/crm/workbench/assigned/`);
+}
+
+export async function assignWorkbenchItem(id: number, assigned_to_id: number): Promise<WorkbenchItem> {
+  return apiFetch(`/admin/crm/workbench/${id}/assign/`, {
+    method: "POST",
+    body: JSON.stringify({ assigned_to_id }),
+  });
+}
+
+export async function completeWorkbenchItem(id: number, notes: string, result_data: Record<string, unknown> = {}): Promise<WorkbenchItem> {
+  return apiFetch(`/admin/crm/workbench/${id}/complete/`, {
+    method: "POST",
+    body: JSON.stringify({ notes, result_data }),
+  });
+}
+
+export async function cancelWorkbenchItem(id: number, notes: string): Promise<WorkbenchItem> {
+  return apiFetch(`/admin/crm/workbench/${id}/cancel/`, {
+    method: "POST",
+    body: JSON.stringify({ notes }),
+  });
+}

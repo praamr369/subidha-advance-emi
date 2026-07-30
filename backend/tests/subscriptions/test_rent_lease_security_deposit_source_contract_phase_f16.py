@@ -41,6 +41,18 @@ def model_count(app_label: str, model_name: str) -> int:
 
 class RentLeaseSecurityDepositSourceContractPhaseF16Tests(TestCase):
     def setUp(self):
+        # These tests assert deposit-source isolation with NO accounting posting.
+        # The rent/lease bridge is auto-ready when mapping is valid, so keep it
+        # explicitly deferred here to preserve the no-posting-side-effects intent.
+        from django.utils import timezone as _tz
+        from subscriptions.services.rent_lease_posting_bridge_config_service import (
+            get_rent_lease_posting_bridge_config,
+        )
+
+        _cfg = get_rent_lease_posting_bridge_config()
+        _cfg.is_enabled = False
+        _cfg.disabled_at = _tz.now()
+        _cfg.save()
         self.admin = create_admin_user(username="f16_admin", phone="9161600001")
         self.customer = create_customer_profile(name="F16 Customer", phone="9161600002")
         self.finance_account = create_payment_collection_finance_account(

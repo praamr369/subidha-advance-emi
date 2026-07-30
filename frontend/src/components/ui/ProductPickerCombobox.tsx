@@ -156,13 +156,22 @@ export default function ProductPickerCombobox({
   return (
     <div ref={wrapRef} className="relative w-full" onKeyDown={handleKeyDown}>
       {/* Trigger button / selected display */}
-      <button
-        type="button"
+      <div
+        role="combobox"
+        aria-expanded={open}
+        aria-controls="product-picker-listbox"
+        tabIndex={disabled ? -1 : 0}
         data-testid={testId}
-        disabled={disabled}
-        onClick={openPicker}
-        className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm transition ${
-          disabled ? "cursor-not-allowed opacity-60 bg-muted border-border" : "border-border bg-card hover:border-ring"
+        onClick={disabled ? undefined : openPicker}
+        onKeyDown={(e) => {
+          if (disabled) return;
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            openPicker();
+          }
+        }}
+        className={`flex w-full cursor-pointer items-center gap-2 rounded-xl border-2 px-3 py-2.5 text-left text-sm transition-all shadow-sm ${
+          disabled ? "cursor-not-allowed opacity-60 bg-muted border-border" : "border-border/60 bg-card hover:border-primary/40 hover:shadow-md focus:border-primary focus:ring-4 focus:ring-primary/10"
         } ${required && !value ? "border-destructive/60" : ""}`}
       >
         {value ? (
@@ -189,11 +198,11 @@ export default function ProductPickerCombobox({
             <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
           </>
         )}
-      </button>
+      </div>
 
       {/* Dropdown panel */}
       {open ? (
-        <div className="absolute left-0 right-0 top-full z-50 mt-1 rounded-xl border border-border bg-card" style={{ boxShadow: "0 8px 40px -8px rgba(10,14,28,0.28), 0 2px 8px -2px rgba(10,14,28,0.14)" }}>
+        <div className="absolute left-0 right-0 top-full z-[9999] mt-2 overflow-hidden rounded-xl border-2 border-primary/20 bg-white shadow-2xl dark:bg-[#121318] dark:shadow-[0_20px_60px_-10px_rgba(0,0,0,0.9)]" style={{ boxShadow: "0 12px 48px -12px rgba(10,14,28,0.4), 0 4px 16px -4px rgba(10,14,28,0.2)" }}>
           {/* Search input */}
           <div className="border-b border-border px-3 py-2">
             <div className="flex items-center gap-2">

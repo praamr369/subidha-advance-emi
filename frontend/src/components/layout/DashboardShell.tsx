@@ -65,8 +65,11 @@ import NotificationBellDropdown from "@/components/layout/NotificationBellDropdo
 import PortalHeader from "@/components/layout/PortalHeader";
 import PortalShell from "@/components/layout/PortalShell";
 import AdminSidebarNav from "@/components/layout/AdminSidebarNav";
+import PartnerMobileBottomNav from "@/components/layout/PartnerMobileBottomNav";
+import CustomerMobileBottomNav from "@/components/layout/CustomerMobileBottomNav";
 import RoleSidebar from "@/components/layout/RoleSidebar";
 import SidebarHoverCard from "@/components/layout/SidebarHoverCard";
+import SidebarLiveStatusWidget from "@/components/layout/SidebarLiveStatusWidget";
 import BusinessSetupWorkflowBanner from "@/components/admin/business-setup/BusinessSetupWorkflowBanner";
 import WorkflowProvider from "@/components/workflows/WorkflowProvider";
 import AdminWorkspaceMenubar from "@/components/layout/AdminWorkspaceMenubar";
@@ -87,6 +90,9 @@ import { useAuth } from "@/providers/AuthProvider";
 import { pushRecent, readFavorites, readRecents, toggleFavorite } from "@/lib/workspace-prefs";
 import { cn } from "@/lib/utils";
 import { subscribeRealtime } from "@/lib/realtime";
+import { getAdminNavigationBadges, refreshAdminNavigationBadges } from "@/services/navigation-badges";
+import { readNavLayout, readNavLayoutServer, subscribeNavLayout, applyNavLayoutToGroups } from "@/lib/navigation-prefs";
+import NavigationCustomizerModal from "@/components/layout/NavigationCustomizerModal";
 
 const CommandPalette = dynamic(
   () => import("@/components/workflows/CommandPalette"),
@@ -217,15 +223,7 @@ function parseSessionSnapshot(snapshot: string): ReturnType<typeof getStoredSess
 }
 
 function readExpandedGroups(): Record<string, boolean> {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = window.localStorage.getItem(SIDEBAR_GROUPS_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {};
-  }
+  return {};
 }
 
 function readWorkspaceWidthPresetSnapshot(): string {
@@ -568,7 +566,15 @@ function SidebarContent({
 }) {
   const isMobile = typeof onClose === "function";
   const searchParams = useSearchParams();
-  const navGroups = useMemo(() => mapNavGroups(getNavigationGroupsForRole(role)), [role]);
+  const [isNavCustomizerOpen, setIsNavCustomizerOpen] = useState(false);
+  const customNavLayout = useSyncExternalStore(subscribeNavLayout, readNavLayout, readNavLayoutServer);
+  const navGroups = useMemo(() => {
+    const canonical = getNavigationGroupsForRole(role);
+    if (role === "ADMIN") {
+      return mapNavGroups(applyNavLayoutToGroups(canonical, customNavLayout));
+    }
+    return mapNavGroups(canonical);
+  }, [role, customNavLayout]);
   const currentUrl = useMemo(() => {
     const query = searchParams.toString();
     return query ? `${pathname}?${query}` : pathname;
@@ -623,29 +629,49 @@ function SidebarContent({
 
   useEffect(() => {
     if (role !== "ADMIN") return;
-    // Live badge updates over the shared SSE stream. The server pushes the
-    // full badge payload immediately on connect and again whenever it
-    // changes, so no initial REST fetch is needed; the stream falls back to
-    // reconnect-with-backoff on its own if the connection drops.
-    return subscribeRealtime({
+
+    const fetchBadges = () => {
+      refreshAdminNavigationBadges()
+        .then((payload) => {
+          if (payload && typeof payload === "object") {
+            setQueueBadges(
+              Object.entries(payload).reduce<Record<string, number>>((acc, [key, value]) => {
+                const numVal = Number(value || 0);
+                acc[key] = numVal;
+                acc[`admin.badges.${key}`] = numVal;
+                return acc;
+              }, {})
+            );
+          }
+        })
+        .catch(() => {});
+    };
+
+    fetchBadges();
+    window.addEventListener("subidha:badges-refresh", fetchBadges);
+
+    const unsubscribe = subscribeRealtime({
       onBadges: (payload) => {
         setQueueBadges(
           Object.entries(payload).reduce<Record<string, number>>((acc, [key, value]) => {
-            acc[`admin.badges.${key}`] = Number(value || 0);
+            const numVal = Number(value || 0);
+            acc[key] = numVal;
+            acc[`admin.badges.${key}`] = numVal;
             return acc;
           }, {})
         );
       },
     });
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener("subidha:badges-refresh", fetchBadges);
+    };
   }, [role]);
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem(SIDEBAR_GROUPS_KEY, JSON.stringify(expandedGroups));
-    } catch {
-      // Enhancement-only persistence.
-    }
-  }, [expandedGroups]);
+    // Sidebar groups are no longer persisted to allow accordion behavior to reset on fresh load.
+  }, []);
 
   const toggleGroup = useCallback(
     (title: string, defaultOpen: boolean) => {
@@ -653,10 +679,13 @@ function SidebarContent({
         setFlyoutGroup((current) => (current === title ? null : title));
         return;
       }
-      setExpandedGroups((current) => ({
-        ...current,
-        [title]: !(current[title] ?? defaultOpen),
-      }));
+      setExpandedGroups((current) => {
+        const isOpening = !(current[title] ?? defaultOpen);
+        if (isOpening) {
+          return { [title]: true };
+        }
+        return { [title]: false };
+      });
     },
     [collapsed, isMobile]
   );
@@ -860,6 +889,11 @@ function SidebarContent({
             </div>
           </div>
         </div>
+
+        <div className="mb-4">
+          <SidebarLiveStatusWidget isMobile={isMobile} collapsed={collapsed} />
+        </div>
+
         <div className="flex gap-2">
           <Link
             href={getProfileHref(role)}
@@ -890,29 +924,36 @@ function SidebarContent({
     );
 
     return (
-      <AdminSidebarNav
-        groups={visibleGroups}
-        activeHref={activeHref}
-        brandName={brandConfig.companyName}
-        roleLabel={formatRoleLabel(role)}
-        isMobile={isMobile}
-        navQuery={navQuery}
-        onNavQueryChange={setNavQuery}
-        expandedGroups={expandedGroups}
-        onToggleGroup={toggleGroup}
-        favorites={favorites}
-        onToggleFavorite={(href) => {
-          if (!sessionId) return;
-          setFavorites(toggleFavorite(sessionId, role, href));
-        }}
-        canFavorite={Boolean(sessionId)}
-        badges={queueBadges}
-        favoriteLinks={favoriteLinks}
-        brandSlot={<WorkspaceBrandMark size={32} variant="onSidebar" />}
-        footerSlot={adminFooter}
-        onToggleCollapse={onToggleCollapse}
-        onClose={onClose}
-      />
+      <>
+        <AdminSidebarNav
+          groups={visibleGroups}
+          activeHref={activeHref}
+          brandName={brandConfig.companyName}
+          roleLabel={formatRoleLabel(role)}
+          isMobile={isMobile}
+          navQuery={navQuery}
+          onNavQueryChange={setNavQuery}
+          expandedGroups={expandedGroups}
+          onToggleGroup={toggleGroup}
+          favorites={favorites}
+          onToggleFavorite={(href) => {
+            if (!sessionId) return;
+            setFavorites(toggleFavorite(sessionId, role, href));
+          }}
+          canFavorite={Boolean(sessionId)}
+          badges={queueBadges}
+          favoriteLinks={favoriteLinks}
+          brandSlot={<WorkspaceBrandMark size={32} variant="onSidebar" />}
+          footerSlot={adminFooter}
+          onToggleCollapse={onToggleCollapse}
+          onClose={onClose}
+          onOpenCustomizer={() => setIsNavCustomizerOpen(true)}
+        />
+        <NavigationCustomizerModal
+          isOpen={isNavCustomizerOpen}
+          onClose={() => setIsNavCustomizerOpen(false)}
+        />
+      </>
     );
   }
 
@@ -1602,6 +1643,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
       <WorkflowProvider role={role}>
         <div className="relative overflow-x-clip" style={workspaceShellStyle}>
           <PortalShell
+            mainClassName={role === "PARTNER" || role === "CUSTOMER" ? "pb-16 md:pb-0" : undefined}
             sidebar={
               <RoleSidebar collapsed={sidebarCollapsed}>
                 <SidebarContent
@@ -1646,6 +1688,13 @@ export default function DashboardShell({ children }: DashboardShellProps) {
               {children}
             </>
           </PortalShell>
+
+          {role === "PARTNER" ? (
+            <PartnerMobileBottomNav pathname={pathname} onOpenMenu={openMobileMenu} />
+          ) : null}
+          {role === "CUSTOMER" ? (
+            <CustomerMobileBottomNav pathname={pathname} onOpenMenu={openMobileMenu} />
+          ) : null}
 
           <RoleSidebar mobile mobileOpen={mobileOpen} onOverlayClick={closeMobileMenu}>
             <div id="mobile-sidebar-nav">

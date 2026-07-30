@@ -11,7 +11,7 @@ from reconciliation.services.accounting_bridge_reconciliation import run_account
 from reconciliation.services.run_numbering import next_reconciliation_run_no
 from subscriptions.models import PlanType, RentLeaseDepositTransaction, RentLeaseDepositTransactionStatus, RentLeaseDepositTransactionType
 from subscriptions.models_rent_lease_collection import RentLeaseCollection
-from subscriptions.services.rent_lease_billing_service import record_deposit_refund
+from subscriptions.services.rent_lease_billing_service import approve_deposit_refund, record_deposit_refund
 from subscriptions.services.rent_lease_collection_workflow_service import collect_security_deposit_with_metadata
 from subscriptions.services.rent_lease_contract_service import create_lease_contract, create_rent_contract
 from tests.accounting.helpers import create_closed_accounting_period, seed_bridge_ready_environment
@@ -96,6 +96,35 @@ class AccountingBridgeSecurityDepositRefundPhaseF18Tests(APITestCase):
         self.assertEqual(rows[rent.id]["event_label"], "Security Deposit Refund")
         self.assertEqual(rows[rent.id]["finance_account_name"], self.finance_account.name)
         self.assertIn("security_deposit_refund_ready_unposted_count", response.data["summary"])
+
+    def test_refund_approved_lifecycle_row_is_skipped_not_blocked(self):
+        """Regression: the non-cash REFUND_APPROVED lifecycle row must classify as
+        SKIPPED_NOT_APPLICABLE (the concrete DEPOSIT_REFUND row owns the F18
+        posting), not fall through to a blocked/unsupported candidate.
+        """
+        refund = self._refund(plan_type=PlanType.RENT, suffix="SKIP")
+        # The approval step (separate from the concrete DEPOSIT_REFUND cash row)
+        # produces the non-cash REFUND_APPROVED lifecycle marker.
+        approved_row = approve_deposit_refund(
+            subscription=refund.subscription,
+            amount=Decimal("100.00"),
+            approved_by=self.admin,
+        )
+        self.assertEqual(approved_row.transaction_type, RentLeaseDepositTransactionType.REFUND_APPROVED)
+
+        response = self.client.get("/api/v1/admin/accounting/bridge-reconciliation/?source_model=RentLeaseDepositTransaction")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        rows = {int(row["source_pk"]): row for row in response.data["results"]}
+
+        approved_candidate = rows[approved_row.id]
+        self.assertEqual(approved_candidate["event_key"], "security_deposit_skipped_not_applicable")
+        self.assertEqual(approved_candidate["status"], "SKIPPED_NOT_APPLICABLE")
+        self.assertFalse(approved_candidate["can_post"])
+
+        # The concrete refund row remains independently postable.
+        refund_candidate = rows[refund.id]
+        self.assertEqual(refund_candidate["status"], "READY_UNPOSTED")
+        self.assertTrue(refund_candidate["can_post"])
 
     def test_receipt_void_and_non_admin_are_not_refund_postable(self):
         receipt = self._receipt()

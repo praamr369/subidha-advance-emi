@@ -23,6 +23,7 @@ from products.services.catalog_browse_service import (
     filter_catalog,
     purpose_catalog_summary,
     serialize_catalog_product,
+    serialize_catalog_product_detail,
 )
 
 
@@ -51,6 +52,17 @@ class _CatalogListMixin:
         return payload if isinstance(payload, Response) else Response(payload)
 
 
+class _CatalogDetailMixin:
+    """Shared catalog detail view for any authenticated portal role."""
+
+    def get(self, request, pk):
+        from django.shortcuts import get_object_or_404
+
+        queryset = approved_catalog_queryset()
+        product = get_object_or_404(queryset, pk=pk)
+        return Response(serialize_catalog_product_detail(product, request))
+
+
 class _CatalogFacetsMixin:
     """Category + purpose facets for the catalog filter rail."""
 
@@ -69,6 +81,10 @@ class CustomerCatalogListView(_CatalogListMixin, APIView):
     permission_classes = [permissions.IsAuthenticated, IsCustomer]
 
 
+class CustomerCatalogDetailView(_CatalogDetailMixin, APIView):
+    permission_classes = [permissions.IsAuthenticated, IsCustomer]
+
+
 class CustomerCatalogFacetsView(_CatalogFacetsMixin, APIView):
     permission_classes = [permissions.IsAuthenticated, IsCustomer]
 
@@ -77,11 +93,19 @@ class PartnerCatalogListView(_CatalogListMixin, APIView):
     permission_classes = [permissions.IsAuthenticated, IsPartner]
 
 
+class PartnerCatalogDetailView(_CatalogDetailMixin, APIView):
+    permission_classes = [permissions.IsAuthenticated, IsPartner]
+
+
 class PartnerCatalogFacetsView(_CatalogFacetsMixin, APIView):
     permission_classes = [permissions.IsAuthenticated, IsPartner]
 
 
 class VendorCatalogListView(_CatalogListMixin, APIView):
+    permission_classes = [permissions.IsAuthenticated, IsVendor]
+
+
+class VendorCatalogDetailView(_CatalogDetailMixin, APIView):
     permission_classes = [permissions.IsAuthenticated, IsVendor]
 
 

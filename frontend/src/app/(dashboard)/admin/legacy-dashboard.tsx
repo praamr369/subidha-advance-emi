@@ -1842,11 +1842,11 @@ export default function AdminDashboardPage() {
                 action={
                   <>
                     <ActionButton
-                      href={ROUTES.admin.subscriptions}
+                      href={ROUTES.admin.subscriptionRequests}
                       variant="secondary"
                       className="h-9 px-3 text-xs"
                     >
-                      Open subscriptions
+                      View product requests
                     </ActionButton>
                     <DashboardSurfaceExportActions
                       query={dashboardQuery}

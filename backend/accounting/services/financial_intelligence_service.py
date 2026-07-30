@@ -109,7 +109,17 @@ def _collection_posture(start: date, end: date) -> dict:
 
         cash_agg = qs.filter(method=PaymentMethod.CASH).aggregate(count=Count("id"), amount=Sum("amount"))
         upi_agg = qs.filter(method=PaymentMethod.UPI).aggregate(count=Count("id"), amount=Sum("amount"))
-        bank_agg = qs.filter(method=PaymentMethod.BANK).aggregate(count=Count("id"), amount=Sum("amount"))
+        # All bank-instrument variants (transfer/cheque/deposit + legacy bank/card)
+        # roll up into the single Bank channel alongside UPI.
+        bank_agg = qs.filter(
+            method__in=[
+                PaymentMethod.BANK,
+                PaymentMethod.CARD,
+                PaymentMethod.TRANSFER,
+                PaymentMethod.CHEQUE,
+                PaymentMethod.DEPOSIT,
+            ]
+        ).aggregate(count=Count("id"), amount=Sum("amount"))
 
         reversed_count = qs.filter(
             allocation_metadata__reversal__is_reversed=True

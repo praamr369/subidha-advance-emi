@@ -51,6 +51,7 @@ export const ROUTES = {
   admin: {
     root: "/admin",
     dashboard: "/admin",
+    today: "/admin/today",
 
     // ── Compatibility-alias topology (Phase 9A audit) ─────────────────────────
     // Most canonical "new" routes are thin page-level redirect aliases that
@@ -100,6 +101,7 @@ export const ROUTES = {
     biInventory: "/admin/bi/inventory",
     biHr: "/admin/bi/hr",
     crmWorkspace: "/admin/crm",
+    crmAnalytics: "/admin/crm/analytics",
     salesWorkspace: "/admin/billing/direct-sale", // was /admin/sales — now redirected
     serviceWorkspace: "/admin/service-desk", // was /admin/service — now redirected
     workspace: "/admin/erp", // was /admin/workspace — now redirected
@@ -118,32 +120,31 @@ export const ROUTES = {
     aiSources: "/admin/ai/sources",
     aiQueryLog: "/admin/ai/query-log",
     aiReadiness: "/admin/ai/readiness",
-    partnerPaymentRequests: "/admin/partner-payment-requests",
+    partnerPaymentRequests: "/admin/partners/collection-requests", // Unified with partnersCollectionRequests
     auditLogs: "/admin/audit-logs",
     auditEvents: "/admin/audit/events",
     settings: "/admin/settings",
+    settingsNavigation: "/admin/settings/navigation",
     settingsUsers: "/admin/settings/users",
     settingsRolesPermissions: "/admin/settings/roles-permissions",
     settingsBusinessSetup: "/admin/settings/business-setup",
     settingsBusinessSetupProfile: "/admin/settings/business-setup/profile",
     settingsBusinessSetupChecklist: "/admin/settings/business-setup/checklist",
-    settingsBusinessSetupBranches: "/admin/settings/business-setup/branches",
-    settingsBusinessSetupCashDesks: "/admin/settings/business-setup/cash-desks",
-    settingsBusinessSetupChartAccounts: "/admin/settings/business-setup/chart-accounts",
+    settingsBusinessSetupBranchesDesks: "/admin/settings/business-setup/branches-desks",
+    settingsBusinessSetupChartAccounts: "/admin/accounting/chart-of-accounts",
     settingsBusinessSetupStaff: "/admin/settings/business-setup/staff",
     settingsBusinessSetupPrintBranding: "/admin/settings/business-setup/print-branding",
     settingsBusinessSetupEmailSmtp: "/admin/settings/business-setup/email-smtp",
-    settingsBusinessSetupFinanceAccounts: "/admin/settings/business-setup/finance-accounts",
+    settingsBusinessSetupFinanceAccounts: "/admin/accounting/finance-accounts",
     settingsBusinessSetupDocumentNumbering: "/admin/settings/business-setup/document-numbering",
-    settingsBusinessSetupPublicSite: "/admin/settings/business-setup/public-site",
+    settingsBusinessSetupPublicSite: "/admin/settings/business-setup/brand-data-center",
     settingsBusinessSetupBrandDataCenter: "/admin/settings/business-setup/brand-data-center",
     reviews: "/admin/reviews",
     payables: "/admin/payables",
     settingsBusinessSetupDryRuns: "/admin/settings/business-setup/dry-runs",
     settingsBusinessSetupReset: "/admin/settings/business-setup/reset",
-    settingsBusinessSetupOpeningBalances: "/admin/settings/business-setup/opening-balances",
-    settingsBusinessSetupMigration: "/admin/settings/business-setup/migration",
-    settingsBusinessCompliance: "/admin/settings/business-compliance",
+    settingsBusinessSetupDataMigration: "/admin/settings/business-setup/data-migration",
+    settingsCompliancePolicies: "/admin/settings/compliance-policies",
     settingsLegalControls: "/admin/settings/legal-controls",
     complianceKyc: "/admin/compliance/kyc",
     revenueWorkbench: "/admin/revenue-workbench",
@@ -151,9 +152,8 @@ export const ROUTES = {
     settingsFinance: "/admin/settings/finance",
     settingsImports: "/admin/settings/imports",
     settingsMasters: "/admin/settings/masters",
-    settingsPolicies: "/admin/settings/policies",
     setupReadiness: "/admin/setup/readiness",
-    brandData: "/admin/brand-data",
+    brandData: "/admin/settings/business-setup/brand-data-center",
     branches: "/admin/branches",
     counters: "/admin/counters",
     branchReporting: "/admin/branch-reporting",
@@ -162,6 +162,7 @@ export const ROUTES = {
     collectionControlCenter: "/admin/collections/control-center",
     outstandings: "/admin/outstandings",
     finance: "/admin/finance",
+    financeDailyClose: "/admin/finance/daily-close",
     financeCollect: "/admin/finance/collect",
     financeOutstandings: "/admin/finance/outstandings",
     financeCustomerCredits: "/admin/finance/customer-credits",
@@ -201,6 +202,7 @@ export const ROUTES = {
     deliveryReturns: "/admin/delivery/returns",
     deliveryPODCapture: "/admin/delivery/pod-capture",
     deliveryPODArchive: "/admin/delivery/pod-archive",
+    logisticsCockpit: "/admin/logistics",
     rentLease: "/admin/rent-lease",
     subscriptions: "/admin/subscriptions",
     subscriptionsCreate: "/admin/subscriptions/create",
@@ -210,7 +212,7 @@ export const ROUTES = {
     contractAmendments: "/admin/contract-amendments",
     contractAmendmentsNew: "/admin/contract-amendments/new",
     contractAmendmentsRecontractReport: "/admin/contract-amendments/recontract-report",
-    subscriptionRequests: "/admin/requests/subscriptions", // was /admin/subscription-requests — now canonical is requests/subscriptions
+    subscriptionRequests: "/admin/requests/product-requests", // was /admin/subscription-requests — now canonical is requests/subscriptions
     payments: "/admin/payments",
     paymentsCreate: "/admin/payments/create",
     paymentsHistory: "/admin/payments/history",
@@ -251,7 +253,6 @@ export const ROUTES = {
 
     crm: "/admin/crm",
     crmLeads: "/admin/crm/leads",
-    crmPipeline: "/admin/crm/pipeline",
     crmFollowUps: "/admin/crm/follow-ups",
     crmKyc: "/admin/crm/kyc",
     crmCustomerDetail: "/admin/crm/customers",
@@ -272,9 +273,10 @@ export const ROUTES = {
     // Phase 6: canonical /admin/requests/* request hub routes
     // These are thin redirect aliases that keep legacy routes intact.
     requestsHub: "/admin/requests",
-    requestsOnlineEnquiries: "/admin/requests/online-enquiries",
+    requestsOnlineEnquiries: "/admin/requests/online-requests",
     requestsSupport: "/admin/requests/support",
     requestsSubscriptions: "/admin/requests/subscriptions",
+    requestsOnlineRequests: "/admin/requests/online-requests",
 
     // P2D: Enterprise Control
     controlRoot: "/admin/control",
@@ -301,6 +303,8 @@ export const ROUTES = {
     billingDebitNotes: "/admin/billing/debit-notes",
     billingDocuments: "/admin/billing/documents",
     billingReversals: "/admin/billing/reversals",
+    billingReversalWorkbench: "/admin/billing/reversal-workbench",
+
 
     inventory: "/admin/inventory",
     inventoryItems: "/admin/inventory/items",
@@ -328,11 +332,12 @@ export const ROUTES = {
     vendorsCategories: "/admin/vendors/categories",
     vendorsQuotes: "/admin/vendors/quotes",
     vendorsSourcing: "/admin/vendors/sourcing",
-    onlineEnquiries: "/admin/requests/online-enquiries", // was /admin/online-enquiries — now canonical is requests/online-enquiries
+    onlineEnquiries: "/admin/requests/online-requests", // was /admin/online-enquiries — now canonical is requests/online-requests
     vendorsLedger: "/admin/vendors/ledger",
     vendorsOutstanding: "/admin/vendors/outstanding",
     vendorsPurchases: "/admin/vendors/purchases",
     vendorsProducts: "/admin/vendors/products",
+    vendorsSettlements: "/admin/vendors/settlements",
     purchases: "/admin/purchases",
     purchaseOrders: "/admin/purchases/orders",
     purchaseReceipts: "/admin/purchases/receipts",
@@ -354,7 +359,7 @@ export const ROUTES = {
     serviceDeskTickets: "/admin/service-desk/tickets",
 
     accounting: "/admin/accounting",
-    accountingControlCenter: "/admin/accounting/control-center",
+    accountingControlCenter: "/admin/accounting",
     accountingSetup: "/admin/accounting/setup",
     accountingChartOfAccounts: "/admin/accounting/chart-of-accounts",
     accountingFinanceAccounts: "/admin/accounting/finance-accounts",
@@ -384,7 +389,7 @@ export const ROUTES = {
     accountingVendors: "/admin/accounting/vendors",
     accountingVendorSettlements: "/admin/accounting/vendor-settlements",
     accountingExpenses: "/admin/accounting/expenses",
-    accountingBridges: "/admin/accounting/bridges",
+    accountingBridges: "/admin/accounting/bridge-reconciliation",
     accountingExports: "/admin/accounting/exports",
     accountingItrPack: "/admin/accounting/exports/itr-pack",
     accountingExportReports: "/admin/accounting/exports/reports",
@@ -398,7 +403,7 @@ export const ROUTES = {
     accountingAttendance: "/admin/hr/attendance", // Redirects to HR (backward compat)
     accountingLeave: "/admin/hr/leave", // Redirects to HR (backward compat)
     accountingSalary: "/admin/hr/payroll", // Redirects to HR (backward compat)
-    accountingCloseCockpit: "/admin/accounting/close-cockpit",
+    closeCockpit: "/admin/close-cockpit",
 
     // P5: Growth & Offers
     growth: "/admin/growth",
@@ -415,12 +420,18 @@ export const ROUTES = {
     customers: "/partner/customers",
     subscriptions: "/partner/subscriptions",
     subscriptionRequests: "/partner/subscription-requests",
+    collections: "/partner/collections",
     collectionRequests: "/partner/collection-requests",
+    payments: "/partner/payments",
     commissions: "/partner/commissions",
     payouts: "/partner/payouts",
+    catalog: "/partner/catalog",
+    contractAmendments: "/partner/contract-amendments",
+    kycRequests: "/partner/kyc-requests",
+    serviceDesk: "/partner/service-desk",
     reports: "/partner/reports",
     notifications: "/partner/notifications",
-    contractAmendments: "/partner/contract-amendments",
+    profile: "/partner/profile",
   },
 
   customer: {

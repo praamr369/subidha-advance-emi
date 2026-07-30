@@ -116,8 +116,8 @@ export function FinancialActionItemsList({
 
   return (
     <ul className="space-y-3">
-      {sorted.map((item) => (
-        <li key={item.key} className="rounded-xl border border-border bg-background p-4">
+      {sorted.map((item, index) => (
+        <li key={`${item.key}-${index}`} className="rounded-xl border border-border bg-background p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">

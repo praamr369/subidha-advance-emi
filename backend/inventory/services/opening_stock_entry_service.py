@@ -36,6 +36,58 @@ POSTED_IMMUTABLE_MSG = "Posted opening stock cannot be edited in place."
 OPENING_CORRECTION_REASON_MSG = "Reason is required for opening stock correction."
 
 
+def _opening_inventory_chart(system_code: str):
+    from accounting.models import ChartOfAccount
+
+    account = (
+        ChartOfAccount.objects.filter(system_code=system_code, is_active=True).order_by("id").first()
+    )
+    if account is None:
+        raise ValueError(
+            f"Missing active {system_code} chart account. Run Accounting Setup defaults before posting opening stock to the ledger."
+        )
+    return account
+
+
+def _post_opening_stock_journal(*, entry, valuation, posted_by):
+    """Post Dr Inventory Asset / Cr Retained Earnings for opening stock valuation.
+
+    Tagged as OPENING_BALANCE_MIGRATION so it coordinates with the other Day-0
+    opening balances and is picked up by the opening-balance integrity check.
+    """
+    from accounting.models import JournalEntry, JournalEntryStatus, JournalEntryType
+    from accounting.services.journal_posting_service import create_journal_entry, post_journal_entry
+
+    if valuation <= MONEY_ZERO:
+        return None
+    # Idempotency guard: never post a second opening journal for the same entry.
+    existing = JournalEntry.objects.filter(
+        source_model="OpeningStockEntry",
+        source_id=str(entry.id),
+        source_type="OPENING_BALANCE_MIGRATION",
+        status=JournalEntryStatus.POSTED,
+    ).first()
+    if existing is not None:
+        return existing
+
+    memo = f"Opening stock valuation - {entry.inventory_item.sku or entry.inventory_item_id}"
+    journal = create_journal_entry(
+        entry_date=entry.effective_date,
+        entry_type=JournalEntryType.SYSTEM_BRIDGE,
+        memo=memo,
+        source_model="OpeningStockEntry",
+        source_id=str(entry.id),
+        voucher_type="OPENING_BALANCE",
+        source_type="OPENING_BALANCE_MIGRATION",
+        source_reference=f"OPENING:STOCK:{entry.id}:{entry.effective_date.isoformat()}",
+        lines=[
+            {"chart_account": _opening_inventory_chart("INVENTORY_ASSET"), "debit_amount": valuation, "credit_amount": MONEY_ZERO, "description": memo},
+            {"chart_account": _opening_inventory_chart("RETAINED_EARNINGS"), "debit_amount": MONEY_ZERO, "credit_amount": valuation, "description": memo},
+        ],
+    )
+    return post_journal_entry(journal_entry_id=journal.id, posted_by=posted_by)[0]
+
+
 def _money(value) -> Decimal:
     return Decimal(str(value or "0.00")).quantize(Decimal("0.01"))
 
@@ -183,6 +235,10 @@ def post_opening_stock_entry(*, entry_id: int, posted_by=None) -> tuple[OpeningS
         posted_by=posted_by,
     )
 
+    # Coordinate opening stock value into the General Ledger so the opening
+    # balance sheet includes inventory alongside cash/bank/receivable/payable.
+    opening_journal = _post_opening_stock_journal(entry=entry, valuation=valuation, posted_by=posted_by)
+
     entry.status = OpeningStockEntryStatus.POSTED
     entry.posted_by = posted_by
     entry.posted_at = timezone.now()
@@ -199,6 +255,7 @@ def post_opening_stock_entry(*, entry_id: int, posted_by=None) -> tuple[OpeningS
             "stock_location_id": entry.stock_location_id,
             "ledger_created": created,
             "valuation_amount_snapshot": str(entry.valuation_amount_snapshot),
+            "opening_journal_entry_id": getattr(opening_journal, "id", None),
             "phase": "posted",
         },
     )

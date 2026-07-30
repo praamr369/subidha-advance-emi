@@ -1,7 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
+import EmptyState from "@/components/feedback/EmptyState";
+import ErrorState from "@/components/feedback/ErrorState";
+import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
@@ -10,6 +13,7 @@ import type { ProductTaxProfile } from "@/types/compliance";
 
 export default function AdminComplianceProductTaxProfilesPage() {
   const [rows, setRows] = useState<ProductTaxProfile[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -21,27 +25,22 @@ export default function AdminComplianceProductTaxProfilesPage() {
     effective_from: new Date().toISOString().slice(0, 10),
   });
 
-  async function load() {
-    const payload = await listProductTaxProfiles();
-    setRows(payload.results);
-  }
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const payload = await listProductTaxProfiles();
+      setRows(payload.results);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load product tax profiles.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        const payload = await listProductTaxProfiles();
-        if (!active) return;
-        setRows(payload.results);
-      } catch (err) {
-        if (!active) return;
-        setError(err instanceof Error ? err.message : "Failed to load product tax profiles.");
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, []);
+    void load();
+  }, [load]);
 
   return (
     <ERPPageShell
@@ -127,17 +126,27 @@ export default function AdminComplianceProductTaxProfilesPage() {
             {saving ? "Saving..." : "Add Profile"}
           </button>
         </form>
-        <div className="space-y-2 text-sm">
-          {rows.map((row) => (
-            <div key={row.id} className="rounded border border-border p-2">
-              <p className="font-medium">{row.product_code || row.product} - {row.product_name || "Product"}</p>
-              <p>HSN: {row.hsn_code || "-"}</p>
-              <p>Category: {row.tax_category}</p>
-              <p>GST rate: {row.gst_rate}</p>
-            </div>
-          ))}
-          {!rows.length ? <p className="text-muted-foreground">No product tax profiles found.</p> : null}
-        </div>
+        {loading ? (
+          <LoadingBlock label="Loading product tax profiles…" />
+        ) : error && !rows.length ? (
+          <ErrorState message={error} onRetry={() => void load()} />
+        ) : rows.length ? (
+          <div className="space-y-2 text-sm">
+            {rows.map((row) => (
+              <div key={row.id} className="rounded border border-border p-2">
+                <p className="font-medium">{row.product_code || row.product} - {row.product_name || "Product"}</p>
+                <p>HSN: {row.hsn_code || "-"}</p>
+                <p>Category: {row.tax_category}</p>
+                <p>GST rate: {row.gst_rate}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            title="No product tax profiles yet"
+            description="Add a product HSN and GST-rate profile above to prepare for GST registration."
+          />
+        )}
       </WorkspaceSection>
     </ERPPageShell>
   );

@@ -73,7 +73,7 @@ export const ADMIN_MODULE_TAXONOMY: AdminModuleDefinition[] = [
       // Core CRM routes
       ROUTES.admin.crm,
       ROUTES.admin.crmLeads,
-      ROUTES.admin.crmPipeline,
+      ROUTES.admin.crmAnalytics,
       ROUTES.admin.crmFollowUps,
       ROUTES.admin.crmKyc,
       // Phase 6: legacy request routes remain under CRM & Requests
@@ -262,7 +262,7 @@ export const ADMIN_MODULE_TAXONOMY: AdminModuleDefinition[] = [
     effect: "settings",
     safetyRule: "Settings may configure workflows but must not execute daily financial operations unless explicitly controlled and audited.",
     uiPattern: "control_center",
-    primaryRoutes: [ROUTES.admin.settings, ROUTES.admin.settingsUsers, ROUTES.admin.settingsRolesPermissions, ROUTES.admin.settingsBusinessSetup, ROUTES.admin.settingsBusinessCompliance, ROUTES.admin.settingsLegalControls, ROUTES.admin.settingsPolicies, ROUTES.admin.settingsImports, ROUTES.admin.auditLogs, ROUTES.admin.auditEvents, ROUTES.admin.brandData],
+    primaryRoutes: [ROUTES.admin.settings, ROUTES.admin.settingsUsers, ROUTES.admin.settingsRolesPermissions, ROUTES.admin.settingsBusinessSetup, ROUTES.admin.settingsCompliancePolicies, ROUTES.admin.settingsLegalControls, ROUTES.admin.settingsImports, ROUTES.admin.auditLogs, ROUTES.admin.auditEvents, ROUTES.admin.brandData],
   },
 ];
 

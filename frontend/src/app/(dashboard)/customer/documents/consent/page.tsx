@@ -54,7 +54,7 @@ export default function DocumentConsentHistoryPage() {
                 </div>
                 <span className="px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700">Signed</span>
               </div>
-              <div className="mt-2 grid grid-cols-2 gap-3 text-xs text-gray-500">
+              <div className="mt-2 grid grid-cols-1 gap-1 text-xs text-gray-500 sm:grid-cols-2 sm:gap-3">
                 <span>Signed: {new Date(d.signed_at).toLocaleDateString("en-IN")}</span>
                 {d.valid_until && <span>Valid until: {new Date(d.valid_until).toLocaleDateString("en-IN")}</span>}
                 {d.e_sign_ref && <span className="col-span-2 font-mono">Ref: {d.e_sign_ref}</span>}

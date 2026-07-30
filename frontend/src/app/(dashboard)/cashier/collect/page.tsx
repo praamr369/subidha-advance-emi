@@ -750,7 +750,7 @@ export default function CashierCollectPage() {
           actionLoadingKey={unifiedActionLoadingKey}
           onQueryChange={setUnifiedSearchQuery}
           onSearch={handleUnifiedReceivableSearch}
-          onAdvanceEmiSelect={handleUnifiedAdvanceEmiSelect}
+          onCollectSelect={handleUnifiedAdvanceEmiSelect}
           lastPaymentSummary={unifiedLastPaymentSummary}
           onRetrySearch={() => void handleUnifiedReceivableSearch(unifiedSearchQuery)}
         />

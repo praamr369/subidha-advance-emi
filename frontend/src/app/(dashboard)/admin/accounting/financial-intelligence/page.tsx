@@ -76,18 +76,18 @@ export default function FinancialIntelligencePage() {
   return (
     <ERPPageShell
       eyebrow="Accounting"
-      title="Financial Intelligence"
-      subtitle="Read-only finance posture across collections, billing, accounting bridges, reconciliation, liabilities, close controls, inventory, and trial balance."
+      title="Finance Health Check"
+      subtitle="Read-only overview of your business's financial health across collections, billing, liabilities, and trial balance."
       helperNote="Diagnostic only. This page does not post journals or mutate financial records."
       helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Accounting", href: ROUTES.admin.accounting },
-        { label: "Financial Intelligence" },
+        { label: "Finance Health Check" },
       ]}
       actions={[
         { href: ROUTES.admin.accountingTrialBalanceCheck, label: "Trial Balance Check", variant: "secondary" },
-        { href: ROUTES.admin.accountingLiabilityReconciliation, label: "Liability Reconciliation", variant: "secondary" },
+        { href: ROUTES.admin.accountingLiabilityReconciliation, label: "Deposit & Liability Checks", variant: "secondary" },
       ]}
       statusBadge={{ label: "Admin Only — Read Only", tone: "info" }}
     >
@@ -125,7 +125,7 @@ export default function FinancialIntelligencePage() {
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-            <FinancialSectionCard title="Collection posture" section={sections.collection}>
+            <FinancialSectionCard title="Collections" section={sections.collection}>
               <FinancialMetricGrid items={[
                 { label: "Payments", value: numberValue(sections.collection, "period_payment_count") },
                 { label: "Collected", value: moneyValue(sections.collection, "period_payment_amount") },
@@ -133,7 +133,7 @@ export default function FinancialIntelligencePage() {
                 { label: "Reversed payments", value: numberValue(sections.collection, "reversed_payment_count") },
               ]} />
             </FinancialSectionCard>
-            <FinancialSectionCard title="Billing posture" section={sections.billing}>
+            <FinancialSectionCard title="Billing" section={sections.billing}>
               <FinancialMetricGrid items={[
                 { label: "Invoices", value: numberValue(sections.billing, "invoice_count") },
                 { label: "Invoice value", value: moneyValue(sections.billing, "invoice_amount") },
@@ -141,7 +141,7 @@ export default function FinancialIntelligencePage() {
                 { label: "Overdue demands", value: numberValue(sections.billing, "overdue_demand_count") },
               ]} />
             </FinancialSectionCard>
-            <FinancialSectionCard title="Accounting bridge posture" section={sections.bridge}>
+            <FinancialSectionCard title="Accounting bridge" section={sections.bridge}>
               <FinancialMetricGrid items={[
                 { label: "Bridge postings", value: numberValue(sections.bridge, "total_bridge_postings") },
                 { label: "Posted", value: numberValue(sections.bridge, "total_posted") },
@@ -149,7 +149,7 @@ export default function FinancialIntelligencePage() {
                 { label: "Void", value: numberValue(sections.bridge, "total_void") },
               ]} />
             </FinancialSectionCard>
-            <FinancialSectionCard title="Reconciliation posture" section={sections.reconciliation}>
+            <FinancialSectionCard title="Reconciliation exceptions" section={sections.reconciliation}>
               <FinancialMetricGrid items={[
                 { label: "Unresolved", value: numberValue(sections.reconciliation, "total_unresolved_items") },
                 { label: "Critical", value: numberValue(sections.reconciliation, "critical_unresolved") },
@@ -157,7 +157,7 @@ export default function FinancialIntelligencePage() {
                 { label: "Stale", value: numberValue(sections.reconciliation, "stale_item_count") },
               ]} />
             </FinancialSectionCard>
-            <FinancialSectionCard title="Advance and deposit posture" section={sections.advance_deposit}>
+            <FinancialSectionCard title="Advances and deposits" section={sections.advance_deposit}>
               <FinancialMetricGrid items={[
                 { label: "Unapplied advance", value: moneyValue(nestedSection(sections.advance_deposit, "customer_advance"), "total_unapplied_amount") },
                 { label: "Advance records", value: numberValue(nestedSection(sections.advance_deposit, "customer_advance"), "total_count") },
@@ -165,7 +165,7 @@ export default function FinancialIntelligencePage() {
                 { label: "Deposit bridge gaps", value: numberValue(nestedSection(sections.advance_deposit, "security_deposit"), "deposit_transactions_without_bridge") },
               ]} />
             </FinancialSectionCard>
-            <FinancialSectionCard title="Control close posture" section={sections.control}>
+            <FinancialSectionCard title="Month-end controls" section={sections.control}>
               <FinancialMetricGrid items={[
                 { label: "Open exceptions", value: numberValue(nestedSection(sections.control, "control_exceptions"), "total_open_count") },
                 { label: "Critical/high exceptions", value: numberValue(nestedSection(sections.control, "control_exceptions"), "open_critical_high_count") },
@@ -173,7 +173,7 @@ export default function FinancialIntelligencePage() {
                 { label: "Month-end blockers", value: numberValue(nestedSection(sections.control, "month_end_close"), "blocking_check_count") },
               ]} />
             </FinancialSectionCard>
-            <FinancialSectionCard title="Inventory-finance posture" section={sections.inventory_finance}>
+            <FinancialSectionCard title="Inventory" section={sections.inventory_finance}>
               <FinancialMetricGrid items={[
                 { label: "Deliveries without stock ledger", value: numberValue(sections.inventory_finance, "delivered_without_stock_ledger_count") },
                 { label: "Direct sales without stock ledger", value: numberValue(sections.inventory_finance, "direct_sale_without_stock_ledger_count") },

@@ -29,8 +29,8 @@ def log_audit(
 
     AuditLog.objects.create(
         action_type=action_type,
-        model_name=instance.__class__.__name__,
-        object_id=instance.pk,
+        model_name=instance.__class__.__name__ if instance else "System",
+        object_id=instance.pk if instance else 0,
         performed_by=performed_by,
         metadata=_normalize_metadata(metadata),
         created_at=timezone.now(),

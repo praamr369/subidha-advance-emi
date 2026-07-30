@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import { ChevronDown, ChevronRight, Tag, Layers, Hash } from "lucide-react";
+import Link from "next/link";
+import { ChevronDown, ChevronRight, Tag, Layers, Hash, Plus } from "lucide-react";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
@@ -145,6 +146,9 @@ export default function PimCategoriesPage() {
     <ERPPageShell
       title="PIM Categories"
       subtitle="Category hierarchy with dynamic attribute templates"
+      actions={[
+        { href: "/admin/pim/categories/manage", label: "Manage categories & attributes", variant: "primary" as const },
+      ]}
     >
       {/* Summary */}
       <div className="grid grid-cols-3 gap-4 mt-2 mb-6">
@@ -175,12 +179,14 @@ export default function PimCategoriesPage() {
         </div>
       )}
 
-      <div className="mt-6 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-        <strong>To add new categories or attributes:</strong> Run the seeding command on the backend:<br />
-        <code className="mt-1 block font-mono text-xs bg-amber-100 rounded px-2 py-1">
-          python manage.py seed_pim_categories
-        </code>
-        <span className="text-xs mt-1 block">Or manage via Django admin at /django-admin/products_pim/</span>
+      <div className="mt-6 rounded-md border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+        <strong>Add categories, subcategories, and attributes</strong> — no backend command needed.
+        <Link
+          href="/admin/pim/categories/manage"
+          className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700"
+        >
+          <Plus className="h-4 w-4" /> Open category &amp; attribute manager
+        </Link>
       </div>
     </ERPPageShell>
   );

@@ -5,7 +5,10 @@ export type SubscriptionRequestStatus =
   | "SUBMITTED"
   | "APPROVED"
   | "REJECTED"
-  | "CANCELLED";
+  | "CANCELLED"
+  | "ON_HOLD_LUCKY_UNAVAILABLE"
+  | "ON_HOLD_PRODUCT_NOT_READY"
+  | "AMENDMENT_REQUESTED";
 
 export type SubscriptionRequestRecord = {
   id: number;
@@ -74,6 +77,8 @@ export type SubscriptionRequestProductOption = {
   product_code?: string | null;
   base_price?: string;
   image?: string | null;
+  category?: string | null;
+  subcategory?: string | null;
 };
 
 export type SubscriptionRequestBatchOption = {
@@ -213,6 +218,8 @@ function normalizeOptions(payload: unknown): SubscriptionRequestOptions {
         product_code: toNullableString(row.product_code),
         base_price: toStringOrUndefined(row.base_price) ?? "0.00",
         image: resolveApiMediaUrl(toNullableString(row.image)),
+        category: toNullableString(row.category),
+        subcategory: toNullableString(row.subcategory),
       };
     }),
     batches: toArray(root.batches).map((item) => {
@@ -406,6 +413,53 @@ export async function rejectAdminSubscriptionRequest(
 ): Promise<SubscriptionRequestDecisionResponse> {
   const response = await apiFetch<unknown>(
     `/admin/subscription-requests/${id}/reject/`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }
+  );
+  const root = (response ?? {}) as Record<string, unknown>;
+  return {
+    detail: toStringOrUndefined(root.detail),
+    result: root.result ? normalizeSubscriptionRequest(root.result) : undefined,
+  };
+}
+
+export type SubscriptionRequestHoldStatus =
+  | "ON_HOLD_LUCKY_UNAVAILABLE"
+  | "ON_HOLD_PRODUCT_NOT_READY";
+
+/** Park a request in a funnel hold stage (lucky ID unavailable / product not ready). */
+export async function holdAdminSubscriptionRequest(
+  id: number | string,
+  payload: {
+    hold_status: SubscriptionRequestHoldStatus;
+    note?: string;
+  }
+): Promise<SubscriptionRequestDecisionResponse> {
+  const response = await apiFetch<unknown>(
+    `/admin/subscription-requests/${id}/hold/`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }
+  );
+  const root = (response ?? {}) as Record<string, unknown>;
+  return {
+    detail: toStringOrUndefined(root.detail),
+    result: root.result ? normalizeSubscriptionRequest(root.result) : undefined,
+  };
+}
+
+/** Send a request back to the requester for changes (no admin snapshot edit). */
+export async function requestAmendmentAdminSubscriptionRequest(
+  id: number | string,
+  payload: {
+    note?: string;
+  }
+): Promise<SubscriptionRequestDecisionResponse> {
+  const response = await apiFetch<unknown>(
+    `/admin/subscription-requests/${id}/amendment/`,
     {
       method: "POST",
       body: JSON.stringify(payload),

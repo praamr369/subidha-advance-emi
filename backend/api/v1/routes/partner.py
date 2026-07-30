@@ -1,6 +1,7 @@
 from django.urls import path
 
 from api.v1.views.catalog import (
+    PartnerCatalogDetailView,
     PartnerCatalogFacetsView,
     PartnerCatalogListView,
 )
@@ -42,11 +43,20 @@ from api.v1.views.subscription_requests import (
     PartnerSubscriptionRequestListCreateView,
     PartnerSubscriptionRequestOptionsView,
 )
+from api.v1.views.product_requests import (
+    PartnerProductRequestListView,
+    PartnerProductRequestOptionsView,
+)
 from api.v1.views.notifications import (
     PartnerNotificationListView,
     PartnerNotificationSummaryView,
 )
 from api.v1.views.username_change import PartnerSelfUsernameChangeView
+from api.v1.views.partner_profile import PartnerSelfPasswordChangeView
+from api.v1.views.partner_customer_kyc_requests import (
+    PartnerCustomerKycRequestListCreateView,
+    PartnerCustomerSearchView,
+)
 
 urlpatterns = [
     path("dashboard/", PartnerDashboardView.as_view()),
@@ -54,12 +64,15 @@ urlpatterns = [
     path("notifications/", PartnerNotificationListView.as_view()),
     path("notifications/summary/", PartnerNotificationSummaryView.as_view()),
     path("profile/username/", PartnerSelfUsernameChangeView.as_view()),
+    path("profile/change-password/", PartnerSelfPasswordChangeView.as_view()),
     path("subscriptions/", PaginatedPartnerSubscriptionListView.as_view()),
     path("subscriptions/<int:pk>/", PartnerSubscriptionDetailView.as_view()),
     path("subscription-request-options/", PartnerSubscriptionRequestOptionsView.as_view()),
     path("subscription-requests/", PartnerSubscriptionRequestListCreateView.as_view()),
     path("subscription-requests/<int:pk>/", PartnerSubscriptionRequestDetailView.as_view()),
     path("subscription-requests/<int:pk>/cancel/", PartnerSubscriptionRequestCancelView.as_view()),
+    path("product-request-options/", PartnerProductRequestOptionsView.as_view()),
+    path("product-requests/", PartnerProductRequestListView.as_view()),
     path("customers/", PaginatedPartnerCustomerListView.as_view()),
     path("customers/<int:pk>/", PartnerCustomerDetailView.as_view()),
     path("payments/", PartnerPaymentListView.as_view()),
@@ -82,5 +95,9 @@ urlpatterns = [
     path("kyc/audit-trail/", PartnerSelfKycAuditTrailView.as_view()),
     # Approved product catalog — browse to raise a request for a customer
     path("catalog/", PartnerCatalogListView.as_view()),
+    path("catalog/<int:pk>/", PartnerCatalogDetailView.as_view()),
     path("catalog/facets/", PartnerCatalogFacetsView.as_view()),
+    # Customer KYC / Login ID requests from partner
+    path("customer-kyc-requests/", PartnerCustomerKycRequestListCreateView.as_view()),
+    path("customer-search/", PartnerCustomerSearchView.as_view()),
 ]

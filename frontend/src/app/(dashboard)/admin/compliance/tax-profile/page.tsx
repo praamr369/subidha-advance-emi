@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
+import ErrorState from "@/components/feedback/ErrorState";
+import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
@@ -17,7 +19,7 @@ export default function AdminComplianceTaxProfilePage() {
   const [gstin, setGstin] = useState("");
   const [activeMode, setActiveMode] = useState<BusinessTaxMode>("GST_UNREGISTERED");
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -31,11 +33,11 @@ export default function AdminComplianceTaxProfilePage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [load]);
 
   const requiresGstin = useMemo(() => mode === "GST_REGULAR" || mode === "GST_COMPOSITION", [mode]);
 
@@ -52,11 +54,14 @@ export default function AdminComplianceTaxProfilePage() {
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <WorkspaceSection title="Current Tax Mode" description={`Active mode: ${activeMode}`}>
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
         {notice ? <p className="text-sm text-emerald-700">{notice}</p> : null}
         {loading ? (
-          <p className="text-sm text-muted-foreground">Loading...</p>
+          <LoadingBlock label="Loading tax profile…" />
+        ) : error && activeMode === "GST_UNREGISTERED" && !effectiveFrom && !gstin ? (
+          <ErrorState message={error} onRetry={() => void load()} />
         ) : (
+          <>
+            {error ? <p className="mb-3 text-sm text-destructive">{error}</p> : null}
           <form
             className="grid gap-3 md:grid-cols-2"
             onSubmit={async (event) => {
@@ -103,6 +108,7 @@ export default function AdminComplianceTaxProfilePage() {
               </button>
             </div>
           </form>
+          </>
         )}
       </WorkspaceSection>
     </ERPPageShell>

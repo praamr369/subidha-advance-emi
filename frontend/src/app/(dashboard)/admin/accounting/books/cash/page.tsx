@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { buildAdminJournalEntryRoute } from "@/lib/route-builders";
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import BookRegisterPage from "@/components/accounting/BookRegisterPage";
 import { ACCOUNTING_BOOK_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
@@ -11,7 +13,15 @@ import { getCashBook } from "@/services/accounting";
 const columns: EnterpriseColumnDef<FinanceBookRow>[] = [
   { key: "entry_date", header: "Date" },
   { key: "finance_account_name", header: "Cash Account" },
-  { key: "entry_no", header: "Journal" },
+  { 
+    key: "entry_no", 
+    header: "Journal",
+    render: (row) => (
+      <Link href={buildAdminJournalEntryRoute(row.journal_entry_id)} className="font-medium text-emerald-700 hover:underline">
+        {row.entry_no}
+      </Link>
+    ),
+  },
   { key: "description", header: "Description" },
   { key: "debit_amount", header: "Debit", render: (row) => accountingMoney(row.debit_amount) },
   { key: "credit_amount", header: "Credit", render: (row) => accountingMoney(row.credit_amount) },

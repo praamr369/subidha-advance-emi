@@ -23,11 +23,18 @@ class CategoryAttributeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CategoryAttribute
+        # `category` is required (an attribute belongs to a category); `subcategory`
+        # is optional. Both must be writable so the manage page can create an
+        # attribute on a chosen category/subcategory.
         fields = [
-            "id", "name", "slug", "data_type", "is_required",
+            "id", "category", "subcategory", "name", "slug", "data_type", "is_required",
             "is_variant_defining", "min_value", "max_value",
             "display_order", "options",
         ]
+        extra_kwargs = {
+            "slug": {"read_only": True},
+            "subcategory": {"required": False, "allow_null": True},
+        }
 
 
 class ProductSubcategorySerializer(serializers.ModelSerializer):
@@ -35,7 +42,13 @@ class ProductSubcategorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProductSubcategory
-        fields = ["id", "name", "slug", "display_order", "attributes"]
+        # `category` must be writable — a subcategory belongs to a category (NOT
+        # NULL). It was previously omitted, so POSTs silently dropped it and hit an
+        # integrity error on category_id. `slug` is read-only: the model derives it
+        # from name in save(), and marking it read-only keeps the model's
+        # unique_together (category, slug) from forcing slug into the request body.
+        fields = ["id", "category", "name", "slug", "display_order", "attributes"]
+        extra_kwargs = {"slug": {"read_only": True}}
 
     def get_attributes(self, obj):
         attrs = CategoryAttribute.objects.filter(subcategory=obj, is_active=True).prefetch_related("options")
@@ -49,6 +62,7 @@ class ProductCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductCategory
         fields = ["id", "name", "slug", "icon", "display_order", "subcategories", "attributes"]
+        extra_kwargs = {"slug": {"required": False, "allow_blank": True}}
 
     def get_attributes(self, obj):
         attrs = CategoryAttribute.objects.filter(category=obj, subcategory__isnull=True, is_active=True).prefetch_related("options")
@@ -161,16 +175,42 @@ class PimProductCreateUpdateSerializer(serializers.ModelSerializer):
                 },
             )
 
+    def _sync_to_register(self, pim_product):
+        try:
+            from subscriptions.models import Product as SubProduct
+            sub_product = SubProduct.objects.filter(product_code=pim_product.code).first()
+            if not sub_product:
+                if not pim_product.is_published:
+                    return
+                sub_product = SubProduct(product_code=pim_product.code)
+            
+            sub_product.name = pim_product.name
+            sub_product.base_price = pim_product.base_price
+            if pim_product.category:
+                sub_product.category = pim_product.category.name
+            if pim_product.subcategory:
+                sub_product.subcategory = pim_product.subcategory.name
+            sub_product.save()
+            
+            if hasattr(sub_product, "inventory_profile") and sub_product.inventory_profile:
+                if pim_product.cost_price is not None:
+                    sub_product.inventory_profile.standard_unit_cost = pim_product.cost_price
+                    sub_product.inventory_profile.save(update_fields=['standard_unit_cost'])
+        except ImportError:
+            pass
+
     def create(self, validated_data):
         attrs_data = validated_data.pop("attributes", [])
         product = super().create(validated_data)
         self._save_attributes(product, attrs_data)
+        self._sync_to_register(product)
         return product
 
     def update(self, instance, validated_data):
         attrs_data = validated_data.pop("attributes", [])
         product = super().update(instance, validated_data)
         self._save_attributes(product, attrs_data)
+        self._sync_to_register(product)
         return product
 
 

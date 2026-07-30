@@ -22,6 +22,11 @@ from subscriptions.models import Subscription
 
 MONEY = Decimal("0.01")
 
+# Defensive upper bound on unpaginated master-list endpoints (lease contracts,
+# fixed assets, cost centres). These are small solopreneur-scale tables; the cap
+# only guards against a data anomaly producing a runaway payload.
+MAX_LIST_ROWS = 500
+
 
 def _money(value) -> Decimal:
     return Decimal(str(value or "0")).quantize(MONEY, rounding=ROUND_HALF_UP)
@@ -566,7 +571,11 @@ def lease_contract_list_create_view(request):
             "rou_asset_account_id", "lease_liability_account_id",
             "lease_expense_account_id", "lease_payment_account_id",
         )
-        return Response({"count": len(leases), "results": list(leases)})
+        # Defensive bound: preserves the {count, results} shape while capping the
+        # payload so a data anomaly can never return a runaway list. count stays
+        # the true total so a client can tell whether the cap was hit.
+        total = leases.count()
+        return Response({"count": total, "results": list(leases[:MAX_LIST_ROWS])})
 
     # POST — create
     required = ["subscription_id", "asset_description", "lease_start_date",
@@ -631,7 +640,8 @@ def fixed_asset_list_create_view(request):
             "acquisition_cost", "useful_life_years", "depreciation_method",
             "salvage_value", "net_book_value", "accumulated_depreciation", "status",
         )
-        return Response({"count": len(assets), "results": list(assets)})
+        total = assets.count()
+        return Response({"count": total, "results": list(assets[:MAX_LIST_ROWS])})
 
     # POST — create
     required = ["asset_code", "asset_name", "asset_type", "acquisition_date",
@@ -680,4 +690,5 @@ def cost_centre_list_view(request):
     centres = CostCentre.objects.filter(is_active=True).values(
         "id", "code", "name", "centre_type", "branch_id"
     )
-    return Response({"count": len(centres), "results": list(centres)})
+    total = centres.count()
+    return Response({"count": total, "results": list(centres[:MAX_LIST_ROWS])})

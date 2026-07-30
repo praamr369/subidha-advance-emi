@@ -447,8 +447,21 @@ function ResetRestoreSection() {
   const snapAllowed = snapImportPreview ? snapImportPreview.import_allowed_here !== false : true;
   const snapErrors = Array.isArray(snapImportPreview?.validation_errors) ? (snapImportPreview?.validation_errors as string[]) : [];
 
+  const isProduction = process.env.NEXT_PUBLIC_APP_ENV === "production";
+
   return (
     <div className="space-y-6">
+      {isProduction && (
+        <div className="rounded-xl border-2 border-red-500 bg-red-50 px-5 py-4 shadow-sm">
+          <div className="flex items-center gap-2 text-base font-bold text-red-700">
+            <span>⛔</span> Reset is disabled in production
+          </div>
+          <p className="mt-1 text-sm text-red-700">
+            This server is running in <strong>production mode</strong>. The Execute Reset button is blocked to prevent accidental data loss.
+            To enable resets on this server, set <code className="rounded bg-red-100 px-1 font-mono text-xs">ALLOW_BUSINESS_RESET=True</code> in your Django settings — but only do this in a test or staging environment.
+          </p>
+        </div>
+      )}
       {error ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">{error}</div> : null}
 
       {/* Settings snapshot */}
@@ -547,8 +560,8 @@ function ResetRestoreSection() {
               <button type="button" className="rounded-lg border border-border bg-background px-4 py-2 text-sm font-semibold" onClick={() => void runPreview()}>Run preview</button>
               <button type="button" className="rounded-lg border border-border bg-background px-4 py-2 text-sm font-semibold" onClick={() => void runBackup("SELECTED_SCOPES_EXPORT")}>Create scope backup</button>
               <button type="button" className="rounded-lg border border-border bg-background px-4 py-2 text-sm font-semibold" onClick={() => void runBackup("FULL_DATABASE_LOGICAL")}>Create full backup</button>
-              <button type="button" className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" disabled={hasBlockers || busy} onClick={() => void runReset()}>
-                {busy ? "Resetting…" : "Execute reset"}
+              <button type="button" className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" disabled={hasBlockers || busy || isProduction} onClick={() => void runReset()}>
+                {busy ? "Resetting…" : isProduction ? "Reset blocked (production)" : "Execute reset"}
               </button>
             </div>
 

@@ -1,26 +1,16 @@
 "use client";
-import { formatRupee } from "@/lib/utils/currency";
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { RefreshCw, Search } from "lucide-react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { ChevronRight, RefreshCw, Search, CreditCard } from "lucide-react";
 
-import {
-  ERPAuditNote,
-  ERPDataToolbar,
-  ERPEmptyState,
-  ERPErrorState,
-  ERPLoadingState,
-  ERPPageShell,
-  ERPSectionShell,
-  ERPStatusBadge,
-} from "@/components/erp";
-import ActionButton from "@/components/ui/ActionButton";
-import DataTable, { type Column } from "@/components/ui/DataTable";
-import { DataTableShell, MobileSafeTable } from "@/components/ui/operations";
+import EmptyState from "@/components/feedback/EmptyState";
+import ErrorState from "@/components/feedback/ErrorState";
+import LoadingBlock from "@/components/feedback/LoadingBlock";
+import StatusBadge from "@/components/ui/status-badge";
+import { formatRupee } from "@/lib/utils/currency";
 import { getPartnerDashboard, listPartnerPayments, type PartnerPayment } from "@/services/partner";
-
 
 function formatDateTime(value?: string | null): string {
   if (!value) return "—";
@@ -94,7 +84,7 @@ export default function PartnerPaymentsPage() {
               fallback.summary?.total_paid_amount ?? fallback.summary?.total_revenue_collected ?? 0
             );
 
-            setRows(fallbackRows);
+            setRows(fallbackRows as any);
             setCount(fallbackRows.length);
             setTotalCollected(Number.isFinite(fallbackTotal) ? fallbackTotal.toFixed(2) : "0.00");
             setError(null);
@@ -122,115 +112,23 @@ export default function PartnerPaymentsPage() {
     void loadPage("initial");
   }, [loadPage]);
 
-  const uniqueCustomers = useMemo(() => {
-    return new Set(rows.map((row) => row.customer).filter(Boolean)).size;
-  }, [rows]);
-
-  const latestPayment = useMemo(() => rows[0] ?? null, [rows]);
   const currentQuery = searchParams.toString();
 
-  const columns = useMemo<Column<PartnerPayment>[]>(
-    () => [
-      {
-        key: "id",
-        title: "Payment",
-        sortable: true,
-        render: (row) => (
-          <div className="space-y-1">
-            <div className="font-medium text-foreground">#{row.id}</div>
-            <div className="text-xs text-muted-foreground">Ref {row.reference_no || `AUTO-${row.id}`}</div>
-          </div>
-        ),
-      },
-      {
-        key: "customer_name",
-        title: "Customer",
-        sortable: true,
-        render: (row) => (
-          <div className="space-y-1">
-            <div className="font-medium text-foreground">{row.customer_name || "—"}</div>
-            <div className="text-xs text-muted-foreground">{row.customer_phone || "—"}</div>
-          </div>
-        ),
-      },
-      {
-        key: "subscription_number",
-        title: "Subscription",
-        render: (row) => (
-          <div className="space-y-1">
-            <div className="font-medium text-foreground">{row.subscription_number || `SUB-${row.subscription}`}</div>
-            <div className="text-xs text-muted-foreground">
-              {row.batch_code || "No batch"}
-              {typeof row.lucky_number === "number" ? ` · Lucky #${row.lucky_number}` : ""}
-            </div>
-          </div>
-        ),
-      },
-      {
-        key: "emi_month_no",
-        title: "EMI",
-        render: (row) =>
-          row.emi ? (
-            <div className="space-y-1">
-              <div className="text-sm text-foreground">Month {row.emi_month_no ?? "—"}</div>
-              <div className="text-xs text-muted-foreground">
-                {row.emi_due_date ? `Due ${formatDateTime(row.emi_due_date)}` : "No due date"}
-              </div>
-            </div>
-          ) : (
-            <span className="text-muted-foreground">—</span>
-          ),
-      },
-      {
-        key: "method",
-        title: "Method",
-        sortable: true,
-        render: (row) =>
-          row.method ? <ERPStatusBadge status={row.method} hideIcon /> : <span className="text-muted-foreground">—</span>,
-      },
-      {
-        key: "payment_date",
-        title: "Recorded",
-        sortable: true,
-        sortAccessor: (row) => Date.parse(row.created_at || row.payment_date || "") || 0,
-        render: (row) => formatDateTime(row.created_at || row.payment_date),
-      },
-      {
-        key: "amount",
-        title: "Amount",
-        align: "right",
-        sortable: true,
-        sortAccessor: (row) => Number(row.amount || 0),
-        render: (row) => formatRupee(row.amount),
-      },
-    ],
-    []
-  );
-
-  function applyFilters() {
+  function handleApplyFilters(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     const next = new URLSearchParams();
+    const nextQuery = searchInput.trim();
 
-    if (searchInput.trim()) {
-      next.set("q", searchInput.trim());
-    }
-
-    if (methodInput.trim()) {
-      next.set("method", methodInput.trim());
-    }
-
-    if (customer) {
-      next.set("customer", customer);
-    }
-
-    if (subscription) {
-      next.set("subscription", subscription);
-    }
+    if (nextQuery) next.set("q", nextQuery);
+    if (methodInput) next.set("method", methodInput);
+    if (customer) next.set("customer", customer);
+    if (subscription) next.set("subscription", subscription);
 
     const queryString = next.toString();
     router.replace(queryString ? `/partner/payments?${queryString}` : "/partner/payments");
   }
 
-  function clearFilters() {
+  function handleReset() {
     setSearchInput("");
     setMethodInput("");
     const next = new URLSearchParams();
@@ -241,170 +139,117 @@ export default function PartnerPaymentsPage() {
   }
 
   return (
-    <ERPPageShell
-      eyebrow="Partner Portal"
-      title="Partner Payments"
-      subtitle="Verified partner-scoped payment history without admin-wide finance leakage, with filters aligned to the shared operational list pattern."
-      helperNote="This register shows partner-visible verified payment truth only. Reversal, payout, and reconciliation controls remain outside partner scope."
-      helperTone="info"
-      breadcrumbs={[
-        { label: "Partner", href: "/partner" },
-        { label: "Payments" },
-      ]}
-      actions={[
-        {
-          href: "/partner/collections",
-          label: "Collections",
-          variant: "secondary",
-        },
-        {
-          href: "/partner/reports",
-          label: "Reports",
-          variant: "secondary",
-        },
-      ]}
-      stats={[
-        { label: "Visible rows", value: String(count) },
-        { label: "Total collected", value: formatRupee(totalCollected), tone: "success" },
-        { label: "Customers", value: String(uniqueCustomers) },
-        { label: "Latest payment", value: latestPayment ? formatDateTime(latestPayment.created_at || latestPayment.payment_date) : "—" },
-      ]}
-      statusBadge={{ label: "Partner payment truth", tone: "info" }}
-    >
-      <div className="space-y-6">
-        <ERPSectionShell
-          title="Payment filters"
-          description="Use search, method, and handoff scope filters to review partner-visible verified payments."
+    <div className="flex flex-col p-4 space-y-5">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-foreground">Payments</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Verified partner payments
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void loadPage("refresh")}
+          disabled={refreshing}
+          className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground shadow-sm transition hover:bg-muted disabled:opacity-50"
         >
-          <ERPDataToolbar
-            left={
-              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_auto]">
-                <label className="relative block">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <input
-                    id="partner-payment-search"
-                    type="text"
-                    value={searchInput}
-                    onChange={(event) => setSearchInput(event.target.value)}
-                    placeholder="Reference, customer, phone, product, batch"
-                    className="h-11 w-full rounded-xl border border-border bg-background pl-10 pr-4 text-sm outline-none transition focus:border-ring"
-                    disabled={loading || refreshing}
-                  />
-                </label>
+          <RefreshCw className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
+        </button>
+      </div>
 
-                <select
-                  id="partner-payment-method"
-                  value={methodInput}
-                  onChange={(event) => setMethodInput(event.target.value)}
-                  className="h-11 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
-                  disabled={loading || refreshing}
-                >
-                  <option value="">All methods</option>
-                  <option value="CASH">Cash</option>
-                  <option value="UPI">UPI</option>
-                  <option value="BANK">Bank</option>
-                  <option value="CARD">Card</option>
-                </select>
+      {/* Stats Summary */}
+      <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <CreditCard className="size-5" />
+        </div>
+        <div>
+          <div className="text-xl font-bold text-foreground">{count}</div>
+          <div className="text-xs font-medium text-muted-foreground">Total Payments</div>
+        </div>
+      </div>
 
-                <div className="flex flex-wrap gap-2">
-                  <ActionButton type="button" onClick={applyFilters} disabled={loading || refreshing}>
-                    Apply
-                  </ActionButton>
-                  <ActionButton type="button" variant="outline" onClick={clearFilters} disabled={loading || refreshing}>
-                    Clear
-                  </ActionButton>
+      {/* Search & Filters */}
+      <form onSubmit={handleApplyFilters} className="space-y-3">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="text"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search reference, customer..."
+            className="h-12 w-full rounded-2xl border border-border bg-background pl-10 pr-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+          />
+        </div>
+        <div className="flex gap-2">
+          <select
+            value={methodInput}
+            onChange={(e) => setMethodInput(e.target.value)}
+            className="h-10 flex-1 rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+          >
+            <option value="">All Methods</option>
+            <option value="CASH">Cash</option>
+            <option value="UPI">UPI</option>
+            <option value="BANK">Bank</option>
+            <option value="CARD">Card</option>
+          </select>
+          <button
+            type="submit"
+            className="h-10 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground active:scale-95"
+          >
+            Apply
+          </button>
+          {(q || method) && (
+            <button
+              type="button"
+              onClick={handleReset}
+              className="h-10 rounded-xl border border-border bg-card px-4 text-sm font-bold text-foreground active:scale-95"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      </form>
+
+      {/* List */}
+      <div className="space-y-3">
+        {loading ? (
+          <LoadingBlock label="Loading payments..." />
+        ) : error ? (
+          <ErrorState title="Error" description={error} onRetry={() => void loadPage("initial")} />
+        ) : count === 0 ? (
+          <EmptyState
+            title="No payments found"
+            description={q || method || customer || subscription ? "No payments matched your filters." : "You have no payments yet."}
+          />
+        ) : (
+          rows.map((row) => (
+            <Link
+              key={row.id}
+              href={`/partner/payments/${row.id}${currentQuery ? `?${currentQuery}` : ""}`}
+              className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm transition active:scale-95"
+            >
+              <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <CreditCard className="size-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="font-bold text-foreground truncate">{row.customer_name || `Payment #${row.id}`}</div>
+                  <div className="font-bold text-green-600 dark:text-green-500">{formatRupee(row.amount)}</div>
+                </div>
+                <div className="mt-0.5 text-xs font-medium text-muted-foreground truncate">{row.subscription_number || `SUB-${row.subscription}`}</div>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <StatusBadge status={row.method || "UNKNOWN"} />
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                    {formatDateTime(row.created_at || row.payment_date)}
+                  </span>
                 </div>
               </div>
-            }
-            right={
-              <ActionButton
-                variant="outline"
-                onClick={() => void loadPage("refresh")}
-                disabled={loading || refreshing}
-                leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
-              >
-                {refreshing ? "Refreshing..." : "Refresh"}
-              </ActionButton>
-            }
-          />
-
-          {q || method || customer || subscription ? (
-            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <span className="font-semibold uppercase tracking-[0.14em]">Active filters</span>
-              {q ? <ERPStatusBadge status="OPEN" label={`Search: ${q}`} hideIcon /> : null}
-              {method ? <ERPStatusBadge status="VERIFIED" label={`Method: ${method}`} hideIcon /> : null}
-              {customer ? <ERPStatusBadge status="ASSIGNED" label={`Customer scope: ${customer}`} hideIcon /> : null}
-              {subscription ? <ERPStatusBadge status="ASSIGNED" label={`Subscription scope: ${subscription}`} hideIcon /> : null}
-            </div>
-          ) : (
-            <ERPAuditNote tone="info" title="Partner scope boundary">
-              This register shows partner-visible verified payment truth only. Commission settlement, reversals, and broader reconciliation remain in admin-only workflows.
-            </ERPAuditNote>
-          )}
-        </ERPSectionShell>
-
-        <ERPSectionShell
-          title="Partner-visible payments"
-          description={
-            q || method || customer || subscription
-              ? "Showing verified partner-visible payments for the current filter set."
-              : "Showing the most recent partner-visible verified payments."
-          }
-        >
-          {loading ? <ERPLoadingState label="Loading partner payments..." /> : null}
-
-          {!loading && error ? (
-            <ERPErrorState
-              title="Unable to load partner payments"
-              description={error}
-              onRetry={() => void loadPage("initial")}
-            />
-          ) : null}
-
-          {!loading && !error ? (
-            <>
-              {rows.length === 0 ? (
-                <ERPEmptyState title="No partner payment rows" description="No verified partner-scoped payment rows matched the current filters." />
-              ) : (
-                <DataTableShell>
-                  <MobileSafeTable className="border-none bg-transparent shadow-none">
-                    <DataTable<PartnerPayment>
-                      rows={rows}
-                      columns={columns}
-                      rowActions={(row) => (
-                        <div className="flex flex-wrap gap-2">
-                          <Link
-                            href={`/partner/payments/${row.id}${currentQuery ? `?${currentQuery}` : ""}`}
-                            className="inline-flex min-h-11 items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                          >
-                            View detail
-                          </Link>
-                          {row.customer ? (
-                            <Link
-                              href={`/partner/customers/${row.customer}`}
-                              className="inline-flex min-h-11 items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                            >
-                              Customer
-                            </Link>
-                          ) : null}
-                          {row.customer ? (
-                            <Link
-                              href={`/partner/subscriptions?customer=${row.customer}`}
-                              className="inline-flex min-h-11 items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                            >
-                              Subscriptions
-                            </Link>
-                          ) : null}
-                        </div>
-                      )}
-                    />
-                  </MobileSafeTable>
-                </DataTableShell>
-              )}
-            </>
-          ) : null}
-        </ERPSectionShell>
+              <ChevronRight className="size-5 shrink-0 text-muted-foreground/50" />
+            </Link>
+          ))
+        )}
       </div>
-    </ERPPageShell>
+    </div>
   );
 }

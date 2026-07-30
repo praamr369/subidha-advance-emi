@@ -10,6 +10,7 @@ from api.v1.views.admin_control_foundation import (
     AdminExceptionSuppressView,
     AdminPolicyListView,
     AdminPolicyUpdateView,
+    AdminControlMetricsView,
 )
 
 urlpatterns = [
@@ -25,4 +26,6 @@ urlpatterns = [
     path("control/exceptions/<int:pk>/acknowledge/", AdminExceptionAcknowledgeView.as_view()),
     path("control/exceptions/<int:pk>/resolve/", AdminExceptionResolveView.as_view()),
     path("control/exceptions/<int:pk>/suppress/", AdminExceptionSuppressView.as_view()),
+    # Metrics
+    path("control/metrics/", AdminControlMetricsView.as_view()),
 ]

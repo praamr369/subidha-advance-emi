@@ -2,15 +2,13 @@
 
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { Send } from "lucide-react";
 
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
-import ERPPageShell from "@/components/erp/ERPPageShell";
-import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
-import ActionButton from "@/components/ui/ActionButton";
-import { DetailItem } from "@/components/ui/workspace";
+import CustomerPageShell, { CPageCard, CPageSection } from "@/components/layout/CustomerPageShell";
 import { ROUTES } from "@/lib/routes";
 import {
   commentCustomerSupportTicket,
@@ -31,11 +29,7 @@ export default function CustomerSupportTicketDetailPage() {
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
-    if (!Number.isFinite(id) || id <= 0) {
-      setError("Invalid ticket.");
-      setLoading(false);
-      return;
-    }
+    if (!Number.isFinite(id) || id <= 0) { setError("Invalid ticket."); setLoading(false); return; }
     setLoading(true);
     try {
       const t = await getCustomerSupportTicket(id);
@@ -49,9 +43,7 @@ export default function CustomerSupportTicketDetailPage() {
     }
   }, [id]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   async function onComment(e: FormEvent) {
     e.preventDefault();
@@ -81,133 +73,112 @@ export default function CustomerSupportTicketDetailPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <ERPPageShell
-        title="Support ticket"
-        breadcrumbs={[{ label: "Support", href: ROUTES.customer.support }]}
-        headerMode="erp"
-      >
-        <ERPLoadingState label="Loading ticket…" />
-      </ERPPageShell>
-    );
-  }
-
-  if (error || !ticket) {
-    return (
-      <ERPPageShell
-        title="Support ticket"
-        breadcrumbs={[{ label: "Support", href: ROUTES.customer.support }]}
-        headerMode="erp"
-      >
-        <ERPErrorState title="Ticket unavailable" description={error || "Not found."} onRetry={() => void load()} />
-      </ERPPageShell>
-    );
-  }
-
-  const canReopen = ["RESOLVED", "CLOSED", "REJECTED"].includes(ticket.status);
+  const canReopen = ticket ? ["RESOLVED", "CLOSED", "REJECTED"].includes(ticket.status) : false;
 
   return (
-    <ERPPageShell
-      eyebrow="Support ticket"
-      title={ticket.ticket_no}
-      subtitle={ticket.subject}
-      breadcrumbs={[
-        { label: "Customer", href: ROUTES.customer.dashboard },
-        { label: "Support", href: ROUTES.customer.support },
-        { label: ticket.ticket_no },
-      ]}
-      actions={[{ href: ROUTES.customer.support, label: "All tickets", variant: "secondary" }]}
-      statusBadge={{ label: ticket.status.replaceAll("_", " "), tone: "info" }}
-      headerMode="erp"
+    <CustomerPageShell
+      title={ticket?.ticket_no || "Support Ticket"}
+      subtitle={ticket?.subject || "Loading…"}
+      backHref={ROUTES.customer.support}
+      backLabel="Support"
     >
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-        <div className="min-w-0 space-y-6">
-          <ERPSectionShell title="Details">
-            <p className="whitespace-pre-wrap text-sm text-foreground">{ticket.description}</p>
-            {ticket.resolution_summary ? (
-              <div className="mt-4 rounded-lg border border-border bg-[var(--surface-muted)]/40 p-3 text-sm">
-                <div className="text-xs font-semibold uppercase text-muted-foreground">Resolution</div>
-                <p className="mt-1 whitespace-pre-wrap">{ticket.resolution_summary}</p>
+      {loading ? <ERPLoadingState label="Loading ticket…" /> : null}
+      {!loading && error ? (
+        <ERPErrorState title="Ticket unavailable" description={error} onRetry={() => void load()} />
+      ) : null}
+      {!loading && !error && !ticket ? (
+        <ERPEmptyState title="Ticket not found" description="Could not load this support ticket." />
+      ) : null}
+
+      {ticket ? (
+        <>
+          {/* Status strip */}
+          <CPageSection>
+            <CPageCard>
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="space-y-1">
+                  <div className="text-xs text-muted-foreground">Status</div>
+                  <ERPStatusBadge status={ticket.status} />
+                </div>
+                <div className="space-y-1 text-right">
+                  <div className="text-xs text-muted-foreground">Priority</div>
+                  <ERPStatusBadge status={ticket.priority} label={ticket.priority.replaceAll("_", " ")} hideIcon />
+                </div>
+                <div className="space-y-1">
+                  <div className="text-xs text-muted-foreground">Category</div>
+                  <div className="text-xs font-semibold">{ticket.category.replaceAll("_", " ")}</div>
+                </div>
               </div>
-            ) : null}
-          </ERPSectionShell>
-          <ERPSectionShell title="Conversation">
+              <div className="mt-3 pt-3 border-t border-border/60 text-xs text-muted-foreground">
+                Opened {new Date(ticket.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+              </div>
+            </CPageCard>
+          </CPageSection>
+
+          {/* Description */}
+          <CPageSection title="Issue">
+            <CPageCard>
+              <p className="whitespace-pre-wrap text-sm text-foreground">{ticket.description}</p>
+              {ticket.resolution_summary ? (
+                <div className="mt-4 rounded-xl border border-border bg-emerald-50 dark:bg-emerald-950/20 p-3 text-sm">
+                  <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 uppercase mb-1">Resolution</div>
+                  <p className="whitespace-pre-wrap text-foreground">{ticket.resolution_summary}</p>
+                </div>
+              ) : null}
+            </CPageCard>
+          </CPageSection>
+
+          {/* Conversation */}
+          <CPageSection title="Conversation">
             {ticket.comments.length === 0 ? (
               <ERPEmptyState title="No replies yet" description="The team will respond here." />
             ) : (
-              <ul className="space-y-3">
+              <div className="space-y-2.5">
                 {ticket.comments.map((c) => (
-                  <li key={c.id} className="rounded-lg border border-border px-3 py-2 text-sm">
-                    <div className="text-xs text-muted-foreground">
+                  <div key={c.id} className="rounded-2xl border border-border bg-card px-4 py-3">
+                    <div className="text-xs text-muted-foreground mb-1.5">
                       {c.author?.username || "User"} · {new Date(c.created_at).toLocaleString("en-IN")}
                     </div>
-                    <p className="mt-1 whitespace-pre-wrap">{c.body}</p>
-                  </li>
+                    <p className="whitespace-pre-wrap text-sm text-foreground">{c.body}</p>
+                  </div>
                 ))}
-              </ul>
+              </div>
             )}
-            <form onSubmit={onComment} className="mt-4 space-y-2">
+
+            {/* Reply form */}
+            <form onSubmit={(e) => void onComment(e)} className="mt-4 space-y-3">
               <textarea
-                className="min-h-[100px] w-full rounded-lg border border-border bg-[var(--surface-card)] px-3 py-3 text-sm"
-                placeholder="Add a message"
+                className="w-full resize-none rounded-2xl border border-border bg-card px-4 py-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/30 min-h-[100px]"
+                placeholder="Add a reply…"
                 value={comment}
                 onChange={(ev) => setComment(ev.target.value)}
               />
-              <ActionButton
+              <button
                 type="submit"
-                className="min-h-11 w-full sm:w-auto"
                 disabled={busy || !comment.trim()}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-3 text-sm font-bold text-primary-foreground transition active:scale-95 disabled:opacity-50"
               >
-                Send reply
-              </ActionButton>
+                <Send className="size-4" />
+                {busy ? "Sending…" : "Send Reply"}
+              </button>
             </form>
-          </ERPSectionShell>
-          <ERPSectionShell title="Timeline (summary)">
-            {ticket.timeline.length === 0 ? (
-              <ERPEmptyState
-                title="No timeline entries yet"
-                description="Updates from the shop will appear here when the ticket moves forward."
-              />
-            ) : (
-              <ul className="space-y-2 text-xs text-muted-foreground">
-                {ticket.timeline.slice(-12).map((row, idx) => (
-                  <li key={`${String(row.at)}-${idx}`}>
-                    {String(row.event_type ?? row.kind ?? "")} · {String(row.at ?? "")}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </ERPSectionShell>
-        </div>
-        <div className="min-w-0 space-y-4">
-          <div className="rounded-xl border border-border bg-[var(--surface-card)] p-4 text-sm">
-            <DetailItem label="Status" value={<ERPStatusBadge status={ticket.status} />} />
-            <DetailItem
-              label="Priority"
-              value={
-                <ERPStatusBadge
-                  status={ticket.priority}
-                  label={ticket.priority.replaceAll("_", " ")}
-                  hideIcon
-                />
-              }
-            />
-            <DetailItem label="Category" value={ticket.category.replaceAll("_", " ")} />
-            <DetailItem label="Opened" value={new Date(ticket.created_at).toLocaleString("en-IN")} />
-          </div>
+          </CPageSection>
+
+          {/* Reopen */}
           {canReopen ? (
-            <ActionButton
-              variant="outline"
-              className="min-h-11 w-full sm:w-auto"
-              disabled={busy}
-              onClick={() => void onReopen()}
-            >
-              Reopen ticket
-            </ActionButton>
+            <CPageSection>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void onReopen()}
+                className="w-full rounded-2xl border border-border bg-background py-3 text-sm font-semibold text-foreground hover:bg-muted disabled:opacity-50"
+              >
+                {busy ? "Processing…" : "Reopen Ticket"}
+              </button>
+            </CPageSection>
           ) : null}
-        </div>
-      </div>
-    </ERPPageShell>
+        </>
+      ) : null}
+    </CustomerPageShell>
   );
 }

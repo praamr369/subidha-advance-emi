@@ -1,6 +1,6 @@
 "use client";
 
-import { RefreshCw, X } from "lucide-react";
+import { ChevronRight, RefreshCw, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
@@ -327,7 +327,7 @@ export default function PartnerPayoutsPage({
           title="Filters"
           description="Filter your own commission ledger by lifecycle status, creation date range, or subscription identifiers visible to partners."
         >
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 grid-cols-2 xl:grid-cols-4">
             <label className="space-y-1 text-sm">
               <span className="font-medium text-foreground">Status</span>
               <select
@@ -450,25 +450,69 @@ export default function PartnerPayoutsPage({
                 description={emptyFilterExplanation}
               />
             ) : (
-              <DataTableShell>
-                <MobileSafeTable className="border-none bg-transparent">
-                  <DataTable<PartnerCommission>
-                    rows={rows}
-                    columns={columns}
-                    rowActions={(row) =>
-                      row.subscription ? (
-                        <ActionButton
-                          href={`/partner/subscriptions/${row.subscription}`}
-                          variant="outline"
-                          className="min-h-11"
-                        >
-                          Subscription
-                        </ActionButton>
-                      ) : null
-                    }
-                  />
-                </MobileSafeTable>
-              </DataTableShell>
+              <>
+                {/* Mobile cards */}
+                <div className="space-y-3 md:hidden">
+                  {rows.map((row) => {
+                    const sub = row.subscription ? subscriptionIndex[row.subscription] : undefined;
+                    const settled = isSettled(row.status);
+                    return (
+                      <div key={row.id} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+                        <div className="flex items-start gap-3">
+                          <div className={`flex size-9 shrink-0 items-center justify-center rounded-xl text-xs font-bold ${settled ? "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300" : "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"}`}>
+                            {settled ? "✓" : "…"}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-semibold text-sm text-foreground">
+                                {row.subscription ? `SUB-${row.subscription}` : `#${row.id}`}
+                              </span>
+                              <span className={`text-sm font-bold tabular-nums shrink-0 ${settled ? "text-green-700 dark:text-green-400" : "text-foreground"}`}>
+                                {money(row.commission_amount)}
+                              </span>
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-0.5 truncate">
+                              {sub?.customer_name || "Customer unavailable"}
+                              {row.emi ? ` · EMI #${row.emi}` : ""}
+                            </div>
+                            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                              <StatusBadge status={row.status || "PENDING"} />
+                              <span className="text-[11px] text-muted-foreground">{formatDateTime(row.created_at)}</span>
+                            </div>
+                          </div>
+                          {row.subscription ? (
+                            <ActionButton href={`/partner/subscriptions/${row.subscription}`} variant="ghost" className="h-8 w-8 p-0 shrink-0">
+                              <ChevronRight className="size-4" />
+                            </ActionButton>
+                          ) : null}
+                        </div>
+                        {settled && row.paid_at ? (
+                          <div className="mt-2 text-[11px] text-muted-foreground pl-12">Settled {formatDateTime(row.paid_at || row.approved_at)}</div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Desktop table */}
+                <div className="hidden md:block">
+                  <DataTableShell>
+                    <MobileSafeTable className="border-none bg-transparent">
+                      <DataTable<PartnerCommission>
+                        rows={rows}
+                        columns={columns}
+                        rowActions={(row) =>
+                          row.subscription ? (
+                            <ActionButton href={`/partner/subscriptions/${row.subscription}`} variant="outline" className="min-h-11">
+                              Subscription
+                            </ActionButton>
+                          ) : null
+                        }
+                      />
+                    </MobileSafeTable>
+                  </DataTableShell>
+                </div>
+              </>
             )}
           </DetailPanel>
         ) : null}

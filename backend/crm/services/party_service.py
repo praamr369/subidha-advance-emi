@@ -6,7 +6,7 @@ from django.db import transaction
 
 from accounts.models import User, UserRole
 from accounting.models import EmployeeProfile, Vendor
-from crm.models import PartyKind, PartyLink, PartyLinkRole, PartyMaster
+from crm.models import PartyKind, PartyLink, PartyLinkRole, PartyMaster, Lead
 from subscriptions.models import AuditLog, Customer, PublicLead
 from subscriptions.services.audit_service import log_audit
 
@@ -286,6 +286,27 @@ def sync_party_for_lead(lead: PublicLead, *, party: PartyMaster | None = None, p
     )
 
 
+def sync_party_for_crm_lead(lead: Lead, *, party: PartyMaster | None = None, performed_by=None) -> PartyMaster:
+    return _sync_party(
+        role_type=PartyLinkRole.LEAD,
+        app_label="crm",
+        model="Lead",
+        source_pk=lead.id,
+        display_name=lead.name,
+        phone=lead.phone,
+        email=getattr(lead, "email", ""),
+        city=getattr(lead, "address", ""),
+        is_active=lead.stage not in ("LOST", "CONVERTED"),
+        source_reference=f"CRM-LEAD-{lead.id}",
+        metadata={
+            "stage": lead.stage,
+            "source": lead.source,
+        },
+        party=party,
+        performed_by=performed_by,
+    )
+
+
 def sync_party_for_customer(customer: Customer, *, party: PartyMaster | None = None, performed_by=None) -> PartyMaster:
     user = getattr(customer, "user", None)
     return _sync_party(
@@ -390,6 +411,9 @@ def sync_all_party_master(*, performed_by=None) -> dict[str, int]:
     for lead in PublicLead.objects.select_related("product").all():
         sync_party_for_lead(lead, performed_by=performed_by)
         summary["leads"] += 1
+    for crm_lead in Lead.objects.all():
+        sync_party_for_crm_lead(crm_lead, performed_by=performed_by)
+        summary["leads"] += 1
     for customer in Customer.objects.select_related("user").all():
         sync_party_for_customer(customer, performed_by=performed_by)
         summary["customers"] += 1
@@ -422,6 +446,17 @@ def seed_missing_party_links(*, performed_by=None) -> dict[str, int]:
     )
     for lead in PublicLead.objects.select_related("product").exclude(id__in=existing_lead_ids):
         sync_party_for_lead(lead, performed_by=performed_by)
+        summary["leads"] += 1
+
+    existing_crm_lead_ids = set(
+        PartyLink.objects.filter(
+            role_type=PartyLinkRole.LEAD,
+            source_model="Lead",
+            source_app_label="crm",
+        ).values_list("source_pk", flat=True)
+    )
+    for crm_lead in Lead.objects.exclude(id__in=existing_crm_lead_ids):
+        sync_party_for_crm_lead(crm_lead, performed_by=performed_by)
         summary["leads"] += 1
 
     existing_customer_ids = set(

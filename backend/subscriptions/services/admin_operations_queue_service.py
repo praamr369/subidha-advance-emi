@@ -26,6 +26,8 @@ from subscriptions.models import (
     Subscription,
     SubscriptionRequest,
     SubscriptionRequestStatus,
+    ProductRequest,
+    ProductRequestStatus,
 )
 from billing.models import BillingDocumentStatus, DirectSale, DirectSaleStatus
 from inventory.models import PurchaseNeed, PurchaseNeedStatus
@@ -50,6 +52,7 @@ def build_admin_queue_summary() -> dict:
     today = timezone.localdate()
     partner_payment_qs = PartnerCollectionRequest.objects.filter(status=PartnerCollectionRequestStatus.SUBMITTED)
     subscription_requests_qs = SubscriptionRequest.objects.filter(status=SubscriptionRequestStatus.SUBMITTED)
+    product_requests_qs = ProductRequest.objects.filter(status=ProductRequestStatus.SUBMITTED)
     kyc_qs = CustomerKycDocument.objects.filter(status__in=[CustomerKycDocumentStatus.SUBMITTED, CustomerKycDocumentStatus.PENDING])
     return_inspection_qs = RentLeaseReturnInspection.objects.filter(status__in=["PENDING", "IN_PROGRESS"])
     reconciliation_qs = PaymentReconciliation.objects.filter(Q(status=ReconciliationStatus.PENDING) | Q(is_flagged=True))
@@ -83,6 +86,13 @@ def build_admin_queue_summary() -> dict:
             oldest_date=subscription_requests_qs.aggregate(oldest=Min("created_at"))["oldest"],
             detail_url="/admin/subscription-requests",
             badge_source="queue.subscription_requests_pending",
+        ),
+        _queue_payload(
+            key="product_requests_pending",
+            count=product_requests_qs.count(),
+            oldest_date=product_requests_qs.aggregate(oldest=Min("created_at"))["oldest"],
+            detail_url="/admin/requests/product-requests",
+            badge_source="queue.product_requests_pending",
         ),
         _queue_payload(
             key="customer_kyc_pending",

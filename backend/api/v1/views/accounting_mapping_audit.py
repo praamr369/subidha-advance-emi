@@ -344,26 +344,18 @@ class BridgePostingApprovalView(APIView):
         return Response({"approvals": rows})
 
     def post(self, request):
-        from accounting.models import BridgePostingApproval
-        from django.utils import timezone
+        from accounting.services.bridge_posting_approval_service import set_bridge_posting_approval
         serializer = BridgePostingApprovalSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         event_key = serializer.validated_data["event_key"]
         reason = serializer.validated_data.get("reason", "")
         action = request.data.get("action", "approve")
-        obj, _ = BridgePostingApproval.objects.get_or_create(event_key=event_key)
-        if action == "revoke":
-            obj.is_approved = False
-            obj.revoked_by = request.user
-            obj.revoked_at = timezone.now()
-        else:
-            obj.is_approved = True
-            obj.approved_by = request.user
-            obj.approved_at = timezone.now()
-            obj.revoked_by = None
-            obj.revoked_at = None
-        obj.reason = reason
-        obj.save()
+        obj = set_bridge_posting_approval(
+            event_key=event_key,
+            approved=(action != "revoke"),
+            actor=request.user,
+            reason=reason,
+        )
         try:
             audit = build_mapping_audit_payload()
         except Exception:

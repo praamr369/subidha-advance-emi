@@ -70,7 +70,7 @@ export default function InventoryProfileCostEditor({
       const payload: Record<string, number> = {};
 
       if (costs.purchase_unit_cost) payload.purchase_unit_cost = Number(costs.purchase_unit_cost);
-      if (costs.standard_unit_cost) payload.standard_unit_cost = Number(costs.standard_unit_cost);
+      // standard_unit_cost is now synced from PIM and read-only
 
       // Manufacturing costs (only for finished goods)
       if (itemType === "FINISHED_GOOD") {
@@ -175,16 +175,22 @@ export default function InventoryProfileCostEditor({
                 </div>
 
                 <label className="text-sm text-muted-foreground">
-                  Standard Unit Cost
+                  <div className="flex items-center justify-between">
+                    <span>Standard Unit Cost</span>
+                    <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">
+                      Synced from PIM Cost
+                    </span>
+                  </div>
                   <input
                     type="number"
                     min="0"
                     step="0.01"
                     value={costs.standard_unit_cost}
                     onChange={(e) => setCosts({ ...costs, standard_unit_cost: e.target.value })}
-                    disabled={saving}
+                    disabled={true}
+                    readOnly={true}
                     placeholder="0.00"
-                    className="mt-2 h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none transition focus:border-ring disabled:opacity-60"
+                    className="mt-2 h-10 w-full rounded-lg border border-border bg-muted/50 px-3 text-sm outline-none cursor-not-allowed opacity-70"
                   />
                 </label>
               </div>

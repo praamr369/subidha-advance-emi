@@ -447,68 +447,59 @@ body {
 .public-app {
   min-height: 100vh;
   overflow-x: clip;
-  /* Warm retail brown primary for marketing + auth only (dashboard uses .dashboard-app). */
-  --primary: oklch(0.44 0.072 58);
-  --primary-foreground: oklch(0.985 0.004 95);
-  --ring: oklch(0.5 0.085 56);
+  
+  /* Modern 3D Premium Brand Palette (Deep Indigo & Amber) */
+  --primary: oklch(0.35 0.1 260);
+  --primary-foreground: oklch(0.98 0.01 260);
+  --accent: oklch(0.75 0.15 70);
+  --accent-foreground: oklch(0.2 0.05 70);
+  --success: oklch(0.6 0.12 150);
+  --success-foreground: oklch(0.98 0.01 150);
+  --ring: oklch(0.45 0.1 260);
+  
+  --surface-card: oklch(0.99 0.01 90); /* Soft cream */
+  --surface-muted: oklch(0.94 0.02 90);
+  --border: oklch(0.85 0.02 260);
+
   background:
     radial-gradient(
       circle at 10% 0%,
-      color-mix(in oklab, var(--accent) 22%, transparent),
-      transparent 42%
+      color-mix(in oklab, var(--accent) 15%, transparent),
+      transparent 40%
     ),
     radial-gradient(
-      circle at 92% 6%,
-      color-mix(in oklab, oklch(0.38 0.045 58) 12%, transparent),
-      transparent 46%
+      circle at 90% 10%,
+      color-mix(in oklab, var(--primary) 12%, transparent),
+      transparent 45%
     ),
-    repeating-linear-gradient(
-      90deg,
-      rgba(15, 23, 42, 0.024) 0,
-      rgba(15, 23, 42, 0.024) 1px,
-      transparent 1px,
-      transparent 84px
-    ),
-    repeating-linear-gradient(
-      180deg,
-      rgba(15, 23, 42, 0.02) 0,
-      rgba(15, 23, 42, 0.02) 1px,
-      transparent 1px,
-      transparent 84px
-    ),
-    linear-gradient(180deg, #fbfaf7 0%, #f4f0eb 55%, #ebe6df 100%);
+    linear-gradient(180deg, oklch(0.98 0.01 90) 0%, oklch(0.96 0.02 90) 100%);
 }
 
 .dark .public-app {
-  --primary: oklch(0.7 0.068 76);
-  --primary-foreground: oklch(0.98 0.01 95);
-  --ring: oklch(0.62 0.075 74);
+  --primary: oklch(0.45 0.12 260);
+  --primary-foreground: oklch(0.98 0.01 260);
+  --accent: oklch(0.7 0.15 70);
+  --accent-foreground: oklch(0.15 0.05 70);
+  --success: oklch(0.55 0.1 150);
+  --success-foreground: oklch(0.98 0.01 150);
+  --ring: oklch(0.55 0.1 260);
+
+  --surface-card: oklch(0.24 0.02 260);
+  --surface-muted: oklch(0.18 0.02 260);
+  --border: oklch(0.3 0.03 260);
+  
   background:
     radial-gradient(
       circle at 10% 0%,
-      color-mix(in oklab, var(--accent) 14%, transparent),
-      transparent 42%
+      color-mix(in oklab, var(--accent) 12%, transparent),
+      transparent 45%
     ),
     radial-gradient(
-      circle at 92% 6%,
-      color-mix(in oklab, oklch(0.42 0.04 58) 18%, transparent),
-      transparent 46%
+      circle at 90% 10%,
+      color-mix(in oklab, var(--primary) 15%, transparent),
+      transparent 50%
     ),
-    repeating-linear-gradient(
-      90deg,
-      rgba(255, 255, 255, 0.03) 0,
-      rgba(255, 255, 255, 0.03) 1px,
-      transparent 1px,
-      transparent 84px
-    ),
-    repeating-linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.025) 0,
-      rgba(255, 255, 255, 0.025) 1px,
-      transparent 1px,
-      transparent 84px
-    ),
-    linear-gradient(180deg, oklch(0.22 0.014 72) 0%, oklch(0.19 0.012 68) 55%, oklch(0.175 0.01 65) 100%);
+    linear-gradient(180deg, oklch(0.18 0.02 260) 0%, oklch(0.15 0.02 260) 100%);
 }
 
 /* Shared focus treatment for public marketing + lead forms */

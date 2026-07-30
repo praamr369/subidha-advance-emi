@@ -21,6 +21,8 @@ class SubscriptionsConfig(AppConfig):
         import subscriptions.models_month_end_close  # noqa
         import subscriptions.models_growth_offers  # noqa
         import subscriptions.models_growth_requests  # noqa
+        import subscriptions.models_online_request  # noqa
+        import subscriptions.models_crm_pipeline  # noqa
 
     def ready(self):
         import subscriptions.signals  # noqa

@@ -72,7 +72,7 @@ export default function DamageAssessmentPage() {
       <div className="max-w-2xl mx-auto space-y-6">
         {assessment && (
           <WorkspaceSection title="Agent Assessment (if completed)">
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
               <div><span className="text-gray-500">Condition:</span> <strong>{assessment.condition}</strong></div>
               <div><span className="text-gray-500">Deduction:</span> <strong>₹{assessment.deduction_amount}</strong></div>
               <div className="col-span-2"><span className="text-gray-500">Notes:</span> {assessment.notes}</div>

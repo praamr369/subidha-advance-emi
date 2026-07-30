@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 
 import { brandConfig } from "@/config/brand";
-import { PUBLIC_MARKETING_ASSETS } from "@/lib/public-marketing-assets";
 import type { ResolvedPublicBusinessProfile } from "@/lib/public-profile";
 
 const fallbackBaseUrl = "https://subidha.example.com";
@@ -23,8 +22,7 @@ export function absolutePublicUrl(path = "/"): string {
 }
 
 function defaultSocialImagePath(): string {
-  const image = PUBLIC_MARKETING_ASSETS.heroShowroom;
-  return image.imageExists ? image.src : "/brand/logo.png";
+  return "/images/hero_living_room.jpg";
 }
 
 export function buildPublicMetadata(input: {

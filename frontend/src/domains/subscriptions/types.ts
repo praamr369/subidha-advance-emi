@@ -1,5 +1,8 @@
 export type AdminSubscription = {
   id: number;
+  subscription_number?: string;
+  subscription_code?: string;
+  code?: string;
   customer: number;
   product: number;
   partner: number | null;

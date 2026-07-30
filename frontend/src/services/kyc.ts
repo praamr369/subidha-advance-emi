@@ -1,4 +1,5 @@
 import { apiFetch } from "@/lib/api";
+import { API_BASE_URL } from "@/lib/constants";
 
 /**
  * Unified KYC intake & review service.

@@ -1,9 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
+import Link from "next/link";
 
 import {
   fetchDocumentReadiness,
+  uploadSubscriptionDocument,
+  verifySubscriptionDocument,
+  rejectSubscriptionDocument,
   type DocumentReadiness,
   type VaultDocumentItem,
 } from "@/services/kyc-readiness";
@@ -21,11 +25,30 @@ const STATUS_CLASSES: Record<string, string> = {
   MISSING: "border-red-200 bg-red-50 text-red-700",
 };
 
+const KEY_TO_DOC_TYPE: Record<string, string> = {
+  ID_PROOF: "CUSTOMER_KYC_ID",
+  ADDRESS_PROOF: "CUSTOMER_KYC_ID", // Changed from OTHER to CUSTOMER_KYC_ID
+  SIGNED_CONTRACT: "CUSTOMER_SIGNATURE",
+  DEPOSIT_RECEIPT: "SECURITY_DEPOSIT_RECEIPT_PDF",
+  CONDITION_PROOF: "ASSET_HANDOVER_ACKNOWLEDGEMENT",
+  HANDOVER_PROOF: "DELIVERY_HANDOVER_NOTE",
+};
+
 function statusClasses(status: string): string {
   return STATUS_CLASSES[status] ?? "border-border bg-muted text-foreground";
 }
 
-function VaultDocumentRow({ doc }: { doc: VaultDocumentItem }) {
+function VaultDocumentRow({
+  doc,
+  subscriptionId,
+  customerId,
+  onRefresh,
+}: {
+  doc: VaultDocumentItem;
+  subscriptionId: number;
+  customerId: number | null;
+  onRefresh: () => void;
+}) {
   const isOk = doc.status === "VERIFIED" || doc.status === "NOT_REQUIRED";
   const dotColor =
     doc.status === "VERIFIED"
@@ -35,6 +58,62 @@ function VaultDocumentRow({ doc }: { doc: VaultDocumentItem }) {
         : doc.status === "PRESENT"
           ? "bg-amber-400"
           : "bg-red-400";
+
+  const [isUploading, setIsUploading] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [isRejecting, setIsRejecting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const isKycDoc = doc.document_key === "ID_PROOF" || doc.document_key === "ADDRESS_PROOF";
+  const canUpload = !isOk;
+  const canVerifyReject = (doc.status === "PRESENT" || doc.status === "REJECTED") && doc.document_id != null;
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const docType = KEY_TO_DOC_TYPE[doc.document_key] || "OTHER";
+      const category = isKycDoc ? doc.document_key : undefined;
+      await uploadSubscriptionDocument(subscriptionId, docType, file, category);
+      onRefresh();
+    } catch (err) {
+      alert("Failed to upload document.");
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleVerify = async () => {
+    if (!doc.document_id) return;
+    setIsVerifying(true);
+    try {
+      await verifySubscriptionDocument(subscriptionId, doc.document_id);
+      onRefresh();
+    } catch (err) {
+      alert("Failed to verify document.");
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const handleReject = async () => {
+    if (!doc.document_id) return;
+    const reason = prompt("Please enter the reason for rejection:");
+    if (!reason) return;
+
+    setIsRejecting(true);
+    try {
+      await rejectSubscriptionDocument(subscriptionId, doc.document_id, reason);
+      onRefresh();
+    } catch (err) {
+      alert("Failed to reject document.");
+    } finally {
+      setIsRejecting(false);
+    }
+  };
 
   return (
     <div
@@ -52,11 +131,13 @@ function VaultDocumentRow({ doc }: { doc: VaultDocumentItem }) {
             )}
           </span>
         </div>
-        <span
-          className={`inline-flex rounded border px-2 py-0.5 text-xs font-semibold ${statusClasses(doc.status)}`}
-        >
-          {doc.status}
-        </span>
+        <div className="flex items-center gap-3">
+          <span
+            className={`inline-flex rounded border px-2 py-0.5 text-xs font-semibold ${statusClasses(doc.status)}`}
+          >
+            {doc.status}
+          </span>
+        </div>
       </div>
 
       <div className="mt-2 flex flex-wrap gap-3 pl-5 text-xs text-muted-foreground">
@@ -82,6 +163,58 @@ function VaultDocumentRow({ doc }: { doc: VaultDocumentItem }) {
         )}
         {doc.blocker_code && (
           <span className="font-medium text-red-700">Blocker: {doc.blocker_code}</span>
+        )}
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2 pl-5">
+        {canUpload && (
+          <>
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              onChange={handleUpload}
+              accept=".pdf,.jpg,.jpeg,.png"
+            />
+            <button
+              type="button"
+              disabled={isUploading}
+              onClick={() => fileInputRef.current?.click()}
+              className="inline-flex items-center rounded bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 disabled:opacity-50"
+            >
+              {isUploading ? "Uploading..." : "Upload"}
+            </button>
+          </>
+        )}
+        
+        {isKycDoc && !isOk && customerId && (
+          <Link
+            href={`/admin/customers/${customerId}/profile`}
+            className="inline-flex items-center rounded border border-border bg-background px-2 py-1 text-xs font-medium hover:bg-accent hover:text-accent-foreground"
+          >
+            View in CRM
+          </Link>
+        )}
+
+        {canVerifyReject && !isKycDoc && (
+          <>
+            <button
+              type="button"
+              disabled={isVerifying}
+              onClick={handleVerify}
+              className="inline-flex items-center rounded border border-emerald-300 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+            >
+              {isVerifying ? "Verifying..." : "Verify"}
+            </button>
+            <button
+              type="button"
+              disabled={isRejecting}
+              onClick={handleReject}
+              className="inline-flex items-center rounded border border-red-300 bg-red-50 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
+            >
+              {isRejecting ? "Rejecting..." : "Reject"}
+            </button>
+          </>
         )}
       </div>
     </div>
@@ -203,12 +336,14 @@ export function DocumentReadinessPanel({ subscriptionId }: Props) {
 
       <div className="mt-4 space-y-2" data-testid="document-readiness-list">
         {requiredDocuments.map((doc) => (
-          <VaultDocumentRow key={doc.document_key} doc={doc} />
+          <VaultDocumentRow 
+            key={doc.document_key} 
+            doc={doc} 
+            subscriptionId={subscriptionId}
+            customerId={data.customer_id}
+            onRefresh={load} 
+          />
         ))}
-      </div>
-
-      <div className="mt-4 rounded-xl border border-border bg-background/60 px-3 py-2 text-xs text-muted-foreground">
-        Read-only. Upload, verify, and reject actions are not available from this panel.
       </div>
     </div>
   );

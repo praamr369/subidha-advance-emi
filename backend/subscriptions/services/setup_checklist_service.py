@@ -351,4 +351,13 @@ def compute_setup_checklist():
         "percent_complete": percent_complete,
         "items": items,
         "counts": counts,
+        "control_room_summary": {
+            "ready": is_ready_for_go_live,
+            "completion_percentage": percent_complete,
+            "required_total": len(required_items),
+            "required_completed": completed_required,
+            "all_total": len(items),
+            "all_completed": completed_all,
+            "status_label": "READY FOR LIVE OPERATIONS" if is_ready_for_go_live else "SETUP IN PROGRESS",
+        },
     }

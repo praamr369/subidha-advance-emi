@@ -9,6 +9,7 @@ import {
   Search,
   Star,
   X,
+  SlidersHorizontal,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -47,6 +48,7 @@ type AdminSidebarNavProps = {
   footerSlot: ReactNode;
   onToggleCollapse: () => void;
   onClose?: () => void;
+  onOpenCustomizer?: () => void;
 };
 
 function flatten(items: AdminNavItem[]): AdminNavItem[] {
@@ -79,17 +81,25 @@ export default function AdminSidebarNav({
   footerSlot,
   onToggleCollapse,
   onClose,
+  onOpenCustomizer,
 }: AdminSidebarNavProps) {
   const searching = navQuery.trim().length > 0;
 
   const groupMeta = useMemo(
     () =>
-      groups.map((group) => ({
-        title: group.title,
-        count: flatten(group.items).filter((i) => !i.children?.length).length,
-        active: isGroupActive(group, activeHref),
-      })),
-    [groups, activeHref]
+      groups.map((group) => {
+        const flatItems = flatten(group.items);
+        return {
+          title: group.title,
+          count: flatItems.filter((i) => !i.children?.length).length,
+          active: isGroupActive(group, activeHref),
+          badgeCount: flatItems.reduce(
+            (sum, item) => sum + (item.badgeSource ? (badges[item.badgeSource] ?? 0) : 0),
+            0
+          ),
+        };
+      }),
+    [groups, activeHref, badges]
   );
 
   function renderItem(item: AdminNavItem, depth = 0): ReactNode {
@@ -119,9 +129,9 @@ export default function AdminSidebarNav({
       <div key={`${item.href}:${item.label}:${depth}`}>
         <div
           className={cn(
-            "group/navrow relative flex min-h-[2.5rem] items-center rounded-xl transition-colors",
+            "group/navrow relative flex min-h-[2.5rem] items-center rounded-xl transition-all duration-200",
             active
-              ? "bg-[color-mix(in_oklab,var(--sidebar-primary)_16%,transparent)] ring-1 ring-inset ring-[color-mix(in_oklab,var(--sidebar-primary)_30%,transparent)]"
+              ? "bg-[linear-gradient(180deg,color-mix(in_oklab,var(--sidebar-primary)_20%,transparent),color-mix(in_oklab,var(--sidebar-primary)_10%,transparent))] ring-1 ring-inset ring-[color-mix(in_oklab,var(--sidebar-primary)_40%,transparent)] shadow-[inset_0_1px_1px_color-mix(in_oklab,white_20%,transparent),0_4px_12px_-4px_color-mix(in_oklab,var(--sidebar-primary)_30%,transparent)]"
               : "hover:bg-card/[0.05]"
           )}
         >
@@ -159,9 +169,12 @@ export default function AdminSidebarNav({
           </Link>
 
           {badgeCount > 0 ? (
-            <span className="mr-1.5 inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-[var(--sidebar-primary)] px-1.5 text-[11px] font-semibold leading-5 text-white">
-              {badgeCount}
-            </span>
+            <div className="relative mr-1.5 flex h-5 min-w-[1.25rem] items-center justify-center">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--sidebar-primary)] opacity-40" />
+              <span className="relative inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-[var(--sidebar-primary)] px-1.5 text-[11px] font-bold leading-5 text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_2px_4px_rgba(0,0,0,0.2)]">
+                {badgeCount}
+              </span>
+            </div>
           ) : null}
 
           {canFavorite && !item.children?.length ? (
@@ -242,6 +255,22 @@ export default function AdminSidebarNav({
             <Command className="h-3 w-3" />K
           </span>
         </div>
+        {onOpenCustomizer && (
+          <button
+            type="button"
+            onClick={onOpenCustomizer}
+            className="mt-2 flex w-full items-center justify-between rounded-xl bg-[linear-gradient(135deg,color-mix(in_oklab,var(--sidebar-primary)_18%,transparent),color-mix(in_oklab,var(--sidebar-primary)_6%,transparent))] px-3 py-2 text-[12px] font-semibold text-[var(--sidebar-foreground)] transition hover:from-[var(--sidebar-primary)]/25 ring-1 ring-inset ring-[var(--sidebar-primary)]/30 shadow-sm"
+            title="Open Live Desktop Navigation Customizer"
+          >
+            <span className="flex items-center gap-2">
+              <SlidersHorizontal className="h-3.5 w-3.5 text-[var(--sidebar-primary)]" />
+              <span>Customize Sidebar</span>
+            </span>
+            <span className="rounded bg-[var(--sidebar-primary)]/20 px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-[var(--sidebar-primary)]">
+              LIVE
+            </span>
+          </button>
+        )}
       </div>
 
       {/* Scroll area */}
@@ -263,8 +292,9 @@ export default function AdminSidebarNav({
           {groups.map((group, index) => {
             const meta = groupMeta[index];
             const GroupIcon = group.icon;
+            const anyGroupExplicitlyOpen = groups.some((g) => expandedGroups[g.title] === true);
             const open =
-              searching || meta.active || (expandedGroups[group.title] ?? meta.active);
+              searching || (expandedGroups[group.title] === true) || (!anyGroupExplicitlyOpen && meta.active);
             return (
               <div
                 key={group.title}
@@ -283,7 +313,7 @@ export default function AdminSidebarNav({
                     className={cn(
                       "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ring-1 ring-inset transition-colors",
                       meta.active
-                        ? "bg-[color-mix(in_oklab,var(--sidebar-primary)_18%,transparent)] text-[var(--sidebar-primary)] ring-[color-mix(in_oklab,var(--sidebar-primary)_30%,transparent)]"
+                        ? "bg-[linear-gradient(180deg,color-mix(in_oklab,var(--sidebar-primary)_24%,transparent),color-mix(in_oklab,var(--sidebar-primary)_12%,transparent))] text-[var(--sidebar-primary)] ring-[color-mix(in_oklab,var(--sidebar-primary)_40%,transparent)] shadow-[inset_0_1px_1px_color-mix(in_oklab,white_20%,transparent),0_2px_8px_-2px_color-mix(in_oklab,var(--sidebar-primary)_30%,transparent)]"
                         : "bg-card/[0.04] text-[var(--sidebar-item-muted)] ring-white/[0.06]"
                     )}
                   >
@@ -299,7 +329,18 @@ export default function AdminSidebarNav({
                   >
                     {group.title}
                   </span>
-                  <span className="shrink-0 text-[11px] font-medium tabular-nums text-[var(--sidebar-section-label)]">
+                  {meta.badgeCount > 0 ? (
+                    <div className="relative mr-1 flex h-5 min-w-[1.25rem] items-center justify-center" title={`${meta.badgeCount} pending action items in ${group.title}`}>
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--sidebar-primary)] opacity-40" />
+                      <span className="relative inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-[var(--sidebar-primary)] px-1.5 text-[11px] font-bold leading-5 text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_2px_4px_rgba(0,0,0,0.2)]">
+                        {meta.badgeCount}
+                      </span>
+                    </div>
+                  ) : null}
+                  <span
+                    className="shrink-0 text-[11px] font-medium tabular-nums text-[var(--sidebar-section-label)]"
+                    title={`${meta.count} pages in ${group.title}`}
+                  >
                     {meta.count}
                   </span>
                   <ChevronDown
@@ -309,11 +350,18 @@ export default function AdminSidebarNav({
                     )}
                   />
                 </button>
-                {open ? (
-                  <div className="space-y-0.5 px-1.5 pb-2">
-                    {group.items.map((item) => renderItem(item))}
+                <div
+                  className={cn(
+                    "grid transition-all duration-200 ease-in-out",
+                    open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0 pointer-events-none"
+                  )}
+                >
+                  <div className="overflow-hidden">
+                    <div className="space-y-0.5 px-1.5 pb-2">
+                      {group.items.map((item) => renderItem(item))}
+                    </div>
                   </div>
-                ) : null}
+                </div>
               </div>
             );
           })}

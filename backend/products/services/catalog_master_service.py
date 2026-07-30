@@ -171,6 +171,9 @@ def sync_inventory_product_master_fields(product: Product) -> None:
     if inventory_profile.unit_of_measure != product.unit_of_measure:
         inventory_profile.unit_of_measure = product.unit_of_measure
         update_fields.append("unit_of_measure")
+    if getattr(inventory_profile, "stock_item_type", None) != product.item_type:
+        inventory_profile.stock_item_type = product.item_type
+        update_fields.append("stock_item_type")
 
     if update_fields:
         inventory_profile.save(update_fields=update_fields + ["updated_at"])
@@ -182,14 +185,22 @@ def ensure_inventory_profile_for_product(
     default_stock_location=None,
     stock_tracking_enabled: bool = True,
 ):
-    from inventory.models import InventoryItem
+    from inventory.models import InventoryItem, InventoryItemType
+
+    valid_inventory_types = {
+        InventoryItemType.FINISHED_GOOD,
+        InventoryItemType.ACCESSORY,
+        InventoryItemType.RAW_MATERIAL,
+    }
+    if product.item_type not in valid_inventory_types:
+        return None, False
 
     defaults = {
         "sku": product.sku,
         "unit_of_measure": product.unit_of_measure or DEFAULT_UNIT_OF_MEASURE,
         "default_stock_location": default_stock_location,
         "stock_tracking_enabled": stock_tracking_enabled,
-        "stock_item_type": InventoryItemType.FINISHED_GOOD,
+        "stock_item_type": product.item_type,
         "delivery_stock_bridge_enabled": bool(product.is_emi_enabled),
         "is_active": product.is_active,
     }

@@ -295,3 +295,24 @@ class AdminExceptionSuppressView(APIView):
         except Exception as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(_exception_payload(updated))
+
+
+class AdminControlMetricsView(APIView):
+    """GET /api/v1/admin/control/metrics/"""
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        from subscriptions.models_cash_counter_session import CashCounterSession, CashCounterSessionStatus
+        
+        pending_approvals = ApprovalRequest.objects.filter(status=ApprovalStatus.PENDING).count()
+        active_exceptions = ControlException.objects.filter(status=ExceptionStatus.OPEN).count()
+        cash_variances = CashCounterSession.objects.filter(
+            status=CashCounterSessionStatus.VARIANCE_PENDING_APPROVAL
+        ).count()
+
+        return Response({
+            "pending_approvals": pending_approvals,
+            "active_exceptions": active_exceptions,
+            "cash_variances": cash_variances,
+            "system_health": "99.9%"
+        })

@@ -56,7 +56,9 @@ class DirectSaleExchangeCreateSerializer(serializers.Serializer):
 class CustomerRefundCreateSerializer(serializers.Serializer):
     amount = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal("0.01"))
     method = serializers.ChoiceField(choices=RefundMethod.choices)
-    finance_account_id = serializers.IntegerField(min_value=1)
+    # Optional: when omitted, the account is auto-resolved from the method
+    # (cash refund -> cash desk; UPI/bank refund -> the single Bank/UPI account).
+    finance_account_id = serializers.IntegerField(min_value=1, required=False, allow_null=True)
     reason = serializers.CharField(required=True, allow_blank=False)
     direct_sale_return_id = serializers.IntegerField(required=False, allow_null=True, min_value=1)
 

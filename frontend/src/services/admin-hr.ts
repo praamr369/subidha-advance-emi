@@ -502,7 +502,7 @@ export const recordEmployeeAttendance = markHrAttendance;
  * @deprecated Endpoint no longer available at /accounting/reports/attendance-calendar/
  * Use listHrAttendance instead
  */
-export async function getAttendanceCalendar(params: {
+export async function getAttendanceCalendar(_params: {
   employee: number;
   year: number;
   month: number;
@@ -517,7 +517,7 @@ export async function getAttendanceCalendar(params: {
  * Use listHrPayroll or listPayrollPeriods instead
  */
 export async function listPayrollPeriods(params: Record<string, string | number | undefined | null> = {}) {
-  return apiFetch<{ count: number; results: any[] }>(`/admin/hr/payroll-periods/${queryString(params)}`);
+  return apiFetch<{ count: number; results: unknown[] }>(`/admin/hr/payroll-periods/${queryString(params)}`);
 }
 
 /**
@@ -525,7 +525,7 @@ export async function listPayrollPeriods(params: Record<string, string | number 
  * Backward compatibility: calls /admin/hr/leave-types/
  */
 export const listLeaveTypes = async (params: Record<string, string | number | undefined | null> = {}) => {
-  return apiFetch<{ count: number; results: any[] }>(`/admin/hr/leave-types/${queryString(params)}`);
+  return apiFetch<{ count: number; results: unknown[] }>(`/admin/hr/leave-types/${queryString(params)}`);
 };
 
 /**
@@ -572,7 +572,7 @@ export async function rejectLeaveRequest(id: number, reason: string) {
 /**
  * @deprecated Endpoint no longer at /accounting/leave-requests/<id>/cancel/
  */
-export async function cancelLeaveRequest(id: number, reason: string) {
+export async function cancelLeaveRequest(_id: number, _reason: string) {
   console.warn("cancelLeaveRequest endpoint moved - contact admin");
   return null;
 }
@@ -581,7 +581,7 @@ export async function cancelLeaveRequest(id: number, reason: string) {
  * @deprecated Use getHrPayroll or listHrSalaryPayments instead
  */
 export async function listSalarySheets(params: Record<string, string | number | undefined | null> = {}) {
-  return apiFetch<{ count: number; results: any[] }>(`/admin/hr/payroll/${queryString(params)}`);
+  return apiFetch<{ count: number; results: unknown[] }>(`/admin/hr/payroll/${queryString(params)}`);
 }
 
 /**

@@ -75,7 +75,7 @@ export default function DataExportPage() {
         ) : (
           <>
             <WorkspaceSection title="Select Data to Export">
-              <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="grid grid-cols-1 gap-3 mb-4 sm:grid-cols-2">
                 {DATA_CATEGORIES.map((cat) => (
                   <label key={cat.key} className={`flex items-start gap-2 p-3 border rounded-lg cursor-pointer ${
                     selected.includes(cat.key) ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20" : "hover:bg-gray-50 dark:hover:bg-gray-800"

@@ -6,6 +6,7 @@ import { ArrowUpRight, Search, SlidersHorizontal, Sparkles, X } from "lucide-rea
 
 import PublicProductMedia from "@/components/public/PublicProductMedia";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
+import ProductCard3D from "@/components/public/ui/ProductCard3D";
 import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/format";
@@ -264,10 +265,23 @@ export default function ProductGrid({ products, locale = "en" }: { products: Pub
       {filteredProducts.length === 0 ? (
         <FilteredEmptyState onReset={resetFilters} />
       ) : (
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
-          {filteredProducts.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3 lg:gap-8">
+          {filteredProducts.map((product) => {
+            const price = Number(product.base_price) || 0;
+            const emiAmount = Math.round(price / 12);
+            return (
+              <ProductCard3D
+                key={product.id}
+                id={String(product.id)}
+                title={product.name}
+                category={product.category || "Uncategorized"}
+                price={price}
+                emiAmount={emiAmount}
+                imageUrl={product.image || ""}
+                href={`/products/${product.id}`}
+              />
+            );
+          })}
         </div>
       )}
     </div>
@@ -352,95 +366,5 @@ function FilteredEmptyState({ onReset }: { onReset: () => void }) {
   );
 }
 
-function ProductCard({ product }: { product: PublicProduct }) {
-  const mediaState = product.image ? "Media ready" : "Media pending";
 
-  return (
-    <Link
-      href={`/products/${product.id}`}
-      className="group block rounded-[2rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2"
-    >
-      <article className="overflow-hidden rounded-[2rem] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] shadow-[0_30px_72px_-54px_rgba(15,23,42,0.82)] transition duration-300 group-hover:-translate-y-1.5 group-hover:shadow-[0_40px_90px_-54px_rgba(15,23,42,0.92)] group-focus-visible:-translate-y-1.5 group-focus-visible:shadow-[0_40px_90px_-54px_rgba(15,23,42,0.92)]">
-        <div className="relative p-3">
-          <div className="pointer-events-none absolute inset-x-7 top-3 h-px bg-gradient-to-r from-transparent via-white to-transparent" />
-          <AspectRatio ratio={4 / 3}>
-            <PublicProductMedia
-              src={product.image}
-              alt={product.name}
-              badge={product.category || null}
-              sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
-              className="absolute inset-0 size-full rounded-[1.7rem]"
-              imageClassName="transition duration-500 group-hover:scale-[1.04]"
-            />
-          </AspectRatio>
-        </div>
-
-        <div className="space-y-4 px-5 pb-5 pt-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-slate-200/90 bg-slate-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600">
-              {product.product_code}
-            </span>
-            <span
-              className={cn(
-                "rounded-full border px-3 py-1 text-[11px] font-medium",
-                product.image
-                  ? "border-[color-mix(in_oklab,var(--border)_55%,var(--primary)_45%)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_90%,var(--accent)_10%)] text-[color-mix(in_oklab,var(--foreground)_72%,var(--primary)_28%)]"
-                  : "border-[color-mix(in_oklab,var(--warning)_35%,var(--border)_65%)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_88%,var(--warning)_12%)] text-[color-mix(in_oklab,var(--foreground)_65%,var(--warning-foreground)_35%)]"
-              )}
-            >
-              {mediaState}
-            </span>
-          </div>
-
-          <div className="space-y-2">
-            <h3 className="text-xl font-semibold tracking-tight text-foreground">
-              {product.name}
-            </h3>
-            <p className="line-clamp-2 text-sm leading-6 text-muted-foreground">
-              {product.description?.trim() || "No short description was added in the catalogue for this item."}
-            </p>
-          </div>
-
-          <div className="grid gap-3 rounded-[1.4rem] border border-white/80 bg-white/82 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.84)]">
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                  Catalogue state
-                </div>
-                <div className="mt-1 font-medium text-foreground">Published</div>
-              </div>
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                  Enquiry handoff
-                </div>
-                <div className="mt-1 font-medium text-foreground">Product context ready</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-end justify-between gap-4">
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                Base price
-              </div>
-              <div className="mt-1 text-2xl font-semibold text-foreground">
-                {formatCurrency(product.base_price)}
-              </div>
-              {product.subcategory ? (
-                <div className="mt-1 text-xs text-muted-foreground">
-                  {product.subcategory}
-                </div>
-              ) : null}
-            </div>
-
-            <span className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/85 px-3 py-2 text-sm font-medium text-foreground shadow-[0_16px_36px_-28px_rgba(15,23,42,0.72)] transition group-hover:bg-slate-950 group-hover:text-white">
-              View product
-              <ArrowUpRight className="h-4 w-4" />
-            </span>
-          </div>
-        </div>
-      </article>
-    </Link>
-  );
-}
 

@@ -2,14 +2,16 @@ import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
+
 type PortalShellProps = {
   sidebar?: ReactNode;
   header?: ReactNode;
   children: ReactNode;
   className?: string;
+  mainClassName?: string;
 };
 
-export default function PortalShell({ sidebar, header, children, className }: PortalShellProps) {
+export default function PortalShell({ sidebar, header, children, className, mainClassName }: PortalShellProps) {
   return (
     <div
       className={cn(
@@ -25,7 +27,7 @@ export default function PortalShell({ sidebar, header, children, className }: Po
           <main
             id="main-content"
             tabIndex={-1}
-            className="portal-scroll-area min-w-0 flex-1 overflow-y-auto overflow-x-clip overscroll-behavior-x-contain"
+            className={cn("portal-scroll-area min-w-0 flex-1 overflow-y-auto overflow-x-clip overscroll-behavior-x-contain", mainClassName)}
           >
             <div className="workspace-shell-stage workspace-content-cap w-full min-w-0 px-3 py-4 sm:px-4 sm:py-5 lg:px-6 lg:py-6 xl:px-8">
               <div className="route-content-fade relative z-[1] min-w-0">{children}</div>

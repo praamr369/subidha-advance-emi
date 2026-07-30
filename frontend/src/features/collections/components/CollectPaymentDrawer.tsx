@@ -11,6 +11,7 @@ import {
   type PaymentCollectionResult,
   type PaymentMethod,
 } from "@/services/payments";
+import { PAYMENT_METHOD_LABELS } from "@/lib/payment-methods";
 
 type CollectPaymentDrawerProps = {
   open: boolean;
@@ -22,12 +23,7 @@ type CollectPaymentDrawerProps = {
   onCollected?: () => void | Promise<void>;
 };
 
-const PAYMENT_METHOD_OPTIONS: PaymentMethod[] = [
-  "CASH",
-  "UPI",
-  "BANK",
-  "CARD",
-];
+const PAYMENT_METHOD_OPTIONS: PaymentMethod[] = ["CASH", "UPI", "TRANSFER", "CHEQUE", "DEPOSIT"];
 
 const FIELD_CLASS_NAME =
   "h-11 w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 text-sm text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] outline-none transition focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35 disabled:cursor-not-allowed disabled:opacity-60";
@@ -80,9 +76,8 @@ function CollectPaymentDrawerContent({
   const availableFinanceAccounts = useMemo(
     () =>
       financeAccounts.filter((account) =>
-        paymentMethod === "CARD"
-          ? account.kind === "BANK"
-          : account.kind === paymentMethod
+        // Cash -> cash desk; every non-cash instrument -> the single Bank/UPI account.
+        paymentMethod === "CASH" ? account.kind === "CASH" : account.kind === "BANK" || account.kind === "UPI"
       ),
     [financeAccounts, paymentMethod]
   );
@@ -185,12 +180,7 @@ function CollectPaymentDrawerContent({
       return;
     }
 
-    if (
-      (paymentMethod === "UPI" ||
-        paymentMethod === "BANK" ||
-        paymentMethod === "CARD") &&
-      !referenceNo.trim()
-    ) {
+    if (paymentMethod !== "CASH" && !referenceNo.trim()) {
       setLocalError(
         "Reference number is required for UPI, bank, or card collections."
       );
@@ -328,13 +318,7 @@ function CollectPaymentDrawerContent({
               >
                 {PAYMENT_METHOD_OPTIONS.map((method) => (
                   <option key={method} value={method}>
-                    {method === "CASH"
-                      ? "Cash"
-                      : method === "UPI"
-                        ? "UPI"
-                        : method === "BANK"
-                          ? "Bank"
-                          : "Card"}
+                    {PAYMENT_METHOD_LABELS[method] ?? method}
                   </option>
                 ))}
               </select>

@@ -10,6 +10,9 @@ import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import KycDocumentPanel from "@/components/kyc/KycDocumentPanel";
+import { Party360Embed, UniversalQuickWidgetsEmbed } from "@/components/profile/Profile360";
+import { ProfilePayablesPanel } from "@/components/profile/ProfilePayablesPanel";
+import { WorkbenchFilterChips } from "@/components/workbench/WorkbenchFilterChips";
 import ActionButton from "@/components/ui/ActionButton";
 import {
   DataTableShell,
@@ -63,7 +66,7 @@ import {
 import { listFinanceAccounts, type FinanceAccount } from "@/services/accounting";
 
 const EMPLOYMENT_TYPES = ["PERMANENT_MONTHLY", "TEMPORARY", "DAILY_WAGE", "HOURLY", "PIECE_RATE", "MANUFACTURING", "SERVICE"];
-const DETAIL_TABS = ["Overview", "Employment", "Attendance", "Payroll", "Documents", "KYC", "Access", "Timeline"] as const;
+const DETAIL_TABS = ["Overview", "360 View", "Employment", "Attendance", "Payroll", "Payables", "Documents", "KYC", "Access", "Timeline"] as const;
 type DetailTab = (typeof DETAIL_TABS)[number];
 
 type StaffAuditEntry = AdminAuditEntry & { source_label: string };
@@ -303,63 +306,63 @@ function EditPanel({
       <div className="mt-4 grid gap-3 md:grid-cols-3">
         {tab === "BASIC" ? (
           <>
-            {field("Full name", <input className={inputClass} value={form.name} onChange={(event) => update("name", event.target.value)} />)}
-            {field("Phone", <input className={inputClass} value={form.phone} onChange={(event) => update("phone", event.target.value)} />)}
-            {field("Role / title", <input className={inputClass} value={form.designation} onChange={(event) => update("designation", event.target.value)} />)}
-            {field("Department", <input className={inputClass} value={form.department} onChange={(event) => update("department", event.target.value)} />)}
+            {field("Full name", <input id="name" name="name" className={inputClass} value={form.name} onChange={(event) => update("name", event.target.value)} />)}
+            {field("Phone", <input id="phone" name="phone" className={inputClass} value={form.phone} onChange={(event) => update("phone", event.target.value)} />)}
+            {field("Role / title", <input id="designation" name="designation" className={inputClass} value={form.designation} onChange={(event) => update("designation", event.target.value)} />)}
+            {field("Department", <input id="department" name="department" className={inputClass} value={form.department} onChange={(event) => update("department", event.target.value)} />)}
             {field("Branch", <select className={inputClass} value={form.branch} onChange={(event) => update("branch", event.target.value)}><option value="">Unassigned</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select>)}
-            {field("Joining date", <input type="date" className={inputClass} value={form.joining_date} onChange={(event) => update("joining_date", event.target.value)} />)}
+            {field("Joining date", <input id="joining_date" name="joining_date" type="date" className={inputClass} value={form.joining_date} onChange={(event) => update("joining_date", event.target.value)} />)}
             {field("Employment status", <select className={inputClass} value={form.employment_status} onChange={(event) => update("employment_status", event.target.value)}><option value="DRAFT">Draft</option><option value="ACTIVE">Active</option></select>)}
           </>
         ) : null}
         {tab === "EMPLOYMENT" ? (
           <>
             {field("Employment type", <select className={inputClass} value={form.employment_type} onChange={(event) => update("employment_type", event.target.value)}>{EMPLOYMENT_TYPES.map((item) => <option key={item} value={item}>{item}</option>)}</select>)}
-            {field("Weekly off", <input className={inputClass} value={form.weekly_off} onChange={(event) => update("weekly_off", event.target.value)} placeholder="SUNDAY" />)}
-            {field("Reporting manager", <input className={inputClass} value={form.reporting_manager} onChange={(event) => update("reporting_manager", event.target.value)} />)}
-            {field("Work location", <input className={inputClass} value={form.work_location} onChange={(event) => update("work_location", event.target.value)} />)}
-            {field("Probation end date", <input type="date" className={inputClass} value={form.probation_end_date} onChange={(event) => update("probation_end_date", event.target.value)} />)}
-            {field("Attendance policy", <input className={inputClass} value={form.attendance_policy} onChange={(event) => update("attendance_policy", event.target.value)} />)}
-            {field("Shift", <input className={inputClass} value={form.shift_name} onChange={(event) => update("shift_name", event.target.value)} />)}
-            {field("Salary effective date", <input type="date" className={inputClass} value={form.salary_effective_from} onChange={(event) => update("salary_effective_from", event.target.value)} />)}
-            {field("Contract end date", <input type="date" className={inputClass} value={form.temporary_contract_end_date} onChange={(event) => update("temporary_contract_end_date", event.target.value)} />)}
+            {field("Weekly off", <input id="weekly_off" name="weekly_off" className={inputClass} value={form.weekly_off} onChange={(event) => update("weekly_off", event.target.value)} placeholder="SUNDAY" />)}
+            {field("Reporting manager", <input id="reporting_manager" name="reporting_manager" className={inputClass} value={form.reporting_manager} onChange={(event) => update("reporting_manager", event.target.value)} />)}
+            {field("Work location", <input id="work_location" name="work_location" className={inputClass} value={form.work_location} onChange={(event) => update("work_location", event.target.value)} />)}
+            {field("Probation end date", <input id="probation_end_date" name="probation_end_date" type="date" className={inputClass} value={form.probation_end_date} onChange={(event) => update("probation_end_date", event.target.value)} />)}
+            {field("Attendance policy", <input id="attendance_policy" name="attendance_policy" className={inputClass} value={form.attendance_policy} onChange={(event) => update("attendance_policy", event.target.value)} />)}
+            {field("Shift", <input id="shift_name" name="shift_name" className={inputClass} value={form.shift_name} onChange={(event) => update("shift_name", event.target.value)} />)}
+            {field("Salary effective date", <input id="salary_effective_from" name="salary_effective_from" type="date" className={inputClass} value={form.salary_effective_from} onChange={(event) => update("salary_effective_from", event.target.value)} />)}
+            {field("Contract end date", <input id="temporary_contract_end_date" name="temporary_contract_end_date" type="date" className={inputClass} value={form.temporary_contract_end_date} onChange={(event) => update("temporary_contract_end_date", event.target.value)} />)}
           </>
         ) : null}
         {tab === "PAYROLL" ? (
           <>
-            {field("Base salary", <input className={inputClass} value={form.base_salary} onChange={(event) => update("base_salary", event.target.value)} />)}
-            {field("Daily wage", <input className={inputClass} value={form.daily_wage_rate} onChange={(event) => update("daily_wage_rate", event.target.value)} />)}
-            {field("Hourly wage", <input className={inputClass} value={form.hourly_wage_rate} onChange={(event) => update("hourly_wage_rate", event.target.value)} />)}
-            {field("Piece rate", <input className={inputClass} value={form.piece_rate_amount} onChange={(event) => update("piece_rate_amount", event.target.value)} />)}
-            {field("Piece unit", <input className={inputClass} value={form.piece_rate_unit_label} onChange={(event) => update("piece_rate_unit_label", event.target.value)} />)}
+            {field("Base salary", <input id="base_salary" name="base_salary" className={inputClass} value={form.base_salary} onChange={(event) => update("base_salary", event.target.value)} />)}
+            {field("Daily wage", <input id="daily_wage_rate" name="daily_wage_rate" className={inputClass} value={form.daily_wage_rate} onChange={(event) => update("daily_wage_rate", event.target.value)} />)}
+            {field("Hourly wage", <input id="hourly_wage_rate" name="hourly_wage_rate" className={inputClass} value={form.hourly_wage_rate} onChange={(event) => update("hourly_wage_rate", event.target.value)} />)}
+            {field("Piece rate", <input id="piece_rate_amount" name="piece_rate_amount" className={inputClass} value={form.piece_rate_amount} onChange={(event) => update("piece_rate_amount", event.target.value)} />)}
+            {field("Piece unit", <input id="piece_rate_unit_label" name="piece_rate_unit_label" className={inputClass} value={form.piece_rate_unit_label} onChange={(event) => update("piece_rate_unit_label", event.target.value)} />)}
             {field("Payroll eligible", <select className={inputClass} value={form.payroll_eligible ? "true" : "false"} onChange={(event) => update("payroll_eligible", event.target.value === "true")}><option value="false">No</option><option value="true">Yes</option></select>)}
-            {field("Salary pay day (1-28)", <input type="number" min={1} max={28} className={inputClass} value={form.salary_pay_day} onChange={(event) => update("salary_pay_day", event.target.value)} placeholder="e.g. 2" />)}
+            {field("Salary pay day (1-28)", <input id="salary_pay_day" name="salary_pay_day" type="number" min={1} max={28} className={inputClass} value={form.salary_pay_day} onChange={(event) => update("salary_pay_day", event.target.value)} placeholder="e.g. 2" />)}
             {field("Payment mode", <select className={inputClass} value={form.payment_mode} onChange={(event) => update("payment_mode", event.target.value)}><option value="CASH">Cash</option><option value="BANK">Bank</option><option value="UPI">UPI</option></select>)}
           </>
         ) : null}
         {tab === "KYC" ? (
           <>
-            {field("KYC type", <input className={inputClass} value={form.kyc_id_type} onChange={(event) => update("kyc_id_type", event.target.value)} />)}
-            {field("KYC reference", <input className={inputClass} value={form.kyc_id_number} onChange={(event) => update("kyc_id_number", event.target.value)} />)}
+            {field("KYC type", <input id="kyc_id_type" name="kyc_id_type" className={inputClass} value={form.kyc_id_type} onChange={(event) => update("kyc_id_type", event.target.value)} />)}
+            {field("KYC reference", <input id="kyc_id_number" name="kyc_id_number" className={inputClass} value={form.kyc_id_number} onChange={(event) => update("kyc_id_number", event.target.value)} />)}
             {field("KYC status", <select className={inputClass} value={form.kyc_verified ? "true" : "false"} onChange={(event) => update("kyc_verified", event.target.value === "true")}><option value="false">Pending</option><option value="true">Verified</option></select>)}
           </>
         ) : null}
         {tab === "EMERGENCY" ? (
           <>
-            {field("Emergency contact", <input className={inputClass} value={form.emergency_contact_name} onChange={(event) => update("emergency_contact_name", event.target.value)} />)}
-            {field("Emergency relation", <input className={inputClass} value={form.emergency_contact_relation} onChange={(event) => update("emergency_contact_relation", event.target.value)} placeholder="SPOUSE" />)}
-            {field("Emergency phone", <input className={inputClass} value={form.emergency_contact_phone} onChange={(event) => update("emergency_contact_phone", event.target.value)} />)}
+            {field("Emergency contact", <input id="emergency_contact_name" name="emergency_contact_name" className={inputClass} value={form.emergency_contact_name} onChange={(event) => update("emergency_contact_name", event.target.value)} />)}
+            {field("Emergency relation", <input id="emergency_contact_relation" name="emergency_contact_relation" className={inputClass} value={form.emergency_contact_relation} onChange={(event) => update("emergency_contact_relation", event.target.value)} placeholder="SPOUSE" />)}
+            {field("Emergency phone", <input id="emergency_contact_phone" name="emergency_contact_phone" className={inputClass} value={form.emergency_contact_phone} onChange={(event) => update("emergency_contact_phone", event.target.value)} />)}
             {field("Address", <textarea className="min-h-24 rounded-xl border border-border bg-background px-3 py-2 text-sm" value={form.address} onChange={(event) => update("address", event.target.value)} />)}
           </>
         ) : null}
         {tab === "ACCESS" ? (
           <>
-            {field("Cost center", <input className={inputClass} value={form.cost_center_code} onChange={(event) => update("cost_center_code", event.target.value)} />)}
-            {field("Payroll expense account ID", <input className={inputClass} value={form.payroll_expense_account} onChange={(event) => update("payroll_expense_account", event.target.value)} />)}
-            {field("Bank account name", <input className={inputClass} value={form.bank_account_name} onChange={(event) => update("bank_account_name", event.target.value)} />)}
-            {field("Bank account number", <input className={inputClass} value={form.bank_account_number} onChange={(event) => update("bank_account_number", event.target.value)} />)}
-            {field("IFSC", <input className={inputClass} value={form.bank_ifsc} onChange={(event) => update("bank_ifsc", event.target.value)} />)}
-            {field("UPI ID", <input className={inputClass} value={form.upi_id} onChange={(event) => update("upi_id", event.target.value)} />)}
+            {field("Cost center", <input id="cost_center_code" name="cost_center_code" className={inputClass} value={form.cost_center_code} onChange={(event) => update("cost_center_code", event.target.value)} />)}
+            {field("Payroll expense account ID", <input id="payroll_expense_account" name="payroll_expense_account" className={inputClass} value={form.payroll_expense_account} onChange={(event) => update("payroll_expense_account", event.target.value)} />)}
+            {field("Bank account name", <input id="bank_account_name" name="bank_account_name" className={inputClass} value={form.bank_account_name} onChange={(event) => update("bank_account_name", event.target.value)} />)}
+            {field("Bank account number", <input id="bank_account_number" name="bank_account_number" className={inputClass} value={form.bank_account_number} onChange={(event) => update("bank_account_number", event.target.value)} />)}
+            {field("IFSC", <input id="bank_ifsc" name="bank_ifsc" className={inputClass} value={form.bank_ifsc} onChange={(event) => update("bank_ifsc", event.target.value)} />)}
+            {field("UPI ID", <input id="upi_id" name="upi_id" className={inputClass} value={form.upi_id} onChange={(event) => update("upi_id", event.target.value)} />)}
           </>
         ) : null}
       </div>
@@ -742,15 +745,18 @@ export default function AdminHrStaffProfilePage() {
         />
       </QuickActionGrid>
 
-      <div className="flex flex-wrap gap-2 rounded-xl border border-border bg-card p-2">
-        {DETAIL_TABS.map((tab) => (
-          <button key={tab} type="button" onClick={() => setActiveTab(tab)} className={`rounded-xl px-3 py-2 text-sm font-semibold ${activeTab === tab ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-muted"}`}>
-            {tab}
-          </button>
-        ))}
+      <div className="sticky top-0 z-10 -mx-2 bg-background/95 px-2 py-3 backdrop-blur sm:-mx-6 sm:px-6">
+        <WorkbenchFilterChips
+          active={activeTab}
+          onSelect={(key) => setActiveTab(key as DetailTab)}
+          chips={DETAIL_TABS.map((tab) => ({ key: tab, label: tab }))}
+        />
       </div>
 
       {activeTab === "Overview" ? <DetailPanel title="Overview" description="Identity, readiness, and operational warnings.">
+        <div className="mb-5">
+          <UniversalQuickWidgetsEmbed role="STAFF" sourceId={staff.id} />
+        </div>
         <div className="mb-4 flex flex-wrap gap-2">
           <ReadinessBadge ready={staff.profile_ready} label="Profile ready" />
           <ReadinessBadge ready={staff.employment_ready} label="Employment ready" />
@@ -777,6 +783,17 @@ export default function AdminHrStaffProfilePage() {
           <Detail label="KYC reference" value={`${staff.kyc_id_type || "KYC"} ${mask(staff.kyc_id_number)}`} />
         </div>
       </DetailPanel> : null}
+
+      {activeTab === "360 View" ? <Party360Embed role="STAFF" sourceId={staff.id} /> : null}
+
+      {activeTab === "Payables" ? (
+        <ProfilePayablesPanel
+          partyType="EMPLOYEE"
+          partyId={staff.id}
+          title="Salary & Expense Payables"
+          description="Approved salary sheets and expense claims for this employee. Paying posts a real Salary/Expense Payable → Finance Account journal."
+        />
+      ) : null}
 
       {activeTab === "Employment" ? <DetailPanel title="Employment">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -818,10 +835,10 @@ export default function AdminHrStaffProfilePage() {
               <select value={upload.document_type} onChange={(event) => setUpload({ ...upload, document_type: event.target.value })} className="h-10 rounded-xl border border-border bg-background px-3 text-sm">
                 <option value="ID_PROOF">ID Proof</option><option value="ADDRESS_PROOF">Address Proof</option><option value="SALARY_AGREEMENT">Salary Agreement</option><option value="APPOINTMENT_LETTER">Appointment Letter</option><option value="OTHER">Other</option>
               </select>
-              <input value={upload.title} onChange={(event) => setUpload({ ...upload, title: event.target.value })} placeholder="Title" className="h-10 rounded-xl border border-border bg-background px-3 text-sm" />
-              <input value={upload.document_no} onChange={(event) => setUpload({ ...upload, document_no: event.target.value })} placeholder="Document number" className="h-10 rounded-xl border border-border bg-background px-3 text-sm" />
-              <input value={upload.notes} onChange={(event) => setUpload({ ...upload, notes: event.target.value })} placeholder="Notes" className="h-10 rounded-xl border border-border bg-background px-3 text-sm" />
-              <input type="file" onChange={(event) => setUpload({ ...upload, file: event.target.files?.[0] || null })} className="h-10 rounded-xl border border-border bg-background px-3 text-sm" />
+              <input id="upload_title" name="upload_title" value={upload.title} onChange={(event) => setUpload({ ...upload, title: event.target.value })} placeholder="Title" className="h-10 rounded-xl border border-border bg-background px-3 text-sm" />
+              <input id="upload_doc_no" name="upload_doc_no" value={upload.document_no} onChange={(event) => setUpload({ ...upload, document_no: event.target.value })} placeholder="Document number" className="h-10 rounded-xl border border-border bg-background px-3 text-sm" />
+              <input id="upload_notes" name="upload_notes" value={upload.notes} onChange={(event) => setUpload({ ...upload, notes: event.target.value })} placeholder="Notes" className="h-10 rounded-xl border border-border bg-background px-3 text-sm" />
+              <input id="upload_file" name="upload_file" type="file" onChange={(event) => setUpload({ ...upload, file: event.target.files?.[0] || null })} className="h-10 rounded-xl border border-border bg-background px-3 text-sm" />
               <ActionButton variant="primary" disabled={!upload.title.trim() || !upload.file} onClick={() => void uploadDocument()}>Upload</ActionButton>
             </div>
           </div>
@@ -851,7 +868,7 @@ export default function AdminHrStaffProfilePage() {
       {activeTab === "Attendance" ? <DetailPanel title="Attendance" description="Month-wise attendance for this staff member. Marking a date that already has a record updates it (correction), so mistakes can be fixed by re-marking the same date.">
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Month</label>
-          <input type="month" value={attMonth} onChange={(e) => setAttMonth(e.target.value)} className="rounded-lg border border-border bg-background px-3 py-2 text-sm" />
+          <input id="att_month" name="att_month" type="month" value={attMonth} onChange={(e) => setAttMonth(e.target.value)} className="rounded-lg border border-border bg-background px-3 py-2 text-sm" />
           <span className="text-xs text-muted-foreground">{attendanceSummary.daysInMonth} days in month · {attendance.length} marked</span>
         </div>
 
@@ -869,16 +886,16 @@ export default function AdminHrStaffProfilePage() {
         <div className="mb-4 rounded-2xl border border-border bg-muted/20 p-4">
           <div className="text-sm font-semibold text-foreground">Mark / correct attendance</div>
           <div className="mt-3 grid gap-3 sm:grid-cols-5">
-            <input type="date" value={attForm.date} onChange={(e) => setAttForm((c) => ({ ...c, date: e.target.value }))} className="rounded-lg border border-border bg-background px-3 py-2 text-sm" />
+            <input id="att_date" name="att_date" type="date" value={attForm.date} onChange={(e) => setAttForm((c) => ({ ...c, date: e.target.value }))} className="rounded-lg border border-border bg-background px-3 py-2 text-sm" />
             <select value={attForm.status} onChange={(e) => setAttForm((c) => ({ ...c, status: e.target.value }))} className="rounded-lg border border-border bg-background px-3 py-2 text-sm">
               <option value="PRESENT">Present</option>
               <option value="HALF_DAY">Half day</option>
               <option value="ABSENT">Absent</option>
               <option value="LEAVE">Leave</option>
             </select>
-            <input type="number" step="0.5" min="0" placeholder="Worked hrs" value={attForm.worked_hours} onChange={(e) => setAttForm((c) => ({ ...c, worked_hours: e.target.value }))} className="rounded-lg border border-border bg-background px-3 py-2 text-sm" />
-            <input type="number" step="0.5" min="0" placeholder="OT hrs" value={attForm.overtime_hours} onChange={(e) => setAttForm((c) => ({ ...c, overtime_hours: e.target.value }))} className="rounded-lg border border-border bg-background px-3 py-2 text-sm" />
-            <input placeholder="Notes" value={attForm.notes} onChange={(e) => setAttForm((c) => ({ ...c, notes: e.target.value }))} className="rounded-lg border border-border bg-background px-3 py-2 text-sm" />
+            <input id="att_worked_hours" name="att_worked_hours" type="number" step="0.5" min="0" placeholder="Worked hrs" value={attForm.worked_hours} onChange={(e) => setAttForm((c) => ({ ...c, worked_hours: e.target.value }))} className="rounded-lg border border-border bg-background px-3 py-2 text-sm" />
+            <input id="att_overtime_hours" name="att_overtime_hours" type="number" step="0.5" min="0" placeholder="OT hrs" value={attForm.overtime_hours} onChange={(e) => setAttForm((c) => ({ ...c, overtime_hours: e.target.value }))} className="rounded-lg border border-border bg-background px-3 py-2 text-sm" />
+            <input id="att_notes" name="att_notes" placeholder="Notes" value={attForm.notes} onChange={(e) => setAttForm((c) => ({ ...c, notes: e.target.value }))} className="rounded-lg border border-border bg-background px-3 py-2 text-sm" />
           </div>
           <button type="button" onClick={() => void submitAttendance()} disabled={attSaving} className="mt-3 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50">
             {attSaving ? "Saving…" : "Save attendance"}
@@ -958,11 +975,11 @@ export default function AdminHrStaffProfilePage() {
             <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Payment date
-                <input type="date" className="h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary" value={payForm.paymentDate} onChange={(event) => setPayForm({ ...payForm, paymentDate: event.target.value })} />
+                <input id="pay_paymentDate" name="pay_paymentDate" type="date" className="h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary" value={payForm.paymentDate} onChange={(event) => setPayForm({ ...payForm, paymentDate: event.target.value })} />
               </label>
               <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Amount
-                <input className="h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary" value={payForm.amount} onChange={(event) => setPayForm({ ...payForm, amount: event.target.value })} />
+                <input id="pay_amount" name="pay_amount" className="h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary" value={payForm.amount} onChange={(event) => setPayForm({ ...payForm, amount: event.target.value })} />
               </label>
               <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Pay from account
@@ -973,7 +990,7 @@ export default function AdminHrStaffProfilePage() {
               </label>
               <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Reference (optional)
-                <input className="h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary" value={payForm.referenceNo} onChange={(event) => setPayForm({ ...payForm, referenceNo: event.target.value })} />
+                <input id="pay_referenceNo" name="pay_referenceNo" className="h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary" value={payForm.referenceNo} onChange={(event) => setPayForm({ ...payForm, referenceNo: event.target.value })} />
               </label>
             </div>
             <div className="mt-3 flex gap-2">
@@ -1011,11 +1028,11 @@ export default function AdminHrStaffProfilePage() {
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Username
-                <input className="h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary" value={loginUsername} onChange={(event) => setLoginUsername(event.target.value)} />
+                <input id="login_username" name="login_username" className="h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary" value={loginUsername} onChange={(event) => setLoginUsername(event.target.value)} />
               </label>
               <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Email (optional)
-                <input className="h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary" value={loginEmail} onChange={(event) => setLoginEmail(event.target.value)} />
+                <input id="login_email" name="login_email" className="h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary" value={loginEmail} onChange={(event) => setLoginEmail(event.target.value)} />
               </label>
             </div>
             <div className="mt-3">

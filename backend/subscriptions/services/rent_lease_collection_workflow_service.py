@@ -12,6 +12,7 @@ from typing import Any
 
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from subscriptions.models import (
@@ -419,6 +420,10 @@ def collect_security_deposit_with_metadata(
     )
     setattr(demand, "_deposit_source_transaction", tx)
     setattr(demand, "_deposit_source_transaction_created", created)
+    if created:
+        from accounting.services.accounting_bridge_security_deposit_service import auto_post_deposit_transaction
+
+        setattr(demand, "_deposit_bridge_post_result", auto_post_deposit_transaction(tx, actor=performed_by))
     return demand
 
 
@@ -677,11 +682,96 @@ def search_receivables(*, query: str = "", user=None, audience: str = "admin", l
         audience=audience,
         limit=limit,
     )
-    return [build_receivable_result(reference, audience=audience) for reference in references]
+    results = [build_receivable_result(reference, audience=audience) for reference in references]
+
+    # Include legacy receivables (CustomerOpeningOutstanding)
+    from accounting.models import CustomerOpeningOutstanding
+    qs = CustomerOpeningOutstanding.objects.filter(is_settled=False)
+    if query:
+        q_cleaned = query.strip()
+        if q_cleaned.startswith("LEGACY-") and q_cleaned[7:].isdigit():
+            qs = qs.filter(id=int(q_cleaned[7:]))
+        elif q_cleaned.startswith("outstanding:") and q_cleaned[12:].isdigit():
+            qs = qs.filter(id=int(q_cleaned[12:]))
+        elif q_cleaned.isdigit():
+            qs = qs.filter(Q(phone__icontains=q_cleaned) | Q(id=int(q_cleaned)))
+        else:
+            qs = qs.filter(Q(customer_name__icontains=q_cleaned) | Q(phone__icontains=q_cleaned))
+    
+    legacy_rows = list(qs[:limit])
+    for row in legacy_rows:
+        outstanding_str = base_contract_reference_service._money_string(row.outstanding_amount)
+        results.append({
+            "contract_reference_id": None,
+            "result_type": "LEGACY",
+            "action_type": "COLLECT_LEGACY_RECEIVABLE",
+            "collectible": True,
+            "collection_workflow": "LEGACY_RECEIVABLE",
+            "source_type": "LEGACY_RECEIVABLE",
+            "source_id": row.id,
+            "reference_no": f"LEGACY-{row.id}",
+            "display_reference": f"LEGACY-{row.id}",
+            "customer_id": None,
+            "customer_name": row.customer_name,
+            "phone_masked": base_contract_reference_service._mask_phone(row.phone),
+            "product_summary": "Migrated Legacy Balance",
+            "due_amount": outstanding_str,
+            "paid_amount": "0.00",
+            "total_amount": outstanding_str,
+            "overdue_amount": outstanding_str if row.entry_date else "0.00",
+            "is_overdue": True,
+            "next_due_date": row.entry_date,
+            "due_date": row.entry_date,
+            "status": "ACTIVE",
+            "payment_state": "UNPAID",
+            "primary_action": "COLLECT_LEGACY_RECEIVABLE",
+            "allowed_actions": ["COLLECT_LEGACY_RECEIVABLE"],
+            "disabled_reason": None,
+            "collection_route": "", 
+            "action_url": "",
+            "operational_state": "",
+            "next_actions": [],
+            "blocking_reasons": [],
+            "inventory_state": "",
+            "delivery_state": "",
+            "collection_state": "",
+        })
+    return results[:limit]
 
 
 def preview_unified_receivable_allocation(*, source_type: str, source_id: int, amount) -> dict[str, object]:
     source_type = (source_type or "").strip().upper()
+    if source_type == "LEGACY_RECEIVABLE":
+        from accounting.models import CustomerOpeningOutstanding
+        legacy = CustomerOpeningOutstanding.objects.filter(id=source_id, is_settled=False).first()
+        if not legacy:
+            raise ValidationError({"source_id": "Legacy receivable was not found or is already settled."})
+        requested_amount = _money(amount)
+        if requested_amount <= MONEY_ZERO:
+            raise ValidationError({"amount": "Amount must be greater than zero."})
+            
+        outstanding = legacy.outstanding_amount
+        allocated = min(outstanding, requested_amount)
+        remaining = max(MONEY_ZERO, requested_amount - allocated)
+        allocations = [{
+            "demand_id": legacy.id,
+            "demand_type": "LEGACY_BALANCE",
+            "due_date": legacy.entry_date,
+            "outstanding_amount": _money_string(outstanding),
+            "allocated_amount": _money_string(allocated)
+        }]
+        return {
+            "source_type": source_type,
+            "source_id": source_id,
+            "requested_amount": _money_string(requested_amount),
+            "allocations": allocations,
+            "allocation_preview": allocations,
+            "pending_dues": allocations,
+            "unallocated_amount": _money_string(remaining),
+            "overpayment_warning": remaining > MONEY_ZERO,
+            "mutates_data": False,
+        }
+
     if source_type not in {ContractReferenceType.RENT, ContractReferenceType.LEASE}:
         return base_contract_reference_service.preview_unified_receivable_allocation(
             source_type=source_type,

@@ -166,7 +166,7 @@ export default function QuickCreateInventoryDrawer({ open, itemType, onClose, on
                   className={INPUT}
                 />
                 <p className="mt-1 text-[11px] text-muted-foreground">
-                  Short label shown when selecting a variant in billing (e.g. "Teak 6ft").
+                  Short label shown when selecting a variant in billing (e.g. &quot;Teak 6ft&quot;).
                 </p>
               </Field>
             )}

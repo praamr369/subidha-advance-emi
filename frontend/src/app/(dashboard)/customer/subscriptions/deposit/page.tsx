@@ -51,7 +51,7 @@ export default function DepositStatusPage() {
     >
       <div className="space-y-6">
         {!loading && deposits.length > 0 && (
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200">
               <div className="text-2xl font-bold text-blue-700">₹{totalHeld.toLocaleString("en-IN")}</div>
               <div className="text-xs text-blue-600 mt-1">Total Held</div>
@@ -91,7 +91,7 @@ export default function DepositStatusPage() {
                     {cfg.label}
                   </span>
                 </div>
-                <div className="mt-3 grid grid-cols-3 gap-3 text-sm">
+                <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
                   <div>
                     <div className="text-gray-500 text-xs">Deposit Amount</div>
                     <div className="font-semibold">₹{dep.deposit_amount.toLocaleString("en-IN")}</div>

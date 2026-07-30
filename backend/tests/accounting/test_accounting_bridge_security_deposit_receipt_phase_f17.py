@@ -127,6 +127,42 @@ class AccountingBridgeSecurityDepositReceiptPhaseF17Tests(APITestCase):
         self.assertEqual(rows[rent.id]["finance_account_name"], self.finance_account.name)
         self.assertIn("security_deposit_receipt_ready_unposted_count", response.data["summary"])
 
+    def test_demand_created_source_row_is_skipped_not_blocked(self):
+        """Regression: the non-cash DEMAND_CREATED lifecycle row must classify as
+        SKIPPED_NOT_APPLICABLE (the receipt row owns the F17 posting), not fall
+        through to a blocked/unsupported candidate on a finance account it never
+        carries. See accounting_bridge_security_deposit_service._classify and the
+        skipped-status short-circuit in accounting_bridge_candidate_service.
+        """
+        receipt = self._deposit(plan_type=PlanType.RENT, suffix="SKIP")
+        demand_row = (
+            RentLeaseDepositTransaction.objects
+            .filter(
+                subscription_id=receipt.subscription_id,
+                transaction_type=RentLeaseDepositTransactionType.DEMAND_CREATED,
+            )
+            .first()
+        )
+        self.assertIsNotNone(demand_row, "Deposit collection should create a DEMAND_CREATED source row.")
+        # The demand row has no finance account and no transaction date — exactly
+        # the shape that previously produced BLOCKED_BY_FINANCE_ACCOUNT.
+        self.assertIsNone(demand_row.finance_account_id)
+
+        response = self.client.get("/api/v1/admin/accounting/bridge-reconciliation/?source_model=RentLeaseDepositTransaction")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        rows = {int(row["source_pk"]): row for row in response.data["results"]}
+
+        demand_candidate = rows[demand_row.id]
+        self.assertEqual(demand_candidate["event_key"], "security_deposit_skipped_not_applicable")
+        self.assertEqual(demand_candidate["status"], "SKIPPED_NOT_APPLICABLE")
+        self.assertFalse(demand_candidate["can_post"])
+        self.assertNotIn("BLOCKED", demand_candidate["status"])
+
+        # The concrete receipt row remains independently postable.
+        receipt_candidate = rows[receipt.id]
+        self.assertEqual(receipt_candidate["status"], "READY_UNPOSTED")
+        self.assertTrue(receipt_candidate["can_post"])
+
     def test_preview_is_read_only_balanced_and_does_not_consume_numbering(self):
         tx = self._deposit(plan_type=PlanType.RENT, suffix="PREVIEW")
         before = {"snapshot": self._snapshot(tx), "journals": JournalEntry.objects.count(), "bridges": AccountingBridgePosting.objects.count(), "items": ReconciliationItem.objects.count(), "next_number": DocumentSequence.objects.get(pk=self.env["journal_numbering_profile"].pk).next_number}

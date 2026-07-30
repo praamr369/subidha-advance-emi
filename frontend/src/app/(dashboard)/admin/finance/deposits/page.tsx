@@ -111,6 +111,12 @@ export default function AdminFinanceDepositsPage() {
     settlement_finance_account_id: "",
     notes: "",
   });
+  // Deposit register workbench controls (search / filter / pagination).
+  const [search, setSearch] = useState("");
+  const [planFilter, setPlanFilter] = useState<"ALL" | "RENT" | "LEASE">("ALL");
+  const [bridgeFilter, setBridgeFilter] = useState<"ALL" | "POSTED" | "DEFERRED">("ALL");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -188,6 +194,39 @@ export default function AdminFinanceDepositsPage() {
       pendingRefunds: rows.filter((row) => row.can_approve_refund || row.can_record_refund).length,
     };
   }, [rows]);
+
+  const filteredRows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return rows.filter((row) => {
+      if (planFilter !== "ALL" && String(row.plan_type).toUpperCase() !== planFilter) return false;
+      if (bridgeFilter !== "ALL") {
+        const posted = Boolean(row.latest_transaction?.bridge_posted);
+        if (bridgeFilter === "POSTED" && !posted) return false;
+        if (bridgeFilter === "DEFERRED" && (posted || !row.latest_transaction?.transaction_id)) return false;
+      }
+      if (!q) return true;
+      return [
+        row.subscription_number,
+        `SUB-${row.subscription_id}`,
+        `Demand #${row.demand_id}`,
+        row.customer_name,
+        row.customer_phone,
+        row.plan_type,
+      ]
+        .filter(Boolean)
+        .some((field) => String(field).toLowerCase().includes(q));
+    });
+  }, [rows, search, planFilter, bridgeFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedRows = useMemo(
+    () => filteredRows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [filteredRows, currentPage],
+  );
+  useEffect(() => {
+    setPage(1);
+  }, [search, planFilter, bridgeFilter]);
 
   const validAmount = isPositive(form.amount);
   const canDeduct = Boolean(selected?.can_deduct && validAmount && form.reason.trim());
@@ -330,6 +369,29 @@ export default function AdminFinanceDepositsPage() {
 
       <WorkspaceSection title="Deposit Register" description="Live rent/lease security deposit ledger with latest concrete source evidence.">
         {rows.length === 0 ? <EmptyState title="No deposit rows" description="No rent/lease security deposit demands are available yet." /> : (
+          <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search contract, customer, phone..."
+              className="h-9 w-64 max-w-full rounded-xl border border-border bg-background px-3 text-sm"
+              aria-label="Search deposits"
+            />
+            <select value={planFilter} onChange={(e) => setPlanFilter(e.target.value as typeof planFilter)} className="h-9 rounded-xl border border-border bg-background px-2 text-sm" aria-label="Filter by plan">
+              <option value="ALL">All plans</option>
+              <option value="RENT">Rent</option>
+              <option value="LEASE">Lease</option>
+            </select>
+            <select value={bridgeFilter} onChange={(e) => setBridgeFilter(e.target.value as typeof bridgeFilter)} className="h-9 rounded-xl border border-border bg-background px-2 text-sm" aria-label="Filter by bridge status">
+              <option value="ALL">All bridge</option>
+              <option value="POSTED">Posted</option>
+              <option value="DEFERRED">Deferred</option>
+            </select>
+            <span className="ml-auto text-xs text-muted-foreground">{filteredRows.length} of {rows.length} deposit{rows.length === 1 ? "" : "s"}</span>
+          </div>
+          {filteredRows.length === 0 ? <EmptyState title="No matching deposits" description="No deposit rows match the current search or filters." /> : (
           <DataTableShell>
             <MobileSafeTable className="border-none bg-transparent">
               <table className="min-w-full text-sm">
@@ -347,7 +409,7 @@ export default function AdminFinanceDepositsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row) => {
+                  {pagedRows.map((row) => {
                     const hasTx = Boolean(row.latest_transaction?.transaction_id);
                     return (
                     <tr
@@ -385,9 +447,15 @@ export default function AdminFinanceDepositsPage() {
                       </td>
                       <td className="px-3 py-2">
                         {hasTx ? (
-                          <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-                            Deferred
-                          </span>
+                          row.latest_transaction?.bridge_posted ? (
+                            <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" title={row.latest_transaction?.posted_journal_entry_id ? `Journal #${row.latest_transaction.posted_journal_entry_id}` : undefined}>
+                              Posted
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                              Deferred
+                            </span>
+                          )
                         ) : (
                           <span className="text-xs text-muted-foreground">—</span>
                         )}
@@ -399,6 +467,17 @@ export default function AdminFinanceDepositsPage() {
               </table>
             </MobileSafeTable>
           </DataTableShell>
+          )}
+          {totalPages > 1 ? (
+            <div className="flex items-center justify-between gap-2 pt-1">
+              <span className="text-xs text-muted-foreground">Page {currentPage} of {totalPages}</span>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={currentPage <= 1} className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm font-medium disabled:opacity-40">Prev</button>
+                <button type="button" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages} className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm font-medium disabled:opacity-40">Next</button>
+              </div>
+            </div>
+          ) : null}
+          </div>
         )}
       </WorkspaceSection>
 

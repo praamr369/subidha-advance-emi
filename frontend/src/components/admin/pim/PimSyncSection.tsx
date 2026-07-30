@@ -96,7 +96,7 @@ export default function PimSyncSection({ productCode, productName, categoryText,
     if (!productCode) return;
     setStatus("loading");
     try {
-      const results = await pimService.getProducts({ search: productCode });
+      const { results } = await pimService.getProducts({ search: productCode });
       const match = results.find((p) => p.code === productCode);
       if (match) {
         const full = await pimService.getProductWithAttributes(match.id);

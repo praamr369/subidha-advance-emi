@@ -1,15 +1,13 @@
 "use client";
+
 import { formatRupee } from "@/lib/utils/currency";
-
 import { useCallback, useEffect, useState } from "react";
-
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
-import { WorkspaceSection } from "@/components/ui/workspace";
+import CustomerPageShell, { CPageSection, CPageStats, CPageStat } from "@/components/layout/CustomerPageShell";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import Link from "next/link";
 import { getCustomerFinanceSummary } from "@/services/phase4-finance";
-
 
 export default function CustomerFinanceSummaryPage() {
   const [loading, setLoading] = useState(true);
@@ -33,105 +31,101 @@ export default function CustomerFinanceSummaryPage() {
     }
   }, []);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   return (
-    <PortalPage
+    <CustomerPageShell
       title="Finance Summary"
-      subtitle="Unified customer finance snapshot across invoices, receipts, dues, and payment methods."
-      breadcrumbs={[{ label: "Dashboard", href: "/customer" }, { label: "Finance" }]}
-      actions={[
-        { href: "/customer/invoices", label: "Invoices", variant: "secondary" },
-        { href: "/customer/receipts", label: "Receipts", variant: "secondary" },
-        { href: "/customer/account-statement", label: "Account Statement", variant: "ghost" },
-      ]}
+      subtitle="Invoices, receipts, dues, and payment methods"
+      backHref="/customer"
+      backLabel="Dashboard"
+      actions={
+        <Link
+          href="/customer/account-statement"
+          className="rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted"
+        >
+          Statement
+        </Link>
+      }
     >
-      <WorkspaceSection title="Summary" description="All values are derived from live finance records.">
-        {loading ? (
-          <LoadingBlock label="Loading customer finance summary..." />
-        ) : error ? (
-          <ErrorState title="Unable to load finance summary" message={error} onRetry={() => void load()} />
-        ) : !summary ? (
-          <EmptyState title="No summary available" description="Finance summary is unavailable for this account." />
-        ) : (
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-2xl border p-4">
-              <div className="text-xs text-muted-foreground">Total Paid</div>
-              <div className="mt-1 text-xl font-semibold">{formatRupee(summary.total_paid)}</div>
-            </div>
-            <div className="rounded-2xl border p-4">
-              <div className="text-xs text-muted-foreground">Total Pending</div>
-              <div className="mt-1 text-xl font-semibold">{formatRupee(summary.total_pending)}</div>
-            </div>
-            <div className="rounded-2xl border p-4">
-              <div className="text-xs text-muted-foreground">Total Overdue</div>
-              <div className="mt-1 text-xl font-semibold">{formatRupee(summary.total_overdue)}</div>
-            </div>
-            <div className="rounded-2xl border p-4">
+      {loading ? <ERPLoadingState label="Loading finance summary..." /> : null}
+
+      {!loading && error ? (
+        <ERPErrorState title="Unable to load finance summary" message={error} onRetry={() => void load()} />
+      ) : null}
+
+      {!loading && !error && !summary ? (
+        <ERPEmptyState title="No summary available" description="Finance summary is not yet available." />
+      ) : null}
+
+      {!loading && !error && summary ? (
+        <>
+          <CPageStats>
+            <CPageStat label="Total Paid" value={formatRupee(summary.total_paid)} tone="success" />
+            <CPageStat label="Pending" value={formatRupee(summary.total_pending)} tone="warning" />
+            <CPageStat label="Overdue" value={formatRupee(summary.total_overdue)} tone={Number(summary.total_overdue ?? 0) > 0 ? "danger" : "default"} />
+          </CPageStats>
+
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <div className="rounded-2xl border border-border bg-card p-4">
               <div className="text-xs text-muted-foreground">Active Contracts</div>
-              <div className="mt-1 text-xl font-semibold">{String(summary.active_contracts ?? 0)}</div>
+              <div className="mt-1 text-xl font-bold text-foreground">{String(summary.active_contracts ?? 0)}</div>
             </div>
-            <div className="rounded-2xl border p-4">
-              <div className="text-xs text-muted-foreground">Next Due Date</div>
-              <div className="mt-1 text-xl font-semibold">{String(summary.next_due_date ?? "—")}</div>
-            </div>
-            <div className="rounded-2xl border p-4">
-              <div className="text-xs text-muted-foreground">Next Due Amount</div>
-              <div className="mt-1 text-xl font-semibold">{formatRupee(summary.next_due_amount)}</div>
+            <div className="rounded-2xl border border-border bg-card p-4">
+              <div className="text-xs text-muted-foreground">Next Due</div>
+              <div className="mt-1 text-base font-bold text-foreground">{String(summary.next_due_date ?? "—")}</div>
+              {summary.next_due_amount ? (
+                <div className="text-xs text-amber-700 mt-0.5">{formatRupee(summary.next_due_amount)}</div>
+              ) : null}
             </div>
           </div>
-        )}
-      </WorkspaceSection>
 
-      <WorkspaceSection title="Payment Method Split" description="Your recorded collections by method.">
-        {loading ? (
-          <LoadingBlock label="Loading method split..." />
-        ) : split.length === 0 ? (
-          <EmptyState title="No payment data" description="No payment method split is available yet." />
-        ) : (
-          <div className="space-y-2">
-            {split.map((row) => (
-              <div key={row.payment_method} className="flex items-center justify-between rounded-xl border px-4 py-2">
-                <div className="text-sm font-medium">{row.payment_method}</div>
-                <div className="text-sm text-muted-foreground">
-                  {row.count} payments • {formatRupee(row.amount)}
-                </div>
+          {split.length > 0 ? (
+            <CPageSection title="How You Pay">
+              <div className="space-y-2">
+                {split.map((row) => (
+                  <div key={row.payment_method} className="flex items-center justify-between rounded-2xl border border-border bg-card px-4 py-3">
+                    <div className="text-sm font-semibold text-foreground">{row.payment_method}</div>
+                    <div className="text-right">
+                      <div className="text-sm font-bold">{formatRupee(row.amount)}</div>
+                      <div className="text-xs text-muted-foreground">{row.count} payment{row.count !== 1 ? "s" : ""}</div>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
-      </WorkspaceSection>
+            </CPageSection>
+          ) : null}
 
-      <WorkspaceSection
-        title="Live Rent/Lease Deposit Status"
-        description="Security deposit paid, held, refundable, deducted, and refunded values from live rent/lease module records."
-      >
-        {loading ? (
-          <LoadingBlock label="Loading deposit status..." />
-        ) : depositRows.length === 0 ? (
-          <EmptyState
-            title="No rent/lease deposit records"
-            description="No active rent/lease deposit ledger is currently linked to this customer."
-          />
-        ) : (
-          <div className="space-y-2">
-            {depositRows.map((row, idx) => (
-              <div key={String(row.subscription_id ?? idx)} className="rounded-xl border px-4 py-3">
-                <div className="text-sm font-medium">
-                  {String(row.subscription_number ?? "Contract")} • {String(row.plan_type ?? "RENT/LEASE")}
-                </div>
-                <div className="mt-1 text-sm text-muted-foreground">
-                  Paid {formatRupee(row.collected_amount)} • Held {formatRupee(row.held_amount)} • Refundable{" "}
-                  {formatRupee(row.refundable_amount)} • Deducted {formatRupee(row.deducted_amount)} • Refunded{" "}
-                  {formatRupee(row.refunded_amount)} • Status {String(row.refund_status ?? "PENDING")}
-                </div>
+          {depositRows.length > 0 ? (
+            <CPageSection title="Security Deposits">
+              <div className="space-y-2">
+                {depositRows.map((row, idx) => (
+                  <div key={String(row.subscription_id ?? idx)} className="rounded-2xl border border-border bg-card p-4 text-sm">
+                    <div className="font-semibold text-foreground">
+                      {String(row.subscription_number ?? "Contract")} · {String(row.plan_type ?? "RENT/LEASE")}
+                    </div>
+                    <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                      <div><span className="text-muted-foreground">Paid: </span><span className="font-medium">{formatRupee(row.collected_amount)}</span></div>
+                      <div><span className="text-muted-foreground">Held: </span><span className="font-medium">{formatRupee(row.held_amount)}</span></div>
+                      <div><span className="text-muted-foreground">Refundable: </span><span className="font-medium text-emerald-700">{formatRupee(row.refundable_amount)}</span></div>
+                      <div><span className="text-muted-foreground">Status: </span><span className="font-medium">{String(row.refund_status ?? "PENDING")}</span></div>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            </CPageSection>
+          ) : null}
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link href="/customer/invoices" className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-medium text-foreground hover:bg-muted">
+              Invoices →
+            </Link>
+            <Link href="/customer/receipts" className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-medium text-foreground hover:bg-muted">
+              Receipts →
+            </Link>
           </div>
-        )}
-      </WorkspaceSection>
-    </PortalPage>
+        </>
+      ) : null}
+    </CustomerPageShell>
   );
 }

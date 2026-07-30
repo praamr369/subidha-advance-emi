@@ -12,6 +12,7 @@ export type AccountingBooksReadinessAccount = {
   chart_account_name?: string | null;
   chart_account_type?: string | null;
   opening_balance: string;
+  current_balance: string;
   is_active: boolean;
   is_real_settlement_account: boolean;
   collection_ready: boolean;

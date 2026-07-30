@@ -52,6 +52,9 @@ from subscriptions.services.delivery_service import (
     build_subscription_delivery_summary,
     get_current_subscription_delivery,
 )
+from subscriptions.services.contract_number_service import (
+    get_or_assign_subscription_number,
+)
 from subscriptions.services.subscription_financial_service import (
     build_subscription_financial_snapshot,
 )
@@ -191,6 +194,8 @@ class CustomerAdminSerializer(serializers.ModelSerializer):
     active_subscription_due = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     active_direct_sale_outstanding = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     active_invoice_outstanding = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    active_delivery_count = serializers.IntegerField(read_only=True)
+    open_service_ticket_count = serializers.IntegerField(read_only=True)
     address = serializers.CharField(required=False, allow_blank=True)
     city = serializers.CharField(required=False, allow_blank=True)
     district = serializers.CharField(required=False, allow_blank=True)
@@ -236,6 +241,8 @@ class CustomerAdminSerializer(serializers.ModelSerializer):
             "active_subscription_due",
             "active_direct_sale_outstanding",
             "active_invoice_outstanding",
+            "active_delivery_count",
+            "open_service_ticket_count",
             "customer_source",
             "customer_code",
             "profile_photo_url",
@@ -319,6 +326,9 @@ class CustomerAdminSerializer(serializers.ModelSerializer):
         attrs["_new_username"] = username
         attrs["_new_password"] = password
         attrs["_new_email"] = email
+        
+        if self.instance and password:
+            raise serializers.ValidationError({"password": "Security Upgrade: Cannot change password for non-staff users. Please use the reset password flow."})
 
         user = attrs.get("user") or getattr(self.instance, "user", None)
         final_email = (
@@ -1480,6 +1490,7 @@ class AdminPaymentReverseSerializer(serializers.Serializer):
 
 
 class ProductAdminSerializer(serializers.ModelSerializer):
+    product_code = serializers.CharField(max_length=50, required=False, allow_null=True, allow_blank=True)
     image = serializers.ImageField(required=False, allow_null=True)
     clear_image = serializers.BooleanField(required=False, write_only=True, default=False)
     category_master_name = serializers.CharField(source="category_master.name", read_only=True)
@@ -1503,7 +1514,6 @@ class ProductAdminSerializer(serializers.ModelSerializer):
             "subcategory_master_name",
             "category",
             "subcategory",
-            "catalog_category",
             "base_specs",
             "sku",
             "unit_of_measure_master",
@@ -1530,6 +1540,12 @@ class ProductAdminSerializer(serializers.ModelSerializer):
             "inventory_ready",
             "inventory_stock_tracking_enabled",
             "inventory_delivery_stock_bridge_enabled",
+            # Warranty coverage
+            "warranty_enabled",
+            "warranty_months_manufacturing",
+            "warranty_months_structural",
+            "warranty_months_extended_max",
+            "extended_warranty_cost_percentage",
             "created_at",
         ]
         read_only_fields = [
@@ -1550,6 +1566,17 @@ class ProductAdminSerializer(serializers.ModelSerializer):
             "product_code",
             instance.product_code if instance else None,
         )
+        if not product_code:
+            import uuid
+            item_type = data.get("item_type", getattr(instance, "item_type", "FINISHED_GOOD") if instance else "FINISHED_GOOD")
+            prefix = "PRD"
+            if item_type == "ACCESSORY": prefix = "ACC"
+            elif item_type == "RAW_MATERIAL": prefix = "RAW"
+            elif item_type == "SERVICE": prefix = "SRV"
+            elif item_type == "ADD_ON": prefix = "ADD"
+            product_code = f"{prefix}-{uuid.uuid4().hex[:6].upper()}"
+            data["product_code"] = product_code
+
         name = data.get(
             "name",
             instance.name if instance else None,
@@ -1585,10 +1612,6 @@ class ProductAdminSerializer(serializers.ModelSerializer):
         subcategory_master = data.get(
             "subcategory_master",
             instance.subcategory_master if instance else None,
-        )
-        catalog_category = data.get(
-            "catalog_category",
-            instance.catalog_category if instance else None,
         )
         base_specs = data.get(
             "base_specs",
@@ -1641,7 +1664,6 @@ class ProductAdminSerializer(serializers.ModelSerializer):
             subcategory_master=subcategory_master,
             category=category,
             subcategory=subcategory,
-            catalog_category=catalog_category,
             base_specs=base_specs,
             sku=sku,
             unit_of_measure_master=unit_of_measure_master,
@@ -1812,6 +1834,8 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
     paid_emi_count = serializers.SerializerMethodField()
     pending_emi_count = serializers.SerializerMethodField()
     waived_emi_count = serializers.SerializerMethodField()
+    subscription_number = serializers.SerializerMethodField()
+    contract_reference = serializers.SerializerMethodField()
 
     customer = serializers.PrimaryKeyRelatedField(
         queryset=Customer.objects.select_related("user").all()
@@ -1834,10 +1858,12 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
     )
+    branch_id = serializers.IntegerField(source="branch.id", read_only=True)
+    branch_code = serializers.CharField(source="branch.code", read_only=True)
+    branch_name = serializers.CharField(source="branch.name", read_only=True)
     plan_type = serializers.ChoiceField(choices=PlanType.choices)
     tenure_months = serializers.IntegerField(min_value=1)
     start_date = serializers.DateField()
-
     total_amount = serializers.DecimalField(
         max_digits=12,
         decimal_places=2,
@@ -1859,6 +1885,8 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
         model = Subscription
         fields = (
             "id",
+            "subscription_number",
+            "contract_reference",
             "branch_id",
             "branch_code",
             "branch_name",
@@ -1894,6 +1922,8 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
         )
         read_only_fields = (
             "id",
+            "subscription_number",
+            "contract_reference",
             "branch_id",
             "branch_code",
             "branch_name",
@@ -1918,6 +1948,12 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
             "pending_emi_count",
             "waived_emi_count",
         )
+
+    def get_subscription_number(self, obj):
+        return get_or_assign_subscription_number(obj) or f"SUB-{obj.id}"
+
+    def get_contract_reference(self, obj):
+        return getattr(obj, "contract_reference", None) or get_or_assign_subscription_number(obj) or f"SUB-{obj.id}"
 
     def get_emi_count(self, obj):
         # Use the prefetched emis (prefetch_related("emis")) instead of .count()
@@ -2254,6 +2290,7 @@ class SubscriptionAdminDetailSerializer(SubscriptionAdminSerializer):
     delivery_summary = serializers.SerializerMethodField()
     deliveries = serializers.SerializerMethodField()
     emis = serializers.SerializerMethodField()
+    rent_lease_demands = serializers.SerializerMethodField()
     activation_readiness = serializers.SerializerMethodField()
 
     class Meta(SubscriptionAdminSerializer.Meta):
@@ -2268,6 +2305,7 @@ class SubscriptionAdminDetailSerializer(SubscriptionAdminSerializer):
             "delivery_summary",
             "deliveries",
             "emis",
+            "rent_lease_demands",
             "activation_readiness",
         )
         read_only_fields = fields
@@ -2411,6 +2449,23 @@ class SubscriptionAdminDetailSerializer(SubscriptionAdminSerializer):
 
     def get_emis(self, obj):
         return self._snapshot(obj)["emis"]
+
+    def get_rent_lease_demands(self, obj):
+        if obj.plan_type not in ("RENT", "LEASE"):
+            return []
+        from subscriptions.models import RentLeaseBillingDemand
+        demands = RentLeaseBillingDemand.objects.filter(subscription=obj).order_by("due_date", "id")
+        return [
+            {
+                "id": demand.id,
+                "demand_type": demand.demand_type,
+                "due_date": demand.due_date.isoformat() if demand.due_date else None,
+                "amount": str(demand.amount),
+                "status": demand.status,
+                "paid_amount": str(demand.collected_amount),
+            }
+            for demand in demands
+        ]
 
     def get_delivery_summary(self, obj):
         return build_subscription_delivery_summary(obj)
@@ -2594,6 +2649,17 @@ class PartnerAdminSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "Only partner users can be represented here."
             )
+            
+        if self.instance and attrs.get("is_active") is False and self.instance.is_active:
+            from subscriptions.models import AuditLog
+            has_logs = AuditLog.objects.filter(
+                models.Q(performed_by=self.instance) | 
+                models.Q(object_id=str(self.instance.id), model_name='User')
+            ).exists()
+            if has_logs:
+                raise serializers.ValidationError(
+                    {"is_active": "Cannot deactivate account with existing audit logs."}
+                )
         return attrs
 
 
@@ -2613,6 +2679,7 @@ class ProductRelationshipSerializer(serializers.ModelSerializer):
             "related_product_item_type",
             "relationship_type",
             "quantity",
+            "is_price_included_in_parent",
             "notes",
             "created_at",
             "updated_at",

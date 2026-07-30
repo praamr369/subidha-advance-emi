@@ -1,19 +1,20 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { Search, Plus, ArrowRight, Clock, CheckCircle, AlertCircle, ChevronRight, UserCheck } from "lucide-react";
 
-import ERPEmptyState from "@/components/erp/ERPEmptyState";
-import ERPErrorState from "@/components/erp/ERPErrorState";
-import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
-import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { apiFetch } from "@/lib/api";
 import { ROUTES } from "@/lib/routes";
+import { cn } from "@/lib/utils";
+import EmptyState from "@/components/feedback/EmptyState";
 import {
   createInternalLead,
   getInternalCrmLeads,
   promotePublicLeadToCrm,
+  reconcileLead,
+  reconcileAllLeads,
   LEAD_SOURCE_LABELS,
   LEAD_STAGE_LABELS,
   LEAD_STAGES,
@@ -24,7 +25,7 @@ import {
 
 function formatDt(value?: string | null) {
   if (!value) return "—";
-  try { return new Date(value).toLocaleString("en-IN"); } catch { return value; }
+  try { return new Date(value).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }); } catch { return value; }
 }
 
 const PLAN_TYPES: { value: LeadPlanType; label: string }[] = [
@@ -35,13 +36,13 @@ const PLAN_TYPES: { value: LeadPlanType; label: string }[] = [
 ];
 
 const STAGE_BADGE: Record<string, string> = {
-  NEW: "bg-blue-100 text-blue-800",
-  CONTACTED: "bg-purple-100 text-purple-800",
-  INTERESTED: "bg-yellow-100 text-yellow-800",
-  KYC_PENDING: "bg-orange-100 text-orange-800",
-  READY_TO_CONVERT: "bg-teal-100 text-teal-800",
-  CONVERTED: "bg-green-100 text-green-800",
-  LOST: "bg-gray-100 text-muted-foreground",
+  NEW: "bg-blue-100 text-blue-800 border-blue-200",
+  CONTACTED: "bg-purple-100 text-purple-800 border-purple-200",
+  INTERESTED: "bg-yellow-100 text-yellow-800 border-yellow-200",
+  KYC_PENDING: "bg-orange-100 text-orange-800 border-orange-200",
+  READY_TO_CONVERT: "bg-teal-100 text-teal-800 border-teal-200",
+  CONVERTED: "bg-green-100 text-green-800 border-green-200",
+  LOST: "bg-gray-100 text-muted-foreground border-gray-200",
 };
 
 const SOURCES = Object.entries(LEAD_SOURCE_LABELS).map(([value, label]) => ({ value, label }));
@@ -55,7 +56,6 @@ const EMPTY_FORM: AddLeadForm = {
   interested_plan_type: "LUCKY_PLAN", next_follow_up_at: "",
 };
 
-// Minimal type for PublicLead rows returned by /admin/leads/
 type PublicLeadRow = {
   id: number;
   name: string;
@@ -80,10 +80,10 @@ export default function AdminCrmLeadRegisterPage() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
   const [filterStage, setFilterStage] = useState<LeadStage | "">("");
   const [search, setSearch] = useState("");
-  const [createdAfter, setCreatedAfter] = useState("");
-  const [createdBefore, setCreatedBefore] = useState("");
+  
   const [showAddForm, setShowAddForm] = useState(false);
   const [form, setForm] = useState<AddLeadForm>(EMPTY_FORM);
   const [addError, setAddError] = useState<string | null>(null);
@@ -92,7 +92,6 @@ export default function AdminCrmLeadRegisterPage() {
   // Public leads state
   const [publicLeads, setPublicLeads] = useState<PublicLeadRow[]>([]);
   const [publicLoading, setPublicLoading] = useState(false);
-  const [publicError, setPublicError] = useState<string | null>(null);
   const [promotingId, setPromotingId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
@@ -102,8 +101,6 @@ export default function AdminCrmLeadRegisterPage() {
       const data = await getInternalCrmLeads({
         q: search || undefined,
         stage: filterStage || undefined,
-        created_after: createdAfter || undefined,
-        created_before: createdBefore || undefined,
         page,
         page_size: 50,
       });
@@ -117,19 +114,46 @@ export default function AdminCrmLeadRegisterPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, filterStage, createdAfter, createdBefore, page]);
+  }, [search, filterStage, page]);
 
   useEffect(() => { void load(); }, [load]);
+
+  const [reconcilingId, setReconcilingId] = useState<number | null>(null);
+  const [reconcileAllBusy, setReconcileAllBusy] = useState(false);
+
+  const handleReconcile = useCallback(async (id: number) => {
+    setReconcilingId(id);
+    try {
+      await reconcileLead(id);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Reconcile failed.");
+    } finally {
+      setReconcilingId(null);
+    }
+  }, [load]);
+
+  const handleReconcileAll = useCallback(async () => {
+    setReconcileAllBusy(true);
+    try {
+      const res = await reconcileAllLeads();
+      await load();
+      setError(res.reconciled > 0 ? null : "No leads needed reconciling.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Reconcile-all failed.");
+    } finally {
+      setReconcileAllBusy(false);
+    }
+  }, [load]);
 
   const loadPublicLeads = useCallback(async () => {
     if (publicLeads.length > 0) return;
     setPublicLoading(true);
-    setPublicError(null);
     try {
       const data = await apiFetch<{ results: PublicLeadRow[] }>("/admin/leads/");
       setPublicLeads(Array.isArray(data?.results) ? data.results : []);
     } catch (err) {
-      setPublicError(err instanceof Error ? err.message : "Unable to load online enquiries.");
+      console.error("Unable to load online enquiries.", err);
     } finally {
       setPublicLoading(false);
     }
@@ -157,9 +181,9 @@ export default function AdminCrmLeadRegisterPage() {
       setPage(1);
       await load();
     } catch (err: unknown) {
-      const e = err as { status?: number; body?: { existing_lead_id?: number; detail?: string } };
+      const e = err as { status?: number; body?: { existing_lead_id?: number } };
       if (e?.status === 409 && e?.body?.existing_lead_id) {
-        setAddError(`Duplicate phone: lead #${e.body.existing_lead_id} already exists in the pipeline.`);
+        setAddError(`Duplicate phone: lead #${e.body.existing_lead_id} already exists.`);
       } else {
         setAddError(err instanceof Error ? err.message : "Failed to create lead.");
       }
@@ -194,192 +218,256 @@ export default function AdminCrmLeadRegisterPage() {
   return (
     <ERPPageShell
       eyebrow="CRM"
-      title="CRM Leads"
-      subtitle="Internal lead pipeline and online enquiry inbox."
+      title="Leads & Enquiries"
+      subtitle="Manage your pipeline and promote incoming public enquiries to active leads."
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
         { label: "CRM", href: ROUTES.admin.crm },
         { label: "Leads" },
       ]}
-      stats={[
-        { label: "Total", value: String(totalCount), tone: "info" },
-        { label: "Active", value: String(totalActive), tone: "default" },
-        { label: "Converted", value: String(stageCounts["CONVERTED"] || 0), tone: "success" },
-        { label: "Lost", value: String(stageCounts["LOST"] || 0), tone: "warning" },
+      actions={[
+        { href: ROUTES.admin.crmAnalytics, label: "Pipeline Board", variant: "secondary" },
       ]}
-      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
-      {/* Tab bar */}
-      <div className="flex gap-0 rounded-xl border border-border overflow-hidden w-fit mb-6">
+      {/* Modern KPI Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="bg-card border border-border rounded-xl p-5 flex flex-col justify-between shadow-sm">
+          <p className="text-sm font-medium text-muted-foreground">Total Leads</p>
+          <div className="flex items-center gap-3 mt-2">
+            <span className="text-3xl font-bold text-foreground">{totalCount}</span>
+          </div>
+        </div>
+        <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-5 flex flex-col justify-between shadow-sm">
+          <p className="text-sm font-medium text-blue-800">Active Pipeline</p>
+          <div className="flex items-center gap-3 mt-2">
+            <span className="text-3xl font-bold text-blue-900">{totalActive}</span>
+            <Activity className="w-5 h-5 text-blue-500 ml-auto opacity-50" />
+          </div>
+        </div>
+        <div className="bg-green-50/50 border border-green-100 rounded-xl p-5 flex flex-col justify-between shadow-sm">
+          <p className="text-sm font-medium text-green-800">Converted</p>
+          <div className="flex items-center gap-3 mt-2">
+            <span className="text-3xl font-bold text-green-900">{stageCounts["CONVERTED"] || 0}</span>
+            <CheckCircle className="w-5 h-5 text-green-500 ml-auto opacity-50" />
+          </div>
+        </div>
+        <div className="bg-orange-50/50 border border-orange-100 rounded-xl p-5 flex flex-col justify-between shadow-sm">
+          <p className="text-sm font-medium text-orange-800">Unreviewed Enquiries</p>
+          <div className="flex items-center gap-3 mt-2">
+            <span className="text-3xl font-bold text-orange-900">{unreviewedPublicLeads.length}</span>
+            <AlertCircle className="w-5 h-5 text-orange-500 ml-auto opacity-50" />
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex items-center gap-4 border-b border-border mb-6">
         <button
+          className={cn("px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2", activeTab === "pipeline" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground")}
           onClick={() => setActiveTab("pipeline")}
-          className={`px-5 py-2 text-sm font-medium transition-colors ${activeTab === "pipeline" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}
         >
           Pipeline Leads
         </button>
         <button
+          className={cn("px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2", activeTab === "enquiries" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground")}
           onClick={() => setActiveTab("enquiries")}
-          className={`px-5 py-2 text-sm font-medium transition-colors relative ${activeTab === "enquiries" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}
         >
           Online Enquiries
-          {unreviewedPublicLeads.length > 0 ? (
-            <span className="ml-1.5 inline-block rounded-full bg-orange-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
+          {unreviewedPublicLeads.length > 0 && (
+            <span className="bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
               {unreviewedPublicLeads.length}
             </span>
-          ) : null}
+          )}
         </button>
       </div>
 
-      {/* ── Pipeline tab ──────────────────────────────────── */}
-      {activeTab === "pipeline" ? (
-        <ERPSectionShell title="Lead register" description="Click any row to open the full detail view with follow-up tasks and opportunities.">
-          {/* Toolbar */}
-          <div className="mb-4 flex flex-wrap gap-3 items-center">
-            <input
-              type="text"
-              placeholder="Search name / phone…"
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              onKeyDown={(e) => e.key === "Enter" && void load()}
-              className="h-9 w-48 rounded-xl border border-border bg-background px-3 text-sm"
-            />
-            <select
-              value={filterStage}
-              onChange={(e) => { setFilterStage(e.target.value as LeadStage | ""); setPage(1); }}
-              className="h-9 rounded-xl border border-border bg-background px-3 text-sm"
-            >
-              <option value="">All stages</option>
-              {LEAD_STAGES.map((s) => (
-                <option key={s} value={s}>{LEAD_STAGE_LABELS[s]} ({stageCounts[s] || 0})</option>
-              ))}
-            </select>
-            {/* Gap 10: date range filter */}
-            <input
-              type="date"
-              value={createdAfter}
-              onChange={(e) => { setCreatedAfter(e.target.value); setPage(1); }}
-              title="Created after"
-              className="h-9 rounded-xl border border-border bg-background px-3 text-sm"
-            />
-            <input
-              type="date"
-              value={createdBefore}
-              onChange={(e) => { setCreatedBefore(e.target.value); setPage(1); }}
-              title="Created before"
-              className="h-9 rounded-xl border border-border bg-background px-3 text-sm"
-            />
-            <button onClick={() => void load()} className="h-9 rounded-xl border border-border bg-background px-4 text-sm font-medium hover:bg-muted">
-              Search
-            </button>
-            <div className="ml-auto flex gap-2">
-              <Link href={ROUTES.admin.crmPipeline} className="flex h-9 items-center rounded-xl border border-border bg-background px-4 text-sm font-medium hover:bg-muted">
-                Pipeline board
-              </Link>
-              <button
-                onClick={() => { setShowAddForm((v) => !v); setAddError(null); }}
-                className="flex h-9 items-center rounded-xl border border-primary bg-primary px-4 text-sm font-semibold text-primary-foreground hover:opacity-90"
+      {/* -- Pipeline Tab ------------------------------------ */}
+      {activeTab === "pipeline" && (
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div className="relative w-full sm:w-64">
+                <Search className="w-4 h-4 absolute left-3 top-2.5 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Search name or phone..."
+                  value={search}
+                  onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                  onKeyDown={(e) => e.key === "Enter" && void load()}
+                  className="w-full h-9 pl-9 pr-3 rounded-lg border border-border bg-background text-sm focus:ring-1 focus:ring-primary"
+                />
+              </div>
+              <select
+                value={filterStage}
+                onChange={(e) => { setFilterStage(e.target.value as LeadStage | ""); setPage(1); }}
+                className="h-9 rounded-lg border border-border bg-background px-3 text-sm focus:ring-1 focus:ring-primary"
               >
-                + Add Lead
-              </button>
+                <option value="">All Stages</option>
+                {LEAD_STAGES.map((s) => (
+                  <option key={s} value={s}>{LEAD_STAGE_LABELS[s]} ({stageCounts[s] || 0})</option>
+                ))}
+              </select>
             </div>
+            
+            <button
+              onClick={() => void handleReconcileAll()}
+              disabled={reconcileAllBusy}
+              title="Sweep and reconcile every lead whose stage drifted from customer truth."
+              className="flex items-center gap-2 h-9 rounded-lg border border-amber-300 bg-amber-50 px-4 text-sm font-semibold text-amber-800 hover:bg-amber-100 w-full sm:w-auto justify-center transition-colors disabled:opacity-50"
+            >
+              <AlertCircle className="w-4 h-4" /> {reconcileAllBusy ? "Reconciling…" : "Reconcile all"}
+            </button>
+
+            <button
+              onClick={() => { setShowAddForm((v) => !v); setAddError(null); }}
+              className="flex items-center gap-2 h-9 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:opacity-90 w-full sm:w-auto justify-center transition-opacity"
+            >
+              <Plus className="w-4 h-4" /> Add Lead
+            </button>
           </div>
 
           {/* Add Lead Form */}
-          {showAddForm ? (
-            <div className="mb-5 rounded-xl border border-border bg-card p-5">
-              <div className="mb-3 text-sm font-semibold text-foreground">New Lead</div>
-              {addError ? <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{addError}</div> : null}
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                <div>
-                  <label className="block text-xs font-medium mb-1">Full name *</label>
-                  <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ramesh Kumar" className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm" />
+          {showAddForm && (
+            <div className="rounded-xl border border-border bg-card p-6 shadow-sm animate-in fade-in slide-in-from-top-2">
+              <h3 className="text-lg font-semibold mb-4">Register New Lead</h3>
+              {addError && <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600 border border-red-200">{addError}</div>}
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Full Name *</label>
+                  <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:ring-1 focus:ring-primary" />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium mb-1">Phone *</label>
-                  <input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="9876543210" className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm" />
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Phone *</label>
+                  <input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:ring-1 focus:ring-primary" />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium mb-1">Email</label>
-                  <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="ramesh@example.com" className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm" />
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Email</label>
+                  <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:ring-1 focus:ring-primary" />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium mb-1">Lead source</label>
-                  <select value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Lead Source</label>
+                  <select value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:ring-1 focus:ring-primary">
                     {SOURCES.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium mb-1">Plan interest</label>
-                  <select value={form.interested_plan_type} onChange={(e) => setForm({ ...form, interested_plan_type: e.target.value as LeadPlanType })} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Plan Interest</label>
+                  <select value={form.interested_plan_type} onChange={(e) => setForm({ ...form, interested_plan_type: e.target.value as LeadPlanType })} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:ring-1 focus:ring-primary">
                     {PLAN_TYPES.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium mb-1">First follow-up</label>
-                  <input type="datetime-local" value={form.next_follow_up_at} onChange={(e) => setForm({ ...form, next_follow_up_at: e.target.value })} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm" />
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">First Follow-up Date</label>
+                  <input type="datetime-local" value={form.next_follow_up_at} onChange={(e) => setForm({ ...form, next_follow_up_at: e.target.value })} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:ring-1 focus:ring-primary" />
                 </div>
               </div>
-              <div className="mt-4 flex gap-2">
-                <button disabled={addBusy} onClick={() => void handleAdd()} className="rounded-xl border border-primary bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50">
-                  {addBusy ? "Saving…" : "Create Lead"}
-                </button>
-                <button onClick={() => { setShowAddForm(false); setForm(EMPTY_FORM); setAddError(null); }} className="rounded-xl border border-border px-5 py-2 text-sm hover:bg-muted">
+              
+              <div className="mt-6 flex justify-end gap-3 border-t border-border pt-4">
+                <button onClick={() => setShowAddForm(false)} className="px-4 py-2 text-sm font-medium hover:bg-muted rounded-md transition-colors">
                   Cancel
+                </button>
+                <button disabled={addBusy} onClick={() => void handleAdd()} className="px-6 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50 transition-opacity">
+                  {addBusy ? "Saving..." : "Create Lead"}
                 </button>
               </div>
             </div>
-          ) : null}
+          )}
 
           {/* Table */}
-          {loading ? <ERPLoadingState label="Loading leads…" /> : null}
-          {!loading && error ? <ERPErrorState title="Unable to load leads" description={error} /> : null}
-          {!loading && !error && rows.length === 0 ? <ERPEmptyState title="No leads found" description="Create the first lead or adjust the search filters." /> : null}
-          {!loading && !error && rows.length > 0 ? (
-            <>
-              <div className="overflow-x-auto rounded-xl border border-border">
+          <div className="bg-card border border-border rounded-xl min-h-[400px] overflow-hidden">
+            {loading ? (
+              <div className="flex justify-center items-center h-[400px] text-muted-foreground text-sm animate-pulse">Loading leads...</div>
+            ) : error ? (
+              <div className="p-12 text-center text-red-600 text-sm">{error}</div>
+            ) : rows.length === 0 ? (
+              <div className="p-12">
+                <EmptyState title="No leads found" description="Adjust your filters or create a new lead." tone="default" />
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
                 <table className="min-w-full text-sm">
-                  <thead className="bg-muted/50">
-                    <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground">
-                      <th className="px-4 py-3">Lead</th>
-                      <th className="px-4 py-3">Contact</th>
-                      <th className="px-4 py-3">Source</th>
-                      <th className="px-4 py-3">Plan</th>
-                      <th className="px-4 py-3">Stage</th>
-                      <th className="px-4 py-3">Assigned</th>
-                      <th className="px-4 py-3">Follow-up</th>
+                  <thead className="bg-muted/50 text-muted-foreground text-xs uppercase tracking-wider text-left border-b border-border">
+                    <tr>
+                      <th className="px-6 py-4 font-medium">Lead Info</th>
+                      <th className="px-6 py-4 font-medium">Interest</th>
+                      <th className="px-6 py-4 font-medium">Stage</th>
+                      <th className="px-6 py-4 font-medium">Assigned To</th>
+                      <th className="px-6 py-4 font-medium">Follow-up</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-border">
                     {rows.map((row) => {
                       const overdue = row.next_follow_up_at && new Date(row.next_follow_up_at) <= new Date();
                       return (
                         <tr
                           key={row.id}
-                          className="border-t border-border/60 hover:bg-muted/30 cursor-pointer"
                           onClick={() => (window.location.href = `${ROUTES.admin.crmLeads}/${row.id}`)}
+                          className="hover:bg-muted/30 transition-colors cursor-pointer group"
                         >
-                          <td className="px-4 py-3">
-                            <div className="font-medium text-foreground">#{row.id}</div>
-                            <div className="text-xs text-muted-foreground">{formatDt(row.created_at)}</div>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-semibold text-foreground group-hover:text-primary transition-colors">{row.name}</span>
+                              <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">#{row.id}</span>
+                              {row.registered_customer ? (
+                                <Link
+                                  href={`/admin/customers/${row.registered_customer.id}`}
+                                  onClick={(e) => e.stopPropagation()}
+                                  title={row.registered_customer.matched_by === "converted"
+                                    ? "Converted to a registered customer — open customer 360"
+                                    : "Existing registered customer with this phone — open customer 360"}
+                                  className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 hover:bg-emerald-100"
+                                >
+                                  <UserCheck className="w-3 h-3" /> Registered
+                                </Link>
+                              ) : null}
+                              {row.registered_customer && row.stage !== "CONVERTED" ? (
+                                <button
+                                  type="button"
+                                  disabled={reconcilingId === row.id}
+                                  onClick={(e) => { e.stopPropagation(); void handleReconcile(row.id); }}
+                                  title={row.registered_customer.matched_by === "converted"
+                                    ? "Linked to a registered customer but stage isn't Converted. Click to reconcile (advances the stage)."
+                                    : "Matches a registered customer by phone. Click to reconcile (links the customer and converts)."}
+                                  className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 hover:bg-amber-100 disabled:opacity-50"
+                                >
+                                  <AlertCircle className="w-3 h-3" /> {reconcilingId === row.id ? "Reconciling…" : "Reconcile"}
+                                </button>
+                              ) : null}
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-1 flex flex-col gap-0.5">
+                              <span>{row.phone}</span>
+                              <span className="opacity-75">{LEAD_SOURCE_LABELS[row.source] || row.source}</span>
+                            </div>
                           </td>
-                          <td className="px-4 py-3">
-                            <div className="font-medium text-foreground">{row.name}</div>
-                            <div className="text-xs text-muted-foreground">{row.phone}</div>
+                          <td className="px-6 py-4">
+                            <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-muted">
+                              {row.interested_plan_type?.replace("_", " ") || "Not specified"}
+                            </span>
                           </td>
-                          <td className="px-4 py-3 text-xs text-muted-foreground">{LEAD_SOURCE_LABELS[row.source] || row.source || "—"}</td>
-                          <td className="px-4 py-3 text-xs text-muted-foreground">{row.interested_plan_type?.replace("_", " ") || "—"}</td>
-                          <td className="px-4 py-3">
-                            <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${STAGE_BADGE[row.stage] || "bg-gray-100 text-muted-foreground"}`}>
+                          <td className="px-6 py-4">
+                            <span className={cn("inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border", STAGE_BADGE[row.stage] || "bg-gray-100 text-muted-foreground border-gray-200")}>
                               {LEAD_STAGE_LABELS[row.stage] || row.stage}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-xs text-muted-foreground">{row.assigned_to_full_name || row.assigned_to_username || "Unassigned"}</td>
-                          <td className="px-4 py-3 text-xs">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-2">
+                              {row.assigned_to_full_name || row.assigned_to_username ? (
+                                <span className="text-sm font-medium">{row.assigned_to_full_name || row.assigned_to_username}</span>
+                              ) : (
+                                <span className="text-xs text-muted-foreground italic">Unassigned</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
                             {row.next_follow_up_at ? (
-                              <span className={overdue ? "text-orange-600 font-medium" : "text-muted-foreground"}>
-                                {formatDt(row.next_follow_up_at)}{overdue ? " ⚠" : ""}
-                              </span>
-                            ) : <span className="text-muted-foreground">—</span>}
+                              <div className={cn("flex items-center gap-1.5 text-xs font-medium", overdue ? "text-orange-600" : "text-muted-foreground")}>
+                                <Clock className="w-3.5 h-3.5" />
+                                {formatDt(row.next_follow_up_at)}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">—</span>
+                            )}
                           </td>
                         </tr>
                       );
@@ -387,98 +475,114 @@ export default function AdminCrmLeadRegisterPage() {
                   </tbody>
                 </table>
               </div>
-
-              {/* Gap 9: Pagination */}
-              {totalPages > 1 ? (
-                <div className="mt-4 flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Page {page} of {totalPages} · {totalCount} leads</span>
-                  <div className="flex gap-2">
-                    <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="h-9 rounded-xl border border-border bg-background px-4 font-medium hover:bg-muted disabled:opacity-40">
-                      ← Prev
-                    </button>
-                    <button disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className="h-9 rounded-xl border border-border bg-background px-4 font-medium hover:bg-muted disabled:opacity-40">
-                      Next →
-                    </button>
-                  </div>
-                </div>
-              ) : null}
-            </>
-          ) : null}
-        </ERPSectionShell>
-      ) : null}
-
-      {/* ── Online Enquiries tab (Gap 11) ─────────────────── */}
-      {activeTab === "enquiries" ? (
-        <ERPSectionShell
-          title="Online Enquiries"
-          description="Leads submitted through the public website. Click 'Promote' to move them into the CRM pipeline as a tracked lead."
-        >
-          {publicLoading ? <ERPLoadingState label="Loading enquiries…" /> : null}
-          {!publicLoading && publicError ? <ERPErrorState title="Unable to load enquiries" description={publicError} /> : null}
-          {!publicLoading && !publicError && publicLeads.length === 0 ? (
-            <ERPEmptyState title="No online enquiries" description="Enquiries submitted through the public website will appear here." />
-          ) : null}
-          {!publicLoading && !publicError && publicLeads.length > 0 ? (
-            <div className="overflow-x-auto rounded-xl border border-border">
-              <table className="min-w-full text-sm">
-                <thead className="bg-muted/50">
-                  <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground">
-                    <th className="px-4 py-3">Enquiry</th>
-                    <th className="px-4 py-3">Contact</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Submitted</th>
-                    <th className="px-4 py-3">CRM Status</th>
-                    <th className="px-4 py-3">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {publicLeads.map((pl) => {
-                    const promoted = (pl.crm_pipeline_lead?.length ?? 0) > 0;
-                    const crmLead = pl.crm_pipeline_lead?.[0];
-                    return (
-                      <tr key={pl.id} className="border-t border-border/60">
-                        <td className="px-4 py-3">
-                          <div className="font-medium text-foreground">#{pl.id}</div>
-                          <div className="text-xs text-muted-foreground">{pl.source || "PUBLIC_SITE"}</div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="font-medium text-foreground">{pl.name}</div>
-                          <div className="text-xs text-muted-foreground">{pl.phone}</div>
-                        </td>
-                        <td className="px-4 py-3 text-xs text-muted-foreground">{pl.status}</td>
-                        <td className="px-4 py-3 text-xs text-muted-foreground">{formatDt(pl.created_at)}</td>
-                        <td className="px-4 py-3">
-                          {promoted && crmLead ? (
-                            <Link
-                              href={`${ROUTES.admin.crmLeads}/${crmLead.id}`}
-                              className="inline-block rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold text-green-700 hover:underline"
-                            >
-                              In pipeline · {LEAD_STAGE_LABELS[crmLead.stage as LeadStage] || crmLead.stage}
-                            </Link>
-                          ) : (
-                            <span className="text-xs text-muted-foreground italic">Not promoted</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          {promoted ? null : (
-                            <button
-                              disabled={promotingId === pl.id}
-                              onClick={() => void handlePromote(pl.id)}
-                              className="rounded-lg border border-primary bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
-                            >
-                              {promotingId === pl.id ? "Promoting…" : "Promote →"}
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            )}
+          </div>
+          
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4">
+              <span className="text-sm text-muted-foreground">Showing page {page} of {totalPages}</span>
+              <div className="flex gap-2">
+                <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="px-4 py-2 text-sm font-medium rounded-lg border border-border hover:bg-muted disabled:opacity-50 transition-colors">Previous</button>
+                <button disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className="px-4 py-2 text-sm font-medium rounded-lg border border-border hover:bg-muted disabled:opacity-50 transition-colors">Next</button>
+              </div>
             </div>
-          ) : null}
-        </ERPSectionShell>
-      ) : null}
+          )}
+        </div>
+      )}
+
+      {/* -- Online Enquiries Tab ------------------------------ */}
+      {activeTab === "enquiries" && (
+        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className="bg-card border border-border rounded-xl min-h-[400px] overflow-hidden">
+            {publicLoading ? (
+              <div className="flex justify-center items-center h-[400px] text-muted-foreground text-sm animate-pulse">Loading online enquiries...</div>
+            ) : publicLeads.length === 0 ? (
+              <div className="p-12">
+                <EmptyState title="No new enquiries" description="The public website enquiry inbox is empty." tone="info" />
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-muted/50 text-muted-foreground text-xs uppercase tracking-wider text-left border-b border-border">
+                    <tr>
+                      <th className="px-6 py-4 font-medium">Visitor details</th>
+                      <th className="px-6 py-4 font-medium">Source / Time</th>
+                      <th className="px-6 py-4 font-medium">Pipeline Status</th>
+                      <th className="px-6 py-4 font-medium text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {publicLeads.map((pl) => {
+                      const promoted = (pl.crm_pipeline_lead?.length ?? 0) > 0;
+                      const crmLead = pl.crm_pipeline_lead?.[0];
+                      return (
+                        <tr key={pl.id} className="hover:bg-muted/30 transition-colors">
+                          <td className="px-6 py-4">
+                            <div className="font-semibold text-foreground">{pl.name}</div>
+                            <div className="text-xs text-muted-foreground mt-1 flex gap-2">
+                              <span>{pl.phone}</span>
+                              {pl.email && <span>· {pl.email}</span>}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-blue-50 text-blue-700 border border-blue-200">
+                              {pl.source || "WEBSITE"}
+                            </span>
+                            <div className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              {formatDt(pl.created_at)}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            {promoted && crmLead ? (
+                              <div className="flex items-center gap-2">
+                                <CheckCircle className="w-4 h-4 text-green-500" />
+                                <div className="text-xs font-medium text-green-700">In Pipeline</div>
+                                <span className="mx-1 text-muted-foreground">·</span>
+                                <span className="text-xs text-muted-foreground">{LEAD_STAGE_LABELS[crmLead.stage as LeadStage] || crmLead.stage}</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <AlertCircle className="w-4 h-4 text-orange-500" />
+                                <span className="text-xs font-medium text-orange-700">Awaiting Review</span>
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            {promoted && crmLead ? (
+                              <Link
+                                href={`${ROUTES.admin.crmLeads}/${crmLead.id}`}
+                                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-background hover:bg-muted transition-colors"
+                              >
+                                View Lead <ChevronRight className="w-3 h-3" />
+                              </Link>
+                            ) : (
+                              <button
+                                disabled={promotingId === pl.id}
+                                onClick={() => void handlePromote(pl.id)}
+                                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors shadow-sm"
+                              >
+                                {promotingId === pl.id ? "Promoting..." : (
+                                  <>Convert to Lead <ArrowRight className="w-3.5 h-3.5" /></>
+                                )}
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </ERPPageShell>
   );
 }
+
+const Activity = ({ className }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+);
+

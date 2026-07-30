@@ -92,6 +92,38 @@ class BusinessProfile(BusinessSetupTimeStampedModel):
     country = models.CharField(max_length=80, default="India")
     gstin = models.CharField(max_length=32, blank=True, default="")
     pan_number = models.CharField(max_length=32, blank=True, default="")
+
+    # Additional Indian statutory identifiers
+    cin_number = models.CharField(max_length=21, blank=True, default="", help_text="Company Identification Number (Pvt Ltd / LLP only). Printed on letterheads under Companies Act 2013.")
+    tan_number = models.CharField(max_length=10, blank=True, default="", help_text="Tax Deduction Account Number. Required if the business deducts TDS.")
+    udyam_number = models.CharField(max_length=20, blank=True, default="", help_text="Udyam / MSME Registration Number (e.g. UDYAM-MH-00-0000000).")
+    trade_license_number = models.CharField(max_length=64, blank=True, default="", help_text="Trade License issued by the local municipal authority.")
+    shop_act_number = models.CharField(max_length=64, blank=True, default="", help_text="Shop & Establishment Act registration number (Shops Act license).")
+
+    # Business classification
+    class BusinessType(models.TextChoices):
+        SOLE_PROPRIETORSHIP = "SOLE_PROPRIETORSHIP", "Sole Proprietorship"
+        PARTNERSHIP = "PARTNERSHIP", "Partnership Firm"
+        LLP = "LLP", "Limited Liability Partnership (LLP)"
+        PRIVATE_LIMITED = "PRIVATE_LIMITED", "Private Limited Company"
+        OPC = "OPC", "One Person Company (OPC)"
+        PUBLIC_LIMITED = "PUBLIC_LIMITED", "Public Limited Company"
+        HUF = "HUF", "Hindu Undivided Family (HUF)"
+
+    business_type = models.CharField(max_length=32, choices=BusinessType.choices, blank=True, default="")
+    year_of_establishment = models.PositiveSmallIntegerField(null=True, blank=True, help_text="Year the business was established (e.g. 2010). Printed on letterheads.")
+
+    # Authorized signatory (for invoices, agreements, and legal documents)
+    authorized_signatory_name = models.CharField(max_length=120, blank=True, default="", help_text="Full name of the person authorized to sign invoices and legal documents.")
+    authorized_signatory_designation = models.CharField(max_length=80, blank=True, default="", help_text="Designation of the signatory (e.g. Proprietor, Director, Partner).")
+
+    # Banking details (printed on B2B invoices for NEFT/RTGS/UPI payments)
+    bank_name = models.CharField(max_length=120, blank=True, default="")
+    bank_account_number = models.CharField(max_length=32, blank=True, default="")
+    bank_ifsc_code = models.CharField(max_length=11, blank=True, default="")
+    bank_branch = models.CharField(max_length=120, blank=True, default="")
+    upi_id = models.CharField(max_length=80, blank=True, default="", help_text="UPI ID for QR / payment link on receipts (e.g. businessname@upi).")
+
     invoice_prefix = models.CharField(max_length=20, blank=True, default="")
     receipt_prefix = models.CharField(max_length=20, blank=True, default="")
     default_currency_code = models.CharField(max_length=10, default="INR")
@@ -128,6 +160,16 @@ class BusinessProfile(BusinessSetupTimeStampedModel):
         self.country = (self.country or "").strip() or "India"
         self.gstin = (self.gstin or "").strip().upper()
         self.pan_number = (self.pan_number or "").strip().upper()
+        self.cin_number = (self.cin_number or "").strip().upper()
+        self.tan_number = (self.tan_number or "").strip().upper()
+        self.udyam_number = (self.udyam_number or "").strip().upper()
+        self.trade_license_number = (self.trade_license_number or "").strip()
+        self.shop_act_number = (self.shop_act_number or "").strip()
+        self.bank_ifsc_code = (self.bank_ifsc_code or "").strip().upper()
+        self.bank_account_number = (self.bank_account_number or "").strip()
+        self.upi_id = (self.upi_id or "").strip()
+        self.authorized_signatory_name = (self.authorized_signatory_name or "").strip()
+        self.authorized_signatory_designation = (self.authorized_signatory_designation or "").strip()
         self.invoice_prefix = (self.invoice_prefix or "").strip().upper()
         self.receipt_prefix = (self.receipt_prefix or "").strip().upper()
         self.default_currency_code = (self.default_currency_code or "").strip().upper() or "INR"

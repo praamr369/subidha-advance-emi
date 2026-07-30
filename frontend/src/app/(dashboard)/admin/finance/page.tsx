@@ -34,6 +34,8 @@ import type { DashboardWindowPreset } from "@/services/dashboard-types";
 import {
   createFinanceTransfer,
   getFinanceOperationalSummary,
+  getMoneyInHand,
+  type MoneyInHandResponse,
   getReconciliationOverview,
   listFinanceTransfers,
   type FinanceOperationalSummaryResponse,
@@ -206,6 +208,7 @@ export default function AdminFinancePage() {
     useState<AccountingPaginatedResponse<AccountingPurchaseBill> | null>(null);
   const [directSales, setDirectSales] = useState<DirectSale[]>([]);
   const [recentCollections, setRecentCollections] = useState<PaymentRegisterRow[]>([]);
+  const [moneyPosition, setMoneyPosition] = useState<MoneyInHandResponse | null>(null);
   const [vendorSummaries, setVendorSummaries] = useState<VendorOperationalSummary[]>([]);
   const [financeOperationalSummary, setFinanceOperationalSummary] =
     useState<FinanceOperationalSummaryResponse | null>(null);
@@ -271,6 +274,7 @@ export default function AdminFinancePage() {
         financeOperationalResult,
         reconciliationResult,
         financeTransferResult,
+        moneyInHandResult,
       ] = await Promise.allSettled([
         apiFetch<AdminCommissionSummaryResponse>("/admin/commissions/summary/"),
         apiFetch<unknown>("/admin/commission-payout-batches/list/"),
@@ -285,6 +289,7 @@ export default function AdminFinancePage() {
         getFinanceOperationalSummary(),
         getReconciliationOverview(),
         listFinanceTransfers(),
+        getMoneyInHand(),
       ]);
 
       function ok<T>(result: PromiseSettledResult<T>): T | null {
@@ -318,6 +323,7 @@ export default function AdminFinancePage() {
       setDirectSales(ok(directSalesResult)?.results ?? []);
       setRecentCollections((ok(paymentRegisterResult)?.results ?? []).slice(0, 8));
       setFinanceOperationalSummary(ok(financeOperationalResult));
+      setMoneyPosition(ok(moneyInHandResult));
       setReconciliationOverview(ok(reconciliationResult));
       setFinanceTransfers(ok(financeTransferResult));
       setVendorSummaries(
@@ -395,7 +401,95 @@ export default function AdminFinancePage() {
     reconciliationOverview?.pending_finance_accounts ?? 0;
   const flaggedOperationalReconciliations =
     reconciliationOverview?.flagged_reconciliation_count ?? reconciliationFlags;
-  const operationalRows = financeOperationalSummary?.results ?? [];
+  const operationalRows = useMemo(() => {
+    const opMap = new Map(
+      (financeOperationalSummary?.results ?? []).map((row) => [row.finance_account_id, row])
+    );
+    const allIds = new Set<number>([
+      ...opMap.keys(),
+      ...(moneyPosition?.accounts ?? []).map((a) => a.finance_account_id),
+    ]);
+    return Array.from(allIds).map((id) => {
+      const op = opMap.get(id);
+      const mh = (moneyPosition?.accounts ?? []).find((a) => a.finance_account_id === id);
+      return {
+        finance_account_id: id,
+        finance_account_name: op?.finance_account_name || mh?.finance_account_name || `Account #${id}`,
+        kind: (op?.kind || mh?.kind || "CASH") as "CASH" | "BANK" | "UPI",
+        branch_id: op?.branch_id || null,
+        branch_name: op?.branch_name || null,
+        chart_account_id: op?.chart_account_id || 0,
+        chart_account_code: op?.chart_account_code || "",
+        payment_total: op?.payment_total || "0",
+        payment_count: op?.payment_count || 0,
+        advance_total: op?.advance_total || "0",
+        advance_count: op?.advance_count || 0,
+        unapplied_advance_total: op?.unapplied_advance_total || "0",
+        security_deposit_total: op?.security_deposit_total || "0",
+        security_deposit_count: op?.security_deposit_count || 0,
+        incoming_transfer_total: op?.incoming_transfer_total || "0",
+        incoming_transfer_count: op?.incoming_transfer_count || 0,
+        outgoing_transfer_total: op?.outgoing_transfer_total || "0",
+        outgoing_transfer_count: op?.outgoing_transfer_count || 0,
+        pending_settlement_amount: op?.pending_settlement_amount || "0",
+        reconciliation_status: op?.reconciliation_status || "OK",
+      };
+    });
+  }, [financeOperationalSummary, moneyPosition]);
+
+  const totalCustomerAdvances = useMemo(
+    () =>
+      operationalRows.reduce(
+        (sum, row) => sum + toNumber(row.advance_total),
+        0
+      ),
+    [operationalRows]
+  );
+  const totalSecurityDeposits = useMemo(
+    () =>
+      operationalRows.reduce(
+        (sum, row) => sum + toNumber(row.security_deposit_total || "0"),
+        0
+      ),
+    [operationalRows]
+  );
+
+  // Live money held now — cash/bank/UPI from the authoritative posted ledger
+  // (matches the cash/bank/UPI books). "Settled out" stays derived from the
+  // per-account operational summary.
+  const moneyInHand = {
+    cash: toNumber(moneyPosition?.cash),
+    bank: toNumber(moneyPosition?.bank),
+    upi: toNumber(moneyPosition?.upi),
+    total: toNumber(moneyPosition?.total),
+    settledOut: operationalRows.reduce(
+      (sum, row) => sum + toNumber(row.outgoing_transfer_total),
+      0
+    ),
+  };
+
+  // Real ledger balance per finance account, keyed by id, so the settlement
+  // posture rows can show the money each account actually holds (from posted
+  // journals) instead of only the Payment-table total, which is 0 when money
+  // arrives via other rails like direct-sale receipts.
+  const ledgerBalanceByAccount = new Map<number, string>(
+    (moneyPosition?.accounts ?? []).map((account) => [
+      account.finance_account_id,
+      account.net_balance,
+    ])
+  );
+
+  // Surface the accounts that actually matter first: real money held, then
+  // pending settlement, then unapplied advances. Otherwise alphabetical order
+  // buries a funded account (e.g. Main Cash Desk) below empty test accounts and
+  // it gets cut off by the row cap.
+  const rankedOperationalRows = [...operationalRows].sort((left, right) => {
+    const score = (row: (typeof operationalRows)[number]) =>
+      toNumber(ledgerBalanceByAccount.get(row.finance_account_id) ?? "0") * 1_000_000 +
+      toNumber(row.pending_settlement_amount) * 1_000 +
+      toNumber(row.unapplied_advance_total);
+    return score(right) - score(left);
+  });
 
   async function handleCreateTransfer(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -474,6 +568,16 @@ export default function AdminFinancePage() {
           label: "Supplier Payables",
           value: formatRupee(supplierPayableTotal),
           tone: supplierPayableTotal > 0 ? "warning" : "success",
+        },
+        {
+          label: "Customer Advances",
+          value: formatRupee(totalCustomerAdvances),
+          tone: totalCustomerAdvances > 0 ? "info" : "success",
+        },
+        {
+          label: "Security Deposits",
+          value: formatRupee(totalSecurityDeposits),
+          tone: totalSecurityDeposits > 0 ? "info" : "success",
         },
         {
           label: "Reconciliation Flags",
@@ -718,7 +822,7 @@ export default function AdminFinancePage() {
                       description="No finance accounts are available for settlement posture review."
                     />
                   ) : (
-                    operationalRows.slice(0, 6).map((row) => (
+                    rankedOperationalRows.map((row) => (
                       <div
                         key={row.finance_account_id}
                         className="rounded-xl border border-border bg-muted/50 px-4 py-3"
@@ -729,10 +833,13 @@ export default function AdminFinancePage() {
                               {row.finance_account_name} · {row.kind}
                             </div>
                             <div className="mt-1 text-xs text-muted-foreground">
-                              Chart {row.chart_account_code} · Branch {row.branch_name || "Shared"} · Payments {formatRupee(row.payment_total)} · Advances {formatRupee(row.advance_total)}
+                              Chart {row.chart_account_code} · Branch {row.branch_name || "Shared"} · EMI collections {formatRupee(row.payment_total)} · Customer advances {formatRupee(row.advance_total)} · Security deposits {formatRupee(row.security_deposit_total || "0")}
                             </div>
                           </div>
                           <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">
+                              Balance held {formatRupee(ledgerBalanceByAccount.get(row.finance_account_id) ?? "0")}
+                            </span>
                             <StatusBadge
                               status={row.reconciliation_status || "UNKNOWN"}
                               label={row.reconciliation_status || "—"}
@@ -741,7 +848,10 @@ export default function AdminFinancePage() {
                               Pending {formatRupee(row.pending_settlement_amount)}
                             </span>
                             <span className="rounded-full border border-border bg-card px-3 py-1 text-xs font-semibold text-muted-foreground">
-                              Unapplied {formatRupee(row.unapplied_advance_total)}
+                              Customer advances {formatRupee(row.advance_total)} ({formatRupee(row.unapplied_advance_total)} unapplied)
+                            </span>
+                            <span className="rounded-full border border-border bg-card px-3 py-1 text-xs font-semibold text-muted-foreground">
+                              Security deposits {formatRupee(row.security_deposit_total || "0")}
                             </span>
                           </div>
                         </div>
@@ -987,27 +1097,27 @@ export default function AdminFinancePage() {
               </SectionCard>
 
               <SectionCard
-                title="Payment method mix"
-                description="Collections remain traceable by operational finance account without changing the underlying payment truth."
+                title="Money held by method"
+                description="How much money you are holding right now split across cash, bank, and UPI — live balances from the posted ledger, so it always matches the cash/bank/UPI books."
               >
                 <div className="space-y-3">
                   <MiniBar
                     label="Cash"
-                    value={cashNet}
-                    total={Math.max(windowNet, 1)}
-                    amount={formatRupee(cashNet)}
+                    value={moneyInHand.cash}
+                    total={Math.max(moneyInHand.total, 1)}
+                    amount={formatRupee(moneyInHand.cash)}
                   />
                   <MiniBar
                     label="Bank"
-                    value={bankNet}
-                    total={Math.max(windowNet, 1)}
-                    amount={formatRupee(bankNet)}
+                    value={moneyInHand.bank}
+                    total={Math.max(moneyInHand.total, 1)}
+                    amount={formatRupee(moneyInHand.bank)}
                   />
                   <MiniBar
                     label="UPI"
-                    value={upiNet}
-                    total={Math.max(windowNet, 1)}
-                    amount={formatRupee(upiNet)}
+                    value={moneyInHand.upi}
+                    total={Math.max(moneyInHand.total, 1)}
+                    amount={formatRupee(moneyInHand.upi)}
                   />
                 </div>
               </SectionCard>
@@ -1068,12 +1178,36 @@ export default function AdminFinancePage() {
 
               <SectionCard
                 title="Recent collections"
-                description="Recent payment register rows give finance visibility into posting method, customer, subscription linkage, and reversal-safe review."
+                description="The latest money that actually came in — across every rail (sales, EMI, rent, lease, deposits), straight from the posted ledger."
               >
-                {recentCollections.length === 0 ? (
+                {recentCollections.length === 0 && (moneyPosition?.recent_receipts?.length ?? 0) > 0 ? (
+                  <div className="space-y-3">
+                    {moneyPosition?.recent_receipts.map((row, idx) => (
+                      <div
+                        key={`${row.reference}-${idx}`}
+                        className="rounded-xl border border-border bg-muted/50 px-4 py-3"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="text-sm font-semibold text-foreground">
+                            {row.source_label} · {formatRupee(row.amount)}
+                          </div>
+                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-800">
+                            {row.kind}
+                          </span>
+                        </div>
+                        <div className="mt-1 text-sm text-muted-foreground">
+                          {formatDate(row.entry_date)} · Into {row.finance_account_name || "—"}
+                        </div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          Ref {row.reference || "—"}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : recentCollections.length === 0 ? (
                   <EmptyState
                     title="No recent collections"
-                    description="No payment register rows are visible right now."
+                    description="No money has come in yet. Collections from any rail will appear here."
                   />
                 ) : (
                   <div className="space-y-3">
@@ -1298,13 +1432,7 @@ export default function AdminFinancePage() {
                     href={ROUTES.admin.accountingBooksBank}
                     className="inline-flex items-center justify-center rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground transition hover:border-ring hover:bg-muted"
                   >
-                    Bank Book
-                  </Link>
-                  <Link
-                    href={ROUTES.admin.accountingBooksUpi}
-                    className="inline-flex items-center justify-center rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground transition hover:border-ring hover:bg-muted"
-                  >
-                    UPI Book
+                    Bank / UPI Book
                   </Link>
                   <Link
                     href={ROUTES.admin.accountingChartOfAccounts}

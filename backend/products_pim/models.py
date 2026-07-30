@@ -1,5 +1,6 @@
 from django.db import models
 from django.core.validators import MinValueValidator
+from django.utils.text import slugify
 
 
 class AttributeDataType(models.TextChoices):
@@ -25,6 +26,11 @@ class ProductCategory(models.Model):
         verbose_name = "Product Category"
         verbose_name_plural = "Product Categories"
 
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name)[:100] or "category"
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return self.name
 
@@ -42,6 +48,11 @@ class ProductSubcategory(models.Model):
         unique_together = ("category", "slug")
         verbose_name = "Product Subcategory"
         verbose_name_plural = "Product Subcategories"
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name)[:100] or "subcategory"
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.category.name} / {self.name}"
@@ -67,6 +78,11 @@ class CategoryAttribute(models.Model):
         unique_together = ("category", "subcategory", "slug")
         verbose_name = "Category Attribute"
         verbose_name_plural = "Category Attributes"
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name)[:100] or "attribute"
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.category.name} / {self.name}"
@@ -94,6 +110,19 @@ class AttributeOption(models.Model):
 
 class PimProduct(models.Model):
     code = models.CharField(max_length=100, unique=True)
+    # Link to the operational product master (subscriptions.Product). This makes the
+    # PIM record the rich-editing layer of a single operational product, so editing
+    # attributes/variants here reflects on the product used for inventory,
+    # subscription, EMI, rent, lease, and direct sale. Nullable so the FK can be
+    # added additively and backfilled by matching code == product_code.
+    source_product = models.ForeignKey(
+        "subscriptions.Product",
+        on_delete=models.PROTECT,
+        related_name="pim",
+        null=True,
+        blank=True,
+        db_index=True,
+    )
     name = models.CharField(max_length=300)
     description = models.TextField(blank=True)
     category = models.ForeignKey(ProductCategory, on_delete=models.PROTECT, related_name="products")
@@ -105,6 +134,9 @@ class PimProduct(models.Model):
     image = models.ImageField(upload_to="pim/products/", null=True, blank=True)
     is_active = models.BooleanField(default=True)
     is_published = models.BooleanField(default=False)
+    variant_generating_attributes = models.ManyToManyField(
+        CategoryAttribute, blank=True, related_name="used_for_variants"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

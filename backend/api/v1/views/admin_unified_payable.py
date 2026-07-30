@@ -81,9 +81,20 @@ class AdminPayableExecuteView(APIView):
             except (TypeError, ValueError):
                 return Response({"detail": "finance_account_id must be an integer."}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Two-account model: if no explicit account is given, auto-resolve it from
+        # the payout instrument (Cash → cash desk; UPI/transfer/cheque/deposit →
+        # the single Bank/UPI account). Payouts default to Bank/UPI.
+        if not finance_account_id:
+            from subscriptions.services.payment_service import _fallback_finance_account_for_method
+
+            payment_method = (data.get("payment_method") or "UPI").strip().upper()
+            resolved = _fallback_finance_account_for_method(payment_method)
+            if resolved is not None:
+                finance_account_id = resolved.id
+
         if payable_type not in ("commission", "credit_refund") and not finance_account_id:
             return Response(
-                {"detail": "finance_account_id is required for this payable type."},
+                {"detail": "No active finance account is available for this payout."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

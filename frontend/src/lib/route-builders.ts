@@ -215,6 +215,10 @@ export function buildAdminJournalEntryPrintRoute(id: number | string): string {
   return `${ADMIN_ACCOUNTING_JOURNALS_ROUTE}/${id}/print`;
 }
 
+export function buildAdminJournalEntryRoute(id: number | string): string {
+  return `${ADMIN_ACCOUNTING_JOURNALS_ROUTE}/${id}`;
+}
+
 export function buildAdminLedgerStatementPrintRoute(
   accountId: number | string,
   params: AdminLedgerStatementParams = {}

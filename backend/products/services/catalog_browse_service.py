@@ -142,6 +142,21 @@ def serialize_catalog_product(product: Product, request=None) -> dict:
     }
 
 
+def serialize_catalog_product_detail(product: Product, request=None) -> dict:
+    """Serialize a product with full details for the PDP (Product Detail Page)."""
+    base = serialize_catalog_product(product, request)
+    base.update({
+        "base_specs": product.base_specs or {},
+        "warranty_enabled": bool(product.warranty_enabled),
+        "warranty_months_manufacturing": product.warranty_months_manufacturing,
+        "warranty_months_structural": product.warranty_months_structural,
+        "warranty_months_extended_max": product.warranty_months_extended_max,
+        "extended_warranty_cost_percentage": str(product.extended_warranty_cost_percentage),
+        "sku": product.sku or "",
+    })
+    return base
+
+
 def catalog_categories(queryset: QuerySet[Product]) -> list[dict]:
     """Distinct categories present in an approved-catalog queryset with counts."""
     from django.db.models import Count

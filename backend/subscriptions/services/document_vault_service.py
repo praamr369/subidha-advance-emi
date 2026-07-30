@@ -320,6 +320,7 @@ def build_required_document_checklist(
     if is_direct:
         return {
             "subscription_id": getattr(subscription, "pk", None),
+            "customer_id": getattr(subscription, "customer_id", None),
             "plan_type": plan,
             "is_direct_sale": True,
             "required_documents": [],
@@ -372,6 +373,7 @@ def build_required_document_checklist(
 
     return {
         "subscription_id": getattr(subscription, "pk", None),
+        "customer_id": getattr(subscription, "customer_id", None),
         "plan_type": plan,
         "is_direct_sale": False,
         "required_documents": items,

@@ -153,7 +153,7 @@ def _check_bridge_postings_complete(run_date: date, branch_id: int | None) -> di
 
         qs = AccountingBridgePosting.objects.filter(
             created_at__date=run_date,
-            posting_status="PENDING",
+            journal_entry__status="DRAFT",
         )
         count = qs.count()
         passed = count == 0
@@ -162,7 +162,7 @@ def _check_bridge_postings_complete(run_date: date, branch_id: int | None) -> di
             "label": "Accounting bridge postings complete",
             "passed": passed,
             "severity": DailyCloseCheckSeverity.WARNING,
-            "detail": "" if passed else f"{count} bridge posting(s) still PENDING for {run_date}.",
+            "detail": "" if passed else f"{count} bridge posting(s) still DRAFT for {run_date}.",
         }
     except Exception as exc:
         return {

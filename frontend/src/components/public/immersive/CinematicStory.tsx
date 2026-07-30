@@ -5,8 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Home, Sparkles, Truck, Wallet, Boxes } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-import GeneratedMarketingVisual from "@/components/public/GeneratedMarketingVisual";
-import { PUBLIC_MARKETING_ASSETS, type PublicMarketingAssetKey } from "@/lib/public-marketing-assets";
+import Image from "next/image";
 import { ROUTES } from "@/lib/routes";
 
 type Chapter = {
@@ -14,7 +13,7 @@ type Chapter = {
   title: string;
   body: string;
   icon: LucideIcon;
-  asset: PublicMarketingAssetKey;
+  asset: string;
   href: string;
   cta: string;
 };
@@ -25,7 +24,7 @@ const CHAPTERS: Chapter[] = [
     title: "Furniture for real Asansol homes",
     body: "Beds, sofas, wardrobes, dining sets and mattresses — chosen for everyday family living. Visit the showroom to see current designs and availability.",
     icon: Home,
-    asset: "showroomPremiumInterior",
+    asset: "/images/hero_living_room.jpg",
     href: ROUTES.public.products,
     cta: "Explore products",
   },
@@ -34,7 +33,7 @@ const CHAPTERS: Chapter[] = [
     title: "Own it now, pay monthly",
     body: "Advance EMI lets eligible customers take furniture home and pay in monthly instalments, with clear tenure and receipted payments as per approved terms.",
     icon: Wallet,
-    asset: "receiptContract",
+    asset: "/images/banner_draw.jpg",
     href: ROUTES.public.apply,
     cta: "Apply / Enquire",
   },
@@ -43,7 +42,7 @@ const CHAPTERS: Chapter[] = [
     title: "A transparent monthly benefit",
     body: "Lucky Plan EMI is a purchase plan where, if a customer wins as per the approved rulebook, future EMIs may be waived per the contract. No lottery, no guaranteed win.",
     icon: Sparkles,
-    asset: "luckyPlanCard",
+    asset: "/images/banner_draw.jpg",
     href: ROUTES.public.luckyPlan,
     cta: "View Lucky Plan",
   },
@@ -52,7 +51,7 @@ const CHAPTERS: Chapter[] = [
     title: "Rent and lease options too",
     body: "Prefer not to buy outright? Rent and lease options support monthly billing workflows for furniture, as per approved terms and availability.",
     icon: Boxes,
-    asset: "rentLeaseRoom",
+    asset: "/images/banner_rent.jpg",
     href: ROUTES.public.products,
     cta: "See options",
   },
@@ -61,7 +60,7 @@ const CHAPTERS: Chapter[] = [
     title: "Delivery across Asansol",
     body: "We deliver in Asansol and nearby areas. Delivery availability and charges depend on the product and your location — confirm with us before ordering.",
     icon: Truck,
-    asset: "asansolFamilyFurniture",
+    asset: "/images/category_sofa.jpg",
     href: ROUTES.public.contact,
     cta: "Contact us",
   },
@@ -160,7 +159,7 @@ export default function CinematicStory() {
               const offset = index - active;
               return (
                 <div
-                  key={chapter.asset}
+                  key={chapter.title}
                   className="imx-layer absolute inset-0"
                   style={{
                     ["--imx-depth" as string]: 12,
@@ -174,12 +173,15 @@ export default function CinematicStory() {
                   }}
                   aria-hidden={!isActive}
                 >
-                  <GeneratedMarketingVisual
-                    asset={PUBLIC_MARKETING_ASSETS[chapter.asset]}
-                    quality={80}
-                    sizes="(max-width: 1024px) 100vw, 46vw"
-                    className="h-full w-full rounded-[1.6rem] border border-border/50"
-                  />
+                  <div className="relative w-full overflow-hidden rounded-[1.2rem] shadow-[0_24px_54px_-24px_rgba(15,23,42,0.6)]">
+                    <Image
+                      src={chapter.asset}
+                      alt={chapter.title}
+                      width={800}
+                      height={533}
+                      className="w-full object-cover aspect-[4/3] sm:aspect-[16/9]"
+                    />
+                  </div>
                 </div>
               );
             })}

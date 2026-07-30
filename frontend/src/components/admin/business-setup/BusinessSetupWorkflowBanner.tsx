@@ -20,7 +20,7 @@ type WorkflowScope = {
 const ADMIN_SENSITIVE_SCOPES: WorkflowScope[] = [
   { label: "Admin dashboard", pathPrefix: ROUTES.admin.dashboard },
   { label: "Subscriptions", pathPrefix: ROUTES.admin.subscriptions },
-  { label: "Subscription requests", pathPrefix: ROUTES.admin.subscriptionRequests },
+  { label: "Product requests", pathPrefix: ROUTES.admin.subscriptionRequests },
   { label: "Payments", pathPrefix: ROUTES.admin.payments },
   { label: "Finance collection", pathPrefix: ROUTES.admin.financeCollect },
   { label: "Billing", pathPrefix: ROUTES.admin.billing },

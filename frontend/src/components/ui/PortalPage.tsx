@@ -25,7 +25,64 @@ type PortalStat = {
   label: string;
   value: string | number;
   tone?: "default" | "success" | "warning" | "danger" | "info";
+  /** Optional small caption under the value (e.g. "vs last month"). */
+  hint?: string;
+  /** Optional trend chip. `good` decides the colour (green when true, red when
+   *  false); omit `good` for a neutral grey chip. */
+  delta?: {
+    value: string | number;
+    direction?: "up" | "down" | "flat";
+    good?: boolean;
+  };
 };
+
+function statToneClass(tone: PortalStat["tone"]) {
+  switch (tone) {
+    case "success":
+      return "text-[var(--semantic-success-fg)]";
+    case "warning":
+      return "text-[var(--semantic-warning-fg)]";
+    case "danger":
+      return "text-[var(--semantic-danger-fg)]";
+    case "info":
+      return "text-[var(--semantic-info-fg)]";
+    default:
+      return "text-foreground";
+  }
+}
+
+/** Shared KPI tile used by every ERPPageShell/PortalPage `stats` band, so tone
+ *  colours, trend deltas and hints render consistently across the whole app. */
+function StatTile({ stat, index }: { stat: PortalStat; index: number }) {
+  const delta = stat.delta;
+  const arrow = delta?.direction === "up" ? "▲" : delta?.direction === "down" ? "▼" : delta?.direction === "flat" ? "▬" : "";
+  const deltaClass =
+    delta?.good === true
+      ? "bg-[var(--semantic-success-bg,theme(colors.emerald.50))] text-[var(--semantic-success-fg)]"
+      : delta?.good === false
+        ? "bg-[var(--semantic-danger-bg,theme(colors.red.50))] text-[var(--semantic-danger-fg)]"
+        : "bg-muted text-muted-foreground";
+  return (
+    <div
+      key={`${stat.label}-${index}`}
+      className="portal-stat-tile rounded-xl border border-border bg-card p-4"
+    >
+      <div className="enterprise-eyebrow">{stat.label}</div>
+      <div className="mt-2 flex items-baseline justify-between gap-2">
+        <div className={cn("enterprise-metric", statToneClass(stat.tone))}>
+          {normalizeStatValue(stat.value)}
+        </div>
+        {delta ? (
+          <span className={cn("inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-semibold", deltaClass)}>
+            {arrow ? <span aria-hidden>{arrow}</span> : null}
+            {normalizeStatValue(delta.value)}
+          </span>
+        ) : null}
+      </div>
+      {stat.hint ? <div className="mt-1 text-xs text-muted-foreground">{stat.hint}</div> : null}
+    </div>
+  );
+}
 
 type PortalStatusBadge = {
   label: string;
@@ -314,29 +371,7 @@ export default function PortalPage({
                 {stats.length > 0 ? (
                   <div className="portal-page-stats workspace-kpi-band grid grid-cols-1 gap-3 p-3 sm:grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))]">
                     {stats.map((stat, index) => (
-                      <div
-                        key={`${stat.label}-${index}`}
-                        className="portal-stat-tile rounded-xl border border-border bg-card p-4"
-                      >
-                        <div className="enterprise-eyebrow">{stat.label}</div>
-
-                        <div
-                          className={cn(
-                            "enterprise-metric mt-2",
-                            stat.tone === "success"
-                              ? "text-[var(--semantic-success-fg)]"
-                              : stat.tone === "warning"
-                                ? "text-[var(--semantic-warning-fg)]"
-                                : stat.tone === "danger"
-                                  ? "text-[var(--semantic-danger-fg)]"
-                                  : stat.tone === "info"
-                                    ? "text-[var(--semantic-info-fg)]"
-                                    : "text-foreground"
-                          )}
-                        >
-                          {normalizeStatValue(stat.value)}
-                        </div>
-                      </div>
+                      <StatTile key={`${stat.label}-${index}`} stat={stat} index={index} />
                     ))}
                   </div>
                 ) : null}
@@ -408,29 +443,7 @@ export default function PortalPage({
                 {stats.length > 0 ? (
                   <div className="portal-page-stats workspace-kpi-band grid grid-cols-1 gap-3 p-3 sm:grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))]">
                     {stats.map((stat, index) => (
-                      <div
-                        key={`${stat.label}-${index}`}
-                        className="portal-stat-tile rounded-xl border border-border bg-card p-4"
-                      >
-                        <div className="enterprise-eyebrow">{stat.label}</div>
-
-                        <div
-                          className={cn(
-                            "enterprise-metric mt-2",
-                            stat.tone === "success"
-                              ? "text-[var(--semantic-success-fg)]"
-                              : stat.tone === "warning"
-                                ? "text-[var(--semantic-warning-fg)]"
-                                : stat.tone === "danger"
-                                  ? "text-[var(--semantic-danger-fg)]"
-                                  : stat.tone === "info"
-                                    ? "text-[var(--semantic-info-fg)]"
-                                    : "text-foreground"
-                          )}
-                        >
-                          {normalizeStatValue(stat.value)}
-                        </div>
-                      </div>
+                      <StatTile key={`${stat.label}-${index}`} stat={stat} index={index} />
                     ))}
                   </div>
                 ) : null}

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import timedelta
 from django.core.cache import cache
 from django.db.models import F, Q, Sum
 from django.utils import timezone
@@ -11,10 +12,13 @@ from api.v1.permissions import IsAdmin
 from billing.models import CustomerRefund, CustomerRefundStatus, DirectSaleReturn, DirectSaleReturnStatus
 from billing.services.outstanding_ledger_service import build_outstanding_ledger, parse_outstanding_filters
 from core.services.operational_visibility import subscription_collectible_q
+from crm.models import PartyInteraction, PartyInteractionStatus
 from inventory.models import InventoryItem, StockLedger, StockLocation
 from service_desk.support_ticket_models import SupportTicket, SupportTicketStatus
 from subscriptions.models import (
     Batch,
+    CustomerKycDocument,
+    CustomerKycDocumentStatus,
     DeliveryStatus,
     Emi,
     EmiStatus,
@@ -22,14 +26,18 @@ from subscriptions.models import (
     ReconciliationStatus,
     SubscriptionDelivery,
 )
+from subscriptions.services.admin_operations_queue_service import build_admin_queue_summary
+from system_jobs.models import Notification
 
 _BADGE_CACHE_KEY = "admin_nav_badges"
 _BADGE_CACHE_TTL = 30  # seconds — fresh enough for navigation badges
 
 
-def build_admin_navigation_badges() -> dict:
+def build_admin_navigation_badges(user=None) -> dict:
     """Cache-aware badge payload, shared by the REST view and the SSE stream."""
-    cached = cache.get(_BADGE_CACHE_KEY)
+    user_id = user if isinstance(user, int) else getattr(user, "id", None)
+    cache_key = f"{_BADGE_CACHE_KEY}:{user_id}" if user_id else _BADGE_CACHE_KEY
+    cached = cache.get(cache_key)
     if cached is not None:
         return cached
 
@@ -104,7 +112,73 @@ def build_admin_navigation_badges() -> dict:
         "unreconciled_count": int(unreconciled_count),
         "pending_draw_count": int(pending_draw_count),
     }
-    cache.set(_BADGE_CACHE_KEY, payload, _BADGE_CACHE_TTL)
+
+    # Merge dynamic queue counts from admin_operations_queue_service
+    today_work_total = 0
+    try:
+        queue_summary = build_admin_queue_summary()
+        for row in queue_summary.get("results", []):
+            count_val = int(row.get("count") or 0)
+            today_work_total += count_val
+            badge_src = row.get("badge_source")
+            if badge_src:
+                payload[badge_src] = count_val
+            row_key = row.get("key")
+            if row_key:
+                payload[f"queue.{row_key}"] = count_val
+                if row_key not in payload:
+                    payload[row_key] = count_val
+    except Exception:
+        pass
+
+    try:
+        kyc_reverification_count = CustomerKycDocument.objects.filter(
+            Q(expiry_date__lte=today + timedelta(days=60)) | Q(expiry_date__lt=today),
+            status=CustomerKycDocumentStatus.APPROVED,
+            expiry_date__isnull=False,
+        ).count()
+    except Exception:
+        kyc_reverification_count = 0
+
+    try:
+        due_followups_count = PartyInteraction.objects.filter(
+            status=PartyInteractionStatus.OPEN,
+            next_follow_up_at__isnull=False,
+            next_follow_up_at__lte=timezone.now(),
+        ).count()
+    except Exception:
+        due_followups_count = 0
+
+    try:
+        if user_id:
+            unread_count = Notification.objects.filter(recipient_id=user_id, read_at__isnull=True).count()
+        else:
+            unread_count = Notification.objects.filter(read_at__isnull=True).count()
+    except Exception:
+        unread_count = 0
+
+    payload["today_work_count"] = int(today_work_total)
+    payload["today_action_count"] = int(today_work_total)
+    payload["unread_count"] = int(unread_count)
+    payload["kyc_reverification_count"] = int(kyc_reverification_count)
+    payload["due_followups_count"] = int(due_followups_count)
+
+    # Ensure queue.* alias mappings are consistent across both naming styles
+    payload["queue.outstanding_count"] = payload["outstanding_count"]
+    payload["queue.overdue_count"] = payload["overdue_count"]
+    payload["queue.pending_delivery_count"] = payload["pending_delivery_count"]
+    payload["queue.pending_return_count"] = payload["pending_return_count"]
+    payload["queue.pending_refund_count"] = payload["pending_refund_count"]
+    payload["queue.pending_reversal_count"] = payload["pending_reversal_count"]
+    payload["queue.open_support_ticket_count"] = payload["open_support_ticket_count"]
+    payload["queue.low_stock_count"] = payload["low_stock_count"]
+    payload["queue.inspection_stock_count"] = payload["inspection_stock_count"]
+    payload["queue.unreconciled_count"] = payload["unreconciled_count"]
+    payload["reconciliation_pending"] = payload["unreconciled_count"]
+    payload["queue.pending_draw_count"] = payload["pending_draw_count"]
+    payload["queue.unread_count"] = payload["unread_count"]
+
+    cache.set(cache_key, payload, _BADGE_CACHE_TTL)
     return payload
 
 
@@ -112,4 +186,4 @@ class AdminNavigationBadgesView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def get(self, request):
-        return Response(build_admin_navigation_badges())
+        return Response(build_admin_navigation_badges(user=request.user))

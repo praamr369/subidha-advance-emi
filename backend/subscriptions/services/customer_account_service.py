@@ -560,7 +560,7 @@ def build_customer_operational_profile(customer: Customer) -> dict[str, object]:
             "historical_invoice_count": history_invoice_totals["total_count"] or 0,
             "invoice_outstanding_total": _money(active_invoice_totals["outstanding_total"]),
             "lead_count": lead_totals["total_count"] or 0,
-            "lead_open_count": lead_totals["open_count"] or 0,
+            "open_lead_count": lead_totals["open_count"] or 0,
             "quotation_estimate_count": (lead_totals["quotation_count"] or 0)
             + (lead_totals["estimate_count"] or 0),
         },

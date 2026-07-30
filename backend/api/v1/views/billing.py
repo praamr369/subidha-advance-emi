@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
-from django.http import Http404
+from django.http import Http404, HttpResponse
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -51,6 +51,10 @@ from subscriptions.services.operational_cancellation_service import (
 from billing.services.billing_sync_service import (
     sync_payment_into_billing,
     sync_subscription_billing_profile,
+)
+from subscriptions.services.document_pdf_service import (
+    render_credit_note_pdf,
+    render_debit_note_pdf,
 )
 from subscriptions.services.document_numbering_service import get_document_numbering_state
 from api.v1.permissions import IsAdmin
@@ -562,6 +566,18 @@ class BillingCreditNoteViewSet(AdminBillingModelViewSet):
         payload = BillingCreditNoteSerializer(note, context=self.get_serializer_context())
         return Response({"updated": updated, "credit_note": payload.data})
 
+    @action(detail=True, methods=["get"], url_path="pdf")
+    def pdf(self, request, pk=None):
+        note = self.get_object()
+        if note.status not in ["APPROVED", "POSTED"]:
+            raise ValidationError({"detail": "Only approved or posted credit notes can be generated as PDF."})
+        
+        pdf_bytes = render_credit_note_pdf(note=note)
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        filename = f"credit-note-{note.note_no or note.id}.pdf"
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
+
 
 class BillingDebitNoteViewSet(AdminBillingModelViewSet):
     queryset = BillingDebitNote.objects.select_related("doc_series", "original_invoice", "posted_journal_entry").prefetch_related("lines").all()
@@ -612,6 +628,18 @@ class BillingDebitNoteViewSet(AdminBillingModelViewSet):
             raise ValidationError({"detail": str(exc)}) from exc
         payload = BillingDebitNoteSerializer(note, context=self.get_serializer_context())
         return Response({"updated": updated, "debit_note": payload.data})
+
+    @action(detail=True, methods=["get"], url_path="pdf")
+    def pdf(self, request, pk=None):
+        note = self.get_object()
+        if note.status not in ["APPROVED", "POSTED"]:
+            raise ValidationError({"detail": "Only approved or posted debit notes can be generated as PDF."})
+        
+        pdf_bytes = render_debit_note_pdf(note=note)
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        filename = f"debit-note-{note.note_no or note.id}.pdf"
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
 
 
 class ReceiptDocumentViewSet(AdminBillingModelViewSet):

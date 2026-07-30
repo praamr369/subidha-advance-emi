@@ -149,7 +149,7 @@ export default function GrowthHubPage() {
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {SECTIONS.map(({ href, label, description, Icon, iconCls, dotCls, statKey, statLabel }) => (
             <Link
-              key={href}
+              key={`${label}-${href}`}
               href={href}
               className="group relative flex min-h-[11rem] flex-col rounded-xl border border-border bg-card p-4 transition hover:border-ring hover:shadow-sm"
             >

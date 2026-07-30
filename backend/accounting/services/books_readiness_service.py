@@ -8,8 +8,12 @@ from accounting.models import (
     FinanceAccountKind,
     MoneyMovement,
     MoneyMovementStatus,
+    JournalEntryLine,
+    JournalEntryStatus,
 )
 from accounting.services.finance_account_readiness import finance_account_readiness
+from django.db.models import Sum
+from django.db.models.functions import Coalesce
 
 
 def _money(value: Decimal | int | str | None) -> str:
@@ -57,6 +61,27 @@ def build_accounting_books_readiness() -> dict:
     active_accounts = accounts.filter(is_active=True)
     settlement_accounts = active_accounts.filter(is_real_settlement_account=True)
     movement_rows = [_finance_account_row(account) for account in settlement_accounts]
+
+    # Calculate real-time balances from posted journals
+    chart_ids = [row["chart_account_id"] for row in movement_rows if row.get("chart_account_id")]
+    balances_by_chart = {}
+    if chart_ids:
+        agg = JournalEntryLine.objects.filter(
+            journal_entry__status=JournalEntryStatus.POSTED,
+            chart_account_id__in=chart_ids
+        ).values("chart_account_id").annotate(
+            debits=Coalesce(Sum("debit_amount"), Decimal("0.00")),
+            credits=Coalesce(Sum("credit_amount"), Decimal("0.00"))
+        )
+        for row in agg:
+            balances_by_chart[row["chart_account_id"]] = row["debits"] - row["credits"]
+
+    for row in movement_rows:
+        opening = Decimal(row["opening_balance"])
+        chart_id = row.get("chart_account_id")
+        net_change = balances_by_chart.get(chart_id, Decimal("0.00")) if chart_id else Decimal("0.00")
+        row["current_balance"] = _money(opening + net_change)
+
     movement_eligible = [row for row in movement_rows if row["movement_eligible"]]
 
     blockers: list[str] = []

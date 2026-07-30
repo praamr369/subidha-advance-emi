@@ -287,7 +287,7 @@ export default function AccountingBooksPage() {
                               </div>
                               {account.collection_blocker_reason ? <div className="mt-1.5 text-xs text-amber-900">{account.collection_blocker_reason}</div> : null}
                             </div>
-                            <div className="shrink-0 text-sm font-semibold tabular-nums text-foreground">{formatRupee(account.opening_balance)}</div>
+                            <div className="shrink-0 text-sm font-semibold tabular-nums text-foreground">{formatRupee(account.current_balance)}</div>
                           </div>
                           <div className="flex flex-wrap gap-2 border-t border-border/60 px-4 py-2.5">
                             <Link href={buildAdminFinanceAccountStatementPrintRoute(account.id)} className="inline-flex h-8 items-center rounded-lg border border-border bg-background px-3 text-xs font-medium text-foreground transition hover:bg-muted">Finance Statement</Link>

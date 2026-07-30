@@ -88,7 +88,7 @@ export const FINANCE_CONTROL_DIRECTORY_GROUPS: WorkspaceDirectoryGroup[] = [
       {
         title: "Vendor Settlements",
         description: "Review payable settlement drafts and posted vendor-clearing transactions.",
-        href: ROUTES.admin.accountingVendorSettlements,
+        href: ROUTES.admin.vendorsSettlements,
         icon: <Building2 className="h-4 w-4" />,
       },
     ],
@@ -127,7 +127,7 @@ export const ACCOUNTING_REGISTER_DIRECTORY_GROUPS: WorkspaceDirectoryGroup[] = [
       {
         title: "Vendor Register",
         description: "Maintain supplier master records and inspect payable exposure.",
-        href: ROUTES.admin.accountingVendors,
+        href: ROUTES.admin.vendors,
         icon: <Building2 className="h-4 w-4" />,
       },
       {
@@ -139,7 +139,7 @@ export const ACCOUNTING_REGISTER_DIRECTORY_GROUPS: WorkspaceDirectoryGroup[] = [
       {
         title: "Vendor Settlements",
         description: "Post payable-clearing settlements from finance accounts through accounting services.",
-        href: ROUTES.admin.accountingVendorSettlements,
+        href: ROUTES.admin.vendorsSettlements,
         icon: <WalletCards className="h-4 w-4" />,
       },
     ],
@@ -182,16 +182,10 @@ export const ACCOUNTING_BOOK_DIRECTORY_GROUPS: WorkspaceDirectoryGroup[] = [
         icon: <BanknoteArrowDown className="h-4 w-4" />,
       },
       {
-        title: "Bank Book",
-        description: "Inspect posted bank-account rows generated through controlled accounting paths.",
+        title: "Bank / UPI Book",
+        description: "Inspect posted rows for the single Bank/UPI holding account (transfers, cheques, deposits, UPI).",
         href: ROUTES.admin.accountingBooksBank,
         icon: <Landmark className="h-4 w-4" />,
-      },
-      {
-        title: "UPI Book",
-        description: "Review posted UPI-account rows within the accounting subsystem.",
-        href: ROUTES.admin.accountingBooksUpi,
-        icon: <WalletCards className="h-4 w-4" />,
       },
     ],
   },
@@ -277,7 +271,7 @@ export const ACCOUNTING_REPORT_DIRECTORY_GROUPS: WorkspaceDirectoryGroup[] = [
       {
         title: "Close Cockpit",
         description: "Combined P2C/P4A/P4B/P4C readiness view with can_close and can_lock indicators.",
-        href: ROUTES.admin.accountingCloseCockpit,
+        href: ROUTES.admin.closeCockpit,
         icon: <CalendarCheck className="h-4 w-4" />,
       },
       {

@@ -10,6 +10,7 @@ from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
 
 from api.v1.permissions import IsAdmin
+from api.v1.pagination import get_page_params
 from api.v1.serializers.settlements import (
     BankStatementImportSerializer,
     BankStatementImportCreateSerializer,
@@ -716,6 +717,49 @@ class CashierDayCloseListView(generics.ListAPIView):
         if business_date:
             qs = qs.filter(business_date=business_date)
         return qs
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        count = queryset.count()
+        
+        pending_review = queryset.filter(status="PENDING_REVIEW").count()
+        with_variance = queryset.exclude(variance=0).count()
+
+        summary = {
+            "total_count": count,
+            "pending_review": pending_review,
+            "with_variance": with_variance,
+        }
+
+        wants_page = (
+            request.query_params.get("page") is not None
+            or request.query_params.get("page_size") is not None
+        )
+        if wants_page:
+            page, page_size = get_page_params(request, default_page_size=25)
+            start = (page - 1) * page_size
+            rows = list(queryset[start : start + page_size]) if start < count else []
+            serializer = self.get_serializer(rows, many=True)
+            num_pages = (count + page_size - 1) // page_size if count else 0
+            return Response(
+                {
+                    "count": count,
+                    "results": serializer.data,
+                    "summary": summary,
+                    "page": page,
+                    "page_size": page_size,
+                    "num_pages": num_pages,
+                    "has_next": page < num_pages,
+                    "has_previous": page > 1 and num_pages > 0,
+                }
+            )
+            
+        serializer = self.get_serializer(queryset, many=True)
+        return Response({
+            "count": count,
+            "results": serializer.data,
+            "summary": summary,
+        })
 
 
 class CashierDayCloseDetailView(generics.RetrieveAPIView):

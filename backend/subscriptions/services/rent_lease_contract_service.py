@@ -155,6 +155,10 @@ def create_rent_contract(
         },
     )
 
+    if subscription.status == SubscriptionStatus.ACTIVE:
+        from subscriptions.services.rent_lease_billing_service import generate_monthly_demands_for_subscription
+        generate_monthly_demands_for_subscription(subscription=subscription, performed_by=performed_by)
+
     return subscription
 
 
@@ -269,6 +273,10 @@ def create_lease_contract(
             "ownership_transfer_allowed": bool(ownership_transfer_allowed),
         },
     )
+
+    if subscription.status == SubscriptionStatus.ACTIVE:
+        from subscriptions.services.rent_lease_billing_service import generate_monthly_demands_for_subscription
+        generate_monthly_demands_for_subscription(subscription=subscription, performed_by=performed_by)
 
     return subscription
 

@@ -56,6 +56,21 @@ def _enable_bridge():
 
     config = get_rent_lease_posting_bridge_config()
     config.is_enabled = True
+    config.disabled_at = None
+    config.save()
+
+
+def _disable_bridge():
+    # The bridge is auto-ready when the mapping is valid; the only way to keep it
+    # deferred is an explicit disable (disabled_at set + is_enabled False).
+    from django.utils import timezone as _tz
+    from subscriptions.services.rent_lease_posting_bridge_config_service import (
+        get_rent_lease_posting_bridge_config,
+    )
+
+    config = get_rent_lease_posting_bridge_config()
+    config.is_enabled = False
+    config.disabled_at = _tz.now()
     config.save()
 
 
@@ -66,6 +81,8 @@ class DamageDeductionBridgeTests(TestCase):
         self.today = timezone.localdate()
         self.admin = create_admin_user(username="dmg_admin", phone="9910000001")
         self.env = seed_bridge_ready_environment(self.today, performed_by=self.admin)
+        # Default to the deferred posture; enabled tests call _enable_bridge().
+        _disable_bridge()
         self.customer = create_customer_profile(name="Dmg Cust", phone="7910000001")
         self.product = _rent_product()
         self.sub = create_rent_contract(
@@ -242,6 +259,8 @@ class ReconcileCommandTests(TestCase):
         self.today = timezone.localdate()
         self.admin = create_admin_user(username="dmg_cmd_admin", phone="9920000001")
         self.env = seed_bridge_ready_environment(self.today, performed_by=self.admin)
+        # Default to the deferred posture; enabled tests call _enable_bridge().
+        _disable_bridge()
         self.customer = create_customer_profile(name="Cmd Cust", phone="7920000001")
         self.product = _rent_product(code="RENT-DMG-CMD")
         self.sub = create_rent_contract(

@@ -40,3 +40,80 @@ export async function listCatalogAttributeDefinitions(category: number): Promise
     .filter((definition) => definition.is_active && definition.is_spec_attribute)
     .sort((left, right) => left.sort_order - right.sort_order || left.name.localeCompare(right.name));
 }
+
+export type CatalogPurposeKey = "emi" | "rent" | "lease" | "direct_sale" | "purchase_request";
+export type CatalogRole = "customer" | "partner" | "vendor" | "staff" | "public";
+
+export type CatalogProduct = {
+  id: number;
+  name: string;
+  slug: string;
+  brand_name: string | null;
+  base_price: string;
+  media_url?: string;
+  image?: string;
+  category?: string;
+  subcategory?: string;
+  description?: string;
+  product_code?: string;
+  base_specs?: Record<string, string>;
+  warranty_enabled?: boolean;
+  warranty_months_manufacturing?: number;
+  warranty_months_structural?: number;
+  warranty_months_extended_max?: number;
+  extended_warranty_cost_percentage?: string;
+  purposes: { key: CatalogPurposeKey; label: string }[];
+  flags?: Record<string, boolean>;
+  [key: string]: unknown;
+};
+
+export type CatalogFacets = {
+  total: number;
+  purposes: { key: CatalogPurposeKey; label: string; count: number }[];
+  brands: { name: string; count: number }[];
+  categories: { name: string; count: number }[];
+  price_min: number;
+  price_max: number;
+};
+
+export async function getCatalogFacets(role: CatalogRole): Promise<CatalogFacets> {
+  const payload = await request(`/${role}/catalog/facets/`);
+  const data = (payload || {}) as Partial<CatalogFacets>;
+  return {
+    total: data.total || 0,
+    purposes: data.purposes || [],
+    brands: data.brands || [],
+    categories: data.categories || [],
+    price_min: data.price_min || 0,
+    price_max: data.price_max || 0,
+  };
+}
+
+export async function listCatalogProducts(
+  role: CatalogRole, 
+  params: Record<string, unknown>
+): Promise<{ count: number; next: string | null; previous: string | null; results: CatalogProduct[] }> {
+  const searchParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null) {
+      searchParams.set(key, String(value));
+    }
+  }
+  const query = searchParams.toString() ? `?${searchParams.toString()}` : "";
+  const payload = await request(`/${role}/catalog/${query}`);
+  const data = (payload || {}) as { count?: number; next?: string | null; previous?: string | null; results?: CatalogProduct[] };
+  return {
+    count: data.count || 0,
+    next: data.next || null,
+    previous: data.previous || null,
+    results: data.results || [],
+  };
+}
+
+export async function getCatalogProduct(
+  role: CatalogRole,
+  id: number | string
+): Promise<CatalogProduct> {
+  const payload = await request(`/${role}/catalog/${id}/`);
+  return payload as CatalogProduct;
+}

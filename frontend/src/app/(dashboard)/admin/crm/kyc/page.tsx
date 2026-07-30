@@ -13,7 +13,8 @@
  */
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
@@ -122,6 +123,15 @@ function StatusPill({ status }: { status: string }) {
 }
 
 export default function AdminCrmKycReviewQueuePage() {
+  const searchParams = useSearchParams();
+  // Deep-link from the CRM workbench: /admin/crm/kyc?customer={id} focuses that customer's row.
+  const focusCustomerId = useMemo(() => {
+    const raw = searchParams.get("customer");
+    const parsed = raw ? Number(raw) : NaN;
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  }, [searchParams]);
+  const focusHandledRef = useRef(false);
+
   const [data, setData] = useState<KycReviewQueueResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -168,9 +178,27 @@ export default function AdminCrmKycReviewQueuePage() {
     // Intentional empty-deps: runs once on mount with explicit empty filter overrides.
     // Subsequent loads are triggered by the "Apply filters" button (calls load() with current state)
     // or by post-action handlers (approve/reject). Not a missing-dep bug.
+    // When deep-linked with ?customer={id}, narrow the initial load to customer owners
+    // so the focused row is present in the queue.
+    const initialOwner: KycOwnerType | "" = focusCustomerId ? "customer" : "";
+    if (initialOwner) setOwnerType(initialOwner);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    void load({ ownerType: "", statusFilter: "", search: "", expiresWithinDays: undefined });
+    void load({ ownerType: initialOwner, statusFilter: "", search: "", expiresWithinDays: undefined });
   }, []);
+
+  // Once rows for the focused customer are loaded, scroll to and highlight the row (once).
+  useEffect(() => {
+    if (!focusCustomerId || focusHandledRef.current || loading) return;
+    const target = (data?.results ?? []).find(
+      (r) => r.owner_type === "customer" && r.owner_id === focusCustomerId
+    );
+    if (!target) return;
+    focusHandledRef.current = true;
+    const el = document.getElementById(`kyc-row-customer-${focusCustomerId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [data, loading, focusCustomerId]);
 
   function openAction(row: KycQueueRow, kind: "reject" | "resubmission") {
     setActionRowKey(rowKey(row));
@@ -370,10 +398,14 @@ export default function AdminCrmKycReviewQueuePage() {
                 const isActionOpen = actionRowKey === key && actionKind != null;
                 const badge = OWNER_BADGE[row.owner_type];
                 const detailHref = `${OWNER_DETAIL_BASE[row.owner_type]}/${row.owner_id}`;
+                const isFocused = focusCustomerId != null && row.owner_type === "customer" && row.owner_id === focusCustomerId;
                 return (
                   <li
                     key={key}
-                    className="rounded-xl border border-border bg-background px-4 py-3 text-sm"
+                    id={row.owner_type === "customer" ? `kyc-row-customer-${row.owner_id}` : undefined}
+                    className={`rounded-xl border bg-background px-4 py-3 text-sm transition-shadow ${
+                      isFocused ? "border-primary ring-2 ring-primary/40 shadow-sm" : "border-border"
+                    }`}
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0">

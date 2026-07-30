@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import SubscriptionContractDocument from "@/components/print/SubscriptionContractDocument";
+
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import DataTable from "@/components/ui/DataTable";
 import SearchSelect from "@/components/ui/SearchSelect";
@@ -182,10 +182,6 @@ export default function AdminSubscriptionsPage() {
     return searchCustomers(q);
   }
 
-  function handlePrintAcknowledgement(subscription: AdminSubscription): void {
-    setSuccessSubscription(subscription);
-    window.print();
-  }
 
   async function handleCreateSubscription(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -325,12 +321,6 @@ export default function AdminSubscriptionsPage() {
                 Create Payment
               </button>
 
-              <button
-                type="button"
-                onClick={() => handlePrintAcknowledgement(successSubscription)}
-              >
-                Print Contract / Acknowledgement
-              </button>
 
               <button
                 type="button"
@@ -352,87 +342,7 @@ export default function AdminSubscriptionsPage() {
             </div>
           </div>
 
-          <SubscriptionContractDocument
-            audienceLabel="Subscription acknowledgement snapshot for customer and shop counter use."
-            contractReference={`SUB-${successSubscription.id}`}
-            subscriptionId={successSubscription.id}
-            statusLabel={successSubscription.status}
-            statusToneClassName={subscriptionStatusToneClassName(successSubscription.status)}
-            customerFields={[
-              {
-                label: "Customer",
-                value: customerMap[successSubscription.customer]
-                  ? `${customerMap[successSubscription.customer].name}`
-                  : `Customer #${successSubscription.customer}`,
-                emphasize: true,
-              },
-              {
-                label: "Phone",
-                value: customerMap[successSubscription.customer]?.phone ?? "—",
-              },
-              {
-                label: "Product",
-                value:
-                  productMap[successSubscription.product]?.name ??
-                  `Product #${successSubscription.product}`,
-                emphasize: true,
-              },
-              {
-                label: "Product Code",
-                value: productMap[successSubscription.product]?.product_code ?? "—",
-              },
-            ]}
-            contractFields={[
-              { label: "Plan Type", value: successSubscription.plan_type },
-              {
-                label: "Tenure",
-                value: `${successSubscription.tenure_months} months`,
-              },
-              { label: "Start Date", value: successSubscription.start_date || "—" },
-              {
-                label: "Batch",
-                value: successSubscription.batch
-                  ? batchMap[successSubscription.batch]?.batch_code ??
-                    `Batch #${successSubscription.batch}`
-                  : "—",
-              },
-              {
-                label: "Lucky ID",
-                value: successSubscription.lucky_id
-                  ? `#${successSubscription.lucky_id}`
-                  : "Auto",
-              },
-              {
-                label: "Partner",
-                value: successSubscription.partner
-                  ? partnerMap[successSubscription.partner]?.username ??
-                    `Partner #${successSubscription.partner}`
-                  : "Auto / None",
-              },
-            ]}
-            financialFields={[
-              {
-                label: "Monthly EMI",
-                value: formatCurrency(successSubscription.monthly_amount),
-                emphasize: true,
-              },
-              {
-                label: "Total Contract Value",
-                value: formatCurrency(successSubscription.total_amount),
-                emphasize: true,
-              },
-              { label: "Contract Status", value: successSubscription.status },
-              {
-                label: "Lifecycle",
-                value: "Newly created contract",
-              },
-            ]}
-            terms={[
-              "Product base price is treated as total contract value for Lucky Plan EMI contracts.",
-              "Monthly EMI remains derived from tenure and contract value in canonical subscription records.",
-              "This acknowledgement does not modify payment, waiver, or winner history.",
-            ]}
-          />
+
         </section>
       ) : null}
 

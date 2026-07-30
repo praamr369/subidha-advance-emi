@@ -1,5 +1,7 @@
+from decimal import Decimal
 from django.db import transaction
 from django.utils import timezone
+from rest_framework import serializers as drf_serializers
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -225,3 +227,184 @@ class AdminPartnerCollectionRequestRejectView(APIView):
                 "result": PartnerCollectionRequestSerializer(response_obj).data,
             }
         )
+
+
+class _FlagSerializer(drf_serializers.Serializer):
+    flag_reason = drf_serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+
+class AdminPartnerCollectionRequestFlagView(APIView):
+    """
+    Flag a collection request as a bad request (money not received by admin).
+    This is distinct from a plain rejection — it records the flag visibly on
+    both partner and customer sides for reconciliation. The request moves to
+    REJECTED with is_flagged_bad=True. A flagged request can later be re-opened
+    and approved if money is subsequently verified.
+    """
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    @transaction.atomic
+    def post(self, request, pk):
+        try:
+            collection_request = (
+                _request_lock_queryset()
+                .select_for_update()
+                .get(pk=pk)
+            )
+        except PartnerCollectionRequest.DoesNotExist:
+            return Response({"detail": "Collection request not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if collection_request.status == PartnerCollectionRequestStatus.APPROVED:
+            return Response({"detail": "Approved request cannot be flagged."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if collection_request.is_flagged_bad:
+            return Response({"detail": "Request is already flagged as bad."}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = _FlagSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        flag_reason = (serializer.validated_data.get("flag_reason") or "").strip()
+
+        collection_request.status = PartnerCollectionRequestStatus.REJECTED
+        collection_request.is_flagged_bad = True
+        collection_request.flag_reason = flag_reason
+        collection_request.flagged_by = request.user
+        collection_request.flagged_at = timezone.now()
+        collection_request.reviewed_by = request.user
+        collection_request.reviewed_at = timezone.now()
+        collection_request.review_note = f"[BAD REQUEST FLAG] {flag_reason}".strip()
+        collection_request.save(update_fields=[
+            "status", "is_flagged_bad", "flag_reason", "flagged_by", "flagged_at",
+            "reviewed_by", "reviewed_at", "review_note",
+        ])
+
+        response_obj = _reload_request_for_response(collection_request.id)
+        return Response({
+            "detail": "Request flagged as bad. Visible to partner and customer.",
+            "result": PartnerCollectionRequestSerializer(response_obj).data,
+        })
+
+
+class AdminPartnerCollectionRequestReopenView(APIView):
+    """
+    Re-open a REJECTED (including flagged-bad) collection request back to UNDER_REVIEW
+    so the admin can then approve it. Used when money is subsequently verified
+    or when the admin realises the rejection was a mistake.
+    """
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    @transaction.atomic
+    def post(self, request, pk):
+        try:
+            collection_request = (
+                _request_lock_queryset()
+                .select_for_update()
+                .get(pk=pk)
+            )
+        except PartnerCollectionRequest.DoesNotExist:
+            return Response({"detail": "Collection request not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if collection_request.status == PartnerCollectionRequestStatus.APPROVED:
+            return Response({"detail": "Approved request cannot be re-opened."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if collection_request.status not in (
+            PartnerCollectionRequestStatus.REJECTED,
+            PartnerCollectionRequestStatus.CANCELLED,
+        ):
+            return Response(
+                {"detail": "Only REJECTED or CANCELLED requests can be re-opened."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        note = (request.data.get("note") or "").strip()
+
+        collection_request.status = PartnerCollectionRequestStatus.UNDER_REVIEW
+        collection_request.is_flagged_bad = False
+        collection_request.flag_reason = ""
+        collection_request.flagged_by = None
+        collection_request.flagged_at = None
+        collection_request.reviewed_by = request.user
+        collection_request.reviewed_at = timezone.now()
+        collection_request.review_note = f"[REOPENED BY ADMIN] {note}".strip() if note else "[REOPENED BY ADMIN]"
+        collection_request.save(update_fields=[
+            "status", "is_flagged_bad", "flag_reason", "flagged_by", "flagged_at",
+            "reviewed_by", "reviewed_at", "review_note",
+        ])
+
+        response_obj = _reload_request_for_response(collection_request.id)
+        return Response({
+            "detail": "Collection request re-opened for review.",
+            "result": PartnerCollectionRequestSerializer(response_obj).data,
+        })
+
+
+class _EditRequestSerializer(drf_serializers.Serializer):
+    amount = drf_serializers.DecimalField(max_digits=12, decimal_places=2, required=False, min_value=Decimal("0.01"))
+    payment_date = drf_serializers.DateField(required=False)
+    reference_no = drf_serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=100)
+    notes = drf_serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    payment_method = drf_serializers.ChoiceField(
+        choices=["CASH", "UPI", "BANK"],
+        required=False,
+    )
+    admin_note = drf_serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+
+class AdminPartnerCollectionRequestEditView(APIView):
+    """
+    Edit fields of a non-APPROVED collection request (amount, date, reference, method, notes).
+    Supports reconciliation when partner submitted wrong details. Admin note is appended
+    to review_note for full audit trail.
+    """
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    @transaction.atomic
+    def patch(self, request, pk):
+        try:
+            collection_request = (
+                _request_lock_queryset()
+                .select_for_update()
+                .get(pk=pk)
+            )
+        except PartnerCollectionRequest.DoesNotExist:
+            return Response({"detail": "Collection request not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if collection_request.status == PartnerCollectionRequestStatus.APPROVED:
+            return Response({"detail": "Approved requests cannot be edited."}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = _EditRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        update_fields = ["updated_at"]
+        if "amount" in data:
+            collection_request.amount = data["amount"]
+            update_fields.append("amount")
+        if "payment_date" in data:
+            collection_request.payment_date = data["payment_date"]
+            update_fields.append("payment_date")
+        if "reference_no" in data:
+            collection_request.reference_no = data["reference_no"] or None
+            update_fields.append("reference_no")
+        if "notes" in data:
+            collection_request.notes = data["notes"] or ""
+            update_fields.append("notes")
+        if "payment_method" in data:
+            collection_request.payment_method = data["payment_method"]
+            update_fields.append("payment_method")
+
+        admin_note = (data.get("admin_note") or "").strip()
+        if admin_note:
+            existing = collection_request.review_note or ""
+            timestamp = timezone.now().strftime("%Y-%m-%d %H:%M")
+            collection_request.review_note = (
+                f"{existing}\n[ADMIN EDIT {timestamp} by {request.user.username}] {admin_note}".strip()
+            )
+            update_fields.append("review_note")
+
+        collection_request.save(update_fields=update_fields)
+
+        response_obj = _reload_request_for_response(collection_request.id)
+        return Response({
+            "detail": "Collection request updated.",
+            "result": PartnerCollectionRequestSerializer(response_obj).data,
+        })

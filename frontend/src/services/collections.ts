@@ -1,0 +1,39 @@
+import { apiFetch } from "@/lib/api";
+
+export type CollectionSplit = {
+  amount: string;
+  payment_method: "CASH" | "UPI" | "TRANSFER" | "CHEQUE" | "DEPOSIT" | "BANK" | "CARD";
+  finance_account_id: number;
+  reference_no?: string;
+};
+
+export type UnifiedCollectionPayload = {
+  source_type: string;
+  source_id: number;
+  amount: string;
+  payment_method: "CASH" | "UPI" | "TRANSFER" | "CHEQUE" | "DEPOSIT" | "BANK" | "CARD";
+  finance_account_id: number;
+  /** Split tender: when present, amounts must sum to `amount`. */
+  splits?: CollectionSplit[];
+  reference_no?: string;
+  notes?: string;
+  receipt_date?: string;
+  branch_id?: number | null;
+  cash_counter_id?: number | null;
+  idempotency_key?: string;
+};
+
+export type UnifiedCollectionResponse = {
+  detail: string;
+  receipt_status: string;
+  message?: string;
+  receipt_id?: number | string;
+  [key: string]: unknown;
+};
+
+export async function processUnifiedCollection(payload: UnifiedCollectionPayload) {
+  return apiFetch<UnifiedCollectionResponse>("/admin/receivables/collect/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}

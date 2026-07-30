@@ -22,10 +22,19 @@ from api.v1.serializers.admin_crm_module import (
     OpportunitySerializer,
     OpportunityStageUpdateSerializer,
 )
-from crm.models import CustomerInteraction, FollowUpTask, Lead, LeadSource, LeadStage, Opportunity
-from subscriptions.models import AuditLog, Customer, Emi, Payment, PublicLead, Subscription
+from crm.models import (
+    CustomerInteraction,
+    FollowUpTask,
+    FollowUpTaskStatus,
+    Lead,
+    LeadSource,
+    LeadStage,
+    Opportunity,
+)
+from subscriptions.models import AuditLog, Customer, Emi, KycStatus, Payment, PublicLead, Subscription
 from subscriptions.services.audit_service import log_audit
 from subscriptions.services.customer_service import find_or_create_customer
+from crm.services.party_service import sync_party_for_crm_lead, sync_party_for_customer
 
 # Gap 2: valid forward transitions per stage
 VALID_TRANSITIONS: dict[str, list[str]] = {
@@ -34,7 +43,7 @@ VALID_TRANSITIONS: dict[str, list[str]] = {
     LeadStage.INTERESTED: [LeadStage.KYC_PENDING, LeadStage.LOST],
     LeadStage.KYC_PENDING: [LeadStage.READY_TO_CONVERT, LeadStage.LOST],
     LeadStage.READY_TO_CONVERT: [LeadStage.CONVERTED, LeadStage.LOST],
-    LeadStage.CONVERTED: [],
+    LeadStage.CONVERTED: [LeadStage.LOST],
     LeadStage.LOST: [LeadStage.NEW],
 }
 
@@ -111,12 +120,24 @@ class AdminCrmLeadListCreateView(APIView):
         total = qs.count()
         # Gap 9: real pagination
         page_qs, page_meta = _paginate(qs, request)
+        page_list = list(page_qs)
+
+        # Bulk-resolve which leads on this page map to a registered customer by
+        # phone (single query), so the serializer's registered_customer field is
+        # N+1-free.
+        phones = [l.phone for l in page_list if l.phone]
+        registered_by_phone = {}
+        if phones:
+            for c in Customer.objects.filter(phone__in=phones).values("id", "name", "kyc_status", "phone"):
+                registered_by_phone.setdefault(c["phone"], {"id": c["id"], "name": c["name"], "kyc_status": c["kyc_status"]})
 
         return Response({
             "count": total,
             "stage_counts": stage_counts,
             **page_meta,
-            "results": LeadSerializer(page_qs, many=True).data,
+            "results": LeadSerializer(
+                page_list, many=True, context={"registered_by_phone": registered_by_phone}
+            ).data,
         })
 
     def post(self, request):
@@ -144,7 +165,114 @@ class AdminCrmLeadListCreateView(APIView):
             performed_by=request.user,
             metadata={"event": "CRM_LEAD_CREATED", "name": lead.name, "source": lead.source},
         )
+        sync_party_for_crm_lead(lead, performed_by=request.user)
         return Response(LeadSerializer(lead).data, status=status.HTTP_201_CREATED)
+
+
+_LEAD_STAGE_SCORE = {
+    "NEW": 0, "CONTACTED": 10, "INTERESTED": 20,
+    "KYC_PENDING": 25, "READY_TO_CONVERT": 35, "CONVERTED": 40, "LOST": -30,
+}
+# Forward progression order used for stage-age and readiness comparisons.
+_LEAD_STAGE_ORDER = ["NEW", "CONTACTED", "INTERESTED", "KYC_PENDING", "READY_TO_CONVERT", "CONVERTED"]
+
+
+def build_lead_qualification(lead, tasks, opportunities, now):
+    """Additive lead-qualification intelligence for the lead profile: a 0-100
+    lead score, age/stage-age, follow-up SLA, existing-customer (duplicate)
+    detection, and a conversion-readiness checklist. Purely derived — no writes,
+    no schema changes."""
+    task_list = list(tasks)
+    opp_list = list(opportunities)
+
+    # --- Lead score (0..100) ---
+    score = 10
+    if lead.email:
+        score += 15
+    if (lead.address or "").strip():
+        score += 10
+    if lead.interested_product_id:
+        score += 15
+    if lead.interested_plan_type:
+        score += 10
+    score += _LEAD_STAGE_SCORE.get(lead.stage, 0)
+    score += min(len(task_list) * 5, 15)
+    score += min(len(opp_list) * 5, 10)
+    score = max(0, min(100, score))
+    band = "hot" if score >= 70 else "warm" if score >= 40 else "cold"
+
+    age_days = (now - lead.created_at).days if lead.created_at else None
+    stage_since = lead.stage_changed_at or lead.updated_at
+    days_in_stage = (now - stage_since).days if stage_since else None
+
+    # --- Follow-up SLA ---
+    nf = lead.next_follow_up_at
+    if nf:
+        hours_until = (nf - now).total_seconds() / 3600.0
+        sla = {
+            "next_follow_up_at": nf.isoformat(),
+            "is_overdue": nf <= now,
+            "hours_until": round(hours_until, 1),
+            "state": "overdue" if nf <= now else ("due_soon" if hours_until <= 24 else "scheduled"),
+        }
+    else:
+        sla = {"next_follow_up_at": None, "is_overdue": False, "hours_until": None, "state": "none"}
+
+    # --- Converted customer link — the customer this lead became ---
+    converted_customer = None
+    if lead.converted_customer_id:
+        cc = lead.converted_customer
+        converted_customer = {
+            "id": cc.id,
+            "name": cc.name,
+            "phone": cc.phone,
+            "kyc_status": cc.kyc_status,
+        }
+
+    # --- Existing-customer (duplicate) detection — phone is the only shared key ---
+    # Only surfaced as a *warning* when it's NOT already this lead's converted target.
+    dup = None
+    if lead.phone:
+        match = Customer.objects.filter(phone=lead.phone).order_by("id").first()
+        if match and match.id != lead.converted_customer_id:
+            dup = {
+                "id": match.id,
+                "name": match.name,
+                "phone": match.phone,
+                "kyc_status": match.kyc_status,
+                "is_converted_target": False,
+            }
+
+    # --- Conversion-readiness checklist ---
+    stage_idx = _LEAD_STAGE_ORDER.index(lead.stage) if lead.stage in _LEAD_STAGE_ORDER else -1
+    contacted = stage_idx >= _LEAD_STAGE_ORDER.index("CONTACTED")
+    kyc_in_progress = stage_idx >= _LEAD_STAGE_ORDER.index("KYC_PENDING") or bool(
+        dup and dup["kyc_status"] in (KycStatus.VERIFIED, KycStatus.APPROVED)
+    )
+    checklist = [
+        {"key": "contact", "label": "Contact captured", "done": bool(lead.phone)},
+        {"key": "product", "label": "Product of interest selected", "done": bool(lead.interested_product_id)},
+        {"key": "plan", "label": "Plan type selected", "done": bool(lead.interested_plan_type)},
+        {"key": "contacted", "label": "Lead contacted", "done": contacted},
+        {"key": "kyc", "label": "KYC in progress", "done": kyc_in_progress},
+    ]
+    core_keys = {"contact", "product", "plan", "contacted"}
+    core_done = all(item["done"] for item in checklist if item["key"] in core_keys)
+    ready = core_done and lead.stage in {"READY_TO_CONVERT", "KYC_PENDING"}
+
+    return {
+        "score": score,
+        "band": band,
+        "age_days": age_days,
+        "days_in_stage": days_in_stage,
+        "sla": sla,
+        "converted_customer": converted_customer,
+        # Data-integrity flag: stage says converted but no customer is linked.
+        "conversion_orphaned": lead.stage == "CONVERTED" and lead.converted_customer_id is None,
+        "duplicate_customer": dup,
+        "readiness": {"items": checklist, "ready": ready},
+        "engagement": {"task_count": len(task_list), "opportunity_count": len(opp_list)},
+    }
 
 
 class AdminCrmLeadDetailView(APIView):
@@ -167,6 +295,7 @@ class AdminCrmLeadDetailView(APIView):
             "opportunities": OpportunitySerializer(opportunities, many=True).data,
             "overdue_task_count": tasks.filter(status="OPEN", due_at__lte=now).count(),
             "open_task_count": tasks.filter(status="OPEN").count(),
+            "qualification": build_lead_qualification(lead, tasks, opportunities, now),
         })
 
     def patch(self, request, pk):
@@ -204,7 +333,13 @@ class AdminCrmLeadStageUpdateView(APIView):
         new_stage = ser.validated_data["stage"]
 
         # Gap 2: enforce valid transitions
-        allowed = VALID_TRANSITIONS.get(lead.stage, [])
+        allowed = list(VALID_TRANSITIONS.get(lead.stage, []))
+        
+        # Fast-track: if the lead is already linked to a customer, allow jumping straight to READY_TO_CONVERT
+        if lead.converted_customer_id is not None and LeadStage.READY_TO_CONVERT not in allowed:
+            if lead.stage not in [LeadStage.CONVERTED, LeadStage.LOST]:
+                allowed.append(LeadStage.READY_TO_CONVERT)
+
         if new_stage not in allowed:
             raise serializers.ValidationError({
                 "stage": (
@@ -213,9 +348,89 @@ class AdminCrmLeadStageUpdateView(APIView):
                 )
             })
 
+        # KYC gate: a lead cannot become READY_TO_CONVERT until its linked customer
+        # has passed KYC. Verified/Approved/Exception-Approved all clear the gate;
+        # anything else (Pending/Submitted/Rejected/missing) blocks the move.
+        # Guard: CONVERTED must go through the Convert action, which creates and
+        # links the customer. Reaching CONVERTED via a bare stage move would leave
+        # the lead "converted" but orphaned (no customer). Block it here.
+        if new_stage == LeadStage.CONVERTED and lead.converted_customer_id is None:
+            raise serializers.ValidationError({
+                "stage": (
+                    "Use the Convert action to convert this lead — it creates and "
+                    "links the customer record. A lead cannot be marked Converted "
+                    "without a linked customer."
+                )
+            })
+
+        if new_stage == LeadStage.READY_TO_CONVERT:
+            customer = lead.converted_customer
+            approved_states = {
+                KycStatus.VERIFIED,
+                KycStatus.APPROVED,
+                KycStatus.EXCEPTION_APPROVED,
+            }
+            if customer is None:
+                raise serializers.ValidationError({
+                    "stage": "KYC required: no customer record is linked. Enter KYC Pending first."
+                })
+            if customer.kyc_status not in approved_states:
+                raise serializers.ValidationError({
+                    "stage": (
+                        "KYC not approved yet. The linked customer's KYC status is "
+                        f"'{customer.kyc_status}'. Approve KYC in the KYC queue before "
+                        "moving to Ready to Convert."
+                    )
+                })
+
+        note = (ser.validated_data.get("note") or "").strip()
+        next_follow_up_at = ser.validated_data.get("next_follow_up_at")
+
         old_stage = lead.stage
         lead.stage = new_stage
-        lead.save(update_fields=["stage", "updated_at"])
+        lead.stage_changed_at = timezone.now()
+        update_fields = ["stage", "stage_changed_at", "updated_at"]
+        if next_follow_up_at is not None:
+            lead.next_follow_up_at = next_follow_up_at
+            update_fields.append("next_follow_up_at")
+
+        # Entering KYC: materialise the Customer record now so KYC documents can be
+        # attached to it via the existing customer-KYC pipeline before conversion.
+        # find_or_create is idempotent (matches on phone), so the later Convert
+        # step reuses this same customer rather than creating a duplicate.
+        kyc_customer = None
+        if new_stage == LeadStage.KYC_PENDING and lead.converted_customer_id is None:
+            kyc_customer, _ = find_or_create_customer(
+                name=lead.name,
+                phone=lead.phone,
+                email=lead.email,
+                address=lead.address,
+                created_by=request.user,
+            )
+            lead.converted_customer = kyc_customer
+            update_fields.append("converted_customer")
+
+        lead.save(update_fields=update_fields)
+
+        if kyc_customer is not None:
+            party = sync_party_for_crm_lead(lead, performed_by=request.user)
+            sync_party_for_customer(kyc_customer, party=party, performed_by=request.user)
+
+        # Durable timeline entry: a completed follow-up activity records who moved
+        # the stage, when, and what feedback was captured — visible in the lead's
+        # Follow-up Tasks list without needing a separate audit-log reader.
+        transition_label = (
+            f"Stage: {LeadStage(old_stage).label} → {LeadStage(new_stage).label}"
+        )
+        FollowUpTask.objects.create(
+            lead=lead,
+            customer=lead.converted_customer,
+            assigned_to=lead.assigned_to,
+            due_at=timezone.now(),
+            status=FollowUpTaskStatus.DONE,
+            call_note=f"{transition_label}\n{note}".strip() if note else transition_label,
+        )
+
         log_audit(
             action_type=AuditLog.ActionType.CRM_INTERACTION_UPDATED,
             instance=lead,
@@ -224,6 +439,7 @@ class AdminCrmLeadStageUpdateView(APIView):
                 "event": "CRM_LEAD_STAGE_MOVED",
                 "from_stage": old_stage,
                 "to_stage": lead.stage,
+                "note": note,
             },
         )
         return Response(LeadSerializer(lead).data)
@@ -283,14 +499,46 @@ class AdminCrmLeadConvertView(APIView):
         )
         lead.converted_customer = customer
         lead.stage = LeadStage.CONVERTED
-        lead.save(update_fields=["converted_customer", "stage", "updated_at"])
+        lead.stage_changed_at = timezone.now()
+        lead.save(update_fields=["converted_customer", "stage", "stage_changed_at", "updated_at"])
         log_audit(
             action_type=AuditLog.ActionType.CRM_INTERACTION_UPDATED,
             instance=lead,
             performed_by=request.user,
             metadata={"event": "CRM_LEAD_CONVERTED", "customer_id": customer.id},
         )
+        party = sync_party_for_crm_lead(lead, performed_by=request.user)
+        sync_party_for_customer(customer, party=party, performed_by=request.user)
         return Response({"lead": LeadSerializer(lead).data, "customer_id": customer.id})
+
+
+class AdminCrmLeadReconcileView(APIView):
+    """Manual reconcile of one lead — link an existing customer and/or advance
+    the stage to CONVERTED so the pipeline matches customer truth."""
+
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, pk):
+        from crm.services.lead_reconcile_service import reconcile_lead
+        lead = get_object_or_404(
+            Lead.objects.select_related("assigned_to", "converted_customer", "interested_product"),
+            pk=pk,
+        )
+        report = reconcile_lead(lead, performed_by=request.user)
+        lead.refresh_from_db()
+        return Response({"report": report, "lead": LeadSerializer(lead).data})
+
+
+class AdminCrmLeadReconcileAllView(APIView):
+    """Automatic reconcile — sweep every drifted lead in one call. Also the entry
+    point used by the scheduled `reconcile_lead_conversions` command."""
+
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request):
+        from crm.services.lead_reconcile_service import reconcile_all_leads
+        summary = reconcile_all_leads(performed_by=request.user)
+        return Response(summary)
 
 
 class AdminCrmLeadTaskListCreateView(APIView):
@@ -407,6 +655,45 @@ class AdminCrmFollowUpCancelView(APIView):
         task.completed_at = timezone.now()
         task.save(update_fields=["status", "completed_at", "updated_at"])
         return Response(FollowUpTaskSerializer(task).data)
+
+
+class AdminCrmFollowUpSnoozeView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, pk):
+        task = get_object_or_404(FollowUpTask, pk=pk)
+        if task.status != "OPEN":
+            raise serializers.ValidationError({"status": "Only OPEN tasks can be snoozed."})
+        
+        days = request.data.get("days", 1)
+        try:
+            days = int(days)
+        except ValueError:
+            raise serializers.ValidationError({"days": "Days must be an integer."})
+            
+        task.due_at = timezone.now() + timezone.timedelta(days=days)
+        task.save(update_fields=["due_at", "updated_at"])
+        return Response(FollowUpTaskSerializer(task).data)
+
+
+class AdminCrmFollowUpDueView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        now = timezone.now()
+        qs = FollowUpTask.objects.select_related("lead", "customer", "assigned_to").order_by("due_at", "-id")
+        qs = qs.filter(status="OPEN", due_at__lte=now)
+
+        # Gap 9: pagination
+        page_qs, page_meta = _paginate(qs, request, max_size=300)
+
+        return Response({
+            "count": qs.count(),
+            "overdue_count": qs.count(),
+            **page_meta,
+            "results": FollowUpTaskSerializer(page_qs, many=True).data,
+        })
+
 
 
 class AdminCrmLeadOpportunityListCreateView(APIView):
@@ -642,6 +929,7 @@ class AdminCrmPromotePublicLeadView(APIView):
                 "name": crm_lead.name,
             },
         )
+        sync_party_for_crm_lead(crm_lead, performed_by=request.user)
         return Response(
             {"crm_lead": LeadSerializer(crm_lead).data, "public_lead_id": public_lead.id},
             status=status.HTTP_201_CREATED,

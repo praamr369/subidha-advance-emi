@@ -153,17 +153,23 @@ class AdminDirectSaleExchangeCreateView(_AdminBase):
 
 class AdminDirectSaleReturnEligibilityView(_AdminBase):
     def get(self, request, pk: int):
+        if pk <= 0:
+            raise ValidationError({"direct_sale_id": ["A valid direct sale id is required."]})
         replacement_inventory_item_id = request.query_params.get("replacement_inventory_item_id")
         replacement_stock_location_id = request.query_params.get("replacement_stock_location_id")
         replacement_quantity = request.query_params.get("replacement_quantity")
-        return Response(
-            get_direct_sale_return_eligibility(
+        try:
+            payload = get_direct_sale_return_eligibility(
                 direct_sale_id=pk,
                 replacement_inventory_item_id=int(replacement_inventory_item_id) if replacement_inventory_item_id else None,
                 replacement_stock_location_id=int(replacement_stock_location_id) if replacement_stock_location_id else None,
                 replacement_quantity=replacement_quantity,
             )
-        )
+        except ObjectDoesNotExist:
+            return Response({"detail": f"Direct sale {pk} was not found."}, status=status.HTTP_404_NOT_FOUND)
+        except (ValueError, DjangoValidationError) as exc:
+            raise _as_drf_validation_error(exc) from exc
+        return Response(payload)
 
 
 class AdminReturnListView(_AdminBase):
@@ -313,6 +319,103 @@ class AdminReceiptVoidReasonView(_AdminBase):
                 "invoice": BillingInvoiceSerializer(invoice, context={"request": request}).data if invoice else None,
                 "direct_sale": DirectSaleSerializer(direct_sale, context={"request": request}).data if direct_sale else None,
                 "return_eligibility": get_direct_sale_return_eligibility(direct_sale_id=direct_sale.id) if direct_sale else None,
+            }
+        )
+
+
+class AdminCustomerReversalContextView(_AdminBase):
+    """
+    GET /admin/billing/reversal-context/?customer_id=N
+
+    One-call context for the reversal/returns workbench: every artifact of a
+    customer that can be reversed, returned, voided, or refunded — so the
+    operator selects from real records instead of typing raw ids.
+    """
+
+    def get(self, request):
+        from billing.models import BillingInvoice, DirectSale
+        from subscriptions.models import Customer, Subscription
+
+        raw_customer_id = request.query_params.get("customer_id")
+        try:
+            customer_id = int(raw_customer_id or 0)
+        except (TypeError, ValueError):
+            customer_id = 0
+        if customer_id <= 0:
+            raise ValidationError({"customer_id": ["A valid customer id is required."]})
+
+        customer = Customer.objects.filter(pk=customer_id).first()
+        if customer is None:
+            return Response({"detail": f"Customer {customer_id} was not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        sales = (
+            DirectSale.objects.filter(customer_id=customer_id)
+            .order_by("-sale_date", "-id")[:100]
+        )
+        invoice_by_sale = {
+            inv.direct_sale_id: inv
+            for inv in BillingInvoice.objects.filter(direct_sale__in=[s.id for s in sales]).order_by("id")
+        }
+        receipts = (
+            ReceiptDocument.objects.filter(customer_id=customer_id)
+            .order_by("-receipt_date", "-id")[:100]
+        )
+        subscriptions = (
+            Subscription.objects.filter(customer_id=customer_id)
+            .select_related("product")
+            .order_by("-id")[:100]
+        )
+        credit_totals = CustomerCreditLedger.objects.filter(customer_id=customer_id).aggregate(
+            credit_total=Sum("credit_amount"), debit_total=Sum("debit_amount")
+        )
+        credit_balance = (credit_totals.get("credit_total") or 0) - (credit_totals.get("debit_total") or 0)
+
+        return Response(
+            {
+                "customer": {
+                    "id": customer.id,
+                    "name": customer.name,
+                    "phone": customer.phone,
+                    "kyc_status": customer.kyc_status,
+                    "credit_balance": str(credit_balance),
+                },
+                "direct_sales": [
+                    {
+                        "id": sale.id,
+                        "sale_no": sale.sale_no,
+                        "sale_date": sale.sale_date.isoformat() if sale.sale_date else None,
+                        "status": sale.status,
+                        "grand_total": str(sale.grand_total),
+                        "received_total": str(sale.received_total),
+                        "balance_total": str(sale.balance_total),
+                        "billing_invoice_id": invoice_by_sale[sale.id].id if sale.id in invoice_by_sale else None,
+                        "billing_invoice_no": invoice_by_sale[sale.id].document_no if sale.id in invoice_by_sale else None,
+                    }
+                    for sale in sales
+                ],
+                "receipts": [
+                    {
+                        "id": receipt.id,
+                        "receipt_no": receipt.receipt_no,
+                        "receipt_date": receipt.receipt_date.isoformat() if receipt.receipt_date else None,
+                        "status": receipt.status,
+                        "amount": str(receipt.amount),
+                        "direct_sale_id": receipt.direct_sale_id,
+                        "billing_invoice_id": receipt.billing_invoice_id,
+                    }
+                    for receipt in receipts
+                ],
+                "subscriptions": [
+                    {
+                        "id": sub.id,
+                        "subscription_number": sub.subscription_number,
+                        "plan_type": sub.plan_type,
+                        "status": sub.status,
+                        "monthly_amount": str(sub.monthly_amount),
+                        "product_name": sub.product.name if sub.product_id else None,
+                    }
+                    for sub in subscriptions
+                ],
             }
         )
 

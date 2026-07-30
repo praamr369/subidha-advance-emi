@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
+import ErrorState from "@/components/feedback/ErrorState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -31,6 +32,7 @@ type Tab = "lease" | "depreciation" | "cost-centre" | "cash-flow" | "fund-flow" 
 export default function FinanceCompletePage() {
   const [activeTab, setActiveTab] = useState<Tab>("lease");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Lease state
   const [leaseSubId, setLeaseSubId] = useState("");
@@ -78,40 +80,41 @@ export default function FinanceCompletePage() {
   const [deferredTax, setDeferredTax] = useState<DeferredTaxList | null>(null);
 
   // Load data based on active tab
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      try {
-        if (activeTab === "lease") {
-          // Lease tab stays interactive (form-based)
-        } else if (activeTab === "depreciation") {
-          const assets = await listFixedAssets();
-          setFixedAssets(assets.results ?? assets);
-        } else if (activeTab === "cost-centre") {
-          const pl = await getCostCentrePL(undefined, periodStart, periodEnd);
-          setCCPL(pl);
-        } else if (activeTab === "cash-flow") {
-          const cf = await getCashFlowStatement(periodStart, periodEnd);
-          setCashFlow(cf);
-        } else if (activeTab === "fund-flow") {
-          const ff = await getFundFlowStatement(periodStart, periodEnd);
-          setFundFlow(ff);
-        } else if (activeTab === "ratios") {
-          const r = await getFinancialRatios();
-          setRatios(r);
-        } else if (activeTab === "deferred-tax") {
-          const dt = await listDeferredTax();
-          setDeferredTax(dt);
-        }
-      } catch {
-        // Silent failure
-      } finally {
-        setLoading(false);
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      if (activeTab === "lease") {
+        // Lease tab stays interactive (form-based)
+      } else if (activeTab === "depreciation") {
+        const assets = await listFixedAssets();
+        setFixedAssets(assets.results ?? assets);
+      } else if (activeTab === "cost-centre") {
+        const pl = await getCostCentrePL(undefined, periodStart, periodEnd);
+        setCCPL(pl);
+      } else if (activeTab === "cash-flow") {
+        const cf = await getCashFlowStatement(periodStart, periodEnd);
+        setCashFlow(cf);
+      } else if (activeTab === "fund-flow") {
+        const ff = await getFundFlowStatement(periodStart, periodEnd);
+        setFundFlow(ff);
+      } else if (activeTab === "ratios") {
+        const r = await getFinancialRatios();
+        setRatios(r);
+      } else if (activeTab === "deferred-tax") {
+        const dt = await listDeferredTax();
+        setDeferredTax(dt);
       }
-    };
-
-    void loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load this section. Please retry.");
+    } finally {
+      setLoading(false);
+    }
   }, [activeTab, periodStart, periodEnd]);
+
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
 
   const handleLeaseCalculate = async () => {
     if (!leaseSubId) return;
@@ -226,6 +229,12 @@ export default function FinanceCompletePage() {
           </button>
         ))}
       </div>
+
+      {error && (
+        <div className="mb-4">
+          <ErrorState message={error} onRetry={() => void loadData()} />
+        </div>
+      )}
 
       {/* LEASE ACCOUNTING */}
       {activeTab === "lease" && (
