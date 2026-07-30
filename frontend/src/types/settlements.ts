@@ -3,7 +3,7 @@ export type PaginatedResponse<T> = {
   next: string | null;
   previous: string | null;
   results: T[];
-  summary?: any;
+  summary?: unknown;
 };
 
 export type SettlementSourceType =

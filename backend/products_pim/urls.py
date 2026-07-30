@@ -9,6 +9,7 @@ from .viewsets import (
     PimProductViewSet,
     ProductVariantViewSet,
 )
+from .workbench_views import PimProductWorkbenchViewSet
 
 router = DefaultRouter()
 router.register(r"attribute-options", AttributeOptionViewSet, basename="pim-attribute-option")
@@ -17,6 +18,7 @@ router.register(r"subcategories", ProductSubcategoryViewSet, basename="pim-subca
 router.register(r"attributes", CategoryAttributeViewSet, basename="pim-attribute")
 router.register(r"products", PimProductViewSet, basename="pim-product")
 router.register(r"variants", ProductVariantViewSet, basename="pim-variant")
+router.register(r"workbench", PimProductWorkbenchViewSet, basename="pim-workbench")
 
 urlpatterns = [
     path("by-product/<int:product_id>/", ProductPimDetailView.as_view(), name="pim-by-product"),

@@ -574,14 +574,18 @@ class BankBookView(AdminAccountingPhase3ReportView):
     def get(self, request):
         serializer = AccountingBookQuerySerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
-        return Response(build_finance_book(kinds=["BANK"], **serializer.validated_data))
+        # Solopreneur model: one Bank/UPI holding account. The Bank Book covers
+        # both BANK and UPI kinds so all non-cash money lives in one book.
+        return Response(build_finance_book(kinds=["BANK", "UPI"], **serializer.validated_data))
 
 
 class UpiBookView(AdminAccountingPhase3ReportView):
     def get(self, request):
+        # Retained for backward compatibility; UPI is merged into the Bank/UPI
+        # book. Returns the same combined view.
         serializer = AccountingBookQuerySerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
-        return Response(build_finance_book(kinds=["UPI"], **serializer.validated_data))
+        return Response(build_finance_book(kinds=["BANK", "UPI"], **serializer.validated_data))
 
 
 class SalesBookView(AdminAccountingPhase3ReportView):

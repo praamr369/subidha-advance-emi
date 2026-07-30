@@ -184,18 +184,24 @@ export const pimService = {
 
   // Products
   getProducts: (filters?: {
-    category?: number;
+    category?: string | number;
     subcategory?: number;
     search?: string;
     is_published?: boolean;
-  }): Promise<PimProduct[]> => {
+    page?: number;
+    page_size?: number;
+  }): Promise<{ results: PimProduct[]; count: number }> => {
     const params = new URLSearchParams();
-    params.set("page_size", "200");
+    params.set("page_size", filters?.page_size ? String(filters.page_size) : "50");
+    if (filters?.page) params.set("page", String(filters.page));
     if (filters?.category) params.set("category", String(filters.category));
     if (filters?.subcategory) params.set("subcategory", String(filters.subcategory));
     if (filters?.search) params.set("search", filters.search);
     if (filters?.is_published !== undefined) params.set("is_published", String(filters.is_published));
-    return request<PaginatedOrArray<PimProduct>>(`${BASE}/products/?${params}`).then(unwrap);
+    return request<PaginatedOrArray<PimProduct>>(`${BASE}/products/?${params}`).then((raw) => {
+      if (Array.isArray(raw)) return { results: raw, count: raw.length };
+      return { results: raw.results ?? [], count: raw.count ?? (raw.results?.length ?? 0) };
+    });
   },
 
   getProduct: (id: number): Promise<PimProduct> =>
@@ -263,15 +269,81 @@ export const pimService = {
   deleteVariant: (variantId: number): Promise<void> =>
     request<void>(`${BASE}/variants/${variantId}/`, { method: "DELETE" }),
 
+  // Workbench (variant generation / bulk ops — uses product CODE as lookup)
+  getWorkbenchAttributes: (code: string): Promise<{
+    category: string;
+    subcategory: string | null;
+    attributes: {
+      id: number;
+      name: string;
+      slug: string;
+      data_type: string;
+      is_variant_defining: boolean;
+      is_selected_for_variants?: boolean;
+      option_count: number;
+      options: { id: number; value: string; display_name: string }[];
+    }[];
+  }> => request(`${BASE}/workbench/${encodeURIComponent(code)}/attributes/`),
+
+  previewVariants: (
+    code: string,
+    pricingRules: Record<string, number>,
+    attributeIds?: number[]
+  ): Promise<{
+    total_combinations: number;
+    price_range: { min: number; max: number };
+    sample_skus: { sku: string; price: number; attributes: Record<string, string> }[];
+    total_samples: number;
+  }> =>
+    request(`${BASE}/workbench/${encodeURIComponent(code)}/preview_variants/`, {
+      method: "POST",
+      body: JSON.stringify({ pricing_rules: pricingRules, attribute_ids: attributeIds }),
+    }),
+
+  generateVariants: (
+    code: string,
+    pricingRules: Record<string, number>,
+    clearExisting: boolean,
+    attributeIds?: number[]
+  ): Promise<{ created: number; skipped: number; total: number; errors: string[] }> =>
+    request(`${BASE}/workbench/${encodeURIComponent(code)}/generate_variants/`, {
+      method: "POST",
+      body: JSON.stringify({ pricing_rules: pricingRules, clear_existing: clearExisting, attribute_ids: attributeIds }),
+    }),
+
+  getVariantSummary: (code: string): Promise<{
+    total_variants: number;
+    active_variants: number;
+    price_range: { min: number; max: number };
+    total_inventory: number;
+    low_stock_count: number;
+  }> => request(`${BASE}/workbench/${encodeURIComponent(code)}/variant_summary/`),
+
+  bulkUpdateVariants: (
+    code: string,
+    updates: Record<string, Record<string, unknown>>
+  ): Promise<{ updated: number; skipped: number; errors: string[] }> =>
+    request(`${BASE}/workbench/${encodeURIComponent(code)}/bulk_update_variants/`, {
+      method: "POST",
+      body: JSON.stringify({ updates }),
+    }),
+
+  clearVariants: (code: string): Promise<{ deleted: number; message: string }> =>
+    request(`${BASE}/workbench/${encodeURIComponent(code)}/clear_variants/`, {
+      method: "DELETE",
+    }),
+
   // Cross-module sync
   getRegisterStatus: (params?: {
     search?: string;
+    category?: string | number;
     synced?: "true" | "false";
     page?: number;
     page_size?: number;
   }): Promise<RegisterStatusResponse> => {
     const qs = new URLSearchParams();
     if (params?.search) qs.set("search", params.search);
+    if (params?.category) qs.set("category", String(params.category));
     if (params?.synced) qs.set("synced", params.synced);
     if (params?.page) qs.set("page", String(params.page));
     if (params?.page_size) qs.set("page_size", String(params.page_size));

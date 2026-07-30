@@ -179,6 +179,8 @@ type RentLeaseDemandRow = {
 
 type SubscriptionDetailRecord = {
   id: number;
+  subscription_number?: string;
+  contract_reference?: string;
   customer_id: number | null;
   customer_name: string;
   customer_phone: string;
@@ -338,6 +340,16 @@ function resolveWinnerStatus(...values: unknown[]): WinnerStatus {
   }
 
   return "NOT_WON";
+}
+
+function getDisplaySubscriptionNumber(sub: any, subId: string): string {
+  if (!sub) return `Subscription #${subId || "—"}`;
+  if (sub.subscription_number) return sub.subscription_number;
+  if (sub.contract_reference) return sub.contract_reference;
+  const year = sub.start_date ? sub.start_date.slice(0, 4) : sub.created_at ? sub.created_at.slice(0, 4) : new Date().getFullYear();
+  const batch = sub.batch_code ? sub.batch_code : sub.batch_id ? `B${sub.batch_id}` : "GEN";
+  const plan = sub.plan_type ? String(sub.plan_type).toUpperCase() : "EMI";
+  return `${plan}/${batch}/${year}/#${sub.id}`;
 }
 
 function parseErrorMessage(error: unknown): string {
@@ -850,19 +862,13 @@ export default function AdminSubscriptionDetailPage() {
 
   return (
     <ERPPageShell
-      title={
-        subscription
-          ? `Subscription #${subscription.id}`
-          : `Subscription #${subscriptionId ?? "—"}`
-      }
+      title={`Subscription ${getDisplaySubscriptionNumber(subscription, subscriptionId)}`}
       subtitle="Contract, winner, and waiver posture with contract lifecycle, winner benefit, waiver and settlement, finance, and audit context from canonical backend truth."
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
         { label: "Subscriptions", href: "/admin/subscriptions" },
         {
-          label: subscription
-            ? `Subscription #${subscription.id}`
-            : `Subscription #${subscriptionId ?? "—"}`,
+          label: getDisplaySubscriptionNumber(subscription, subscriptionId),
         },
       ]}
       actions={[
@@ -1230,7 +1236,15 @@ export default function AdminSubscriptionDetailPage() {
                 className="rounded-[28px]"
               >
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <DetailValue label="Subscription ID" value={`#${subscription.id}`} />
+                  <DetailValue
+                    label="Contract No."
+                    value={
+                      <span className="font-mono font-semibold text-primary">
+                        {getDisplaySubscriptionNumber(subscription, subscriptionId)}
+                      </span>
+                    }
+                  />
+                  <DetailValue label="System DB ID" value={`#${subscription.id}`} />
                   <DetailValue
                     label="Status"
                     value={<ERPStatusBadge status={subscription.status} />}

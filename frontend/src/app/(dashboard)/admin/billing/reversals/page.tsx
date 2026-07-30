@@ -88,7 +88,6 @@ export default function AdminBillingReversalsPage() {
   const [refundCustomerId, setRefundCustomerId] = useState("");
   const [refundAmount, setRefundAmount] = useState("");
   const [refundMethod, setRefundMethod] = useState<"CASH_REFUND" | "UPI_REFUND" | "BANK_REFUND">("CASH_REFUND");
-  const [refundFinanceId, setRefundFinanceId] = useState("");
   const [refundReason, setRefundReason] = useState("");
 
   const [purchaseBillId, setPurchaseBillId] = useState("");
@@ -512,15 +511,14 @@ export default function AdminBillingReversalsPage() {
             {!hasDirectSaleContext || debugMode ? <input className="mb-2 h-10 w-full rounded border px-2" value={refundCustomerId} onChange={(e) => setRefundCustomerId(e.target.value)} placeholder="Customer ID" /> : null}
             <input className="mb-2 h-10 w-full rounded border px-2" value={refundAmount} onChange={(e) => setRefundAmount(e.target.value)} placeholder="Amount" />
             <select className="mb-2 h-10 w-full rounded border px-2" value={refundMethod} onChange={(e) => setRefundMethod(e.target.value as typeof refundMethod)} aria-label="Refund Method">
-              <option value="CASH_REFUND">CASH_REFUND</option>
-              <option value="UPI_REFUND">UPI_REFUND</option>
-              <option value="BANK_REFUND">BANK_REFUND</option>
+              <option value="CASH_REFUND">Cash</option>
+              <option value="UPI_REFUND">UPI / Bank</option>
             </select>
-            {!hasDirectSaleContext || debugMode ? <input className="mb-2 h-10 w-full rounded border px-2" value={refundFinanceId} onChange={(e) => setRefundFinanceId(e.target.value)} placeholder="Finance Account ID" /> : null}
+            <p className="mb-2 text-xs text-muted-foreground">Payout account is chosen automatically: Cash → Main Cash Desk; UPI/Bank → Main UPI / Bank Account.</p>
             <input className="mb-2 h-10 w-full rounded border px-2" value={refundReason} onChange={(e) => setRefundReason(e.target.value)} placeholder="Reason" />
             <button className="rounded border px-3 py-2 text-sm" onClick={() => {
-              if (!refundMethod || !refundFinanceId) { setError("Refund method and finance account are required."); return; }
-              void runAction(() => createAdminCustomerRefund(Number(refundCustomerId), { amount: refundAmount, method: refundMethod, finance_account_id: Number(refundFinanceId), reason: refundReason }), "Refund created.");
+              if (!refundMethod) { setError("Refund method is required."); return; }
+              void runAction(() => createAdminCustomerRefund(Number(refundCustomerId), { amount: refundAmount, method: refundMethod, reason: refundReason }), "Refund created.");
             }}>Create Refund</button>
           </div>
 

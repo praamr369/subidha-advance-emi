@@ -2,7 +2,7 @@ import { apiFetch } from "@/lib/api";
 
 export type CollectionSplit = {
   amount: string;
-  payment_method: "CASH" | "UPI" | "BANK" | "CARD";
+  payment_method: "CASH" | "UPI" | "TRANSFER" | "CHEQUE" | "DEPOSIT" | "BANK" | "CARD";
   finance_account_id: number;
   reference_no?: string;
 };
@@ -11,7 +11,7 @@ export type UnifiedCollectionPayload = {
   source_type: string;
   source_id: number;
   amount: string;
-  payment_method: "CASH" | "UPI" | "BANK" | "CARD";
+  payment_method: "CASH" | "UPI" | "TRANSFER" | "CHEQUE" | "DEPOSIT" | "BANK" | "CARD";
   finance_account_id: number;
   /** Split tender: when present, amounts must sum to `amount`. */
   splits?: CollectionSplit[];
@@ -26,7 +26,9 @@ export type UnifiedCollectionPayload = {
 export type UnifiedCollectionResponse = {
   detail: string;
   receipt_status: string;
-  [key: string]: any;
+  message?: string;
+  receipt_id?: number | string;
+  [key: string]: unknown;
 };
 
 export async function processUnifiedCollection(payload: UnifiedCollectionPayload) {

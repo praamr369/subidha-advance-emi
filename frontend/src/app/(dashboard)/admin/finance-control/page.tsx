@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { 
-  Banknote, WalletCards, Receipt, UsersRound, Repeat2, HandCoins, Building2, ClipboardCheck, ArrowRightLeft
+  Banknote, WalletCards, Receipt, UsersRound, Repeat2, HandCoins, Building2, ClipboardCheck, ArrowRightLeft,
+  AlertTriangle, ShieldCheck, CalendarClock, ArrowDownCircle, Loader2, Play
 } from "lucide-react";
 
 import EmptyState from "@/components/feedback/EmptyState";
@@ -139,6 +140,15 @@ export default function FinanceControlPage() {
     });
   }, [operations, moneyInHand, ledgerBalanceByAccount]);
 
+  const totalCustomerAdvances = useMemo(
+    () => (operations?.results ?? []).reduce((sum, row) => sum + toNumber(row.advance_total), 0),
+    [operations]
+  );
+  const totalSecurityDeposits = useMemo(
+    () => (operations?.results ?? []).reduce((sum, row) => sum + toNumber((row as { security_deposit_total?: string }).security_deposit_total || "0"), 0),
+    [operations]
+  );
+
   const metrics: ERPMetric[] = [
     {
       label: "Total Liquid Balance",
@@ -153,12 +163,40 @@ export default function FinanceControlPage() {
       detail: moneyInHand ? `Total Income: ${formatRupee(moneyInHand.total_income)}` : undefined,
     },
     {
+      label: "Total Outflow",
+      value: formatRupee(moneyInHand?.total_outflow),
+      detail: moneyInHand ? `Net: ${formatRupee(toNumber(moneyInHand.total_income) - toNumber(moneyInHand.total_outflow))}` : undefined,
+      className: toNumber(moneyInHand?.total_outflow) > 0 ? "border-rose-200" : undefined,
+    },
+    {
       label: "Supplier & Salary Payables",
       value: formatRupee(payables?.total_outstanding),
       detail: payables
         ? `${payables.total_items} item(s) · ${payables.needs_posting_count} awaiting posting`
         : "Awaiting payables data",
       className: (payables?.needs_posting_count ?? 0) > 0 ? "border-amber-200" : undefined,
+    },
+    {
+      label: "Deposits Held",
+      value: formatRupee(cards?.deposits_held),
+      detail: `Refund pending: ${formatRupee(cards?.deposit_refunds_pending)} · Deductions: ${formatRupee(cards?.deposit_deductions)}`,
+      className: toNumber(cards?.deposit_refunds_pending) > 0 ? "border-amber-200" : undefined,
+    },
+    {
+      label: "Overdue Rent/Lease",
+      value: String(cards?.rent_lease_overdue ?? 0),
+      detail: `Rent pending: ${cards?.rent_monthly_invoices_pending ?? 0} · Lease pending: ${cards?.lease_monthly_invoices_pending ?? 0}`,
+      className: (cards?.rent_lease_overdue ?? 0) > 0 ? "border-red-200" : undefined,
+    },
+    {
+      label: "Customer Advances",
+      value: formatRupee(totalCustomerAdvances),
+      detail: "Customer money held before receivable rail allocation",
+    },
+    {
+      label: "Security Deposits",
+      value: formatRupee(totalSecurityDeposits),
+      detail: "Security deposit liabilities held",
     },
     {
       label: "Books balanced",
@@ -224,6 +262,28 @@ export default function FinanceControlPage() {
         <div className="bg-background rounded-2xl border border-border p-6 shadow-sm">
           {activeTab === "control" && (
             <div className="space-y-6">
+              {/* Daily Close Action Banner */}
+              {!loading && !error && data && (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
+                  <div className="flex items-center gap-2 text-sm">
+                    <ClipboardCheck className="h-4 w-4 text-primary" />
+                    <span className="font-medium">Daily Close</span>
+                    {closeMessage && (
+                      <span className="text-xs text-muted-foreground ml-2">{closeMessage}</span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={closing}
+                    onClick={() => void runDailyClose()}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 transition disabled:opacity-50"
+                  >
+                    {closing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+                    {closing ? "Running…" : "Run Daily Close"}
+                  </button>
+                </div>
+              )}
+
               {loading && <LoadingBlock />}
               {!loading && error && <ErrorState message={error} onRetry={() => void load()} />}
               {!loading && !error && data && (
@@ -276,23 +336,128 @@ export default function FinanceControlPage() {
                            ))}
                         </div>
                       </ERPSectionShell>
+
+                      {/* Overdue Rent/Lease Demands */}
+                      <ERPSectionShell title="Overdue Rent/Lease Demands" description="Outstanding rent & lease invoices requiring action.">
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="flex items-center gap-2 p-3 border rounded-xl bg-red-50/40">
+                              <AlertTriangle className="h-4 w-4 text-red-600 shrink-0" />
+                              <div>
+                                <div className="text-xs text-muted-foreground">Overdue Demands</div>
+                                <div className="font-bold text-red-700 text-lg">{cards?.rent_lease_overdue ?? 0}</div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 p-3 border rounded-xl bg-amber-50/40">
+                              <CalendarClock className="h-4 w-4 text-amber-600 shrink-0" />
+                              <div>
+                                <div className="text-xs text-muted-foreground">Upcoming (30d)</div>
+                                <div className="font-bold text-amber-700 text-lg">{cards?.upcoming_rent_lease_due_dates ?? 0}</div>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="p-3 border rounded-xl bg-blue-50/30">
+                              <div className="text-xs text-muted-foreground">Rent Invoices Pending</div>
+                              <div className="font-semibold text-blue-700">{cards?.rent_monthly_invoices_pending ?? 0}</div>
+                            </div>
+                            <div className="p-3 border rounded-xl bg-purple-50/30">
+                              <div className="text-xs text-muted-foreground">Lease Invoices Pending</div>
+                              <div className="font-semibold text-purple-700">{cards?.lease_monthly_invoices_pending ?? 0}</div>
+                            </div>
+                          </div>
+                          {/* Contracts nearing return */}
+                          {(cards?.contracts_nearing_return_date ?? 0) > 0 && (
+                            <div className="flex items-center gap-2 p-3 border border-amber-200 rounded-xl bg-amber-50/50">
+                              <ShieldCheck className="h-4 w-4 text-amber-600 shrink-0" />
+                              <div className="text-sm">
+                                <span className="font-semibold text-amber-800">{cards?.contracts_nearing_return_date}</span>
+                                <span className="text-muted-foreground"> contract(s) nearing return · </span>
+                                <span className="font-semibold text-amber-800">{cards?.return_inspections_pending ?? 0}</span>
+                                <span className="text-muted-foreground"> inspection(s) pending</span>
+                              </div>
+                            </div>
+                          )}
+                          <Link href={ROUTES.admin.financeOutstandings ?? "/admin/finance/outstandings"} className="text-sm font-medium text-primary hover:underline">
+                            View All Overdue Outstandings →
+                          </Link>
+                        </div>
+                      </ERPSectionShell>
                     </div>
 
                     {/* Right Column: Outflow / Payables & Posture */}
                     <div className="space-y-6">
-                      <ERPSectionShell title="Where your money went" description="Supplier payable and payroll visibility.">
+                      <ERPSectionShell title="Where your money went" description="Ledger-posted outflows by category.">
                         {moneyInHand?.outflow_by_source && moneyInHand.outflow_by_source.length > 0 ? (
-                          <div className="space-y-3">
+                          <div className="space-y-2">
                             {moneyInHand.outflow_by_source.map((source) => (
                               <div key={source.source_type} className="flex justify-between items-center p-3 border rounded-xl bg-red-50/30">
                                 <span className="text-sm font-medium text-muted-foreground">{source.label}</span>
                                 <span className="font-semibold text-red-700">{formatRupee(source.amount)}</span>
                               </div>
                             ))}
+                            <div className="flex justify-between items-center pt-2 border-t text-sm font-semibold">
+                              <span>Total Outflow</span>
+                              <span className="text-red-700">{formatRupee(moneyInHand.total_outflow)}</span>
+                            </div>
                           </div>
                         ) : (
                           <div className="p-4 text-center text-sm text-muted-foreground border rounded-xl bg-muted/20">
                             No outflows recorded yet.
+                          </div>
+                        )}
+                      </ERPSectionShell>
+
+                      {/* Payables Breakdown */}
+                      <ERPSectionShell title="Supplier Payable & Payroll" description="Outstanding payables by category — not yet posted to ledger.">
+                        {payables && payables.type_summary.length > 0 ? (
+                          <div className="space-y-2">
+                            {payables.type_summary.map((ts) => (
+                              <div key={ts.payable_type} className="flex justify-between items-center p-3 border rounded-xl bg-orange-50/30">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-medium text-muted-foreground">{ts.label}</span>
+                                  <span className="rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold text-orange-700">{ts.count}</span>
+                                </div>
+                                <span className="font-semibold text-orange-700">{formatRupee(ts.total)}</span>
+                              </div>
+                            ))}
+                            <div className="flex justify-between items-center pt-2 border-t text-sm font-semibold">
+                              <span>Total Outstanding</span>
+                              <span className="text-orange-700">{formatRupee(payables.total_outstanding)}</span>
+                            </div>
+                            <Link href={ROUTES.admin.payables ?? "/admin/payables"} className="text-sm font-medium text-primary hover:underline">
+                              Open Payable Command Center →
+                            </Link>
+                          </div>
+                        ) : (
+                          <div className="p-4 text-center text-sm text-muted-foreground border rounded-xl bg-muted/20">
+                            No outstanding payables.
+                          </div>
+                        )}
+                      </ERPSectionShell>
+
+                      {/* Recent Outflows */}
+                      <ERPSectionShell title="Recent Outflows" description="Latest outgoing cash movements from the ledger.">
+                        {moneyInHand?.recent_outflows && moneyInHand.recent_outflows.length > 0 ? (
+                          <div className="space-y-1.5">
+                            {moneyInHand.recent_outflows.map((row, idx) => (
+                              <div key={`${row.reference}-${idx}`} className="flex items-center justify-between gap-2 p-2 border rounded-lg bg-rose-50/20 text-sm">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <ArrowDownCircle className="h-3.5 w-3.5 text-rose-500 shrink-0" />
+                                  <div className="min-w-0">
+                                    <div className="font-medium truncate">{row.source_label}</div>
+                                    <div className="text-[10px] text-muted-foreground truncate">
+                                      {row.reference} · {row.kind} · {row.entry_date}
+                                    </div>
+                                  </div>
+                                </div>
+                                <span className="font-mono font-semibold text-rose-700 shrink-0">{formatRupee(row.amount)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="p-4 text-center text-sm text-muted-foreground border rounded-xl bg-muted/20">
+                            No recent outflows.
                           </div>
                         )}
                       </ERPSectionShell>
@@ -308,7 +473,7 @@ export default function FinanceControlPage() {
                                      <div>
                                        <span className="font-semibold text-foreground">{acc.finance_account_name} · {acc.kind}</span>
                                        <div className="mt-0.5 text-[11px] text-muted-foreground">
-                                         Chart {acc.chart_account_code || "—"} · Branch {acc.branch_name || "Shared"} · EMI collections {formatRupee(acc.payment_total)} · Customer advances {formatRupee(acc.advance_total)} · Security deposits {formatRupee((acc as any).security_deposit_total || "0")}
+                                         Chart {acc.chart_account_code || "—"} · Branch {acc.branch_name || "Shared"} · EMI collections {formatRupee(acc.payment_total)} · Customer advances {formatRupee(acc.advance_total)} · Security deposits {formatRupee((acc as { security_deposit_total?: string }).security_deposit_total || "0")}
                                        </div>
                                      </div>
                                      <div className="flex flex-wrap items-center gap-1.5">
@@ -324,7 +489,7 @@ export default function FinanceControlPage() {
                                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-1.5 border-t border-border/50 text-muted-foreground">
                                      <span>Pending settlement: <strong className="font-mono font-medium text-foreground">{formatRupee(acc.pending_settlement_amount)}</strong></span>
                                      <span>Customer advances: <strong className="font-mono font-medium text-foreground">{formatRupee(acc.advance_total)} ({formatRupee(acc.unapplied_advance_total)} unapplied)</strong></span>
-                                     <span>Security deposits: <strong className="font-mono font-medium text-foreground">{formatRupee((acc as any).security_deposit_total || "0")}</strong></span>
+                                     <span>Security deposits: <strong className="font-mono font-medium text-foreground">{formatRupee((acc as { security_deposit_total?: string }).security_deposit_total || "0")}</strong></span>
                                    </div>
                                  </div>
                                );

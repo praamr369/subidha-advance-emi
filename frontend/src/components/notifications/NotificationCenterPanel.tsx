@@ -80,6 +80,9 @@ export default function NotificationCenterPanel({
     setBusyId(id);
     try {
       await markRead(id);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("subidha:badges-refresh"));
+      }
       await load();
     } finally {
       setBusyId(null);

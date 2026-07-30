@@ -163,6 +163,7 @@ def build_collection_control_center_payload(*, user, role: str) -> dict[str, Any
             "collection_center": "/cashier/collections/control-center",
             "advance_emi_collect": "/cashier/collect",
             "direct_sale_collect": "/cashier/collect?workflow=direct-sale",
+            "unified_search": "/cashier/collect?workflow=unified",
             "payment_history": "/cashier/payments",
             "accounting_setup": None,
         }
@@ -205,7 +206,7 @@ def build_collection_control_center_payload(*, user, role: str) -> dict[str, Any
         "collection_lanes": [
             {"key": "advance_emi", "label": "Advance EMI collection", "enabled": True, "route": routes["advance_emi_collect"]},
             {"key": "direct_sale", "label": "Direct-sale collection", "enabled": True, "route": routes["direct_sale_collect"]},
-            {"key": "rent_lease", "label": "Rent/lease collection", "enabled": False, "route": None},
+            {"key": "rent_lease", "label": "Rent/lease collection", "enabled": True, "route": routes["unified_search"]},
             {"key": "customer_advance", "label": "Customer advance", "enabled": True, "route": routes["advance_emi_collect"]},
         ],
         "route_hints": routes,

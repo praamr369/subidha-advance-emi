@@ -124,6 +124,7 @@ export const ROUTES = {
     auditLogs: "/admin/audit-logs",
     auditEvents: "/admin/audit/events",
     settings: "/admin/settings",
+    settingsNavigation: "/admin/settings/navigation",
     settingsUsers: "/admin/settings/users",
     settingsRolesPermissions: "/admin/settings/roles-permissions",
     settingsBusinessSetup: "/admin/settings/business-setup",

@@ -92,7 +92,13 @@ export default function AdminRentLeaseCockpitPage() {
           <div className="mt-3 flex flex-wrap gap-2">{needsPeriod ? <button type="button" onClick={() => void handleGeneratePeriod()} disabled={Boolean(actionBusy)} className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-950">{actionBusy === "period" ? "Generating..." : "Generate Current Period"}</button> : null}<button type="button" onClick={() => void handleSeedMappings()} disabled={Boolean(actionBusy)} className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-950">{actionBusy === "seed" ? "Seeding..." : "Seed Rent/Lease Mappings"}</button><Link href={MAPPING_AUDIT_HREF} className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground">Open Mapping Audit</Link><Link href={ROUTES.admin.accountingPeriods} className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground">Open Accounting Periods</Link></div>
           <div className="mt-3 grid gap-3 sm:grid-cols-3"><div className="rounded-xl border bg-background/70 px-3 py-2">Monthly collected sources: {valueOf(summary.monthly_collected_sources)}</div><div className="rounded-xl border bg-background/70 px-3 py-2">Deposit collected sources: {valueOf(summary.deposit_collected_sources)}</div><div className="rounded-xl border bg-background/70 px-3 py-2">Posted bridge entries: {valueOf(summary.posting_bridge?.posted ?? 0)}</div></div>
         </div> : null}
-        <ERPSectionShell title="Rent / lease workflows" description="Detailed child routes live here instead of the admin sidebar. Every card links to an existing route."><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">{workflowCards.map((card) => <CockpitWorkflowCard key={card.title} card={card} />)}</div></ERPSectionShell>
+        <ERPSectionShell title="Rent / lease workflows" description="Detailed child routes live here instead of the admin sidebar. Every card links to an existing route."><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">{workflowCards.map((card) => {
+          const isMappingCard = card.title === "Full Mapping Audit" || card.title === "Account Mapping / Deposit Mapping";
+          const resolved: CockpitCard = isMappingCard
+            ? { ...card, status: bridgeReady ? (postingEnabled ? "Active" : "Read-only") : "Setup required" }
+            : card;
+          return <CockpitWorkflowCard key={card.title} card={resolved} />;
+        })}</div></ERPSectionShell>
       </div>
     </ERPPageShell>
   );

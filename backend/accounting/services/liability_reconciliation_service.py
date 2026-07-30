@@ -184,6 +184,119 @@ def _bridge_gap_count_multi_purpose(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Posted GL liability balance lookup
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _resolve_liability_account(purpose_key: str):
+    """
+    Resolve the ChartOfAccount for a liability posting purpose, reusing the
+    same posting-profile → system-code resolution the bridge posters use so the
+    reconciliation compares against the exact account the postings hit.
+    Returns None when the mapping is not configured.
+    """
+    try:
+        from accounting.services.accounting_bridge_candidate_service import (
+            _posting_profile_account,
+        )
+        return _posting_profile_account(purpose_key)
+    except Exception:
+        return None
+
+
+def _posted_liability_balance(purpose_key: str, as_of: date) -> Decimal | None:
+    """
+    Compute the posted general-ledger balance for a liability chart account as of
+    a date.  Liability accounts carry a natural CREDIT balance, so:
+
+        balance = Σ credit_amount − Σ debit_amount   (POSTED entries, entry_date ≤ as_of)
+
+    Returns None when the account mapping is unavailable (feature stays gracefully
+    deferred rather than reporting a false ₹0.00 balance).
+    """
+    account = _resolve_liability_account(purpose_key)
+    if account is None:
+        return None
+    try:
+        from django.db.models import Sum
+        from accounting.models import JournalEntryLine, JournalEntryStatus
+
+        agg = JournalEntryLine.objects.filter(
+            chart_account_id=account.id,
+            journal_entry__status=JournalEntryStatus.POSTED,
+            journal_entry__entry_date__lte=as_of,
+        ).aggregate(debit=Sum("debit_amount"), credit=Sum("credit_amount"))
+        return _money(_money(agg["credit"]) - _money(agg["debit"]))
+    except Exception:
+        return None
+
+
+def _gl_comparison_check(
+    *,
+    key: str,
+    title: str,
+    source_area: str,
+    expected_liability: Decimal,
+    posted_balance: Decimal | None,
+    deferred_message: str,
+    action_url: str | None = None,
+) -> tuple[dict, str]:
+    """
+    Build a posted-GL-vs-expected comparison check.  Returns (check, status).
+    Falls back to a deferred INFO check when the posted balance is unavailable.
+    """
+    if posted_balance is None:
+        return (
+            _deferred_check(key, title, deferred_message, source_area),
+            STATUS_OK,
+        )
+
+    diff = _money(posted_balance - expected_liability)
+    if diff == MONEY_ZERO:
+        check = _check(
+            key=key,
+            status=STATUS_OK,
+            severity=SEVERITY_INFO,
+            title=title,
+            message=(
+                f"Posted GL balance ({_money_str(posted_balance)}) matches expected "
+                f"liability ({_money_str(expected_liability)})."
+            ),
+            count=0,
+            amount=_money_str(posted_balance),
+            source_area=source_area,
+            metadata={
+                "posted_balance": _money_str(posted_balance),
+                "expected_liability": _money_str(expected_liability),
+                "difference": _money_str(diff),
+            },
+        )
+        return check, STATUS_OK
+
+    severity = SEVERITY_CRITICAL if abs(diff) > Decimal("1000") else SEVERITY_WARNING
+    status = STATUS_CRITICAL if severity == SEVERITY_CRITICAL else STATUS_WARNING
+    check = _check(
+        key=key,
+        status=status,
+        severity=severity,
+        title=title,
+        message=(
+            f"Posted GL balance ({_money_str(posted_balance)}) differs from expected "
+            f"liability ({_money_str(expected_liability)}) by {_money_str(diff)}."
+        ),
+        count=0,
+        amount=_money_str(abs(diff)),
+        source_area=source_area,
+        action_url=action_url,
+        metadata={
+            "posted_balance": _money_str(posted_balance),
+            "expected_liability": _money_str(expected_liability),
+            "difference": _money_str(diff),
+        },
+    )
+    return check, status
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Customer advance reconciliation
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -472,6 +585,37 @@ def build_customer_advance_reconciliation(
         ))
         stale_unapplied_count = 0
 
+    # ── Posted GL liability balance comparison ────────────────────────────────
+    posted_liability_balance = _posted_liability_balance(
+        "CUSTOMER_ADVANCE_UNEARNED_REVENUE", resolved_as_of
+    )
+    gl_check, gl_status = _gl_comparison_check(
+        key="customer_advance_gl_balance",
+        title="Customer Advance Posted GL Balance",
+        source_area="customer_advance",
+        expected_liability=expected_liability,
+        posted_balance=posted_liability_balance,
+        deferred_message=(
+            "Posted GL balance comparison deferred — map a Customer Advance / "
+            "Unearned Revenue liability account (CUSTOMER_ADVANCE_UNEARNED_REVENUE) "
+            "in the accounting posting profile to enable automated ledger lookup."
+        ),
+        action_url="/admin/accounting/setup",
+    )
+    checks.append(gl_check)
+    overall = _worst(overall, gl_status)
+
+    posted_liability_difference = (
+        None
+        if posted_liability_balance is None
+        else _money_str(_money(posted_liability_balance - expected_liability))
+    )
+    posted_liability_matches = (
+        None
+        if posted_liability_balance is None
+        else (_money(posted_liability_balance - expected_liability) == MONEY_ZERO)
+    )
+
     return {
         "status": overall,
         "source_available": True,
@@ -480,7 +624,11 @@ def build_customer_advance_reconciliation(
         "total_advance_refunded": _money_str(total_advance_refunded),
         "expected_liability": _money_str(expected_liability),
         "unapplied_balance": _money_str(unapplied_balance),
-        "posted_liability_balance": None,
+        "posted_liability_balance": (
+            None if posted_liability_balance is None else _money_str(posted_liability_balance)
+        ),
+        "posted_liability_difference": posted_liability_difference,
+        "posted_liability_matches": posted_liability_matches,
         "difference": _money_str(difference),
         "mismatch_count": mismatch_count,
         "bridge_gap_count": total_bridge_gap,
@@ -493,8 +641,9 @@ def build_customer_advance_reconciliation(
             "total_advance_count": total_advance_count,
             "bridge_scan_cap": _BRIDGE_SCAN_CAP,
             "note": (
-                "posted_liability_balance is deferred — chart-of-accounts mapping "
-                "required for automated ledger lookup."
+                "posted_liability_balance is the posted GL credit-less-debit balance "
+                "of the CUSTOMER_ADVANCE_UNEARNED_REVENUE account as of the period end; "
+                "null only when that account mapping is not configured."
             ),
         },
     }
@@ -623,23 +772,28 @@ def build_security_deposit_reconciliation(
     except Exception as exc:
         return {**_deferred_section("security_deposit", f"Deposit aggregate unavailable: {exc!s:.200}")}
 
-    # ── Liability mismatch — we can only compare with posted GL balance if the
-    #    mapping is resolved; defer that to future work. ─────────────────────
+    # ── Posted GL liability balance comparison ────────────────────────────────
     mismatch_count = 0
-    checks.append(_check(
+    posted_deposit_liability_balance = _posted_liability_balance(
+        "SECURITY_DEPOSIT_LIABILITY", resolved_as_of
+    )
+    dep_gl_check, dep_gl_status = _gl_comparison_check(
         key="security_deposit_liability_mismatch",
-        status=STATUS_INFO,
-        severity=SEVERITY_INFO,
-        title="Security Deposit GL Balance Comparison",
-        message=(
-            "Posted GL liability balance comparison deferred — chart-of-accounts "
-            "mapping for deposit liability account requires manual configuration."
-        ),
-        count=0,
+        title="Security Deposit Posted GL Balance",
         source_area="security_deposit",
-        deferred=True,
-        metadata={"expected_deposit_liability": _money_str(expected_deposit_liability)},
-    ))
+        expected_liability=expected_deposit_liability,
+        posted_balance=posted_deposit_liability_balance,
+        deferred_message=(
+            "Posted GL balance comparison deferred — map a Security Deposit "
+            "liability account (SECURITY_DEPOSIT_LIABILITY) in the accounting "
+            "posting profile to enable automated ledger lookup."
+        ),
+        action_url="/admin/accounting/setup",
+    )
+    checks.append(dep_gl_check)
+    overall = _worst(overall, dep_gl_status)
+    if dep_gl_status in (STATUS_WARNING, STATUS_CRITICAL):
+        mismatch_count = 1
 
     # ── Bridge gap — collections ──────────────────────────────────────────────
     try:
@@ -845,7 +999,21 @@ def build_security_deposit_reconciliation(
         "total_deposit_refunded": _money_str(total_deposit_refunded),
         "total_deposit_deducted": _money_str(total_deposit_deducted),
         "expected_deposit_liability": _money_str(expected_deposit_liability),
-        "posted_deposit_liability_balance": None,
+        "posted_deposit_liability_balance": (
+            None
+            if posted_deposit_liability_balance is None
+            else _money_str(posted_deposit_liability_balance)
+        ),
+        "posted_deposit_liability_difference": (
+            None
+            if posted_deposit_liability_balance is None
+            else _money_str(_money(posted_deposit_liability_balance - expected_deposit_liability))
+        ),
+        "posted_deposit_liability_matches": (
+            None
+            if posted_deposit_liability_balance is None
+            else (_money(posted_deposit_liability_balance - expected_deposit_liability) == MONEY_ZERO)
+        ),
         "unposted_collection_count": unposted_collection_count,
         "unposted_refund_count": unposted_refund_count,
         "unposted_deduction_count": unposted_deduction_count,
@@ -861,8 +1029,9 @@ def build_security_deposit_reconciliation(
             "deduction_count": ded_count,
             "bridge_scan_cap": _BRIDGE_SCAN_CAP,
             "note": (
-                "posted_deposit_liability_balance is deferred — chart-of-accounts "
-                "mapping for deposit liability account requires manual configuration."
+                "posted_deposit_liability_balance is the posted GL credit-less-debit "
+                "balance of the SECURITY_DEPOSIT_LIABILITY account as of the period end; "
+                "null only when that account mapping is not configured."
             ),
         },
     }

@@ -88,7 +88,9 @@ class PimProductViewSet(viewsets.ModelViewSet):
         search = self.request.query_params.get("search")
         is_published = self.request.query_params.get("is_published")
         if category_id:
-            qs = qs.filter(category_id=category_id)
+            category_ids = [c for c in category_id.split(",") if c]
+            if category_ids:
+                qs = qs.filter(category_id__in=category_ids)
         if subcategory_id:
             qs = qs.filter(subcategory_id=subcategory_id)
         if search:
@@ -139,6 +141,7 @@ class PimProductViewSet(viewsets.ModelViewSet):
 
         search = request.query_params.get("search", "").strip()
         synced_filter = request.query_params.get("synced", "")
+        category_filter = request.query_params.get("category", "")
         page = max(1, int(request.query_params.get("page", 1)))
         page_size = min(100, max(10, int(request.query_params.get("page_size", 50))))
 
@@ -146,6 +149,13 @@ class PimProductViewSet(viewsets.ModelViewSet):
             qs = qs.filter(
                 Q(name__icontains=search) | Q(product_code__icontains=search) | Q(category__icontains=search)
             )
+
+        if category_filter:
+            cat_ids = [c for c in category_filter.split(",") if c]
+            if cat_ids:
+                cat_names = set(ProductCategory.objects.filter(id__in=cat_ids).values_list("name", flat=True))
+                if cat_names:
+                    qs = qs.filter(category__in=cat_names)
 
         all_products = list(qs.values(
             "id", "product_code", "name", "category", "subcategory",

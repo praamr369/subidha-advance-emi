@@ -32,8 +32,8 @@ def run_solopreneur_daily_close(*, as_of: date | None = None, performed_by=None,
         start_date = date(2020, 1, 1)
     else:
         last_run = AuditLog.objects.filter(
-            action="SOLOPRENEUR_DAILY_CLOSE",
-            status="SUCCESS"
+            action_type="SOLOPRENEUR_DAILY_CLOSE",
+            metadata__status="SUCCESS"
         ).order_by('-created_at').first()
         
         if last_run and last_run.created_at:
@@ -77,10 +77,11 @@ def run_solopreneur_daily_close(*, as_of: date | None = None, performed_by=None,
     # 3. Write Audit Log
     if not dry_run:
         log_audit(
-            action="SOLOPRENEUR_DAILY_CLOSE",
-            status=status,
+            action_type="SOLOPRENEUR_DAILY_CLOSE",
+            instance=None,
             performed_by=performed_by,
             metadata={
+                "status": status,
                 "start_date": str(start_date),
                 "end_date": str(end_date),
                 "processed": total_processed,

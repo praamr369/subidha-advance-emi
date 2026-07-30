@@ -158,6 +158,7 @@ export type MoneyInHandResponse = {
   total_income: string;
   total_outflow: string;
   recent_receipts: MoneyReceiptRow[];
+  recent_outflows: MoneyReceiptRow[];
 };
 
 // Authoritative live cash/bank/UPI balances from the posted ledger — reflects

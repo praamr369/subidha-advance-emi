@@ -2589,7 +2589,7 @@ export type SolopreneurCloseResponse = {
   status: "SUCCESS" | "PARTIAL_SUCCESS";
   processed: number;
   errors: number;
-  details: any;
+  details: unknown;
 };
 
 export async function postSolopreneurDailyClose(as_of?: string): Promise<SolopreneurCloseResponse> {

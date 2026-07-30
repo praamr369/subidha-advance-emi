@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import Link from "next/link";
@@ -140,6 +141,7 @@ export function money(value: unknown): string {
   return `₹${num.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 }
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 export type Col = {
   key: string;
   label: string;

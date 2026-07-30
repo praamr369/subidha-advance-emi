@@ -78,14 +78,14 @@ export type CatalogFacets = {
 
 export async function getCatalogFacets(role: CatalogRole): Promise<CatalogFacets> {
   const payload = await request(`/${role}/catalog/facets/`);
-  const data = (payload || {}) as any;
+  const data = (payload || {}) as Partial<CatalogFacets>;
   return {
     total: data.total || 0,
     purposes: data.purposes || [],
-    brands: [],
+    brands: data.brands || [],
     categories: data.categories || [],
-    price_min: 0,
-    price_max: 0,
+    price_min: data.price_min || 0,
+    price_max: data.price_max || 0,
   };
 }
 
@@ -101,7 +101,7 @@ export async function listCatalogProducts(
   }
   const query = searchParams.toString() ? `?${searchParams.toString()}` : "";
   const payload = await request(`/${role}/catalog/${query}`);
-  const data = (payload || {}) as any;
+  const data = (payload || {}) as { count?: number; next?: string | null; previous?: string | null; results?: CatalogProduct[] };
   return {
     count: data.count || 0,
     next: data.next || null,

@@ -84,10 +84,12 @@ function ProductPicker({
     return subs.sort();
   }, [products, category]);
 
-  // Reset subcategory when category changes
-  useEffect(() => {
+  // Reset subcategory when category changes without useEffect synchronous cascade
+  const [prevCategory, setPrevCategory] = useState(category);
+  if (category !== prevCategory) {
+    setPrevCategory(category);
     setSubcategory("");
-  }, [category]);
+  }
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();

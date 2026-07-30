@@ -279,7 +279,20 @@ def _legacy_workbench(source_id: int) -> dict[str, object]:
     receivable = CustomerOpeningOutstanding.objects.filter(pk=source_id).first()
     if not receivable:
         raise ValidationError({"source_id": "Legacy receivable was not found."})
-    outstanding = MONEY_ZERO if receivable.is_settled else _money(receivable.outstanding_amount)
+    outstanding = MONEY_ZERO if receivable.is_settled else _money(receivable.balance_remaining)
+    collected = _money(receivable.collected_amount)
+    payments = [
+        {
+            "payment_id": c.id,
+            "date": c.receipt_date.isoformat() if c.receipt_date else None,
+            "amount": _s(_money(c.amount)),
+            "method": c.payment_method,
+            "reference_no": c.reference_no or "",
+            "collection_number": c.collection_no,
+            "finance_account_id": c.finance_account_id,
+        }
+        for c in receivable.collections.all().order_by("created_at", "id")
+    ]
     return {
         "contract": {
             "reference": f"LEGACY-{receivable.id}",
@@ -287,7 +300,7 @@ def _legacy_workbench(source_id: int) -> dict[str, object]:
             "status": "SETTLED" if receivable.is_settled else "OPEN",
             "start_date": receivable.entry_date,
             "contract_value": _s(receivable.outstanding_amount),
-            "total_paid": _s(receivable.outstanding_amount if receivable.is_settled else MONEY_ZERO),
+            "total_paid": _s(collected),
             "total_outstanding": _s(outstanding),
             "overdue_amount": _s(outstanding),
             "next_due": (
@@ -302,11 +315,11 @@ def _legacy_workbench(source_id: int) -> dict[str, object]:
                 "period_label": "Opening Balance",
                 "due_date": receivable.entry_date,
                 "amount": _s(receivable.outstanding_amount),
-                "paid_amount": _s(receivable.outstanding_amount if receivable.is_settled else MONEY_ZERO),
+                "paid_amount": _s(collected),
                 "outstanding_amount": _s(outstanding),
-                "status": "SETTLED" if receivable.is_settled else "PENDING",
+                "status": "SETTLED" if receivable.is_settled else ("PARTIAL" if collected > MONEY_ZERO else "PENDING"),
                 "is_overdue": not receivable.is_settled,
-                "payments": [],
+                "payments": payments,
             }
         ],
         "customer": {"id": None, "name": receivable.customer_name, "phone": receivable.phone or ""},
@@ -403,8 +416,8 @@ def _other_customer_dues(
                         "source_type": "LEGACY_RECEIVABLE",
                         "source_id": legacy.id,
                         "reference": f"LEGACY-{legacy.id}",
-                        "due_amount": _s(legacy.outstanding_amount),
-                        "overdue_amount": _s(legacy.outstanding_amount),
+                        "due_amount": _s(_money(legacy.balance_remaining)),
+                        "overdue_amount": _s(_money(legacy.balance_remaining)),
                         "next_due_date": legacy.entry_date,
                         "status": "OPEN",
                     }

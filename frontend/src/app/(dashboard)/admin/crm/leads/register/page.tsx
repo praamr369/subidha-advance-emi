@@ -25,6 +25,7 @@ interface SubscriptionData {
   subscriptions: {
     emi: Array<{
       id: number;
+      subscription_number?: string;
       amount: string;
       status: string;
       created_at: string;
@@ -32,6 +33,7 @@ interface SubscriptionData {
     }>;
     rent: Array<{
       id: number;
+      subscription_number?: string;
       amount: string;
       status: string;
       created_at: string;
@@ -39,6 +41,7 @@ interface SubscriptionData {
     }>;
     lease: Array<{
       id: number;
+      subscription_number?: string;
       amount: string;
       status: string;
       created_at: string;
@@ -208,7 +211,7 @@ export default function LeadRegisterPage() {
                 {data.subscriptions.emi.map((sub) => (
                   <div key={sub.id} className="p-4 border border-border rounded-lg hover:bg-muted/50 transition">
                     <div className="flex items-center justify-between mb-2">
-                      <div className="font-semibold">EMI Subscription #{sub.id}</div>
+                      <div className="font-semibold">{sub.subscription_number || `EMI #${sub.id}`}</div>
                       <StatusBadge status={sub.status} />
                     </div>
                     <div className="grid grid-cols-3 gap-4 text-sm">
@@ -238,7 +241,7 @@ export default function LeadRegisterPage() {
                 {data.subscriptions.rent.map((sub) => (
                   <div key={sub.id} className="p-4 border border-border rounded-lg hover:bg-muted/50 transition">
                     <div className="flex items-center justify-between mb-2">
-                      <div className="font-semibold">Rent Subscription #{sub.id}</div>
+                      <div className="font-semibold">{sub.subscription_number || `Rent #${sub.id}`}</div>
                       <StatusBadge status={sub.status} />
                     </div>
                     <div className="grid grid-cols-3 gap-4 text-sm">
@@ -268,7 +271,7 @@ export default function LeadRegisterPage() {
                 {data.subscriptions.lease.map((sub) => (
                   <div key={sub.id} className="p-4 border border-border rounded-lg hover:bg-muted/50 transition">
                     <div className="flex items-center justify-between mb-2">
-                      <div className="font-semibold">Lease Subscription #{sub.id}</div>
+                      <div className="font-semibold">{sub.subscription_number || `Lease #${sub.id}`}</div>
                       <StatusBadge status={sub.status} />
                     </div>
                     <div className="grid grid-cols-3 gap-4 text-sm">

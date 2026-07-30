@@ -14,6 +14,7 @@ import {
   type UnifiedCollectionResponse,
 } from "@/services/collections";
 import { normalizeApiError } from "@/services/api/errors";
+import { PAYMENT_METHOD_OPTIONS, type PaymentMethodValue, isCashMethod } from "@/lib/payment-methods";
 import ErrorState from "@/components/feedback/ErrorState";
 
 const FIELD_CLASS_NAME =
@@ -21,7 +22,7 @@ const FIELD_CLASS_NAME =
 
 type FormState = {
   amount: string;
-  payment_method: "CASH" | "UPI" | "BANK" | "CARD";
+  payment_method: PaymentMethodValue;
   finance_account_id: string;
   branch_id: string;
   cash_counter_id: string;
@@ -29,12 +30,6 @@ type FormState = {
   notes: string;
   receipt_date: string;
 };
-
-const PAYMENT_METHOD_OPTIONS: Array<{ value: FormState["payment_method"]; label: string }> = [
-  { value: "CASH", label: "Cash" },
-  { value: "UPI", label: "UPI / Bank" },
-  { value: "CARD", label: "Card" },
-];
 
 type SplitRow = {
   amount: string;
@@ -46,9 +41,9 @@ type SplitRow = {
 function accountsForMethod(financeAccounts: FinanceAccount[], method: FormState["payment_method"]) {
   return financeAccounts.filter((account) => {
     if (account.collection_ready === false) return false;
-    if (method === "UPI" || method === "BANK") return account.kind === "UPI" || account.kind === "BANK";
-    if (method === "CARD") return account.kind === "BANK";
-    return account.kind === method;
+    // Cash -> cash desk; every non-cash instrument -> the single Bank/UPI account.
+    if (isCashMethod(method)) return account.kind === "CASH";
+    return account.kind === "BANK" || account.kind === "UPI";
   });
 }
 
@@ -156,16 +151,7 @@ export default function AdminUniversalCollectForm({
     : counters;
 
   const availableFinanceAccounts = useMemo(
-    () =>
-      financeAccounts.filter((account) => {
-        if (form.payment_method === "UPI" || form.payment_method === "BANK") {
-          return account.kind === "UPI" || account.kind === "BANK";
-        }
-        if (form.payment_method === "CARD") {
-          return account.kind === "BANK";
-        }
-        return account.kind === form.payment_method;
-      }),
+    () => accountsForMethod(financeAccounts, form.payment_method),
     [financeAccounts, form.payment_method]
   );
 
@@ -558,7 +544,7 @@ export default function AdminUniversalCollectForm({
           }
           confirmLabel="Yes, post receipt"
           onConfirm={async () => {
-            await submitPayment({ preventDefault: () => {} } as any);
+            await submitPayment({ preventDefault: () => {} } as React.FormEvent<HTMLFormElement>);
           }}
           disabled={
             isSubmitting ||

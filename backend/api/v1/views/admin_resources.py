@@ -1373,6 +1373,120 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
             status=403
         )
 
+    @action(detail=False, methods=["get"], url_path="operational-summary")
+    def operational_summary(self, request):
+        from django.db.models import Sum
+        from decimal import Decimal
+        from subscriptions.models import (
+            Customer,
+            Subscription,
+            PlanType,
+            KycStatus,
+            Emi,
+            EmiStatus,
+            CustomerSupportRequest,
+            SupportRequestStatus,
+            SubscriptionDelivery,
+            DeliveryStatus,
+        )
+        from billing.models import DirectSale, BillingInvoice
+        from core.services.operational_visibility import (
+            subscription_batch_active_q,
+            subscription_collectible_q,
+            direct_sale_active_q,
+            invoice_active_q,
+        )
+
+        total_customers = Customer.objects.count()
+        active_users = Customer.objects.filter(user__is_active=True).count()
+
+        # KYC breakdown
+        kyc_verified_or_approved = Customer.objects.filter(
+            kyc_status__in=[
+                KycStatus.VERIFIED,
+                KycStatus.APPROVED,
+                KycStatus.EXCEPTION_APPROVED,
+            ]
+        ).count()
+        kyc_not_approved = total_customers - kyc_verified_or_approved
+        kyc_pending = Customer.objects.filter(
+            kyc_status__in=[
+                KycStatus.PENDING,
+                KycStatus.SUBMITTED,
+                KycStatus.NOT_PROVIDED,
+            ]
+        ).count()
+        kyc_rejected = Customer.objects.filter(kyc_status=KycStatus.REJECTED).count()
+
+        # Active Contracts (by plan type)
+        active_subs = Subscription.objects.filter(subscription_batch_active_q())
+        total_active_subs = active_subs.count()
+        active_emi_subs = active_subs.filter(plan_type=PlanType.EMI).count()
+        active_rent_subs = active_subs.filter(plan_type=PlanType.RENT).count()
+        active_lease_subs = active_subs.filter(plan_type=PlanType.LEASE).count()
+
+        # Financial Outstandings across all modules
+        emi_due_total = (
+            Emi.objects.filter(
+                subscription_collectible_q("subscription__"),
+                status=EmiStatus.PENDING,
+            ).aggregate(total=Sum("amount"))["total"]
+            or Decimal("0.00")
+        )
+        direct_sales_due = (
+            DirectSale.objects.filter(direct_sale_active_q(""))
+            .aggregate(total=Sum("balance_total"))["total"]
+            or Decimal("0.00")
+        )
+        invoices_due = (
+            BillingInvoice.objects.filter(invoice_active_q(""))
+            .aggregate(total=Sum("balance_total"))["total"]
+            or Decimal("0.00")
+        )
+        total_outstanding = emi_due_total + direct_sales_due + invoices_due
+
+        # Operational queues
+        open_tickets = CustomerSupportRequest.objects.exclude(
+            status=SupportRequestStatus.CLOSED
+        ).count()
+        active_deliveries = SubscriptionDelivery.objects.filter(
+            status__in=[
+                DeliveryStatus.PENDING,
+                DeliveryStatus.SCHEDULED,
+                DeliveryStatus.DISPATCHED,
+                DeliveryStatus.OUT_FOR_DELIVERY,
+            ]
+        ).count()
+
+        return Response(
+            {
+                "total_customers": total_customers,
+                "active_users": active_users,
+                "kyc": {
+                    "approved_count": kyc_verified_or_approved,
+                    "not_approved_count": kyc_not_approved,
+                    "pending_count": kyc_pending,
+                    "rejected_count": kyc_rejected,
+                },
+                "contracts": {
+                    "total_active": total_active_subs,
+                    "emi": active_emi_subs,
+                    "rent": active_rent_subs,
+                    "lease": active_lease_subs,
+                },
+                "outstandings": {
+                    "total_due": str(total_outstanding),
+                    "emi_due": str(emi_due_total),
+                    "direct_sales_due": str(direct_sales_due),
+                    "invoices_due": str(invoices_due),
+                },
+                "operations": {
+                    "open_tickets": open_tickets,
+                    "active_deliveries": active_deliveries,
+                },
+            }
+        )
+
 # =====================================================
 # EMI
 # =====================================================
@@ -3199,6 +3313,52 @@ class ProductAdminViewSet(AdminOnlyModelViewSet):
                 {"message": f"Failed to update costs: {str(e)}"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+    @action(detail=True, methods=["post"], url_path="clone-relationships")
+    def clone_relationships(self, request, pk=None):
+        source_product = self.get_object()
+        target_ids = request.data.get("target_ids", [])
+        
+        if not target_ids or not isinstance(target_ids, list):
+            return Response(
+                {"error": "target_ids must be a non-empty list of product IDs."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+            
+        from subscriptions.models import Product, ProductRelationship
+        
+        source_relationships = ProductRelationship.objects.filter(product=source_product)
+        if not source_relationships.exists():
+            return Response(
+                {"message": "No related products found to clone."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+            
+        target_products = Product.objects.filter(id__in=target_ids).exclude(id=source_product.id)
+        
+        created_count = 0
+        for target in target_products:
+            for rel in source_relationships:
+                # Use get_or_create/update_or_create to avoid unique constraint errors
+                # on (product, related_product, relationship_type)
+                _, created = ProductRelationship.objects.update_or_create(
+                    product=target,
+                    related_product=rel.related_product,
+                    relationship_type=rel.relationship_type,
+                    defaults={
+                        "quantity": rel.quantity,
+                        "is_price_included_in_parent": rel.is_price_included_in_parent,
+                        "notes": rel.notes,
+                    }
+                )
+                if created:
+                    created_count += 1
+                    
+        return Response({
+            "message": f"Successfully copied setup to {target_products.count()} product(s).",
+            "cloned_records_count": created_count
+        })
+
 
 
 class ProductCategoryMasterViewSet(AdminOnlyCatalogMasterViewSet):

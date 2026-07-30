@@ -31,6 +31,18 @@ COLLECTION_MAPPING_PURPOSE_BY_KIND: dict[str, str] = {
     FinanceAccountKind.UPI: FinanceAccountMappingPurpose.UPI_COLLECTION,
 }
 
+COLLECTION_MAPPING_PURPOSES_BY_KIND: dict[str, tuple[str, ...]] = {
+    FinanceAccountKind.CASH: (FinanceAccountMappingPurpose.CASH_COLLECTION,),
+    FinanceAccountKind.BANK: (
+        FinanceAccountMappingPurpose.BANK_COLLECTION,
+        FinanceAccountMappingPurpose.PAYMENT_GATEWAY_COLLECTION,
+    ),
+    FinanceAccountKind.UPI: (
+        FinanceAccountMappingPurpose.UPI_COLLECTION,
+        FinanceAccountMappingPurpose.PAYMENT_GATEWAY_COLLECTION,
+    ),
+}
+
 
 @dataclass(frozen=True)
 class FinanceAccountReadiness:
@@ -119,16 +131,14 @@ def chart_account_allowed_for_collection(chart_account: ChartOfAccount | None, *
 
 
 def finance_account_has_collection_mapping(finance_account: FinanceAccount) -> bool:
-    purpose = COLLECTION_MAPPING_PURPOSE_BY_KIND.get((finance_account.kind or "").strip().upper())
-    if not purpose:
+    purposes = COLLECTION_MAPPING_PURPOSES_BY_KIND.get((finance_account.kind or "").strip().upper())
+    if not purposes:
         return False
-    chart_account_id = getattr(finance_account, "chart_account_id", None)
-    if not chart_account_id:
+    if not getattr(finance_account, "chart_account_id", None):
         return False
     return FinanceAccountCoaMapping.objects.filter(
         finance_account_id=finance_account.pk,
-        chart_account_id=chart_account_id,
-        purpose=purpose,
+        purpose__in=purposes,
         is_active=True,
         chart_account__is_active=True,
         chart_account__account_type=ChartOfAccountType.ASSET,

@@ -56,12 +56,11 @@ def _iso_to_date(value, *, fallback: date | None = None) -> date | None:
 
 
 def _resolve_collection_finance_account(*, method: str) -> tuple[FinanceAccount | None, str | None, list[int]]:
+    from subscriptions.models import settlement_channel_for_method
+
     normalized = (method or "").strip().upper() or "CASH"
-    kind = FinanceAccountKind.CASH
-    if normalized == "BANK":
-        kind = FinanceAccountKind.BANK
-    elif normalized == "UPI":
-        kind = FinanceAccountKind.UPI
+    # Every non-cash instrument settles into the single Bank/UPI holding account.
+    kind = FinanceAccountKind.CASH if settlement_channel_for_method(normalized) == "CASH" else FinanceAccountKind.BANK
 
     candidates = list(
         FinanceAccount.objects.filter(

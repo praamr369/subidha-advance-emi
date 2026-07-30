@@ -81,6 +81,9 @@ export async function invalidateAfterStockRequirementMutation(queryClient: Query
 
 /** After notification read state changes from the bell or notification center. */
 export async function invalidateAfterNotificationMutation(queryClient: QueryClient): Promise<void> {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("subidha:badges-refresh"));
+  }
   await queryClient.invalidateQueries({ queryKey: notificationKeys.all });
 }
 

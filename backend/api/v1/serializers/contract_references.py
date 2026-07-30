@@ -51,7 +51,9 @@ class ContractReferenceSerializer(serializers.ModelSerializer):
         return obj.direct_sale_id or obj.subscription_id or obj.invoice_id
 
 
-PAYMENT_METHOD_CHOICES = ["CASH", "UPI", "BANK", "CARD"]
+# Selectable instruments (UI). Legacy BANK/CARD still accepted for compatibility
+# with older clients/records, but not offered in the dropdowns.
+PAYMENT_METHOD_CHOICES = ["CASH", "UPI", "TRANSFER", "CHEQUE", "DEPOSIT", "BANK", "CARD"]
 
 
 class CollectionSplitSerializer(serializers.Serializer):

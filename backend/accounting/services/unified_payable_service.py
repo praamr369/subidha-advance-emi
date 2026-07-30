@@ -289,6 +289,36 @@ def get_unified_payables(payable_type=None, search=None, status_category=None, p
                         "notes": "Outstanding balance from vendor ledger",
                     })
 
+    # 6. Customer Deposit & Credit Refunds
+    if (not payable_type or payable_type in ("credit_refund", "deposit_refund")) and _party_ok("CUSTOMER"):
+        if status_category in ["READY_TO_PAY", "ALL", None]:
+            from subscriptions.services.rent_lease_billing_service import list_admin_deposit_register
+            dep_data = list_admin_deposit_register(limit=500)
+            for row in dep_data.get("results", []):
+                if row.get("can_record_refund") or row.get("can_approve_refund"):
+                    amt_str = str(row.get("refundable_amount") or row.get("held_amount") or row.get("deposit_amount") or "0.00")
+                    ref_str = str(row.get("reference_key") or row.get("contract_reference") or f"SUB-{row['subscription_id']}")
+                    cname = str(row.get("customer_name") or "Unknown Customer")
+                    if search and search.lower() not in (ref_str + " " + cname).lower():
+                        continue
+                    items.append({
+                        "id": f"dep_ref_{row['subscription_id']}",
+                        "payable_type": "credit_refund",
+                        "payable_type_label": "Customer Deposit Refund",
+                        "payable_id": row["subscription_id"],
+                        "reference": ref_str,
+                        "party_name": cname,
+                        "party_type": "CUSTOMER",
+                        "amount": amt_str,
+                        "outstanding": amt_str,
+                        "status": "READY_TO_PAY",
+                        "date": str(timezone.now().date()),
+                        "journal_posted": bool(row.get("refund_record_transaction_id")),
+                        "journal_id": getattr(row, "posted_journal_entry_id", None),
+                        "needs_posting": bool(row.get("can_approve_refund")),
+                        "notes": f"Security deposit refund for {row.get('plan_type', 'subscription')} contract {ref_str}",
+                    })
+
     # Calculate summary
     total_items = len(items)
     total_outstanding = sum(Decimal(i["outstanding"]) for i in items)
@@ -514,6 +544,34 @@ def execute_unified_payable(payload, executed_by, idempotency_key=None, fingerpr
                 reference_no=reference_no,
                 posted_by=executed_by
             )
+
+        elif payable_type in ("credit_refund", "deposit_refund"):
+            from subscriptions.models import Subscription
+            from subscriptions.services.rent_lease_billing_service import record_deposit_refund
+            sub = Subscription.objects.get(id=payable_id)
+            demand = record_deposit_refund(
+                subscription=sub,
+                amount=amount,
+                performed_by=executed_by,
+                reference_no=reference_no,
+                finance_account_id=finance_account_id,
+                payment_method="CASH",
+                payment_date=payment_date,
+                idempotency_key=idempotency_key,
+            )
+            from accounting.services.accounting_bridge_security_deposit_service import post_bridge_candidate, candidate_for
+            tx = getattr(demand, "_deposit_source_transaction", None)
+            if tx:
+                cand = candidate_for(tx)
+                if cand.get("is_postable"):
+                    res = post_bridge_candidate(
+                        candidate_id=cand["id"],
+                        idempotency_key=cand["idempotency_key"],
+                        confirmed=True,
+                        posting_note=notes,
+                        actor=executed_by
+                    )
+                    journal_entry_id = res.get("journal_entry", {}).get("id")
 
         else:
             raise ValueError(f"Unsupported payable type: {payable_type}")

@@ -1,4 +1,4 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 from .models import (
     ProductCategory,
     ProductSubcategory,
@@ -9,6 +9,7 @@ from .models import (
     ProductVariant,
     VariantAttributeValue,
 )
+from .services import FlexibleVariantService
 
 
 class ProductSubcategoryInline(admin.TabularInline):
@@ -55,10 +56,61 @@ class ProductVariantInline(admin.TabularInline):
 
 @admin.register(PimProduct)
 class PimProductAdmin(admin.ModelAdmin):
-    list_display = ["code", "name", "category", "subcategory", "base_price", "is_active", "is_published"]
+    list_display = ["code", "name", "category", "subcategory", "base_price", "variant_count", "is_active", "is_published"]
     list_filter = ["category", "subcategory", "is_published", "is_active"]
     search_fields = ["code", "name"]
     inlines = [ProductAttributeInline, ProductVariantInline]
+    actions = ["generate_variants", "regenerate_variants"]
+
+    def variant_count(self, obj):
+        return obj.variants.count()
+    variant_count.short_description = "SKU Count"
+
+    def generate_variants(self, request, queryset):
+        """Generate variants for selected products from variant-defining attributes"""
+        total_created = 0
+        total_skipped = 0
+
+        for product in queryset:
+            result = FlexibleVariantService.generate_variants(
+                product, clear_existing=False
+            )
+            created = result['created']
+            skipped = result['skipped']
+            total_created += created
+            total_skipped += skipped
+
+            if created > 0:
+                messages.success(
+                    request,
+                    f"{product.name}: Created {created} variants"
+                )
+            if skipped > 0:
+                messages.warning(
+                    request,
+                    f"{product.name}: {skipped} variants already existed"
+                )
+
+        if total_created > 0:
+            messages.success(request, f"Total: {total_created} new SKUs generated")
+
+    generate_variants.short_description = "Generate SKU variants from attributes"
+
+    def regenerate_variants(self, request, queryset):
+        """Regenerate all variants (clears old ones first)"""
+        for product in queryset:
+            old_count = product.variants.count()
+            result = FlexibleVariantService.generate_variants(
+                product, clear_existing=True
+            )
+            created = result['created']
+
+            messages.success(
+                request,
+                f"{product.name}: Deleted {old_count} old variants, created {created} new ones"
+            )
+
+    regenerate_variants.short_description = "Regenerate variants (⚠ deletes old ones)"
 
 
 class VariantAttributeValueInline(admin.TabularInline):

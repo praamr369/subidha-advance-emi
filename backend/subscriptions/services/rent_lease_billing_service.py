@@ -576,6 +576,10 @@ def record_deposit_refund(
     )
     setattr(demand, "_deposit_source_transaction", tx)
     setattr(demand, "_deposit_source_transaction_created", created)
+    if created:
+        from accounting.services.accounting_bridge_security_deposit_service import auto_post_deposit_transaction
+
+        setattr(demand, "_deposit_bridge_post_result", auto_post_deposit_transaction(tx, actor=performed_by))
     return demand
 
 
@@ -618,6 +622,31 @@ def build_deposit_snapshot(*, subscription: Subscription) -> DepositSnapshot:
     )
 
 
+def _compute_deposit_posture(row: RentLeaseBillingDemand) -> dict:
+    collected = q2(row.collected_amount or MONEY_ZERO)
+    held = q2(row.held_amount or MONEY_ZERO)
+    refundable = q2(row.refundable_amount or MONEY_ZERO)
+    amount = q2(row.amount or MONEY_ZERO)
+    sub_status = getattr(row.subscription, "status", "").upper()
+
+    can_collect = (collected < amount) and (sub_status not in ["CANCELLED", "CLOSED", "TERMINATED", "REJECTED"])
+    can_deduct = (held > MONEY_ZERO)
+    can_record_refund = (refundable > MONEY_ZERO) or (held > MONEY_ZERO and sub_status in ["CANCELLED", "CLOSED", "TERMINATED", "RETURNED", "INSPECTION"])
+    can_approve_refund = can_record_refund
+
+    disabled_reason = None
+    if not (can_collect or can_deduct or can_record_refund or can_approve_refund):
+        disabled_reason = "Deposit fully collected and settled or closed."
+
+    return {
+        "can_collect": can_collect,
+        "can_deduct": can_deduct,
+        "can_approve_refund": can_approve_refund,
+        "can_record_refund": can_record_refund,
+        "disabled_reason": disabled_reason,
+    }
+
+
 def list_admin_deposit_register(*, subscription_id: int | None = None, limit: int = 200) -> dict:
     qs = RentLeaseBillingDemand.objects.filter(
         demand_type=RentLeaseDemandType.SECURITY_DEPOSIT
@@ -639,6 +668,20 @@ def list_admin_deposit_register(*, subscription_id: int | None = None, limit: in
         .order_by("demand_id", "-transaction_date", "-created_at", "-id")
     ):
         latest_sources.setdefault(tx.demand_id, tx)
+    # Determine which deposit source transactions already have a POSTED bridge
+    # journal, so the register can show an accurate Posted vs Deferred posture
+    # instead of a hardcoded "Deferred" label.
+    posted_tx_journal: dict[str, int] = {}
+    if latest_sources:
+        from accounting.models import JournalEntry, JournalEntryStatus
+
+        tx_ids = [str(tx.id) for tx in latest_sources.values()]
+        for je in JournalEntry.objects.filter(
+            source_model="RentLeaseDepositTransaction",
+            source_id__in=tx_ids,
+            status=JournalEntryStatus.POSTED,
+        ).values("source_id", "id"):
+            posted_tx_journal.setdefault(str(je["source_id"]), je["id"])
     return {
         "count": qs.count(),
         "results": [
@@ -671,10 +714,13 @@ def list_admin_deposit_register(*, subscription_id: int | None = None, limit: in
                         "finance_account_name": getattr(latest_sources[row.id].finance_account, "name", None),
                         "status": latest_sources[row.id].status,
                         "created_at": latest_sources[row.id].created_at,
+                        "bridge_posted": str(latest_sources[row.id].id) in posted_tx_journal,
+                        "posted_journal_entry_id": posted_tx_journal.get(str(latest_sources[row.id].id)),
                     }
                     if row.id in latest_sources
                     else None
                 ),
+                **_compute_deposit_posture(row),
             }
             for row in rows
         ],

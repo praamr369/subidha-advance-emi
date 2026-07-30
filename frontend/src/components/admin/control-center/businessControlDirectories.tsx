@@ -182,16 +182,10 @@ export const ACCOUNTING_BOOK_DIRECTORY_GROUPS: WorkspaceDirectoryGroup[] = [
         icon: <BanknoteArrowDown className="h-4 w-4" />,
       },
       {
-        title: "Bank Book",
-        description: "Inspect posted bank-account rows generated through controlled accounting paths.",
+        title: "Bank / UPI Book",
+        description: "Inspect posted rows for the single Bank/UPI holding account (transfers, cheques, deposits, UPI).",
         href: ROUTES.admin.accountingBooksBank,
         icon: <Landmark className="h-4 w-4" />,
-      },
-      {
-        title: "UPI Book",
-        description: "Review posted UPI-account rows within the accounting subsystem.",
-        href: ROUTES.admin.accountingBooksUpi,
-        icon: <WalletCards className="h-4 w-4" />,
       },
     ],
   },

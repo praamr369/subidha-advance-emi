@@ -156,6 +156,25 @@ export type StockSummaryRow = {
   default_stock_location_code?: string | null;
   default_stock_location_name?: string | null;
   branch_id?: number | null;
+  category?: string;
+  subcategory?: string;
+  hsn_sac_code?: string;
+  gst_rate?: string;
+  base_price?: string;
+  standard_unit_cost?: string;
+  valuation_amount?: string;
+  stock_tracking_status?: string;
+  lifecycle_status?: string;
+};
+
+export type StockSummaryMetrics = {
+  total_on_hand_qty?: string;
+  total_reserved_qty?: string;
+  total_available_qty?: string;
+  total_valuation_amount?: string;
+  in_stock_count?: number;
+  low_stock_count?: number;
+  out_of_stock_count?: number;
 };
 
 export type ProductDemandPlanning = {
@@ -749,7 +768,7 @@ export function listInventoryMovements(params: Record<string, QueryValue> = {}) 
 }
 
 export function getStockSummary(params: Record<string, QueryValue> = {}) {
-  return apiFetch<{ count: number; results: StockSummaryRow[] }>(
+  return apiFetch<{ count: number; summary?: StockSummaryMetrics; results: StockSummaryRow[] }>(
     `/inventory/stock-summary/${buildQuery(params)}`
   );
 }

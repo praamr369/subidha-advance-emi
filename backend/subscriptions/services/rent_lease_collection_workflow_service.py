@@ -420,6 +420,10 @@ def collect_security_deposit_with_metadata(
     )
     setattr(demand, "_deposit_source_transaction", tx)
     setattr(demand, "_deposit_source_transaction_created", created)
+    if created:
+        from accounting.services.accounting_bridge_security_deposit_service import auto_post_deposit_transaction
+
+        setattr(demand, "_deposit_bridge_post_result", auto_post_deposit_transaction(tx, actor=performed_by))
     return demand
 
 

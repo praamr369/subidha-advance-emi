@@ -396,6 +396,7 @@ def build_money_in_hand(*, branch_id: int | None = None) -> dict:
     income_totals: dict[str, Decimal] = {}
     outflow_totals: dict[str, Decimal] = {}
     money_in_rows: list[dict] = []
+    money_out_rows: list[dict] = []
     for kind in ("CASH", "BANK", "UPI"):
         book = build_finance_book(kinds=[kind], branch_id=branch_id)
         per_kind[kind] = _money(book["summary"]["net_balance"])
@@ -420,11 +421,28 @@ def build_money_in_hand(*, branch_id: int | None = None) -> dict:
                 )
             if credit > MONEY_ZERO:
                 outflow_totals[source_type] = outflow_totals.get(source_type, MONEY_ZERO) + credit
+                money_out_rows.append(
+                    {
+                        "entry_date": row.get("entry_date"),
+                        "source_type": source_type or "OTHER",
+                        "source_label": _money_source_label(source_type),
+                        "finance_account_name": row.get("finance_account_name"),
+                        "kind": kind,
+                        "reference": row.get("source_reference") or row.get("entry_no"),
+                        "description": row.get("description") or "",
+                        "amount": _money_string(credit),
+                    }
+                )
     total = per_kind["CASH"] + per_kind["BANK"] + per_kind["UPI"]
     # Most recent money-in events across every rail, so "recent collections" shows
     # real receipts (EMI, direct sale, rent/lease, deposits) not just Payment rows.
     recent_receipts = sorted(
         money_in_rows, key=lambda r: (r["entry_date"] or ""), reverse=True
+    )[:8]
+    # Most recent money-out events (security deposit refunds, vendor payments,
+    # salary payouts, etc.) — mirrors recent_receipts for the outflow side.
+    recent_outflows = sorted(
+        money_out_rows, key=lambda r: (r["entry_date"] or ""), reverse=True
     )[:8]
 
     def _breakdown(totals: dict[str, Decimal]) -> list[dict]:
@@ -451,6 +469,7 @@ def build_money_in_hand(*, branch_id: int | None = None) -> dict:
         "total_income": _money_string(total_income),
         "total_outflow": _money_string(total_outflow),
         "recent_receipts": recent_receipts,
+        "recent_outflows": recent_outflows,
     }
 
 
@@ -463,7 +482,7 @@ def build_finance_book(
 ) -> dict:
     finance_accounts = list(
         FinanceAccount.objects.select_related("chart_account")
-        .filter(kind__in=kinds)
+        .filter(kind__in=kinds, is_active=True, is_real_settlement_account=True)
         .order_by("name", "id")
     )
     if branch_id is not None:

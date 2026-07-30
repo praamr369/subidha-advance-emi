@@ -110,6 +110,8 @@ export type CustomerAdvanceReconciliation = FinancialIntelligenceSection & {
   expected_liability?: string;
   unapplied_balance?: string;
   posted_liability_balance?: string | null;
+  posted_liability_difference?: string | null;
+  posted_liability_matches?: boolean | null;
   difference?: string;
   mismatch_count?: number;
   bridge_gap_count?: number;
@@ -124,6 +126,8 @@ export type SecurityDepositReconciliation = FinancialIntelligenceSection & {
   total_deposit_deducted?: string;
   expected_deposit_liability?: string;
   posted_deposit_liability_balance?: string | null;
+  posted_deposit_liability_difference?: string | null;
+  posted_deposit_liability_matches?: boolean | null;
   unposted_collection_count?: number;
   unposted_refund_count?: number;
   unposted_deduction_count?: number;

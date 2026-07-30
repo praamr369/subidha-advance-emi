@@ -17,7 +17,7 @@ export interface KPICardProps {
   size?: "sm" | "md" | "lg";
   onClick?: () => void;
   loading?: boolean;
-  format?: (value: any) => string;
+  format?: (value: unknown) => string;
   comparison?: string;
 }
 

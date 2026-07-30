@@ -94,7 +94,7 @@ export function CrmOperationalWorkspace({ workspace, assignedTasks, taskError }:
         {/* Action Items (Today Work) */}
         <section className="rounded-xl border border-border bg-card overflow-hidden">
           <div className="bg-muted/30 p-4 border-b border-border flex justify-between items-center">
-            <h3 className="font-semibold text-sm">Today's Radar</h3>
+            <h3 className="font-semibold text-sm">Today&apos;s Radar</h3>
             <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
               {actionItems.filter(i => i.count > 0).length} active
             </span>

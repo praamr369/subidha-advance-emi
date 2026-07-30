@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, Q, Sum, Case, When, DecimalField
 
 from accounting.models import FinanceAccount, MoneyMovement, MoneyMovementStatus
 from subscriptions.models import (

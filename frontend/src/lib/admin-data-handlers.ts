@@ -33,12 +33,12 @@ export type DataType =
   | "file";
 
 export interface DataTypeHandler {
-  format: (value: any) => string;
-  copy: (value: any) => string;
-  validate: (value: any) => boolean;
-  getIcon: () => any;
-  getPreview: (value: any) => string;
-  open?: (value: any) => void;
+  format: (value: unknown) => string;
+  copy: (value: unknown) => string;
+  validate: (value: unknown) => boolean;
+  getIcon: () => unknown;
+  getPreview: (value: unknown) => string;
+  open?: (value: unknown) => void;
 }
 
 export const dataTypeHandlers: Record<DataType, DataTypeHandler> = {
@@ -365,14 +365,14 @@ export function getStatusColor(status: string) {
 }
 
 // Format data by type
-export function formatDataByType(value: any, type: DataType): string {
+export function formatDataByType(value: unknown, type: DataType): string {
   const handler = dataTypeHandlers[type];
   if (!handler) return String(value || "—");
   return handler.format(value);
 }
 
 // Copy data by type
-export async function copyDataByType(value: any, type: DataType) {
+export async function copyDataByType(value: unknown, type: DataType) {
   const handler = dataTypeHandlers[type];
   if (!handler) return;
   const text = handler.copy(value);
@@ -380,14 +380,14 @@ export async function copyDataByType(value: any, type: DataType) {
 }
 
 // Get preview by type
-export function getPreviewByType(value: any, type: DataType): string {
+export function getPreviewByType(value: unknown, type: DataType): string {
   const handler = dataTypeHandlers[type];
   if (!handler) return String(value || "—");
   return handler.getPreview(value);
 }
 
 // Open data by type (for clickable data)
-export function openDataByType(value: any, type: DataType) {
+export function openDataByType(value: unknown, type: DataType) {
   const handler = dataTypeHandlers[type];
   if (!handler || !handler.open) return;
   handler.open(value);

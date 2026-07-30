@@ -134,6 +134,9 @@ class PimProduct(models.Model):
     image = models.ImageField(upload_to="pim/products/", null=True, blank=True)
     is_active = models.BooleanField(default=True)
     is_published = models.BooleanField(default=False)
+    variant_generating_attributes = models.ManyToManyField(
+        CategoryAttribute, blank=True, related_name="used_for_variants"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

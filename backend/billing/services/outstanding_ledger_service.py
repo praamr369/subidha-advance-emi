@@ -384,7 +384,9 @@ def _collect_opening_outstanding_rows(*, today: date) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     outstandings = CustomerOpeningOutstanding.objects.filter(is_settled=False).order_by("entry_date", "id")
     for out in outstandings:
-        amount = _money(out.outstanding_amount)
+        original = _money(out.outstanding_amount)
+        collected = _money(out.collected_amount or MONEY_ZERO)
+        amount = _money(out.balance_remaining)
         if amount <= MONEY_ZERO:
             continue
         due_date = out.entry_date
@@ -404,8 +406,8 @@ def _collect_opening_outstanding_rows(*, today: date) -> list[dict[str, Any]]:
                 "batch_code": None,
                 "lucky_number": None,
                 "due_date": due_date.isoformat() if due_date else None,
-                "original_amount": _money_string(amount),
-                "paid_amount": _money_string(MONEY_ZERO),
+                "original_amount": _money_string(original),
+                "paid_amount": _money_string(collected),
                 "waived_amount": _money_string(MONEY_ZERO),
                 "outstanding_amount": _money_string(amount),
                 "overdue_days": overdue_days,

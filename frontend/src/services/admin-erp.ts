@@ -126,7 +126,7 @@ export type WorkbenchItem = {
   due_date?: string | null;
   created_at: string;
   updated_at: string;
-  result_data?: Record<string, any> | null;
+  result_data?: Record<string, unknown> | null;
 };
 
 export async function getAdminWorkbenchItems(params?: Record<string, string>): Promise<{ count: number; next: string | null; previous: string | null; results: WorkbenchItem[] }> {
@@ -145,7 +145,7 @@ export async function assignWorkbenchItem(id: number, assigned_to_id: number): P
   });
 }
 
-export async function completeWorkbenchItem(id: number, notes: string, result_data: Record<string, any> = {}): Promise<WorkbenchItem> {
+export async function completeWorkbenchItem(id: number, notes: string, result_data: Record<string, unknown> = {}): Promise<WorkbenchItem> {
   return apiFetch(`/admin/crm/workbench/${id}/complete/`, {
     method: "POST",
     body: JSON.stringify({ notes, result_data }),

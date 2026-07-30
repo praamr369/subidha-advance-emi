@@ -723,7 +723,7 @@ class CashierDayCloseListView(generics.ListAPIView):
         count = queryset.count()
         
         pending_review = queryset.filter(status="PENDING_REVIEW").count()
-        with_variance = queryset.exclude(total_variance=0).count()
+        with_variance = queryset.exclude(variance=0).count()
 
         summary = {
             "total_count": count,

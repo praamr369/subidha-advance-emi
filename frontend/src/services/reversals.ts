@@ -297,7 +297,7 @@ export async function getAdminCustomerCredits(customerId: number): Promise<{
 
 export async function createAdminCustomerRefund(
   customerId: number,
-  payload: { amount: string | number; method: "CASH_REFUND" | "UPI_REFUND" | "BANK_REFUND"; finance_account_id: number; reason: string; direct_sale_return_id?: number }
+  payload: { amount: string | number; method: "CASH_REFUND" | "UPI_REFUND" | "BANK_REFUND"; finance_account_id?: number; reason: string; direct_sale_return_id?: number }
 ): Promise<{ id: number; refund_no: string; status: string }> {
   return apiFetch(`/admin/customers/${customerId}/refunds/`, { method: "POST", body: JSON.stringify(payload) });
 }

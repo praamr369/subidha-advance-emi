@@ -401,7 +401,58 @@ export default function AdminFinancePage() {
     reconciliationOverview?.pending_finance_accounts ?? 0;
   const flaggedOperationalReconciliations =
     reconciliationOverview?.flagged_reconciliation_count ?? reconciliationFlags;
-  const operationalRows = financeOperationalSummary?.results ?? [];
+  const operationalRows = useMemo(() => {
+    const opMap = new Map(
+      (financeOperationalSummary?.results ?? []).map((row) => [row.finance_account_id, row])
+    );
+    const allIds = new Set<number>([
+      ...opMap.keys(),
+      ...(moneyPosition?.accounts ?? []).map((a) => a.finance_account_id),
+    ]);
+    return Array.from(allIds).map((id) => {
+      const op = opMap.get(id);
+      const mh = (moneyPosition?.accounts ?? []).find((a) => a.finance_account_id === id);
+      return {
+        finance_account_id: id,
+        finance_account_name: op?.finance_account_name || mh?.finance_account_name || `Account #${id}`,
+        kind: (op?.kind || mh?.kind || "CASH") as "CASH" | "BANK" | "UPI",
+        branch_id: op?.branch_id || null,
+        branch_name: op?.branch_name || null,
+        chart_account_id: op?.chart_account_id || 0,
+        chart_account_code: op?.chart_account_code || "",
+        payment_total: op?.payment_total || "0",
+        payment_count: op?.payment_count || 0,
+        advance_total: op?.advance_total || "0",
+        advance_count: op?.advance_count || 0,
+        unapplied_advance_total: op?.unapplied_advance_total || "0",
+        security_deposit_total: op?.security_deposit_total || "0",
+        security_deposit_count: op?.security_deposit_count || 0,
+        incoming_transfer_total: op?.incoming_transfer_total || "0",
+        incoming_transfer_count: op?.incoming_transfer_count || 0,
+        outgoing_transfer_total: op?.outgoing_transfer_total || "0",
+        outgoing_transfer_count: op?.outgoing_transfer_count || 0,
+        pending_settlement_amount: op?.pending_settlement_amount || "0",
+        reconciliation_status: op?.reconciliation_status || "OK",
+      };
+    });
+  }, [financeOperationalSummary, moneyPosition]);
+
+  const totalCustomerAdvances = useMemo(
+    () =>
+      operationalRows.reduce(
+        (sum, row) => sum + toNumber(row.advance_total),
+        0
+      ),
+    [operationalRows]
+  );
+  const totalSecurityDeposits = useMemo(
+    () =>
+      operationalRows.reduce(
+        (sum, row) => sum + toNumber(row.security_deposit_total || "0"),
+        0
+      ),
+    [operationalRows]
+  );
 
   // Live money held now — cash/bank/UPI from the authoritative posted ledger
   // (matches the cash/bank/UPI books). "Settled out" stays derived from the
@@ -517,6 +568,16 @@ export default function AdminFinancePage() {
           label: "Supplier Payables",
           value: formatRupee(supplierPayableTotal),
           tone: supplierPayableTotal > 0 ? "warning" : "success",
+        },
+        {
+          label: "Customer Advances",
+          value: formatRupee(totalCustomerAdvances),
+          tone: totalCustomerAdvances > 0 ? "info" : "success",
+        },
+        {
+          label: "Security Deposits",
+          value: formatRupee(totalSecurityDeposits),
+          tone: totalSecurityDeposits > 0 ? "info" : "success",
         },
         {
           label: "Reconciliation Flags",
@@ -761,7 +822,7 @@ export default function AdminFinancePage() {
                       description="No finance accounts are available for settlement posture review."
                     />
                   ) : (
-                    rankedOperationalRows.slice(0, 8).map((row) => (
+                    rankedOperationalRows.map((row) => (
                       <div
                         key={row.finance_account_id}
                         className="rounded-xl border border-border bg-muted/50 px-4 py-3"
@@ -1371,13 +1432,7 @@ export default function AdminFinancePage() {
                     href={ROUTES.admin.accountingBooksBank}
                     className="inline-flex items-center justify-center rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground transition hover:border-ring hover:bg-muted"
                   >
-                    Bank Book
-                  </Link>
-                  <Link
-                    href={ROUTES.admin.accountingBooksUpi}
-                    className="inline-flex items-center justify-center rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground transition hover:border-ring hover:bg-muted"
-                  >
-                    UPI Book
+                    Bank / UPI Book
                   </Link>
                   <Link
                     href={ROUTES.admin.accountingChartOfAccounts}

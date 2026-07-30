@@ -175,16 +175,42 @@ class PimProductCreateUpdateSerializer(serializers.ModelSerializer):
                 },
             )
 
+    def _sync_to_register(self, pim_product):
+        try:
+            from subscriptions.models import Product as SubProduct
+            sub_product = SubProduct.objects.filter(product_code=pim_product.code).first()
+            if not sub_product:
+                if not pim_product.is_published:
+                    return
+                sub_product = SubProduct(product_code=pim_product.code)
+            
+            sub_product.name = pim_product.name
+            sub_product.base_price = pim_product.base_price
+            if pim_product.category:
+                sub_product.category = pim_product.category.name
+            if pim_product.subcategory:
+                sub_product.subcategory = pim_product.subcategory.name
+            sub_product.save()
+            
+            if hasattr(sub_product, "inventory_profile") and sub_product.inventory_profile:
+                if pim_product.cost_price is not None:
+                    sub_product.inventory_profile.standard_unit_cost = pim_product.cost_price
+                    sub_product.inventory_profile.save(update_fields=['standard_unit_cost'])
+        except ImportError:
+            pass
+
     def create(self, validated_data):
         attrs_data = validated_data.pop("attributes", [])
         product = super().create(validated_data)
         self._save_attributes(product, attrs_data)
+        self._sync_to_register(product)
         return product
 
     def update(self, instance, validated_data):
         attrs_data = validated_data.pop("attributes", [])
         product = super().update(instance, validated_data)
         self._save_attributes(product, attrs_data)
+        self._sync_to_register(product)
         return product
 
 

@@ -119,6 +119,7 @@ const ADMIN_PERMANENT_REDIRECTS: Array<{ source: string; destination: string }> 
   { source: "/admin/profiles/partners", destination: "/admin/partners" },
   { source: "/admin/profiles/staff", destination: "/admin/hr/staff" },
   { source: "/admin/profiles/vendors", destination: "/admin/vendors" },
+  { source: "/admin/payable", destination: "/admin/payables" },
   { source: "/admin/purchases/vendor-payables", destination: "/admin/payables" }, // type=vendor_settlement
   { source: "/admin/purchases/vendor-payments", destination: "/admin/payables" },
   { source: "/admin/reconciliation", destination: "/admin/accounting/bridge-reconciliation" },

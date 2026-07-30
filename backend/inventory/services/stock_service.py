@@ -955,9 +955,39 @@ def build_stock_summary(
                 "default_stock_location_code": getattr(item.default_stock_location, "code", None),
                 "default_stock_location_name": getattr(item.default_stock_location, "name", None),
                 "branch_id": getattr(item.default_stock_location, "branch_id", None),
+                "category": getattr(item.product, "category", "") or "",
+                "subcategory": getattr(item.product, "subcategory", "") or "",
+                "hsn_sac_code": getattr(item.product, "hsn_sac_code", "") or "",
+                "gst_rate": str(getattr(item.product, "gst_rate", "0.00") or "0.00"),
+                "base_price": str(getattr(item.product, "base_price", "0.00") or "0.00"),
+                "standard_unit_cost": str(item.standard_unit_cost or "0.00"),
+                "valuation_amount": str((on_hand * Decimal(str(item.standard_unit_cost or "0.00"))).quantize(Decimal("0.01"))),
+                "stock_tracking_status": getattr(item, "stock_tracking_status", "PREPARED_NO_STOCK") or "PREPARED_NO_STOCK",
+                "lifecycle_status": getattr(item.product, "lifecycle_status", "ACTIVE") or "ACTIVE",
             }
         )
-    return {"count": len(rows), "results": rows}
+
+    total_on_hand = sum(Decimal(r["on_hand_qty"]) for r in rows)
+    total_reserved = sum(Decimal(r["reserved_qty"]) for r in rows)
+    total_available = sum(Decimal(r["available_qty"]) for r in rows)
+    total_valuation = sum(Decimal(r["valuation_amount"]) for r in rows)
+    in_stock_count = sum(1 for r in rows if Decimal(r["on_hand_qty"]) > 0 and not r["is_below_reorder"])
+    low_stock_count = sum(1 for r in rows if Decimal(r["on_hand_qty"]) > 0 and r["is_below_reorder"])
+    out_of_stock_count = sum(1 for r in rows if Decimal(r["on_hand_qty"]) <= 0)
+
+    return {
+        "count": len(rows),
+        "summary": {
+            "total_on_hand_qty": f"{total_on_hand:.3f}",
+            "total_reserved_qty": f"{total_reserved:.3f}",
+            "total_available_qty": f"{total_available:.3f}",
+            "total_valuation_amount": f"{total_valuation:.2f}",
+            "in_stock_count": in_stock_count,
+            "low_stock_count": low_stock_count,
+            "out_of_stock_count": out_of_stock_count,
+        },
+        "results": rows,
+    }
 
 
 def build_stock_ledger(

@@ -95,7 +95,7 @@ export default function PartnerShellRouter({ children }: { children: ReactNode }
   );
 }
 
-function SidebarLink({ href, icon: Icon, label, onClick }: { href: string; icon: any; label: string; onClick: () => void }) {
+function SidebarLink({ href, icon: Icon, label, onClick }: { href: string; icon: React.ComponentType<{ className?: string }>; label: string; onClick: () => void }) {
   return (
     <Link
       href={href}

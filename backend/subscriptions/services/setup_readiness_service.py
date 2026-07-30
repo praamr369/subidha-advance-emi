@@ -318,6 +318,192 @@ def _staff_hr_payroll_section(admin_count: int, cashier_count: int) -> dict[str,
     )
 
 
+def _accounting_period_section() -> dict[str, Any]:
+    from accounting.models import AccountingPeriod, AccountingPeriodStatus
+
+    today = timezone.localdate()
+    current = (
+        AccountingPeriod.objects.filter(start_date__lte=today, end_date__gte=today)
+        .order_by("start_date")
+        .first()
+    )
+    open_count = AccountingPeriod.objects.filter(status=AccountingPeriodStatus.OPEN).count()
+    blockers: list[str] = []
+    warnings: list[str] = []
+    if current is None:
+        blockers.append("No accounting period covers today's date. Seed the financial year before any posting — the first journal will otherwise be rejected.")
+    elif current.status != AccountingPeriodStatus.OPEN:
+        blockers.append(f"Current accounting period {current.code} is {current.status}; live postings will be rejected until an OPEN period covers today.")
+    return _section(
+        key="accounting_period_open",
+        title="Accounting Period / Financial Year OPEN",
+        status=_status_from(blockers, warnings),
+        blockers=blockers,
+        warnings=warnings,
+        recommended_action="Seed the financial year and confirm the current month's accounting period is OPEN before going live.",
+        target_route="/admin/accounting/setup",
+        why_this_matters="Every journal post asserts an OPEN accounting period for its date. A fresh production database with no seeded financial year will silently reject the very first collection or opening-balance post.",
+        category=FINANCE_ACCOUNTING_REQUIRED,
+        repairable=True,
+        metadata={
+            "current_period_code": getattr(current, "code", None),
+            "current_period_status": getattr(current, "status", None),
+            "open_period_count": open_count,
+        },
+    )
+
+
+def _go_live_backup_section() -> dict[str, Any]:
+    from subscriptions.models_business_setup import BusinessDataBackupJob
+
+    latest = (
+        BusinessDataBackupJob.objects.filter(status=BusinessDataBackupJob.Status.COMPLETED)
+        .order_by("-completed_at", "-id")
+        .first()
+    )
+    warnings: list[str] = []
+    if latest is None:
+        warnings.append("No completed backup exists yet. Take a full backup snapshot before the first live transaction so a bad opening migration can be rolled back cleanly.")
+    return _section(
+        key="go_live_backup",
+        title="Pre-Go-Live Backup Checkpoint",
+        status="READY" if latest is not None else "REQUIRED_PENDING",
+        warnings=warnings,
+        recommended_action="Run a full-database backup from the reset/backup workspace and keep it as the pre-go-live restore point.",
+        target_route="/admin/settings/business-setup/reset",
+        why_this_matters="A clean, dated snapshot taken before the first live transaction is your safety net if opening balances or master data turn out wrong after go-live.",
+        category=RESET_DRY_RUN_REQUIRED,
+        repairable=False,
+        optional_for_initial_start=True,
+        metadata={
+            "latest_backup_completed_at": latest.completed_at.isoformat() if latest and latest.completed_at else None,
+            "latest_backup_job_type": getattr(latest, "job_type", None),
+            "backup_route": "/admin/settings/business-setup/reset",
+        },
+    )
+
+
+def _numbering_continuity_section() -> dict[str, Any]:
+    from subscriptions.services.document_numbering_service import get_document_numbering_state
+
+    state = get_document_numbering_state()
+    required_keys = set(required_numbering_keys_for_checklist())
+    rows = [row for row in state["sequences"] if row["key"] in required_keys]
+    still_at_one = [row["key"] for row in rows if row.get("configured") and int(row.get("next_number") or 1) <= 1]
+    no_duplicates = bool(state["checks"].get("no_duplicate_issued_numbers"))
+    warnings: list[str] = []
+    blockers: list[str] = []
+    if not no_duplicates:
+        blockers.append("Duplicate issued document numbers detected — resolve before live issuance.")
+    if still_at_one:
+        warnings.append(
+            "If you are migrating from a previous system, set each document sequence's next number to continue past the last legacy number to avoid duplicate/overlapping invoice and receipt numbers."
+        )
+    return _section(
+        key="numbering_continuity",
+        title="Document Numbering Continuity (Legacy Carry-Over)",
+        status=_status_from(blockers, warnings),
+        blockers=blockers,
+        warnings=warnings,
+        recommended_action="On the document-numbering page, set each sequence's next number to start after your last legacy document number, then verify no duplicate issued numbers.",
+        target_route="/admin/settings/business-setup/document-numbering",
+        why_this_matters="Reusing numbers already issued by your old system creates duplicate invoice/receipt references — an audit and GST reconciliation problem. Numbering must continue, not restart.",
+        category=CORE_REQUIRED,
+        repairable=True,
+        optional_for_initial_start=True,
+        metadata={
+            "financial_year": state.get("financial_year"),
+            "sequences_still_at_one": still_at_one,
+            "no_duplicate_issued_numbers": no_duplicates,
+        },
+    )
+
+
+def _opening_stock_valuation_section() -> dict[str, Any]:
+    from decimal import Decimal
+    from django.db.models import Q
+    from inventory.models import OpeningStockEntry
+
+    entries = OpeningStockEntry.objects.filter(quantity__gt=Decimal("0"))
+    zero_cost = entries.filter(Q(unit_cost_snapshot__isnull=True) | Q(unit_cost_snapshot=Decimal("0.00"))).count()
+    total = entries.count()
+    warnings: list[str] = []
+    if zero_cost:
+        warnings.append(f"{zero_cost} opening-stock entry(ies) have zero/blank unit cost. COGS and margin will be wrong on the first sale of those items.")
+    return _section(
+        key="opening_stock_valuation",
+        title="Opening Stock Cost / Valuation",
+        status="READY" if total == 0 or zero_cost == 0 else "REQUIRED_PENDING",
+        warnings=warnings,
+        recommended_action="Ensure every opening-stock line carries a real unit cost before posting, so inventory valuation, COGS, and margin are correct from day 1.",
+        target_route="/admin/inventory/opening-stock",
+        why_this_matters="Opening stock entered without a unit cost values inventory at zero and books a 100% margin on its first sale, distorting profit from Day-0.",
+        category=INVENTORY_REQUIRED,
+        repairable=False,
+        optional_for_initial_start=True,
+        metadata={"opening_stock_entries": total, "zero_cost_entries": zero_cost},
+    )
+
+
+def _opening_balance_integrity_section() -> dict[str, Any]:
+    from accounting.services.opening_balance_integrity_service import build_opening_balance_integrity
+
+    data = build_opening_balance_integrity()
+    tb = data["trial_balance"]
+    return _section(
+        key="opening_balance_integrity",
+        title="Opening Balance Integrity (Trial Balance = 0)",
+        status=data["status"],
+        blockers=data["blockers"],
+        warnings=data["warnings"],
+        recommended_action="Enter finance/vendor/customer opening balances through the migration workflows, then confirm the opening trial balance nets to zero before go-live.",
+        target_route="/admin/settings/business-setup/data-migration",
+        why_this_matters="Migrated opening balances must be posted and internally balanced (debits = credits). A non-zero opening trial balance means the legacy migration is incomplete or inconsistent and books will be wrong from Day-0.",
+        category=FINANCE_ACCOUNTING_REQUIRED,
+        repairable=True,
+        optional_for_initial_start=True,
+        metadata=data,
+    )
+
+
+def _legacy_receivable_section() -> dict[str, Any]:
+    from accounting.models import CustomerOpeningOutstanding
+    from django.db.models import Sum
+    from decimal import Decimal
+
+    qs = CustomerOpeningOutstanding.objects.all()
+    total = qs.count()
+    open_count = qs.filter(is_settled=False).count()
+    settled_count = qs.filter(is_settled=True).count()
+    original = qs.aggregate(t=Sum("outstanding_amount"))["t"] or Decimal("0.00")
+    collected = qs.aggregate(t=Sum("collected_amount"))["t"] or Decimal("0.00")
+    remaining = original - collected
+    warnings: list[str] = []
+    if total == 0:
+        warnings.append("No legacy customer outstandings migrated yet. This is normal if there is no old-account receivable to carry over.")
+    return _section(
+        key="legacy_receivable_collection",
+        title="Legacy Customer Outstandings (Old Account Collections)",
+        status="READY" if total == 0 or open_count == 0 else "REQUIRED_PENDING",
+        warnings=warnings,
+        recommended_action="Migrate old-account customer outstandings, then collect them (full or partial) from the universal collection workspace so each payment posts to your cash/bank/UPI ledger.",
+        target_route="/admin/finance/collect",
+        why_this_matters="Old-account receivables must be collectable with real ledger posting (Dr cash/bank/UPI, Cr Accounts Receivable) and auto-settle when fully paid, matching new-customer collections.",
+        category=FINANCE_ACCOUNTING_REQUIRED,
+        repairable=False,
+        optional_for_initial_start=True,
+        metadata={
+            "total": total,
+            "open": open_count,
+            "settled": settled_count,
+            "total_original": f"{original:.2f}",
+            "total_collected": f"{collected:.2f}",
+            "total_remaining": f"{remaining:.2f}",
+            "collection_route": "/admin/finance/collect?workflow=legacy-receivable",
+        },
+    )
+
+
 def _crm_section() -> dict[str, Any]:
     party_model_exists = _model_exists("crm", "PartyMaster")
     warnings: list[str] = []
@@ -388,6 +574,12 @@ def get_setup_readiness() -> dict[str, Any]:
         _section(key="chart_of_accounts", title="Chart of Accounts", status="READY" if not required_coa_missing else "BLOCKED", blockers=[] if not required_coa_missing else [f"Missing required COA account(s): {', '.join(required_coa_missing)}"], recommended_action="Seed default accounting setup and review account names before live posting.", target_route="/admin/accounting/setup", why_this_matters="Payment collection, receipts, invoices, reversals, settlements, deposits, and reconciliation require stable posting accounts.", category=FINANCE_ACCOUNTING_REQUIRED, repairable=True, metadata={"active_accounts": active_chart_accounts.count(), "missing_required_codes": required_coa_missing}),
         _section(key="finance_account_coa_mapping", title="FinanceAccount to COA Mapping", status="READY" if not required_mappings_missing and collection_mappings.exists() else "BLOCKED", blockers=[] if not required_mappings_missing and collection_mappings.exists() else ["FinanceAccount to COA collection mappings are incomplete."], recommended_action="Complete cash/bank/UPI collection mappings and system posting profiles before controlled posting.", target_route="/admin/settings/business-setup/finance-accounts", why_this_matters="Collection accounts must map to real posting-enabled ASSET accounts; setup must not auto-post journals.", category=FINANCE_ACCOUNTING_REQUIRED, repairable=True, metadata={"missing_mapping_purposes": required_mappings_missing, "collection_mappings": collection_mappings.count()}),
         _section(key="accounting_bridge", title="Accounting Bridge Readiness", status="READY" if not required_coa_missing and not required_mappings_missing and posting_profiles_count else "BLOCKED", blockers=[] if not required_coa_missing and not required_mappings_missing and posting_profiles_count else ["Accounting setup, posting profiles, or reconciliation mappings are incomplete."], warnings=["Bridge posting may remain approval-gated; no journals are auto-posted by setup."], recommended_action="Review mapping audit, bridge readiness, bridge reconciliation, and approval-gated posting workflows.", target_route="/admin/accounting/bridges", why_this_matters="Financial correctness depends on explicit posting profiles and reconciliation evidence. Bridge readiness is read-only and must not auto-post journals.", category=FINANCE_ACCOUNTING_REQUIRED, repairable=True, metadata={"posting_profiles": posting_profiles_count, "tax_profile_configured": bool(active_tax_profile), "bridge_reconciliation_route": "/admin/accounting/bridge-reconciliation"}),
+        _accounting_period_section(),
+        _opening_balance_integrity_section(),
+        _legacy_receivable_section(),
+        _numbering_continuity_section(),
+        _opening_stock_valuation_section(),
+        _go_live_backup_section(),
         _rent_lease_section(),
         _section(key="direct_sale_setup", title="Direct Sale Setup", status="READY" if direct_sale_ready else ("REQUIRED_PENDING" if active_products.exists() else "BLOCKED"), blockers=[] if active_products.exists() else ["No active products configured for direct sale."], warnings=[] if direct_sale_ready or not active_products.exists() else ["Direct-sale numbering or document readiness is not yet configured."], recommended_action="Create active products, verify direct-sale route, numbering, invoice/receipt readiness, and bridge readiness.", target_route="/admin/billing/direct-sale", why_this_matters="Direct sale is a live selling path and must use real product, invoice, receipt, and bridge readiness without changing financial semantics.", category=DIRECT_SALE_REQUIRED, repairable=True, metadata={"active_products": active_products.count(), "document_numbering_ready": numbering_ready, "route": "/admin/billing/direct-sale"}),
         _section(key="subscription_emi_setup", title="Subscription EMI / Lucky Plan Setup", status="READY" if subscription_ready else "REQUIRED_PENDING", warnings=[] if subscription_ready else ["Active products, batch/lucky IDs, or receipt/document readiness is incomplete."], recommended_action="Create active products, prepare Lucky Plan batches/Lucky IDs, verify EMI collection and receipt readiness, and keep bridge posting controlled.", target_route="/admin/subscriptions", why_this_matters="Lucky Plan EMI requires controlled product pricing, batch/Lucky ID readiness, receipts, waiver audit, and bridge readiness.", category=SUBSCRIPTION_EMI_REQUIRED, repairable=True, metadata={"active_products": active_products.count(), "batches": batches.count(), "lucky_ids": lucky_ids.count(), "document_numbering_ready": numbering_ready}),
@@ -414,8 +606,14 @@ def get_setup_readiness() -> dict[str, Any]:
     for category in CATEGORY_LABELS:
         rows = [section for section in sections if section["category"] == category]
         category_summary[category] = {"total": len(rows), "ready": sum(1 for row in rows if row["status"] == "READY"), "blocked": sum(1 for row in rows if row["status"] == "BLOCKED"), "info": sum(1 for row in rows if row["status"] != "READY" and row["status"] != "BLOCKED")}
+    _sections_by_key = {section["key"]: section for section in sections}
+    _opening_tb = _sections_by_key.get("opening_balance_integrity", {}).get("metadata", {}).get("trial_balance", {})
+    opening_tb_ok = bool(_opening_tb.get("is_balanced", True)) and not _opening_tb.get("non_posted_journal_count", 0)
     launch_checklist = [
         {"key": "can_create_customer", "label": "Can create customer", "ready": bool(active_business_profile), "source_section": "business_profile", "category": CORE_REQUIRED},
+        {"key": "accounting_period_open", "label": "Accounting period is OPEN for posting", "ready": _sections_by_key.get("accounting_period_open", {}).get("status") == "READY", "source_section": "accounting_period_open", "category": FINANCE_ACCOUNTING_REQUIRED},
+        {"key": "opening_trial_balance_zero", "label": "Opening trial balance is zero", "ready": opening_tb_ok, "source_section": "opening_balance_integrity", "category": FINANCE_ACCOUNTING_REQUIRED},
+        {"key": "legacy_receivables_collectable", "label": "Old-account receivables collect to ledger", "ready": True, "source_section": "legacy_receivable_collection", "category": FINANCE_ACCOUNTING_REQUIRED},
         {"key": "can_create_product", "label": "Can create product", "ready": active_products.exists(), "source_section": "direct_sale_setup", "category": DIRECT_SALE_REQUIRED},
         {"key": "can_collect_payment", "label": "Can collect payment", "ready": ready_collection_account_exists, "source_section": "finance_accounts", "category": CORE_REQUIRED},
         {"key": "can_issue_receipt", "label": "Can issue receipt", "ready": ready_collection_account_exists and numbering_ready, "source_section": "document_templates", "category": CORE_REQUIRED},

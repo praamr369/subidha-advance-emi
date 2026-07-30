@@ -9,6 +9,9 @@ from subscriptions.models import Emi, Payment, Subscription
 from subscriptions.services.delivery_service import (
     get_current_subscription_delivery,
 )
+from subscriptions.services.contract_number_service import (
+    get_or_assign_subscription_number,
+)
 from subscriptions.services.subscription_financial_service import (
     attach_subscription_financial_snapshot,
     build_subscription_financial_snapshot,
@@ -159,7 +162,7 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_subscription_number(self, obj):
-        return f"SUB-{obj.id}"
+        return get_or_assign_subscription_number(obj) or f"SUB-{obj.id}"
 
     def get_delivery_status(self, obj):
         current_delivery = get_current_subscription_delivery(obj)

@@ -292,7 +292,7 @@ test("P4 finance pages render seeded, deferred, warning, and empty states withou
   await expect(page.getByText("One draft journal is excluded.")).toBeVisible();
 
   await page.goto("/admin/accounting/liability-reconciliation");
-  await expect(page.getByText("Deferred — posted GL comparison unavailable").first()).toBeVisible();
+  await expect(page.getByText("Configure account mapping").first()).toBeVisible();
   await expect(page.getByText("Critical finance blocker")).toBeVisible();
 
   await page.goto("/admin/accounting/close-cockpit");

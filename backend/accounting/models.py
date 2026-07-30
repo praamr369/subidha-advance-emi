@@ -73,6 +73,10 @@ def generate_vendor_settlement_no() -> str:
     return _generate_reference("VSET")
 
 
+def generate_legacy_receivable_collection_no() -> str:
+    return _generate_reference("LRC")
+
+
 def generate_leave_request_no() -> str:
     return _generate_reference("LREQ")
 
@@ -4848,6 +4852,10 @@ class CustomerOpeningOutstanding(AccountingTimeStampedModel):
         max_digits=12, decimal_places=2,
         validators=[MinValueValidator(Decimal("0.01"))],
     )
+    collected_amount = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00"),
+        help_text="Sum of real collections posted against this opening receivable.",
+    )
     entry_date = models.DateField(db_index=True)
     notes = models.TextField(blank=True, default="")
     is_settled = models.BooleanField(default=False, db_index=True)
@@ -4865,6 +4873,76 @@ class CustomerOpeningOutstanding(AccountingTimeStampedModel):
 
     def __str__(self):
         return f"{self.customer_name} - {self.outstanding_amount}"
+
+    @property
+    def balance_remaining(self) -> Decimal:
+        """Amount still to be collected (original minus collections)."""
+        remaining = (self.outstanding_amount or Decimal("0.00")) - (self.collected_amount or Decimal("0.00"))
+        return remaining if remaining > Decimal("0.00") else Decimal("0.00")
+
+
+class LegacyReceivableCollection(AccountingTimeStampedModel):
+    """One real money-in payment posted against a legacy opening receivable.
+
+    Each row carries the accounting journal that debits the chosen cash/bank/UPI
+    finance account and credits Accounts Receivable, giving old-customer
+    collections the same ledger footprint as new-customer collections and a
+    full-proof settlement history.
+    """
+
+    collection_no = models.CharField(
+        max_length=40, unique=True, default=generate_legacy_receivable_collection_no,
+    )
+    receivable = models.ForeignKey(
+        "accounting.CustomerOpeningOutstanding",
+        on_delete=models.PROTECT,
+        related_name="collections",
+    )
+    amount = models.DecimalField(
+        max_digits=12, decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01"))],
+    )
+    payment_method = models.CharField(max_length=20, default="CASH")
+    finance_account = models.ForeignKey(
+        "accounting.FinanceAccount",
+        null=True, blank=True,
+        on_delete=models.PROTECT,
+        related_name="legacy_receivable_collections",
+    )
+    posted_journal_entry = models.ForeignKey(
+        "accounting.JournalEntry",
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name="legacy_receivable_collections",
+    )
+    branch = models.ForeignKey(
+        "branch_control.Branch",
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name="legacy_receivable_collections",
+    )
+    cash_counter = models.ForeignKey(
+        "branch_control.CashCounter",
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name="legacy_receivable_collections",
+    )
+    receipt_date = models.DateField(null=True, blank=True)
+    reference_no = models.CharField(max_length=100, blank=True, default="")
+    notes = models.TextField(blank=True, default="")
+    collected_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name="legacy_receivable_collections",
+    )
+
+    class Meta:
+        db_table = "accounting_legacy_receivable_collections"
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self):
+        return f"{self.collection_no} - {self.amount}"
 
 
 class UnifiedPayableIdempotencyStatus(models.TextChoices):

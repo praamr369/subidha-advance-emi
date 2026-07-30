@@ -59,6 +59,9 @@ export default function PartnerNotificationsPage() {
     setBusyId(id);
     try {
       await markNotificationRead(id);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("subidha:badges-refresh"));
+      }
       await load("refresh");
     } finally {
       setBusyId(null);

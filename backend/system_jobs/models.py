@@ -93,10 +93,35 @@ class Notification(models.Model):
             models.Index(fields=["module", "created_at"]),
         ]
 
+    def _invalidate_badge_cache(self):
+        try:
+            from django.core.cache import cache
+            cache.delete("admin_nav_badges")
+            if self.recipient_id:
+                cache.delete(f"admin_nav_badges:{self.recipient_id}")
+        except Exception:
+            pass
+
     def mark_read(self):
         if self.read_at is None:
             self.read_at = timezone.now()
             self.save(update_fields=["read_at"])
+        self._invalidate_badge_cache()
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        self._invalidate_badge_cache()
+
+    def delete(self, *args, **kwargs):
+        recipient_id = self.recipient_id
+        super().delete(*args, **kwargs)
+        try:
+            from django.core.cache import cache
+            cache.delete("admin_nav_badges")
+            if recipient_id:
+                cache.delete(f"admin_nav_badges:{recipient_id}")
+        except Exception:
+            pass
 
 
 class NotificationPreference(models.Model):

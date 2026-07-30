@@ -90,6 +90,9 @@ import { useAuth } from "@/providers/AuthProvider";
 import { pushRecent, readFavorites, readRecents, toggleFavorite } from "@/lib/workspace-prefs";
 import { cn } from "@/lib/utils";
 import { subscribeRealtime } from "@/lib/realtime";
+import { getAdminNavigationBadges, refreshAdminNavigationBadges } from "@/services/navigation-badges";
+import { readNavLayout, readNavLayoutServer, subscribeNavLayout, applyNavLayoutToGroups } from "@/lib/navigation-prefs";
+import NavigationCustomizerModal from "@/components/layout/NavigationCustomizerModal";
 
 const CommandPalette = dynamic(
   () => import("@/components/workflows/CommandPalette"),
@@ -563,7 +566,15 @@ function SidebarContent({
 }) {
   const isMobile = typeof onClose === "function";
   const searchParams = useSearchParams();
-  const navGroups = useMemo(() => mapNavGroups(getNavigationGroupsForRole(role)), [role]);
+  const [isNavCustomizerOpen, setIsNavCustomizerOpen] = useState(false);
+  const customNavLayout = useSyncExternalStore(subscribeNavLayout, readNavLayout, readNavLayoutServer);
+  const navGroups = useMemo(() => {
+    const canonical = getNavigationGroupsForRole(role);
+    if (role === "ADMIN") {
+      return mapNavGroups(applyNavLayoutToGroups(canonical, customNavLayout));
+    }
+    return mapNavGroups(canonical);
+  }, [role, customNavLayout]);
   const currentUrl = useMemo(() => {
     const query = searchParams.toString();
     return query ? `${pathname}?${query}` : pathname;
@@ -618,20 +629,44 @@ function SidebarContent({
 
   useEffect(() => {
     if (role !== "ADMIN") return;
-    // Live badge updates over the shared SSE stream. The server pushes the
-    // full badge payload immediately on connect and again whenever it
-    // changes, so no initial REST fetch is needed; the stream falls back to
-    // reconnect-with-backoff on its own if the connection drops.
-    return subscribeRealtime({
+
+    const fetchBadges = () => {
+      refreshAdminNavigationBadges()
+        .then((payload) => {
+          if (payload && typeof payload === "object") {
+            setQueueBadges(
+              Object.entries(payload).reduce<Record<string, number>>((acc, [key, value]) => {
+                const numVal = Number(value || 0);
+                acc[key] = numVal;
+                acc[`admin.badges.${key}`] = numVal;
+                return acc;
+              }, {})
+            );
+          }
+        })
+        .catch(() => {});
+    };
+
+    fetchBadges();
+    window.addEventListener("subidha:badges-refresh", fetchBadges);
+
+    const unsubscribe = subscribeRealtime({
       onBadges: (payload) => {
         setQueueBadges(
           Object.entries(payload).reduce<Record<string, number>>((acc, [key, value]) => {
-            acc[`admin.badges.${key}`] = Number(value || 0);
+            const numVal = Number(value || 0);
+            acc[key] = numVal;
+            acc[`admin.badges.${key}`] = numVal;
             return acc;
           }, {})
         );
       },
     });
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener("subidha:badges-refresh", fetchBadges);
+    };
   }, [role]);
 
   useEffect(() => {
@@ -889,29 +924,36 @@ function SidebarContent({
     );
 
     return (
-      <AdminSidebarNav
-        groups={visibleGroups}
-        activeHref={activeHref}
-        brandName={brandConfig.companyName}
-        roleLabel={formatRoleLabel(role)}
-        isMobile={isMobile}
-        navQuery={navQuery}
-        onNavQueryChange={setNavQuery}
-        expandedGroups={expandedGroups}
-        onToggleGroup={toggleGroup}
-        favorites={favorites}
-        onToggleFavorite={(href) => {
-          if (!sessionId) return;
-          setFavorites(toggleFavorite(sessionId, role, href));
-        }}
-        canFavorite={Boolean(sessionId)}
-        badges={queueBadges}
-        favoriteLinks={favoriteLinks}
-        brandSlot={<WorkspaceBrandMark size={32} variant="onSidebar" />}
-        footerSlot={adminFooter}
-        onToggleCollapse={onToggleCollapse}
-        onClose={onClose}
-      />
+      <>
+        <AdminSidebarNav
+          groups={visibleGroups}
+          activeHref={activeHref}
+          brandName={brandConfig.companyName}
+          roleLabel={formatRoleLabel(role)}
+          isMobile={isMobile}
+          navQuery={navQuery}
+          onNavQueryChange={setNavQuery}
+          expandedGroups={expandedGroups}
+          onToggleGroup={toggleGroup}
+          favorites={favorites}
+          onToggleFavorite={(href) => {
+            if (!sessionId) return;
+            setFavorites(toggleFavorite(sessionId, role, href));
+          }}
+          canFavorite={Boolean(sessionId)}
+          badges={queueBadges}
+          favoriteLinks={favoriteLinks}
+          brandSlot={<WorkspaceBrandMark size={32} variant="onSidebar" />}
+          footerSlot={adminFooter}
+          onToggleCollapse={onToggleCollapse}
+          onClose={onClose}
+          onOpenCustomizer={() => setIsNavCustomizerOpen(true)}
+        />
+        <NavigationCustomizerModal
+          isOpen={isNavCustomizerOpen}
+          onClose={() => setIsNavCustomizerOpen(false)}
+        />
+      </>
     );
   }
 

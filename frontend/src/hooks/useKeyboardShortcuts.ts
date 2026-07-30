@@ -108,7 +108,7 @@ export const DEFAULT_DASHBOARD_SHORTCUTS: ShortcutMap = {
     // Navigate to previous module
     const modules = document.querySelectorAll('[data-module]');
     const current = document.activeElement;
-    const currentIndex = Array.from(modules).indexOf(current as any);
+    const currentIndex = Array.from(modules).indexOf(current as Element);
     if (currentIndex > 0) {
       (modules[currentIndex - 1] as HTMLElement).focus();
     }
@@ -117,7 +117,7 @@ export const DEFAULT_DASHBOARD_SHORTCUTS: ShortcutMap = {
     // Navigate to next module
     const modules = document.querySelectorAll('[data-module]');
     const current = document.activeElement;
-    const currentIndex = Array.from(modules).indexOf(current as any);
+    const currentIndex = Array.from(modules).indexOf(current as Element);
     if (currentIndex < modules.length - 1) {
       (modules[currentIndex + 1] as HTMLElement).focus();
     }

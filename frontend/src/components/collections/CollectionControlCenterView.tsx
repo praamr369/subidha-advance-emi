@@ -46,7 +46,7 @@ function laneTitle(lane: CollectionControlLane): string {
 }
 
 function isDeferredLane(lane: CollectionControlLane): boolean {
-  return lane.key === "rent_lease" || !lane.enabled || !lane.route;
+  return !lane.enabled || !lane.route;
 }
 
 function accountBlocker(account: CollectionControlFinanceAccount): string {

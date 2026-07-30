@@ -29,6 +29,7 @@ import {
   type FinanceAccount,
 } from "@/services/accounting";
 import { invalidateAfterDirectSaleCollect } from "@/lib/operational-query-invalidation";
+import { PAYMENT_METHOD_OPTIONS, type PaymentMethodValue, isCashMethod } from "@/lib/payment-methods";
 import { searchAdminReceivables, type UnifiedReceivableResult } from "@/services/receivables";
 
 const FIELD_CLASS_NAME =
@@ -39,15 +40,13 @@ const READ_ONLY_FIELD_CLASS_NAME =
 type FormState = {
   amount: string;
   receipt_date: string;
-  payment_method: "CASH" | "UPI" | "BANK" | "CARD";
+  payment_method: PaymentMethodValue;
   branch_id: string;
   cash_counter_id: string;
   finance_account_id: string;
   reference_no: string;
   notes: string;
 };
-
-const PAYMENT_METHOD_OPTIONS: FormState["payment_method"][] = ["CASH", "UPI", "CARD"];
 
 function formatMoney(value?: string | number | null): string {
   const numeric = Number(value ?? 0);
@@ -213,13 +212,9 @@ export default function AdminDirectSaleCollectForm({
 
   const availableFinanceAccounts = useMemo(() => {
     const methodFiltered = financeAccounts.filter((account) => {
-      // Combined "UPI / Bank" method: most businesses run one UPI-linked bank
-      // account, so both kinds must be selectable.
-      if (form.payment_method === "UPI" || form.payment_method === "BANK") {
-        return account.kind === "UPI" || account.kind === "BANK";
-      }
-      if (form.payment_method === "CARD") return account.kind === "BANK";
-      return account.kind === form.payment_method;
+      // Cash -> cash desk; every non-cash instrument -> the single Bank/UPI account.
+      if (isCashMethod(form.payment_method)) return account.kind === "CASH";
+      return account.kind === "BANK" || account.kind === "UPI";
     });
     if (!form.branch_id) return methodFiltered;
     return methodFiltered.filter((account) => {
@@ -649,9 +644,9 @@ export default function AdminDirectSaleCollectForm({
                 onChange={(event) => updateField("payment_method", event.target.value as FormState["payment_method"])}
                 className={FIELD_CLASS_NAME}
               >
-                {PAYMENT_METHOD_OPTIONS.map((method) => (
-                  <option key={method} value={method}>
-                    {method === "UPI" ? "UPI / Bank" : method === "BANK" ? "Bank Transfer" : method}
+                {PAYMENT_METHOD_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
                   </option>
                 ))}
               </select>

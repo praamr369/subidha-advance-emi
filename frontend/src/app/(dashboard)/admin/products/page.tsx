@@ -141,7 +141,7 @@ function PimPanel() {
 
   useEffect(() => {
     Promise.all([
-      pimService.getProducts({ search: pimSearch || undefined, category: pimCat || undefined }),
+      pimService.getProducts({ search: pimSearch || undefined, category: pimCat || undefined }).then(r => r.results),
       pimService.getCategories(),
     ]).then(([prods, cats]) => {
       setPimProducts(Array.isArray(prods) ? prods : []);
@@ -155,13 +155,10 @@ function PimPanel() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <p className="text-sm text-muted-foreground">
-            Enterprise PIM — category-specific attributes, SKU variants, dynamic specs.
+            Enterprise PIM — used strictly for managing category-specific attributes, SKU variants, and dynamic specs for existing base products.
           </p>
         </div>
         <div className="flex gap-2">
-          <Link href="/admin/pim/products/create" className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
-            <Layers className="h-4 w-4" /> New PIM Product
-          </Link>
           <Link href="/admin/pim/categories" className="inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm hover:bg-muted">
             Categories
           </Link>
@@ -195,8 +192,7 @@ function PimPanel() {
           <div className="p-8 text-center text-sm text-muted-foreground">Loading PIM products…</div>
         ) : pimProducts.length === 0 ? (
           <div className="p-8 text-center text-sm text-muted-foreground">
-            No PIM products found.{" "}
-            <Link href="/admin/pim/products/create" className="text-primary underline">Create one →</Link>
+            No PIM products found. Base products can be synced to PIM from the main register.
           </div>
         ) : (
           <table className="w-full text-sm">
@@ -241,7 +237,7 @@ function PimPanel() {
 
       <div className="rounded-xl border border-blue-200 bg-blue-50 dark:bg-blue-900/10 dark:border-blue-800 px-4 py-3 text-xs text-blue-700 dark:text-blue-300">
         <strong>PIM products</strong> support dynamic category attributes (bed size/material, fridge liters, AC tons, etc.) and per-SKU variants.
-        Subscription products above are used for EMI/Rent/Lease billing. Both systems can coexist for the same physical product.
+        Create all products in the main register above, then sync them here to enrich them with attributes and descriptions.
       </div>
     </div>
   );
@@ -251,9 +247,9 @@ export default function AdminProductsPage() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-
-  const [activeTab, setActiveTab] = useState<"subscription" | "pim">("subscription");
-
+  const [activeTab, setActiveTab] = useState<"subscription" | "pim">(() => {
+    return searchParams.get("tab") === "pim" ? "pim" : "subscription";
+  });
   const [payload, setPayload] = useState<ProductRegisterPage>(() => emptyPage());
   const [catalogOptions, setCatalogOptions] = useState<ProductCatalogOptions>(() => emptyCatalogOptions());
   const [loading, setLoading] = useState(true);

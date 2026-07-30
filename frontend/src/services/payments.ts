@@ -25,7 +25,7 @@ export interface Receipt {
 }
 
 // ── EMI Collection types ───────────────────────────────────────────────────────
-export type PaymentMethod = 'CASH' | 'UPI' | 'BANK' | 'CARD'
+export type PaymentMethod = 'CASH' | 'UPI' | 'TRANSFER' | 'CHEQUE' | 'DEPOSIT' | 'BANK' | 'CARD'
 
 export interface AdminSubscriptionCollectionCandidate {
   id: number

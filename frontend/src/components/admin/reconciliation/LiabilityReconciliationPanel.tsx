@@ -9,46 +9,17 @@ import {
   FinancialStatusBadge,
   PeriodSelector,
 } from "@/components/admin/accounting/financial-intelligence";
+import { CheckList, PostedGlBalance } from "@/components/admin/reconciliation/liability-reconciliation-shared";
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import {
   fetchLiabilityReconciliation,
-  type FinancialCheck,
   type LiabilityReconciliationResponse,
 } from "@/services/financial-intelligence";
 
 const today = new Date().toISOString().slice(0, 10);
-
-function DeferredBalance({ value }: { value?: string | null }) {
-  if (value == null) {
-    return <span className="text-sky-700">Deferred — posted GL comparison unavailable</span>;
-  }
-  return <>{accountingMoney(value)}</>;
-}
-
-function CheckList({ checks }: { checks?: FinancialCheck[] | null }) {
-  const safeChecks = Array.isArray(checks) ? checks : [];
-
-  if (safeChecks.length === 0) {
-    return <p className="text-sm text-muted-foreground">No checks returned.</p>;
-  }
-  return (
-    <div className="grid gap-3 md:grid-cols-2">
-      {safeChecks.map((check, index) => (
-        <article key={`${check.key}-${index}`} className="rounded-xl border border-border bg-background p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="font-semibold">{check.title ?? check.label ?? check.key}</div>
-            <FinancialStatusBadge status={check.status} deferred={check.deferred} />
-          </div>
-          <p className="mt-2 text-sm text-muted-foreground">{check.message}</p>
-          {check.count > 0 ? <p className="mt-2 text-xs font-medium">Affected records: {check.count}</p> : null}
-        </article>
-      ))}
-    </div>
-  );
-}
 
 /**
  * Diagnostic liability reconciliation (customer advance + security deposit source
@@ -111,7 +82,7 @@ export default function LiabilityReconciliationPanel() {
                   { label: "Refunded", value: accountingMoney(data.customer_advance.total_advance_refunded) },
                   { label: "Expected liability", value: accountingMoney(data.customer_advance.expected_liability) },
                   { label: "Unapplied balance", value: accountingMoney(data.customer_advance.unapplied_balance) },
-                  { label: "Posted GL liability", value: <DeferredBalance value={data.customer_advance.posted_liability_balance} /> },
+                  { label: "Posted GL liability", value: <PostedGlBalance value={data.customer_advance.posted_liability_balance} difference={data.customer_advance.posted_liability_difference} matches={data.customer_advance.posted_liability_matches} /> },
                   { label: "Bridge gaps", value: data.customer_advance.bridge_gap_count ?? "—" },
                   { label: "Stale unapplied", value: data.customer_advance.stale_unapplied_count ?? "—" },
                 ]} />
@@ -130,7 +101,7 @@ export default function LiabilityReconciliationPanel() {
                   { label: "Refunded", value: accountingMoney(data.security_deposit.total_deposit_refunded) },
                   { label: "Deducted", value: accountingMoney(data.security_deposit.total_deposit_deducted) },
                   { label: "Expected liability", value: accountingMoney(data.security_deposit.expected_deposit_liability) },
-                  { label: "Posted GL liability", value: <DeferredBalance value={data.security_deposit.posted_deposit_liability_balance} /> },
+                  { label: "Posted GL liability", value: <PostedGlBalance value={data.security_deposit.posted_deposit_liability_balance} difference={data.security_deposit.posted_deposit_liability_difference} matches={data.security_deposit.posted_deposit_liability_matches} /> },
                   { label: "Collection bridge gaps", value: data.security_deposit.unposted_collection_count ?? "—" },
                   { label: "Refund bridge gaps", value: data.security_deposit.unposted_refund_count ?? "—" },
                   { label: "Deduction bridge gaps", value: data.security_deposit.unposted_deduction_count ?? "—" },

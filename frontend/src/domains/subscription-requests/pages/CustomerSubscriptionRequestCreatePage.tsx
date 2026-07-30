@@ -82,7 +82,11 @@ function ProductPicker({
     return subs.sort();
   }, [products, category]);
 
-  useEffect(() => { setSubcategory(""); }, [category]);
+  const [prevCategory, setPrevCategory] = useState(category);
+  if (category !== prevCategory) {
+    setPrevCategory(category);
+    setSubcategory("");
+  }
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();

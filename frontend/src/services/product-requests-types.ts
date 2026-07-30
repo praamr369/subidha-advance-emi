@@ -56,7 +56,7 @@ export function getPreviousStep(
 export function isStepCompleted(
   requestType: ProductRequestType,
   step: WorkflowStep,
-  data: Record<string, any>
+  data: Record<string, unknown>
 ): boolean {
   if (step === "link_customer") {
     return Boolean(data.customer_id);

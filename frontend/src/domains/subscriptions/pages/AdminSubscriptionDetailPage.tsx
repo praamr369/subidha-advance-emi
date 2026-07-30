@@ -110,7 +110,7 @@ export default function AdminSubscriptionDetailPage() {
   }, [payments, subscription]);
 
   return (
-    <ERPPageShell title={subscription ? `Subscription #${subscription.id}` : "Subscription Detail"} subtitle="Contract, EMI, payment and reconciliation operational snapshot.">
+    <ERPPageShell title={subscription ? `Subscription ${subscription.subscription_number || `SUB-${subscription.id}`}` : "Subscription Detail"} subtitle="Contract, EMI, payment and reconciliation operational snapshot.">
       <section style={{ marginBottom: 12, display: "flex", gap: 8 }}>
         <button type="button" onClick={() => router.push("/admin/subscriptions")}>Back</button>
         {subscription ? (

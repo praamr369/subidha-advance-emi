@@ -17,7 +17,6 @@ import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import ProductPimAttributesEditor from "@/components/products/ProductPimAttributesEditor";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import SmartSuggestField from "@/components/forms/SmartSuggestField";
-import CatalogSpecificationFields from "@/components/admin/products/CatalogSpecificationFields";
 import PimSyncSection from "@/components/admin/pim/PimSyncSection";
 import { pimService, type PimProduct } from "@/services/pim";
 import { shouldBypassNextImageOptimization } from "@/lib/media";
@@ -44,7 +43,8 @@ function PimStatusMini({ productCode }: { productCode: string }) {
   const [pimProduct, setPimProduct] = useState<PimProduct | null | undefined>(undefined);
   useEffect(() => {
     if (!productCode) { setPimProduct(null); return; }
-    pimService.getProducts({ search: productCode }).then((list) => {
+    pimService.getProducts({ search: productCode }).then((res) => {
+      const list = res.results;
       const match = list.find((p) => p.code === productCode);
       setPimProduct(match ?? null);
     }).catch(() => setPimProduct(null));
@@ -85,8 +85,6 @@ export default function AdminProductEditPage() {
   const [unit, setUnit] = useState("PCS");
   const [category, setCategory] = useState("");
   const [subcategory, setSubcategory] = useState("");
-  const [catalogCategoryId, setCatalogCategoryId] = useState<number | null>(null);
-  const [baseSpecs, setBaseSpecs] = useState<Record<string, unknown>>({});
   const [description, setDescription] = useState("");
   const [hsnSacCode, setHsnSacCode] = useState("");
   const [gstRate, setGstRate] = useState("");
@@ -116,8 +114,6 @@ export default function AdminProductEditPage() {
     setUnit(next.unit_of_measure || "PCS");
     setCategory(next.category || "");
     setSubcategory(next.subcategory || "");
-    setCatalogCategoryId(next.catalog_category ?? null);
-    setBaseSpecs(next.base_specs || {});
     setDescription(next.description || "");
     setHsnSacCode(next.hsn_sac_code || "");
     setGstRate(next.gst_rate != null ? String(next.gst_rate) : "");
@@ -146,6 +142,7 @@ export default function AdminProductEditPage() {
     try {
       const [productPayload, optionsPayload] = await Promise.allSettled([getProduct(productId), getProductCatalogOptions()]);
       if (productPayload.status !== "fulfilled") throw productPayload.reason;
+      
       hydrate(productPayload.value);
       if (optionsPayload.status === "fulfilled") setCatalogOptions(optionsPayload.value);
       setError(null);
@@ -192,12 +189,6 @@ export default function AdminProductEditPage() {
         unit_of_measure: unit || "PCS",
         category,
         subcategory,
-        // NOTE: catalog_category (catalog.CatalogCategory) is deliberately NOT sent
-        // here. The spec picker loads PIM categories (products_pim.ProductCategory),
-        // a different table — sending its id as catalog_category caused a 400
-        // "Invalid pk". The product's PIM category is managed via the linked PIM
-        // record / the "PIM attributes" editor below, not this legacy FK.
-        base_specs: baseSpecs,
         description,
         hsn_sac_code: hsnSacCode.trim().toUpperCase(),
         gst_rate: gstRate.trim() ? gstRate.trim() : null,
@@ -223,21 +214,19 @@ export default function AdminProductEditPage() {
         payload.set("unit_of_measure", unit || "PCS");
         payload.set("category", category);
         payload.set("subcategory", subcategory);
-        // catalog_category intentionally omitted — see note in the JSON branch above.
-        payload.set("base_specs", JSON.stringify(baseSpecs));
         payload.set("description", description);
         payload.set("hsn_sac_code", hsnSacCode.trim().toUpperCase());
         if (gstRate.trim()) payload.set("gst_rate", gstRate.trim());
         payload.set("base_price", basePrice);
         payload.set("is_active", String(active));
         payload.set("plan_type_default", effectiveDefault());
-        payload.set("is_emi_enabled", String(emi));
-        payload.set("is_rent_enabled", String(rent));
-        payload.set("is_lease_enabled", String(lease));
-        payload.set("is_direct_sale_enabled", String(directSale));
+        payload.set("is_emi_enabled", String(itemType === "FINISHED_GOOD" ? emi : false));
+        payload.set("is_rent_enabled", String(itemType === "FINISHED_GOOD" ? rent : false));
+        payload.set("is_lease_enabled", String(itemType === "FINISHED_GOOD" ? lease : false));
+        payload.set("is_direct_sale_enabled", String(itemType === "FINISHED_GOOD" || itemType === "ADD_ON" || itemType === "ACCESSORY" ? directSale : false));
         payload.set("item_type", itemType);
         payload.set("stock_type", stockType);
-        payload.set("warranty_enabled", String(warrantyEnabled));
+        payload.set("warranty_enabled", String(itemType === "FINISHED_GOOD" ? warrantyEnabled : false));
         payload.set("warranty_months_manufacturing", String(Number(warrantyManufacturing) || 12));
         payload.set("warranty_months_structural", String(Number(warrantyStructural) || 36));
         payload.set("warranty_months_extended_max", String(Number(warrantyExtendedMax) || 12));
@@ -329,63 +318,66 @@ export default function AdminProductEditPage() {
                   />
                 </div>
                 <label className="text-sm text-muted-foreground">GST Rate (%)<input className={fieldClass()} type="number" min="0" step="0.01" value={gstRate} onChange={(event) => setGstRate(event.target.value)} /></label>
-                <CatalogSpecificationFields
-                  categoryId={catalogCategoryId}
-                  values={baseSpecs}
-                  onCategoryChange={setCatalogCategoryId}
-                  onValuesChange={setBaseSpecs}
-                  disabled={saving}
-                />
               </FormCard>
 
-              <FormCard title="Capabilities" description="Controls future use in EMI, rent, lease, and direct-sale workflows.">
-                <label className="text-sm text-muted-foreground">Default plan<select className={fieldClass()} value={planType} onChange={(event) => setPlanType(event.target.value as "EMI" | "RENT" | "LEASE")}><option value="EMI">EMI</option><option value="RENT">Rent</option><option value="LEASE">Lease</option></select></label>
-                <label className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm">Active<input type="checkbox" checked={active} onChange={(event) => setActive(event.target.checked)} /></label>
-                <label className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm">EMI<input type="checkbox" checked={emi} onChange={(event) => setEmi(event.target.checked)} /></label>
-                <label className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm">Rent<input type="checkbox" checked={rent} onChange={(event) => setRent(event.target.checked)} /></label>
-                <label className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm">Lease<input type="checkbox" checked={lease} onChange={(event) => setLease(event.target.checked)} /></label>
-                <label className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm">Direct Sale<input type="checkbox" checked={directSale} onChange={(event) => setDirectSale(event.target.checked)} /></label>
-              </FormCard>
+              {(itemType === "FINISHED_GOOD" || itemType === "ADD_ON" || itemType === "ACCESSORY") && (
+                <>
+                  <FormCard title="Capabilities" description="Controls future use in EMI, rent, lease, and direct-sale workflows.">
+                    <label className="text-sm text-muted-foreground">Default plan<select className={fieldClass()} value={planType} onChange={(event) => setPlanType(event.target.value as "EMI" | "RENT" | "LEASE")}><option value="EMI">EMI</option><option value="RENT">Rent</option><option value="LEASE">Lease</option></select></label>
+                    <label className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm">Active<input type="checkbox" checked={active} onChange={(event) => setActive(event.target.checked)} /></label>
+                    {itemType === "FINISHED_GOOD" && (
+                      <>
+                        <label className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm">EMI<input type="checkbox" checked={emi} onChange={(event) => setEmi(event.target.checked)} /></label>
+                        <label className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm">Rent<input type="checkbox" checked={rent} onChange={(event) => setRent(event.target.checked)} /></label>
+                        <label className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm">Lease<input type="checkbox" checked={lease} onChange={(event) => setLease(event.target.checked)} /></label>
+                      </>
+                    )}
+                    <label className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm">Direct Sale<input type="checkbox" checked={directSale} onChange={(event) => setDirectSale(event.target.checked)} /></label>
+                  </FormCard>
 
-              <ERPSectionShell title="Warranty Coverage" description="Configure warranty periods and extended warranty pricing. Applies to future deliveries only.">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <label className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm md:col-span-2">
-                    Warranty Enabled
-                    <input type="checkbox" checked={warrantyEnabled} onChange={(e) => setWarrantyEnabled(e.target.checked)} />
-                  </label>
-                  {warrantyEnabled ? (
-                    <>
-                      <label className="text-sm text-muted-foreground">
-                        Manufacturing Warranty (months)
-                        <input className={fieldClass()} type="number" min="0" max="120" value={warrantyManufacturing} onChange={(e) => setWarrantyManufacturing(e.target.value)} />
-                      </label>
-                      <label className="text-sm text-muted-foreground">
-                        Structural Warranty (months)
-                        <input className={fieldClass()} type="number" min="0" max="120" value={warrantyStructural} onChange={(e) => setWarrantyStructural(e.target.value)} />
-                      </label>
-                      <label className="text-sm text-muted-foreground">
-                        Max Extended Warranty (months)
-                        <input className={fieldClass()} type="number" min="0" max="60" value={warrantyExtendedMax} onChange={(e) => setWarrantyExtendedMax(e.target.value)} />
-                      </label>
-                      <label className="text-sm text-muted-foreground">
-                        Extended Warranty Cost (% of price)
-                        <input className={fieldClass()} type="number" min="0" max="100" step="0.01" value={extendedWarrantyCostPct} onChange={(e) => setExtendedWarrantyCostPct(e.target.value)} />
-                      </label>
-                      <div className="md:col-span-2 rounded-xl border border-border bg-muted/30 px-4 py-3 text-xs text-muted-foreground space-y-1">
-                        <div>Manufacturing warranty covers defects in materials and workmanship for <strong>{warrantyManufacturing} months</strong> from delivery.</div>
-                        <div>Structural warranty covers frame and core structure for <strong>{warrantyStructural} months</strong> from delivery.</div>
-                        {Number(warrantyExtendedMax) > 0 ? (
-                          <div>Extended warranty available up to <strong>{warrantyExtendedMax} months</strong> at <strong>{extendedWarrantyCostPct}%</strong> of product price ({formatRupee(Number(basePrice || 0) * Number(extendedWarrantyCostPct || 0) / 100)} per month).</div>
-                        ) : null}
+                  {itemType === "FINISHED_GOOD" && (
+                    <ERPSectionShell title="Warranty Coverage" description="Configure warranty periods and extended warranty pricing. Applies to future deliveries only.">
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <label className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm md:col-span-2">
+                          Warranty Enabled
+                          <input type="checkbox" checked={warrantyEnabled} onChange={(e) => setWarrantyEnabled(e.target.checked)} />
+                        </label>
+                        {warrantyEnabled ? (
+                          <>
+                            <label className="text-sm text-muted-foreground">
+                              Manufacturing Warranty (months)
+                              <input className={fieldClass()} type="number" min="0" max="120" value={warrantyManufacturing} onChange={(e) => setWarrantyManufacturing(e.target.value)} />
+                            </label>
+                            <label className="text-sm text-muted-foreground">
+                              Structural Warranty (months)
+                              <input className={fieldClass()} type="number" min="0" max="120" value={warrantyStructural} onChange={(e) => setWarrantyStructural(e.target.value)} />
+                            </label>
+                            <label className="text-sm text-muted-foreground">
+                              Max Extended Warranty (months)
+                              <input className={fieldClass()} type="number" min="0" max="60" value={warrantyExtendedMax} onChange={(e) => setWarrantyExtendedMax(e.target.value)} />
+                            </label>
+                            <label className="text-sm text-muted-foreground">
+                              Extended Warranty Cost (% of price)
+                              <input className={fieldClass()} type="number" min="0" max="100" step="0.01" value={extendedWarrantyCostPct} onChange={(e) => setExtendedWarrantyCostPct(e.target.value)} />
+                            </label>
+                            <div className="md:col-span-2 rounded-xl border border-border bg-muted/30 px-4 py-3 text-xs text-muted-foreground space-y-1">
+                              <div>Manufacturing warranty covers defects in materials and workmanship for <strong>{warrantyManufacturing} months</strong> from delivery.</div>
+                              <div>Structural warranty covers frame and core structure for <strong>{warrantyStructural} months</strong> from delivery.</div>
+                              {Number(warrantyExtendedMax) > 0 ? (
+                                <div>Extended warranty available up to <strong>{warrantyExtendedMax} months</strong> at <strong>{extendedWarrantyCostPct}%</strong> of product price ({formatRupee(Number(basePrice || 0) * Number(extendedWarrantyCostPct || 0) / 100)} per month).</div>
+                              ) : null}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="md:col-span-2 rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+                            Warranty is disabled for this product. No warranty tracking or claims will be available for future deliveries.
+                          </div>
+                        )}
                       </div>
-                    </>
-                  ) : (
-                    <div className="md:col-span-2 rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
-                      Warranty is disabled for this product. No warranty tracking or claims will be available for future deliveries.
-                    </div>
+                    </ERPSectionShell>
                   )}
-                </div>
-              </ERPSectionShell>
+                </>
+              )}
 
               {/* PIM Sync — auto-matches category/subcategory, inline spec editing */}
               <PimSyncSection

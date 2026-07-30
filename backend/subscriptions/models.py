@@ -226,6 +226,30 @@ class PaymentMethod(models.TextChoices):
     UPI = "UPI", "UPI"
     BANK = "BANK", "Bank"
     CARD = "CARD", "Card"
+    # Instrument-level detail for the single Bank/UPI holding account. Every
+    # non-cash instrument settles into the same bank account; only the process
+    # differs. CARD is retained only for historical records (not offered in UI).
+    TRANSFER = "TRANSFER", "Bank Transfer"
+    CHEQUE = "CHEQUE", "Cheque"
+    DEPOSIT = "DEPOSIT", "Bank Deposit"
+
+
+# Instruments offered in the UI for a solopreneur: cash + one bank/UPI account
+# reached through several processes. CARD and gateway are intentionally excluded.
+SELECTABLE_PAYMENT_METHODS = ["CASH", "UPI", "TRANSFER", "CHEQUE", "DEPOSIT"]
+
+# Non-cash instruments all settle into the single Bank/UPI holding account.
+NON_CASH_PAYMENT_METHODS = {"UPI", "BANK", "CARD", "TRANSFER", "CHEQUE", "DEPOSIT"}
+
+
+def settlement_channel_for_method(method: str | None) -> str:
+    """Collapse any payment instrument to its settlement channel: CASH or BANK.
+
+    All non-cash instruments (UPI/transfer/cheque/deposit) live in one Bank/UPI
+    holding account, so reporting and account resolution treat them as BANK.
+    """
+    normalized = (method or "CASH").strip().upper()
+    return "CASH" if normalized == "CASH" else "BANK"
 
 
 class KycStatus(models.TextChoices):
@@ -4320,6 +4344,7 @@ class AuditLog(models.Model):
             "Production Material Movement Posted",
         )
         PRODUCTION_OUTPUT_POSTED = "PRODUCTION_OUTPUT_POSTED", "Production Output Posted"
+        SOLOPRENEUR_DAILY_CLOSE = "SOLOPRENEUR_DAILY_CLOSE", "Solopreneur Daily Close"
 
         PASSWORD_RESET_REQUESTED = "PASSWORD_RESET_REQUESTED", "Password Reset Requested"
         PASSWORD_RESET_VERIFIED = "PASSWORD_RESET_VERIFIED", "Password Reset Verified"
@@ -5574,6 +5599,10 @@ class ProductRelationship(models.Model):
     related_product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="parent_products")
     relationship_type = models.CharField(max_length=20, choices=ProductRelationshipType.choices)
     quantity = models.DecimalField(max_digits=8, decimal_places=2, default=1)
+    is_price_included_in_parent = models.BooleanField(
+        default=True,
+        help_text="If true, the cost is included in the parent's base price. If false, it acts as an extra add-on cost."
+    )
     notes = models.TextField(blank=True, default="")
     created_at = models.DateTimeField(db_index=True, default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True, db_index=True)

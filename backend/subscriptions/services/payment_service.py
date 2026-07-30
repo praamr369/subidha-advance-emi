@@ -313,36 +313,37 @@ def _reconcile_after_payment(subscription: Subscription, emi: Emi):
 
 
 def _fallback_finance_account_for_method(method: str):
-    normalized = (method or "CASH").strip().upper()
-    kind = FinanceAccountKind.CASH
-    if normalized in {"BANK", "CARD"}:
-        kind = FinanceAccountKind.BANK
-    elif normalized == "UPI":
-        kind = FinanceAccountKind.UPI
-    candidates = list(
-        FinanceAccount.objects.select_related("chart_account")
-        .filter(kind=kind, is_active=True)
-        .order_by("id")[:2]
-    )
-    if candidates:
-        return candidates[0]
-    if normalized == "UPI":
-        # Fresh setup intentionally combines bank and UPI into one physical
-        # settlement account. Resolve it through its UPI purpose mapping when
-        # no separate legacy UPI-kind account exists.
+    from subscriptions.models import settlement_channel_for_method
+
+    channel = settlement_channel_for_method(method)
+    if channel == "CASH":
         return (
             FinanceAccount.objects.select_related("chart_account")
-            .filter(
-                kind=FinanceAccountKind.BANK,
-                is_active=True,
-                is_real_settlement_account=True,
-                coa_mappings__purpose=FinanceAccountMappingPurpose.UPI_COLLECTION,
-                coa_mappings__is_active=True,
-            )
+            .filter(kind=FinanceAccountKind.CASH, is_active=True)
             .order_by("id")
             .first()
         )
-    return None
+    # Every non-cash instrument (UPI/transfer/cheque/deposit) settles into the
+    # single Bank/UPI holding account. Prefer a BANK-kind real settlement account;
+    # fall back to a legacy UPI-kind account only if no bank account exists.
+    bank_account = (
+        FinanceAccount.objects.select_related("chart_account")
+        .filter(kind=FinanceAccountKind.BANK, is_active=True, is_real_settlement_account=True)
+        .order_by("id")
+        .first()
+        or FinanceAccount.objects.select_related("chart_account")
+        .filter(kind=FinanceAccountKind.BANK, is_active=True)
+        .order_by("id")
+        .first()
+    )
+    if bank_account is not None:
+        return bank_account
+    return (
+        FinanceAccount.objects.select_related("chart_account")
+        .filter(kind=FinanceAccountKind.UPI, is_active=True)
+        .order_by("id")
+        .first()
+    )
 
 
 def _emi_outstanding_amount(emi: Emi) -> Decimal:

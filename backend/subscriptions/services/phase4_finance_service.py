@@ -167,6 +167,8 @@ def build_admin_finance_dashboard(*, flt: FinanceFilter) -> dict:
     emi_payments = base_payments.filter(subscription__plan_type=PlanType.EMI)
     rent_lease_demands = RentLeaseBillingDemand.objects.filter(
         subscription__plan_type__in=[PlanType.RENT, PlanType.LEASE]
+    ).exclude(
+        subscription__status__in=["CLOSED", "CANCELLED", "RETURNED", "COMPLETED", "DEFAULTED"]
     )
     if flt.plan_type:
         rent_lease_demands = rent_lease_demands.filter(subscription__plan_type=flt.plan_type)
@@ -402,7 +404,8 @@ def customer_finance_summary(*, customer) -> dict:
     rent_lease_demands = RentLeaseBillingDemand.objects.filter(subscription__customer=customer)
     
     legacy_outstandings = customer.opening_outstandings.filter(is_settled=False)
-    legacy_pending = _money(legacy_outstandings.aggregate(total=Sum("outstanding_amount"))["total"] or Decimal("0"))
+    legacy_pending_val = (legacy_outstandings.aggregate(total=Sum("outstanding_amount"))["total"] or Decimal("0"))
+    legacy_pending_str = _money(legacy_pending_val)
 
     deposit_rows = []
     for sub in rent_lease_subscriptions.select_related("rent_profile", "lease_profile"):
@@ -434,11 +437,11 @@ def customer_finance_summary(*, customer) -> dict:
             "total_invoices": invoices.count(),
             "total_receipts": receipts.count(),
             "total_paid": _money(payments.aggregate(total=Sum("amount"))["total"]),
-            "total_pending": _money((emis.filter(status=EmiStatus.PENDING).aggregate(total=Sum("amount"))["total"] or Decimal("0")) + legacy_pending),
+            "total_pending": _money((emis.filter(status=EmiStatus.PENDING).aggregate(total=Sum("amount"))["total"] or Decimal("0")) + legacy_pending_val),
             "total_overdue": _money(
-                (emis.filter(status=EmiStatus.PENDING, due_date__lt=timezone.localdate()).aggregate(total=Sum("amount"))["total"] or Decimal("0")) + legacy_pending
+                (emis.filter(status=EmiStatus.PENDING, due_date__lt=timezone.localdate()).aggregate(total=Sum("amount"))["total"] or Decimal("0")) + legacy_pending_val
             ),
-            "legacy_outstanding": legacy_pending,
+            "legacy_outstanding": legacy_pending_str,
             "active_contracts": subscriptions.filter(status__in=["ACTIVE", "APPROVED"]).count(),
             "rent_lease_pending_invoices": rent_lease_demands.filter(
                 demand_type__in=[RentLeaseDemandType.RENT_MONTHLY, RentLeaseDemandType.LEASE_MONTHLY],

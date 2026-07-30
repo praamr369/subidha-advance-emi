@@ -55,8 +55,8 @@ export function SubscriptionDocumentUploadPanel({
       } else {
         router.refresh();
       }
-    } catch (err: any) {
-      setError(err.message || "An error occurred during upload.");
+    } catch (err: unknown) {
+      setError((err as { message?: string })?.message || "An error occurred during upload.");
     } finally {
       setLoading(false);
     }

@@ -45,9 +45,11 @@ type CustomerStatus = "ACTIVE" | "INACTIVE" | "UNKNOWN";
 type KycStatus =
   | "NOT_PROVIDED"
   | "PENDING"
+  | "SUBMITTED"
   | "APPROVED"
   | "VERIFIED"
   | "REJECTED"
+  | "EXCEPTION_APPROVED"
   | "UNKNOWN";
 
 type CustomerRow = {
@@ -70,6 +72,33 @@ type CustomerRow = {
   active_subscription_due?: string;
   active_direct_sale_outstanding?: string;
   active_invoice_outstanding?: string;
+};
+
+type CustomerOperationalSummary = {
+  total_customers: number;
+  active_users: number;
+  kyc: {
+    approved_count: number;
+    not_approved_count: number;
+    pending_count: number;
+    rejected_count: number;
+  };
+  contracts: {
+    total_active: number;
+    emi: number;
+    rent: number;
+    lease: number;
+  };
+  outstandings: {
+    total_due: string;
+    emi_due: string;
+    direct_sales_due: string;
+    invoices_due: string;
+  };
+  operations: {
+    open_tickets: number;
+    active_deliveries: number;
+  };
 };
 
 
@@ -216,6 +245,7 @@ export default function AdminCustomersPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [summary, setSummary] = useState<CustomerOperationalSummary | null>(null);
 
   const [queryInput, setQueryInput] = useState(initialQuery);
   const [kycInput, setKycInput] = useState<"" | KycStatus>(initialKyc);
@@ -252,11 +282,23 @@ export default function AdminCustomersPage() {
         params.set("page", String(page));
         params.set("page_size", String(CUSTOMERS_PAGE_SIZE));
 
-        const payload = await apiFetch<unknown>(`/admin/customers/?${params.toString()}`);
-        const normalized = toPaginated<Record<string, unknown>>(payload);
-        setRows((normalized.results ?? []).map(normalizeCustomerRow));
-        setCount(normalized.count ?? 0);
-        setError(null);
+        const [payloadResult, summaryResult] = await Promise.allSettled([
+          apiFetch<unknown>(`/admin/customers/?${params.toString()}`),
+          apiFetch<CustomerOperationalSummary>("/admin/customers/operational-summary/"),
+        ]);
+
+        if (payloadResult.status === "fulfilled") {
+          const normalized = toPaginated<Record<string, unknown>>(payloadResult.value);
+          setRows((normalized.results ?? []).map(normalizeCustomerRow));
+          setCount(normalized.count ?? 0);
+          setError(null);
+        } else {
+          throw payloadResult.reason;
+        }
+
+        if (summaryResult.status === "fulfilled" && summaryResult.value) {
+          setSummary(summaryResult.value);
+        }
       } catch (err) {
         setError(toErrorMessage(err));
         if (mode === "initial") {
@@ -504,47 +546,80 @@ export default function AdminCustomersPage() {
         key: "kyc_status",
         title: "Compliance",
         sortable: true,
-        render: (row) => (
-          <div className="flex flex-wrap gap-2">
-            <StatusBadge status={row.kyc_status} />
-            <StatusBadge status={row.status} />
-          </div>
-        ),
+        render: (row) => {
+          const isKycApproved = row.kyc_status === "VERIFIED" || row.kyc_status === "APPROVED" || row.kyc_status === "EXCEPTION_APPROVED";
+          return (
+            <div className="space-y-1.5">
+              <div className="flex flex-wrap gap-1.5 items-center">
+                <StatusBadge status={row.kyc_status} />
+                <StatusBadge status={row.status} />
+              </div>
+              {!isKycApproved ? (
+                <div>
+                  <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-700 border border-amber-500/30">
+                    ⚠️ KYC Not Approved
+                  </span>
+                </div>
+              ) : (
+                <div>
+                  <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 border border-emerald-500/20">
+                    ✅ KYC Verified
+                  </span>
+                </div>
+              )}
+            </div>
+          );
+        },
       },
       {
         key: "active_subscription_count",
-        title: "Contract Context",
+        title: "Contract & Money Posture",
         align: "right",
         sortable: true,
-        render: (row) => (
-          <div className="space-y-1 text-right">
-            <div className="font-semibold text-foreground">
-              {row.active_subscription_count ?? 0} active
-            </div>
-            <div className="text-xs text-muted-foreground">
-              Active contract {formatRupee(row.active_contract_value)}
-            </div>
-            <div className="text-xs text-muted-foreground">
-              Active due {formatRupee(row.active_subscription_due)}
-            </div>
-            <div className="text-xs text-muted-foreground">
-              Direct due {formatRupee(row.active_direct_sale_outstanding)} · Invoice due {formatRupee(row.active_invoice_outstanding)}
-            </div>
-            {(row.cancelled_subscription_count || 0) > 0 ? (
-              <div className="text-xs text-amber-700">
-                {row.cancelled_subscription_count} cancelled contract(s) in history
+        render: (row) => {
+          const subDue = Number(row.active_subscription_due || 0);
+          const directDue = Number(row.active_direct_sale_outstanding || 0);
+          const invDue = Number(row.active_invoice_outstanding || 0);
+          const totalDue = subDue + directDue + invDue;
+          return (
+            <div className="space-y-1.5 text-right">
+              <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                <span className="inline-flex items-center rounded-md bg-primary/15 px-2 py-0.5 text-xs font-semibold text-primary border border-primary/25">
+                  📄 {row.active_subscription_count ?? 0} Active Contract(s)
+                </span>
+                {totalDue > 0 ? (
+                  <span className="inline-flex items-center rounded-md bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-700 border border-amber-500/30">
+                    🔴 Due: {formatRupee(totalDue)}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center rounded-md bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-700 border border-emerald-500/20">
+                    🟢 Clear Due
+                  </span>
+                )}
               </div>
-            ) : null}
-            {(row.historical_subscription_count || 0) > 0 && (row.cancelled_subscription_count || 0) === 0 ? (
-              <div className="text-xs text-muted-foreground">
-                {row.historical_subscription_count} historical contract(s)
+              <div className="text-xs font-medium text-foreground">
+                Total Value: <span className="text-primary">{formatRupee(row.active_contract_value)}</span>
               </div>
-            ) : null}
-            <div className="text-xs text-muted-foreground">
-              Historical contract (deduped) {formatRupee(row.historical_contract_value ?? "0.00")}
+              <div className="text-[11px] text-muted-foreground bg-muted/60 rounded px-1.5 py-1 inline-block border border-border/60">
+                <div className="flex items-center justify-end gap-2">
+                  <span>EMI Due: <strong className="text-foreground">{formatRupee(subDue)}</strong></span>
+                  <span>·</span>
+                  <span>Direct: <strong className="text-foreground">{formatRupee(directDue)}</strong></span>
+                </div>
+              </div>
+              {(row.cancelled_subscription_count || 0) > 0 ? (
+                <div className="text-[11px] text-rose-600 font-semibold">
+                  ⚠️ {row.cancelled_subscription_count} cancelled contract(s) in history
+                </div>
+              ) : null}
+              {(row.historical_subscription_count || 0) > 0 && (row.cancelled_subscription_count || 0) === 0 ? (
+                <div className="text-[11px] text-muted-foreground">
+                  📜 {row.historical_subscription_count} completed/historical contract(s)
+                </div>
+              ) : null}
             </div>
-          </div>
-        ),
+          );
+        },
       },
       {
         key: "created_at",
@@ -577,19 +652,113 @@ export default function AdminCustomersPage() {
       ]}
       statusBadge={{ label: "Customer Profile Source", tone: "info" }}
       stats={[
-        { label: "Total Customers", value: loading ? "—" : count, tone: "info" },
-        { label: "Active (page)", value: loading ? "—" : activeCustomers, tone: "success" },
-        { label: "KYC Pending (page)", value: loading ? "—" : pendingKyc, tone: !loading && pendingKyc > 0 ? "warning" : "success" },
-        { label: "Active Subs (page)", value: loading ? "—" : activeSubscriptions, tone: "default" },
+        {
+          label: "Total Customers",
+          value: loading ? "—" : (summary?.total_customers ?? count),
+          tone: "info",
+          hint: summary ? `${summary.active_users} active user account(s)` : undefined,
+        },
+        {
+          label: "KYC Action Required",
+          value: loading ? "—" : (summary ? summary.kyc.not_approved_count : pendingKyc),
+          tone: !loading && (summary ? summary.kyc.not_approved_count > 0 : pendingKyc > 0) ? "warning" : "success",
+          hint: summary ? `${summary.kyc.pending_count} pending · ${summary.kyc.rejected_count} rejected` : "Not verified/approved",
+        },
+        {
+          label: "Active Contracts",
+          value: loading ? "—" : (summary ? summary.contracts.total_active : activeSubscriptions),
+          tone: "default",
+          hint: summary ? `EMI: ${summary.contracts.emi} · Rent: ${summary.contracts.rent} · Lease: ${summary.contracts.lease}` : undefined,
+        },
+        {
+          label: "Outstandings (All Modules)",
+          value: loading ? "—" : (summary ? formatRupee(summary.outstandings.total_due) : "—"),
+          tone: !loading && summary && Number(summary.outstandings.total_due) > 0 ? "warning" : "success",
+          hint: summary ? `EMI: ${formatRupee(summary.outstandings.emi_due)} · Direct: ${formatRupee(summary.outstandings.direct_sales_due)}` : undefined,
+        },
       ]}
     >
       <RegistryPageShell
         summary={
           !loading && !error ? (
-            <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground sm:text-sm">
-              <span className="font-semibold text-foreground">Register</span>
-              {": "}
-              {count} total · page {page} of {Math.max(Math.ceil(count / CUSTOMERS_PAGE_SIZE), 1)} · {rows.length} on this page · {activeCustomers} active · {pendingKyc} pending KYC
+            <div className="space-y-3">
+              <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground sm:text-sm flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <span className="font-semibold text-foreground">Register View</span>
+                  {": "}
+                  {count} matching customer(s) · page {page} of {Math.max(Math.ceil(count / CUSTOMERS_PAGE_SIZE), 1)} · {rows.length} row(s) on this page
+                </div>
+                {summary && (
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs font-medium">
+                    <span className="inline-flex items-center gap-1 rounded bg-info/10 px-2 py-0.5 text-info border border-info/20">
+                      👥 {summary.total_customers} Global Customers
+                    </span>
+                    {summary.kyc.not_approved_count > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setKycFilter("PENDING");
+                          setKycInput("PENDING");
+                          setPage(1);
+                        }}
+                        className="inline-flex items-center gap-1 rounded bg-amber-500/15 px-2 py-0.5 text-amber-700 hover:bg-amber-500/25 border border-amber-500/30 transition-colors cursor-pointer font-semibold"
+                      >
+                        ⚠️ {summary.kyc.not_approved_count} KYC Unapproved (Click to filter)
+                      </button>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 px-2 py-0.5 text-emerald-700 border border-emerald-500/20">
+                        ✅ All Customers KYC Verified
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+              {summary && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                  <Link
+                    href="/admin/subscriptions"
+                    className="flex items-center justify-between p-2.5 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors group"
+                  >
+                    <div>
+                      <div className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                        📦 Active Contracts ({summary.contracts.total_active})
+                      </div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">
+                        EMI: {summary.contracts.emi} · Rent: {summary.contracts.rent} · Lease: {summary.contracts.lease}
+                      </div>
+                    </div>
+                    <span className="text-muted-foreground group-hover:translate-x-0.5 transition-transform">→</span>
+                  </Link>
+                  <Link
+                    href={ROUTES.admin.outstandings}
+                    className="flex items-center justify-between p-2.5 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors group"
+                  >
+                    <div>
+                      <div className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                        💰 Money Posture Due ({formatRupee(summary.outstandings.total_due)})
+                      </div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">
+                        EMI: {formatRupee(summary.outstandings.emi_due)} · Direct Sales: {formatRupee(summary.outstandings.direct_sales_due)}
+                      </div>
+                    </div>
+                    <span className="text-muted-foreground group-hover:translate-x-0.5 transition-transform">→</span>
+                  </Link>
+                  <Link
+                    href="/admin/requests/support"
+                    className="flex items-center justify-between p-2.5 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors group"
+                  >
+                    <div>
+                      <div className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                        🎧 Operational Queue & Deliveries
+                      </div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">
+                        {summary.operations.open_tickets} open ticket(s) · {summary.operations.active_deliveries} active dispatch(es)
+                      </div>
+                    </div>
+                    <span className="text-muted-foreground group-hover:translate-x-0.5 transition-transform">→</span>
+                  </Link>
+                </div>
+              )}
             </div>
           ) : null
         }

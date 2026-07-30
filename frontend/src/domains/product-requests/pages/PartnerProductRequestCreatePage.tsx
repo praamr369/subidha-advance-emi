@@ -85,10 +85,11 @@ function ProductPicker({
     return subs.sort();
   }, [products, category]);
 
-  // Reset subcategory when category changes
-  useEffect(() => {
+  const [prevCategory, setPrevCategory] = useState(category);
+  if (category !== prevCategory) {
+    setPrevCategory(category);
     setSubcategory("");
-  }, [category]);
+  }
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -532,7 +533,7 @@ export default function PartnerProductRequestCreatePage({
       } catch { /* silent */ }
     }
     void refreshBatch();
-  }, [batchId]);
+  }, [batchId, requestType]);
 
   const selectedProduct = useMemo(
     () => options?.products.find((p) => String(p.id) === productId) ?? null,

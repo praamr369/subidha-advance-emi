@@ -323,6 +323,7 @@ export type ProductRelationship = {
   related_product_item_type: string;
   relationship_type: ProductRelationshipType;
   quantity: string | number;
+  is_price_included_in_parent: boolean;
   notes: string;
   created_at: string;
   updated_at: string;
@@ -341,10 +342,10 @@ export async function getProductRelationships(productId: number | string): Promi
   return result.results || [];
 }
 
-export async function addProductRelationship(productId: number | string, relatedProductId: number, relationshipType: ProductRelationshipType, quantity: number = 1, notes: string = ""): Promise<ProductRelationship> {
+export async function addProductRelationship(productId: number | string, relatedProductId: number, relationshipType: ProductRelationshipType, quantity: number = 1, notes: string = "", isPriceIncluded: boolean = true): Promise<ProductRelationship> {
   return request<ProductRelationship>(`/admin/products/${productId}/add-related-product/`, {
     method: "POST",
-    body: JSON.stringify({ related_product: relatedProductId, relationship_type: relationshipType, quantity, notes }),
+    body: JSON.stringify({ related_product: relatedProductId, relationship_type: relationshipType, quantity, notes, is_price_included_in_parent: isPriceIncluded }),
     retryCount: 0,
   });
 }
@@ -359,4 +360,12 @@ export async function searchProductsForAttachment(q: string = "", excludeId?: nu
   if (excludeId) params.set("exclude_id", String(excludeId));
   const result = await request<{ results: ProductSearchResult[] }>(`/admin/products/search-for-attachment/?${params}`);
   return result.results || [];
+}
+
+export async function cloneProductRelationships(sourceId: number | string, targetIds: number[]): Promise<{ cloned_records_count: number }> {
+  return request<{ cloned_records_count: number }>(`/admin/products/${sourceId}/clone-relationships/`, {
+    method: "POST",
+    body: JSON.stringify({ target_ids: targetIds }),
+    retryCount: 0,
+  });
 }

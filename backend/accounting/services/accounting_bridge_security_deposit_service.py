@@ -320,7 +320,9 @@ def get_bridge_candidate(candidate_id: str, *, for_update: bool = False) -> dict
     source_kind, source_pk, event_key = base._parse_candidate_id(candidate_id)
     if source_kind != "rentleasedeposittransaction":
         return previous.get_bridge_candidate(candidate_id, for_update=for_update)
-    qs = _qs().select_for_update() if for_update else _qs()
+    # Lock only the base row: _qs() LEFT-JOINs nullable relations, and Postgres
+    # rejects FOR UPDATE on the nullable side of an outer join.
+    qs = _qs().select_for_update(of=("self",)) if for_update else _qs()
     candidate = candidate_for(qs.get(pk=source_pk))
     if candidate["event_key"] != event_key:
         raise ValueError("RentLeaseDepositTransaction candidate event no longer matches current source state.")
@@ -417,7 +419,7 @@ def post_bridge_candidate(*, candidate_id: str, idempotency_key: str, confirmed:
     preview = preview_bridge_candidate(candidate_id)
     if not preview["can_post"]:
         raise ValueError("; ".join(preview["blockers"]) or "Candidate is not postable.")
-    row = _qs().select_for_update().get(pk=candidate["source_id"])
+    row = _qs().select_for_update(of=("self",)).get(pk=candidate["source_id"])
     source_before = _source_snapshot(row)
     linked_before = _linked_snapshot(row)
     lines, _warnings, finance_account = _lines_for_candidate(candidate)
@@ -549,3 +551,45 @@ def summarize_candidate_statuses(rows: list[dict]) -> dict[str, int]:
         }
     )
     return summary
+
+
+def auto_post_deposit_transaction(transaction_row, *, actor=None) -> dict:
+    """Best-effort immediate posting of a deposit receipt/refund's bridge entry.
+
+    Called right after a DEPOSIT_RECEIPT or DEPOSIT_REFUND source transaction is
+    created, so the ledger reflects the money movement without a separate manual
+    bridge step. Only posts postable receipt/refund candidates; any classification
+    or postability problem is swallowed so it can never break the collection —
+    the entry simply stays as a normal (postable) bridge candidate.
+    """
+    try:
+        candidate = candidate_for(transaction_row)
+    except Exception:
+        return {"posted": False, "reason": "candidate_unavailable"}
+    event_key = candidate.get("event_key")
+    if event_key not in EVENT_KEYS:
+        return {"posted": False, "reason": "not_a_postable_event"}
+    # Respect the approval gate: only auto-post when this event is explicitly
+    # approved for bridge posting. Otherwise it stays a deferred candidate,
+    # exactly like the manual flow (deferred-by-default governance).
+    from accounting.models import BridgePostingApproval
+
+    if not BridgePostingApproval.objects.filter(event_key=event_key, is_approved=True).exists():
+        return {"posted": False, "reason": "posting_not_approved"}
+    if not candidate.get("postable"):
+        return {"posted": False, "reason": "not_postable", "blocker": candidate.get("blocker")}
+    candidate_id = candidate.get("candidate_id")
+    key = candidate.get("idempotency_key")
+    if not candidate_id or not key:
+        return {"posted": False, "reason": "missing_candidate_key"}
+    try:
+        with transaction.atomic():
+            return post_bridge_candidate(
+                candidate_id=candidate_id,
+                idempotency_key=key,
+                confirmed=True,
+                posting_note="Auto-posted on deposit source creation.",
+                actor=actor,
+            )
+    except Exception as exc:  # never break the collection/refund flow
+        return {"posted": False, "reason": "post_failed", "error": str(exc)[:200]}

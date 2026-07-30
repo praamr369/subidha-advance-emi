@@ -636,8 +636,25 @@ class AdminCustomerOpeningOutstandingView(APIView):
             qs = qs.filter(is_settled=True)
         elif settled == "false":
             qs = qs.filter(is_settled=False)
-        rows = list(qs.values("id", "customer_name", "phone", "outstanding_amount", "entry_date", "notes", "is_settled", "settled_at", "created_at"))
-        total = sum((r["outstanding_amount"] for r in rows if not r["is_settled"]), Decimal("0.00"))
+        rows = []
+        total = Decimal("0.00")
+        for obj in qs:
+            remaining = obj.balance_remaining
+            if not obj.is_settled:
+                total += remaining
+            rows.append({
+                "id": obj.id,
+                "customer_name": obj.customer_name,
+                "phone": obj.phone,
+                "outstanding_amount": str(obj.outstanding_amount),
+                "collected_amount": str(obj.collected_amount or Decimal("0.00")),
+                "balance_remaining": str(remaining),
+                "entry_date": obj.entry_date,
+                "notes": obj.notes,
+                "is_settled": obj.is_settled,
+                "settled_at": obj.settled_at,
+                "created_at": obj.created_at,
+            })
         return Response({"count": len(rows), "total_outstanding": str(total), "results": rows})
 
     def post(self, request):

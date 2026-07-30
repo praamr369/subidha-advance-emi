@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { buildAdminJournalEntryRoute } from "@/lib/route-builders";
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import BookRegisterPage from "@/components/accounting/BookRegisterPage";
 import { ACCOUNTING_BOOK_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
@@ -14,7 +16,15 @@ const columns: EnterpriseColumnDef<PurchaseBookRow>[] = [
   { key: "vendor_name", header: "Vendor" },
   { key: "tax_mode", header: "Tax Mode" },
   { key: "grand_total", header: "Grand Total", render: (row) => accountingMoney(row.grand_total) },
-  { key: "journal_entry_no", header: "Journal" },
+  { 
+    key: "journal_entry_no", 
+    header: "Journal",
+    render: (row) => (
+      <Link href={buildAdminJournalEntryRoute(row.journal_entry_id)} className="font-medium text-emerald-700 hover:underline">
+        {row.journal_entry_no}
+      </Link>
+    ),
+  },
 ];
 
 export default function AccountingPurchaseBookPage() {

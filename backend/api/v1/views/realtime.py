@@ -85,7 +85,7 @@ def _stream_body(user_id: int, is_admin: bool):
             yield _sse_event("notifications", payload)
 
         if is_admin:
-            badges = build_admin_navigation_badges()
+            badges = build_admin_navigation_badges(user=user_id)
             serialized_badges = json.dumps(badges, sort_keys=True)
             if serialized_badges != last_badges:
                 last_badges = serialized_badges
