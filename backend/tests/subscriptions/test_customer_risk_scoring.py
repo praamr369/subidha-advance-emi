@@ -42,14 +42,14 @@ from subscriptions.models import (
     RentLeaseDemandType,
     SubscriptionStatus,
 )
-from subscriptions.services.customer_risk_service import (
+from customers.services.customer_risk_service import (
     assert_customer_risk_allows_contract,
     calculate_customer_risk,
     evaluate_contract_risk,
     get_customer_risk_profile,
     recalculate_customer_risk_profile,
 )
-from subscriptions.services.contract_activation_readiness_service import (
+from contracts.services.contract_activation_readiness_service import (
     evaluate_contract_activation_readiness,
 )
 from tests.helpers import (
@@ -244,7 +244,7 @@ class TestEnforcement(TestCase):
         customer = _make_customer(kyc_status=KycStatus.REJECTED)
 
         def _mock_policy(key, default=None):
-            from subscriptions.services.customer_risk_service import (
+            from customers.services.customer_risk_service import (
                 POLICY_ENFORCEMENT_ENABLED, POLICY_BLOCKED_THRESHOLD,
                 POLICY_MEDIUM_THRESHOLD, POLICY_HIGH_THRESHOLD,
                 POLICY_HIGH_REQUIRES_APPROVAL, POLICY_BLOCKED_BLOCKS_RENT_LEASE,
@@ -274,7 +274,7 @@ class TestEnforcement(TestCase):
         customer = _make_customer(kyc_status=KycStatus.REJECTED)
 
         def _mock_policy(key, default=None):
-            from subscriptions.services.customer_risk_service import (
+            from customers.services.customer_risk_service import (
                 POLICY_ENFORCEMENT_ENABLED, POLICY_BLOCKED_THRESHOLD,
                 POLICY_MEDIUM_THRESHOLD, POLICY_HIGH_THRESHOLD,
                 POLICY_HIGH_REQUIRES_APPROVAL, POLICY_BLOCKED_BLOCKS_RENT_LEASE,
@@ -304,7 +304,7 @@ class TestEnforcement(TestCase):
         customer = _make_customer(kyc_status=KycStatus.REJECTED)
 
         def _mock_policy(key, default=None):
-            from subscriptions.services.customer_risk_service import (
+            from customers.services.customer_risk_service import (
                 POLICY_ENFORCEMENT_ENABLED, POLICY_BLOCKED_THRESHOLD,
                 POLICY_MEDIUM_THRESHOLD, POLICY_HIGH_THRESHOLD,
                 POLICY_HIGH_REQUIRES_APPROVAL, POLICY_BLOCKED_BLOCKS_RENT_LEASE,
@@ -369,7 +369,7 @@ class TestRiskProfilePersistence(TestCase):
 class TestReadinessRiskIntegration(TestCase):
 
     def test_readiness_payload_has_risk_key(self):
-        from subscriptions.services.rent_lease_contract_service import create_rent_contract
+        from contracts.services.rent_lease_contract_service import create_rent_contract
         admin = create_admin_user(username=f"ra-{_uid()}", phone=f"9300{next(_seq):06d}"[:15])
         customer = _make_customer(kyc_status=KycStatus.VERIFIED)
         product = _make_rent_product()
@@ -388,7 +388,7 @@ class TestReadinessRiskIntegration(TestCase):
             self.assertIn(key, risk)
 
     def test_readiness_risk_enforcement_disabled_no_risk_blockers(self):
-        from subscriptions.services.rent_lease_contract_service import create_rent_contract
+        from contracts.services.rent_lease_contract_service import create_rent_contract
         admin = create_admin_user(username=f"ra2-{_uid()}", phone=f"9300{next(_seq):06d}"[:15])
         customer = _make_customer(kyc_status=KycStatus.REJECTED)
         product = _make_rent_product()

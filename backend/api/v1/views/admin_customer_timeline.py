@@ -23,7 +23,7 @@ from rest_framework.views import APIView
 
 from api.v1.permissions import IsAdmin
 from subscriptions.models import Customer
-from subscriptions.services.customer_timeline_service import get_customer_timeline
+from customers.services.customer_timeline_service import get_customer_timeline
 
 
 def _parse_date(value: str | None) -> date | None:

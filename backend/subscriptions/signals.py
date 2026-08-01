@@ -71,7 +71,7 @@ def lucky_draw_cache_refresh(sender, instance, **kwargs):
 # 3️⃣ ONLINE REQUEST → AUTO-SYNC TO CRM PIPELINE
 # =====================================================
 
-@receiver(post_save, sender='subscriptions.OnlineRequest')
+@receiver(post_save, sender='crm.OnlineRequest')
 def sync_online_request_to_pipeline(sender, instance, created, **kwargs):
     """
     Automatically create/update CRMPipeline when OnlineRequest is saved.

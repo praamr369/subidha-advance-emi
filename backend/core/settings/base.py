@@ -429,6 +429,17 @@ INSTALLED_APPS = [
     "brochures",
     "reminders",
     "system_jobs",
+    "customers",
+    "contracts",
+    "payments",
+    "lucky_plan",
+    "deliveries",
+    "commissions",
+    "growth",
+    "business_setup",
+    "finance_control",
+    "audit",
+    "products_core",
     "subscriptions",
     "reconciliation",
     "settlements",
@@ -741,12 +752,27 @@ LOGGING = {
     },
 }
 
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        "LOCATION": "subidha-core-cache",
+# Prefer a shared Redis cache (survives restarts, shared across workers) when a
+# URL is configured; fall back to in-process LocMemCache for local/test only.
+_CACHE_REDIS_URL = (
+    (os.getenv("CACHE_REDIS_URL") or "").strip()
+    or (os.getenv("REDIS_URL") or "").strip()
+)
+if _CACHE_REDIS_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": _CACHE_REDIS_URL,
+            "KEY_PREFIX": "subidha",
+        }
     }
-}
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "subidha-core-cache",
+        }
+    }
 
 # ---------------------------------------------------------------------------
 # Celery (additive background jobs). Core finance DB transactions must not

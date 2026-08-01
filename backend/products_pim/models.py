@@ -116,7 +116,7 @@ class PimProduct(models.Model):
     # subscription, EMI, rent, lease, and direct sale. Nullable so the FK can be
     # added additively and backfilled by matching code == product_code.
     source_product = models.ForeignKey(
-        "subscriptions.Product",
+        "products_core.Product",
         on_delete=models.PROTECT,
         related_name="pim",
         null=True,

@@ -11,7 +11,7 @@ from django.db.models import Q, Sum
 from django.utils import timezone
 
 from accounting.models import FinanceAccount, JournalEntry, Vendor
-from subscriptions.models import Product
+from products_core.models import Product
 
 MONEY_ZERO = Decimal("0.00")
 QUANTITY_ZERO = Decimal("0.000")
@@ -1554,7 +1554,7 @@ class PurchaseNeed(InventoryTimeStampedModel):
         blank=True,
     )
     customer = models.ForeignKey(
-        "subscriptions.Customer",
+        "customers.Customer",
         on_delete=models.PROTECT,
         related_name="inventory_purchase_needs",
         null=True,

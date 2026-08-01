@@ -22,7 +22,7 @@ from subscriptions.models import (
     RentLeaseReturnInspection,
     Subscription,
 )
-from subscriptions.services.phase4_finance_service import (
+from payments.services.phase4_finance_service import (
     FinanceFilter,
     customer_account_statement,
     customer_archive,
@@ -32,7 +32,7 @@ from subscriptions.services.phase4_finance_service import (
     customer_payment_schedule,
     customer_receipt_list,
 )
-from subscriptions.services.document_pdf_service import (
+from contracts.services.document_pdf_service import (
     render_invoice_pdf,
     render_lease_contract_pdf,
     render_receipt_pdf,

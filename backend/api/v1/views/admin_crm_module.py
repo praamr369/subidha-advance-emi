@@ -33,7 +33,7 @@ from crm.models import (
 )
 from subscriptions.models import AuditLog, Customer, Emi, KycStatus, Payment, PublicLead, Subscription
 from subscriptions.services.audit_service import log_audit
-from subscriptions.services.customer_service import find_or_create_customer
+from customers.services.customer_service import find_or_create_customer
 from crm.services.party_service import sync_party_for_crm_lead, sync_party_for_customer
 
 # Gap 2: valid forward transitions per stage

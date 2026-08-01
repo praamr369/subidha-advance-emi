@@ -18,7 +18,7 @@ from api.v1.serializers.customers import (
     CustomerSearchSerializer,
 )
 from subscriptions.models import Customer, CustomerSource
-from subscriptions.services.customer_service import (
+from customers.services.customer_service import (
     find_customer_by_phone,
     find_or_create_customer,
     get_customer_operational_profile,

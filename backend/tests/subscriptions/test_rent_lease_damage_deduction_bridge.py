@@ -22,16 +22,16 @@ from subscriptions.models import (
     RentLeaseDepositTransaction,
     RentLeaseDepositTransactionType,
 )
-from subscriptions.services.rent_lease_accounting_bridge_service import (
+from contracts.services.rent_lease_accounting_bridge_service import (
     PURPOSE_SECURITY_DEPOSIT_DAMAGE_DEDUCTION,
     post_security_deposit_damage_deduction,
 )
-from subscriptions.services.rent_lease_billing_service import (
+from contracts.services.rent_lease_billing_service import (
     collect_security_deposit,
     record_damage_deduction,
 )
-from subscriptions.services.rent_lease_contract_service import create_rent_contract
-from subscriptions.services.rent_lease_finance_sync_service import (
+from contracts.services.rent_lease_contract_service import create_rent_contract
+from contracts.services.rent_lease_finance_sync_service import (
     sync_damage_deduction_income,
 )
 from tests.accounting.helpers import (
@@ -50,7 +50,7 @@ def _rent_product(code="RENT-DMG-1"):
 
 
 def _enable_bridge():
-    from subscriptions.services.rent_lease_posting_bridge_config_service import (
+    from contracts.services.rent_lease_posting_bridge_config_service import (
         get_rent_lease_posting_bridge_config,
     )
 
@@ -64,7 +64,7 @@ def _disable_bridge():
     # The bridge is auto-ready when the mapping is valid; the only way to keep it
     # deferred is an explicit disable (disabled_at set + is_enabled False).
     from django.utils import timezone as _tz
-    from subscriptions.services.rent_lease_posting_bridge_config_service import (
+    from contracts.services.rent_lease_posting_bridge_config_service import (
         get_rent_lease_posting_bridge_config,
     )
 

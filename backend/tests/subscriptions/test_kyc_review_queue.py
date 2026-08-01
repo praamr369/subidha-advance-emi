@@ -27,7 +27,7 @@ from subscriptions.models_kyc_workflow import (
     KycReviewAction,
     KycReviewActionType,
 )
-from subscriptions.services.kyc_workflow_service import (
+from customers.services.kyc_workflow_service import (
     admin_upload_customer_kyc,
     admin_upload_partner_kyc,
     admin_upload_staff_kyc,
@@ -131,7 +131,7 @@ class KycReviewQueueServiceTests(TestCase):
         self.assertEqual(data["results"][0]["owner_type"], KycOwnerType.CUSTOMER)
 
     def test_approved_documents_excluded_by_default(self):
-        from subscriptions.services.kyc_workflow_service import queue_approve_kyc_document
+        from customers.services.kyc_workflow_service import queue_approve_kyc_document
 
         partner_doc = self.partner.partner_kyc_documents.first()
         queue_approve_kyc_document(

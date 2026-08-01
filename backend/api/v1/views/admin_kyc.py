@@ -19,7 +19,7 @@ from rest_framework.views import APIView
 from rest_framework.exceptions import ValidationError
 
 from api.v1.permissions import IsAdmin
-from subscriptions.services.kyc_workflow_service import (
+from customers.services.kyc_workflow_service import (
     admin_upload_customer_kyc,
     admin_request_customer_kyc_resubmission,
     admin_upload_partner_kyc,

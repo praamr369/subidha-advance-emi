@@ -38,9 +38,9 @@ from billing.services.direct_sale_delivery_actions import (
     update_direct_sale_delivery_metadata,
 )
 from subscriptions.models import DeliveryStatus, Subscription, SubscriptionDelivery
-from subscriptions.services.delivery_service import get_subscription_delivery_prefetch
-from subscriptions.services.document_pdf_service import render_delivery_handover_pdf
-from subscriptions.services.delivery_service import (
+from deliveries.services.delivery_service import get_subscription_delivery_prefetch
+from contracts.services.document_pdf_service import render_delivery_handover_pdf
+from deliveries.services.delivery_service import (
     build_delivery_report_summary,
     cancel_subscription_delivery,
     create_subscription_delivery,
@@ -52,7 +52,7 @@ from subscriptions.services.delivery_service import (
     transition_subscription_delivery_status,
     update_subscription_delivery_metadata,
 )
-from subscriptions.services.operational_cancellation_service import record_delivery_cancellation_audit
+from contracts.services.operational_cancellation_service import record_delivery_cancellation_audit
 
 
 def _apply_delivery_filters(queryset, request):

@@ -36,12 +36,12 @@ from subscriptions.services.business_reset_service import (
     build_business_reset_plan,
     execute_business_reset,
 )
-from subscriptions.services.document_numbering_service import (
+from contracts.services.document_numbering_service import (
     NUMBERING_BY_KEY,
     get_document_numbering_state,
     upsert_document_numbering,
 )
-from subscriptions.services.document_print_settings_service import get_or_create_document_print_settings
+from contracts.services.document_print_settings_service import get_or_create_document_print_settings
 from subscriptions.services.email_smtp_settings_service import (
     get_or_create_email_smtp_settings,
     record_test_result,

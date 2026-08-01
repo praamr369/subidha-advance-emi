@@ -4,7 +4,7 @@ from datetime import date
 from django.test import TestCase
 
 from subscriptions.models import AuditLog
-from subscriptions.services.payment_service import (
+from payments.services.payment_service import (
     record_emi_payment,
     reverse_payment_for_admin,
 )

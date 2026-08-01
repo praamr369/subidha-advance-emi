@@ -37,7 +37,7 @@ from subscriptions.models_growth_offers import (
     PlanTemplate,
     PlanTemplateType,
 )
-from subscriptions.services.growth_offer_service import (
+from crm.services.growth_offer_service import (
     build_offer_package_preview,
     build_plan_template_preview,
     evaluate_offer_package_eligibility,

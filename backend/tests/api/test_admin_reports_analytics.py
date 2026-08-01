@@ -8,7 +8,7 @@ from rest_framework.test import APITestCase
 from accounting.models import DocumentSequence
 from billing.models import BillingDocumentStatus, BillingInvoice, DirectSale, DirectSaleStatus, ReceiptDocument
 from subscriptions.models import PlanType, PublicLead, PublicLeadIntent, Subscription, SubscriptionStatus
-from subscriptions.services.payment_service import record_emi_payment
+from payments.services.payment_service import record_emi_payment
 from tests.helpers import (
     create_admin_user,
     create_batch,

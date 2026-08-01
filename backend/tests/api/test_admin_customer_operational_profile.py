@@ -13,8 +13,8 @@ from billing.services.direct_sale_collection_service import collect_direct_sale_
 from inventory.models import InventoryItem
 from subscriptions.models import PublicLeadIntent
 from subscriptions.models import SubscriptionDocument, SubscriptionDocumentType
-from subscriptions.services.public_lead_service import create_admin_lead
-from subscriptions.services.payment_service import record_emi_payment
+from crm.services.public_lead_service import create_admin_lead
+from payments.services.payment_service import record_emi_payment
 from tests.helpers import (
     create_admin_user,
     create_batch,

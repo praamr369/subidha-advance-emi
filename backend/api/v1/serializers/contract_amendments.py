@@ -9,8 +9,8 @@ from subscriptions.models import (
     Subscription,
 )
 from subscriptions.models_contract_amendment import PHASE1_AMENDMENT_TYPES, PHASE1_STATUSES
-from subscriptions.services.contract_amendment_service import get_workflow_capability, phase3_implementation_metadata
-from subscriptions.services.product_recontract_preview_service import latest_product_recontract_preview_summary
+from contracts.services.contract_amendment_service import get_workflow_capability, phase3_implementation_metadata
+from contracts.services.product_recontract_preview_service import latest_product_recontract_preview_summary
 
 PRODUCT_RECONTRACT_AMENDMENT_TYPES = {"PRODUCT_CHANGE", "PRODUCT_UPGRADE"}
 
@@ -255,21 +255,21 @@ class ContractAmendmentSerializer(serializers.ModelSerializer):
             summary["product_recontract_evidence"] = self.get_latest_product_recontract_preview(obj)
             
         elif category == "LUCKY_ID_BATCH_PREVIEW":
-            from subscriptions.services.lucky_batch_preview_service import preview_lucky_id_batch_amendment
+            from lucky_plan.services.lucky_batch_preview_service import preview_lucky_id_batch_amendment
             try:
                 summary["lucky_batch_preview"] = preview_lucky_id_batch_amendment(obj)
             except Exception as e:
                 summary["lucky_batch_preview"] = {"error": str(e)}
                 
         elif category == "RENT_LEASE_PREVIEW":
-            from subscriptions.services.rent_lease_preview_service import preview_rent_lease_amendment
+            from contracts.services.rent_lease_preview_service import preview_rent_lease_amendment
             try:
                 summary["rent_lease_preview"] = preview_rent_lease_amendment(obj)
             except Exception as e:
                 summary["rent_lease_preview"] = {"error": str(e)}
                 
         elif category == "DEPOSIT_SECURITY_PREVIEW":
-            from subscriptions.services.deposit_security_preview_service import preview_deposit_security_amendment
+            from contracts.services.deposit_security_preview_service import preview_deposit_security_amendment
             try:
                 summary["deposit_security_preview"] = preview_deposit_security_amendment(obj)
             except Exception as e:

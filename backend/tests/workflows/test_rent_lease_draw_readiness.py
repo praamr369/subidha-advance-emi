@@ -15,16 +15,16 @@ from subscriptions.models import (
     RentLeaseDepositTransactionType,
     SubscriptionStatus,
 )
-from subscriptions.services.lucky_draw_service import (
+from lucky_plan.services.lucky_draw_service import (
     create_lucky_draw_commit,
     reveal_and_execute_draw,
 )
-from subscriptions.services.payment_service import record_emi_payment
-from subscriptions.services.rent_lease_billing_service import (
+from payments.services.payment_service import record_emi_payment
+from contracts.services.rent_lease_billing_service import (
     collect_security_deposit,
     generate_monthly_demands_for_subscription,
 )
-from subscriptions.services.rent_lease_contract_service import (
+from contracts.services.rent_lease_contract_service import (
     create_lease_contract,
     create_rent_contract,
 )

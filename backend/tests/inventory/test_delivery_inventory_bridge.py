@@ -6,7 +6,7 @@ from django.test import TestCase
 from inventory.models import InventoryItem, StockLedger, StockLocation, StockMovementType
 from inventory.services.delivery_bridge_service import sync_delivery_inventory_bridge
 from subscriptions.models import DeliveryStatus
-from subscriptions.services.delivery_service import (
+from deliveries.services.delivery_service import (
     create_subscription_delivery,
     mark_subscription_delivery_delivered,
     mark_subscription_delivery_returned,

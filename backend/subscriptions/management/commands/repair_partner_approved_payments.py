@@ -14,12 +14,12 @@ from subscriptions.models import (
     PartnerCollectionRequest,
     PartnerCollectionRequestStatus,
 )
-from subscriptions.services.payment_service import (
+from payments.services.payment_service import (
     _get_emi_net_paid,
     _refresh_emi_status,
     _refresh_subscription_status,
 )
-from subscriptions.services.commission_service import create_commission_for_payment
+from commissions.services.commission_service import create_commission_for_payment
 
 
 class Command(BaseCommand):

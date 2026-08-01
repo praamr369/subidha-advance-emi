@@ -62,7 +62,7 @@ class BusinessSetupModularGovernanceTests(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         labels = {row["label"] for row in res.data["targets"]["models"]}
         self.assertNotIn("accounting.JournalEntry", labels)
-        self.assertNotIn("subscriptions.Payment", labels)
+        self.assertNotIn("payments.Payment", labels)
 
     def test_reset_execute_requires_typed_confirmation(self):
         self.client.force_authenticate(self.admin)

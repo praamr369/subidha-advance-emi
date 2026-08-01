@@ -6,12 +6,12 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from subscriptions.models import Commission, CommissionStatus, MONEY_ZERO
-from subscriptions.services.lucky_draw_service import (
+from lucky_plan.services.lucky_draw_service import (
     create_lucky_draw_commit,
     reveal_and_execute_draw,
 )
-from subscriptions.services.payment_service import record_emi_payment
-from subscriptions.services.winner_service import WinnerService
+from payments.services.payment_service import record_emi_payment
+from lucky_plan.services.winner_service import WinnerService
 from tests.helpers import (
     create_admin_user,
     create_batch,
@@ -426,7 +426,7 @@ from rest_framework.test import APIClient
 from django.test import TestCase
 
 from subscriptions.models import Commission, CommissionStatus
-from subscriptions.services.payment_service import record_emi_payment, reverse_payment_for_admin
+from payments.services.payment_service import record_emi_payment, reverse_payment_for_admin
 from tests.helpers import (
     create_admin_user,
     create_partner_user,

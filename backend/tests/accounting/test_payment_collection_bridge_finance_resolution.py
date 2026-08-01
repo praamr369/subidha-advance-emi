@@ -9,7 +9,7 @@ from django.utils import timezone
 from accounting.models import AccountingBridgePosting, FinanceAccount, FinanceAccountKind
 from accounting.services.bridge_run_service import run_bridge_postings
 from subscriptions.models import Payment
-from subscriptions.services.payment_service import record_emi_payment, reverse_payment_for_admin
+from payments.services.payment_service import record_emi_payment, reverse_payment_for_admin
 from tests.helpers import (
     create_admin_user,
     create_batch,

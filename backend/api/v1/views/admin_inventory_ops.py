@@ -27,7 +27,7 @@ from inventory.services.purchase_need_reconciliation_service import (
     recheck_purchase_need_availability,
     reconcile_direct_sale_stock_requirements,
 )
-from subscriptions.services.operational_cancellation_service import cancel_stock_requirement
+from contracts.services.operational_cancellation_service import cancel_stock_requirement
 from subscriptions.models import AuditLog
 from subscriptions.services.audit_service import log_audit
 

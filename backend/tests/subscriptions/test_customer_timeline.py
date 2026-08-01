@@ -65,7 +65,7 @@ from subscriptions.models import (
     SubscriptionRequestStatus,
     SubscriptionStatus,
 )
-from subscriptions.services.customer_timeline_service import get_customer_timeline
+from customers.services.customer_timeline_service import get_customer_timeline
 from tests.helpers import (
     create_admin_user,
     create_batch,

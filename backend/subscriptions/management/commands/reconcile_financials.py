@@ -13,7 +13,7 @@ from subscriptions.models import (
     Payment,
     Subscription,
 )
-from subscriptions.services.emi_reconciliation import (
+from payments.services.emi_reconciliation import (
     effective_paid_for_emi,
     effective_paid_for_subscription,
     reconcile_emi_ledger,

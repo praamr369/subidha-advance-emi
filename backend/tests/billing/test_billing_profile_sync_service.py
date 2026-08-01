@@ -10,7 +10,7 @@ from billing.services.billing_sync_service import (
     sync_subscription_billing_profile,
 )
 from subscriptions.models import DeliveryStatus, FulfillmentStatus
-from subscriptions.services.payment_service import record_emi_payment
+from payments.services.payment_service import record_emi_payment
 from tests.helpers import (
     create_admin_user,
     create_batch,

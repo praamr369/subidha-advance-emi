@@ -5,7 +5,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from subscriptions.models import Emi
-from subscriptions.services.emi_label_service import installment_label, ordinal
+from payments.services.emi_label_service import installment_label, ordinal
 from tests.helpers import (
     create_admin_user,
     create_batch,

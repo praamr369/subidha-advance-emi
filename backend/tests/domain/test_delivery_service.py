@@ -4,7 +4,7 @@ from decimal import Decimal
 from django.test import TestCase
 
 from subscriptions.models import AuditLog, DeliveryStatus, FulfillmentStatus
-from subscriptions.services.delivery_service import (
+from deliveries.services.delivery_service import (
     build_delivery_report_summary,
     create_subscription_delivery,
     get_delivery_queryset,

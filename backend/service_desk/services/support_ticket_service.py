@@ -36,7 +36,7 @@ from subscriptions.models import (
     Subscription,
     SubscriptionDelivery,
 )
-from subscriptions.services.customer_support_service import validate_assignable_user
+from customers.services.customer_support_service import validate_assignable_user
 
 
 def _log_event(

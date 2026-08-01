@@ -26,9 +26,9 @@ from subscriptions.services.dashboard_canonical_financial_summary_service import
 )
 from subscriptions.services.dashboard_scopes import AdminScope
 
-from subscriptions.services.risk_service import evaluate_all_active_subscriptions
+from customers.services.risk_service import evaluate_all_active_subscriptions
 from subscriptions.services.financial_health_service import system_financial_health
-from subscriptions.services.winner_state_service import winner_history_q
+from lucky_plan.services.winner_state_service import winner_history_q
 
 
 CACHE_KEY = "admin_dashboard_v1"

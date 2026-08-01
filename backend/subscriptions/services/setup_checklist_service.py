@@ -19,7 +19,7 @@ from accounting.services.accounting_setup_status import compute_accounting_maste
 
 from subscriptions.models import Batch, Product
 from subscriptions.models_business_setup import BusinessProfile
-from subscriptions.services.document_numbering_service import (
+from contracts.services.document_numbering_service import (
     get_document_numbering_state,
     required_numbering_keys_for_checklist,
 )

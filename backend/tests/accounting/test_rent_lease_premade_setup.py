@@ -20,13 +20,13 @@ from billing.models import ReceiptDocument
 from reconciliation.models import ReconciliationItem
 from settlements.models import SettlementAllocation
 from subscriptions.models import AuditLog, Payment
-from subscriptions.services import rent_lease_posting_bridge_config_service as bridge_config
-from subscriptions.services.rent_lease_accounting_posting_service import _execute, _line, _preview
-from subscriptions.services.rent_lease_accounting_readiness_service import (
+from contracts.services import rent_lease_posting_bridge_config_service as bridge_config
+from contracts.services.rent_lease_accounting_posting_service import _execute, _line, _preview
+from contracts.services.rent_lease_accounting_readiness_service import (
     get_rent_lease_accounting_readiness as canonical_readiness,
 )
-from subscriptions.services.rent_lease_accounting_posting_service import get_rent_lease_accounting_readiness
-from subscriptions.services.rent_lease_finance_sync_service import (
+from contracts.services.rent_lease_accounting_posting_service import get_rent_lease_accounting_readiness
+from contracts.services.rent_lease_finance_sync_service import (
     ensure_premade_rent_lease_accounting_setup,
 )
 from tests.accounting.helpers import seed_bridge_ready_environment

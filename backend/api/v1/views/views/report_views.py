@@ -6,7 +6,7 @@ from rest_framework.response import Response
 
 from api.permissions import IsAdmin, IsCustomer, IsPartner
 from subscriptions.models import Commission, Customer, FinancialLedger, Payment, Subscription
-from subscriptions.services.winner_state_service import winner_history_q
+from lucky_plan.services.winner_state_service import winner_history_q
 
 
 @api_view(["GET"])

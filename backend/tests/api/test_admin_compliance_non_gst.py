@@ -30,7 +30,7 @@ from subscriptions.models import (
     RentSubscriptionProfile,
     Subscription,
 )
-from subscriptions.services.rent_lease_billing_service import generate_monthly_demands_for_subscription
+from contracts.services.rent_lease_billing_service import generate_monthly_demands_for_subscription
 from accounting.services.gst_document_posting_service import financial_year_for
 from tests.helpers import (
     create_admin_user,

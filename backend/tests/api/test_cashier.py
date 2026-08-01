@@ -8,7 +8,7 @@ from rest_framework.test import APITestCase
 from accounts.models import UserRole
 from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind
 from subscriptions.models import SubscriptionStatus
-from subscriptions.services.payment_service import record_emi_payment, reverse_payment_for_admin
+from payments.services.payment_service import record_emi_payment, reverse_payment_for_admin
 from tests.helpers import (
     create_admin_user,
     create_batch,

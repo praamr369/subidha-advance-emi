@@ -83,7 +83,7 @@ class CustomerImportPipelineTests(TestCase):
         self.assertEqual(batch.status, MigrationBatchStatus.IMPORTED)
         row = batch.rows.get()
         self.assertEqual(row.status, StagingRowStatus.IMPORTED)
-        self.assertEqual(row.target_model, "subscriptions.Customer")
+        self.assertEqual(row.target_model, "customers.Customer")
 
     def test_duplicate_detection_and_skip_resolution(self):
         create_user(username="existing_cust", role=UserRole.CUSTOMER, phone="9876543210")

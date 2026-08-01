@@ -11,7 +11,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from subscriptions.models import PublicLead, OnlineRequest
-from subscriptions.services.crm_pipeline_service import (
+from crm.services.crm_pipeline_service import (
     create_online_request_from_lead,
     convert_online_request_to_product_request,
     convert_online_request_to_subscription_request,

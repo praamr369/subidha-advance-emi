@@ -42,14 +42,14 @@ from subscriptions.models import (
     SubscriptionDocument,
     SubscriptionDocumentType,
 )
-from subscriptions.services.contract_activation_readiness_service import (
+from contracts.services.contract_activation_readiness_service import (
     evaluate_contract_activation_readiness,
 )
-from subscriptions.services.rent_lease_contract_service import (
+from contracts.services.rent_lease_contract_service import (
     create_lease_contract,
     create_rent_contract,
 )
-from subscriptions.services.rental_asset_lifecycle_service import (
+from deliveries.services.rental_asset_lifecycle_service import (
     create_rental_asset_from_inventory,
     mark_asset_handed_over,
     mark_asset_returned,
@@ -329,7 +329,7 @@ class AssetConditionSnapshotTests(TestCase):
         )
 
         # Readiness should now report condition proof satisfied (for LEASE).
-        from subscriptions.services.contract_activation_readiness_service import _has_condition_proof
+        from contracts.services.contract_activation_readiness_service import _has_condition_proof
         self.assertTrue(_has_condition_proof(sub))
 
     def test_document_based_condition_proof_fallback_still_works(self):
@@ -342,7 +342,7 @@ class AssetConditionSnapshotTests(TestCase):
             file=_small_file("inspect.pdf"),
         )
 
-        from subscriptions.services.contract_activation_readiness_service import _has_condition_proof
+        from contracts.services.contract_activation_readiness_service import _has_condition_proof
         self.assertTrue(_has_condition_proof(sub))
 
     def test_after_return_snapshot_records_correctly(self):

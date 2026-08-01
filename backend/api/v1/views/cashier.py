@@ -20,8 +20,8 @@ from billing.models import DirectSale
 from core.services.operational_visibility import invoice_active_q
 from billing.services.direct_sale_collection_service import collect_direct_sale_payment
 from branch_control.services.branch_service import scope_queryset_to_user_branches
-from subscriptions.services.customer_advance_service import CustomerAdvanceService
-from subscriptions.services.payment_collection_service import PaymentCollectionService
+from payments.services.customer_advance_service import CustomerAdvanceService
+from payments.services.payment_collection_service import PaymentCollectionService
 
 
 def _parse_amount(value) -> Decimal:

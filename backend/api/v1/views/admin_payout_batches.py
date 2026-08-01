@@ -15,7 +15,7 @@ from api.v1.serializers.admin_payout_batch import (
     PayoutBatchPreviewQuerySerializer,
 )
 from subscriptions.models import CommissionPayoutBatch
-from subscriptions.services.commission_payout_service import (
+from commissions.services.commission_payout_service import (
     cancel_commission_payout_batch,
     create_commission_payout_batch,
     finalize_commission_payout_batch,

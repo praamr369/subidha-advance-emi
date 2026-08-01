@@ -30,7 +30,7 @@ from subscriptions.models import (
     SubscriptionRequest,
     SubscriptionRequestStatus,
 )
-from subscriptions.services.subscription_request_service import (
+from contracts.services.subscription_request_service import (
     approve_subscription_request,
     available_lucky_numbers_for_batch,
     cancel_subscription_request,

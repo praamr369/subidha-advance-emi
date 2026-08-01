@@ -7,8 +7,8 @@ from rest_framework.test import APITestCase
 
 from accounting.models import ChartOfAccount, ChartOfAccountType
 from subscriptions.models import Payment, PaymentMethod
-from subscriptions.services.rent_lease_contract_service import create_rent_contract
-from subscriptions.services.rent_lease_billing_service import collect_security_deposit
+from contracts.services.rent_lease_contract_service import create_rent_contract
+from contracts.services.rent_lease_billing_service import collect_security_deposit
 from tests.helpers import (
     create_admin_user,
     create_batch,

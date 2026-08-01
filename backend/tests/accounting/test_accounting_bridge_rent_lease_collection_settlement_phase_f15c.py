@@ -11,7 +11,7 @@ from reconciliation.services.accounting_bridge_reconciliation import run_account
 from reconciliation.services.run_numbering import next_reconciliation_run_no
 from subscriptions.models import PlanType, RentLeaseBillingDemand, RentLeaseDemandStatus, RentLeaseDemandType, Subscription, SubscriptionStatus
 from subscriptions.models_rent_lease_collection import RentLeaseCollection, RentLeaseCollectionStatus
-from subscriptions.services.rent_lease_collection_workflow_service import collect_rent_lease_monthly_demand
+from contracts.services.rent_lease_collection_workflow_service import collect_rent_lease_monthly_demand
 from tests.accounting.helpers import seed_bridge_ready_environment
 from tests.helpers import create_admin_user, create_cashier_user, create_customer_profile, create_customer_user, create_product
 

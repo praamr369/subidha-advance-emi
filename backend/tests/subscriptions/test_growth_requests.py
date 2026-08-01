@@ -28,7 +28,7 @@ from subscriptions.models_growth_requests import (
     GrowthRequestStatus,
     GrowthRequestType,
 )
-from subscriptions.services.growth_request_service import (
+from crm.services.growth_request_service import (
     approve_growth_request,
     build_growth_request_preview,
     create_growth_request,

@@ -13,7 +13,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.v1.permissions import IsAdmin
-from subscriptions.services.partner_performance_service import (
+from commissions.services.partner_performance_service import (
     build_partner_performance_snapshot,
     list_partner_performance,
 )

@@ -26,9 +26,9 @@ SETUP_MODEL_LABELS: tuple[str, ...] = (
     "branch_control.CashCounter",
     "inventory.Warehouse",
     "inventory.StockLocation",
-    "subscriptions.ProductCategoryMaster",
-    "subscriptions.ProductSubcategoryMaster",
-    "subscriptions.ProductUnitOfMeasureMaster",
+    "products_core.ProductCategoryMaster",
+    "products_core.ProductSubcategoryMaster",
+    "products_core.ProductUnitOfMeasureMaster",
     "accounting.ProductTaxProfile",
     "reminders.NotificationTemplate",
 )
@@ -43,8 +43,8 @@ NATURAL_KEYS: dict[str, tuple[str, ...]] = {
     "branch_control.CashCounter": ("code",),
     "inventory.Warehouse": ("code",),
     "inventory.StockLocation": ("code",),
-    "subscriptions.ProductCategoryMaster": ("name",),
-    "subscriptions.ProductUnitOfMeasureMaster": ("code",),
+    "products_core.ProductCategoryMaster": ("name",),
+    "products_core.ProductUnitOfMeasureMaster": ("code",),
     "reminders.NotificationTemplate": ("key",),
 }
 
@@ -63,13 +63,13 @@ SETUP_IMPORT_ALLOWED_ENVS: frozenset[str] = frozenset(
 )
 
 EXCLUDED_TRANSACTIONAL_MODEL_PREFIXES: tuple[str, ...] = (
-    "subscriptions.Customer",
-    "subscriptions.Subscription",
-    "subscriptions.Emi",
-    "subscriptions.Payment",
+    "customers.Customer",
+    "contracts.Subscription",
+    "payments.Emi",
+    "payments.Payment",
     "billing.DirectSale",
     "inventory.PurchaseBill",
-    "subscriptions.Commission",
+    "commissions.Commission",
     "subscriptions.CommissionPayout",
     "subscriptions.AuditLog",
     "inventory.StockLedger",
@@ -204,7 +204,7 @@ def build_setup_snapshot_restore_preview(*, payload: dict[str, Any], preserve_ad
         {"key": "counter", "label": "Counter included", "status": "PASS" if "branch_control.CashCounter" in labels else "NOT_INCLUDED", "details": "Counter setup presence.", "recommended_action": "Include branch_control.CashCounter."},
         {"key": "warehouse", "label": "Warehouse / stock location included", "status": "PASS" if "inventory.Warehouse" in labels and "inventory.StockLocation" in labels else "NOT_INCLUDED", "details": "Warehouse and stock location setup.", "recommended_action": "Include both inventory.Warehouse and inventory.StockLocation."},
         {"key": "payment_collection", "label": "Payment collection account included", "status": "PASS" if "accounting.FinanceAccountCoaMapping" in labels else "WARNING", "details": "Collection mapping inferred via COA mappings.", "recommended_action": "Ensure collection purposes exist in mappings."},
-        {"key": "product_category", "label": "Product category included", "status": "PASS" if "subscriptions.ProductCategoryMaster" in labels else "NOT_INCLUDED", "details": "Product category master presence.", "recommended_action": "Include subscriptions.ProductCategoryMaster."},
+        {"key": "product_category", "label": "Product category included", "status": "PASS" if "products_core.ProductCategoryMaster" in labels else "NOT_INCLUDED", "details": "Product category master presence.", "recommended_action": "Include subscriptions.ProductCategoryMaster."},
         {"key": "product_tax", "label": "Product tax profile readiness included", "status": "PASS" if "accounting.ProductTaxProfile" in labels else "NOT_INCLUDED", "details": "Product tax profile section.", "recommended_action": "Include accounting.ProductTaxProfile."},
         {"key": "direct_sale_ready", "label": "Direct sale readiness check", "status": "WARNING", "details": "Derived from setup coverage only.", "recommended_action": "Run setup readiness after restore."},
         {"key": "advance_emi_ready", "label": "Advance EMI readiness check", "status": "WARNING", "details": "Derived from setup coverage only.", "recommended_action": "Run setup readiness after restore."},

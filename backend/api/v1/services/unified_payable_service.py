@@ -438,7 +438,7 @@ def _execute_commission(*, payable_id, finance_account_id, amount, payment_date,
       CR  Finance Account (cash/bank/UPI paid out)
     If no finance_account provided the commission is just marked settled (no accounting entry).
     """
-    from subscriptions.services.commission_service import settle_commission
+    from commissions.services.commission_service import settle_commission
     from subscriptions.models import Commission
 
     result = settle_commission(

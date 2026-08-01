@@ -5,8 +5,8 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from service_desk.models import ServiceDeskCase, ServiceDeskCaseType
-from subscriptions.services.payment_service import record_emi_payment
-from subscriptions.services.public_lead_service import (
+from payments.services.payment_service import record_emi_payment
+from crm.services.public_lead_service import (
     complete_public_lead_conversion,
     create_public_lead,
 )

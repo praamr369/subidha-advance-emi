@@ -18,7 +18,7 @@ from api.v1.serializers.admin_leads import (
 from crm.models import PartyInteraction, PartyInteractionStatus, PartyLink, PartyLinkRole
 from crm.services.party_service import seed_missing_party_links
 from subscriptions.models import PublicLead, PublicLeadIntent, PublicLeadStatus
-from subscriptions.services.public_lead_service import (
+from crm.services.public_lead_service import (
     assign_public_lead,
     create_admin_lead,
     complete_public_lead_conversion,

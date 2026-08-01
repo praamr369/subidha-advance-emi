@@ -9,8 +9,8 @@ from rest_framework.views import APIView
 from api.v1.permissions import IsAdmin, IsCustomer, IsPartner
 from api.v1.serializers.contract_amendments import ContractAmendmentCreateSerializer, ContractAmendmentSerializer
 from api.v1.views.contract_amendments import _amendment_queryset, _customer_profile_for, _validation_response
-from subscriptions.services.contract_amendment_lifecycle_service import cancel_or_archive_amendment
-from subscriptions.services.contract_amendment_service import create_amendment
+from contracts.services.contract_amendment_lifecycle_service import cancel_or_archive_amendment
+from contracts.services.contract_amendment_service import create_amendment
 
 
 class AmendmentLifecycleReasonSerializer(serializers.Serializer):

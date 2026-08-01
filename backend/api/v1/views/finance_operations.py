@@ -17,7 +17,7 @@ from api.v1.serializers.finance_operations import (
     AdminAdvanceAllocationSerializer,
     FinanceTransferCreateSerializer,
 )
-from subscriptions.services.payment_allocation_service import PaymentAllocationService
+from payments.services.payment_allocation_service import PaymentAllocationService
 
 
 def _positive_int(value, *, default: int, maximum: int | None = None) -> int:

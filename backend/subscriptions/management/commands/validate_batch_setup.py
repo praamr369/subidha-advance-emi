@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand, CommandError
 
 from subscriptions.models import Batch
-from subscriptions.services.onboarding_validation_service import inspect_batch_setup
+from customers.services.onboarding_validation_service import inspect_batch_setup
 
 
 def _format_number_list(numbers: list[int], *, limit: int = 20) -> str:

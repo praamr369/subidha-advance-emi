@@ -45,7 +45,7 @@ from subscriptions.models import (
     Subscription,
     SubscriptionStatus,
 )
-from subscriptions.services.product_recontract_preview_service import (
+from contracts.services.product_recontract_preview_service import (
     create_product_recontract_financial_impact_preview,
     create_product_recontract_preview_snapshot,
     create_product_recontract_schedule_preview,

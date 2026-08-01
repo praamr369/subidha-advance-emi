@@ -14,7 +14,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.v1.permissions import IsAdmin
-from subscriptions.services.customer_retention_intelligence_service import (
+from customers.services.customer_retention_intelligence_service import (
     build_customer_retention_profile,
     list_retention_opportunities,
 )

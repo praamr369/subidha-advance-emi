@@ -5,7 +5,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from subscriptions.models import CommissionStatus
-from subscriptions.services.payment_service import (
+from payments.services.payment_service import (
     record_emi_payment,
     reverse_payment_for_admin,
 )

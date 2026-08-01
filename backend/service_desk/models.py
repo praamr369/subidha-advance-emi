@@ -11,7 +11,10 @@ from django.utils import timezone
 from billing.models import BillingCreditNote, BillingDebitNote, BillingInvoice, DirectSale
 from crm.models import PartyMaster
 from inventory.models import InventoryItem
-from subscriptions.models import CustomerSupportRequest, Product, Subscription, SubscriptionDelivery
+from customers.models import CustomerSupportRequest
+from products_core.models import Product
+from contracts.models import Subscription
+from deliveries.models import SubscriptionDelivery
 
 MONEY_ZERO = Decimal("0.00")
 QUANTITY_ZERO = Decimal("0.000")

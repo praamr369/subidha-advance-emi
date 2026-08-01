@@ -10,10 +10,10 @@ from django.utils import timezone
 
 from billing.models import DirectSale, SmartCollectionRun
 from subscriptions.models import CustomerAdvance, Emi, Customer, Payment
-from subscriptions.services.payment_service import record_emi_payment
+from payments.services.payment_service import record_emi_payment
 from billing.services.direct_sale_collection_service import collect_direct_sale_payment
-from subscriptions.services.payment_allocation_service import PaymentAllocationService, _emi_outstanding_amount
-from subscriptions.services.customer_advance_service import CustomerAdvanceService
+from payments.services.payment_allocation_service import PaymentAllocationService, _emi_outstanding_amount
+from payments.services.customer_advance_service import CustomerAdvanceService
 
 logger = logging.getLogger(__name__)
 

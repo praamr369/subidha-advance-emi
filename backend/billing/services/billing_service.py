@@ -602,7 +602,7 @@ def create_direct_sale(*, payload: dict, created_by):
     from billing.services.direct_sale_delivery_bridge_service import sync_direct_sale_delivery_case
 
     sync_direct_sale_delivery_case(sale=sale, actor=created_by)
-    from subscriptions.services.contract_reference_service import (
+    from contracts.services.contract_reference_service import (
         ensure_contract_reference_for_direct_sale,
     )
     ensure_contract_reference_for_direct_sale(sale)

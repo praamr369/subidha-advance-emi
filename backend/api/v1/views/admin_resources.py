@@ -93,34 +93,34 @@ from subscriptions.models import (
     KycStatus,
     BatchStatus,
 )
-from subscriptions.services.lucky_draw_service import (
+from lucky_plan.services.lucky_draw_service import (
     create_lucky_draw_commit,
     reveal_and_execute_draw,
 )
-from subscriptions.services.batch_service import BATCH_STATUS_TRANSITIONS
-from subscriptions.services.payment_service import (
+from lucky_plan.services.batch_service import BATCH_STATUS_TRANSITIONS
+from payments.services.payment_service import (
     record_emi_payment,
     reverse_payment_for_admin,
 )
 from subscriptions.services.audit_service import log_audit, log_customer_kyc_decision
-from subscriptions.services.customer_account_service import build_customer_operational_profile
-from subscriptions.services.batch_draw_coordination_service import (
+from customers.services.customer_account_service import build_customer_operational_profile
+from lucky_plan.services.batch_draw_coordination_service import (
     build_control_center,
     commit_batch_draw,
     execute_batch_draw,
     lock_batch_for_draw,
 )
-from subscriptions.services.delivery_service import get_subscription_delivery_prefetch
+from deliveries.services.delivery_service import get_subscription_delivery_prefetch
 from subscriptions.services.subscription_financial_service import (
     build_reconciliation_attention_payload,
     get_subscription_detail_queryset,
 )
-from subscriptions.services.winner_state_service import (
+from lucky_plan.services.winner_state_service import (
     get_subscription_winner_evidence,
     sync_winner_state,
     winner_history_q,
 )
-from subscriptions.services.lucky_id_release_service import PRE_LOCK_BATCH_STATUSES
+from lucky_plan.services.lucky_id_release_service import PRE_LOCK_BATCH_STATUSES
 from core.services.operational_visibility import (
     subscription_batch_active_q,
     subscription_collectible_q,
@@ -847,7 +847,7 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
     @action(detail=True, methods=["post"], url_path="kyc-decision")
     @transaction.atomic
     def kyc_decision(self, request, pk=None):
-        from subscriptions.services.customer_service import approve_kyc, reject_kyc
+        from customers.services.customer_service import approve_kyc, reject_kyc
 
         customer = self.get_object()
         serializer = CustomerKycDecisionSerializer(data=request.data)
@@ -970,7 +970,7 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
     @transaction.atomic
     def approve_kyc_document(self, request, pk=None, document_id=None):
         from subscriptions.models import CustomerKycDocument, CustomerKycDocumentStatus
-        from subscriptions.services.customer_service import approve_kyc
+        from customers.services.customer_service import approve_kyc
 
         customer = self.get_object()
         document = get_object_or_404(
@@ -994,7 +994,7 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
     @transaction.atomic
     def reject_kyc_document(self, request, pk=None, document_id=None):
         from subscriptions.models import CustomerKycDocument, CustomerKycDocumentStatus
-        from subscriptions.services.customer_service import reject_kyc
+        from customers.services.customer_service import reject_kyc
 
         reason = (request.data.get("reason") or "").strip()
         if not reason:
@@ -1054,7 +1054,7 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
         optional ``deposit_required`` (truthy/falsey), optional ``high_value``.
         """
         from subscriptions.models import Subscription
-        from subscriptions.services.kyc_readiness_service import (
+        from customers.services.kyc_readiness_service import (
             get_contract_kyc_readiness,
         )
 
@@ -1090,7 +1090,7 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
         # activation/handover milestone readiness (deposit receipt + lease
         # condition proof). Computation only — never enforced here.
         if subscription is not None:
-            from subscriptions.services.contract_activation_readiness_service import (
+            from contracts.services.contract_activation_readiness_service import (
                 evaluate_contract_activation_readiness,
             )
 
@@ -1103,7 +1103,7 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
     @transaction.atomic
     def kyc_exception_approve(self, request, pk=None):
         """Admin-only audited KYC exception override (requires a reason)."""
-        from subscriptions.services.customer_service import exception_approve_kyc
+        from customers.services.customer_service import exception_approve_kyc
 
         reason = (request.data.get("reason") or "").strip()
         if not reason:
@@ -3491,7 +3491,7 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
         subscription = self.get_object()
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        from subscriptions.services.rent_lease_billing_service import generate_monthly_demands_for_subscription
+        from contracts.services.rent_lease_billing_service import generate_monthly_demands_for_subscription
 
         if subscription.plan_type not in ("RENT", "LEASE"):
             return Response({"detail": "Only Rent and Lease contracts support ledger generation."}, status=status.HTTP_400_BAD_REQUEST)
@@ -3525,7 +3525,7 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
         subscription = self.get_object()
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        from subscriptions.services.operational_cancellation_service import cancel_subscription
+        from contracts.services.operational_cancellation_service import cancel_subscription
 
         try:
             result = cancel_subscription(
@@ -3804,7 +3804,7 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
         (MISSING / PRESENT / VERIFIED / REJECTED / EXPIRED / NOT_REQUIRED),
         expiry, signed_status, access_level, and overall ready + blocker_codes.
         """
-        from subscriptions.services.document_vault_service import build_required_document_checklist
+        from contracts.services.document_vault_service import build_required_document_checklist
 
         subscription = self.get_object()
         include_handover = str(
@@ -3938,7 +3938,7 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
     def verify_document(self, request, pk=None, document_id=None):
         subscription = self.get_object()
         from subscriptions.models import SubscriptionDocument
-        from subscriptions.services.document_vault_service import verify_document as svc_verify
+        from contracts.services.document_vault_service import verify_document as svc_verify
 
         doc = get_object_or_404(SubscriptionDocument, pk=document_id, subscription=subscription)
         notes = request.data.get("notes", "").strip()
@@ -3949,7 +3949,7 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
     def reject_document(self, request, pk=None, document_id=None):
         subscription = self.get_object()
         from subscriptions.models import SubscriptionDocument
-        from subscriptions.services.document_vault_service import reject_document as svc_reject
+        from contracts.services.document_vault_service import reject_document as svc_reject
 
         doc = get_object_or_404(SubscriptionDocument, pk=document_id, subscription=subscription)
         reason = request.data.get("reason", "").strip()
@@ -3967,7 +3967,7 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
         serializer = ContractReturnAssessmentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        from subscriptions.services.rent_lease_contract_service import assess_return_and_calculate_refund
+        from contracts.services.rent_lease_contract_service import assess_return_and_calculate_refund
 
         result = assess_return_and_calculate_refund(
             subscription=subscription,
@@ -4040,7 +4040,7 @@ class RentalAssetAdminViewSet(viewsets.ReadOnlyModelViewSet):
     def subscription_readiness(self, request, subscription_pk=None):
         """Asset condition readiness for a specific subscription (P3B integration)."""
         from subscriptions.models import AssetConditionSnapshotStage, RentalAsset
-        from subscriptions.services.contract_activation_readiness_service import (
+        from contracts.services.contract_activation_readiness_service import (
             evaluate_contract_activation_readiness,
         )
         subscription = get_object_or_404(Subscription, pk=subscription_pk)

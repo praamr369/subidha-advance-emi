@@ -46,19 +46,19 @@ from subscriptions.models import (
     SubscriptionStatus,
     KycStatus,
 )
-from subscriptions.services.customer_account_service import sync_customer_login_identity
-from subscriptions.services.delivery_service import (
+from customers.services.customer_account_service import sync_customer_login_identity
+from deliveries.services.delivery_service import (
     build_subscription_delivery_history,
     build_subscription_delivery_summary,
     get_current_subscription_delivery,
 )
-from subscriptions.services.contract_number_service import (
+from contracts.services.contract_number_service import (
     get_or_assign_subscription_number,
 )
 from subscriptions.services.subscription_financial_service import (
     build_subscription_financial_snapshot,
 )
-from subscriptions.services.lucky_id_release_service import PRE_LOCK_BATCH_STATUSES
+from lucky_plan.services.lucky_id_release_service import PRE_LOCK_BATCH_STATUSES
 from core.services.operational_visibility import ACTIVE_BATCH_SUBSCRIPTION_STATUSES
 
 
@@ -624,7 +624,7 @@ class EmiAdminSerializer(serializers.ModelSerializer):
         return getattr(obj.subscription, "tenure_months", None)
 
     def get_installment_label(self, obj):
-        from subscriptions.services.emi_label_service import installment_label
+        from payments.services.emi_label_service import installment_label
 
         return installment_label(
             obj.month_no, getattr(obj.subscription, "tenure_months", None)
@@ -1177,7 +1177,7 @@ class LuckyIdAdminSerializer(serializers.ModelSerializer):
         instance = self.instance
         if instance and instance.batch_id and "status" in attrs:
             if attrs["status"] != instance.status:
-                from subscriptions.services.batch_draw_coordination_service import (
+                from lucky_plan.services.batch_draw_coordination_service import (
                     assert_subscription_eligibility_mutations_allowed,
                 )
 
@@ -2024,7 +2024,7 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
             and instance.batch_id
             and instance.plan_type == PlanType.EMI
         ):
-            from subscriptions.services.batch_draw_coordination_service import (
+            from lucky_plan.services.batch_draw_coordination_service import (
                 assert_subscription_eligibility_mutations_allowed,
             )
 
@@ -2548,7 +2548,7 @@ class SubscriptionAdminDetailSerializer(SubscriptionAdminSerializer):
             }
 
         try:
-            from subscriptions.services.contract_activation_readiness_service import (
+            from contracts.services.contract_activation_readiness_service import (
                 evaluate_contract_activation_readiness,
             )
             data = evaluate_contract_activation_readiness(obj)

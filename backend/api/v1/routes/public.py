@@ -28,8 +28,8 @@ from subscriptions.models import (
     Subscription,
 )
 from subscriptions.services.audit_service import log_audit
-from subscriptions.services.public_lead_service import create_public_lead
-from subscriptions.services.winner_state_service import winner_history_q
+from crm.services.public_lead_service import create_public_lead
+from lucky_plan.services.winner_state_service import winner_history_q
 
 
 class PublicLeadSerializer(serializers.Serializer):

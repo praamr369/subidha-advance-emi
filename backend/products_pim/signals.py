@@ -9,7 +9,7 @@ from django.dispatch import receiver
 logger = logging.getLogger(__name__)
 
 
-@receiver(post_save, sender="subscriptions.Product", dispatch_uid="pim_ensure_link")
+@receiver(post_save, sender="products_core.Product", dispatch_uid="pim_ensure_link")
 def ensure_pim_link_on_product_save(sender, instance, created, **kwargs):
     """Auto-create/link a PimProduct whenever a product is created, so new products
     are immediately editable with full PIM attributes/variants. Best-effort — a PIM

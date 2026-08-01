@@ -4,7 +4,7 @@ from billing.models import DirectSale, DirectSaleStatus
 from billing.services.direct_sale_delivery_bridge_service import compute_direct_sale_delivery_snapshot
 from inventory.services.demand_planning_service import stock_status_for_delivery
 from subscriptions.models import DeliveryStatus, PlanType, Subscription, SubscriptionDelivery
-from subscriptions.services.delivery_service import (
+from deliveries.services.delivery_service import (
     build_subscription_delivery_summary,
 )
 

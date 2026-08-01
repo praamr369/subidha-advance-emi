@@ -35,7 +35,7 @@ from subscriptions.models_kyc_workflow import (
     PartnerKycDocument,
     PartnerKycDocumentStatus,
 )
-from subscriptions.services.kyc_workflow_service import (
+from customers.services.kyc_workflow_service import (
     admin_approve_partner_kyc_document,
     admin_approve_staff_kyc_document,
     admin_approve_vendor_kyc_document,
@@ -605,7 +605,7 @@ class VendorSelfKycServiceTests(TestCase):
     def test_vendor_self_upload_is_always_submitted(self):
         from accounting.models import KycDocumentGenericStatus
 
-        from subscriptions.services.kyc_workflow_service import vendor_self_upload_kyc
+        from customers.services.kyc_workflow_service import vendor_self_upload_kyc
 
         doc = vendor_self_upload_kyc(
             vendor=self.vendor,
@@ -703,7 +703,7 @@ class StaffSelfKycServiceTests(TestCase):
     def test_staff_self_upload_is_always_submitted(self):
         from accounting.models import KycDocumentGenericStatus
 
-        from subscriptions.services.kyc_workflow_service import staff_self_upload_kyc
+        from customers.services.kyc_workflow_service import staff_self_upload_kyc
 
         doc = staff_self_upload_kyc(
             employee=self.employee,

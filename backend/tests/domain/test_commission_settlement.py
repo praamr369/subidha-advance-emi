@@ -4,8 +4,8 @@ from datetime import date
 from django.test import TestCase
 
 from subscriptions.models import CommissionStatus
-from subscriptions.services.commission_service import settle_commission
-from subscriptions.services.payment_service import (
+from commissions.services.commission_service import settle_commission
+from payments.services.payment_service import (
     record_emi_payment,
     reverse_payment_for_admin,
 )

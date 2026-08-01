@@ -61,7 +61,7 @@ class CustomerConsent(TimeStampedModel):
     """Track customer consent for data processing (DPDP 2023 s.6)"""
 
     customer = models.ForeignKey(
-        'subscriptions.Customer',
+        'customers.Customer',
         on_delete=models.CASCADE,
         related_name='consents',
     )
@@ -341,7 +341,7 @@ class DataAccessLog(TimeStampedModel):
     )
 
     customer = models.ForeignKey(
-        'subscriptions.Customer',
+        'customers.Customer',
         on_delete=models.CASCADE,
         related_name='access_logs',
     )

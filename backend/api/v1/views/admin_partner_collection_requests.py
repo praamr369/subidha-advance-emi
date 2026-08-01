@@ -16,7 +16,7 @@ from subscriptions.models import (
     PartnerCollectionRequest,
     PartnerCollectionRequestStatus,
 )
-from subscriptions.services.payment_service import collect_payment_for_admin
+from payments.services.payment_service import collect_payment_for_admin
 
 
 def _request_base_queryset():

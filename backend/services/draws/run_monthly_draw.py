@@ -1,4 +1,4 @@
-from subscriptions.services.lucky_draw_service import reveal_and_execute_draw
+from lucky_plan.services.lucky_draw_service import reveal_and_execute_draw
 
 
 def run_monthly_draw(*, draw_id: int, revealed_seed: str, performed_by=None):

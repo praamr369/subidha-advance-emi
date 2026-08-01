@@ -31,7 +31,7 @@ from subscriptions.models import (
 from subscriptions.services.subscription_financial_service import (
     build_reconciliation_attention_payload,
 )
-from subscriptions.services.winner_state_service import winner_history_q
+from lucky_plan.services.winner_state_service import winner_history_q
 
 
 class AdminRevenueAggregateView(APIView):

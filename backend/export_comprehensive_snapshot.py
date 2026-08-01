@@ -42,8 +42,8 @@ def export_snapshot(output_path: str) -> bool:
         'branch_control.Branch',
         'branch_control.CashCounter',
         'inventory.StockLocation',
-        'subscriptions.ProductCategoryMaster',
-        'subscriptions.ProductSubcategoryMaster',
+        'products_core.ProductCategoryMaster',
+        'products_core.ProductSubcategoryMaster',
 
         # Public site & policy governance
         'subscriptions.PublicBusinessProfile',

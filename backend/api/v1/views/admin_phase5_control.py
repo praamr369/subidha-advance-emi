@@ -9,7 +9,7 @@ from accounts.capabilities import require_capability
 from api.v1.permissions import IsAdmin
 from subscriptions.services.phase5_export_service import build_csv_export_response
 from subscriptions.services.phase5_filter_service import parse_admin_report_filters
-from subscriptions.services.phase5_reconciliation_service import (
+from payments.services.phase5_reconciliation_service import (
     attach_reference,
     mark_reconciled,
     mark_unreconciled,

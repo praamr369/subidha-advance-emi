@@ -9,12 +9,12 @@ from rest_framework.views import APIView
 
 from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, RentLeaseAccountingAccountMapping
 from api.v1.permissions import IsAdmin
-from subscriptions.services import rent_lease_accounting_posting_service as bridge
-from subscriptions.services.rent_lease_finance_sync_service import (
+from contracts.services import rent_lease_accounting_posting_service as bridge
+from contracts.services.rent_lease_finance_sync_service import (
     ensure_premade_rent_lease_accounting_setup,
     get_active_account_mapping,
 )
-from subscriptions.services.rent_lease_posting_bridge_config_service import (
+from contracts.services.rent_lease_posting_bridge_config_service import (
     disable_rent_lease_posting_bridge,
     enable_rent_lease_posting_bridge,
     get_rent_lease_posting_bridge_state,

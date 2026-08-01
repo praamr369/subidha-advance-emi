@@ -14,7 +14,7 @@ from rest_framework.views import APIView
 
 from api.v1.permissions import IsAdmin
 from subscriptions.models import Customer, CustomerRiskProfile
-from subscriptions.services.customer_risk_service import (
+from customers.services.customer_risk_service import (
     get_customer_risk_profile,
     recalculate_customer_risk_profile,
 )

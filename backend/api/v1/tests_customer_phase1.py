@@ -30,7 +30,7 @@ from subscriptions.models import (
     CustomerSource,
     KycStatus,
 )
-from subscriptions.services.customer_service import (
+from customers.services.customer_service import (
     approve_kyc,
     create_kyc_update_request,
     create_referral,
@@ -191,7 +191,7 @@ class CustomerEmailUpdateTests(TestCase):
         assert customer.user.email == "newemail@test.com"
 
     def test_email_change_creates_audit_log(self):
-        from subscriptions.services.customer_service import update_customer_contact
+        from customers.services.customer_service import update_customer_contact
 
         customer = make_customer(phone="8444444441")
         admin = make_user(role=UserRole.ADMIN, phone="7100000001")

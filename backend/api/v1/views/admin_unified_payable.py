@@ -85,7 +85,7 @@ class AdminPayableExecuteView(APIView):
         # the payout instrument (Cash → cash desk; UPI/transfer/cheque/deposit →
         # the single Bank/UPI account). Payouts default to Bank/UPI.
         if not finance_account_id:
-            from subscriptions.services.payment_service import _fallback_finance_account_for_method
+            from payments.services.payment_service import _fallback_finance_account_for_method
 
             payment_method = (data.get("payment_method") or "UPI").strip().upper()
             resolved = _fallback_finance_account_for_method(payment_method)

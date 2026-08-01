@@ -7,7 +7,7 @@ from django.utils import timezone
 from accounting.models import AccountingBridgePosting, ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountCoaMapping, FinanceAccountKind, FinanceAccountMappingPurpose
 from billing.models import ReceiptType
 from billing.services.billing_service import generate_emi_payment_receipt
-from subscriptions.services.payment_service import record_emi_payment
+from payments.services.payment_service import record_emi_payment
 from tests.helpers import (
     create_admin_user,
     create_batch,

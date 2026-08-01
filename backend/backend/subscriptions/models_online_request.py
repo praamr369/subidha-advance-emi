@@ -132,7 +132,7 @@ class OnlineRequest(models.Model):
 
     # Linked Transactions
     approved_subscription = models.ForeignKey(
-        'subscriptions.Subscription',
+        'contracts.Subscription',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

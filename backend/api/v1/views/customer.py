@@ -38,11 +38,11 @@ from subscriptions.models import (
     SubscriptionDelivery,
     SubscriptionStatus,
 )
-from subscriptions.services.customer_support_service import (
+from customers.services.customer_support_service import (
     create_customer_support_request,
 )
-from subscriptions.services.customer_account_service import build_customer_profile_summary
-from subscriptions.services.customer_service import (
+from customers.services.customer_account_service import build_customer_profile_summary
+from customers.services.customer_service import (
     approve_kyc,
     create_kyc_update_request,
     create_referral,
@@ -52,11 +52,11 @@ from subscriptions.services.dashboard_canonical_financial_summary_service import
     get_dashboard_summary,
 )
 from subscriptions.services.dashboard_scopes import CustomerScope
-from subscriptions.services.delivery_service import (
+from deliveries.services.delivery_service import (
     build_delivery_report_summary,
     get_subscription_delivery_prefetch,
 )
-from subscriptions.services.document_pdf_service import render_delivery_handover_pdf
+from contracts.services.document_pdf_service import render_delivery_handover_pdf
 from core.services.operational_visibility import get_payment_collection_totals
 from subscriptions.services.subscription_financial_service import (
     get_subscription_detail_queryset,

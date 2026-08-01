@@ -44,7 +44,7 @@ from billing.services.invoice_delivery_service import (
     create_delivery_from_invoice,
     get_invoice_delivery_readiness,
 )
-from subscriptions.services.operational_cancellation_service import (
+from contracts.services.operational_cancellation_service import (
     cancel_billing_invoice,
     cancel_direct_sale,
 )
@@ -52,11 +52,11 @@ from billing.services.billing_sync_service import (
     sync_payment_into_billing,
     sync_subscription_billing_profile,
 )
-from subscriptions.services.document_pdf_service import (
+from contracts.services.document_pdf_service import (
     render_credit_note_pdf,
     render_debit_note_pdf,
 )
-from subscriptions.services.document_numbering_service import get_document_numbering_state
+from contracts.services.document_numbering_service import get_document_numbering_state
 from api.v1.permissions import IsAdmin
 from api.v1.serializers.accounting_phase3 import AccountingBookQuerySerializer
 from api.v1.serializers.billing import (

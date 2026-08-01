@@ -24,7 +24,7 @@ from subscriptions.models import Batch, ContractAmendment, ContractRecontractEve
 from subscriptions.models_business_setup import BusinessProfile
 from subscriptions.models_document_print_settings import DocumentPrintSettings
 from subscriptions.services.business_compliance_governance_service import build_business_compliance_readiness
-from subscriptions.services.document_numbering_service import get_document_numbering_state, required_numbering_keys_for_checklist
+from contracts.services.document_numbering_service import get_document_numbering_state, required_numbering_keys_for_checklist
 from subscriptions.services.policy_governance_service import build_policy_coverage_matrix
 
 ReadinessStatus = str
@@ -239,7 +239,7 @@ def _inventory_onboarding_section(active_products) -> dict[str, Any]:
 
 def _rent_lease_section() -> dict[str, Any]:
     try:
-        from subscriptions.services.rent_lease_accounting_readiness_service import get_rent_lease_accounting_readiness
+        from contracts.services.rent_lease_accounting_readiness_service import get_rent_lease_accounting_readiness
 
         readiness = get_rent_lease_accounting_readiness(auto_create=False)
     except Exception as exc:  # defensive: setup readiness must explain, not crash.
@@ -384,7 +384,7 @@ def _go_live_backup_section() -> dict[str, Any]:
 
 
 def _numbering_continuity_section() -> dict[str, Any]:
-    from subscriptions.services.document_numbering_service import get_document_numbering_state
+    from contracts.services.document_numbering_service import get_document_numbering_state
 
     state = get_document_numbering_state()
     required_keys = set(required_numbering_keys_for_checklist())

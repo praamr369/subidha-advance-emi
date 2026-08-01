@@ -88,7 +88,7 @@ def _extend_contract_amendment_model() -> None:
     _contribute("amendment_no", models.CharField(max_length=40, unique=True, null=True, blank=True, db_index=True))
     _contribute("contract_type", models.CharField(max_length=24, choices=CONTRACT_AMENDMENT_CONTRACT_TYPE_CHOICES, default="EMI_SUBSCRIPTION", db_index=True))
     _contribute("rent_lease_contract", models.ForeignKey(Subscription, on_delete=models.PROTECT, related_name="rent_lease_contract_amendments", null=True, blank=True))
-    _contribute("customer", models.ForeignKey("subscriptions.Customer", on_delete=models.PROTECT, related_name="contract_amendments", null=True, blank=True))
+    _contribute("customer", models.ForeignKey("customers.Customer", on_delete=models.PROTECT, related_name="contract_amendments", null=True, blank=True))
     _contribute("partner", models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="partner_contract_amendments", null=True, blank=True))
     _contribute("requested_role", models.CharField(max_length=16, choices=CONTRACT_AMENDMENT_REQUESTED_ROLE_CHOICES, default="CUSTOMER", db_index=True))
     _contribute("old_values", models.JSONField(default=dict, blank=True))

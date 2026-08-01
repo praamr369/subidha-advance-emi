@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 
 from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, RentLeaseAccountingAccountMapping
 from api.v1.permissions import IsAdmin
-from subscriptions.services.rent_lease_accounting_posting_service import get_rent_lease_accounting_readiness
+from contracts.services.rent_lease_accounting_posting_service import get_rent_lease_accounting_readiness
 
 REQUIRED_SYSTEM_CODES = {
     "monthly_income_account": ("RENT_INCOME", ChartOfAccountType.INCOME),

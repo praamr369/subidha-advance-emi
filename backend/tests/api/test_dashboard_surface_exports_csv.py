@@ -8,7 +8,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from subscriptions.services.payment_service import record_emi_payment
+from payments.services.payment_service import record_emi_payment
 from tests.helpers import (
     create_admin_user,
     create_batch,

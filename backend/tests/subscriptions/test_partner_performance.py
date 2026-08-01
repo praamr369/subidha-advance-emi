@@ -17,7 +17,7 @@ from decimal import Decimal
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from subscriptions.services.partner_performance_service import (
+from commissions.services.partner_performance_service import (
     build_partner_performance_snapshot,
     build_partner_risk_flags,
     list_partner_performance,

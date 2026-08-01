@@ -11,18 +11,18 @@ from django.db import connection, transaction
 RESET_CONFIRM_PHRASE = "RESET LOCAL SANDBOX"
 
 RESET_SCOPE_MODELS: dict[str, tuple[str, ...]] = {
-    "customers": ("subscriptions.Customer",),
+    "customers": ("customers.Customer",),
     "partners": ("accounts.User",),
-    "subscriptions": ("subscriptions.Subscription", "subscriptions.Batch", "subscriptions.LuckyId"),
-    "payments": ("subscriptions.Emi", "subscriptions.Payment", "subscriptions.PaymentReconciliation"),
+    "subscriptions": ("contracts.Subscription", "lucky_plan.Batch", "lucky_plan.LuckyId"),
+    "payments": ("payments.Emi", "payments.Payment", "payments.PaymentReconciliation"),
     "direct_sales": ("billing.DirectSale", "billing.DirectSaleLine", "billing.DirectSaleReturn", "billing.DirectSaleReturnLine"),
     "purchases": ("inventory.PurchaseBill", "inventory.PurchaseBillLine", "inventory.PurchaseOrder", "inventory.GoodsReceipt"),
     "inventory": ("inventory.StockLedger", "inventory.StockAdjustment", "inventory.StockAdjustmentLine", "inventory.StockReservation"),
-    "rent_lease": ("subscriptions.RentSubscriptionProfile", "subscriptions.LeaseSubscriptionProfile", "subscriptions.RentLeaseDemand"),
-    "deliveries": ("subscriptions.SubscriptionDelivery",),
+    "rent_lease": ("contracts.RentSubscriptionProfile", "contracts.LeaseSubscriptionProfile", "subscriptions.RentLeaseDemand"),
+    "deliveries": ("deliveries.SubscriptionDelivery",),
     "service_desk": ("service_desk.ServiceDeskCase", "service_desk.ServiceDeskCaseLine"),
-    "commissions": ("subscriptions.Commission",),
-    "payouts": ("subscriptions.CommissionPayoutBatch", "subscriptions.CommissionPayoutLine"),
+    "commissions": ("commissions.Commission",),
+    "payouts": ("commissions.CommissionPayoutBatch", "commissions.CommissionPayoutLine"),
     "crm": ("crm.CrmLead", "crm.CrmInteraction", "crm.CrmParty"),
 }
 

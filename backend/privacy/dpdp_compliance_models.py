@@ -31,7 +31,7 @@ class TimeStampedModel(models.Model):
 class DataErasureGuard(TimeStampedModel):
     """CTRL-DPDP-3 — DPDP 2023 s.12 erasure request record."""
     customer = models.ForeignKey(
-        'subscriptions.Customer',
+        'customers.Customer',
         on_delete=models.PROTECT,
         related_name='erasure_requests',
     )

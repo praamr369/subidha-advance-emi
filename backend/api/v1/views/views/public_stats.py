@@ -12,7 +12,7 @@ from subscriptions.models import (
     Payment,
     LuckyDraw,
 )
-from subscriptions.services.winner_state_service import winner_history_q
+from lucky_plan.services.winner_state_service import winner_history_q
 
 CACHE_KEY = "public_stats"
 CACHE_TIMEOUT = 60

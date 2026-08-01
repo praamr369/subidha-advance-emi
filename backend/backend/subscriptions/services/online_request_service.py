@@ -7,7 +7,7 @@ from django.core.exceptions import ValidationError
 
 from subscriptions.models_online_request import OnlineRequest, OnlineRequestAction
 from subscriptions.models import Customer, Product, Batch
-from subscriptions.services.subscription_service import (
+from contracts.services.subscription_service import (
     create_emi_subscription,
     create_rent_subscription,
     create_lease_subscription,

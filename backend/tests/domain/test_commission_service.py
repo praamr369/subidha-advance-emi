@@ -5,8 +5,8 @@ from django.core.management import call_command
 from django.test import TestCase
 
 from subscriptions.models import Commission, CommissionStatus, EmiStatus
-from subscriptions.services.commission_service import create_commission_for_payment
-from subscriptions.services.payment_service import (
+from commissions.services.commission_service import create_commission_for_payment
+from payments.services.payment_service import (
     record_emi_payment,
     reverse_payment_for_admin,
 )

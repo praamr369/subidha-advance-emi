@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.v1.permissions import IsAdmin
-from subscriptions.services.crm_analytics_service import (
+from crm.services.crm_analytics_service import (
     get_funnel_analytics,
     get_product_performance,
     get_timeline_analytics,

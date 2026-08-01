@@ -19,7 +19,7 @@ from datetime import date, timedelta
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from subscriptions.services.customer_retention_intelligence_service import (
+from customers.services.customer_retention_intelligence_service import (
     build_customer_retention_profile,
     build_retention_action_items,
     classify_retention_signal,

@@ -7,7 +7,7 @@ from rest_framework.test import APITestCase
 from billing.services.billing_service import create_direct_sale
 from inventory.models import InventoryItem
 from subscriptions.models import AuditLog, PublicLead, PublicLeadIntent, PublicLeadStatus
-from subscriptions.services.public_lead_service import create_public_lead
+from crm.services.public_lead_service import create_public_lead
 from tests.helpers import (
     create_admin_user,
     create_batch,

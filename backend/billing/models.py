@@ -11,7 +11,11 @@ from django.utils import timezone
 
 from accounting.models import DocumentSequence, FinanceAccount, JournalEntry
 from inventory.models import InventoryItem
-from subscriptions.models import Customer, Emi, FulfillmentStatus, Payment, Product, Subscription
+from customers.models import Customer
+from payments.models import Emi, Payment
+from subscriptions.enums import FulfillmentStatus
+from products_core.models import Product
+from contracts.models import Subscription
 
 MONEY_ZERO = Decimal("0.00")
 QUANTITY_ZERO = Decimal("0.000")

@@ -27,17 +27,17 @@ from subscriptions.models import (
     Subscription,
     SubscriptionStatus,
 )
-from subscriptions.services.batch_draw_coordination_service import (
+from lucky_plan.services.batch_draw_coordination_service import (
     commit_batch_draw,
     compute_snapshot_aggregate_hash,
     execute_batch_draw,
     freeze_draw_eligibility_snapshot,
 )
-from subscriptions.services.lucky_draw_service import reveal_and_execute_draw
-from subscriptions.services.payment_service import record_emi_payment
-from subscriptions.services.emi_engine import generate_emi_schedule
-from subscriptions.services.emi_reconciliation import reconcile_subscription_emis
-from subscriptions.services.subscription_service import create_emi_subscription
+from lucky_plan.services.lucky_draw_service import reveal_and_execute_draw
+from payments.services.payment_service import record_emi_payment
+from payments.services.emi_engine import generate_emi_schedule
+from payments.services.emi_reconciliation import reconcile_subscription_emis
+from contracts.services.subscription_service import create_emi_subscription
 from tests.helpers import (
     create_batch,
     create_product,

@@ -2,7 +2,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from branch_control.models import Branch
-from subscriptions.services.customer_support_service import create_customer_support_request
+from customers.services.customer_support_service import create_customer_support_request
 from tests.helpers import (
     create_admin_user,
     create_batch,

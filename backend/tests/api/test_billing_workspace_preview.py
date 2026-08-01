@@ -17,7 +17,7 @@ from tests.helpers import (
     ensure_default_payment_collection_accounts,
     ensure_test_accounting_posting_prerequisites,
 )
-from subscriptions.services.rent_lease_contract_service import create_rent_contract
+from contracts.services.rent_lease_contract_service import create_rent_contract
 
 
 class BillingWorkspacePreviewApiTests(TestCase):

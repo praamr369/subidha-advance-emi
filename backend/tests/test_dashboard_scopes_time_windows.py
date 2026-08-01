@@ -9,7 +9,7 @@ from subscriptions.services.dashboard_canonical_financial_summary_service import
 )
 from subscriptions.services.dashboard_scopes import CustomerScope, PartnerScope
 from subscriptions.services.dashboard_surface_query_service import list_recent_payments
-from subscriptions.services.payment_service import record_emi_payment
+from payments.services.payment_service import record_emi_payment
 from tests.helpers import (
     create_admin_user,
     create_batch,

@@ -47,11 +47,11 @@ RESET_SCOPE_REGISTRY: tuple[ResetScopeSpec, ...] = (
     ResetScopeSpec("ACCOUNTING_SETUP_ONLY", "Accounting setup", "HIGH", ("accounting.ChartOfAccount", "accounting.FinanceAccount", "accounting.FinanceAccountCoaMapping", "accounting.AccountingPostingProfile", "accounting.AccountingPeriod", "accounting.DocumentSequence", "accounting.TaxProfile")),
     ResetScopeSpec("BRANCH_COUNTER_SETUP_ONLY", "Branch/counter setup", "MEDIUM", ("branch_control.Branch", "accounting.CashCounter")),
     ResetScopeSpec("INVENTORY_SETUP_ONLY", "Inventory setup", "HIGH", ("inventory.StockLocation", "inventory.Warehouse", "inventory.InventoryItem", "inventory.OpeningStockEntry", "inventory.ReorderRule")),
-    ResetScopeSpec("PRODUCT_CATALOG_ONLY", "Product catalog", "HIGH", ("subscriptions.ProductCategoryMaster", "subscriptions.ProductSubcategoryMaster", "subscriptions.ProductUnitOfMeasureMaster", "subscriptions.Product")),
-    ResetScopeSpec("CUSTOMER_CRM_ONLY", "Customer CRM", "HIGH", ("subscriptions.Customer", "crm.CrmParty", "crm.CrmLead", "crm.CrmInteraction", "subscriptions.CustomerSupportRequest")),
+    ResetScopeSpec("PRODUCT_CATALOG_ONLY", "Product catalog", "HIGH", ("products_core.ProductCategoryMaster", "products_core.ProductSubcategoryMaster", "products_core.ProductUnitOfMeasureMaster", "products_core.Product")),
+    ResetScopeSpec("CUSTOMER_CRM_ONLY", "Customer CRM", "HIGH", ("customers.Customer", "crm.CrmParty", "crm.CrmLead", "crm.CrmInteraction", "customers.CustomerSupportRequest")),
     ResetScopeSpec("SALES_DIRECT_ONLY", "Direct sales", "HIGH", ("billing.DirectSale", "billing.SalesInvoice", "billing.SalesReceipt", "billing.CreditNote", "billing.DebitNote")),
-    ResetScopeSpec("SUBSCRIPTION_EMI_ONLY", "Subscriptions/EMI", "VERY_HIGH", ("subscriptions.Batch", "subscriptions.LuckyId", "subscriptions.Subscription", "subscriptions.Emi", "subscriptions.Payment", "subscriptions.LuckyDraw", "subscriptions.PaymentReconciliation", "subscriptions.Commission", "subscriptions.CommissionPayoutBatch"), True),
-    ResetScopeSpec("RENT_LEASE_ONLY", "Rent/lease", "HIGH", ("subscriptions.RentSubscriptionProfile", "subscriptions.LeaseSubscriptionProfile", "subscriptions.RentLeaseDemand", "subscriptions.RentLeaseDepositLedger", "subscriptions.ProductPossession", "subscriptions.RentLeaseReturnInspection")),
+    ResetScopeSpec("SUBSCRIPTION_EMI_ONLY", "Subscriptions/EMI", "VERY_HIGH", ("lucky_plan.Batch", "lucky_plan.LuckyId", "contracts.Subscription", "payments.Emi", "payments.Payment", "lucky_plan.LuckyDraw", "payments.PaymentReconciliation", "commissions.Commission", "commissions.CommissionPayoutBatch"), True),
+    ResetScopeSpec("RENT_LEASE_ONLY", "Rent/lease", "HIGH", ("contracts.RentSubscriptionProfile", "contracts.LeaseSubscriptionProfile", "subscriptions.RentLeaseDemand", "subscriptions.RentLeaseDepositLedger", "deliveries.ProductPossession", "deliveries.RentLeaseReturnInspection")),
     ResetScopeSpec("AUTH_ARTIFACTS_ONLY", "Auth artifacts", "MEDIUM", ("sessions.Session", "token_blacklist.OutstandingToken", "token_blacklist.BlacklistedToken", "accounts.PasswordResetRequest")),
     ResetScopeSpec("MIGRATION_CENTER_ONLY", "Migration / import staging data", "MEDIUM", ("migration_center.MigrationBatch", "migration_center.MigrationStagingRow", "migration_center.MigrationMappingRule", "migration_center.MigrationAuditLog")),
     ResetScopeSpec("FULL_BUSINESS_DATA_EXCEPT_PRESERVED_ADMIN", "Full business reset except preserved admin", "VERY_HIGH", (), True),
@@ -91,7 +91,7 @@ def _resolve_existing_models(model_labels: tuple[str, ...]) -> list[type]:
 
 
 def _has_posted_financial_history() -> bool:
-    for label in ("accounting.JournalEntry", "subscriptions.Payment", "subscriptions.FinancialLedger"):
+    for label in ("accounting.JournalEntry", "payments.Payment", "payments.FinancialLedger"):
         try:
             app_label, model_name = label.split(".", 1)
             model = apps.get_model(app_label, model_name)
@@ -115,7 +115,7 @@ def _has_inventory_history() -> bool:
 
 
 def _has_product_references() -> bool:
-    for label in ("subscriptions.Subscription", "billing.DirectSale", "inventory.StockLedger"):
+    for label in ("contracts.Subscription", "billing.DirectSale", "inventory.StockLedger"):
         try:
             app_label, model_name = label.split(".", 1)
             model = apps.get_model(app_label, model_name)

@@ -22,7 +22,7 @@ from subscriptions.models_cash_counter_session import (
     CashCounterSessionStatus,
     DailyCloseRun,
 )
-from subscriptions.services.control_cash_counter_service import (
+from payments.services.control_cash_counter_service import (
     approve_cash_variance,
     close_cash_counter_session,
     get_cash_counter_session_status,

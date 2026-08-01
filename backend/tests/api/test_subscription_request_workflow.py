@@ -13,7 +13,7 @@ from subscriptions.models import (
     SubscriptionRequest,
     SubscriptionRequestStatus,
 )
-from subscriptions.services.subscription_request_service import (
+from contracts.services.subscription_request_service import (
     subscription_request_lock_queryset,
 )
 from tests.helpers import (

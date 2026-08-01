@@ -12,8 +12,8 @@ from reconciliation.models import ReconciliationItem, ReconciliationItemStatus, 
 from reconciliation.services.accounting_bridge_reconciliation import run_accounting_bridge_checks
 from reconciliation.services.run_numbering import next_reconciliation_run_no
 from subscriptions.models import CustomerAdvance, CustomerAdvanceAllocation, Payment
-from subscriptions.services.customer_advance_service import CustomerAdvanceService
-from subscriptions.services.payment_allocation_service import PaymentAllocationService
+from payments.services.customer_advance_service import CustomerAdvanceService
+from payments.services.payment_allocation_service import PaymentAllocationService
 from tests.accounting.helpers import seed_bridge_ready_environment
 from tests.helpers import create_admin_user, create_cashier_user, create_batch, create_customer_profile, create_emi, create_lucky_id, create_product, create_subscription
 

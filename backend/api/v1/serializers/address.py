@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from subscriptions.models import Address, PincodeDatabase, ServiceZone
-from subscriptions.services.address_service import validate_pincode, lookup_pincode
+from customers.services.address_service import validate_pincode, lookup_pincode
 
 class PincodeSerializer(serializers.Serializer):
     """Pincode lookup serializer"""

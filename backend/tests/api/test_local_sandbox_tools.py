@@ -46,8 +46,8 @@ class LocalSandboxToolsApiTests(APITestCase):
     def test_export_excludes_transactional_sections(self):
         payload = export_setup_snapshot().payload
         sections = payload.get("sections", {})
-        self.assertNotIn("subscriptions.Customer", sections)
-        self.assertNotIn("subscriptions.Payment", sections)
+        self.assertNotIn("customers.Customer", sections)
+        self.assertNotIn("payments.Payment", sections)
 
     def test_import_restores_setup_snapshot(self):
         coa = ChartOfAccount.objects.create(code="SNAP-COA-001", name="Snapshot COA", account_type=ChartOfAccountType.ASSET, is_active=True)
@@ -94,7 +94,7 @@ class LocalSandboxToolsApiTests(APITestCase):
     def test_setup_snapshot_restore_rejects_transactional_models(self):
         self.client.force_authenticate(self.admin)
         payload = export_setup_snapshot().payload
-        payload["sections"]["subscriptions.Payment"] = []
+        payload["sections"]["payments.Payment"] = []
         res = self.client.post(
             "/api/v1/admin/business-setup/restore/preview/",
             {

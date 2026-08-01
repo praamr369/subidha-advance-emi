@@ -4,7 +4,7 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from subscriptions.models import Commission, Payment
-from subscriptions.services.commission_service import create_commission_for_payment
+from commissions.services.commission_service import create_commission_for_payment
 
 
 def _to_decimal(value) -> Decimal:

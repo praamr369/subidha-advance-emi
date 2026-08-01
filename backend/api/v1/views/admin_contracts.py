@@ -13,7 +13,7 @@ from api.v1.serializers.contracts import (
 from subscriptions.services.subscription_financial_service import (
     get_subscription_detail_queryset,
 )
-from subscriptions.services.rent_lease_contract_service import (
+from contracts.services.rent_lease_contract_service import (
     create_lease_contract,
     create_rent_contract,
 )
@@ -25,7 +25,7 @@ from subscriptions.models import (
     PlanType,
     Subscription,
 )
-from subscriptions.services.document_pdf_service import (
+from contracts.services.document_pdf_service import (
     render_lease_contract_pdf,
     render_rent_contract_pdf,
     render_return_inspection_pdf,
@@ -59,7 +59,7 @@ class AdminRentContractCreateView(APIView):
             save_as_draft=bool(data.get("save_as_draft", False)),
         )
 
-        from subscriptions.services.contract_pdf_service import generate_contract_pdf_for_subscription
+        from contracts.services.contract_pdf_service import generate_contract_pdf_for_subscription
         generate_contract_pdf_for_subscription(subscription=subscription, performed_by=request.user)
 
         refreshed = get_subscription_detail_queryset().get(pk=subscription.pk)
@@ -91,7 +91,7 @@ class AdminLeaseContractCreateView(APIView):
             save_as_draft=bool(data.get("save_as_draft", False)),
         )
 
-        from subscriptions.services.contract_pdf_service import generate_contract_pdf_for_subscription
+        from contracts.services.contract_pdf_service import generate_contract_pdf_for_subscription
         generate_contract_pdf_for_subscription(subscription=subscription, performed_by=request.user)
 
         refreshed = get_subscription_detail_queryset().get(pk=subscription.pk)
@@ -169,7 +169,7 @@ class ContractApproveView(APIView):
         if sub is None:
             return Response({"detail": "Contract not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        from subscriptions.services.contract_lifecycle_service import approve_contract
+        from contracts.services.contract_lifecycle_service import approve_contract
         from django.core.exceptions import ValidationError
         try:
             sub = approve_contract(subscription=sub, performed_by=request.user)
@@ -190,7 +190,7 @@ class ContractActivateView(APIView):
         if sub is None:
             return Response({"detail": "Contract not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        from subscriptions.services.contract_lifecycle_service import activate_contract
+        from contracts.services.contract_lifecycle_service import activate_contract
         from django.core.exceptions import ValidationError
         try:
             sub = activate_contract(subscription=sub, performed_by=request.user)
@@ -214,7 +214,7 @@ class ContractCancelView(APIView):
         reason = (request.data.get("reason") or "").strip()
         force = bool(request.data.get("force_after_activation", False))
 
-        from subscriptions.services.operational_cancellation_service import cancel_subscription
+        from contracts.services.operational_cancellation_service import cancel_subscription
         from django.core.exceptions import ValidationError
         try:
             cancel_subscription(
@@ -240,7 +240,7 @@ class ContractCloseView(APIView):
         if sub is None:
             return Response({"detail": "Contract not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        from subscriptions.services.contract_lifecycle_service import close_contract
+        from contracts.services.contract_lifecycle_service import close_contract
         from django.core.exceptions import ValidationError
         try:
             sub = close_contract(subscription=sub, performed_by=request.user)
@@ -284,7 +284,7 @@ class ContractAmendmentListCreateView(APIView):
         if sub is None:
             return Response({"detail": "Contract not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        from subscriptions.services.contract_amendment_service import create_amendment
+        from contracts.services.contract_amendment_service import create_amendment
         from django.core.exceptions import ValidationError
         try:
             amendment = create_amendment(
@@ -313,7 +313,7 @@ class ContractAmendmentApproveView(APIView):
         except ContractAmendment.DoesNotExist:
             return Response({"detail": "Amendment not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        from subscriptions.services.contract_amendment_service import approve_amendment
+        from contracts.services.contract_amendment_service import approve_amendment
         from django.core.exceptions import ValidationError
         try:
             amendment = approve_amendment(amendment=amendment, approved_by=request.user)
@@ -333,7 +333,7 @@ class ContractAmendmentRejectView(APIView):
         except ContractAmendment.DoesNotExist:
             return Response({"detail": "Amendment not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        from subscriptions.services.contract_amendment_service import reject_amendment
+        from contracts.services.contract_amendment_service import reject_amendment
         from django.core.exceptions import ValidationError
         try:
             amendment = reject_amendment(
@@ -357,7 +357,7 @@ class ContractAmendmentApplyView(APIView):
         except ContractAmendment.DoesNotExist:
             return Response({"detail": "Amendment not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        from subscriptions.services.contract_amendment_service import apply_amendment
+        from contracts.services.contract_amendment_service import apply_amendment
         from django.core.exceptions import ValidationError
         try:
             # Legacy lifecycle endpoint kept for backward-compatible clients only.
@@ -400,7 +400,7 @@ class ContractPossessionView(APIView):
         if sub is None:
             return Response({"detail": "Contract not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        from subscriptions.services.product_possession_service import create_possession_record
+        from deliveries.services.product_possession_service import create_possession_record
         from django.core.exceptions import ValidationError
         try:
             possession = create_possession_record(
@@ -425,7 +425,7 @@ class ContractHandoverView(APIView):
         if not possession:
             return Response({"detail": "No possession record found."}, status=status.HTTP_404_NOT_FOUND)
 
-        from subscriptions.services.product_possession_service import record_handover
+        from deliveries.services.product_possession_service import record_handover
         from django.core.exceptions import ValidationError
         try:
             possession = record_handover(
@@ -449,7 +449,7 @@ class ContractInitiateReturnView(APIView):
         if not possession:
             return Response({"detail": "No possession record found."}, status=status.HTTP_404_NOT_FOUND)
 
-        from subscriptions.services.product_possession_service import initiate_return
+        from deliveries.services.product_possession_service import initiate_return
         from django.core.exceptions import ValidationError
         try:
             possession = initiate_return(
@@ -494,7 +494,7 @@ class ContractReturnInspectionView(APIView):
         if sub is None:
             return Response({"detail": "Contract not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        from subscriptions.services.return_inspection_service import create_return_inspection
+        from deliveries.services.return_inspection_service import create_return_inspection
         from django.core.exceptions import ValidationError
         try:
             inspection = create_return_inspection(subscription=sub, performed_by=request.user)
@@ -513,7 +513,7 @@ class ContractReturnInspectionRecordView(APIView):
         if not inspection:
             return Response({"detail": "No inspection found."}, status=status.HTTP_404_NOT_FOUND)
 
-        from subscriptions.services.return_inspection_service import record_inspection
+        from deliveries.services.return_inspection_service import record_inspection
         from django.core.exceptions import ValidationError
         from decimal import Decimal, InvalidOperation
         try:
@@ -545,7 +545,7 @@ class ContractReturnInspectionApproveView(APIView):
         if not inspection:
             return Response({"detail": "No inspection found."}, status=status.HTTP_404_NOT_FOUND)
 
-        from subscriptions.services.return_inspection_service import approve_inspection
+        from deliveries.services.return_inspection_service import approve_inspection
         from django.core.exceptions import ValidationError
         try:
             inspection = approve_inspection(inspection=inspection, approved_by=request.user)

@@ -8,7 +8,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 
 from subscriptions.models_crm_pipeline import CRMPipeline
-from subscriptions.services.crm_approval_service import (
+from crm.services.crm_approval_service import (
     approve_online_request,
     move_pipeline_stage,
     get_pipeline_metrics,

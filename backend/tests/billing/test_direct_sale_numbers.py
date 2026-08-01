@@ -30,7 +30,7 @@ from billing.services.billing_service import (
     create_direct_sale,
 )
 from subscriptions.models import ContractReference, ContractReferenceType
-from subscriptions.services.contract_number_service import assign_direct_sale_number
+from contracts.services.contract_number_service import assign_direct_sale_number
 
 
 # ---------------------------------------------------------------------------

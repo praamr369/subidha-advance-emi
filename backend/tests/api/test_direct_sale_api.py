@@ -8,8 +8,8 @@ from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount
 from accounting.services.document_sequence_service import DocumentType
 from billing.models import ReceiptDocument
 from inventory.models import InventoryItem, PurchaseNeed, PurchaseNeedStatus
-from subscriptions.services.product_possession_service import record_handover
-from subscriptions.services.rent_lease_contract_service import create_rent_contract
+from deliveries.services.product_possession_service import record_handover
+from contracts.services.rent_lease_contract_service import create_rent_contract
 from tests.helpers import (
     create_admin_user,
     create_customer_profile,

@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 
-from subscriptions.services.contract_reference_service import (
+from contracts.services.contract_reference_service import (
     backfill_contract_references,
 )
 

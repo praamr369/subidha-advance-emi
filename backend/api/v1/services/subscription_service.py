@@ -9,7 +9,7 @@ from rest_framework import serializers
 
 from accounting.services.non_gst_document_service import build_non_gst_snapshot
 from subscriptions.models import Batch, LuckyId, LuckyIdStatus, PlanType, Subscription
-from subscriptions.services.emi_engine import generate_emi_schedule
+from payments.services.emi_engine import generate_emi_schedule
 
 from api.v1.selectors.subscription_selector import (
     get_batch_by_id,

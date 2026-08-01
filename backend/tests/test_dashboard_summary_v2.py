@@ -9,7 +9,7 @@ from subscriptions.services.dashboard_canonical_financial_summary_service import
     resolve_dashboard_window,
 )
 from subscriptions.services.dashboard_scopes import AdminScope
-from subscriptions.services.payment_service import record_emi_payment
+from payments.services.payment_service import record_emi_payment
 from tests.helpers import (
     create_admin_user,
     create_batch,

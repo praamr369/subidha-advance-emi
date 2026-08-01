@@ -6,10 +6,10 @@ from rest_framework import serializers
 from api.v1.serializers.delivery import CustomerSubscriptionDeliveryReadSerializer
 from api.v1.serializers.media import serialize_media_url
 from subscriptions.models import Emi, Payment, Subscription
-from subscriptions.services.delivery_service import (
+from deliveries.services.delivery_service import (
     get_current_subscription_delivery,
 )
-from subscriptions.services.contract_number_service import (
+from contracts.services.contract_number_service import (
     get_or_assign_subscription_number,
 )
 from subscriptions.services.subscription_financial_service import (
@@ -172,7 +172,7 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
         if obj.plan_type not in ["RENT", "LEASE"]:
             return "NOT_REQUIRED"
         try:
-            from subscriptions.services.contract_activation_readiness_service import _deposit_readiness
+            from contracts.services.contract_activation_readiness_service import _deposit_readiness
             deposit = _deposit_readiness(obj)
             if deposit.get("required"):
                 return "SUBMITTED" if deposit.get("ready") else "PENDING"

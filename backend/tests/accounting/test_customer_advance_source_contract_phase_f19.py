@@ -16,8 +16,8 @@ from accounting.services.accounting_bridge_customer_advance_guard_service import
 from billing.models import BillingDocumentStatus, BillingSourceType, ReceiptDocument, ReceiptType
 from reconciliation.models import ReconciliationItem
 from subscriptions.models import CustomerAdvance, CustomerAdvanceAllocation, Payment
-from subscriptions.services.customer_advance_service import CustomerAdvanceService
-from subscriptions.services.payment_allocation_service import PaymentAllocationService
+from payments.services.customer_advance_service import CustomerAdvanceService
+from payments.services.payment_allocation_service import PaymentAllocationService
 from tests.accounting.helpers import seed_bridge_ready_environment
 from tests.helpers import create_admin_user, create_batch, create_customer_profile, create_emi, create_lucky_id, create_product, create_subscription
 

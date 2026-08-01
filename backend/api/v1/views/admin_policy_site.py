@@ -45,7 +45,7 @@ from subscriptions.services.business_compliance_review_actions import (
     revoke_public_summary,
     update_document_metadata,
 )
-from subscriptions.services.waiver_classification_service import (
+from lucky_plan.services.waiver_classification_service import (
     WAIVER_CLASSIFICATION_MATRIX,
     classify_waiver_from_dict,
 )

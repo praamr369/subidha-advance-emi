@@ -292,7 +292,7 @@ def get_unified_payables(payable_type=None, search=None, status_category=None, p
     # 6. Customer Deposit & Credit Refunds
     if (not payable_type or payable_type in ("credit_refund", "deposit_refund")) and _party_ok("CUSTOMER"):
         if status_category in ["READY_TO_PAY", "ALL", None]:
-            from subscriptions.services.rent_lease_billing_service import list_admin_deposit_register
+            from contracts.services.rent_lease_billing_service import list_admin_deposit_register
             dep_data = list_admin_deposit_register(limit=500)
             for row in dep_data.get("results", []):
                 if row.get("can_record_refund") or row.get("can_approve_refund"):
@@ -547,7 +547,7 @@ def execute_unified_payable(payload, executed_by, idempotency_key=None, fingerpr
 
         elif payable_type in ("credit_refund", "deposit_refund"):
             from subscriptions.models import Subscription
-            from subscriptions.services.rent_lease_billing_service import record_deposit_refund
+            from contracts.services.rent_lease_billing_service import record_deposit_refund
             sub = Subscription.objects.get(id=payable_id)
             demand = record_deposit_refund(
                 subscription=sub,

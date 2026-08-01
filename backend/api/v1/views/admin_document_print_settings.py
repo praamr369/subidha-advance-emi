@@ -5,7 +5,7 @@ from rest_framework.views import APIView
 
 from api.v1.permissions import IsAdmin
 from api.v1.serializers.business_setup import DocumentPrintSettingsSerializer
-from subscriptions.services.document_print_settings_service import get_or_create_document_print_settings
+from contracts.services.document_print_settings_service import get_or_create_document_print_settings
 
 
 class AdminDocumentPrintSettingsView(APIView):

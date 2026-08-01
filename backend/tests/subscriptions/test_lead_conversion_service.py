@@ -3,7 +3,7 @@ from decimal import Decimal
 from django.contrib.auth.models import User
 from subscriptions.models import Customer, PublicLead, OnlineRequest
 from billing.models import DirectSale
-from subscriptions.services.lead_conversion_service import LeadConversionService
+from crm.services.lead_conversion_service import LeadConversionService
 
 pytestmark = pytest.mark.django_db
 

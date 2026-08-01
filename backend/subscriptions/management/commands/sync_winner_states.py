@@ -9,7 +9,7 @@ from subscriptions.models import (
     Subscription,
     SubscriptionStatus,
 )
-from subscriptions.services.winner_state_service import sync_winner_state
+from lucky_plan.services.winner_state_service import sync_winner_state
 
 
 class Command(BaseCommand):
