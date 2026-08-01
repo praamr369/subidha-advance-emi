@@ -127,21 +127,12 @@ class CollectionControlCenterApiTests(APITestCase):
         self.assertFalse(diagnostic[0]["selectable_for_collection"])
         self.assertIn("diagnostic only", diagnostic[0]["collection_blocker_reason"])
 
-    def test_rent_lease_lane_remains_deferred(self):
-        # The rent/lease posting bridge is auto-ready when its mapping is valid;
-        # keeping the lane deferred now requires an explicit disable (2026-07-27).
-        from django.utils import timezone as _tz
-        from contracts.services.rent_lease_posting_bridge_config_service import (
-            get_rent_lease_posting_bridge_config,
-        )
-        config = get_rent_lease_posting_bridge_config()
-        config.is_enabled = False
-        config.disabled_at = _tz.now()
-        config.save()
-
+    def test_rent_lease_lane_is_enabled(self):
+        # Rent/lease collection is now an enabled lane (consistent with cashiers
+        # being able to collect rent); it routes to the unified collection search.
         self.client.force_authenticate(self.admin)
         response = self.client.get("/api/v1/admin/collections/control-center/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         lane = next(item for item in response.data["collection_lanes"] if item["key"] == "rent_lease")
-        self.assertFalse(lane["enabled"])
-        self.assertIsNone(lane["route"])
+        self.assertTrue(lane["enabled"])
+        self.assertIsNotNone(lane["route"])

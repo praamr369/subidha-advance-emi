@@ -308,7 +308,12 @@ class CustomerDirectSaleSummaryView(APIView):
         customer = _customer_or_404(request)
         if customer is None:
             return _customer_missing_response()
-        queryset = _direct_sale_queryset_for_customer(customer).exclude(status__in=INACTIVE_DIRECT_SALE_STATUSES)
+        # Draft sales are not finalized payable dues, so exclude them from the
+        # customer-facing summary alongside cancelled/void statuses (a draft's
+        # balance must not show up as an outstanding due).
+        queryset = _direct_sale_queryset_for_customer(customer).exclude(
+            status__in=INACTIVE_DIRECT_SALE_STATUSES | {"DRAFT"}
+        )
         latest = queryset.first()
         latest_payload = None
         if latest is not None:

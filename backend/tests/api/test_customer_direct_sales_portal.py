@@ -235,8 +235,9 @@ class CustomerDirectSalesPortalApiTests(APITestCase):
         self.client.force_authenticate(user=self.customer_user)
         response = self.client.get("/api/v1/customer/direct-sales/summary/")
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-        # Draft/cancelled invoices are excluded from the customer-facing count.
-        self.assertEqual(response.data["total_direct_sale_invoices"], 2)
+        # Cancelled AND draft sales are excluded (only the finalized "own" sale
+        # remains; the walk-in has no customer_id, cancelled/draft are filtered).
+        self.assertEqual(response.data["total_direct_sale_invoices"], 1)
         self.assertEqual(Decimal(response.data["total_paid_direct_sale_amount"]), Decimal("1500.00"))
         self.assertEqual(Decimal(response.data["total_outstanding_direct_sale_dues"]), Decimal("3000.00"))
 
