@@ -596,6 +596,10 @@ class PartnerCustomerKycRequest(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
+        # Physical table was created under the subscriptions app (migration 0128)
+        # and moved to customers state-only; the db_table pin was lost in the
+        # split, so the model looked for a non-existent customers_* table.
+        db_table = "subscriptions_partnercustomerkycrequest"
         ordering = ["-created_at"]
         indexes = [
             models.Index(fields=["partner", "status"]),

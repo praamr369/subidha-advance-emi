@@ -127,7 +127,7 @@ class BillingWorkspacePreviewApiTests(TestCase):
         )
         self.assertIn(response.status_code, [200, 400], response.data)
 
-    def test_cashier_rent_collect_is_rejected(self):
+    def test_cashier_rent_collect_is_allowed(self):
         self.product.is_rent_enabled = True
         self.product.save(update_fields=["is_rent_enabled"])
         rent_subscription = create_rent_contract(
@@ -151,4 +151,5 @@ class BillingWorkspacePreviewApiTests(TestCase):
             },
             format="json",
         )
-        self.assertEqual(response.status_code, 400, response.data)
+        # Cashiers are permitted to collect rent receivables (behavior change).
+        self.assertEqual(response.status_code, 201, response.data)

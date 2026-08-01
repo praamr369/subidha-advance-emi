@@ -8,6 +8,7 @@ from decimal import Decimal, InvalidOperation
 from urllib import request
 
 from django.conf import settings
+from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.http import FileResponse, Http404
 from django.db import models, transaction
@@ -1368,10 +1369,34 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='change-user-password')
     def change_user_password(self, request, pk=None):
-        return Response(
-            {"detail": "Security Upgrade: Cannot change password for non-staff users. Please instruct them to use the password reset flow."},
-            status=403
+        customer = self.get_object()
+        user = getattr(customer, "user", None)
+        if user is None:
+            return Response({"detail": "This customer has no login account."}, status=400)
+
+        new_password = (request.data.get("password") or "").strip()
+        if not new_password:
+            return Response({"detail": "Password is required."}, status=400)
+        try:
+            validate_password(new_password, user)
+        except ValidationError as exc:
+            return Response({"password": list(exc.messages)}, status=400)
+
+        user.set_password(new_password)
+        user.save(update_fields=["password"])
+
+        # Audited; the plaintext password is never stored or echoed back.
+        AuditLog.objects.create(
+            action_type=AuditLog.ActionType.USER_PASSWORD_RESET,
+            model_name="User",
+            object_id=customer.user_id,
+            performed_by=request.user,
+            metadata={
+                "origin": "ADMIN_CUSTOMER_WORKFLOW",
+                "customer_id": customer.id,
+            },
         )
+        return Response({"detail": "Password updated successfully."}, status=200)
 
     @action(detail=False, methods=["get"], url_path="operational-summary")
     def operational_summary(self, request):
