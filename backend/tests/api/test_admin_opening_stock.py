@@ -22,7 +22,9 @@ from tests.helpers import (
     create_cashier_user,
     create_partner_user,
     create_product,
+    ensure_test_accounting_posting_prerequisites,
 )
+from accounting.services.setup_defaults_service import apply_accounting_setup_defaults
 
 
 class AdminOpeningStockApiTests(APITestCase):
@@ -30,6 +32,10 @@ class AdminOpeningStockApiTests(APITestCase):
         super().setUp()
         self.admin = create_admin_user(username="opening_stock_admin", phone="9388001001")
         self.client.force_authenticate(self.admin)
+        # Opening-stock ledger posting needs the default chart of accounts
+        # (INVENTORY_ASSET etc.) and an open accounting period.
+        apply_accounting_setup_defaults(performed_by=self.admin)
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         self.product = create_product(
             name="Opening Item",
             product_code="OS-ITEM-001",

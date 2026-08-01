@@ -372,6 +372,8 @@ class AdminLeadApiTests(APITestCase):
             sku="LEAD-RETAIL-SKU-001",
             opening_stock_qty=Decimal("4.000"),
         )
+        from tests.helpers import ensure_test_accounting_posting_prerequisites
+        ensure_test_accounting_posting_prerequisites(posting_date=date(2026, 4, 10))
         direct_sale = create_direct_sale(
             payload={
                 "sale_date": date(2026, 4, 10),

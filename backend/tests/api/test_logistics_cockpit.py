@@ -13,6 +13,8 @@ from tests.helpers import (
     create_product,
     create_admin_user,
     create_user,
+    create_batch,
+    create_lucky_id,
 )
 from inventory.models import StockLocation, StockLocationType, InventoryItem
 
@@ -32,7 +34,12 @@ class AdminLogisticsCockpitViewTests(APITestCase):
             reorder_level_qty=Decimal("5.000")
         )
         
-        self.subscription = create_subscription(customer=self.customer, product=self.product)
+        self.batch = create_batch(batch_code="LOGI-BATCH-1")
+        self.lucky_id = create_lucky_id(batch=self.batch, lucky_number=1)
+        self.subscription = create_subscription(
+            customer=self.customer, product=self.product,
+            batch=self.batch, lucky_id=self.lucky_id,
+        )
         self.sub_delivery_today = SubscriptionDelivery.objects.create(
             subscription=self.subscription,
             status=DeliveryStatus.PENDING,

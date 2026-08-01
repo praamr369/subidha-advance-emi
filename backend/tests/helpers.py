@@ -35,6 +35,17 @@ from subscriptions.models import (
 )
 
 
+import itertools as _itertools
+
+# Distinct "999" prefix so auto-generated test phones never collide with the
+# explicit numbers other helpers use (90.., 93.., …).
+_test_phone_seq = _itertools.count(1)
+
+
+def _next_test_phone() -> str:
+    return f"999{next(_test_phone_seq):07d}"
+
+
 def create_user(
     *,
     username: str,
@@ -47,6 +58,10 @@ def create_user(
     is_superuser: bool = False,
 ):
     ensure_default_payment_collection_accounts()
+    if not phone:
+        # User.phone is required (model clean) and unique, so generate a
+        # distinct number when a caller doesn't supply one.
+        phone = _next_test_phone()
     return User.objects.create_user(
         username=username,
         password=password,
