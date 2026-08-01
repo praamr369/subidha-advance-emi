@@ -534,6 +534,12 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
+    # Global baseline throttling. Endpoint-specific scoped throttles (login,
+    # payment_mutation, …) still apply on top of these.
+    "DEFAULT_THROTTLE_CLASSES": [
+        "api.v1.throttles.role_aware.RoleAwareUserRateThrottle",
+        "rest_framework.throttling.AnonRateThrottle",
+    ],
     "DEFAULT_THROTTLE_RATES": {
         "auth_login": "20/minute",
         "forgot_password": "10/hour",
@@ -541,6 +547,18 @@ REST_FRAMEWORK = {
         "reset_password": "20/hour",
         "payment_mutation": "60/minute",
         "username_change_self": "5/hour",
+        # Anonymous baseline.
+        "anon": "120/minute",
+        # Role-aware per-user baselines (generous — a cap on abuse, not normal
+        # use). Admin/staff run bulk dashboards and hit many endpoints, so they
+        # get much higher ceilings than partner/customer portals. Tune per env.
+        "role_admin": "6000/minute",
+        "role_staff": "3000/minute",
+        "role_cashier": "3000/minute",
+        "role_partner": "600/minute",
+        "role_vendor": "600/minute",
+        "role_customer": "300/minute",
+        "role_default": "300/minute",
     },
 }
 
