@@ -23,6 +23,11 @@ class AdminLogisticsCockpitViewTests(APITestCase):
     def setUp(self):
         self.admin_user = create_user(username="admin_test123", is_staff=True, is_superuser=True)
         self.staff_user = create_user(username="staff_test123", is_staff=True, is_superuser=False)
+        # DirectSale creation needs document numbering (financial_year/doc_series).
+        from tests.helpers import ensure_test_accounting_posting_prerequisites
+        from accounting.services.setup_defaults_service import apply_accounting_setup_defaults
+        apply_accounting_setup_defaults(performed_by=self.admin_user)
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin_user)
         self.customer = create_customer_profile()
         self.product = create_product()
 
@@ -34,12 +39,19 @@ class AdminLogisticsCockpitViewTests(APITestCase):
             reorder_level_qty=Decimal("5.000")
         )
         
+        # One active delivery per subscription is enforced by
+        # uq_active_subscription_delivery_per_subscription, so each delivery
+        # below needs its own subscription (same batch, distinct lucky IDs).
         self.batch = create_batch(batch_code="LOGI-BATCH-1")
-        self.lucky_id = create_lucky_id(batch=self.batch, lucky_number=1)
-        self.subscription = create_subscription(
-            customer=self.customer, product=self.product,
-            batch=self.batch, lucky_id=self.lucky_id,
-        )
+
+        def _make_subscription(lucky_number):
+            lucky_id = create_lucky_id(batch=self.batch, lucky_number=lucky_number)
+            return create_subscription(
+                customer=self.customer, product=self.product,
+                batch=self.batch, lucky_id=lucky_id,
+            )
+
+        self.subscription = _make_subscription(1)
         self.sub_delivery_today = SubscriptionDelivery.objects.create(
             subscription=self.subscription,
             status=DeliveryStatus.PENDING,
@@ -47,13 +59,13 @@ class AdminLogisticsCockpitViewTests(APITestCase):
             delivery_reference="SUB-DEL-1"
         )
         self.sub_delivery_overdue = SubscriptionDelivery.objects.create(
-            subscription=self.subscription,
+            subscription=_make_subscription(2),
             status=DeliveryStatus.PENDING,
             scheduled_date=timezone.localdate() - timedelta(days=2),
             delivery_reference="SUB-DEL-2"
         )
         self.sub_delivery_future = SubscriptionDelivery.objects.create(
-            subscription=self.subscription,
+            subscription=_make_subscription(3),
             status=DeliveryStatus.SCHEDULED,
             scheduled_date=timezone.localdate() + timedelta(days=2),
             delivery_reference="SUB-DEL-3"
@@ -62,6 +74,7 @@ class AdminLogisticsCockpitViewTests(APITestCase):
             subscription=self.subscription,
             status=DeliveryStatus.DELIVERED,
             scheduled_date=timezone.localdate(),
+            delivered_at=timezone.now(),
             delivery_reference="SUB-DEL-4"
         )
 
