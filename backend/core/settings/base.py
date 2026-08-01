@@ -413,6 +413,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "corsheaders",
     "rest_framework",
+    "drf_spectacular",
     "django_filters",
     "rest_framework_simplejwt.token_blacklist",
     "accounts",
@@ -521,6 +522,7 @@ STORAGES = {
 AUTH_USER_MODEL = "accounts.User"
 
 REST_FRAMEWORK = {
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
@@ -539,6 +541,28 @@ REST_FRAMEWORK = {
         "reset_password": "20/hour",
         "payment_mutation": "60/minute",
         "username_change_self": "5/hour",
+    },
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Subidha Advance EMI API",
+    "DESCRIPTION": (
+        "Internal API for the Subidha ERP (subscriptions/EMI, rent/lease, "
+        "payments, accounting, CRM, lucky plan, and admin operations). "
+        "All endpoints are served under /api/v1/."
+    ),
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,  # don't expose the raw schema on the Swagger view
+    "SCHEMA_PATH_PREFIX": r"/api/v1",
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SORT_OPERATIONS": True,
+    # Large surface (~1,300 endpoints) — keep schema generation resilient so one
+    # bad view doesn't abort the whole document.
+    "DISABLE_ERRORS_AND_WARNINGS": False,
+    "SWAGGER_UI_SETTINGS": {
+        "deepLinking": True,
+        "persistAuthorization": True,
+        "displayOperationId": False,
     },
 }
 
