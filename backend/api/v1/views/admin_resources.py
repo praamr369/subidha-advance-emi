@@ -10,7 +10,7 @@ from urllib import request
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.http import FileResponse, Http404
-from django.db import transaction
+from django.db import models, transaction
 from django.db.models import Count, Prefetch, Q, Sum, Value, DecimalField, IntegerField, OuterRef, Subquery
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404

@@ -1,7 +1,7 @@
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator, RegexValidator, MinLengthValidator
 from django.utils import timezone
-from django.db.models import Q, F
+from django.db.models import Q, F, Sum
 from decimal import Decimal
 from django.conf import settings
 from subscriptions.enums import *

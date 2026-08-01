@@ -4,7 +4,7 @@ from decimal import Decimal
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind
+from accounting.models import ChartOfAccount, ChartOfAccountType, DocumentSequence, FinanceAccount, FinanceAccountKind
 from accounting.services.document_sequence_service import DocumentType
 from billing.models import ReceiptDocument
 from inventory.models import InventoryItem, PurchaseNeed, PurchaseNeedStatus

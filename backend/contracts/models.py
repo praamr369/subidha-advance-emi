@@ -208,6 +208,10 @@ class Subscription(TimeStampedModel):
             # CTRL-LP-5 — once the batch is LOCKED or beyond, no new subscriptions
             # may be enrolled; the eligible-pool snapshot is frozen at lock time.
             if not self.pk and self.batch_id:
+                # Local import: contracts loads before lucky_plan in INSTALLED_APPS,
+                # so importing the Batch model at module top would risk
+                # AppRegistryNotReady. clean() runs at request time, so it's safe here.
+                from lucky_plan.models import Batch
                 locked_statuses = {BatchStatus.LOCKED, BatchStatus.COMPLETED, BatchStatus.CLOSED}
                 batch_status = self.batch.status if hasattr(self, '_batch_cache') else (
                     Batch.objects.filter(pk=self.batch_id).values_list("status", flat=True).first()
@@ -276,6 +280,11 @@ class Subscription(TimeStampedModel):
         with transaction.atomic():
             super().save(*args, **kwargs)
 
+            # Local import: contracts loads before lucky_plan in INSTALLED_APPS,
+            # so a module-level import would risk AppRegistryNotReady. save()
+            # runs at request time, so it's safe here.
+            from lucky_plan.models import LuckyId
+
             if self.plan_type == PlanType.EMI and self.lucky_id_id:
                 has_winner_history = (
                     self.status == SubscriptionStatus.WON
@@ -295,6 +304,9 @@ class Subscription(TimeStampedModel):
                     )
 
     def net_paid_amount(self) -> Decimal:
+        # Local import: payments loads after contracts in INSTALLED_APPS.
+        from payments.models import FinancialLedger
+
         effective_paid = (
             FinancialLedger.objects.filter(
                 emi__subscription=self,
