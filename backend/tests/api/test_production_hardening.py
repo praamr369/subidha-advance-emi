@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -23,7 +24,7 @@ class ProductionHardeningTests(TestCase):
         ALLOWED_HOSTS=["localhost"],
         CELERY_BROKER_URL="",
         DEFAULT_FROM_EMAIL="ops@example.com",
-        BACKUP_ROOT="/tmp",
+        BACKUP_ROOT=tempfile.gettempdir(),
         SESSION_COOKIE_SECURE=True,
         CSRF_COOKIE_SECURE=True,
         CSRF_TRUSTED_ORIGINS=["https://example.com"],
@@ -72,7 +73,7 @@ class ProductionHardeningTests(TestCase):
         DEBUG=False,
         ALLOWED_HOSTS=["example.com"],
         CELERY_BROKER_URL="",
-        BACKUP_ROOT="/tmp",
+        BACKUP_ROOT=tempfile.gettempdir(),
         SECRET_KEY="safe-secret-key-for-tests",
         SESSION_COOKIE_SECURE=True,
         CSRF_COOKIE_SECURE=True,
@@ -98,7 +99,7 @@ class ProductionHardeningTests(TestCase):
         DEBUG=False,
         ALLOWED_HOSTS=["example.com"],
         CELERY_BROKER_URL="",
-        BACKUP_ROOT="/tmp",
+        BACKUP_ROOT=tempfile.gettempdir(),
         SECRET_KEY="safe-secret-key-for-tests",
         SESSION_COOKIE_SECURE=True,
         CSRF_COOKIE_SECURE=True,
@@ -125,7 +126,7 @@ class ProductionHardeningTests(TestCase):
         DEBUG=False,
         ALLOWED_HOSTS=["example.com"],
         CELERY_BROKER_URL="",
-        BACKUP_ROOT="/tmp",
+        BACKUP_ROOT=tempfile.gettempdir(),
         SECRET_KEY="safe-secret-key-for-tests",
         SESSION_COOKIE_SECURE=True,
         CSRF_COOKIE_SECURE=True,
@@ -142,7 +143,7 @@ class ProductionHardeningTests(TestCase):
         DEBUG=False,
         ALLOWED_HOSTS=["example.com"],
         CELERY_BROKER_URL="",
-        BACKUP_ROOT="/tmp",
+        BACKUP_ROOT=tempfile.gettempdir(),
         SECRET_KEY="safe-secret-key-for-tests",
         SESSION_COOKIE_SECURE=True,
         CSRF_COOKIE_SECURE=True,
