@@ -1,6 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from api.v1.permissions import IsAdmin
 from rest_framework import status
 from django.db.models import Q
 from accounting.models import FinanceAccount
@@ -11,7 +12,7 @@ from accounting.services.unified_payable_service import (
 )
 
 class AdminUnifiedPayableView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdmin]
 
     def get(self, request, *args, **kwargs):
         payable_type = request.query_params.get("payable_type")
@@ -29,7 +30,7 @@ class AdminUnifiedPayableView(APIView):
         return Response(data)
 
 class AdminPayableActionView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdmin]
 
     def post(self, request, *args, **kwargs):
         payload = request.data
@@ -45,7 +46,7 @@ class AdminPayableActionView(APIView):
             return Response({"error": "An internal error occurred during payable action.", "detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class AdminPayableFinanceAccountsView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdmin]
 
     def get(self, request, *args, **kwargs):
         accounts = FinanceAccount.objects.select_related("branch").filter(
@@ -66,7 +67,7 @@ class AdminPayableFinanceAccountsView(APIView):
         return Response(results)
 
 class AdminPayableExecuteView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdmin]
 
     def post(self, request, *args, **kwargs):
         payload = request.data

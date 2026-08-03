@@ -8,6 +8,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.db import transaction
+from django.http import Http404
 from django.shortcuts import get_object_or_404
 
 from subscriptions.models import Customer, PublicLead, Subscription
@@ -117,6 +118,8 @@ class LeadSubscriptionTrackerView(APIView):
                     }
                 }
             })
+        except Http404:
+            raise
         except Exception as e:
             return Response(
                 {"error": str(e)},
@@ -188,6 +191,8 @@ class LeadConversionTypeView(APIView):
                     },
                 }
             })
+        except Http404:
+            raise
         except Exception as e:
             return Response(
                 {"error": str(e)},

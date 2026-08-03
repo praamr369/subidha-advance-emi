@@ -337,7 +337,7 @@ class AdminVendorQuoteRequestDetailView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def get(self, request, pk: int):
-        row = VendorQuoteRequest.objects.prefetch_related("quotes__vendor").get(pk=pk)
+        row = get_object_or_404(VendorQuoteRequest.objects.prefetch_related("quotes__vendor"), pk=pk)
         return Response(VendorQuoteRequestSerializer(row).data)
 
 

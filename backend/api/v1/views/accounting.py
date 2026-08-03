@@ -1,3 +1,4 @@
+from django.shortcuts import get_object_or_404
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -904,7 +905,7 @@ class JournalGroupBalanceView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def get(self, request, pk):
-        group = JournalEntryGroup.objects.get(pk=pk)
+        group = get_object_or_404(JournalEntryGroup, pk=pk)
         return Response(validate_journal_group_balance(group), status=status.HTTP_200_OK)
 
 

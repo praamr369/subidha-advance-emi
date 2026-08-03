@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.db import transaction
+from django.shortcuts import get_object_or_404
 from rest_framework import permissions
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
@@ -34,7 +35,7 @@ class _AdminBase(APIView):
 
 class AdminCustomerAccountLinkView(_AdminBase):
     def get(self, request, pk: int):
-        customer = Customer.objects.select_related("user").get(pk=pk)
+        customer = get_object_or_404(Customer.objects.select_related("user"), pk=pk)
         return Response({"entity_type": "customer", "entity_id": customer.id, "linked_user": _linked_user_payload(customer.user)})
 
     @transaction.atomic
@@ -145,7 +146,7 @@ class AdminPartnerAccountLinkView(_AdminBase):
 
 class AdminPartyAccountLinkView(_AdminBase):
     def get(self, request, pk: int):
-        party = PartyMaster.objects.get(pk=pk)
+        party = get_object_or_404(PartyMaster, pk=pk)
         user_id = int((party.notes_summary or "").split("linked_user_id:")[-1]) if "linked_user_id:" in (party.notes_summary or "") else None
         user = User.objects.filter(pk=user_id).first() if user_id else None
         return Response({"entity_type": "party", "entity_id": party.id, "linked_user": _linked_user_payload(user)})

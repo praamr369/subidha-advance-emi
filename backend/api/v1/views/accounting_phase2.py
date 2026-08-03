@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 
 from django.http import FileResponse, Http404
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
@@ -359,7 +360,7 @@ class GstExportPackListCreateView(AdminAccountingReportView):
 
 class ItrExportPackDetailView(AdminAccountingReportView):
     def get(self, request, pk: int):
-        job = ExportPackJob.objects.select_related("created_by").get(pk=pk)
+        job = get_object_or_404(ExportPackJob.objects.select_related("created_by"), pk=pk)
         serializer = ExportPackJobSerializer(job)
         return Response(serializer.data)
 
@@ -367,7 +368,7 @@ class ItrExportPackDetailView(AdminAccountingReportView):
 class ItrExportPackDownloadView(AdminAccountingReportView):
     @require_capability("reports.export")
     def get(self, request, pk: int):
-        job = ExportPackJob.objects.get(pk=pk)
+        job = get_object_or_404(ExportPackJob, pk=pk)
         if not job.file_path or not os.path.exists(job.file_path):
             raise Http404("Export pack file is not available.")
         return FileResponse(

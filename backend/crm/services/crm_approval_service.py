@@ -281,12 +281,18 @@ def get_pipeline_metrics(days: int = 30):
     """Get CRM pipeline health metrics"""
     from django.utils import timezone
     from datetime import timedelta
-    from django.db.models import Count, Sum
+    from django.db.models import Count, Sum, Avg, F, DurationField, ExpressionWrapper
 
     end_date = timezone.now()
     start_date = end_date - timedelta(days=days)
 
     pipelines = CRMPipeline.objects.filter(created_at__range=[start_date, end_date])
+
+    avg_duration = pipelines.aggregate(
+        avg_days=Avg(
+            ExpressionWrapper(F('updated_at') - F('created_at'), output_field=DurationField())
+        )
+    )['avg_days']
 
     metrics = {
         'total_leads': pipelines.count(),
@@ -299,11 +305,7 @@ def get_pipeline_metrics(days: int = 30):
         'approved_count': pipelines.filter(current_stage__in=['APPROVED', 'CONVERTED']).count(),
         'converted_count': pipelines.filter(current_stage__in=['CONVERTED', 'ACTIVE', 'WON']).count(),
         'total_revenue': float(pipelines.aggregate(Sum('revenue'))['revenue__sum'] or 0),
-        'average_days_in_pipeline': int(
-            (pipelines.aggregate(
-                avg_days=Sum('updated_at') - Sum('created_at')
-            )['avg_days'] or timedelta(0)).total_seconds() / 86400 / max(pipelines.count(), 1)
-        ),
+        'average_days_in_pipeline': int((avg_duration or timedelta(0)).total_seconds() / 86400),
     }
 
     return metrics

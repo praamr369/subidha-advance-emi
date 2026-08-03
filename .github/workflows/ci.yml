@@ -51,6 +51,14 @@ jobs:
             lucky_plan crm accounting billing inventory growth business_setup \
             finance_control audit products_core
 
+      # Blocking: Layer-A verification gate. Walks the whole /api/v1 surface and
+      # asserts (1) no auth-gated endpoint serves data to anon, (2) no admin-only
+      # endpoint serves data to a non-admin, (3) no GET endpoint 500s on empty
+      # data. This is the automated replacement for hand-checking 2,500+
+      # endpoints; a new privilege leak or crash fails the PR here.
+      - name: Layer-A auth matrix + endpoint smoke
+        run: python manage.py test tests.verification --settings=core.settings.test --verbosity 2
+
       # Reported but NON-BLOCKING until the ~pre-existing suite failures
       # (uq_payment_per_emi + accounting-fixture gaps) are triaged. Flip
       # continue-on-error to false to make the full suite a hard gate.

@@ -173,7 +173,7 @@ class AdminPartnerKycDocumentListUploadView(APIView):
         return get_object_or_404(User, pk=pk, role=UserRole.PARTNER)
 
     def get(self, request, pk):
-        from subscriptions.models_kyc_workflow import PartnerKycDocument
+        from customers.models import PartnerKycDocument
 
         partner = self._get_partner(pk)
         docs = (
@@ -234,7 +234,7 @@ class AdminPartnerKycDocumentApproveView(APIView):
 
     def post(self, request, pk, doc_id):
         from accounts.models import User, UserRole
-        from subscriptions.models_kyc_workflow import PartnerKycDocument
+        from customers.models import PartnerKycDocument
 
         partner = get_object_or_404(User, pk=pk, role=UserRole.PARTNER)
         document = get_object_or_404(PartnerKycDocument, pk=doc_id, partner_user=partner)
@@ -248,7 +248,7 @@ class AdminPartnerKycDocumentRejectView(APIView):
 
     def post(self, request, pk, doc_id):
         from accounts.models import User, UserRole
-        from subscriptions.models_kyc_workflow import PartnerKycDocument
+        from customers.models import PartnerKycDocument
 
         partner = get_object_or_404(User, pk=pk, role=UserRole.PARTNER)
         document = get_object_or_404(PartnerKycDocument, pk=doc_id, partner_user=partner)
@@ -270,7 +270,7 @@ class AdminPartnerKycDocumentResubmitView(APIView):
 
     def post(self, request, pk, doc_id):
         from accounts.models import User, UserRole
-        from subscriptions.models_kyc_workflow import PartnerKycDocument
+        from customers.models import PartnerKycDocument
 
         partner = get_object_or_404(User, pk=pk, role=UserRole.PARTNER)
         document = get_object_or_404(PartnerKycDocument, pk=doc_id, partner_user=partner)
@@ -292,7 +292,7 @@ class AdminPartnerKycDocumentDownloadView(APIView):
 
     def get(self, request, pk, doc_id):
         from accounts.models import User, UserRole
-        from subscriptions.models_kyc_workflow import PartnerKycDocument
+        from customers.models import PartnerKycDocument
 
         partner = get_object_or_404(User, pk=pk, role=UserRole.PARTNER)
         document = get_object_or_404(PartnerKycDocument, pk=doc_id, partner_user=partner)

@@ -5,6 +5,7 @@ from urllib.parse import quote
 from django.conf import settings
 from django.core.mail import send_mail
 from django.db import transaction
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
 from reminders.models import PaymentReminder, ReminderChannel, ReminderStatus, ReminderType
@@ -280,9 +281,10 @@ def generate_whatsapp_link(*, reminder_id: int, performed_by=None) -> dict:
     Delivery is NOT automated — staff must send manually. Call the send action after
     confirming to record the manual send in the audit log.
     """
-    reminder = PaymentReminder.objects.select_related(
-        "target_customer", "target_subscription"
-    ).get(pk=reminder_id)
+    reminder = get_object_or_404(
+        PaymentReminder.objects.select_related("target_customer", "target_subscription"),
+        pk=reminder_id,
+    )
 
     if reminder.status in {ReminderStatus.SENT, ReminderStatus.CANCELLED}:
         raise ValueError(f"Cannot generate WhatsApp link for {reminder.status} reminders.")

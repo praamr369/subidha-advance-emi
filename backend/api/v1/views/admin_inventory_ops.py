@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from django.db import transaction
 from django.db.models import Q
+from django.shortcuts import get_object_or_404
 from rest_framework import permissions, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -59,7 +60,7 @@ class AdminInventoryProfileListView(_AdminBase):
 
 class AdminInventoryProfileDetailView(_AdminBase):
     def get_object(self, pk: int) -> InventoryItem:
-        return InventoryItem.objects.select_related("product").get(pk=pk)
+        return get_object_or_404(InventoryItem.objects.select_related("product"), pk=pk)
 
     def get(self, request, pk):
         item = self.get_object(pk)
@@ -77,18 +78,18 @@ class AdminInventoryProfileDetailView(_AdminBase):
 
 class AdminInventoryProfileStockByLocationView(_AdminBase):
     def get(self, request, pk):
-        item = InventoryItem.objects.select_related("product").get(pk=pk)
+        item = get_object_or_404(InventoryItem.objects.select_related("product"), pk=pk)
         return Response(build_profile_stock_by_location(inventory_item=item))
 
 
 class AdminInventoryProfileManufacturingCostView(_AdminBase):
     def get(self, request, pk):
-        item = InventoryItem.objects.select_related("product").get(pk=pk)
+        item = get_object_or_404(InventoryItem.objects.select_related("product"), pk=pk)
         return Response(build_manufacturing_cost_profile(inventory_item=item))
 
     @transaction.atomic
     def patch(self, request, pk):
-        item = InventoryItem.objects.select_related("product").get(pk=pk)
+        item = get_object_or_404(InventoryItem.objects.select_related("product"), pk=pk)
         serializer = AdminInventoryProfileUpdateSerializer(item, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
