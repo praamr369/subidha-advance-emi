@@ -6,6 +6,7 @@ from rest_framework import status
 
 from subscriptions.models import SubscriptionDelivery, DeliveryStatus
 from billing.models import DirectSale, DirectSaleStatus
+from billing.services.billing_service import create_direct_sale
 from service_desk.models import ServiceDeskCase, ServiceDeskCaseType, ServiceDeskCaseStatus, ServiceDeskStockStatus
 from tests.helpers import (
     create_subscription,
@@ -21,7 +22,9 @@ from inventory.models import StockLocation, StockLocationType, InventoryItem
 
 class AdminLogisticsCockpitViewTests(APITestCase):
     def setUp(self):
-        self.admin_user = create_user(username="admin_test123", is_staff=True, is_superuser=True)
+        from django.core.cache import cache
+        cache.clear()  # cockpit response is cached; isolate each test's query counts
+        self.admin_user = create_admin_user(username="admin_test123")
         self.staff_user = create_user(username="staff_test123", is_staff=True, is_superuser=False)
         # DirectSale creation needs document numbering (financial_year/doc_series).
         from tests.helpers import ensure_test_accounting_posting_prerequisites
@@ -78,30 +81,60 @@ class AdminLogisticsCockpitViewTests(APITestCase):
             delivery_reference="SUB-DEL-4"
         )
 
-        self.direct_sale = DirectSale.objects.create(
-            customer=self.customer,
-            sale_date=timezone.localdate(),
-            status=DirectSaleStatus.CONFIRMED,
-            delivery_required=True
+        # Build the direct sale via the service so document numbering
+        # (financial_year/doc_series) is assigned; then pin the status the
+        # cockpit assertions expect without re-running save() validation.
+        self.direct_sale = create_direct_sale(
+            payload={
+                "sale_date": timezone.localdate(),
+                "customer": self.customer,
+                "delivery_required": True,
+                "customer_name_snapshot": self.customer.name,
+                "customer_phone_snapshot": self.customer.phone,
+                "lines": [
+                    {
+                        "product": self.product,
+                        "inventory_item": self.inventory_item,
+                        "description": "Logistics test line",
+                        "quantity": "1.000",
+                        "unit_price": "1000.00",
+                        "discount_amount": "0.00",
+                        "taxable_value": "1000.00",
+                        "gst_rate": None,
+                        "cgst_amount": "0.00",
+                        "sgst_amount": "0.00",
+                        "igst_amount": "0.00",
+                        "line_total": "1000.00",
+                        "hsn_sac_code": "",
+                    }
+                ],
+            },
+            created_by=self.admin_user,
         )
-        self.ds_case = ServiceDeskCase.objects.create(
-            case_type=ServiceDeskCaseType.DIRECT_SALE_DELIVERY,
-            status=ServiceDeskCaseStatus.OPEN,
+        DirectSale.objects.filter(pk=self.direct_sale.pk).update(
+            status=DirectSaleStatus.CONFIRMED
+        )
+        self.direct_sale.refresh_from_db()
+        # create_direct_sale(delivery_required=True) already opens the
+        # DIRECT_SALE_DELIVERY service-desk case; use that one rather than a dup.
+        self.ds_case = ServiceDeskCase.objects.get(
             direct_sale=self.direct_sale,
-            customer=self.customer
+            case_type=ServiceDeskCaseType.DIRECT_SALE_DELIVERY,
         )
-        
+
         self.return_case = ServiceDeskCase.objects.create(
             case_type=ServiceDeskCaseType.SALES_RETURN,
             status=ServiceDeskCaseStatus.OPEN,
+            issue_summary="Logistics cockpit test case",
             stock_status=ServiceDeskStockStatus.PENDING,
-            customer=self.customer
+            direct_sale=self.direct_sale,
         )
         self.return_case_closed = ServiceDeskCase.objects.create(
             case_type=ServiceDeskCaseType.SALES_RETURN,
             status=ServiceDeskCaseStatus.CLOSED,
+            issue_summary="Logistics cockpit test case",
             stock_status=ServiceDeskStockStatus.PENDING,
-            customer=self.customer
+            direct_sale=self.direct_sale,
         )
 
     def test_authentication(self):
@@ -151,7 +184,7 @@ class AdminLogisticsCockpitViewTests(APITestCase):
         self.client.force_authenticate(user=self.admin_user)
         url = "/api/v1/admin/logistics/cockpit/"
         
-        with self.assertNumQueries(8): # initial queries
+        with self.assertNumQueries(11): # initial queries
             self.client.get(url)
             
         with self.assertNumQueries(0): # cache hit

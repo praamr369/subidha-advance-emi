@@ -59,7 +59,7 @@ class AdminLogisticsCockpitView(APIView):
                 "id": c.id,
                 "type": "DIRECT_SALE",
                 "case_no": c.case_no,
-                "customer_name": c.reporter_name_snapshot or (c.direct_sale.customer_name if getattr(c, 'direct_sale_id', None) else ""),
+                "customer_name": c.reporter_name_snapshot or (c.direct_sale.customer_name_snapshot if getattr(c, 'direct_sale_id', None) else ""),
                 "status": c.status,
                 "scheduled_date": None,
                 "is_overdue": False,
