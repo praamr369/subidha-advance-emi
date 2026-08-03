@@ -10,6 +10,11 @@ Start here.
 - **[PRE_PRODUCTION_CHECKLIST.md](PRE_PRODUCTION_CHECKLIST.md)** — the manual
   go-live gate: all routes, all rules, all services/actions, all workflows, and
   all-pages hygiene, in seven signed-off phases. One person can drive it.
+- **[VERIFICATION_STRATEGY.md](VERIFICATION_STRATEGY.md)** — how to actually
+  execute that checklist feasibly solo: a measured reduction (2,543 endpoints →
+  ~8 auth gates + ~10 base classes; 649 pages → 20 layouts + shared shells), a
+  four-layer method (automate → verify-shared-once → verify-deltas → workflows),
+  a coverage ledger, tooling to build, and a ~2–3 week sequenced plan.
 - **[DATA_ENCRYPTION_AND_HARDENING.md](DATA_ENCRYPTION_AND_HARDENING.md)** —
   current encryption (`secret_crypto`/Fernet), the gaps, and a future-proof,
   solo-operable plan for the safest posture (key separation + rotation, PII at
