@@ -27,15 +27,21 @@ _ANON_ALLOWED_PATHS = {
 }
 
 
+# Every non-admin portal role. NONE of these may reach an IsAdmin endpoint.
+_NON_ADMIN_ROLES = ("CUSTOMER", "PARTNER", "CASHIER", "VENDOR", "STAFF")
+
+
 @override_settings(REST_FRAMEWORK=_RF_NO_THROTTLE)
 class AuthMatrixTest(APITestCase):
     @classmethod
     def setUpTestData(cls):
         User = get_user_model()
-        cls.customer = User.objects.create_user(
-            username="vmatrix_customer", password="Verify123!", role="CUSTOMER",
-            phone="9990000002",
-        )
+        cls.users = {}
+        for i, role in enumerate(_NON_ADMIN_ROLES):
+            cls.users[role] = User.objects.create_user(
+                username=f"vmatrix_{role.lower()}", password="Verify123!", role=role,
+                phone=f"999000{i:04d}",
+            )
         cls.endpoints = list(iter_api_endpoints())
 
     def test_protected_endpoints_reject_anonymous(self):
@@ -55,21 +61,35 @@ class AuthMatrixTest(APITestCase):
                 "\n".join(f"  {s}  {p}  [{v}]" for s, p, v in failures[:25]),
         )
 
-    def test_admin_endpoints_reject_non_admin(self):
-        self.client.force_authenticate(user=self.customer)
-        failures = []
+    def test_admin_endpoints_reject_every_non_admin_role(self):
+        # Privilege escalation: NO portal role (customer/partner/cashier/vendor/
+        # staff) may get a 2xx from an IsAdmin endpoint. DRF enforces permissions
+        # on the VIEW CLASS in initial(), so testing one representative path per
+        # unique admin view class fully covers the permission logic while keeping
+        # the sweep fast enough for a PR gate.
+        seen_view = set()
+        reps = []
         for ep in self.endpoints:
             if not requires_admin(ep):
                 continue
-            resp = self.client.get(ep.path)
-            # A privilege-escalation leak is a 2xx (admin data served to a
-            # non-admin). 403/404/405 mean the customer was correctly blocked.
-            if 200 <= resp.status_code < 300:
-                failures.append((resp.status_code, ep.path, ep.view))
-        self.client.force_authenticate(user=None)
+            key = ep.view_cls or ep.view
+            if key in seen_view:
+                continue
+            seen_view.add(key)
+            reps.append(ep)
+
+        failures = []
+        for role in _NON_ADMIN_ROLES:
+            self.client.force_authenticate(user=self.users[role])
+            for ep in reps:
+                resp = self.client.get(ep.path)
+                # 403/404/405 mean the role was correctly blocked.
+                if 200 <= resp.status_code < 300:
+                    failures.append((role, resp.status_code, ep.path, ep.view))
+            self.client.force_authenticate(user=None)
         self.assertEqual(
             failures, [],
-            msg=f"{len(failures)} admin-only endpoint(s) SERVED admin data to an "
-                f"authenticated CUSTOMER (2xx). First 25:\n" +
-                "\n".join(f"  {s}  {p}  [{v}]" for s, p, v in failures[:25]),
+            msg=f"{len(failures)} admin-only view(s) SERVED admin data to a "
+                f"non-admin portal role (2xx). First 25:\n" +
+                "\n".join(f"  {r:8} {s}  {p}  [{v}]" for r, s, p, v in failures[:25]),
         )
