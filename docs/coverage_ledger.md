@@ -63,7 +63,7 @@ step (`.github/workflows/ci.yml`) — see
 | Accounting **bridge** (operational event → journal) | ⬜ | |
 | Pagination helpers (`AdminListPagination`/`AdminOptInPagination`, `build_paginated_payload`) | ⬜ | |
 | Audit helper (`log_audit`) | ⬜ | |
-| `secret_crypto` (Fernet) | ⬜ | |
+| `secret_crypto` (Fernet) | ✅ | `test_secret_crypto.py` — round-trip, real ciphertext, tamper→"", key bound to SECRET_KEY |
 
 ### Frontend shared parts (verify once, light+dark, mobile+desktop)
 
