@@ -184,86 +184,6 @@ class WorkbenchLeadUpdateView(APIView):
             )
 
 
-class WorkbenchLeadFollowUpView(APIView):
-    """Manage lead follow-up tasks"""
-    permission_classes = [IsAuthenticated, IsAdmin]
-
-    def get(self, request, customer_id, lead_id):
-        """Get follow-up tasks for lead"""
-        try:
-            from subscriptions.models import CRMFollowUpTask
-
-            lead = PublicLead.objects.get(id=lead_id)
-            tasks = CRMFollowUpTask.objects.filter(
-                lead=lead
-            ).order_by('-created_at')
-
-            return Response({
-                "status": "success",
-                "data": [
-                    {
-                        "id": task.id,
-                        "title": task.title or "Follow-up",
-                        "description": task.description or "",
-                        "due_date": task.due_date.isoformat() if task.due_date else None,
-                        "status": task.status,
-                        "created_at": task.created_at.isoformat(),
-                    }
-                    for task in tasks
-                ][:10]  # Last 10 tasks
-            })
-
-        except PublicLead.DoesNotExist:
-            return Response(
-                {"error": "Lead not found"},
-                status=status.HTTP_404_NOT_FOUND
-            )
-        except Exception as e:
-            return Response(
-                {"error": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-    @transaction.atomic
-    def post(self, request, customer_id, lead_id):
-        """Create follow-up task"""
-        try:
-            from subscriptions.models import CRMFollowUpTask
-
-            lead = PublicLead.objects.get(id=lead_id)
-
-            task = CRMFollowUpTask.objects.create(
-                lead=lead,
-                title=request.data.get("title", "Follow-up"),
-                description=request.data.get("description", ""),
-                due_date=request.data.get("due_date"),
-                status="OPEN",
-                created_by=request.user,
-            )
-
-            return Response({
-                "status": "success",
-                "message": "Follow-up task created",
-                "data": {
-                    "id": task.id,
-                    "title": task.title,
-                    "due_date": task.due_date.isoformat() if task.due_date else None,
-                    "status": task.status,
-                }
-            })
-
-        except PublicLead.DoesNotExist:
-            return Response(
-                {"error": "Lead not found"},
-                status=status.HTTP_404_NOT_FOUND
-            )
-        except Exception as e:
-            return Response(
-                {"error": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-
 # URL Configuration
 from django.urls import path
 
@@ -277,10 +197,5 @@ urlpatterns = [
         'admin/workbench/customer/<int:customer_id>/lead/<int:lead_id>/update/',
         WorkbenchLeadUpdateView.as_view(),
         name='workbench-lead-update'
-    ),
-    path(
-        'admin/workbench/customer/<int:customer_id>/lead/<int:lead_id>/followup/',
-        WorkbenchLeadFollowUpView.as_view(),
-        name='workbench-lead-followup'
     ),
 ]

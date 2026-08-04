@@ -25,11 +25,6 @@ KNOWN_500: dict[str, str] = {
     # optional dependency (Redis/Celery/DB replica) is unavailable, which is
     # the case in the isolated test env. Shallow /health/ stays 200.
     "/api/v1/health/deep/": "deep health probe returns 503 by design when optional deps are down",
-    # Incomplete feature: WorkbenchLeadFollowUpView references a CRMFollowUpTask
-    # model that does not exist anywhere in the codebase (no model class, no
-    # table). GET/POST both 500 (ImportError). Needs a product decision: create
-    # the model + migration, or remove the endpoint. Tracked as tech debt.
-    "/api/v1/admin/workbench/customer/1/lead/1/followup/": "references non-existent CRMFollowUpTask model (unfinished feature)",
 }
 
 
