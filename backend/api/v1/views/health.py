@@ -248,6 +248,8 @@ class PublicApiDeepHealthView(APIView):
         alias = _db_alias()
         checks: dict[str, dict] = {}
 
+        # Critical dependencies: if any is down the service cannot serve requests
+        # correctly, so the probe reports 503 (pull the instance from rotation).
         db_ok, checks["database"] = _database_check(alias)
         if db_ok:
             migrations_ok, checks["migrations"] = _migration_check(alias)
@@ -256,16 +258,30 @@ class PublicApiDeepHealthView(APIView):
                 "status": "skipped",
                 "reason": "database_check_failed",
             }
-        cache_ok, checks["cache"] = _cache_check()
-        worker_ok, checks["worker_heartbeat"] = _worker_heartbeat_check()
         storage_ok, checks["storage_writable"] = _storage_writable_check()
 
-        healthy = db_ok and migrations_ok and cache_ok and worker_ok and storage_ok
+        # Optional/degradable dependencies: their failure marks the service
+        # "degraded" but still ready — HTTP serving continues (cache falls back
+        # to the DB; async jobs queue until workers recover). Reporting 503 here
+        # would needlessly pull a still-serving instance out of the pool.
+        cache_ok, checks["cache"] = _cache_check()
+        worker_ok, checks["worker_heartbeat"] = _worker_heartbeat_check()
+
+        critical_ok = db_ok and migrations_ok and storage_ok
+        degraded = not (cache_ok and worker_ok)
+
+        if not critical_ok:
+            overall = "unhealthy"
+        elif degraded:
+            overall = "degraded"
+        else:
+            overall = "healthy"
+
         return Response(
             {
-                "status": "healthy" if healthy else "degraded",
+                "status": overall,
                 "service": "subidha-advance-emi-backend",
                 "checks": checks,
             },
-            status=status.HTTP_200_OK if healthy else status.HTTP_503_SERVICE_UNAVAILABLE,
+            status=status.HTTP_200_OK if critical_ok else status.HTTP_503_SERVICE_UNAVAILABLE,
         )

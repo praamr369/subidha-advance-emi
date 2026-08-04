@@ -19,13 +19,9 @@ from tests.verification.url_walker import iter_api_endpoints
 _RF_NO_THROTTLE = {**settings.REST_FRAMEWORK, "DEFAULT_THROTTLE_CLASSES": [], "DEFAULT_THROTTLE_RATES": {}}
 
 # path -> reason. Populate ONLY with confirmed pre-existing crashes to keep the
-# gate green; each entry is tech debt to fix and remove.
-KNOWN_500: dict[str, str] = {
-    # Not a crash: the deep health probe intentionally returns 503 when an
-    # optional dependency (Redis/Celery/DB replica) is unavailable, which is
-    # the case in the isolated test env. Shallow /health/ stays 200.
-    "/api/v1/health/deep/": "deep health probe returns 503 by design when optional deps are down",
-}
+# gate green; each entry is tech debt to fix and remove. Currently empty — the
+# whole GET surface returns <500 on an empty DB.
+KNOWN_500: dict[str, str] = {}
 
 
 @override_settings(REST_FRAMEWORK=_RF_NO_THROTTLE)
