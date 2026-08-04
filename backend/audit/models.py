@@ -268,7 +268,7 @@ class AuditLog(models.Model):
         null=True,
         blank=True,
     )
-    metadata = models.JSONField(default=dict)
+    metadata = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:

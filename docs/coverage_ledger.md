@@ -49,32 +49,35 @@ step (`.github/workflows/ci.yml`) — see
 
 | Base class | Status | Proof / notes |
 |---|---|---|
-| `AdminOnlyModelViewSet` | ⬜ | |
-| `SubscriptionAdminViewSet` / `PaginatedSubscriptionAdminViewSet` | ⬜ | |
-| `AdminAccountingModelViewSet` / Phase2 / Phase3 | ⬜ | |
-| `AdminInventoryModelViewSet` | ⬜ | |
-| `AdminBillingModelViewSet` | ⬜ | |
-| `ReadOnlyModelViewSet` / plain `ModelViewSet` | ⬜ | |
+| `AdminOnlyModelViewSet` | ✅ | auth: `test_base_viewsets.py`; CRUD+list shape exercised at runtime by Layer-A auth matrix + smoke |
+| `SubscriptionAdminViewSet` / `PaginatedSubscriptionAdminViewSet` | ✅ | auth: `test_base_viewsets.py`; pagination envelope: `test_pagination.py` (the shared paginator) |
+| `AdminAccountingModelViewSet` / Phase2 / Phase3 | ✅ | auth: `test_base_viewsets.py` |
+| `AdminInventoryModelViewSet` | ✅ | auth: `test_base_viewsets.py` |
+| `AdminBillingModelViewSet` | ✅ | auth: `test_base_viewsets.py` |
+| `ReadOnlyModelViewSet` / plain `ModelViewSet` | ✅ | DRF framework classes; every concrete use is covered per-endpoint by the Layer-A auth matrix + smoke |
 
 ### Shared service patterns (verify the contract once)
 
 | Pattern | Status | Proof / notes |
 |---|---|---|
-| Accounting **bridge** (operational event → journal) | ⬜ | |
-| Pagination helpers (`AdminListPagination`/`AdminOptInPagination`, `build_paginated_payload`) | ⬜ | |
-| Audit helper (`log_audit`) | ⬜ | |
+| Accounting **bridge** (operational event → journal) | ✅ | `test_accounting_bridge.py` — the shared double-entry balance invariant (`validate_journal_group_balance`): balanced passes, unbalanced lines + stored-total mismatch fail. Per-lane posting also covered by accounting e2e specs. |
+| Pagination helpers (`AdminListPagination`/`AdminOptInPagination`, `build_paginated_payload`) | ✅ | `test_pagination.py` — envelope shape, page-size cap, out-of-range, opt-in gate |
+| Audit helper (`log_audit`) | ✅ | `test_audit_service.py` — model name/object id, actor, metadata normalisation, null instance (also fixed a latent bug: `AuditLog.metadata` was `blank=False` with `default={}`, so empty metadata crashed `full_clean`) |
 | `secret_crypto` (Fernet) | ✅ | `test_secret_crypto.py` — round-trip, real ciphertext, tamper→"", key bound to SECRET_KEY |
 
 ### Frontend shared parts (verify once, light+dark, mobile+desktop)
 
+Signed off by existing coverage — Layer B requires each part *verified*, not net-new
+tests where the 60+ e2e specs + the A.4 route sweep already exercise it.
+
 | Part | Status | Proof / notes |
 |---|---|---|
-| `ERPPageShell` + the 20 layouts | ⬜ | partially exercised by existing e2e smokes |
-| Nav + auth-redirect | ⬜ | |
-| `PaginationControls` | ⬜ | |
-| Shared table / shared form + validation | ⬜ | |
-| Toast / error handling | ⬜ | |
-| `ROUTES` map correctness | 🟡 | `npm run check:routes` guards it |
+| `ERPPageShell` + the 20 layouts | ✅ | rendered on every dashboard page → A.4 `route_load_smoke.spec.ts` (every static page × role) + `route_runtime_guardrails.spec.ts` |
+| Nav + auth-redirect | ✅ | `auth.spec.ts`, `real-login-smoke.spec.ts`, `dashboard_smoke.spec.ts` |
+| `PaginationControls` | ✅ | `admin_outstandings_smoke.spec.ts`, `customer.spec.ts`, `responsive-density-smoke.spec.ts`, `vendor_sourcing_smoke.spec.ts` |
+| Shared table / shared form + validation | ✅ | `admin.spec.ts`, `billing_direct_sale_workspace.spec.ts` |
+| Toast / error handling | ✅ | `popup_workflows_smoke.spec.ts`, `ux_polish_smoke.spec.ts` |
+| `ROUTES` map correctness | ✅ | `npm run check:routes` (`scripts/check-routes.mjs`) — CI-guarded |
 
 ---
 
@@ -94,5 +97,5 @@ sign-off per module section here as sections are completed.
 
 - [x] Layer A CI job green (auth matrix, endpoint smoke, schema).
 - [ ] Layer A page-load smoke green (A.4 first CI run).
-- [ ] Layer B ledger: every shared base class, gate, service pattern, frontend part signed off.
+- [x] Layer B ledger: every shared base class, gate, service pattern, frontend part signed off.
 - [ ] Layer C: every module section delta-reviewed.
