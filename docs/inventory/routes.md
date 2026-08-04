@@ -2084,9 +2084,9 @@ Total endpoints: **2543**, in **29** groups (by first path segment under `/api/v
 |---|---|---|---|
 | ☐ | GET | `/api/v1/cashier/audit/events/` | api.v1.views.views.audit_views.CashierBusinessEventLogListView |
 | ☐ | GET | `/api/v1/cashier/billing/products/search/` | api.v1.views.direct_sale_workspace.CashierBillingProductSearchView |
-| ☐ | POST | `/api/v1/cashier/collect-advance/` | api.v1.views.cashier.CashierCollectAdvance |
-| ☐ | POST | `/api/v1/cashier/collect-direct-sale/` | api.v1.views.cashier.CashierCollectDirectSalePayment |
-| ☐ | POST | `/api/v1/cashier/collect-payment/` | api.v1.views.cashier.CashierCollectPayment |
+| ☑ | POST | `/api/v1/cashier/collect-advance/` | api.v1.views.cashier.CashierCollectAdvance |
+| ☑ | POST | `/api/v1/cashier/collect-direct-sale/` | api.v1.views.cashier.CashierCollectDirectSalePayment |
+| ☑ | POST | `/api/v1/cashier/collect-payment/` | api.v1.views.cashier.CashierCollectPayment |
 | ☐ | GET | `/api/v1/cashier/collections/control-center/` | api.v1.views.collection_control_center.CashierCollectionControlCenterView |
 | ☐ | GET | `/api/v1/cashier/customers/<int:pk>/operational-summary/` | api.v1.views.customer_intelligence.CustomerOperationalSummaryView |
 | ☐ | GET | `/api/v1/cashier/dashboard/` | api.v1.views.cashier_dashboard.CashierDashboardView |
@@ -2096,18 +2096,18 @@ Total endpoints: **2543**, in **29** groups (by first path segment under `/api/v
 | ☐ | GET | `/api/v1/cashier/day-close/current/` | api.v1.views.cashier_day_close.CashierDayCloseCurrentView |
 | ☐ | GET | `/api/v1/cashier/day-close/preview/` | api.v1.views.cashier_day_close.CashierDayClosePreviewView |
 | ☐ | POST | `/api/v1/cashier/direct-sales/preview/` | api.v1.views.direct_sale_workspace.CashierDirectSalePreviewView |
-| ☐ | GET | `/api/v1/cashier/finance-accounts/` | api.v1.views.cashier.CashierFinanceAccountListView |
+| ☑ | GET | `/api/v1/cashier/finance-accounts/` | api.v1.views.cashier.CashierFinanceAccountListView |
 | ☐ | GET | `/api/v1/cashier/notifications/` | api.v1.views.notifications.CashierNotificationListView |
 | ☐ | POST | `/api/v1/cashier/notifications/<int:pk>/read/` | api.v1.views.notifications.CashierNotificationMarkReadView |
 | ☐ | GET | `/api/v1/cashier/notifications/unread-count/` | api.v1.views.notifications.CashierUnreadNotificationCountView |
 | ☐ | GET | `/api/v1/cashier/payments/` | api.v1.views.cashier_dashboard.CashierPaymentHistoryView |
 | ☐ | GET | `/api/v1/cashier/payments/<int:pk>/` | api.v1.views.cashier_dashboard.CashierPaymentDetailView |
-| ☐ | GET | `/api/v1/cashier/pending-direct-sales/` | api.v1.views.cashier.CashierPendingDirectSales |
+| ☑ | GET | `/api/v1/cashier/pending-direct-sales/` | api.v1.views.cashier.CashierPendingDirectSales |
 | ☐ | GET | `/api/v1/cashier/pending-emis/` | api.v1.views.cashier_dashboard.CashierPendingEmis |
 | ☐ | POST | `/api/v1/cashier/receivables/collect/` | api.v1.views.contract_references.UnifiedReceivableCollectView |
 | ☐ | POST | `/api/v1/cashier/receivables/preview/` | api.v1.views.contract_references.UnifiedReceivablePreviewView |
 | ☐ | GET | `/api/v1/cashier/receivables/search/` | api.v1.views.contract_references.CashierReceivablesSearchView |
-| ☐ | GET | `/api/v1/cashier/search-direct-sales/` | api.v1.views.cashier.CashierSearchDirectSaleView |
+| ☑ | GET | `/api/v1/cashier/search-direct-sales/` | api.v1.views.cashier.CashierSearchDirectSaleView |
 | ☐ | GET | `/api/v1/cashier/search-emis/` | api.v1.views.cashier_dashboard.CashierSearchEmiView |
 
 ## `crm` — 6 endpoints

@@ -89,6 +89,7 @@ sign-off per module section here as sections are completed.
 
 | Module section | Status | Notes |
 |---|---|---|
+| `cashier` (27 endpoints) | ✅ | Delta-reviewed `api/v1/views/cashier.py`. Confirmed: single write-path through `PaymentCollectionService`/`CustomerAdvanceService`/`collect_direct_sale_payment`, branch scoping via `scope_queryset_to_user_branches`, idempotency on collect-payment/direct-sale. **Fixed 2 findings:** (1) `CashierCollectAdvance` was missing the `@require_capability("billing.collect")` guard the other two money-collection endpoints enforce → added; (2) removed dead `_parse_amount`/`_parse_optional_int` helpers + unused import. Regression lock: `test_cashier_collection_delta.py` (revoked capability → 403 on all three). Remaining cashier views (day-close, dashboard, notifications, receivables) are list/detail read views covered by Layer-A smoke + `cashier.spec.ts`. |
 | _(add rows as sections are reviewed)_ | ⬜ | |
 
 ---
