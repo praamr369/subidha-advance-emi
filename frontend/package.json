@@ -15,6 +15,7 @@
     "typecheck": "node scripts/run-typecheck.mjs",
     "validate": "npm run check:routes && npm run lint && npm run typecheck && npm run test:dashboard-presets && npm run build",
     "test:e2e:smoke": "npm run build:smoke && playwright test --project=chromium-smoke",
+    "test:e2e:route-smoke": "npm run build:smoke && playwright test --project=chromium-route-smoke",
     "test:e2e:release-smoke": "npm run build:smoke && playwright test --project=chromium-release-smoke",
     "test:e2e:smoke:headed": "npm run build:smoke && playwright test --project=chromium-smoke --headed",
     "test:e2e:auth-smoke": "playwright test --project=chromium-auth-smoke",
@@ -50,6 +51,7 @@
     "next": "^16.2.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "react-easy-crop": "^6.2.3",
     "react-resizable-panels": "^2.1.9",
     "tailwind-merge": "^3.5.0"
   },
