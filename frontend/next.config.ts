@@ -75,8 +75,11 @@ const ADMIN_PERMANENT_REDIRECTS: Array<{ source: string; destination: string }> 
   { source: "/admin/delivery/workspace", destination: "/admin/deliveries" },
   { source: "/admin/delivery/create", destination: "/admin/deliveries" },
   { source: "/admin/delivery/returns", destination: "/admin/service-desk/returns" },
+  { source: "/admin/delivery/pod-capture", destination: "/admin/deliveries/pod-capture" },
+  { source: "/admin/delivery/pod-archive", destination: "/admin/deliveries/pod-archive" },
   // Service workspace alias → service-desk
   { source: "/admin/service", destination: "/admin/service-desk" },
+  { source: "/admin/service/schedule", destination: "/admin/warranty/service-schedule" },
   // Leads alias (top-level → crm/leads)
   { source: "/admin/leads", destination: "/admin/crm/leads" },
   { source: "/admin/leads/:id*", destination: "/admin/crm/leads" },
@@ -124,6 +127,18 @@ const ADMIN_PERMANENT_REDIRECTS: Array<{ source: string; destination: string }> 
   { source: "/admin/purchases/vendor-payments", destination: "/admin/payables" },
   { source: "/admin/reconciliation", destination: "/admin/accounting/bridge-reconciliation" },
   { source: "/admin/reconciliation/runs", destination: "/admin/accounting/bridge-reconciliation" },
+  // Tombstone migration — former app-router redirect stubs moved to edge
+  { source: "/admin/close-cokpit", destination: "/admin/close-cockpit" }, // typo
+  { source: "/admin/accounting/close-cockpit", destination: "/admin/close-cockpit" },
+  { source: "/admin/manufacturing/boms/create", destination: "/admin/manufacturing/boms" },
+  { source: "/admin/pim/products", destination: "/admin/products?tab=pim" },
+  { source: "/admin/billing/direct-sale/create", destination: "/admin/billing/direct-sale?mode=create" },
+  { source: "/admin/payments/create", destination: "/admin/finance/collect" },
+  { source: "/admin/payments/history", destination: "/admin/payments" },
+  { source: "/admin/partners/commissions", destination: "/admin/finance/commissions" }, // typo/wrong-group
+  { source: "/admin/vendors/purchases", destination: "/admin/purchases" },
+  { source: "/admin/vendors/purchase-returns", destination: "/admin/purchases/vendor-returns" },
+  { source: "/admin/accounting/books/upi", destination: "/admin/accounting/books/bank" },
   // CRM Hub Deduplication redirects
   { source: "/admin/workbench", destination: "/admin/crm" },
   { source: "/admin/workbench/lead-workflow", destination: "/admin/crm/leads" },

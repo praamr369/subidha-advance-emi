@@ -287,6 +287,8 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Delivery & Service", "Complaints", ROUTES.admin.serviceDeskComplaints, "Complaint register."),
   item("Delivery & Service", "Returns", ROUTES.admin.serviceDeskReturns, "Return queue."),
   item("Delivery & Service", "Tickets", ROUTES.admin.serviceDeskTickets, "Service ticket register.", { badgeSource: "open_support_ticket_count" }),
+  item("Delivery & Service", "Warranty Claims", ROUTES.admin.warrantyClaims, "Warranty claim register — filing, review, and approval."),
+  item("Delivery & Service", "Service Schedule", ROUTES.admin.warrantyServiceSchedule, "Schedule technicians and dates for approved warranty service jobs."),
 
   // ── 13. HR & Staff ────────────────────────────────────────────────────────
   // Phase 7: HR & Staff owns people operations only.
