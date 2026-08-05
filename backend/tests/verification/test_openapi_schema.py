@@ -6,12 +6,16 @@ introspection, generation raises here — so this one test proves the whole API
 surface stays schema-generatable, and keeps `/api/schema/`, `/api/docs/`, and any
 generated client in sync. Complements the auth matrix + endpoint smoke.
 """
-from django.test import SimpleTestCase
+from django.test import TestCase
 
 from drf_spectacular.generators import SchemaGenerator
 
 
-class OpenApiSchemaTest(SimpleTestCase):
+class OpenApiSchemaTest(TestCase):
+    # drf-spectacular introspects every view; some have a get_queryset that
+    # queries the DB at schema-build time (they don't guard on swagger_fake_view),
+    # so the generator needs DB access. TestCase (empty DB) makes this
+    # deterministic rather than order-dependent.
     def test_schema_generates_for_whole_surface(self):
         generator = SchemaGenerator()
         schema = generator.get_schema(request=None, public=True)
