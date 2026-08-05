@@ -420,7 +420,7 @@ class WorkbenchCancelView(APIView):
 
 
 class WorkbenchActionListView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdmin]
 
     def get(self, request, pk):
         try:

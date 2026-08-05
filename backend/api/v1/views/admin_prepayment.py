@@ -2,6 +2,7 @@
 from decimal import Decimal
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
+from api.v1.permissions import IsAdmin
 from rest_framework.response import Response
 from rest_framework import status
 from django.utils import timezone
@@ -11,7 +12,7 @@ from subscriptions.models import Subscription, Delivery, DeliveryStatus, Fulfill
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdmin])
 def prepayment_calculate_view(request, subscription_id):
     """
     Calculate prepayment threshold for advance delivery unlock.
@@ -69,7 +70,7 @@ def prepayment_calculate_view(request, subscription_id):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdmin])
 def prepayment_unlock_delivery_view(request, subscription_id):
     """
     Process prepayment and unlock advance delivery.
@@ -166,7 +167,7 @@ def prepayment_unlock_delivery_view(request, subscription_id):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdmin])
 def prepayment_list_view(request):
     """List all prepayments (admin audit)."""
     prepayments = Subscription.objects.filter(

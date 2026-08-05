@@ -5,6 +5,7 @@ from dateutil.relativedelta import relativedelta
 
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
+from api.v1.permissions import IsAdmin
 from rest_framework.response import Response
 from rest_framework import status
 from django.utils import timezone
@@ -37,7 +38,7 @@ def _money(value) -> Decimal:
 # ─────────────────────────────────────────────────────────────────────────────
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdmin])
 def lease_calculate_rou_liability_view(request, subscription_id):
     """
     Calculate ROU asset and lease liability using IFRS-16 present value formula.
@@ -85,7 +86,7 @@ def lease_calculate_rou_liability_view(request, subscription_id):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdmin])
 def lease_generate_schedule_view(request, lease_id):
     """
     Generate monthly payment schedule for lease with ROU depreciation & interest.
@@ -136,7 +137,7 @@ def lease_generate_schedule_view(request, lease_id):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdmin])
 def lease_post_to_gl_view(request, lease_id):
     """
     Post lease journal entries to GL (ROU asset, liability, depreciation, interest).
@@ -230,7 +231,7 @@ def lease_post_to_gl_view(request, lease_id):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdmin])
 def depreciation_generate_schedule_view(request, asset_id):
     """
     Generate depreciation schedule for an asset (monthly).
@@ -286,7 +287,7 @@ def depreciation_generate_schedule_view(request, asset_id):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdmin])
 def cost_centre_pl_view(request):
     """
     P&L by cost centre for period.
@@ -359,7 +360,7 @@ def cost_centre_pl_view(request):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdmin])
 def cash_flow_statement_view(request):
     """
     Cash flow statement (operating, investing, financing activities).
@@ -439,7 +440,7 @@ def cash_flow_statement_view(request):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdmin])
 def fund_flow_statement_view(request):
     """
     Fund flow statement (sources & uses of funds).
@@ -471,7 +472,7 @@ def fund_flow_statement_view(request):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdmin])
 def financial_ratios_view(request):
     """
     Key financial ratios and intelligence.
@@ -509,7 +510,7 @@ def financial_ratios_view(request):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdmin])
 def deferred_tax_list_view(request):
     """
     List/create deferred tax records.
@@ -559,7 +560,7 @@ def deferred_tax_list_view(request):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdmin])
 def lease_contract_list_create_view(request):
     """List all lease contracts (GET) or create a new one (POST)."""
     if request.method == 'GET':
@@ -631,7 +632,7 @@ def lease_contract_list_create_view(request):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdmin])
 def fixed_asset_list_create_view(request):
     """List fixed assets (GET) or register a new asset (POST)."""
     if request.method == 'GET':
@@ -684,7 +685,7 @@ def fixed_asset_list_create_view(request):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdmin])
 def cost_centre_list_view(request):
     """List all active cost centres."""
     centres = CostCentre.objects.filter(is_active=True).values(
