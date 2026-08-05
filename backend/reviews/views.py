@@ -6,7 +6,7 @@ from rest_framework import status
 
 import os
 
-from api.v1.permissions import IsAdmin
+from api.v1.permissions import IsAdmin, IsCustomer
 from reviews.models import InternalReview, ReviewPlatformConfig
 from reviews.services import (
     get_combined_reviews,
@@ -65,7 +65,7 @@ class PublicReviewSubmitView(APIView):
 # ── Customer ──────────────────────────────────────────────────────────────────
 
 class CustomerReviewListView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsCustomer]
 
     def get(self, request):
         qs = InternalReview.objects.filter(customer=request.user)
