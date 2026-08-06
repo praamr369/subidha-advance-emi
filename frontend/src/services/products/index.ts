@@ -40,6 +40,7 @@ export type ProductRecord = {
   hsn_sac_code?: string | null;
   gst_rate?: string | number | null;
   image?: string | null;
+  video?: string | null;
   is_active?: boolean;
   item_type?: ProductItemType | string;
   stock_type?: ProductStockType | string;
@@ -94,6 +95,9 @@ export type ProductRegisterSummary = {
   image_missing: number;
   catalog_cleanup_required: number;
   total_base_value: string;
+  item_type_counts?: Record<string, number>;
+  stock_active?: number;
+  stock_prepared_no_stock?: number;
 };
 
 export type ProductRegisterPage = {

@@ -222,7 +222,7 @@ export default function SolopreneurDailyClosePage() {
                     <h4 className="text-sm font-medium text-foreground mb-3">Diagnostic Checks</h4>
                     <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
                       {health.checks.map((check, idx) => {
-                        const passed = check.status === "OK" || check.status === "INFO" || check.passed;
+                        const passed = check.passed;
                         return (
                           <div key={idx} className="flex justify-between items-center text-sm p-2 rounded hover:bg-muted/50">
                             <span className="text-muted-foreground">{check.key}</span>

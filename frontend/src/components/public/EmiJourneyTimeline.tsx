@@ -1,3 +1,5 @@
+import { getPublicDictionary } from "@/lib/public-i18n";
+import { getPublicLocale } from "@/lib/public-i18n.server";
 import {
   BadgeCheck,
   Box,
@@ -20,25 +22,35 @@ type JourneyStep = {
   note?: string;
 };
 
+
+
+type EmiJourneyTimelineProps = {
+  className?: string;
+};
+
+export default async function EmiJourneyTimeline({ className }: EmiJourneyTimelineProps) {
+  const locale = await getPublicLocale();
+  const dict = getPublicDictionary(locale);
+
 const emiJourney: JourneyStep[] = [
   {
     icon: Box,
     step: 1,
-    title: "Choose a product",
+    title: dict.public.EmiJourneyTimeline_prop1,
     description:
       "Visit the showroom or browse the online catalogue. Ask the branch about which product fits your monthly budget and family needs.",
   },
   {
     icon: FileCheck,
     step: 2,
-    title: "Register as a customer",
+    title: dict.public.EmiJourneyTimeline_prop3,
     description:
       "The branch team creates your customer profile. KYC documents may be required before activation. Your details are securely stored inside the system.",
   },
   {
     icon: BadgeCheck,
     step: 3,
-    title: "Join a batch and receive your Lucky ID",
+    title: dict.public.EmiJourneyTimeline_prop5,
     description:
       "You are enrolled in an active batch. The system assigns a Lucky ID (00–99) to your subscription. One customer can hold multiple Lucky IDs across different batches.",
     note: "Lucky ID assignment does not guarantee winning.",
@@ -46,21 +58,21 @@ const emiJourney: JourneyStep[] = [
   {
     icon: CreditCard,
     step: 4,
-    title: "Pay monthly EMI",
+    title: dict.public.EmiJourneyTimeline_prop7,
     description:
       "Pay your scheduled monthly EMI through approved channels (cash, UPI, bank transfer). Each payment generates an official receipt you can view in your customer portal.",
   },
   {
     icon: CalendarDays,
     step: 5,
-    title: "Monthly draw takes place",
+    title: dict.public.EmiJourneyTimeline_prop9,
     description:
       "Every month, a draw is conducted under published rules. A commitment hash is published before the draw, and the reveal comes afterward — so results cannot be secretly changed.",
   },
   {
     icon: Trophy,
     step: 6,
-    title: "Winner receives future EMI waiver",
+    title: dict.public.EmiJourneyTimeline_prop11,
     description:
       "If your Lucky ID wins, remaining future EMI obligations from that month onward may be waived per plan rules. Already-paid EMI is not reversed or refunded automatically.",
     note: "Winning is not guaranteed. Waiver applies to future EMI only.",
@@ -68,28 +80,25 @@ const emiJourney: JourneyStep[] = [
   {
     icon: Gift,
     step: 7,
-    title: "Delivery and handover",
+    title: dict.public.EmiJourneyTimeline_prop13,
     description:
       "Delivery depends on contract readiness, stock availability, and verification checks. A delivery/handover document is generated to confirm condition and completion.",
   },
   {
     icon: PackageCheck,
     step: 8,
-    title: "Keep your documents",
+    title: dict.public.EmiJourneyTimeline_prop15,
     description:
       "Always keep your contract, payment receipts, delivery note, and any winner confirmation documents. These form your proof of the entire transaction history.",
   },
 ];
 
-type EmiJourneyTimelineProps = {
-  className?: string;
-};
 
-export default function EmiJourneyTimeline({ className }: EmiJourneyTimelineProps) {
+
   return (
     <section
       className={cn(
-        "rounded-[2rem] border border-border bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] p-6 shadow-[0_24px_70px_-50px_rgba(15,23,42,0.62)]",
+        "rounded-[2rem] border border-border bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] dark:bg-[linear-gradient(180deg,rgba(30,41,59,0.5),rgba(15,23,42,0.8))] p-6 shadow-[0_24px_70px_-50px_rgba(15,23,42,0.62)] dark:shadow-none",
         className
       )}
     >

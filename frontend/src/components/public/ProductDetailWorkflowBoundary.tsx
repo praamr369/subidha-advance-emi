@@ -1,23 +1,6 @@
+import { getPublicDictionary } from "@/lib/public-i18n";
+import { getPublicLocale } from "@/lib/public-i18n.server";
 import { CheckCircle2, ClipboardCheck, PackageCheck, ReceiptText, ShieldCheck } from "lucide-react";
-
-const workflowCards = [
-  {
-    icon: PackageCheck,
-    title: "Catalogue discovery",
-    description: "Product detail pages show published product records and media only. They do not expose internal inventory allocation.",
-  },
-  {
-    icon: ClipboardCheck,
-    title: "Branch confirmation",
-    description: "Staff confirm stock posture, plan fit, documents, customer details, monthly comfort, and delivery expectation.",
-  },
-  {
-    icon: ReceiptText,
-    title: "Controlled records",
-    description: "Contracts, payments, receipts, invoices, deposits, handover, and accounting records stay inside authenticated workflows.",
-  },
-] as const;
-
 const readBeforeEnquiry = [
   "Product images and descriptions are public catalogue content only.",
   "Catalogue base price is not a final contract, EMI, rent, lease, or invoice amount.",
@@ -25,7 +8,27 @@ const readBeforeEnquiry = [
   "Winner waiver, rent/lease deposit, direct-sale receipt, and delivery proof remain backend-controlled.",
 ] as const;
 
-export default function ProductDetailWorkflowBoundary() {
+export default async function ProductDetailWorkflowBoundary() {
+  const locale = await getPublicLocale();
+  const dict = getPublicDictionary(locale);
+    const workflowCards = [
+      {
+        icon: PackageCheck,
+        title: dict.public.ProductDetailWorkflowBoundary_prop1,
+        description: dict.public.ProductDetailWorkflowBoundary_prop2,
+      },
+      {
+        icon: ClipboardCheck,
+        title: dict.public.ProductDetailWorkflowBoundary_prop3,
+        description: dict.public.ProductDetailWorkflowBoundary_prop4,
+      },
+      {
+        icon: ReceiptText,
+        title: dict.public.ProductDetailWorkflowBoundary_prop5,
+        description: dict.public.ProductDetailWorkflowBoundary_prop6,
+      },
+    ] as const;
+
   return (
     <section className="grid gap-6">
       <section className="grid gap-4 md:grid-cols-3">

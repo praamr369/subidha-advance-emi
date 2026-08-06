@@ -1,4 +1,5 @@
 "use client";
+import { useI18n } from "@/components/i18n/I18nProvider";
 
 import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
@@ -24,6 +25,8 @@ export default function WinnerHistoryTableClient({
 }: {
   winners: PublicWinner[];
 }) {
+  const { t } = useI18n();
+
   const [query, setQuery] = useState("");
   const [batch, setBatch] = useState("");
 
@@ -67,7 +70,7 @@ export default function WinnerHistoryTableClient({
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Batch, draw month, Lucky ID, product, or hash fragment"
+              placeholder={t('public.WinnerHistoryTableClient_attr2')}
               className="public-control-focus h-12 w-full rounded-2xl border border-slate-200/80 bg-white/90 pl-10 pr-4 text-sm text-foreground"
             />
           </div>
@@ -82,7 +85,7 @@ export default function WinnerHistoryTableClient({
             onChange={(event) => setBatch(event.target.value)}
             className="h-12 w-full rounded-2xl border border-slate-200/80 bg-white/90 px-3 text-sm text-foreground outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
           >
-            <option value="">All batches</option>
+            <option value="">{t('public.WinnerHistoryTableClient_text4')}</option>
             {batches.map((code) => (
               <option key={code} value={code}>
                 {code}

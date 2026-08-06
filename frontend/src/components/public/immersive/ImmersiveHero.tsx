@@ -1,4 +1,5 @@
 "use client";
+import { useI18n } from "@/components/i18n/I18nProvider";
 
 import Image from "next/image";
 import Link from "next/link";
@@ -8,14 +9,14 @@ import { ArrowRight, ChevronDown, ReceiptText, ShieldCheck, Sparkles } from "luc
 import { brandConfig } from "@/config/brand";
 import { ROUTES } from "@/lib/routes";
 
-type Stats = { total_batches: number; active_subscriptions: number; total_winners: number } | null;
+import { type PublicStats } from "@/services/public";
 
 type Props = {
   title: string;
   subtitle: string;
   companyName: string;
   tagline: string;
-  stats: Stats;
+  stats: PublicStats | null;
 };
 
 /**
@@ -26,6 +27,7 @@ type Props = {
  * prefers-reduced-motion.
  */
 export default function ImmersiveHero({ title, subtitle, companyName, tagline, stats }: Props) {
+  const { t } = useI18n();
   const sceneRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -79,9 +81,12 @@ export default function ImmersiveHero({ title, subtitle, companyName, tagline, s
 
   const heroStats = stats
     ? [
-        { label: "Published batches", value: stats.total_batches.toLocaleString("en-IN") },
-        { label: "Active subscriptions", value: stats.active_subscriptions.toLocaleString("en-IN") },
-        { label: "Published winners", value: stats.total_winners.toLocaleString("en-IN") },
+        { label: t('public.ImmersiveHero_prop1'), value: stats.total_batches.toLocaleString("en-IN") },
+        { label: t('public.ImmersiveHero_prop2'), value: stats.active_subscriptions.toLocaleString("en-IN") },
+        { label: t('public.ImmersiveHero_prop3'), value: stats.total_winners.toLocaleString("en-IN") },
+        { label: "Available Seats", value: (stats.batch_available_seats || 0).toLocaleString("en-IN") },
+        { label: "Rent Active", value: (stats.active_rent_subscriptions || 0).toLocaleString("en-IN") },
+        { label: "Lease Active", value: (stats.active_lease_subscriptions || 0).toLocaleString("en-IN") },
       ]
     : [];
 

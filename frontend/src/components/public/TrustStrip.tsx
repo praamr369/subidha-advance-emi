@@ -1,31 +1,35 @@
+import { getPublicDictionary } from "@/lib/public-i18n";
+import { getPublicLocale } from "@/lib/public-i18n.server";
 import { ShieldCheck, Sparkles, Wallet, MapPin } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-const points = [
-  {
-    icon: Wallet,
-    title: "Predictable monthly structure",
-    description: "Know your EMI and tenure upfront before you join a batch.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Transparent winner publication",
-    description: "Winner visibility comes from revealed draw records, not static marketing rows.",
-  },
-  {
-    icon: Sparkles,
-    title: "Future EMI waiver for winners",
-    description: "Winning waives remaining future EMI only; already-paid EMI stays valid.",
-  },
-  {
-    icon: MapPin,
-    title: "Local branch trust",
-    description: "Operated by Subidha Furniture in Asansol, West Bengal.",
-  },
-] as const;
+export default async function TrustStrip({ className }: { className?: string }) {
+  const locale = await getPublicLocale();
+  const dict = getPublicDictionary(locale);
+    const points = [
+      {
+        icon: Wallet,
+        title: dict.public.TrustStrip_prop1,
+        description: dict.public.TrustStrip_prop2,
+      },
+      {
+        icon: ShieldCheck,
+        title: dict.public.TrustStrip_prop3,
+        description: dict.public.TrustStrip_prop4,
+      },
+      {
+        icon: Sparkles,
+        title: dict.public.TrustStrip_prop5,
+        description: dict.public.TrustStrip_prop6,
+      },
+      {
+        icon: MapPin,
+        title: dict.public.TrustStrip_prop7,
+        description: dict.public.TrustStrip_prop8,
+      },
+    ] as const;
 
-export default function TrustStrip({ className }: { className?: string }) {
   return (
     <section
       className={cn(

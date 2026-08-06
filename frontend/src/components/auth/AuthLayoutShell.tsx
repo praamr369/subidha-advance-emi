@@ -44,9 +44,11 @@ export default function AuthLayoutShell({
 }: AuthLayoutShellProps) {
   return (
     <section className={cn("auth-stage w-full", className)}>
-      <div className="auth-shell grid lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
-        <aside className="hidden border-r border-border bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.22),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(180,130,70,0.16),transparent_36%),linear-gradient(160deg,rgba(28,18,12,0.99),rgba(38,28,22,0.98))] lg:block">
-        <div className="flex h-full flex-col justify-between p-8 xl:p-10">
+      <div className="auth-shell grid min-h-[calc(100vh-4rem)] lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
+        <aside className="hidden relative border-r border-border bg-slate-950 lg:block overflow-hidden">
+          <div className="absolute inset-0 pointer-events-none bg-[url('https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-40 mix-blend-luminosity" />
+          <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-slate-950/90 via-slate-950/60 to-slate-900/90" />
+          <div className="relative flex h-full flex-col justify-between p-8 xl:p-10 z-10">
           <div>
             <AuthBrand tone="dark" />
 
@@ -92,14 +94,14 @@ export default function AuthLayoutShell({
         </div>
         </aside>
 
-        <div className="relative flex min-h-full items-center bg-[linear-gradient(180deg,color-mix(in_oklab,white_72%,transparent),transparent_20%)]">
-          <div className="mx-auto w-full max-w-xl px-4 py-6 sm:px-8 sm:py-8 lg:px-10">
-            <AuthBrand
-              compact={compactMobileBrand}
-              className="mb-5"
-            />
+        <div className="relative flex min-h-full flex-col justify-center bg-background lg:bg-transparent">
+          <div className="relative mx-auto w-full max-w-xl px-4 py-8 sm:px-8 lg:px-10">
+            <div className="mb-5 lg:hidden">
+              <AuthBrand compact={compactMobileBrand} tone="light" className="dark:hidden" />
+              <AuthBrand compact={compactMobileBrand} tone="dark" className="hidden dark:flex" />
+            </div>
 
-            <div className="public-card p-5 sm:p-7">
+            <div className="public-card dark:bg-card dark:border-border dark:shadow-none p-5 sm:p-7">
               <div className="workspace-pill w-fit px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                 <ShieldCheck className="h-3.5 w-3.5" />
                 Secure Entry

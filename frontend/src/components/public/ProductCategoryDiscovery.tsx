@@ -1,3 +1,5 @@
+import { getPublicDictionary } from "@/lib/public-i18n";
+import { getPublicLocale } from "@/lib/public-i18n.server";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Image as ImageIcon, PackageCheck } from "lucide-react";
@@ -27,19 +29,22 @@ type ProductCategoryDiscoveryProps = {
   categories: ProductCategorySummary[];
 };
 
-export default function ProductCategoryDiscovery({ categories }: ProductCategoryDiscoveryProps) {
+export default async function ProductCategoryDiscovery({ categories }: ProductCategoryDiscoveryProps) {
+  const locale = await getPublicLocale();
+  const dict = getPublicDictionary(locale);
+
   return (
     <PublicSectionShell className="grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-center">
       <div className="space-y-5">
         <SectionHeader
-          eyebrow="Category discovery"
-          title="Browse by real published category"
-          description="These category cards are derived from live public product records. They are discovery aids only; they do not imply stock reservation, delivery readiness, or plan approval."
+          eyebrow={dict.public.ProductCategoryDiscovery_attr1}
+          title={dict.public.ProductCategoryDiscovery_attr2}
+          description={dict.public.ProductCategoryDiscovery_attr3}
         />
         <div className="relative overflow-hidden rounded-[1.6rem] shadow-[0_20px_40px_-20px_rgba(15,23,42,0.4)]">
           <Image 
             src="/images/category_bedroom.jpg"
-            alt="Modern Bedroom Category"
+            alt={dict.public.ProductCategoryDiscovery_attr4}
             width={600}
             height={600}
             className="w-full object-cover min-h-[18rem]"
@@ -80,7 +85,7 @@ export default function ProductCategoryDiscovery({ categories }: ProductCategory
           ))
         ) : (
           <article className="public-card-sm p-5 sm:col-span-2">
-            <h3 className="text-base font-semibold text-foreground">No categories published yet</h3>
+            <h3 className="text-base font-semibold text-foreground">{dict.public.ProductCategoryDiscovery_text7}</h3>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
               The public catalogue has no category metadata available. Published products will still appear in the live catalogue when available.
             </p>
@@ -89,8 +94,8 @@ export default function ProductCategoryDiscovery({ categories }: ProductCategory
 
         <div className="public-card-sm flex flex-col justify-between gap-4 p-5 sm:col-span-2 sm:flex-row sm:items-center">
           <div>
-            <h3 className="text-base font-semibold text-foreground">Need assisted selection?</h3>
-            <p className="mt-1 text-sm leading-6 text-muted-foreground">Send an enquiry and the branch can confirm item fit, plan type, and document requirements.</p>
+            <h3 className="text-base font-semibold text-foreground">{dict.public.ProductCategoryDiscovery_text9}</h3>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">{dict.public.ProductCategoryDiscovery_text10}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Link href={ROUTES.public.contact} className="public-action-secondary">

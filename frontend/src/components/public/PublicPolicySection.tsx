@@ -1,3 +1,5 @@
+import { getPublicDictionary } from "@/lib/public-i18n";
+import { getPublicLocale } from "@/lib/public-i18n.server";
 import PublicRuleCard from "@/components/public/PublicRuleCard";
 import { Typography } from "@/components/ui/typography";
 
@@ -8,12 +10,15 @@ type PublicPolicySectionProps = {
   cards: readonly { title: string; points: readonly string[] }[];
 };
 
-export default function PublicPolicySection({ id, title, intro, cards }: PublicPolicySectionProps) {
+export default async function PublicPolicySection({ id, title, intro, cards }: PublicPolicySectionProps) {
+  const locale = await getPublicLocale();
+  const dict = getPublicDictionary(locale);
+
   return (
     <section id={id} className="public-surface p-6">
       <details open>
         <summary className="cursor-pointer list-none">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Policy section</div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{dict.public.PublicPolicySection_text1}</div>
           <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">{title}</h2>
           <Typography className="mt-3 max-w-4xl sm:text-base">{intro}</Typography>
         </summary>

@@ -1,3 +1,5 @@
+import { getPublicDictionary } from "@/lib/public-i18n";
+import { getPublicLocale } from "@/lib/public-i18n.server";
 import Link from "next/link";
 import { Clock3, Mail, MapPin, MessageCircle, Phone, type LucideIcon } from "lucide-react";
 
@@ -26,32 +28,35 @@ function isContactTrustRow(row: ContactTrustRow | null): row is ContactTrustRow 
   return row !== null;
 }
 
-export default function ContactBranchTrustPanel({ profile }: ContactBranchTrustPanelProps) {
+export default async function ContactBranchTrustPanel({ profile }: ContactBranchTrustPanelProps) {
+  const locale = await getPublicLocale();
+  const dict = getPublicDictionary(locale);
+
   const phoneHref = cleanPhoneHref(profile.support_phone);
 
   const sourceRows: Array<ContactTrustRow | null> = [
     profile.address_text
-      ? { icon: MapPin, label: "Address", value: profile.address_text, href: profile.map_url || undefined, action: profile.map_url ? "Open map" : undefined }
+      ? { icon: MapPin, label: dict.public.ContactBranchTrustPanel_prop1, value: profile.address_text, href: profile.map_url || undefined, action: profile.map_url ? "Open map" : undefined }
       : null,
     profile.support_phone
-      ? { icon: Phone, label: "Phone", value: profile.support_phone, href: phoneHref || undefined, action: "Call" }
+      ? { icon: Phone, label: dict.public.ContactBranchTrustPanel_prop2, value: profile.support_phone, href: phoneHref || undefined, action: "Call" }
       : null,
     profile.support_email
-      ? { icon: Mail, label: "Email", value: profile.support_email, href: `mailto:${profile.support_email}`, action: "Email" }
+      ? { icon: Mail, label: dict.public.ContactBranchTrustPanel_prop3, value: profile.support_email, href: `mailto:${profile.support_email}`, action: dict.public.ContactBranchTrustPanel_prop3 }
       : null,
     profile.business_hours
-      ? { icon: Clock3, label: "Hours", value: profile.business_hours }
+      ? { icon: Clock3, label: dict.public.ContactBranchTrustPanel_prop4, value: profile.business_hours }
       : null,
     profile.resolved_whatsapp_link
-      ? { icon: MessageCircle, label: "WhatsApp", value: "Message branch support", href: profile.resolved_whatsapp_link, action: "Open WhatsApp", external: true }
+      ? { icon: MessageCircle, label: dict.public.ContactBranchTrustPanel_prop5, value: "Message branch support", href: profile.resolved_whatsapp_link, action: "Open WhatsApp", external: true }
       : null,
   ];
   const rows: ContactTrustRow[] = sourceRows.filter(isContactTrustRow);
 
   return (
     <section className="public-surface p-6">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Branch details</div>
-      <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">Visit or contact the branch</h2>
+      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{dict.public.ContactBranchTrustPanel_text6}</div>
+      <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">{dict.public.ContactBranchTrustPanel_text7}</h2>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">
         Use these details for product checks, plan guidance, documents, delivery coordination, or after-sales support. Operational records are created only through staff-controlled workflows.
       </p>

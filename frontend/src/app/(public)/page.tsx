@@ -94,8 +94,13 @@ export default async function PublicHome() {
               <AnimatedStatsStrip
                 stats={[
                   { label: "Published batches", value: stats.total_batches },
+                  { label: "Batch capacity", value: stats.batch_total_capacity || 0 },
+                  { label: "Reserved seats", value: stats.batch_reserved_seats || 0 },
+                  { label: "Available seats", value: stats.batch_available_seats || 0 },
                   { label: "Total subscriptions", value: stats.total_subscriptions },
-                  { label: "Active subscriptions", value: stats.active_subscriptions },
+                  { label: "Lucky Plan active", value: stats.active_subscriptions },
+                  { label: "Rent active", value: stats.active_rent_subscriptions || 0 },
+                  { label: "Lease active", value: stats.active_lease_subscriptions || 0 },
                   { label: "Published winners", value: stats.total_winners },
                 ]}
               />

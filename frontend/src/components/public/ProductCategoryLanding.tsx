@@ -1,3 +1,5 @@
+import { getPublicDictionary } from "@/lib/public-i18n";
+import { getPublicLocale } from "@/lib/public-i18n.server";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -13,7 +15,7 @@ function formatPrice(value: string | null | undefined): string | null {
   return `₹${Math.round(numeric).toLocaleString("en-IN")}`;
 }
 
-function ProductCard({ product, categoryName }: { product: PublicProduct; categoryName: string }) {
+function ProductCard({ product, categoryName, dict }: { product: PublicProduct; categoryName: string; dict: any }) {
   const price = formatPrice(product.base_price);
   const alt = `${product.name} at Subidha Furniture Asansol`;
   return (
@@ -30,7 +32,7 @@ function ProductCard({ product, categoryName }: { product: PublicProduct; catego
       <div className="flex flex-1 flex-col gap-1 p-4">
         <h3 className="text-base font-semibold text-foreground">{product.name}</h3>
         {price ? <p className="text-sm font-medium text-foreground">{price}</p> : null}
-        <p className="mt-auto pt-2 text-xs text-muted-foreground">Visit showroom for latest availability</p>
+        <p className="mt-auto pt-2 text-xs text-muted-foreground">{dict.public.ProductCategoryLanding_text2}</p>
       </div>
     </li>
   );
@@ -43,6 +45,9 @@ function ProductCard({ product, categoryName }: { product: PublicProduct; catego
  * sections, visible FAQ + matching JSON-LD, breadcrumb + ItemList JSON-LD.
  */
 export default async function ProductCategoryLanding({ category }: { category: ProductSeoCategory }) {
+  const locale = await getPublicLocale();
+  const dict = getPublicDictionary(locale);
+
   let matched: PublicProduct[] = [];
   try {
     const { products } = await listPublicProducts();
@@ -65,13 +70,13 @@ export default async function ProductCategoryLanding({ category }: { category: P
         title={`${category.name} in Asansol — Subidha Furniture`}
         subtitle={`${category.name} at Subidha Furniture, Asansol. Visit our showroom for current designs, availability, and plan options.`}
         breadcrumbs={[
-          { label: "Home", href: "/" },
-          { label: "Products", href: "/products" },
+          { label: dict.public.ProductCategoryLanding_prop3, href: "/" },
+          { label: dict.public.ProductCategoryLanding_prop4, href: "/products" },
           { label: `${category.name} in Asansol` },
         ]}
         actions={[
-          { label: "Contact showroom", href: "/contact", variant: "primary" },
-          { label: "All products", href: "/products", variant: "secondary" },
+          { label: dict.public.ProductCategoryLanding_prop5, href: "/contact", variant: "primary" },
+          { label: dict.public.ProductCategoryLanding_prop6, href: "/products", variant: "secondary" },
         ]}
       >
         <div className="flex flex-col gap-10">
@@ -86,7 +91,7 @@ export default async function ProductCategoryLanding({ category }: { category: P
             {matched.length > 0 ? (
               <ul className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 {matched.slice(0, 24).map((product) => (
-                  <ProductCard key={product.id} product={product} categoryName={category.name} />
+                  <ProductCard key={product.id} product={product} categoryName={category.name} dict={dict} />
                 ))}
               </ul>
             ) : (
@@ -98,7 +103,7 @@ export default async function ProductCategoryLanding({ category }: { category: P
           </section>
 
           <section className="flex flex-col gap-3">
-            <h2 className="text-xl font-semibold text-foreground">Explore more categories</h2>
+            <h2 className="text-xl font-semibold text-foreground">{dict.public.ProductCategoryLanding_text11}</h2>
             <ul className="flex flex-wrap gap-3">
               {related.map((entry) => (
                 <li key={entry.slug}>
@@ -120,7 +125,7 @@ export default async function ProductCategoryLanding({ category }: { category: P
 
           {category.faqs.length > 0 ? (
             <section className="flex flex-col gap-4">
-              <h2 className="text-xl font-semibold text-foreground">Frequently asked questions</h2>
+              <h2 className="text-xl font-semibold text-foreground">{dict.public.ProductCategoryLanding_text13}</h2>
               <dl className="flex flex-col gap-4">
                 {category.faqs.map((faq) => (
                   <div key={faq.question} className="rounded-xl border border-border p-4">

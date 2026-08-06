@@ -79,8 +79,8 @@ export default function ContractsHubPage() {
               className={[
                 "group flex flex-col gap-4 rounded-[2rem] border p-6 transition hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2",
                 card.highlight
-                  ? "border-primary/30 bg-[linear-gradient(160deg,color-mix(in_oklab,var(--primary)_7%,white),color-mix(in_oklab,var(--primary)_3%,white))] shadow-[0_24px_70px_-50px_color-mix(in_oklab,var(--primary)_40%,transparent)]"
-                  : "border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] shadow-[0_24px_70px_-50px_rgba(15,23,42,0.62)]",
+                  ? "border-primary/30 bg-[linear-gradient(160deg,color-mix(in_oklab,var(--primary)_7%,var(--card)),color-mix(in_oklab,var(--primary)_3%,var(--card)))] shadow-[0_24px_70px_-50px_color-mix(in_oklab,var(--primary)_40%,transparent)] dark:shadow-none"
+                  : "border-border bg-card shadow-[0_24px_70px_-50px_rgba(15,23,42,0.62)] dark:shadow-none",
               ].join(" ")}
             >
               <div className="flex items-start justify-between gap-3">
@@ -89,7 +89,7 @@ export default function ContractsHubPage() {
                     "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
                     card.highlight
                       ? "bg-primary/12 text-primary"
-                      : "bg-[color-mix(in_oklab,var(--surface-muted)_80%,white)] text-muted-foreground",
+                      : "bg-muted text-muted-foreground",
                   ].join(" ")}
                 >
                   <Icon className="h-5 w-5" aria-hidden="true" />

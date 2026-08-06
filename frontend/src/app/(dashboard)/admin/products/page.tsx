@@ -469,8 +469,8 @@ export default function AdminProductsPage() {
           { label: "Total products", value: payload.catalog_total_count || payload.count, detail: `${rangeText} visible` },
           { label: "Total base value", value: formatRupee(summary.total_base_value), detail: "Filtered product value" },
           { label: "Inventory ready", value: summary.inventory_ready, detail: `${summary.stock_profile_pending} pending` },
-          { label: "Subscription ready", value: summary.subscription_ready, detail: "EMI eligible" },
-          { label: "Direct sale ready", value: summary.direct_sale_ready, detail: "Direct billing eligible" },
+          { label: "Stock active", value: summary.stock_active ?? 0, detail: "Tracked with live stock" },
+          { label: "No stock yet", value: summary.stock_prepared_no_stock ?? 0, detail: "Profile ready, awaiting stock" },
           { label: "Image missing", value: summary.image_missing, detail: "Catalog cleanup needed" },
         ]} />
 
@@ -497,6 +497,42 @@ export default function AdminProductsPage() {
 
         {/* Subscription products section */}
         {activeTab === "subscription" && <>
+        {/* Item-type segmented register — every type is a tab with a live count */}
+        <nav aria-label="Product item type" className="flex flex-wrap gap-2">
+          {([
+            { value: "", label: "All types" },
+            { value: "FINISHED_GOOD", label: ITEM_TYPE_LABELS.FINISHED_GOOD },
+            { value: "RAW_MATERIAL", label: ITEM_TYPE_LABELS.RAW_MATERIAL },
+            { value: "ACCESSORY", label: ITEM_TYPE_LABELS.ACCESSORY },
+            { value: "SERVICE", label: ITEM_TYPE_LABELS.SERVICE },
+            { value: "ADD_ON", label: ITEM_TYPE_LABELS.ADD_ON },
+          ] as const).map((tab) => {
+            const active = filters.item_type === tab.value;
+            const tabCount = tab.value === ""
+              ? (summary.item_type_counts
+                  ? Object.values(summary.item_type_counts).reduce((a, b) => a + b, 0)
+                  : undefined)
+              : summary.item_type_counts?.[tab.value];
+            return (
+              <button
+                key={tab.label}
+                type="button"
+                onClick={() => changeFilter("item_type", tab.value)}
+                className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+                  active
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-background text-foreground hover:bg-muted"
+                }`}
+              >
+                {tab.label}
+                {typeof tabCount === "number" ? (
+                  <span className="ml-1.5 tabular-nums opacity-70">{tabCount}</span>
+                ) : null}
+              </button>
+            );
+          })}
+        </nav>
+
         <ERPSectionShell title="Filters" description="All filters run on the full dataset. State is cached in the URL — refresh keeps your filters.">
           <form onSubmit={applyFilters} className="space-y-3">
             {/* Row 1: Search + quick dropdowns */}

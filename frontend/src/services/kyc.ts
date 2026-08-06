@@ -60,6 +60,10 @@ export type KycUploadPayload = {
   notes?: string;
   document_reference?: string;
   expiry_date?: string;
+  // Admin-only. When true, the admin upload is NOT auto-accepted and is instead
+  // routed through the normal review queue (SUBMITTED). Ignored for self-service
+  // uploads, which are always gated to SUBMITTED regardless.
+  force_review?: boolean;
 };
 
 // ---------------------------------------------------------------------------
@@ -167,6 +171,7 @@ export async function uploadAdminKycDocument(
   if (payload.document_reference)
     form.append("document_reference", payload.document_reference);
   if (payload.expiry_date) form.append("expiry_date", payload.expiry_date);
+  if (payload.force_review) form.append("force_review", "true");
 
   const response = await apiFetch<unknown>(
     `${adminBasePath(owner, ownerId)}/upload/`,
@@ -601,14 +606,18 @@ export async function getPartyKyc(partyId: number | string): Promise<PartyKycRes
 // Status display helpers
 // ---------------------------------------------------------------------------
 
+// NOTE ON WORDING: We do not perform government / UIDAI Aadhaar verification
+// (no paid official verification API). Documents are only visually reviewed and
+// accepted by staff, so customer-facing labels intentionally say "Reviewed"
+// rather than "Verified"/"Approved" to avoid implying an official identity check.
 export const KYC_STATUS_LABELS: Record<string, string> = {
-  SUBMITTED: "Submitted",
-  PENDING: "Pending Review",
-  APPROVED: "Approved",
-  VERIFIED: "Verified",
-  EXCEPTION_APPROVED: "Exception Approved",
-  REJECTED: "Rejected",
-  RESUBMISSION_REQUIRED: "Resubmission Required",
+  SUBMITTED: "Under Review",
+  PENDING: "Under Review",
+  APPROVED: "Documents Reviewed",
+  VERIFIED: "Documents Reviewed",
+  EXCEPTION_APPROVED: "Reviewed (Exception)",
+  REJECTED: "Not Accepted",
+  RESUBMISSION_REQUIRED: "Resubmission Needed",
 };
 
 export function kycStatusLabel(status: string): string {

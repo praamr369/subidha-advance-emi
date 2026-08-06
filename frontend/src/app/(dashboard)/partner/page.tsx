@@ -154,7 +154,7 @@ export default function PartnerDashboardPage() {
   });
   const productsQ = useQuery({
     queryKey: ["public", "products", "partner-dash"],
-    queryFn: listPublicProducts,
+    queryFn: () => listPublicProducts(),
     enabled: coreQ.isSuccess,
   });
 

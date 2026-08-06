@@ -1,3 +1,5 @@
+import { getPublicDictionary } from "@/lib/public-i18n";
+import { getPublicLocale } from "@/lib/public-i18n.server";
 import Link from "next/link";
 import { ArrowRight, BadgeCheck, FileCheck2, ShieldCheck, Sparkles } from "lucide-react";
 
@@ -13,9 +15,17 @@ type DrawTransparencyHeroProps = {
   subtitle: string;
 };
 
+
+
+
+
+export default async function DrawTransparencyHero({ mode, title, subtitle }: DrawTransparencyHeroProps) {
+  const locale = await getPublicLocale();
+  const dict = getPublicDictionary(locale);
+
 const modeCopy = {
   winners: {
-    eyebrow: "Winner publication",
+    eyebrow: dict.public.DrawTransparencyHero_prop1,
     primaryLabel: "Winner history",
     primaryHref: ROUTES.public.winnerHistory,
     secondaryLabel: "Fair Draw",
@@ -24,7 +34,7 @@ const modeCopy = {
     calloutText: "Privacy-safe records",
   },
   history: {
-    eyebrow: "Winner archive",
+    eyebrow: dict.public.DrawTransparencyHero_prop2,
     primaryLabel: "Latest winners",
     primaryHref: ROUTES.public.winners,
     secondaryLabel: "Fair Draw",
@@ -33,7 +43,7 @@ const modeCopy = {
     calloutText: "Backend records only",
   },
   fairDraw: {
-    eyebrow: "Fair Draw trust",
+    eyebrow: dict.public.DrawTransparencyHero_prop3,
     primaryLabel: "Published winners",
     primaryHref: ROUTES.public.winners,
     secondaryLabel: "Lucky Plan rules",
@@ -42,7 +52,7 @@ const modeCopy = {
     calloutText: "Reveal later",
   },
   certificate: {
-    eyebrow: "Draw certificate",
+    eyebrow: dict.public.DrawTransparencyHero_prop4,
     primaryLabel: "All winners",
     primaryHref: ROUTES.public.winners,
     secondaryLabel: "Fair Draw home",
@@ -55,22 +65,21 @@ const modeCopy = {
 const proofPoints = [
   {
     icon: FileCheck2,
-    title: "Public evidence first",
-    description: "Pages show published hashes, timestamps, verification status, and masked winner fields when the backend returns them.",
+    title: dict.public.DrawTransparencyHero_prop5,
+    description: dict.public.DrawTransparencyHero_prop6,
   },
   {
     icon: ShieldCheck,
-    title: "Privacy boundary",
-    description: "Phone numbers, KYC IDs, addresses, internal customer IDs, and private documents are never shown publicly.",
+    title: dict.public.DrawTransparencyHero_prop7,
+    description: dict.public.DrawTransparencyHero_prop8,
   },
   {
     icon: BadgeCheck,
-    title: "Future EMI waiver only",
-    description: "Winner publication explains the benefit boundary without rewriting already settled payment history.",
+    title: dict.public.DrawTransparencyHero_prop9,
+    description: dict.public.DrawTransparencyHero_prop10,
   },
 ] as const;
 
-export default function DrawTransparencyHero({ mode, title, subtitle }: DrawTransparencyHeroProps) {
   const copy = modeCopy[mode];
 
   return (
@@ -91,7 +100,7 @@ export default function DrawTransparencyHero({ mode, title, subtitle }: DrawTran
               {subtitle}
             </p>
             <div className="public-card-sm max-w-3xl px-4 py-3 text-sm leading-6 text-muted-foreground">
-              <strong className="font-semibold text-foreground">Important:</strong> Draw transparency pages are read-only. They never select winners, assign Lucky IDs, create waivers, collect payments, or alter EMI records.
+              <strong className="font-semibold text-foreground">{dict.public.DrawTransparencyHero_text11}</strong> Draw transparency pages are read-only. They never select winners, assign Lucky IDs, create waivers, collect payments, or alter EMI records.
             </div>
           </div>
 
@@ -113,7 +122,7 @@ export default function DrawTransparencyHero({ mode, title, subtitle }: DrawTran
           <div className="relative w-full overflow-hidden rounded-[1.6rem] shadow-[0_24px_54px_-24px_rgba(15,23,42,0.6)]">
             <Image
               src="/images/banner_draw.jpg"
-              alt="Draw Transparency"
+              alt={dict.public.DrawTransparencyHero_attr14}
               width={800}
               height={533}
               priority
@@ -125,8 +134,8 @@ export default function DrawTransparencyHero({ mode, title, subtitle }: DrawTran
             <div className="mt-1 text-sm font-semibold text-foreground">{copy.calloutText}</div>
           </div>
           <div className="pointer-events-none absolute -right-3 bottom-8 hidden rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_84%,transparent)] px-4 py-3 shadow-[0_22px_54px_-38px_rgba(15,23,42,0.74)] backdrop-blur md:block">
-            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Finance boundary</div>
-            <div className="mt-1 text-sm font-semibold text-foreground">No public posting</div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">{dict.public.DrawTransparencyHero_text15}</div>
+            <div className="mt-1 text-sm font-semibold text-foreground">{dict.public.DrawTransparencyHero_text16}</div>
           </div>
         </div>
       </div>

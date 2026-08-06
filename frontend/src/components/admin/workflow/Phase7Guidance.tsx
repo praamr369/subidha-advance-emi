@@ -20,9 +20,9 @@ export default function Phase7Guidance({
   if (items.length === 0) return null;
 
   return (
-    <section className="rounded-xl border border-amber-200/80 bg-[#fffaf5] p-4 shadow-[0_18px_34px_-30px_rgba(120,53,15,0.35)]">
+    <section className="rounded-xl border border-amber-200/80 bg-[#fffaf5] dark:border-amber-900/50 dark:bg-amber-950/20 p-4 shadow-[0_18px_34px_-30px_rgba(120,53,15,0.35)] dark:shadow-none">
       <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-        <CheckCircle2 className="h-4 w-4 text-emerald-700" />
+        <CheckCircle2 className="h-4 w-4 text-emerald-700 dark:text-emerald-500" />
         {title}
       </div>
       <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
@@ -30,7 +30,7 @@ export default function Phase7Guidance({
           <Link
             key={`${item.href}:${item.label}`}
             href={item.href}
-            className="group rounded-xl border border-border bg-card px-3 py-3 transition hover:border-amber-300 hover:bg-amber-50/70"
+            className="group rounded-xl border border-border bg-card px-3 py-3 transition hover:border-amber-300 hover:bg-amber-50/70 dark:hover:border-amber-700/50 dark:hover:bg-amber-900/20"
           >
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -40,7 +40,7 @@ export default function Phase7Guidance({
               <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-foreground" />
             </div>
             {item.warning ? (
-              <div className="mt-2 flex items-start gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-[11px] font-medium text-amber-900">
+              <div className="mt-2 flex items-start gap-1.5 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/40 px-2 py-1.5 text-[11px] font-medium text-amber-900 dark:text-amber-200">
                 <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 {item.warning}
               </div>

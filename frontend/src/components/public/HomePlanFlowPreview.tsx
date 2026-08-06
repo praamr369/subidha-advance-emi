@@ -1,3 +1,5 @@
+import { getPublicDictionary } from "@/lib/public-i18n";
+import { getPublicLocale } from "@/lib/public-i18n.server";
 import Link from "next/link";
 import { ArrowRight, ClipboardCheck, PackageCheck, ReceiptText, Wallet } from "lucide-react";
 
@@ -6,42 +8,47 @@ import PublicSectionShell from "@/components/public/PublicSectionShell";
 import SectionHeader from "@/components/public/SectionHeader";
 import { ROUTES } from "@/lib/routes";
 
+
+
+export default async function HomePlanFlowPreview() {
+  const locale = await getPublicLocale();
+  const dict = getPublicDictionary(locale);
+
 const steps = [
   {
     icon: PackageCheck,
-    title: "Choose furniture or appliance",
-    description: "Start from the real public catalogue or branch-assisted selection.",
+    title: dict.public.HomePlanFlowPreview_prop1,
+    description: dict.public.HomePlanFlowPreview_prop2,
   },
   {
     icon: ClipboardCheck,
-    title: "Select the right plan",
-    description: "Advance EMI, rent, lease or direct-sale flow stays clearly separated.",
+    title: dict.public.HomePlanFlowPreview_prop3,
+    description: dict.public.HomePlanFlowPreview_prop4,
   },
   {
     icon: Wallet,
-    title: "Pay monthly with records",
-    description: "Customer-facing payment history and receipts stay inside the authenticated portal.",
+    title: dict.public.HomePlanFlowPreview_prop5,
+    description: dict.public.HomePlanFlowPreview_prop6,
   },
   {
     icon: ReceiptText,
-    title: "Track proof online",
-    description: "Winner publication, documents and product status use controlled system data.",
+    title: dict.public.HomePlanFlowPreview_prop7,
+    description: dict.public.HomePlanFlowPreview_prop8,
   },
 ] as const;
 
-export default function HomePlanFlowPreview() {
   return (
     <PublicSectionShell className="grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-center">
       <div className="space-y-5">
         <SectionHeader
-          eyebrow="How Subidha works"
-          title="A modern public site, backed by controlled shop operations"
-          description="The homepage can look premium and animated while system records remain authoritative. Public content never creates payments, winners, delivery proof, or stock claims."
+          eyebrow={dict.public.HomePlanFlowPreview_attr9}
+          title={dict.public.HomePlanFlowPreview_attr10}
+          description={dict.public.HomePlanFlowPreview_attr11}
         />
         <div className="relative w-full overflow-hidden rounded-[1.6rem] shadow-[0_24px_54px_-24px_rgba(15,23,42,0.6)]">
           <Image
             src="/images/banner_policies.jpg"
-            alt="Plan Flow"
+            alt={dict.public.HomePlanFlowPreview_attr12}
             width={800}
             height={533}
             priority
@@ -62,8 +69,8 @@ export default function HomePlanFlowPreview() {
         ))}
         <div className="public-card-sm flex flex-col justify-between gap-4 p-5 sm:col-span-2 sm:flex-row sm:items-center">
           <div>
-            <h3 className="text-base font-semibold text-foreground">Need plan guidance?</h3>
-            <p className="mt-1 text-sm leading-6 text-muted-foreground">Start an enquiry or review the Lucky Plan rules first.</p>
+            <h3 className="text-base font-semibold text-foreground">{dict.public.HomePlanFlowPreview_text13}</h3>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">{dict.public.HomePlanFlowPreview_text14}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Link href={ROUTES.public.apply} className="public-action-primary gap-2">

@@ -1,31 +1,35 @@
+import { getPublicDictionary } from "@/lib/public-i18n";
+import { getPublicLocale } from "@/lib/public-i18n.server";
 import { ShieldCheck, Sparkles, Wallet, MapPin } from "lucide-react";
 
 import PublicAnimatedCard from "@/components/public/PublicAnimatedCard";
 
-const points = [
-  {
-    icon: Wallet,
-    title: "Predictable monthly structure",
-    description: "Know EMI and tenure expectations before enrollment.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Transparent winner publication",
-    description: "Only revealed draw records appear on public winner pages.",
-  },
-  {
-    icon: Sparkles,
-    title: "Future EMI waiver only",
-    description: "Winner benefit applies only to future dues as per policy.",
-  },
-  {
-    icon: MapPin,
-    title: "Asansol branch support",
-    description: "Local onboarding and support through Subidha Furniture staff.",
-  },
-] as const;
+export default async function PublicTrustStrip() {
+  const locale = await getPublicLocale();
+  const dict = getPublicDictionary(locale);
+    const points = [
+      {
+        icon: Wallet,
+        title: dict.public.PublicTrustStrip_prop1,
+        description: dict.public.PublicTrustStrip_prop2,
+      },
+      {
+        icon: ShieldCheck,
+        title: dict.public.PublicTrustStrip_prop3,
+        description: dict.public.PublicTrustStrip_prop4,
+      },
+      {
+        icon: Sparkles,
+        title: dict.public.PublicTrustStrip_prop5,
+        description: dict.public.PublicTrustStrip_prop6,
+      },
+      {
+        icon: MapPin,
+        title: dict.public.PublicTrustStrip_prop7,
+        description: dict.public.PublicTrustStrip_prop8,
+      },
+    ] as const;
 
-export default function PublicTrustStrip() {
   return (
     <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       {points.map((point) => (

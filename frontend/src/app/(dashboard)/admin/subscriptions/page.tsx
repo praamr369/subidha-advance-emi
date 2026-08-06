@@ -73,6 +73,83 @@ type SubscriptionListPayload = {
   has_previous: boolean;
 };
 
+type SubscriptionKpis = {
+  total_subscriptions: number;
+  active_subscriptions: number;
+  won_subscriptions: number;
+  completed_subscriptions: number;
+  defaulted_subscriptions: number;
+  emi_count: number;
+  rent_count: number;
+  lease_count: number;
+  total_contract_value: string;
+  total_monthly_value: string;
+  total_waived_value: string;
+  pending_emis: number;
+  overdue_emis: number;
+  today_collection: string;
+  total_outstanding: string;
+};
+
+type BatchBreakdownRow = {
+  batch_id: number | null;
+  batch_code: string | null;
+  subscriber_count: number;
+  contract_value: string;
+  monthly_value: string;
+  collected_value: string;
+  waived_value: string;
+  outstanding_value: string;
+};
+
+type BatchBreakdownPayload = {
+  count: number;
+  batch_count: number;
+  results: BatchBreakdownRow[];
+};
+
+function normalizeKpis(payload: unknown): SubscriptionKpis {
+  const raw = (payload ?? {}) as Record<string, unknown>;
+  return {
+    total_subscriptions: toNumber(raw.total_subscriptions),
+    active_subscriptions: toNumber(raw.active_subscriptions),
+    won_subscriptions: toNumber(raw.won_subscriptions),
+    completed_subscriptions: toNumber(raw.completed_subscriptions),
+    defaulted_subscriptions: toNumber(raw.defaulted_subscriptions),
+    emi_count: toNumber(raw.emi_count),
+    rent_count: toNumber(raw.rent_count),
+    lease_count: toNumber(raw.lease_count),
+    total_contract_value: toMoneyString(raw.total_contract_value),
+    total_monthly_value: toMoneyString(raw.total_monthly_value),
+    total_waived_value: toMoneyString(raw.total_waived_value),
+    pending_emis: toNumber(raw.pending_emis),
+    overdue_emis: toNumber(raw.overdue_emis),
+    today_collection: toMoneyString(raw.today_collection),
+    total_outstanding: toMoneyString(raw.total_outstanding),
+  };
+}
+
+function normalizeBatchBreakdown(payload: unknown): BatchBreakdownPayload {
+  const raw = (payload ?? {}) as Record<string, unknown>;
+  const results = Array.isArray(raw.results)
+    ? (raw.results as Record<string, unknown>[]).map((row) => ({
+        batch_id: toNullableNumber(row.batch_id) ?? null,
+        batch_code: toNullableString(row.batch_code) ?? null,
+        subscriber_count: toNumber(row.subscriber_count),
+        contract_value: toMoneyString(row.contract_value),
+        monthly_value: toMoneyString(row.monthly_value),
+        collected_value: toMoneyString(row.collected_value),
+        waived_value: toMoneyString(row.waived_value),
+        outstanding_value: toMoneyString(row.outstanding_value),
+      }))
+    : [];
+  return {
+    count: toNumber(raw.count) || results.length,
+    batch_count: toNumber(raw.batch_count),
+    results,
+  };
+}
+
 
 function toMoneyString(value: unknown): string {
   const parsed = Number(value ?? 0);
@@ -400,6 +477,9 @@ export default function AdminSubscriptionsPage() {
   const [statusInput, setStatusInput] = useState<"" | SubscriptionStatus>(currentStatusFilter);
   const [planTypeInput, setPlanTypeInput] = useState(currentPlanTypeFilter);
 
+  const [kpis, setKpis] = useState<SubscriptionKpis | null>(null);
+  const [batchBreakdown, setBatchBreakdown] = useState<BatchBreakdownRow[]>([]);
+
   useEffect(() => {
     setSearchInput(currentSearchQuery);
     setStatusInput(currentStatusFilter);
@@ -448,6 +528,47 @@ export default function AdminSubscriptionsPage() {
     currentSearchQuery,
     currentStatusFilter,
   ]);
+
+  const filterQueryString = useMemo(() => {
+    const params = new URLSearchParams();
+    if (currentSearchQuery) params.set("q", currentSearchQuery);
+    if (currentStatusFilter) params.set("status", currentStatusFilter);
+    if (currentPlanTypeFilter) params.set("plan_type", currentPlanTypeFilter);
+    if (currentCustomerFilter) params.set("customer", currentCustomerFilter);
+    if (currentProductFilter) params.set("product", currentProductFilter);
+    if (currentPartnerFilter) params.set("partner", currentPartnerFilter);
+    if (currentBatchFilter) params.set("batch", currentBatchFilter);
+    return params.toString();
+  }, [
+    currentBatchFilter,
+    currentCustomerFilter,
+    currentPartnerFilter,
+    currentPlanTypeFilter,
+    currentProductFilter,
+    currentSearchQuery,
+    currentStatusFilter,
+  ]);
+
+  const loadInsights = useCallback(async () => {
+    if (isWorkflowLanding) return;
+    const suffix = filterQueryString ? `?${filterQueryString}` : "";
+    try {
+      const [kpiPayload, batchPayload] = await Promise.all([
+        apiFetch<unknown>(`/admin/subscriptions/kpis/${suffix}`),
+        apiFetch<unknown>(`/admin/subscriptions/batch-breakdown/${suffix}`),
+      ]);
+      setKpis(normalizeKpis(kpiPayload));
+      setBatchBreakdown(normalizeBatchBreakdown(batchPayload).results);
+    } catch {
+      // KPIs are supplementary — a failure here must not blank the register.
+      setKpis(null);
+      setBatchBreakdown([]);
+    }
+  }, [filterQueryString, isWorkflowLanding]);
+
+  useEffect(() => {
+    void loadInsights();
+  }, [loadInsights]);
 
   const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
     if (isWorkflowLanding) {
@@ -538,6 +659,49 @@ export default function AdminSubscriptionsPage() {
     [rows]
   );
 
+  const activePlanType = currentPlanTypeFilter.trim().toUpperCase();
+
+  const statCards = useMemo(() => {
+    // Register-wide KPIs from the backend honor every active filter. Fall back
+    // to page-scoped figures only until the KPI call resolves.
+    if (!kpis) {
+      return [
+        { label: "Total Matching", value: loading ? "—" : count, tone: "info" as const },
+        { label: "Active (page)", value: loading ? "—" : pageActiveCount, tone: "success" as const },
+        { label: "Page Contract Value", value: loading ? "—" : formatRupee(pageContractValue), tone: "default" as const },
+      ];
+    }
+
+    if (activePlanType === "EMI") {
+      return [
+        { label: "EMI Subscriptions", value: kpis.emi_count, tone: "info" as const },
+        { label: "Contract Value", value: formatRupee(kpis.total_contract_value), tone: "default" as const },
+        { label: "To Collect (Outstanding)", value: formatRupee(kpis.total_outstanding), tone: "warning" as const },
+        { label: "Won (Draw)", value: kpis.won_subscriptions, tone: "success" as const },
+        { label: "Overdue EMIs", value: kpis.overdue_emis, tone: kpis.overdue_emis > 0 ? ("danger" as const) : ("success" as const) },
+      ];
+    }
+
+    if (activePlanType === "RENT" || activePlanType === "LEASE") {
+      const label = activePlanType === "RENT" ? "Rent" : "Lease";
+      return [
+        { label: `${label} Contracts`, value: kpis.total_subscriptions, tone: "info" as const },
+        { label: "Contract Value", value: formatRupee(kpis.total_contract_value), tone: "default" as const },
+        { label: "Monthly Demand", value: formatRupee(kpis.total_monthly_value), tone: "default" as const },
+        { label: "To Collect (Outstanding)", value: formatRupee(kpis.total_outstanding), tone: "warning" as const },
+      ];
+    }
+
+    // "All" view — headline totals plus the per-plan mix.
+    return [
+      { label: "Total Subscriptions", value: kpis.total_subscriptions, tone: "info" as const },
+      { label: "Contract Value", value: formatRupee(kpis.total_contract_value), tone: "default" as const },
+      { label: "To Collect (Outstanding)", value: formatRupee(kpis.total_outstanding), tone: "warning" as const },
+      { label: "Won (Draw)", value: kpis.won_subscriptions, tone: "success" as const },
+      { label: "Mix (EMI / Rent / Lease)", value: `${kpis.emi_count} / ${kpis.rent_count} / ${kpis.lease_count}`, tone: "default" as const },
+    ];
+  }, [kpis, activePlanType, loading, count, pageActiveCount, pageContractValue]);
+
   const exportRows = useMemo(
     () =>
       rows.map((row) => ({
@@ -617,12 +781,7 @@ export default function AdminSubscriptionsPage() {
         label: "Contract Source Workflow",
         tone: "info",
       }}
-      stats={[
-        { label: "Total Matching", value: loading ? "—" : count, tone: "info" },
-        { label: "Active (page)", value: loading ? "—" : pageActiveCount, tone: "success" },
-        { label: "Won (page)", value: loading ? "—" : pageWonCount, tone: "default" },
-        { label: "Page Contract Value", value: loading ? "—" : formatRupee(pageContractValue), tone: "default" },
-      ]}
+      stats={statCards}
     >
       <RegistryPageShell
         summary={
@@ -630,13 +789,77 @@ export default function AdminSubscriptionsPage() {
             <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground sm:text-sm">
               <span className="font-semibold text-foreground">Filtered register</span>
               {": "}
-              {count} matching · This page: {pageActiveCount} active, {pageWonCount} won · Page contract total{" "}
-              <span className="tabular-nums text-foreground">{formatRupee(pageContractValue)}</span>
+              {count} matching
+              {kpis ? (
+                <>
+                  {" · Contract value "}
+                  <span className="tabular-nums text-foreground">{formatRupee(kpis.total_contract_value)}</span>
+                  {" · To collect "}
+                  <span className="tabular-nums text-amber-600">{formatRupee(kpis.total_outstanding)}</span>
+                  {activePlanType === "EMI" || activePlanType === "" ? (
+                    <>
+                      {" · Pending EMIs "}
+                      <span className="tabular-nums text-foreground">{kpis.pending_emis}</span>
+                      {kpis.overdue_emis > 0 ? (
+                        <span className="text-red-600"> ({kpis.overdue_emis} overdue)</span>
+                      ) : null}
+                    </>
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  {" · This page: "}
+                  {pageActiveCount} active, {pageWonCount} won · Page contract total{" "}
+                  <span className="tabular-nums text-foreground">{formatRupee(pageContractValue)}</span>
+                </>
+              )}
             </div>
           ) : null
         }
         filters={
           <>
+        <nav aria-label="Plan type" className="flex flex-wrap items-center gap-2">
+          <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Plan type
+          </span>
+          {(
+            [
+              { label: "All plans", plan: "" },
+              { label: "Advance EMI", plan: "EMI" },
+              { label: "Rent", plan: "RENT" },
+              { label: "Lease", plan: "LEASE" },
+            ] as const
+          ).map((tab) => {
+            const active =
+              tab.plan === "" ? !activePlanType : activePlanType === tab.plan;
+            const countForTab =
+              tab.plan === "EMI"
+                ? kpis?.emi_count
+                : tab.plan === "RENT"
+                  ? kpis?.rent_count
+                  : tab.plan === "LEASE"
+                    ? kpis?.lease_count
+                    : kpis?.total_subscriptions;
+            return (
+              <Link
+                key={tab.label}
+                href={buildListPath({ plan_type: tab.plan, page: "" })}
+                className={cn(
+                  "rounded-full border px-3 py-1.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                  active
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-background text-foreground hover:bg-muted"
+                )}
+              >
+                {tab.label}
+                {typeof countForTab === "number" ? (
+                  <span className="ml-1.5 tabular-nums opacity-70">{countForTab}</span>
+                ) : null}
+              </Link>
+            );
+          })}
+        </nav>
+
         <nav aria-label="Subscription lifecycle" className="flex flex-wrap gap-2">
           {(
             [
@@ -784,7 +1007,10 @@ export default function AdminSubscriptionsPage() {
           <div className="mt-4 flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => void loadPage("refresh")}
+              onClick={() => {
+                void loadPage("refresh");
+                void loadInsights();
+              }}
               disabled={refreshing || loading}
               className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -832,6 +1058,65 @@ export default function AdminSubscriptionsPage() {
         }
         register={
           <>
+        {!loading && !error && batchBreakdown.some((b) => b.batch_id !== null) ? (
+          <DetailPanel
+            title="Batch breakdown"
+            description="Running batches inside the current filtered register — subscribers, contract value and outstanding per batch. Select a batch to drill the register into it."
+          >
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[640px] text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                    <th className="px-3 py-2 font-semibold">Batch</th>
+                    <th className="px-3 py-2 text-right font-semibold">Subscribers</th>
+                    <th className="px-3 py-2 text-right font-semibold">Contract value</th>
+                    <th className="px-3 py-2 text-right font-semibold">Collected</th>
+                    <th className="px-3 py-2 text-right font-semibold">Outstanding</th>
+                    <th className="px-3 py-2" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {batchBreakdown
+                    .filter((b) => b.batch_id !== null)
+                    .map((b) => {
+                      const isActive = currentBatchFilter === String(b.batch_id);
+                      return (
+                        <tr
+                          key={b.batch_id}
+                          className={cn(
+                            "border-b border-border/60 last:border-0",
+                            isActive ? "bg-primary/5" : "hover:bg-muted/40"
+                          )}
+                        >
+                          <td className="px-3 py-2 font-medium text-foreground">
+                            {b.batch_code || `Batch #${b.batch_id}`}
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums">{b.subscriber_count}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{formatRupee(b.contract_value)}</td>
+                          <td className="px-3 py-2 text-right tabular-nums text-emerald-600">{formatRupee(b.collected_value)}</td>
+                          <td className="px-3 py-2 text-right tabular-nums font-semibold text-amber-600">{formatRupee(b.outstanding_value)}</td>
+                          <td className="px-3 py-2 text-right">
+                            <Link
+                              href={buildListPath({ batch: isActive ? "" : String(b.batch_id), page: "" })}
+                              className={cn(
+                                "inline-flex h-7 items-center rounded-md border px-2.5 text-xs font-medium transition",
+                                isActive
+                                  ? "border-primary bg-primary text-primary-foreground"
+                                  : "border-input bg-background hover:bg-muted"
+                              )}
+                            >
+                              {isActive ? "Clear" : "Filter"}
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          </DetailPanel>
+        ) : null}
+
         {loading ? <ERPLoadingState label="Loading subscription register..." /> : null}
 
         {!loading && error ? (

@@ -1,3 +1,5 @@
+import { getPublicDictionary } from "@/lib/public-i18n";
+import { getPublicLocale } from "@/lib/public-i18n.server";
 import PublicRuleCard from "@/components/public/PublicRuleCard";
 import {
   ADVANCE_EMI_POLICY,
@@ -16,12 +18,15 @@ const commonSections = [
   GENERIC_POLICIES.kycVerification,
 ] as const;
 
-export default function PoliciesOperationalSummary() {
+export default async function PoliciesOperationalSummary() {
+  const locale = await getPublicLocale();
+  const dict = getPublicDictionary(locale);
+
   return (
     <section className="grid gap-6">
       <section className="public-surface p-6">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Customer rule summary</div>
-        <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">Core workflow rules</h2>
+        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{dict.public.PoliciesOperationalSummary_text1}</div>
+        <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">{dict.public.PoliciesOperationalSummary_text2}</h2>
         <p className="mt-3 max-w-4xl text-sm leading-7 text-muted-foreground sm:text-base">
           These summaries reuse existing public policy content so customers can compare plan paths before contacting the branch.
         </p>
@@ -42,8 +47,8 @@ export default function PoliciesOperationalSummary() {
       </section>
 
       <section className="public-surface p-6">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Common rule areas</div>
-        <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">Delivery, service, records, and verification</h2>
+        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{dict.public.PoliciesOperationalSummary_text4}</div>
+        <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">{dict.public.PoliciesOperationalSummary_text5}</h2>
         <p className="mt-3 max-w-4xl text-sm leading-7 text-muted-foreground sm:text-base">
           These common areas apply across multiple customer journeys and should be reviewed before branch confirmation.
         </p>

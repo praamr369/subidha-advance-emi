@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useSearchParams, type ReadonlyURLSearchParams } from "next/navigation";
 import { CheckCircle2, ClipboardCheck, PackageCheck, ShieldCheck } from "lucide-react";
 
-import ApplyEnquiryHero from "@/components/public/ApplyEnquiryHero";
 import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
 import PublicPageShell from "@/components/public/PublicPageShell";
 import ActionButton from "@/components/ui/ActionButton";
@@ -100,7 +99,7 @@ function buildLeadNotes({
   return lines.join("\n");
 }
 
-export default function ApplyPageClient() {
+export default function ApplyPageClient({ heroSlot }: { heroSlot: React.ReactNode }) {
   const searchParams = useSearchParams();
 
   const initialInterestedProduct = useMemo(
@@ -202,7 +201,7 @@ export default function ApplyPageClient() {
     <PublicPageShell
       title="Apply / Enquire"
       subtitle="Share your product preference, preferred monthly comfort, and contact details so the branch can guide you on Lucky Plan Advance EMI, rent, lease, or direct-sale availability."
-      heroSlot={<ApplyEnquiryHero />}
+      heroSlot={heroSlot}
       breadcrumbs={[
         { label: "Home", href: ROUTES.public.home },
         { label: "Apply" },

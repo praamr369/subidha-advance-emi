@@ -36,7 +36,9 @@ import {
   type StockLedgerRow,
   type StockLocation,
   type StockSummaryRow,
+  type StockSummaryMetrics,
 } from "@/services/inventory";
+import { formatRupee } from "@/lib/utils/currency";
 
 function getStockStatus(row: StockSummaryRow) {
   const onHand = parseFloat(row.on_hand_qty || "0");
@@ -100,12 +102,13 @@ function KPIBlock({ label, value, sub, tone, icon, href }: {
   return href ? <Link href={href}>{inner}</Link> : inner;
 }
 
-function CategoryRow({ label, count, inStock, low, out, icon, color }: {
+function CategoryRow({ label, count, inStock, low, out, value, icon, color }: {
   label: string;
   count: number;
   inStock: number;
   low: number;
   out: number;
+  value: number;
   icon: React.ReactNode;
   color: string;
 }) {
@@ -114,7 +117,7 @@ function CategoryRow({ label, count, inStock, low, out, icon, color }: {
       <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${color}`}>{icon}</div>
       <div className="min-w-0 flex-1">
         <div className="text-sm font-semibold text-foreground">{label}</div>
-        <div className="mt-0.5 text-xs text-muted-foreground">{count} SKUs total</div>
+        <div className="mt-0.5 text-xs text-muted-foreground">{count} SKUs · {formatRupee(value)} value</div>
       </div>
       <div className="hidden flex-wrap items-center gap-2 sm:flex">
         <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">{inStock} healthy</span>
@@ -136,6 +139,7 @@ export default function AdminInventoryPage() {
   const [error, setError] = useState<string | null>(null);
   const [itemsCount, setItemsCount] = useState(0);
   const [stockSummary, setStockSummary] = useState<StockSummaryRow[]>([]);
+  const [stockMetrics, setStockMetrics] = useState<StockSummaryMetrics | null>(null);
   const [adjustments, setAdjustments] = useState<StockAdjustment[]>([]);
   const [locations, setLocations] = useState<StockLocation[]>([]);
   const [bridgeRows, setBridgeRows] = useState<StockLedgerRow[]>([]);
@@ -155,6 +159,7 @@ export default function AdminInventoryPage() {
         if (cancelled) return;
         setItemsCount(itemsPayload.count);
         setStockSummary(summaryPayload.results);
+        setStockMetrics(summaryPayload.summary ?? null);
         setAdjustments(adjPayload.results);
         setLocations(locPayload.results);
         setBridgeRows(bridgePayload.results.slice(0, 10));
@@ -174,10 +179,13 @@ export default function AdminInventoryPage() {
     const finished = stockSummary.filter(r => r.stock_item_type === "FINISHED_GOOD");
     const raw = stockSummary.filter(r => r.stock_item_type === "RAW_MATERIAL");
     const acc = stockSummary.filter(r => r.stock_item_type === "ACCESSORY");
+    const sumValue = (rows: StockSummaryRow[]) =>
+      rows.reduce((total, r) => total + parseFloat(r.valuation_amount || "0"), 0);
     const byStatus = (rows: StockSummaryRow[]) => ({
       ok: rows.filter(r => getStockStatus(r) === "ok").length,
       low: rows.filter(r => getStockStatus(r) === "low").length,
       out: rows.filter(r => getStockStatus(r) === "out").length,
+      value: sumValue(rows),
     });
     return {
       total: stockSummary.length,
@@ -218,9 +226,9 @@ export default function AdminInventoryPage() {
       ]}
       stats={[
         { label: "Tracked Items", value: loading ? "—" : itemsCount, tone: "info" },
-        { label: "Active Locations", value: loading ? "—" : activeLocations, tone: "info" },
+        { label: "Stock Value", value: loading ? "—" : formatRupee(stockMetrics?.total_valuation_amount ?? 0), tone: "info" },
         { label: "Below Reorder", value: loading ? "—" : kpis.belowReorder, tone: (!loading && kpis.belowReorder > 0 ? "warning" : "success") as "warning" | "success" },
-        { label: "Draft Adjustments", value: loading ? "—" : draftAdjustments, tone: (!loading && draftAdjustments > 0 ? "warning" : "default") as "warning" | "default" },
+        { label: "Out of Stock", value: loading ? "—" : (stockMetrics?.out_of_stock_count ?? kpis.outOfStock), tone: (!loading && (stockMetrics?.out_of_stock_count ?? kpis.outOfStock) > 0 ? "danger" : "success") as "danger" | "success" },
       ]}
     >
       {loading ? <ERPLoadingState label="Loading inventory operations..." /> : null}
@@ -264,6 +272,42 @@ export default function AdminInventoryPage() {
             />
           </div>
 
+          {/* Stock value & flow — authoritative totals from the stock ledger */}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <KPIBlock
+              label="Total Stock Value"
+              value={formatRupee(stockMetrics?.total_valuation_amount ?? 0)}
+              sub="On-hand quantity × standard unit cost, valued across all tracked items."
+              icon={<Boxes className="h-5 w-5" />}
+              tone="info"
+              href={ROUTES.admin.inventoryValuation}
+            />
+            <KPIBlock
+              label="On Hand"
+              value={Number(stockMetrics?.total_on_hand_qty ?? 0).toLocaleString("en-IN")}
+              sub="Physical units present across all locations."
+              icon={<Layers className="h-5 w-5" />}
+              tone="default"
+              href={ROUTES.admin.inventoryStockOnHand}
+            />
+            <KPIBlock
+              label="Available"
+              value={Number(stockMetrics?.total_available_qty ?? 0).toLocaleString("en-IN")}
+              sub="Available-to-promise: on hand minus reservations."
+              icon={<Package className="h-5 w-5" />}
+              tone="success"
+              href={ROUTES.admin.inventoryStockOnHand}
+            />
+            <KPIBlock
+              label="Reserved"
+              value={Number(stockMetrics?.total_reserved_qty ?? 0).toLocaleString("en-IN")}
+              sub="Committed to winners and confirmed orders pending handover."
+              icon={<ClipboardCheck className="h-5 w-5" />}
+              tone={Number(stockMetrics?.total_reserved_qty ?? 0) > 0 ? "warning" : "default"}
+              href={ROUTES.admin.inventoryReservations}
+            />
+          </div>
+
           {/* Category breakdown */}
           <ERPSectionShell
             title="Inventory by category"
@@ -276,6 +320,7 @@ export default function AdminInventoryPage() {
                 inStock={kpis.finished.ok}
                 low={kpis.finished.low}
                 out={kpis.finished.out}
+                value={kpis.finished.value}
                 icon={<Package className="h-4 w-4 text-sky-700" />}
                 color="bg-sky-100"
               />
@@ -285,6 +330,7 @@ export default function AdminInventoryPage() {
                 inStock={kpis.raw.ok}
                 low={kpis.raw.low}
                 out={kpis.raw.out}
+                value={kpis.raw.value}
                 icon={<Factory className="h-4 w-4 text-violet-700" />}
                 color="bg-violet-100"
               />
@@ -294,6 +340,7 @@ export default function AdminInventoryPage() {
                 inStock={kpis.acc.ok}
                 low={kpis.acc.low}
                 out={kpis.acc.out}
+                value={kpis.acc.value}
                 icon={<Wrench className="h-4 w-4 text-amber-700" />}
                 color="bg-amber-100"
               />

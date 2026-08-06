@@ -773,6 +773,29 @@ export function getStockSummary(params: Record<string, QueryValue> = {}) {
   );
 }
 
+export type PurchasePipelineSummary = {
+  purchase_requests: { open: number; total: number };
+  purchase_orders: {
+    total: number;
+    draft: number;
+    sent: number;
+    partially_received: number;
+    received: number;
+    billed: number;
+    awaiting_receipt: number;
+    open_value: string;
+  };
+  goods_receipts: { received: number; unbilled: number };
+  vendor_bills: { draft: number; posted: number; posted_value: string };
+  vendor_payments: { paid_value: string; outstanding_payable: string };
+};
+
+export function getPurchasePipelineSummary(params: Record<string, QueryValue> = {}) {
+  return apiFetch<PurchasePipelineSummary>(
+    `/inventory/purchase-pipeline-summary/${buildQuery(params)}`
+  );
+}
+
 export function getProductDemandPlanning(productId: number | string) {
   return apiFetch<ProductDemandPlanning>(`/inventory/products/${productId}/demand-planning/`);
 }

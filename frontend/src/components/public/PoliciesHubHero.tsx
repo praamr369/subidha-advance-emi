@@ -1,3 +1,5 @@
+import { getPublicDictionary } from "@/lib/public-i18n";
+import { getPublicLocale } from "@/lib/public-i18n.server";
 import Link from "next/link";
 import { ArrowRight, ClipboardCheck, FileText, ReceiptText, ShieldCheck } from "lucide-react";
 
@@ -5,25 +7,30 @@ import Image from "next/image";
 import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
+
+
+export default async function PoliciesHubHero() {
+  const locale = await getPublicLocale();
+  const dict = getPublicDictionary(locale);
+
 const proofPoints = [
   {
     icon: FileText,
-    title: "Published policy pages",
-    description: "Legal and policy pages remain governed by the published policy workflow.",
+    title: dict.public.PoliciesHubHero_prop1,
+    description: dict.public.PoliciesHubHero_prop2,
   },
   {
     icon: ClipboardCheck,
-    title: "Operational rule clarity",
-    description: "Plan, delivery, return, payment, KYC, and service expectations are grouped for customer reading.",
+    title: dict.public.PoliciesHubHero_prop3,
+    description: dict.public.PoliciesHubHero_prop4,
   },
   {
     icon: ShieldCheck,
-    title: "No public record mutation",
-    description: "Reading policy pages never creates financial, contract, delivery, or accounting records.",
+    title: dict.public.PoliciesHubHero_prop5,
+    description: dict.public.PoliciesHubHero_prop6,
   },
 ] as const;
 
-export default function PoliciesHubHero() {
   return (
     <section className="public-hero relative overflow-hidden p-5 sm:p-7 lg:p-8">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_78%_12%,rgba(214,170,94,0.22),transparent_32%),radial-gradient(circle_at_16%_84%,rgba(112,72,42,0.14),transparent_34%)]" />
@@ -42,7 +49,7 @@ export default function PoliciesHubHero() {
               Read Lucky Plan, rent, lease, direct sale, delivery, warranty, payment, refund, KYC, and support rules before enquiry, payment, or contract signing.
             </p>
             <div className="public-card-sm max-w-3xl px-4 py-3 text-sm leading-6 text-muted-foreground">
-              <strong className="font-semibold text-foreground">Important:</strong> Public rules explain customer expectations. Final transaction truth remains in approved contracts, invoices, receipts, delivery records, inspection evidence, and audited ledgers.
+              <strong className="font-semibold text-foreground">{dict.public.PoliciesHubHero_text10}</strong> Public rules explain customer expectations. Final transaction truth remains in approved contracts, invoices, receipts, delivery records, inspection evidence, and audited ledgers.
             </div>
           </div>
 
@@ -67,7 +74,7 @@ export default function PoliciesHubHero() {
           <div className="relative w-full overflow-hidden rounded-[1.6rem] shadow-[0_24px_54px_-24px_rgba(15,23,42,0.6)]">
             <Image
               src="/images/banner_policies.jpg"
-              alt="Policies Hub"
+              alt={dict.public.PoliciesHubHero_attr16}
               width={800}
               height={533}
               priority
@@ -75,12 +82,12 @@ export default function PoliciesHubHero() {
             />
           </div>
           <div className="pointer-events-none absolute -left-3 top-8 hidden rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_84%,transparent)] px-4 py-3 shadow-[0_22px_54px_-38px_rgba(15,23,42,0.74)] backdrop-blur md:block">
-            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Policy hub</div>
-            <div className="mt-1 text-sm font-semibold text-foreground">Read before pay</div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">{dict.public.PoliciesHubHero_text17}</div>
+            <div className="mt-1 text-sm font-semibold text-foreground">{dict.public.PoliciesHubHero_text18}</div>
           </div>
           <div className="pointer-events-none absolute -right-3 bottom-8 hidden rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_84%,transparent)] px-4 py-3 shadow-[0_22px_54px_-38px_rgba(15,23,42,0.74)] backdrop-blur md:block">
-            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Audit boundary</div>
-            <div className="mt-1 text-sm font-semibold text-foreground">Records protected</div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">{dict.public.PoliciesHubHero_text19}</div>
+            <div className="mt-1 text-sm font-semibold text-foreground">{dict.public.PoliciesHubHero_text20}</div>
           </div>
         </div>
       </div>

@@ -38,14 +38,14 @@ export default function PublicProductMedia({
   return (
     <div
       className={cn(
-        "relative isolate overflow-hidden rounded-[1.7rem] border border-border bg-[linear-gradient(180deg,rgba(248,250,252,0.98),rgba(226,232,240,0.88))] shadow-[0_30px_72px_-54px_rgba(15,23,42,0.84)] contain-paint",
+        "relative isolate overflow-hidden rounded-[1.7rem] border border-border bg-card shadow-sm contain-paint",
         className
       )}
       data-public-image={shouldRenderImage ? "product" : "fallback"}
     >
-      <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent" />
-      <div className="pointer-events-none absolute -left-10 bottom-0 h-24 w-24 rounded-full bg-amber-200/30 blur-3xl" />
-      <div className="pointer-events-none absolute -right-12 top-2 h-24 w-24 rounded-full bg-slate-200/40 blur-3xl" />
+      <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-white dark:via-white/20 to-transparent" />
+      <div className="pointer-events-none absolute -left-10 bottom-0 h-24 w-24 rounded-full bg-amber-200/30 dark:bg-amber-500/10 blur-3xl" />
+      <div className="pointer-events-none absolute -right-12 top-2 h-24 w-24 rounded-full bg-slate-200/40 dark:bg-slate-700/40 blur-3xl" />
 
       {shouldRenderImage ? (
         <Image
@@ -61,8 +61,8 @@ export default function PublicProductMedia({
           onError={() => setFailedSrc(resolvedSrc)}
         />
       ) : (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.9),rgba(226,232,240,0.96))] text-muted-foreground">
-          <div className="rounded-full border border-border bg-card p-3 shadow-[0_16px_36px_-28px_rgba(15,23,42,0.76)]">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-card text-muted-foreground">
+          <div className="rounded-full border border-border bg-muted p-3">
             <ImageOff className="h-5 w-5" />
           </div>
           <div className="text-sm font-medium">{fallbackLabel}</div>

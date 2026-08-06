@@ -1,3 +1,5 @@
+import { getPublicDictionary } from "@/lib/public-i18n";
+import { getPublicLocale } from "@/lib/public-i18n.server";
 import Link from "next/link";
 
 import PublicPageShell from "@/components/public/PublicPageShell";
@@ -35,6 +37,9 @@ export default async function LocalSeoLanding({
   faqs,
   heroEyebrow,
 }: Props) {
+  const locale = await getPublicLocale();
+  const dict = getPublicDictionary(locale);
+
   const profile = await getResolvedPublicBusinessProfile().catch(() => null);
   const phone = profile?.support_phone?.trim();
   const whatsapp = profile?.resolved_whatsapp_link?.trim();
@@ -49,8 +54,8 @@ export default async function LocalSeoLanding({
         breadcrumbs={breadcrumbs}
         hero={heroEyebrow ? { eyebrow: heroEyebrow, badges: ["Asansol", "West Bengal"] } : undefined}
         actions={[
-          { label: "Contact showroom", href: "/contact", variant: "primary" },
-          { label: "Browse products", href: "/products", variant: "secondary" },
+          { label: dict.public.LocalSeoLanding_prop1, href: "/contact", variant: "primary" },
+          { label: dict.public.LocalSeoLanding_prop2, href: "/products", variant: "secondary" },
         ]}
       >
         <div className="flex flex-col gap-10">
@@ -72,7 +77,7 @@ export default async function LocalSeoLanding({
           ))}
 
           <section className="flex flex-col gap-3">
-            <h2 className="text-xl font-semibold text-foreground">Explore more</h2>
+            <h2 className="text-xl font-semibold text-foreground">{dict.public.LocalSeoLanding_text3}</h2>
             <ul className="flex flex-wrap gap-3">
               {quickLinks.map((link) => (
                 <li key={link.href}>
@@ -89,7 +94,7 @@ export default async function LocalSeoLanding({
 
           {(phone || whatsapp || address) && (
             <section className="flex flex-col gap-2 rounded-2xl border border-border bg-muted/40 p-5">
-              <h2 className="text-xl font-semibold text-foreground">Visit or contact Subidha Furniture</h2>
+              <h2 className="text-xl font-semibold text-foreground">{dict.public.LocalSeoLanding_text4}</h2>
               {address ? <p className="text-base text-muted-foreground">{address}</p> : null}
               <div className="flex flex-wrap gap-4 text-base">
                 {phone ? (
@@ -111,7 +116,7 @@ export default async function LocalSeoLanding({
 
           {faqs.length > 0 ? (
             <section className="flex flex-col gap-4">
-              <h2 className="text-xl font-semibold text-foreground">Frequently asked questions</h2>
+              <h2 className="text-xl font-semibold text-foreground">{dict.public.LocalSeoLanding_text8}</h2>
               <dl className="flex flex-col gap-4">
                 {faqs.map((faq) => (
                   <div key={faq.question} className="rounded-xl border border-border p-4">

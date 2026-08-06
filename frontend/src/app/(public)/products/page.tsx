@@ -10,7 +10,7 @@ import { getPublicDictionary } from "@/lib/public-i18n";
 import { getPublicLocale } from "@/lib/public-i18n.server";
 import { PRODUCT_SEO_CATEGORIES } from "@/lib/product-category-seo";
 import { ROUTES } from "@/lib/routes";
-import { listPublicProducts, type PublicProduct } from "@/lib/public-api";
+import { listPublicProducts, listPublicProductCategories, type PublicProduct } from "@/services/public";
 import { buildFaqJsonLd, buildItemListJsonLd, buildPublicMetadata } from "@/lib/public-seo";
 import ProductGrid from "./ProductGrid";
 
@@ -52,18 +52,32 @@ function buildCategorySummaries(products: PublicProduct[]): ProductCategorySumma
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 }
 
-export default async function ProductsPage() {
+export default async function ProductsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ search?: string }>;
+}) {
   const locale = await getPublicLocale();
   const dictionary = getPublicDictionary(locale);
+  
+  const resolvedSearchParams = (await searchParams) || {};
+  const initialSearch = resolvedSearchParams.search || "";
 
   let products: PublicProduct[] = [];
   let count = 0;
+  let nextUrl: string | null = null;
   let error: string | null = null;
+  let serverCategories: import("@/services/public").PublicProductCategory[] = [];
 
   try {
-    const payload = await listPublicProducts();
+    const [payload, categories] = await Promise.all([
+      listPublicProducts({ limit: 24, search: initialSearch }),
+      listPublicProductCategories(),
+    ]);
     products = payload.products;
     count = payload.count;
+    nextUrl = payload.next || null;
+    serverCategories = categories;
   } catch (err) {
     error = err instanceof Error ? err.message : "Unable to load products right now.";
   }
@@ -100,6 +114,27 @@ export default async function ProductsPage() {
       />
       <PublicSeoJsonLd payload={buildFaqJsonLd(PRODUCTS_FAQS)} />
 
+      <ProductCategoryDiscovery categories={categorySummaries} />
+
+      {/* Primary Shopping Section - Quick Commerce Style */}
+      <section className="mt-2 mb-8">
+        {error ? (
+          <div className="rounded-[1.6rem] border border-red-200/90 bg-[linear-gradient(180deg,rgba(254,242,242,0.98),rgba(254,226,226,0.9))] px-5 py-4 text-sm text-red-700 shadow-[0_16px_36px_-28px_rgba(127,29,29,0.42)]">
+            {error}
+          </div>
+        ) : (
+          <ProductGrid 
+            initialProducts={products} 
+            initialCount={count}
+            initialNext={nextUrl}
+            serverCategories={serverCategories}
+            initialSearch={initialSearch}
+            locale={locale} 
+          />
+        )}
+      </section>
+
+      {/* SEO & Marketing Fluff Moved Below the Fold */}
       <section className="public-surface p-6">
         <h2 className="text-lg font-semibold text-foreground">Shop furniture by category in Asansol</h2>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -118,8 +153,6 @@ export default async function ProductsPage() {
           ))}
         </ul>
       </section>
-
-      <ProductCategoryDiscovery categories={categorySummaries} />
 
       <PublicMarketingBanner
         eyebrow="Category bands"
@@ -144,9 +177,6 @@ export default async function ProductsPage() {
       />
 
       <section className="public-surface p-6">
-        <p className="mb-4 text-sm leading-6 text-muted-foreground">
-          Browse the live catalogue sourced from production product records.
-        </p>
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="public-card p-4">
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Published products</div>
@@ -161,16 +191,6 @@ export default async function ProductsPage() {
             <div className="mt-2 text-lg font-semibold text-foreground">Browse → Inspect → Enquire</div>
           </div>
         </div>
-
-        {error ? (
-          <div className="mt-6 rounded-[1.6rem] border border-red-200/90 bg-[linear-gradient(180deg,rgba(254,242,242,0.98),rgba(254,226,226,0.9))] px-5 py-4 text-sm text-red-700 shadow-[0_16px_36px_-28px_rgba(127,29,29,0.42)]">
-            {error}
-          </div>
-        ) : (
-          <div className="mt-6">
-            <ProductGrid products={products} locale={locale} />
-          </div>
-        )}
       </section>
 
       <section className="public-surface p-6">

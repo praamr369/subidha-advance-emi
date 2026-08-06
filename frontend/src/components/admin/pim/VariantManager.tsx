@@ -3,7 +3,7 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import {
   Plus, Trash2, Check, X, Search, ChevronLeft, ChevronRight,
   Zap, TrendingUp, Package, AlertTriangle, BarChart3, Settings2,
-  RefreshCw, Download, Database
+  RefreshCw, Download, Database, Image as ImageIcon, Upload
 } from "lucide-react";
 import { pimService, type PimVariant, type PimCategoryAttribute } from "@/services/pim";
 import { formatRupee } from "@/lib/utils/currency";
@@ -111,6 +111,21 @@ export default function VariantManager({ productId, productCode, variants, allAt
   const [bulkMode, setBulkMode] = useState<"percent" | "fixed">("percent");
   const [bulkAmount, setBulkAmount] = useState("");
   const [bulkApplying, setBulkApplying] = useState(false);
+
+  // --- image upload ---
+  const [uploadingImage, setUploadingImage] = useState<number | null>(null);
+
+  const handleImageUpload = async (id: number, file: File) => {
+    setUploadingImage(id);
+    try {
+      await pimService.updateVariantImage(id, file);
+      onRefresh();
+    } catch {
+      // handle error
+    } finally {
+      setUploadingImage(null);
+    }
+  };
 
   // ──────────────────────────── Summary stats ────────────────────────────
   const stats = useMemo(() => {
@@ -639,6 +654,7 @@ export default function VariantManager({ productId, productCode, variants, allAt
                     <th className="px-3 py-2.5 w-8">
                       <input type="checkbox" checked={allPageSelected} onChange={toggleAll} className="accent-primary" />
                     </th>
+                    <th className="px-3 py-2.5 w-12 text-center text-muted-foreground">Image</th>
                     <th className="px-3 py-2.5 text-left font-medium text-muted-foreground cursor-pointer select-none" onClick={() => toggleSort("sku")}>
                       SKU{sortIcon("sku")}
                     </th>
@@ -657,6 +673,33 @@ export default function VariantManager({ productId, productCode, variants, allAt
                     <tr key={v.id} className={`transition-colors ${selected.has(v.id) ? "bg-primary/5" : "hover:bg-muted/30"} ${v.is_low_stock ? "bg-red-50/30 dark:bg-red-950/10" : ""}`}>
                       <td className="px-3 py-2">
                         <input type="checkbox" checked={selected.has(v.id)} onChange={() => toggleOne(v.id)} className="accent-primary" />
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="relative group w-8 h-8 rounded border bg-muted flex items-center justify-center overflow-hidden">
+                          {v.image ? (
+                            <img src={v.image} alt="Variant" className="w-full h-full object-cover" />
+                          ) : (
+                            <ImageIcon className="h-4 w-4 text-muted-foreground/50" />
+                          )}
+                          <label className={`absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity ${uploadingImage === v.id ? "opacity-100 bg-black/20" : ""}`}>
+                            {uploadingImage === v.id ? (
+                              <RefreshCw className="h-3 w-3 text-white animate-spin" />
+                            ) : (
+                              <Upload className="h-3 w-3 text-white" />
+                            )}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              disabled={uploadingImage === v.id}
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleImageUpload(v.id, file);
+                                e.target.value = "";
+                              }}
+                            />
+                          </label>
+                        </div>
                       </td>
                       <td className="px-3 py-2 font-mono text-xs whitespace-nowrap">{v.sku}</td>
                       <td className="px-3 py-2 text-xs text-muted-foreground max-w-xs">
