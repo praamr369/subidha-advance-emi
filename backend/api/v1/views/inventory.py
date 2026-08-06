@@ -686,6 +686,19 @@ class InventoryValuationView(APIView):
         return Response(payload)
 
 
+class PurchasePipelineSummaryView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        from inventory.services.procurement_service import build_purchase_pipeline_summary
+
+        branch_id = request.query_params.get("branch")
+        payload = build_purchase_pipeline_summary(
+            branch_id=int(branch_id) if branch_id and str(branch_id).isdigit() else None,
+        )
+        return Response(payload)
+
+
 class AdminInventoryItemSearchView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 

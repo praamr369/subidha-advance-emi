@@ -9,7 +9,7 @@ from django.conf import settings
 from subscriptions.enums import *
 from subscriptions.base_models import (
     TimeStampedModel, MONEY_ZERO, HUNDRED, q2, _default_branch,
-    product_image_upload_to, subscription_document_upload_to,
+    product_image_upload_to, product_video_upload_to, subscription_document_upload_to,
     customer_photo_upload_to, customer_kyc_doc_upload_to,
     
 )
@@ -161,6 +161,7 @@ class Product(TimeStampedModel):
         blank=True,
     )
     image = models.ImageField(upload_to=product_image_upload_to, null=True, blank=True)
+    video = models.FileField(upload_to=product_video_upload_to, null=True, blank=True)
     is_active = models.BooleanField(default=True, db_index=True)
 
     plan_type_default = models.CharField(

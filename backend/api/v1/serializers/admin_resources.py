@@ -1493,6 +1493,8 @@ class ProductAdminSerializer(serializers.ModelSerializer):
     product_code = serializers.CharField(max_length=50, required=False, allow_null=True, allow_blank=True)
     image = serializers.ImageField(required=False, allow_null=True)
     clear_image = serializers.BooleanField(required=False, write_only=True, default=False)
+    video = serializers.FileField(required=False, allow_null=True)
+    clear_video = serializers.BooleanField(required=False, write_only=True, default=False)
     category_master_name = serializers.CharField(source="category_master.name", read_only=True)
     subcategory_master_name = serializers.CharField(source="subcategory_master.name", read_only=True)
     unit_of_measure_master_name = serializers.CharField(source="unit_of_measure_master.name", read_only=True)
@@ -1524,6 +1526,8 @@ class ProductAdminSerializer(serializers.ModelSerializer):
             "gst_rate",
             "image",
             "clear_image",
+            "video",
+            "clear_video",
             "is_active",
             "plan_type_default",
             "is_emi_enabled",
@@ -1631,6 +1635,15 @@ class ProductAdminSerializer(serializers.ModelSerializer):
                 instance.image if instance else None,
             )
 
+        clear_video = data.get("clear_video", False)
+        if clear_video:
+            video = None
+        else:
+            video = data.get(
+                "video",
+                instance.video if instance else None,
+            )
+
         is_active = data.get(
             "is_active",
             instance.is_active if instance else True,
@@ -1670,6 +1683,7 @@ class ProductAdminSerializer(serializers.ModelSerializer):
             unit_of_measure=unit_of_measure,
             description=description,
             image=image,
+            video=video,
             is_active=is_active,
             plan_type_default=plan_type_default,
             is_emi_enabled=is_emi_enabled,
@@ -1710,12 +1724,16 @@ class ProductAdminSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data.pop("clear_image", None)
+        validated_data.pop("clear_video", None)
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
         clear_image = bool(validated_data.pop("clear_image", False))
         if clear_image:
             validated_data["image"] = None
+        clear_video = bool(validated_data.pop("clear_video", False))
+        if clear_video:
+            validated_data["video"] = None
         return super().update(instance, validated_data)
 
 

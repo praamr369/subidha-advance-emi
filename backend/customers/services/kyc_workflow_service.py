@@ -44,6 +44,20 @@ def _validate_file(file):
         raise ValueError("File must be 5 MB or smaller.")
 
 
+def admin_upload_is_auto_accepted(upload_source: str, force_review: bool) -> bool:
+    """Admin-originated uploads are trusted and auto-accepted (no review guard).
+
+    A staff/admin uploading a document on behalf of a customer/partner/vendor/
+    staff member is treated as the reviewing authority, so the document lands
+    directly as APPROVED. Passing ``force_review=True`` overrides this and keeps
+    the document in the review queue (the "allow override" escape hatch).
+
+    Self-service uploads (SELF_SERVICE_UPLOAD) always return False here and are
+    hard-gated to SUBMITTED until an admin explicitly approves them.
+    """
+    return (upload_source == KycUploadSource.ADMIN_UPLOAD) and not force_review
+
+
 def _mask_reference(reference: str) -> str:
     """Return masked version – last 4 chars visible, rest replaced by *."""
     if not reference or len(reference) <= 4:
@@ -100,6 +114,7 @@ def admin_upload_customer_kyc(
     expiry_date: str | None = None,
     performed_by,
     upload_source: str = KycUploadSource.ADMIN_UPLOAD,
+    force_review: bool = False,
 ) -> "CustomerKycDocument":
     from subscriptions.models import (
         Customer,
@@ -111,16 +126,24 @@ def admin_upload_customer_kyc(
     )
 
     _validate_file(file)
+    auto_accepted = admin_upload_is_auto_accepted(upload_source, force_review)
     doc = CustomerKycDocument(
         customer=customer,
         document_type=document_type or CustomerKycDocumentType.OTHER,
         category=category or KycDocumentCategory.UNSPECIFIED,
         file=file,
         notes=(notes or "").strip(),
-        status=CustomerKycDocumentStatus.SUBMITTED,
+        status=(
+            CustomerKycDocumentStatus.APPROVED
+            if auto_accepted
+            else CustomerKycDocumentStatus.SUBMITTED
+        ),
         uploaded_by=performed_by,
         upload_source=upload_source,
     )
+    if auto_accepted:
+        doc.reviewed_by = performed_by
+        doc.reviewed_at = timezone.now()
     if expiry_date:
         try:
             from datetime import date as _date
@@ -129,7 +152,23 @@ def admin_upload_customer_kyc(
             pass
     doc.save()
 
-    if customer.kyc_status not in (
+    if auto_accepted:
+        # Admin-uploaded document is trusted and accepted immediately (no review
+        # guard). We record the acceptance at the document level but leave the
+        # customer-level kyc_status to the explicit admin "verify customer"
+        # action, so the contract gate still checks every required doc category.
+        _record_action(
+            owner_type=KycOwnerType.CUSTOMER,
+            owner_id=customer.pk,
+            action=KycReviewActionType.APPROVE,
+            performed_by=performed_by,
+            old_status=CustomerKycDocumentStatus.SUBMITTED,
+            new_status=CustomerKycDocumentStatus.APPROVED,
+            upload_source=upload_source,
+            document_model="CustomerKycDocument",
+            document_id=doc.pk,
+        )
+    elif customer.kyc_status not in (
         KycStatus.APPROVED,
         KycStatus.VERIFIED,
         KycStatus.EXCEPTION_APPROVED,
@@ -257,8 +296,10 @@ def admin_upload_partner_kyc(
     expiry_date: str | None = None,
     performed_by,
     upload_source: str = KycUploadSource.ADMIN_UPLOAD,
+    force_review: bool = False,
 ) -> PartnerKycDocument:
     _validate_file(file)
+    auto_accepted = admin_upload_is_auto_accepted(upload_source, force_review)
     doc = PartnerKycDocument(
         partner_user=partner_user,
         document_type=document_type or "OTHER",
@@ -266,10 +307,17 @@ def admin_upload_partner_kyc(
         file=file,
         notes=(notes or "").strip(),
         document_reference=(document_reference or "").strip(),
-        status=PartnerKycDocumentStatus.SUBMITTED,
+        status=(
+            PartnerKycDocumentStatus.APPROVED
+            if auto_accepted
+            else PartnerKycDocumentStatus.SUBMITTED
+        ),
         uploaded_by=performed_by,
         upload_source=upload_source,
     )
+    if auto_accepted:
+        doc.reviewed_by = performed_by
+        doc.reviewed_at = timezone.now()
     if expiry_date:
         try:
             from datetime import date as _date
@@ -280,10 +328,14 @@ def admin_upload_partner_kyc(
     _record_action(
         owner_type=KycOwnerType.PARTNER,
         owner_id=partner_user.pk,
-        action=KycReviewActionType.UPLOAD,
+        action=(
+            KycReviewActionType.APPROVE
+            if auto_accepted
+            else KycReviewActionType.UPLOAD
+        ),
         performed_by=performed_by,
         old_status="",
-        new_status=PartnerKycDocumentStatus.SUBMITTED,
+        new_status=doc.status,
         upload_source=upload_source,
         document_model="PartnerKycDocument",
         document_id=doc.pk,
@@ -437,10 +489,12 @@ def admin_upload_vendor_kyc(
     expiry_date: str | None = None,
     performed_by,
     upload_source: str = KycUploadSource.ADMIN_UPLOAD,
+    force_review: bool = False,
 ):
     from accounting.models import VendorKycDocument, KycDocumentGenericStatus
 
     _validate_file(file)
+    auto_accepted = admin_upload_is_auto_accepted(upload_source, force_review)
     doc = VendorKycDocument(
         vendor=vendor,
         document_type=document_type or "OTHER",
@@ -448,10 +502,17 @@ def admin_upload_vendor_kyc(
         file=file,
         notes=(notes or "").strip(),
         document_reference=(document_reference or "").strip(),
-        status=KycDocumentGenericStatus.SUBMITTED,
+        status=(
+            KycDocumentGenericStatus.APPROVED
+            if auto_accepted
+            else KycDocumentGenericStatus.SUBMITTED
+        ),
         uploaded_by=performed_by,
         upload_source=upload_source,
     )
+    if auto_accepted:
+        doc.reviewed_by = performed_by
+        doc.reviewed_at = timezone.now()
     if expiry_date:
         try:
             from datetime import date as _date
@@ -462,10 +523,14 @@ def admin_upload_vendor_kyc(
     _record_action(
         owner_type=KycOwnerType.VENDOR,
         owner_id=vendor.pk,
-        action=KycReviewActionType.UPLOAD,
+        action=(
+            KycReviewActionType.APPROVE
+            if auto_accepted
+            else KycReviewActionType.UPLOAD
+        ),
         performed_by=performed_by,
         old_status="",
-        new_status=KycDocumentGenericStatus.SUBMITTED,
+        new_status=doc.status,
         upload_source=upload_source,
         document_model="VendorKycDocument",
         document_id=doc.pk,
@@ -615,10 +680,12 @@ def admin_upload_staff_kyc(
     expiry_date: str | None = None,
     performed_by,
     upload_source: str = KycUploadSource.ADMIN_UPLOAD,
+    force_review: bool = False,
 ):
     from accounting.models import StaffKycDocument, KycDocumentGenericStatus
 
     _validate_file(file)
+    auto_accepted = admin_upload_is_auto_accepted(upload_source, force_review)
     doc = StaffKycDocument(
         employee=employee,
         document_type=document_type or "OTHER",
@@ -626,10 +693,17 @@ def admin_upload_staff_kyc(
         file=file,
         notes=(notes or "").strip(),
         document_reference=(document_reference or "").strip(),
-        status=KycDocumentGenericStatus.SUBMITTED,
+        status=(
+            KycDocumentGenericStatus.APPROVED
+            if auto_accepted
+            else KycDocumentGenericStatus.SUBMITTED
+        ),
         uploaded_by=performed_by,
         upload_source=upload_source,
     )
+    if auto_accepted:
+        doc.reviewed_by = performed_by
+        doc.reviewed_at = timezone.now()
     if expiry_date:
         try:
             from datetime import date as _date
@@ -640,10 +714,14 @@ def admin_upload_staff_kyc(
     _record_action(
         owner_type=KycOwnerType.STAFF,
         owner_id=employee.pk,
-        action=KycReviewActionType.UPLOAD,
+        action=(
+            KycReviewActionType.APPROVE
+            if auto_accepted
+            else KycReviewActionType.UPLOAD
+        ),
         performed_by=performed_by,
         old_status="",
-        new_status=KycDocumentGenericStatus.SUBMITTED,
+        new_status=doc.status,
         upload_source=upload_source,
         document_model="StaffKycDocument",
         document_id=doc.pk,

@@ -3816,6 +3816,91 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
             }
         )
 
+    @action(detail=False, methods=["get"], url_path="batch-breakdown")
+    def batch_breakdown(self, request):
+        """Per-batch rollup for the current filtered register.
+
+        Honors every list filter (plan_type, status, partner, product, q, ...).
+        For each batch that has at least one matching subscription it returns
+        the subscriber count, contract value, monthly demand, waived amount and
+        the derived outstanding (contract - collected + reversals - waived).
+        Rows without a batch (typical for Rent / Lease) are grouped under a
+        single null batch entry so the totals still reconcile.
+        """
+        queryset = self.get_queryset()
+
+        # Base per-batch aggregates straight off the subscription register.
+        batch_rows = (
+            queryset.values("batch_id", "batch__batch_code")
+            .annotate(
+                subscriber_count=Count("id", distinct=True),
+                contract_value=Coalesce(
+                    Sum("total_amount"), Value(MONEY_ZERO, output_field=DecimalField())
+                ),
+                monthly_value=Coalesce(
+                    Sum("monthly_amount"), Value(MONEY_ZERO, output_field=DecimalField())
+                ),
+                waived_value=Coalesce(
+                    Sum("waived_amount"), Value(MONEY_ZERO, output_field=DecimalField())
+                ),
+            )
+            .order_by("-subscriber_count", "batch__batch_code")
+        )
+
+        # Collected / reversed per batch, derived from the financial ledger so
+        # the outstanding figure matches the register-wide KPI arithmetic.
+        payments_by_batch = {
+            row["emi__subscription__batch_id"]: row["total"]
+            for row in FinancialLedger.objects.filter(
+                emi__subscription__in=queryset,
+                entry_type=LedgerEntryType.EMI_PAYMENT,
+            )
+            .values("emi__subscription__batch_id")
+            .annotate(total=Sum("amount"))
+        }
+        reversals_by_batch = {
+            row["emi__subscription__batch_id"]: row["total"]
+            for row in FinancialLedger.objects.filter(
+                emi__subscription__in=queryset,
+                entry_type=LedgerEntryType.PAYMENT_REVERSAL,
+            )
+            .values("emi__subscription__batch_id")
+            .annotate(total=Sum("amount"))
+        }
+
+        results = []
+        for row in batch_rows:
+            batch_id = row["batch_id"]
+            contract_value = row["contract_value"] or MONEY_ZERO
+            waived_value = row["waived_value"] or MONEY_ZERO
+            collected = payments_by_batch.get(batch_id) or MONEY_ZERO
+            reversed_amount = reversals_by_batch.get(batch_id) or MONEY_ZERO
+
+            outstanding = contract_value - collected + reversed_amount - waived_value
+            if outstanding < MONEY_ZERO:
+                outstanding = MONEY_ZERO
+
+            results.append(
+                {
+                    "batch_id": batch_id,
+                    "batch_code": row["batch__batch_code"],
+                    "subscriber_count": row["subscriber_count"],
+                    "contract_value": str(contract_value),
+                    "monthly_value": str(row["monthly_value"] or MONEY_ZERO),
+                    "collected_value": str(collected),
+                    "waived_value": str(waived_value),
+                    "outstanding_value": str(outstanding),
+                }
+            )
+
+        return Response(
+            {
+                "count": len(results),
+                "batch_count": sum(1 for r in results if r["batch_id"] is not None),
+                "results": results,
+            }
+        )
+
     @action(detail=False, methods=["get"], url_path="reconciliation-attention")
     def reconciliation_attention(self, request):
         queryset = self.get_queryset()

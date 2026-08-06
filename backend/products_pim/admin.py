@@ -8,6 +8,7 @@ from .models import (
     ProductAttribute,
     ProductVariant,
     VariantAttributeValue,
+    ProductAsset,
 )
 from .services import FlexibleVariantService
 
@@ -54,12 +55,18 @@ class ProductVariantInline(admin.TabularInline):
     fields = ["sku", "price", "quantity_on_hand", "reorder_level", "is_active"]
 
 
+class ProductAssetInline(admin.TabularInline):
+    model = ProductAsset
+    extra = 1
+    fields = ["image", "is_hero", "mapped_attribute_option", "display_order"]
+
+
 @admin.register(PimProduct)
 class PimProductAdmin(admin.ModelAdmin):
-    list_display = ["code", "name", "category", "subcategory", "base_price", "variant_count", "is_active", "is_published"]
+    list_display = ["code", "name", "brand", "category", "subcategory", "base_price", "variant_count", "is_active", "is_published"]
     list_filter = ["category", "subcategory", "is_published", "is_active"]
-    search_fields = ["code", "name"]
-    inlines = [ProductAttributeInline, ProductVariantInline]
+    search_fields = ["code", "name", "brand"]
+    inlines = [ProductAttributeInline, ProductAssetInline, ProductVariantInline]
     actions = ["generate_variants", "regenerate_variants"]
 
     def variant_count(self, obj):
@@ -120,7 +127,7 @@ class VariantAttributeValueInline(admin.TabularInline):
 
 @admin.register(ProductVariant)
 class ProductVariantAdmin(admin.ModelAdmin):
-    list_display = ["sku", "product", "price", "quantity_on_hand", "reorder_level", "is_active"]
+    list_display = ["sku", "product", "operational_product", "price", "quantity_on_hand", "reorder_level", "is_active"]
     list_filter = ["is_active"]
     search_fields = ["sku", "product__name", "product__code"]
     inlines = [VariantAttributeValueInline]

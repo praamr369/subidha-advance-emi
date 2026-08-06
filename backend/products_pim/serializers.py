@@ -100,13 +100,13 @@ class ProductVariantSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductVariant
         fields = [
-            "id", "sku", "barcode", "price", "cost_price",
+            "id", "sku", "barcode", "price", "cost_price", "image",
             "quantity_on_hand", "reorder_level", "is_active",
             "attribute_values", "is_low_stock", "variant_label",
         ]
 
     def get_variant_label(self, obj):
-        vals = obj.attribute_values.all().select_related("attribute")
+        vals = obj.attribute_values.all()
         parts = [v.value_text or str(v.value_number) for v in vals if (v.value_text or v.value_number)]
         return " / ".join(parts) if parts else obj.sku
 
@@ -219,7 +219,7 @@ class ProductVariantCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProductVariant
-        fields = ["id", "sku", "barcode", "price", "cost_price", "quantity_on_hand", "reorder_level", "attribute_values"]
+        fields = ["id", "sku", "barcode", "price", "cost_price", "image", "quantity_on_hand", "reorder_level", "attribute_values"]
 
     def create(self, validated_data):
         av_data = validated_data.pop("attribute_values", [])

@@ -3,7 +3,9 @@ customers.models (customers absorbed KYC in a prior split); re-export from there
 from customers.models import (  # noqa: F401
     KycOwnerType,
     KycUploadSource,
+    KycReviewAction,
     KycReviewActionType,
+    PartnerKycDocument,
     PartnerKycDocumentStatus,
     PartnerKycDocumentType,
     partner_kyc_doc_upload_to,

@@ -79,17 +79,23 @@ class KycReviewQueueServiceTests(TestCase):
         self.vendor = _make_vendor()
         self.employee = _make_employee()
 
+        # force_review=True keeps docs in SUBMITTED so they populate the queue
+        # (admin uploads otherwise auto-accept and drop out of review).
         admin_upload_customer_kyc(
-            customer=self.customer, file=_pdf(), document_type="AADHAAR", performed_by=self.admin
+            customer=self.customer, file=_pdf(), document_type="AADHAAR", performed_by=self.admin,
+            force_review=True,
         )
         admin_upload_partner_kyc(
-            partner_user=self.partner, file=_pdf("p.pdf"), document_type="PAN", performed_by=self.admin
+            partner_user=self.partner, file=_pdf("p.pdf"), document_type="PAN", performed_by=self.admin,
+            force_review=True,
         )
         admin_upload_vendor_kyc(
-            vendor=self.vendor, file=_pdf("v.pdf"), document_type="GST_CERTIFICATE", performed_by=self.admin
+            vendor=self.vendor, file=_pdf("v.pdf"), document_type="GST_CERTIFICATE", performed_by=self.admin,
+            force_review=True,
         )
         admin_upload_staff_kyc(
-            employee=self.employee, file=_pdf("s.pdf"), document_type="AADHAAR", performed_by=self.admin
+            employee=self.employee, file=_pdf("s.pdf"), document_type="AADHAAR", performed_by=self.admin,
+            force_review=True,
         )
 
     def test_queue_lists_all_owner_types(self):
@@ -154,10 +160,12 @@ class KycReviewQueueApiTests(APITestCase):
         self.vendor = _make_vendor(name="API Queue Vendor")
 
         self.partner_doc = admin_upload_partner_kyc(
-            partner_user=self.partner_user, file=_pdf("p.pdf"), document_type="PAN", performed_by=self.admin
+            partner_user=self.partner_user, file=_pdf("p.pdf"), document_type="PAN", performed_by=self.admin,
+            force_review=True,
         )
         self.customer_doc = admin_upload_customer_kyc(
-            customer=self.customer, file=_pdf(), document_type="AADHAAR", performed_by=self.admin
+            customer=self.customer, file=_pdf(), document_type="AADHAAR", performed_by=self.admin,
+            force_review=True,
         )
         self.queue_url = "/api/v1/admin/kyc/review-queue/"
 

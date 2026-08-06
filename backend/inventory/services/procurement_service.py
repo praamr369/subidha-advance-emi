@@ -421,3 +421,118 @@ def post_vendor_payment(*, vendor_payment_id: int, posted_by=None):
         notes=f"Vendor payment posted via journal {journal_entry.entry_no}.",
     )
     return payment, True
+
+
+def build_purchase_pipeline_summary(*, branch_id: int | None = None) -> dict:
+    """Live procure-to-pay pipeline rollup for the Purchases command center.
+
+    Every stage of the chain (request → order → receipt → bill → payment) is
+    aggregated with both counts and the operationally meaningful bottleneck
+    metrics: purchase orders still awaiting goods, goods receipts not yet
+    billed, and posted bills not fully paid (outstanding vendor payable).
+    """
+    from django.db.models import Count, F, Q
+
+    def _scope(qs):
+        if branch_id:
+            return qs.filter(branch_id=branch_id)
+        return qs
+
+    ZERO = Decimal("0.00")
+
+    # --- Purchase requests -------------------------------------------------
+    pr_qs = _scope(PurchaseRequest.objects.all())
+    pr_open = pr_qs.filter(
+        status__in=[
+            PurchaseRequestStatus.DRAFT,
+            PurchaseRequestStatus.APPROVED,
+            PurchaseRequestStatus.PARTIALLY_ORDERED,
+        ]
+    ).count()
+
+    # --- Purchase orders ---------------------------------------------------
+    po_qs = _scope(PurchaseOrder.objects.all())
+    po_status_counts = {
+        row["status"]: row["c"]
+        for row in po_qs.values("status").annotate(c=Count("id"))
+    }
+    awaiting_statuses = [
+        PurchaseOrderStatus.SENT,
+        PurchaseOrderStatus.PARTIALLY_RECEIVED,
+    ]
+    po_awaiting_receipt = sum(po_status_counts.get(s, 0) for s in awaiting_statuses)
+    # Committed value of not-yet-closed POs (open = anything not received/billed/cancelled).
+    open_po_value = (
+        PurchaseOrderLine.objects.filter(
+            purchase_order__in=po_qs.filter(
+                status__in=[
+                    PurchaseOrderStatus.DRAFT,
+                    PurchaseOrderStatus.SENT,
+                    PurchaseOrderStatus.PARTIALLY_RECEIVED,
+                ]
+            )
+        )
+        .aggregate(total=Sum(F("quantity") * F("unit_cost") + F("tax_amount")))["total"]
+        or ZERO
+    )
+
+    # --- Goods receipts ----------------------------------------------------
+    gr_qs = _scope(GoodsReceipt.objects.all())
+    gr_received = gr_qs.filter(status=GoodsReceiptStatus.RECEIVED).count()
+    # Received but not yet billed — the GRN→Bill bottleneck.
+    unbilled_receipts_qs = gr_qs.filter(
+        status=GoodsReceiptStatus.RECEIVED, vendor_bills__isnull=True
+    )
+    unbilled_receipts = unbilled_receipts_qs.count()
+
+    # --- Vendor bills ------------------------------------------------------
+    vb_qs = VendorBill.objects.all()
+    if branch_id:
+        vb_qs = vb_qs.filter(
+            Q(purchase_order__branch_id=branch_id) | Q(goods_receipt__branch_id=branch_id)
+        )
+    bills_draft = vb_qs.filter(status=VendorBillStatus.DRAFT).count()
+    posted_bills = vb_qs.filter(status=VendorBillStatus.POSTED)
+    bills_posted_count = posted_bills.count()
+    bills_posted_value = posted_bills.aggregate(total=Sum("grand_total"))["total"] or ZERO
+
+    # --- Vendor payments (outstanding payable) -----------------------------
+    payments_posted_value = (
+        VendorPayment.objects.filter(
+            status=VendorPaymentStatus.POSTED,
+            vendor_bill__in=posted_bills,
+        ).aggregate(total=Sum("amount"))["total"]
+        or ZERO
+    )
+    outstanding_payable = bills_posted_value - payments_posted_value
+    if outstanding_payable < ZERO:
+        outstanding_payable = ZERO
+
+    return {
+        "purchase_requests": {"open": pr_open, "total": pr_qs.count()},
+        "purchase_orders": {
+            "total": po_qs.count(),
+            "draft": po_status_counts.get(PurchaseOrderStatus.DRAFT, 0),
+            "sent": po_status_counts.get(PurchaseOrderStatus.SENT, 0),
+            "partially_received": po_status_counts.get(
+                PurchaseOrderStatus.PARTIALLY_RECEIVED, 0
+            ),
+            "received": po_status_counts.get(PurchaseOrderStatus.RECEIVED, 0),
+            "billed": po_status_counts.get(PurchaseOrderStatus.BILLED, 0),
+            "awaiting_receipt": po_awaiting_receipt,
+            "open_value": str(_money(open_po_value)),
+        },
+        "goods_receipts": {
+            "received": gr_received,
+            "unbilled": unbilled_receipts,
+        },
+        "vendor_bills": {
+            "draft": bills_draft,
+            "posted": bills_posted_count,
+            "posted_value": str(_money(bills_posted_value)),
+        },
+        "vendor_payments": {
+            "paid_value": str(_money(payments_posted_value)),
+            "outstanding_payable": str(_money(outstanding_payable)),
+        },
+    }

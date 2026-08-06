@@ -49,6 +49,11 @@ from subscriptions.models_kyc_workflow import KycOwnerType
 # Shared helpers
 # ---------------------------------------------------------------------------
 
+def _parse_bool(value) -> bool:
+    """Parse a multipart/form-data flag into a boolean."""
+    return str(value or "").strip().lower() in ("1", "true", "yes", "on")
+
+
 def _stream_file(document, filename_fallback: str):
     from django.http import FileResponse
 
@@ -96,6 +101,7 @@ class AdminCustomerKycUploadView(APIView):
                 document_reference=(request.data.get("document_reference") or "").strip(),
                 expiry_date=(request.data.get("expiry_date") or None),
                 performed_by=request.user,
+                force_review=_parse_bool(request.data.get("force_review")),
             )
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)})
@@ -219,6 +225,7 @@ class AdminPartnerKycDocumentListUploadView(APIView):
                 document_reference=(request.data.get("document_reference") or "").strip(),
                 expiry_date=(request.data.get("expiry_date") or None),
                 performed_by=request.user,
+                force_review=_parse_bool(request.data.get("force_review")),
             )
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)})
@@ -372,6 +379,7 @@ class AdminVendorKycDocumentListUploadView(APIView):
                 document_reference=(request.data.get("document_reference") or "").strip(),
                 expiry_date=(request.data.get("expiry_date") or None),
                 performed_by=request.user,
+                force_review=_parse_bool(request.data.get("force_review")),
             )
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)})
@@ -521,6 +529,7 @@ class AdminStaffKycDocumentListUploadView(APIView):
                 document_reference=(request.data.get("document_reference") or "").strip(),
                 expiry_date=(request.data.get("expiry_date") or None),
                 performed_by=request.user,
+                force_review=_parse_bool(request.data.get("force_review")),
             )
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)})

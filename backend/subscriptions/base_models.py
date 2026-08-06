@@ -55,6 +55,21 @@ def _normalize_product_image_identity(value: str | None, *, fallback: str) -> st
     return normalized or fallback
 
 
+def product_video_upload_to(instance, filename: str) -> str:
+    extension = Path(filename or "").suffix.lower()
+    if not extension:
+        extension = ".mp4"
+
+    product_code = (getattr(instance, "product_code", "") or "").strip()
+    if product_code:
+        identity_seed = product_code
+    else:
+        identity_seed = str(uuid.uuid4())
+
+    hash_key = hashlib.md5(identity_seed.encode("utf-8")).hexdigest()[:8]
+    return f"products/{hash_key}/video_{hash_key}{extension}"
+
+
 def product_image_upload_to(instance, filename: str) -> str:
     extension = Path(filename or "").suffix.lower()
     if not extension:

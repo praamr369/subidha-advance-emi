@@ -24,7 +24,7 @@ from django.utils import timezone
 from django.utils.crypto import get_random_string
 
 from subscriptions.models import AuditLog, BusinessEventType, CustomerKycDocumentStatus, CustomerSource, KycDocumentCategory, KycStatus
-from customers.models import Customer, CustomerKycDocument, CustomerReferral
+from customers.models import Customer, CustomerKycDocument, CustomerReferral, KycUploadSource
 
 from customers.services.customer_account_service import (
     build_customer_profile_summary,
@@ -392,6 +392,7 @@ def create_kyc_update_request(
         notes=(notes or "").strip(),
         status=CustomerKycDocumentStatus.SUBMITTED,
         uploaded_by=uploaded_by,
+        upload_source=KycUploadSource.SELF_SERVICE_UPLOAD,
     )
 
     if customer.kyc_status not in (

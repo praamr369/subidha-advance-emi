@@ -10,6 +10,7 @@ from api.v1.views.inventory import (
     OpeningStockImportPreviewView,
     PurchaseBillViewSet,
     PurchaseOrderViewSet,
+    PurchasePipelineSummaryView,
     PurchaseRequestViewSet,
     StockLocationViewSet,
     StockAdjustmentViewSet,
@@ -50,6 +51,7 @@ router.register(r"stock-ledger", StockLedgerViewSet, basename="inventory-stock-l
 urlpatterns = [
     path("stock-summary/", StockSummaryView.as_view()),
     path("valuation/", InventoryValuationView.as_view()),
+    path("purchase-pipeline-summary/", PurchasePipelineSummaryView.as_view()),
     path("opening-stock/preview/", OpeningStockImportPreviewView.as_view()),
     path("opening-stock/post/", OpeningStockImportPostView.as_view()),
     # Phase 2: stock status per product, demand summary, purchase suggestions

@@ -2,7 +2,8 @@ import hashlib
 
 from django.urls import path
 from django.shortcuts import get_object_or_404
-from rest_framework import serializers, status
+from django.db.models import Q
+from rest_framework import generics, serializers, status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -11,6 +12,7 @@ from core.services.operational_visibility import subscription_dashboard_visible_
 from api.v1.serializers.media import serialize_media_url
 from api.v1.serializers.public import PublicProductSerializer, PublicProductCategorySerializer
 from api.v1.views.health import PublicLivenessView, PublicReadinessView
+from api.v1.utils.pagination import StandardResultsSetPagination
 from api.v1.views.public_policy_site import (
     PublicBusinessComplianceSummaryView,
     PublicPolicyPageDetailView,
@@ -368,33 +370,78 @@ class PublicStatsView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
+        from lucky_plan.models import LuckyId
+        from django.db.models import Sum
+
         visible_subscriptions = Subscription.objects.filter(subscription_dashboard_visible_q())
+        active_visible_subs = visible_subscriptions.filter(status="ACTIVE")
+
+        batch_stats = Batch.objects.aggregate(total_capacity=Sum('total_slots'))
+        total_capacity = batch_stats['total_capacity'] or 0
+
+        available_ids = LuckyId.objects.filter(status="AVAILABLE").count()
+        reserved_ids = LuckyId.objects.exclude(status="AVAILABLE").count()
+
         return Response(
             {
                 "total_batches": Batch.objects.count(),
                 "total_subscriptions": visible_subscriptions.count(),
-                "active_subscriptions": visible_subscriptions.filter(status="ACTIVE").count(),
+                "active_subscriptions": active_visible_subs.filter(plan_type="EMI").count(),
+                "active_rent_subscriptions": active_visible_subs.filter(plan_type="RENT").count(),
+                "active_lease_subscriptions": active_visible_subs.filter(plan_type="LEASE").count(),
                 "total_winners": visible_subscriptions.filter(
                     winner_history_q()
                 ).distinct().count(),
+                "batch_total_capacity": total_capacity,
+                "batch_available_seats": available_ids,
+                "batch_reserved_seats": reserved_ids,
             }
         )
 
 
-class PublicProductsView(APIView):
+class PublicProductsView(generics.ListAPIView):
     authentication_classes = []
     permission_classes = [AllowAny]
+    serializer_class = PublicProductSerializer
+    pagination_class = StandardResultsSetPagination
 
-    def get(self, request):
+    def get_queryset(self):
         # Public site shows sellable finished goods only — raw materials and
         # accessories (manufacturing inputs) are internal, admin-only items.
-        products = (
-            Product.objects.filter(is_active=True)
+        queryset = (
+            Product.objects.filter(is_active=True, item_type="FINISHED_GOOD", pim__is_published=True)
             .exclude(inventory_profile__stock_item_type__in=["RAW_MATERIAL", "ACCESSORY"])
+            .select_related("category_master")
+            .prefetch_related("pim", "pim__attributes__attribute", "pim__variants__attribute_values__attribute")
             .order_by("name", "id")
         )
-        serializer = PublicProductSerializer(products, many=True, context={'request': request})
-        return Response({"count": products.count(), "results": serializer.data})
+        
+        search_query = self.request.query_params.get("search", "").strip()
+        category = self.request.query_params.get("category", "").strip()
+        subcategory = self.request.query_params.get("subcategory", "").strip()
+        min_price = self.request.query_params.get("min_price", "").strip()
+        max_price = self.request.query_params.get("max_price", "").strip()
+
+        if search_query:
+            queryset = queryset.filter(
+                Q(name__icontains=search_query) |
+                Q(product_code__icontains=search_query) |
+                Q(category_master__name__icontains=search_query)
+            )
+            
+        if category:
+            queryset = queryset.filter(category_master__name__iexact=category)
+            
+        if subcategory:
+            queryset = queryset.filter(pim__subcategory__name__iexact=subcategory)
+            
+        if min_price and min_price.isdigit():
+            queryset = queryset.filter(base_price__gte=int(min_price))
+            
+        if max_price and max_price.isdigit():
+            queryset = queryset.filter(base_price__lte=int(max_price))
+            
+        return queryset
 
 
 class PublicProductCategoriesView(APIView):
@@ -420,8 +467,9 @@ class PublicProductDetailView(APIView):
     def get(self, request, id):
         try:
             product = (
-                Product.objects.filter(id=id, is_active=True)
+                Product.objects.filter(id=id, is_active=True, item_type="FINISHED_GOOD", pim__is_published=True)
                 .exclude(inventory_profile__stock_item_type__in=["RAW_MATERIAL", "ACCESSORY"])
+                .prefetch_related("pim", "pim__attributes__attribute", "pim__variants__attribute_values__attribute")
                 .get()
             )
         except Product.DoesNotExist:

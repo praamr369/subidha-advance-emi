@@ -1,4 +1,5 @@
 from django.db.models import Q
+from products_pim.services.sync_service import PIMSyncService
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -83,7 +84,10 @@ class PimProductViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsAdmin]
 
     def get_queryset(self):
-        qs = PimProduct.objects.select_related("category", "subcategory").prefetch_related("attributes__attribute", "variants")
+        qs = PimProduct.objects.select_related("category", "subcategory").prefetch_related(
+            "attributes__attribute", 
+            "variants__attribute_values__attribute"
+        )
         category_id = self.request.query_params.get("category")
         subcategory_id = self.request.query_params.get("subcategory")
         search = self.request.query_params.get("search")
@@ -124,6 +128,7 @@ class PimProductViewSet(viewsets.ModelViewSet):
         serializer = ProductVariantCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         variant = serializer.save(product=product)
+        PIMSyncService.sync_variant_to_operational_product(variant)
         return Response(ProductVariantSerializer(variant).data, status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=["get"])
@@ -304,6 +309,10 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
             return ProductVariantCreateSerializer
         return ProductVariantSerializer
 
+    def perform_update(self, serializer):
+        variant = serializer.save()
+        PIMSyncService.sync_variant_to_operational_product(variant)
+
     @action(detail=True, methods=["patch"])
     def update_stock(self, request, pk=None):
         variant = self.get_object()
@@ -314,6 +323,7 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
         if reorder is not None:
             variant.reorder_level = int(reorder)
         variant.save(update_fields=["quantity_on_hand", "reorder_level"])
+        PIMSyncService.sync_variant_to_operational_product(variant)
         return Response(ProductVariantSerializer(variant).data)
 
     @action(detail=True, methods=["patch"])
@@ -326,4 +336,5 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
         if cost_price is not None:
             variant.cost_price = cost_price
         variant.save(update_fields=["price", "cost_price"])
+        PIMSyncService.sync_variant_to_operational_product(variant)
         return Response(ProductVariantSerializer(variant).data)

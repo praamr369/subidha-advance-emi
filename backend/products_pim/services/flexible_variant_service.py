@@ -8,6 +8,7 @@ from products_pim.models import (
     ProductVariant, VariantAttributeValue,
     CategoryAttribute, AttributeOption, PimProduct
 )
+from products_pim.services.sync_service import PIMSyncService
 
 
 class VariantPreviewResult:
@@ -214,6 +215,9 @@ class FlexibleVariantService:
                             attribute=attribute,
                             value_text=option.value
                         )
+                        
+                    # Sync to ERP core products
+                    PIMSyncService.sync_variant_to_operational_product(variant)
 
                     created_count += 1
 
@@ -277,6 +281,10 @@ class FlexibleVariantService:
                         variant.barcode = data['barcode']
 
                     variant.save()
+                    
+                    # Sync to ERP core products
+                    PIMSyncService.sync_variant_to_operational_product(variant)
+                    
                     updated_count += 1
 
                 except ProductVariant.DoesNotExist:

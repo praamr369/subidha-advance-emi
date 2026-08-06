@@ -106,17 +106,30 @@ class CustomerKycUploadServiceTests(TestCase):
             performed_by=self.admin,
         )
         self.assertIsNotNone(doc.pk)
-        self.assertEqual(doc.status, CustomerKycDocumentStatus.SUBMITTED)
+        # Admin uploads are trusted and auto-accepted (no review guard).
+        self.assertEqual(doc.status, CustomerKycDocumentStatus.APPROVED)
+        self.assertEqual(doc.reviewed_by_id, self.admin.pk)
         self.assertEqual(doc.upload_source, KycUploadSource.ADMIN_UPLOAD)
 
         actions = KycReviewAction.objects.filter(
             owner_type=KycOwnerType.CUSTOMER, owner_id=self.customer.pk
         )
         self.assertGreater(actions.count(), 0)
-        upload_action = actions.filter(action=KycReviewActionType.UPLOAD).first()
-        self.assertIsNotNone(upload_action)
-        self.assertEqual(upload_action.document_model, "CustomerKycDocument")
-        self.assertEqual(upload_action.document_id, doc.pk)
+        accept_action = actions.filter(action=KycReviewActionType.APPROVE).first()
+        self.assertIsNotNone(accept_action)
+        self.assertEqual(accept_action.document_model, "CustomerKycDocument")
+        self.assertEqual(accept_action.document_id, doc.pk)
+
+    def test_admin_upload_with_force_review_stays_submitted(self):
+        doc = admin_upload_customer_kyc(
+            customer=self.customer,
+            file=_pdf(),
+            document_type=CustomerKycDocumentType.AADHAAR,
+            category=KycDocumentCategory.ID_PROOF,
+            performed_by=self.admin,
+            force_review=True,
+        )
+        self.assertEqual(doc.status, CustomerKycDocumentStatus.SUBMITTED)
 
     def test_admin_request_resubmission_requires_reason(self):
         doc = admin_upload_customer_kyc(
@@ -185,12 +198,14 @@ class PartnerKycServiceTests(TestCase):
             performed_by=self.admin,
         )
         self.assertIsNotNone(doc.pk)
-        self.assertEqual(doc.status, PartnerKycDocumentStatus.SUBMITTED)
+        # Admin uploads are trusted and auto-accepted (no review guard).
+        self.assertEqual(doc.status, PartnerKycDocumentStatus.APPROVED)
+        self.assertEqual(doc.reviewed_by_id, self.admin.pk)
         self.assertEqual(doc.partner_user_id, self.partner.pk)
         self.assertTrue(
             KycReviewAction.objects.filter(
                 owner_type=KycOwnerType.PARTNER,
-                action=KycReviewActionType.UPLOAD,
+                action=KycReviewActionType.APPROVE,
                 document_id=doc.pk,
             ).exists()
         )
@@ -273,11 +288,13 @@ class VendorKycServiceTests(TestCase):
             vendor=self.vendor, file=_png(), document_type="GST_CERTIFICATE", performed_by=self.admin
         )
         self.assertIsNotNone(doc.pk)
-        self.assertEqual(doc.status, KycDocumentGenericStatus.SUBMITTED)
+        # Admin uploads are trusted and auto-accepted (no review guard).
+        self.assertEqual(doc.status, KycDocumentGenericStatus.APPROVED)
+        self.assertEqual(doc.reviewed_by_id, self.admin.pk)
         self.assertTrue(
             KycReviewAction.objects.filter(
                 owner_type=KycOwnerType.VENDOR,
-                action=KycReviewActionType.UPLOAD,
+                action=KycReviewActionType.APPROVE,
                 document_id=doc.pk,
             ).exists()
         )
@@ -318,11 +335,13 @@ class StaffKycServiceTests(TestCase):
             employee=self.employee, file=_pdf(), document_type="AADHAAR", performed_by=self.admin
         )
         self.assertIsNotNone(doc.pk)
-        self.assertEqual(doc.status, KycDocumentGenericStatus.SUBMITTED)
+        # Admin uploads are trusted and auto-accepted (no review guard).
+        self.assertEqual(doc.status, KycDocumentGenericStatus.APPROVED)
+        self.assertEqual(doc.reviewed_by_id, self.admin.pk)
         self.assertTrue(
             KycReviewAction.objects.filter(
                 owner_type=KycOwnerType.STAFF,
-                action=KycReviewActionType.UPLOAD,
+                action=KycReviewActionType.APPROVE,
                 document_id=doc.pk,
             ).exists()
         )

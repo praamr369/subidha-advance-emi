@@ -3,7 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any
 
-from django.db.models import Q, Sum
+from django.db.models import Count, Q, Sum
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -11,6 +11,7 @@ from rest_framework.views import APIView
 from api.v1.permissions import IsAdmin
 from api.v1.serializers.admin_resources import ProductAdminSerializer
 from api.v1.pagination import get_page_params
+from subscriptions.enums import ProductItemType
 from subscriptions.models import Product
 
 PAGE_SIZE_OPTIONS = {20, 50, 100}
@@ -146,6 +147,23 @@ def _summary(queryset) -> dict[str, Any]:
     direct_sale_ready = queryset.filter(is_active=True, is_direct_sale_enabled=True, base_price__gt=Decimal("0.00")).count()
     rent_lease_ready = queryset.filter(Q(is_rent_enabled=True) | Q(is_lease_enabled=True)).count()
     base_value = queryset.aggregate(total=Sum("base_price"))["total"] or Decimal("0.00")
+
+    # Per-item-type counts — every type key is always present (0 when absent) so
+    # the frontend can render stable segmented tabs.
+    item_type_counts = {choice.value: 0 for choice in ProductItemType}
+    for row in queryset.values("item_type").annotate(c=Count("id")):
+        key = row["item_type"] or ProductItemType.FINISHED_GOOD.value
+        item_type_counts[key] = item_type_counts.get(key, 0) + row["c"]
+
+    # Stock-tracking posture, read from the stored InventoryItem status so this
+    # stays cheap (no per-item ledger aggregation on a register listing).
+    stock_active = queryset.filter(
+        inventory_profile__stock_tracking_status="STOCK_ACTIVE"
+    ).count()
+    stock_prepared_no_stock = queryset.filter(
+        inventory_profile__stock_tracking_status="PREPARED_NO_STOCK"
+    ).count()
+
     return {
         "total_products": count,
         "inventory_ready": inventory_ready,
@@ -156,6 +174,9 @@ def _summary(queryset) -> dict[str, Any]:
         "image_missing": max(count - image_ready, 0),
         "catalog_cleanup_required": max(count - cataloged, 0),
         "total_base_value": str(base_value),
+        "item_type_counts": item_type_counts,
+        "stock_active": stock_active,
+        "stock_prepared_no_stock": stock_prepared_no_stock,
     }
 
 

@@ -1,5 +1,6 @@
 from decimal import Decimal
 from pathlib import Path
+from uuid import uuid4
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
