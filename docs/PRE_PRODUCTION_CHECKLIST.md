@@ -75,6 +75,12 @@ Run each critical journey start-to-finish as the real roles. Tick only when the
 whole chain — UI action → API → service → DB → audit → downstream (accounting/
 stock/notification) — is correct.
 
+> **Automated coverage** for every journey below (Playwright release-candidate specs
+> + the Layer-A/B/C API locks that gate & delta-review each endpoint) is mapped in
+> the Layer-D table of [`coverage_ledger.md`](coverage_ledger.md#layer-d--end-to-end-workflows--go-live-pre-production-checklist-phases-4--6).
+> These boxes are the operator's **manual UI walkthrough on a prod-like clone** — the
+> one genuinely-manual gate on top of that automated coverage.
+
 - [ ] **Lead → customer → KYC → contract → delivery** (EMI).
 - [ ] **Rent / lease contract → monthly demand → collection → deposit handling.**
 - [ ] **Cashier collection** (cash / bank / UPI) → receipt → daily close.

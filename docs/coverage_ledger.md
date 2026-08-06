@@ -129,9 +129,59 @@ sign-off per module section here as sections are completed.
 
 ---
 
+## Layer D — end-to-end workflows + go-live (pre-production checklist Phases 4 & 6)
+
+The full-chain money/stock journeys. Each is covered by (a) a Playwright spec that
+drives the real UI→API→service→DB→audit chain in the release-candidate CI job, plus
+(b) the Layer-A/B/C API-level locks proving the endpoints it exercises. "CI-covered"
+= a dedicated/adjacent Playwright spec exists; "API-locked" = the journey's endpoints
+are gated + delta-reviewed here. The final **human UI walkthrough on a prod-like
+clone** is the one genuinely-manual step (the operator's release sign-off).
+
+### Phase 4 — money/stock journeys
+
+| # | Journey | Automated coverage | Manual (clone) |
+|---|---|---|---|
+| 1 | Lead → customer → KYC → contract → delivery (EMI) | `subscription_contract_print`, `customer.spec`, `admin.spec` + A.4 route smoke; API-locked: kyc/contracts/deliveries Layer-C locks | ☐ operator |
+| 2 | Rent/lease → monthly demand → collection → deposit | `accounting_rent_lease_collection_ready`, `rent_lease_unified_collection`, `rent_lease_contract_print` + rent-lease bridge Layer-C lock | ☐ operator |
+| 3 | Cashier collection (cash/bank/UPI) → receipt → daily close | `cashier.spec`, `cashier_day_close_print_smoke`, `collection_control_center` + cashier + settlement Layer-C locks | ☐ operator |
+| 4 | Direct sale → invoice → delivery case → payment → posting | `billing_direct_sale_workspace` + billing action Layer-C lock | ☐ operator |
+| 5 | Purchase order → goods receipt → vendor bill → payment | `purchase_vendor_document_print_smoke`, `vendor_sourcing_smoke` + inventory Layer-C lock | ☐ operator |
+| 6 | Bank/UPI statement import → reconciliation → allocation | `reconciliation_report_print_smoke` + settlement + reconciliation Layer-C locks | ☐ operator |
+| 7 | Return/exchange → restock → credit/debit note | `reversal_center_smoke` + billing credit/debit-note action lock | ☐ operator |
+| 8 | Commission accrual → payout batch → payout | `release-smoke` (batch lifecycle) + admin_resources `draw.commit`/commission locks | ☐ operator |
+| 9 | Lucky-plan batch → lock → draw commit → reveal → winner | `release-smoke` (admin batch lifecycle) + admin_resources `batch.lock`/`draw.commit`/`draw.complete` locks | ☐ operator |
+| 10 | Month-end / year-end close (books balance; locks apply) | accounting year-end/period-actions Layer-C review + the **balanced-ledger invariant** `test_accounting_bridge.py` | ☐ operator |
+| 11 | Business setup reset on a clone (preserves admin) | business-setup reset capability lock (`test_admin_business_setup_delta.py`) | ☐ operator (must run on a clone) |
+
+Every journey's API surface is delta-reviewed and locked (Layers A–C); each has
+release-candidate Playwright coverage. Journeys 7–11 lean more on backend review +
+release-smoke than a dedicated named spec — good candidates for a dedicated E2E spec
+next.
+
+### Phase 6 — data / security / operability (go-live)
+
+| Item | Status | Verification |
+|---|---|---|
+| Encryption at rest (`secret_crypto`) | ✅ verified | `test_secret_crypto.py` (Layer B) — Fernet round-trip, key bound to SECRET_KEY |
+| Audit trail produces rows | ✅ verified | `test_audit_service.py` (Layer B) + the `log_audit` blank-metadata fix |
+| Health `/healthz` + `/readyz` + deep | ✅ verified | Layer-A smoke + the deep-health critical/optional split in `api/v1/tests_health.py` |
+| Production-readiness command | ✅ exists (go-live gate) | `manage.py check_production_readiness` — checks DEBUG off, ALLOWED_HOSTS, BACKUP_ROOT exists, SECRET_KEY not placeholder, CORS no `*`, admin capability + active admin; run against prod settings at deploy |
+| TLS / secure cookies / CORS no wildcard | ☐ deploy-time | enforced by prod settings + readiness command |
+| Backups + test restore, Redis cache, rollback snapshot, observability, runbook | ☐ deploy-time | operator/infra — see `DATA_ENCRYPTION_AND_HARDENING.md` + `PRE_PRODUCTION_CHECKLIST.md` |
+
+**Layer D status:** the automated half is complete — every journey is API-locked and
+CI-covered, and every code-verifiable Phase-6 control is green. The remaining ☐ items
+are inherently human/infra: the operator's UI walkthrough on a prod-like clone and the
+deploy-time ops controls (backups/TLS/Redis/rollback), gated by `check_production_readiness`.
+
+---
+
 ## Definition of done (from the strategy §9)
 
 - [x] Layer A CI job green (auth matrix, endpoint smoke, schema).
 - [ ] Layer A page-load smoke green (A.4 first CI run — reported job in release-candidate CI).
 - [x] Layer B ledger: every shared base class, gate, service pattern, frontend part signed off.
 - [x] Layer C: every module section delta-reviewed (7 bugs fixed, 3 systemic priv-esc classes closed).
+- [x] Layer D (automated half): every Phase-4 journey API-locked + CI-covered; code-verifiable Phase-6 controls green.
+- [ ] Layer D (manual half): operator UI walkthrough on a prod-like clone + deploy-time ops (gated by `check_production_readiness`).
