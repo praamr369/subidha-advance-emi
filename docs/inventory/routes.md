@@ -2063,20 +2063,20 @@ Total endpoints: **2543**, in **29** groups (by first path segment under `/api/v
 |---|---|---|---|
 | ☐ | GET | `/api/v1/branch-control/` | rest_framework.routers.APIRootView |
 | ☐ | GET | `/api/v1/branch-control/<drf_format_suffix:format>` | rest_framework.routers.APIRootView |
-| ☐ | ANY | `/api/v1/branch-control/branches.(?P<format>[a-z0-9]+)/?` | api.v1.views.branch_control.BranchViewSet |
-| ☐ | ANY | `/api/v1/branch-control/branches/` | api.v1.views.branch_control.BranchViewSet |
-| ☐ | ANY | `/api/v1/branch-control/branches/(?P<pk>[/.]+).(?P<format>[a-z0-9]+)/?` | api.v1.views.branch_control.BranchViewSet |
-| ☐ | ANY | `/api/v1/branch-control/branches/(?P<pk>[/.]+)/` | api.v1.views.branch_control.BranchViewSet |
-| ☐ | ANY | `/api/v1/branch-control/counters.(?P<format>[a-z0-9]+)/?` | api.v1.views.branch_control.CashCounterViewSet |
-| ☐ | ANY | `/api/v1/branch-control/counters/` | api.v1.views.branch_control.CashCounterViewSet |
-| ☐ | ANY | `/api/v1/branch-control/counters/(?P<pk>[/.]+).(?P<format>[a-z0-9]+)/?` | api.v1.views.branch_control.CashCounterViewSet |
-| ☐ | ANY | `/api/v1/branch-control/counters/(?P<pk>[/.]+)/` | api.v1.views.branch_control.CashCounterViewSet |
-| ☐ | POST | `/api/v1/branch-control/imports/branches/post/` | api.v1.views.branch_control.BranchImportPostView |
-| ☐ | POST | `/api/v1/branch-control/imports/branches/preview/` | api.v1.views.branch_control.BranchImportPreviewView |
-| ☐ | POST | `/api/v1/branch-control/imports/counters/post/` | api.v1.views.branch_control.CounterImportPostView |
-| ☐ | POST | `/api/v1/branch-control/imports/counters/preview/` | api.v1.views.branch_control.CounterImportPreviewView |
-| ☐ | GET | `/api/v1/branch-control/readiness/` | api.v1.views.branch_control.BranchReadinessView |
-| ☐ | GET | `/api/v1/branch-control/reporting/overview/` | api.v1.views.branch_control.BranchReportingOverviewView |
+| ☑ | ANY | `/api/v1/branch-control/branches.(?P<format>[a-z0-9]+)/?` | api.v1.views.branch_control.BranchViewSet |
+| ☑ | ANY | `/api/v1/branch-control/branches/` | api.v1.views.branch_control.BranchViewSet |
+| ☑ | ANY | `/api/v1/branch-control/branches/(?P<pk>[/.]+).(?P<format>[a-z0-9]+)/?` | api.v1.views.branch_control.BranchViewSet |
+| ☑ | ANY | `/api/v1/branch-control/branches/(?P<pk>[/.]+)/` | api.v1.views.branch_control.BranchViewSet |
+| ☑ | ANY | `/api/v1/branch-control/counters.(?P<format>[a-z0-9]+)/?` | api.v1.views.branch_control.CashCounterViewSet |
+| ☑ | ANY | `/api/v1/branch-control/counters/` | api.v1.views.branch_control.CashCounterViewSet |
+| ☑ | ANY | `/api/v1/branch-control/counters/(?P<pk>[/.]+).(?P<format>[a-z0-9]+)/?` | api.v1.views.branch_control.CashCounterViewSet |
+| ☑ | ANY | `/api/v1/branch-control/counters/(?P<pk>[/.]+)/` | api.v1.views.branch_control.CashCounterViewSet |
+| ☑ | POST | `/api/v1/branch-control/imports/branches/post/` | api.v1.views.branch_control.BranchImportPostView |
+| ☑ | POST | `/api/v1/branch-control/imports/branches/preview/` | api.v1.views.branch_control.BranchImportPreviewView |
+| ☑ | POST | `/api/v1/branch-control/imports/counters/post/` | api.v1.views.branch_control.CounterImportPostView |
+| ☑ | POST | `/api/v1/branch-control/imports/counters/preview/` | api.v1.views.branch_control.CounterImportPreviewView |
+| ☑ | GET | `/api/v1/branch-control/readiness/` | api.v1.views.branch_control.BranchReadinessView |
+| ☑ | GET | `/api/v1/branch-control/reporting/overview/` | api.v1.views.branch_control.BranchReportingOverviewView |
 
 ## `cashier` — 27 endpoints
 
@@ -2114,25 +2114,25 @@ Total endpoints: **2543**, in **29** groups (by first path segment under `/api/v
 
 | ✓ | Methods | Path | View |
 |---|---|---|---|
-| ☐ | POST | `/api/v1/crm/interactions/<int:pk>/status/` | api.v1.views.crm.PartyInteractionStatusUpdateView |
-| ☐ | GET | `/api/v1/crm/overview/` | api.v1.views.crm.CrmOverviewView |
-| ☐ | GET | `/api/v1/crm/parties/` | api.v1.views.crm.PartyDirectoryListView |
-| ☐ | GET,PATCH | `/api/v1/crm/parties/<int:pk>/` | api.v1.views.crm.PartyDirectoryDetailView |
-| ☐ | POST | `/api/v1/crm/parties/<int:pk>/interactions/` | api.v1.views.crm.PartyInteractionCreateView |
-| ☐ | GET | `/api/v1/crm/parties/resolve/` | api.v1.views.crm.PartyResolveView |
+| ☑ | POST | `/api/v1/crm/interactions/<int:pk>/status/` | api.v1.views.crm.PartyInteractionStatusUpdateView |
+| ☑ | GET | `/api/v1/crm/overview/` | api.v1.views.crm.CrmOverviewView |
+| ☑ | GET | `/api/v1/crm/parties/` | api.v1.views.crm.PartyDirectoryListView |
+| ☑ | GET,PATCH | `/api/v1/crm/parties/<int:pk>/` | api.v1.views.crm.PartyDirectoryDetailView |
+| ☑ | POST | `/api/v1/crm/parties/<int:pk>/interactions/` | api.v1.views.crm.PartyInteractionCreateView |
+| ☑ | GET | `/api/v1/crm/parties/resolve/` | api.v1.views.crm.PartyResolveView |
 
 ## `crm-pipeline` — 8 endpoints
 
 | ✓ | Methods | Path | View |
 |---|---|---|---|
-| ☐ | ANY | `/api/v1/crm-pipeline/pipeline/` | api.v1.crm_pipeline.CRMPipelineViewSet |
-| ☐ | ANY | `/api/v1/crm-pipeline/pipeline/<int:pk>/` | api.v1.crm_pipeline.CRMPipelineViewSet |
-| ☐ | ANY | `/api/v1/crm-pipeline/pipeline/<int:pk>/approve/` | api.v1.crm_pipeline.CRMPipelineViewSet |
-| ☐ | ANY | `/api/v1/crm-pipeline/pipeline/<int:pk>/quote/` | api.v1.crm_pipeline.CRMPipelineViewSet |
-| ☐ | ANY | `/api/v1/crm-pipeline/pipeline/<int:pk>/stage/` | api.v1.crm_pipeline.CRMPipelineViewSet |
-| ☐ | ANY | `/api/v1/crm-pipeline/pipeline/analytics/` | api.v1.crm_pipeline.CRMPipelineViewSet |
-| ☐ | ANY | `/api/v1/crm-pipeline/pipeline/funnel/` | api.v1.crm_pipeline.CRMPipelineViewSet |
-| ☐ | ANY | `/api/v1/crm-pipeline/pipeline/metrics/` | api.v1.crm_pipeline.CRMPipelineViewSet |
+| ☑ | ANY | `/api/v1/crm-pipeline/pipeline/` | api.v1.crm_pipeline.CRMPipelineViewSet |
+| ☑ | ANY | `/api/v1/crm-pipeline/pipeline/<int:pk>/` | api.v1.crm_pipeline.CRMPipelineViewSet |
+| ☑ | ANY | `/api/v1/crm-pipeline/pipeline/<int:pk>/approve/` | api.v1.crm_pipeline.CRMPipelineViewSet |
+| ☑ | ANY | `/api/v1/crm-pipeline/pipeline/<int:pk>/quote/` | api.v1.crm_pipeline.CRMPipelineViewSet |
+| ☑ | ANY | `/api/v1/crm-pipeline/pipeline/<int:pk>/stage/` | api.v1.crm_pipeline.CRMPipelineViewSet |
+| ☑ | ANY | `/api/v1/crm-pipeline/pipeline/analytics/` | api.v1.crm_pipeline.CRMPipelineViewSet |
+| ☑ | ANY | `/api/v1/crm-pipeline/pipeline/funnel/` | api.v1.crm_pipeline.CRMPipelineViewSet |
+| ☑ | ANY | `/api/v1/crm-pipeline/pipeline/metrics/` | api.v1.crm_pipeline.CRMPipelineViewSet |
 
 ## `customer` — 61 endpoints
 
@@ -2212,17 +2212,17 @@ Total endpoints: **2543**, in **29** groups (by first path segment under `/api/v
 
 | ✓ | Methods | Path | View |
 |---|---|---|---|
-| ☐ | GET | `/api/v1/dashboards/summary-v2/` | api.v1.views.dashboard_surfaces.DashboardSummaryV2View |
-| ☐ | GET | `/api/v1/dashboards/surfaces/overdue/` | api.v1.views.dashboard_surfaces.DashboardOverdueSurfaceView |
-| ☐ | GET | `/api/v1/dashboards/surfaces/overdue/export.csv` | api.v1.views.dashboard_surfaces.DashboardOverdueSurfaceCsvExportView |
-| ☐ | GET | `/api/v1/dashboards/surfaces/recent-payments/` | api.v1.views.dashboard_surfaces.DashboardRecentPaymentsSurfaceView |
-| ☐ | GET | `/api/v1/dashboards/surfaces/recent-payments/export.csv` | api.v1.views.dashboard_surfaces.DashboardRecentPaymentsSurfaceCsvExportView |
-| ☐ | GET | `/api/v1/dashboards/surfaces/reconciliation-exceptions/` | api.v1.views.dashboard_surfaces.DashboardReconciliationExceptionsSurfaceView |
-| ☐ | GET | `/api/v1/dashboards/surfaces/reconciliation-exceptions/export.csv` | api.v1.views.dashboard_surfaces.DashboardReconciliationExceptionsSurfaceCsvExportView |
-| ☐ | GET | `/api/v1/dashboards/surfaces/upcoming/` | api.v1.views.dashboard_surfaces.DashboardUpcomingSurfaceView |
-| ☐ | GET | `/api/v1/dashboards/surfaces/upcoming/export.csv` | api.v1.views.dashboard_surfaces.DashboardUpcomingSurfaceCsvExportView |
-| ☐ | GET | `/api/v1/dashboards/surfaces/winners/` | api.v1.views.dashboard_surfaces.DashboardWinnersSurfaceView |
-| ☐ | GET | `/api/v1/dashboards/surfaces/winners/export.csv` | api.v1.views.dashboard_surfaces.DashboardWinnersSurfaceCsvExportView |
+| ☑ | GET | `/api/v1/dashboards/summary-v2/` | api.v1.views.dashboard_surfaces.DashboardSummaryV2View |
+| ☑ | GET | `/api/v1/dashboards/surfaces/overdue/` | api.v1.views.dashboard_surfaces.DashboardOverdueSurfaceView |
+| ☑ | GET | `/api/v1/dashboards/surfaces/overdue/export.csv` | api.v1.views.dashboard_surfaces.DashboardOverdueSurfaceCsvExportView |
+| ☑ | GET | `/api/v1/dashboards/surfaces/recent-payments/` | api.v1.views.dashboard_surfaces.DashboardRecentPaymentsSurfaceView |
+| ☑ | GET | `/api/v1/dashboards/surfaces/recent-payments/export.csv` | api.v1.views.dashboard_surfaces.DashboardRecentPaymentsSurfaceCsvExportView |
+| ☑ | GET | `/api/v1/dashboards/surfaces/reconciliation-exceptions/` | api.v1.views.dashboard_surfaces.DashboardReconciliationExceptionsSurfaceView |
+| ☑ | GET | `/api/v1/dashboards/surfaces/reconciliation-exceptions/export.csv` | api.v1.views.dashboard_surfaces.DashboardReconciliationExceptionsSurfaceCsvExportView |
+| ☑ | GET | `/api/v1/dashboards/surfaces/upcoming/` | api.v1.views.dashboard_surfaces.DashboardUpcomingSurfaceView |
+| ☑ | GET | `/api/v1/dashboards/surfaces/upcoming/export.csv` | api.v1.views.dashboard_surfaces.DashboardUpcomingSurfaceCsvExportView |
+| ☑ | GET | `/api/v1/dashboards/surfaces/winners/` | api.v1.views.dashboard_surfaces.DashboardWinnersSurfaceView |
+| ☑ | GET | `/api/v1/dashboards/surfaces/winners/export.csv` | api.v1.views.dashboard_surfaces.DashboardWinnersSurfaceCsvExportView |
 
 ## `executive` — 1 endpoints
 
@@ -2344,29 +2344,29 @@ Total endpoints: **2543**, in **29** groups (by first path segment under `/api/v
 |---|---|---|---|
 | ☐ | GET | `/api/v1/manufacturing/` | rest_framework.routers.APIRootView |
 | ☐ | GET | `/api/v1/manufacturing/<drf_format_suffix:format>` | rest_framework.routers.APIRootView |
-| ☐ | ANY | `/api/v1/manufacturing/boms.(?P<format>[a-z0-9]+)/?` | api.v1.views.manufacturing.ManufacturingBomViewSet |
-| ☐ | ANY | `/api/v1/manufacturing/boms/` | api.v1.views.manufacturing.ManufacturingBomViewSet |
-| ☐ | ANY | `/api/v1/manufacturing/boms/(?P<pk>[/.]+).(?P<format>[a-z0-9]+)/?` | api.v1.views.manufacturing.ManufacturingBomViewSet |
-| ☐ | ANY | `/api/v1/manufacturing/boms/(?P<pk>[/.]+)/` | api.v1.views.manufacturing.ManufacturingBomViewSet |
-| ☐ | ANY | `/api/v1/manufacturing/boms/(?P<pk>[/.]+)/activate.(?P<format>[a-z0-9]+)/?` | api.v1.views.manufacturing.ManufacturingBomViewSet |
-| ☐ | ANY | `/api/v1/manufacturing/boms/(?P<pk>[/.]+)/activate/` | api.v1.views.manufacturing.ManufacturingBomViewSet |
-| ☐ | ANY | `/api/v1/manufacturing/boms/(?P<pk>[/.]+)/deactivate.(?P<format>[a-z0-9]+)/?` | api.v1.views.manufacturing.ManufacturingBomViewSet |
-| ☐ | ANY | `/api/v1/manufacturing/boms/(?P<pk>[/.]+)/deactivate/` | api.v1.views.manufacturing.ManufacturingBomViewSet |
-| ☐ | ANY | `/api/v1/manufacturing/jobs.(?P<format>[a-z0-9]+)/?` | api.v1.views.manufacturing.ProductionJobViewSet |
-| ☐ | ANY | `/api/v1/manufacturing/jobs/` | api.v1.views.manufacturing.ProductionJobViewSet |
-| ☐ | ANY | `/api/v1/manufacturing/jobs/(?P<pk>[/.]+).(?P<format>[a-z0-9]+)/?` | api.v1.views.manufacturing.ProductionJobViewSet |
-| ☐ | ANY | `/api/v1/manufacturing/jobs/(?P<pk>[/.]+)/` | api.v1.views.manufacturing.ProductionJobViewSet |
-| ☐ | ANY | `/api/v1/manufacturing/jobs/(?P<pk>[/.]+)/cancel.(?P<format>[a-z0-9]+)/?` | api.v1.views.manufacturing.ProductionJobViewSet |
-| ☐ | ANY | `/api/v1/manufacturing/jobs/(?P<pk>[/.]+)/cancel/` | api.v1.views.manufacturing.ProductionJobViewSet |
-| ☐ | ANY | `/api/v1/manufacturing/jobs/(?P<pk>[/.]+)/complete.(?P<format>[a-z0-9]+)/?` | api.v1.views.manufacturing.ProductionJobViewSet |
-| ☐ | ANY | `/api/v1/manufacturing/jobs/(?P<pk>[/.]+)/complete/` | api.v1.views.manufacturing.ProductionJobViewSet |
-| ☐ | ANY | `/api/v1/manufacturing/jobs/(?P<pk>[/.]+)/post-materials.(?P<format>[a-z0-9]+)/?` | api.v1.views.manufacturing.ProductionJobViewSet |
-| ☐ | ANY | `/api/v1/manufacturing/jobs/(?P<pk>[/.]+)/post-materials/` | api.v1.views.manufacturing.ProductionJobViewSet |
-| ☐ | ANY | `/api/v1/manufacturing/jobs/(?P<pk>[/.]+)/post-output.(?P<format>[a-z0-9]+)/?` | api.v1.views.manufacturing.ProductionJobViewSet |
-| ☐ | ANY | `/api/v1/manufacturing/jobs/(?P<pk>[/.]+)/post-output/` | api.v1.views.manufacturing.ProductionJobViewSet |
-| ☐ | ANY | `/api/v1/manufacturing/jobs/(?P<pk>[/.]+)/release.(?P<format>[a-z0-9]+)/?` | api.v1.views.manufacturing.ProductionJobViewSet |
-| ☐ | ANY | `/api/v1/manufacturing/jobs/(?P<pk>[/.]+)/release/` | api.v1.views.manufacturing.ProductionJobViewSet |
-| ☐ | GET | `/api/v1/manufacturing/overview/` | api.v1.views.manufacturing.ManufacturingOverviewView |
+| ☑ | ANY | `/api/v1/manufacturing/boms.(?P<format>[a-z0-9]+)/?` | api.v1.views.manufacturing.ManufacturingBomViewSet |
+| ☑ | ANY | `/api/v1/manufacturing/boms/` | api.v1.views.manufacturing.ManufacturingBomViewSet |
+| ☑ | ANY | `/api/v1/manufacturing/boms/(?P<pk>[/.]+).(?P<format>[a-z0-9]+)/?` | api.v1.views.manufacturing.ManufacturingBomViewSet |
+| ☑ | ANY | `/api/v1/manufacturing/boms/(?P<pk>[/.]+)/` | api.v1.views.manufacturing.ManufacturingBomViewSet |
+| ☑ | ANY | `/api/v1/manufacturing/boms/(?P<pk>[/.]+)/activate.(?P<format>[a-z0-9]+)/?` | api.v1.views.manufacturing.ManufacturingBomViewSet |
+| ☑ | ANY | `/api/v1/manufacturing/boms/(?P<pk>[/.]+)/activate/` | api.v1.views.manufacturing.ManufacturingBomViewSet |
+| ☑ | ANY | `/api/v1/manufacturing/boms/(?P<pk>[/.]+)/deactivate.(?P<format>[a-z0-9]+)/?` | api.v1.views.manufacturing.ManufacturingBomViewSet |
+| ☑ | ANY | `/api/v1/manufacturing/boms/(?P<pk>[/.]+)/deactivate/` | api.v1.views.manufacturing.ManufacturingBomViewSet |
+| ☑ | ANY | `/api/v1/manufacturing/jobs.(?P<format>[a-z0-9]+)/?` | api.v1.views.manufacturing.ProductionJobViewSet |
+| ☑ | ANY | `/api/v1/manufacturing/jobs/` | api.v1.views.manufacturing.ProductionJobViewSet |
+| ☑ | ANY | `/api/v1/manufacturing/jobs/(?P<pk>[/.]+).(?P<format>[a-z0-9]+)/?` | api.v1.views.manufacturing.ProductionJobViewSet |
+| ☑ | ANY | `/api/v1/manufacturing/jobs/(?P<pk>[/.]+)/` | api.v1.views.manufacturing.ProductionJobViewSet |
+| ☑ | ANY | `/api/v1/manufacturing/jobs/(?P<pk>[/.]+)/cancel.(?P<format>[a-z0-9]+)/?` | api.v1.views.manufacturing.ProductionJobViewSet |
+| ☑ | ANY | `/api/v1/manufacturing/jobs/(?P<pk>[/.]+)/cancel/` | api.v1.views.manufacturing.ProductionJobViewSet |
+| ☑ | ANY | `/api/v1/manufacturing/jobs/(?P<pk>[/.]+)/complete.(?P<format>[a-z0-9]+)/?` | api.v1.views.manufacturing.ProductionJobViewSet |
+| ☑ | ANY | `/api/v1/manufacturing/jobs/(?P<pk>[/.]+)/complete/` | api.v1.views.manufacturing.ProductionJobViewSet |
+| ☑ | ANY | `/api/v1/manufacturing/jobs/(?P<pk>[/.]+)/post-materials.(?P<format>[a-z0-9]+)/?` | api.v1.views.manufacturing.ProductionJobViewSet |
+| ☑ | ANY | `/api/v1/manufacturing/jobs/(?P<pk>[/.]+)/post-materials/` | api.v1.views.manufacturing.ProductionJobViewSet |
+| ☑ | ANY | `/api/v1/manufacturing/jobs/(?P<pk>[/.]+)/post-output.(?P<format>[a-z0-9]+)/?` | api.v1.views.manufacturing.ProductionJobViewSet |
+| ☑ | ANY | `/api/v1/manufacturing/jobs/(?P<pk>[/.]+)/post-output/` | api.v1.views.manufacturing.ProductionJobViewSet |
+| ☑ | ANY | `/api/v1/manufacturing/jobs/(?P<pk>[/.]+)/release.(?P<format>[a-z0-9]+)/?` | api.v1.views.manufacturing.ProductionJobViewSet |
+| ☑ | ANY | `/api/v1/manufacturing/jobs/(?P<pk>[/.]+)/release/` | api.v1.views.manufacturing.ProductionJobViewSet |
+| ☑ | GET | `/api/v1/manufacturing/overview/` | api.v1.views.manufacturing.ManufacturingOverviewView |
 
 ## `media` — 1 endpoints
 
@@ -2378,10 +2378,10 @@ Total endpoints: **2543**, in **29** groups (by first path segment under `/api/v
 
 | ✓ | Methods | Path | View |
 |---|---|---|---|
-| ☐ | GET | `/api/v1/notifications/` | api.v1.views.notifications.NotificationListView |
-| ☐ | POST | `/api/v1/notifications/<int:pk>/read/` | api.v1.views.notifications.NotificationMarkReadView |
-| ☐ | POST | `/api/v1/notifications/mark-all-read/` | api.v1.views.notifications.NotificationMarkAllReadView |
-| ☐ | GET | `/api/v1/notifications/summary/` | api.v1.views.notifications.NotificationSummaryView |
+| ☑ | GET | `/api/v1/notifications/` | api.v1.views.notifications.NotificationListView |
+| ☑ | POST | `/api/v1/notifications/<int:pk>/read/` | api.v1.views.notifications.NotificationMarkReadView |
+| ☑ | POST | `/api/v1/notifications/mark-all-read/` | api.v1.views.notifications.NotificationMarkAllReadView |
+| ☑ | GET | `/api/v1/notifications/summary/` | api.v1.views.notifications.NotificationSummaryView |
 
 ## `partner` — 40 endpoints
 
@@ -2506,28 +2506,28 @@ Total endpoints: **2543**, in **29** groups (by first path segment under `/api/v
 | ☐ | GET | `/api/v1/public/brochures/<str:public_token>/` | brochures.views.PublicBrochureDetailView |
 | ☐ | POST | `/api/v1/public/brochures/<str:public_token>/enquiries/` | brochures.views.PublicBrochureEnquiryCreateView |
 | ☐ | GET | `/api/v1/public/brochures/<str:public_token>/products/` | brochures.views.PublicBrochureProductsView |
-| ☐ | GET | `/api/v1/public/business-compliance/summary/` | api.v1.views.public_policy_site.PublicBusinessComplianceSummaryView |
-| ☐ | GET | `/api/v1/public/business-profile/` | api.v1.views.public_site.PublicBusinessProfileView |
-| ☐ | GET | `/api/v1/public/health/` | api.v1.views.health.PublicLivenessView |
-| ☐ | GET | `/api/v1/public/latest-winner/` | api.v1.routes.public.LatestWinnerView |
-| ☐ | POST | `/api/v1/public/leads/` | api.v1.routes.public.PublicLeadView |
-| ☐ | GET | `/api/v1/public/lucky-draws/<int:draw_id>/certificate/` | api.v1.routes.public.PublicLuckyDrawCertificateView |
-| ☐ | GET | `/api/v1/public/lucky-draws/<int:draw_id>/trust-summary/` | api.v1.routes.public.PublicLuckyDrawTrustSummaryView |
-| ☐ | GET | `/api/v1/public/lucky-draws/<int:draw_id>/verification/` | api.v1.routes.public.PublicLuckyDrawVerificationView |
-| ☐ | GET | `/api/v1/public/lucky-draws/<int:draw_id>/winner/` | api.v1.routes.public.PublicLuckyDrawWinnerView |
-| ☐ | GET | `/api/v1/public/lucky-draws/latest/` | api.v1.routes.public.PublicLuckyDrawLatestTrustSummaryView |
-| ☐ | GET | `/api/v1/public/policies/` | api.v1.views.public_policy_site.PublicPolicyPageListView |
-| ☐ | GET | `/api/v1/public/policies/<slug:slug>/` | api.v1.views.public_policy_site.PublicPolicyPageDetailView |
-| ☐ | GET | `/api/v1/public/product-categories/` | api.v1.routes.public.PublicProductCategoriesView |
-| ☐ | GET | `/api/v1/public/products/` | api.v1.routes.public.PublicProductsView |
-| ☐ | GET | `/api/v1/public/products/<int:id>/` | api.v1.routes.public.PublicProductDetailView |
+| ☑ | GET | `/api/v1/public/business-compliance/summary/` | api.v1.views.public_policy_site.PublicBusinessComplianceSummaryView |
+| ☑ | GET | `/api/v1/public/business-profile/` | api.v1.views.public_site.PublicBusinessProfileView |
+| ☑ | GET | `/api/v1/public/health/` | api.v1.views.health.PublicLivenessView |
+| ☑ | GET | `/api/v1/public/latest-winner/` | api.v1.routes.public.LatestWinnerView |
+| ☑ | POST | `/api/v1/public/leads/` | api.v1.routes.public.PublicLeadView |
+| ☑ | GET | `/api/v1/public/lucky-draws/<int:draw_id>/certificate/` | api.v1.routes.public.PublicLuckyDrawCertificateView |
+| ☑ | GET | `/api/v1/public/lucky-draws/<int:draw_id>/trust-summary/` | api.v1.routes.public.PublicLuckyDrawTrustSummaryView |
+| ☑ | GET | `/api/v1/public/lucky-draws/<int:draw_id>/verification/` | api.v1.routes.public.PublicLuckyDrawVerificationView |
+| ☑ | GET | `/api/v1/public/lucky-draws/<int:draw_id>/winner/` | api.v1.routes.public.PublicLuckyDrawWinnerView |
+| ☑ | GET | `/api/v1/public/lucky-draws/latest/` | api.v1.routes.public.PublicLuckyDrawLatestTrustSummaryView |
+| ☑ | GET | `/api/v1/public/policies/` | api.v1.views.public_policy_site.PublicPolicyPageListView |
+| ☑ | GET | `/api/v1/public/policies/<slug:slug>/` | api.v1.views.public_policy_site.PublicPolicyPageDetailView |
+| ☑ | GET | `/api/v1/public/product-categories/` | api.v1.routes.public.PublicProductCategoriesView |
+| ☑ | GET | `/api/v1/public/products/` | api.v1.routes.public.PublicProductsView |
+| ☑ | GET | `/api/v1/public/products/<int:id>/` | api.v1.routes.public.PublicProductDetailView |
 | ☐ | GET | `/api/v1/public/quotations/<str:public_token>/` | brochures.views.PublicBrochureQuotationDetailView |
-| ☐ | GET | `/api/v1/public/readiness/` | api.v1.views.health.PublicReadinessView |
+| ☑ | GET | `/api/v1/public/readiness/` | api.v1.views.health.PublicReadinessView |
 | ☐ | GET | `/api/v1/public/reviews/` | reviews.views.PublicReviewsView |
 | ☐ | POST | `/api/v1/public/reviews/submit/` | reviews.views.PublicReviewSubmitView |
-| ☐ | GET | `/api/v1/public/stats/` | api.v1.routes.public.PublicStatsView |
-| ☐ | GET | `/api/v1/public/winner-history/` | api.v1.routes.public.PublicWinnerHistoryView |
-| ☐ | GET | `/api/v1/public/winners/` | api.v1.routes.public.PublicWinnersView |
+| ☑ | GET | `/api/v1/public/stats/` | api.v1.routes.public.PublicStatsView |
+| ☑ | GET | `/api/v1/public/winner-history/` | api.v1.routes.public.PublicWinnerHistoryView |
+| ☑ | GET | `/api/v1/public/winners/` | api.v1.routes.public.PublicWinnersView |
 
 ## `readyz` — 1 endpoints
 
@@ -2599,24 +2599,24 @@ Total endpoints: **2543**, in **29** groups (by first path segment under `/api/v
 |---|---|---|---|
 | ☐ | GET | `/api/v1/service-desk/` | rest_framework.routers.APIRootView |
 | ☐ | GET | `/api/v1/service-desk/<drf_format_suffix:format>` | rest_framework.routers.APIRootView |
-| ☐ | ANY | `/api/v1/service-desk/cases.(?P<format>[a-z0-9]+)/?` | api.v1.views.service_desk.ServiceDeskCaseViewSet |
-| ☐ | ANY | `/api/v1/service-desk/cases/` | api.v1.views.service_desk.ServiceDeskCaseViewSet |
-| ☐ | ANY | `/api/v1/service-desk/cases/(?P<pk>[/.]+).(?P<format>[a-z0-9]+)/?` | api.v1.views.service_desk.ServiceDeskCaseViewSet |
-| ☐ | ANY | `/api/v1/service-desk/cases/(?P<pk>[/.]+)/` | api.v1.views.service_desk.ServiceDeskCaseViewSet |
-| ☐ | ANY | `/api/v1/service-desk/cases/(?P<pk>[/.]+)/complete-delivery-return.(?P<format>[a-z0-9]+)/?` | api.v1.views.service_desk.ServiceDeskCaseViewSet |
-| ☐ | ANY | `/api/v1/service-desk/cases/(?P<pk>[/.]+)/complete-delivery-return/` | api.v1.views.service_desk.ServiceDeskCaseViewSet |
-| ☐ | ANY | `/api/v1/service-desk/cases/(?P<pk>[/.]+)/link-replacement-sale.(?P<format>[a-z0-9]+)/?` | api.v1.views.service_desk.ServiceDeskCaseViewSet |
-| ☐ | ANY | `/api/v1/service-desk/cases/(?P<pk>[/.]+)/link-replacement-sale/` | api.v1.views.service_desk.ServiceDeskCaseViewSet |
-| ☐ | ANY | `/api/v1/service-desk/cases/(?P<pk>[/.]+)/post-credit-note.(?P<format>[a-z0-9]+)/?` | api.v1.views.service_desk.ServiceDeskCaseViewSet |
-| ☐ | ANY | `/api/v1/service-desk/cases/(?P<pk>[/.]+)/post-credit-note/` | api.v1.views.service_desk.ServiceDeskCaseViewSet |
-| ☐ | ANY | `/api/v1/service-desk/cases/(?P<pk>[/.]+)/post-debit-note.(?P<format>[a-z0-9]+)/?` | api.v1.views.service_desk.ServiceDeskCaseViewSet |
-| ☐ | ANY | `/api/v1/service-desk/cases/(?P<pk>[/.]+)/post-debit-note/` | api.v1.views.service_desk.ServiceDeskCaseViewSet |
-| ☐ | ANY | `/api/v1/service-desk/cases/(?P<pk>[/.]+)/request-delivery-return.(?P<format>[a-z0-9]+)/?` | api.v1.views.service_desk.ServiceDeskCaseViewSet |
-| ☐ | ANY | `/api/v1/service-desk/cases/(?P<pk>[/.]+)/request-delivery-return/` | api.v1.views.service_desk.ServiceDeskCaseViewSet |
-| ☐ | ANY | `/api/v1/service-desk/cases/(?P<pk>[/.]+)/status.(?P<format>[a-z0-9]+)/?` | api.v1.views.service_desk.ServiceDeskCaseViewSet |
-| ☐ | ANY | `/api/v1/service-desk/cases/(?P<pk>[/.]+)/status/` | api.v1.views.service_desk.ServiceDeskCaseViewSet |
-| ☐ | GET | `/api/v1/service-desk/complaints/` | api.v1.views.service_desk.ServiceDeskComplaintRegisterView |
-| ☐ | GET | `/api/v1/service-desk/overview/` | api.v1.views.service_desk.ServiceDeskOverviewView |
+| ☑ | ANY | `/api/v1/service-desk/cases.(?P<format>[a-z0-9]+)/?` | api.v1.views.service_desk.ServiceDeskCaseViewSet |
+| ☑ | ANY | `/api/v1/service-desk/cases/` | api.v1.views.service_desk.ServiceDeskCaseViewSet |
+| ☑ | ANY | `/api/v1/service-desk/cases/(?P<pk>[/.]+).(?P<format>[a-z0-9]+)/?` | api.v1.views.service_desk.ServiceDeskCaseViewSet |
+| ☑ | ANY | `/api/v1/service-desk/cases/(?P<pk>[/.]+)/` | api.v1.views.service_desk.ServiceDeskCaseViewSet |
+| ☑ | ANY | `/api/v1/service-desk/cases/(?P<pk>[/.]+)/complete-delivery-return.(?P<format>[a-z0-9]+)/?` | api.v1.views.service_desk.ServiceDeskCaseViewSet |
+| ☑ | ANY | `/api/v1/service-desk/cases/(?P<pk>[/.]+)/complete-delivery-return/` | api.v1.views.service_desk.ServiceDeskCaseViewSet |
+| ☑ | ANY | `/api/v1/service-desk/cases/(?P<pk>[/.]+)/link-replacement-sale.(?P<format>[a-z0-9]+)/?` | api.v1.views.service_desk.ServiceDeskCaseViewSet |
+| ☑ | ANY | `/api/v1/service-desk/cases/(?P<pk>[/.]+)/link-replacement-sale/` | api.v1.views.service_desk.ServiceDeskCaseViewSet |
+| ☑ | ANY | `/api/v1/service-desk/cases/(?P<pk>[/.]+)/post-credit-note.(?P<format>[a-z0-9]+)/?` | api.v1.views.service_desk.ServiceDeskCaseViewSet |
+| ☑ | ANY | `/api/v1/service-desk/cases/(?P<pk>[/.]+)/post-credit-note/` | api.v1.views.service_desk.ServiceDeskCaseViewSet |
+| ☑ | ANY | `/api/v1/service-desk/cases/(?P<pk>[/.]+)/post-debit-note.(?P<format>[a-z0-9]+)/?` | api.v1.views.service_desk.ServiceDeskCaseViewSet |
+| ☑ | ANY | `/api/v1/service-desk/cases/(?P<pk>[/.]+)/post-debit-note/` | api.v1.views.service_desk.ServiceDeskCaseViewSet |
+| ☑ | ANY | `/api/v1/service-desk/cases/(?P<pk>[/.]+)/request-delivery-return.(?P<format>[a-z0-9]+)/?` | api.v1.views.service_desk.ServiceDeskCaseViewSet |
+| ☑ | ANY | `/api/v1/service-desk/cases/(?P<pk>[/.]+)/request-delivery-return/` | api.v1.views.service_desk.ServiceDeskCaseViewSet |
+| ☑ | ANY | `/api/v1/service-desk/cases/(?P<pk>[/.]+)/status.(?P<format>[a-z0-9]+)/?` | api.v1.views.service_desk.ServiceDeskCaseViewSet |
+| ☑ | ANY | `/api/v1/service-desk/cases/(?P<pk>[/.]+)/status/` | api.v1.views.service_desk.ServiceDeskCaseViewSet |
+| ☑ | GET | `/api/v1/service-desk/complaints/` | api.v1.views.service_desk.ServiceDeskComplaintRegisterView |
+| ☑ | GET | `/api/v1/service-desk/overview/` | api.v1.views.service_desk.ServiceDeskOverviewView |
 
 ## `staff` — 17 endpoints
 

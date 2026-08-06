@@ -4,6 +4,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from api.v1.permissions import IsAdmin
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 
@@ -63,7 +64,7 @@ class CRMPipelineViewSet(viewsets.ModelViewSet):
     """CRM Pipeline management - lead tracking through sales funnel"""
 
     queryset = CRMPipeline.objects.select_related('lead', 'online_request', 'approved_by').order_by('-created_at')
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdmin]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['current_stage', 'request_type', 'approved_by']
     search_fields = ['lead__customer_name', 'lead__customer_phone']

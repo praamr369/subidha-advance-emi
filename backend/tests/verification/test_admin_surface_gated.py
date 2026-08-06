@@ -35,6 +35,7 @@ ADMIN_FUNCTIONALITY_PREFIXES = (
     "/api/v1/billing/",
     "/api/v1/manufacturing/",
     "/api/v1/branch-control/",
+    "/api/v1/crm-pipeline/",
 )
 
 
