@@ -137,3 +137,38 @@ present on every large register (customers, lucky-ids, products, payments).
 | 6 Data/security/ops | | | |
 
 **Go-live approved only when every phase is signed and every blocking box is ticked.**
+
+---
+
+## Go-live execution sequence (operator runbook)
+
+The automated gates (Layers A–C, ~52 CI tests) and the config-side security controls
+(`production.py`/`base.py`) are already green. What remains is the human/infra
+sequence below — run top-to-bottom on deploy day.
+
+**A. Pre-flight (on a prod-like clone)**
+1. Restore the latest prod DB dump onto a clone. Run the **Phase-4 UI walkthrough**
+   (the 11 journeys — coverage mapped in [`coverage_ledger.md`](coverage_ledger.md) Layer D)
+   as the real roles; tick each Phase-4 box only when the whole chain is correct.
+2. `python manage.py check_production_readiness --settings=core.settings.production`
+   (with prod env vars loaded) → must exit 0. It enforces: DEBUG off, ALLOWED_HOSTS set,
+   `BACKUP_ROOT` exists, `SECRET_KEY` not placeholder, `CORS_ALLOWED_ORIGINS` has no `*`,
+   an active admin exists, admin has `billing.override_allocation`.
+3. Confirm prod env: `REDIS_URL`/`CACHE_REDIS_URL` set (→ RedisCache, not LocMem),
+   `BACKUP_ROOT` on persistent storage, TLS termination in front (HSTS/secure cookies
+   are already on in `production.py`).
+
+**B. Deploy**
+4. **Take a rollback snapshot** of the prod DB *immediately* before deploy.
+5. Run the deploy pipeline (`push-live.ps1` → `deploy.sh`); it runs `migrate`.
+6. Post-deploy smoke: `GET /healthz` and `/readyz` return 200; `GET /api/v1/health/deep/`
+   returns 200 (or 200 "degraded" if an optional dep is down — see the deep-health split).
+
+**C. Verify + retention**
+7. Spot-check the **audit trail** (recent admin actions produced `AuditLog` rows).
+8. Confirm a **backup ran + a test restore** on the clone succeeded; set retention.
+9. Keep the rollback path known: restore the step-4 snapshot if step 6/7 fail.
+
+The CI release-candidate job also runs the Playwright **route-load smoke** (every static
+page × role) and the **release-smoke** journey specs on Linux — the automated proxy for
+much of the Phase-4/Phase-5 walkthrough.
