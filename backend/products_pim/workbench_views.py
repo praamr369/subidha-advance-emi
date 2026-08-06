@@ -3,6 +3,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from api.v1.permissions import IsAdmin
 
 from products_pim.models import PimProduct, ProductVariant, CategoryAttribute, AttributeOption
 from products_pim.serializers import (
@@ -16,7 +17,7 @@ class PimProductWorkbenchViewSet(viewsets.ModelViewSet):
 
     queryset = PimProduct.objects.all()
     serializer_class = PimProductDetailSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdmin]
     lookup_field = 'code'
 
     @action(detail=True, methods=['post'])

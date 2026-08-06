@@ -3,6 +3,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from api.v1.permissions import IsAdmin
 
 from .models import (
     ProductCategory,
@@ -28,7 +29,7 @@ from .serializers import (
 
 
 class AttributeOptionViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdmin]
     serializer_class = AttributeOptionSerializer
 
     def get_queryset(self):
@@ -40,7 +41,7 @@ class AttributeOptionViewSet(viewsets.ModelViewSet):
 
 
 class ProductCategoryViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdmin]
     queryset = ProductCategory.objects.filter(is_active=True).prefetch_related("subcategories", "attributes")
     serializer_class = ProductCategorySerializer
 
@@ -52,7 +53,7 @@ class ProductCategoryViewSet(viewsets.ModelViewSet):
 
 
 class ProductSubcategoryViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdmin]
     serializer_class = ProductSubcategorySerializer
 
     def get_queryset(self):
@@ -64,7 +65,7 @@ class ProductSubcategoryViewSet(viewsets.ModelViewSet):
 
 
 class CategoryAttributeViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdmin]
     serializer_class = CategoryAttributeSerializer
 
     def get_queryset(self):
@@ -79,7 +80,7 @@ class CategoryAttributeViewSet(viewsets.ModelViewSet):
 
 
 class PimProductViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdmin]
 
     def get_queryset(self):
         qs = PimProduct.objects.select_related("category", "subcategory").prefetch_related("attributes__attribute", "variants")
@@ -289,7 +290,7 @@ class PimProductViewSet(viewsets.ModelViewSet):
 
 
 class ProductVariantViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdmin]
 
     def get_queryset(self):
         qs = ProductVariant.objects.select_related("product").prefetch_related("attribute_values__attribute")

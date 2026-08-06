@@ -22,6 +22,21 @@ ADMIN_PREFIX = "/api/v1/admin/"
 # namespace — not admin functionality. They are correctly customer-gated.
 CUSTOMER_NAMESPACE = "/api/v1/admin/customer/"
 
+# Admin-functionality lives under more than /admin/: these prefixes are backend
+# management surfaces (catalog, stock, ledgers, billing docs, manufacturing, branch
+# config) that portals never call directly (they have their own /partner|customer/…
+# endpoints). Every endpoint here must be admin-gated too — a leak in one of these
+# is exactly the class this test found in both /admin/ (finance-complete) and /pim/.
+ADMIN_FUNCTIONALITY_PREFIXES = (
+    ADMIN_PREFIX,
+    "/api/v1/pim/",
+    "/api/v1/inventory/",
+    "/api/v1/accounting/",
+    "/api/v1/billing/",
+    "/api/v1/manufacturing/",
+    "/api/v1/branch-control/",
+)
+
 
 def _is_admin_inclusive(perms: set[str]) -> bool:
     return (
@@ -35,7 +50,7 @@ class AdminSurfaceGatedTest(SimpleTestCase):
         leaks = []
         seen = 0
         for ep in iter_api_endpoints():
-            if not ep.path.startswith(ADMIN_PREFIX):
+            if not ep.path.startswith(ADMIN_FUNCTIONALITY_PREFIXES):
                 continue
             if ep.path.startswith(CUSTOMER_NAMESPACE):
                 continue
@@ -45,10 +60,10 @@ class AdminSurfaceGatedTest(SimpleTestCase):
             seen += 1
             if not _is_admin_inclusive(perms):
                 leaks.append((ep.path, tuple(perms), ep.view))
-        self.assertGreater(seen, 0, "walker found no /admin/ endpoints")
+        self.assertGreater(seen, 0, "walker found no admin-functionality endpoints")
         self.assertEqual(
             leaks, [],
-            msg=f"{len(leaks)} /admin/ endpoint(s) are NOT admin-gated "
+            msg=f"{len(leaks)} admin-functionality endpoint(s) are NOT admin-gated "
                 f"(privilege-escalation risk):\n"
                 + "\n".join(f"  {p}  {perms}  [{v}]" for p, perms, v in leaks),
         )
