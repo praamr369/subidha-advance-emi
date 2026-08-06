@@ -22,19 +22,19 @@ Total endpoints: **2543**, in **29** groups (by first path segment under `/api/v
 | ☑ | GET | `/api/v1/accounting/books/bank/` | api.v1.views.accounting_phase3.BankBookView |
 | ☑ | GET | `/api/v1/accounting/books/cash/` | api.v1.views.accounting_phase3.CashBookView |
 | ☑ | GET | `/api/v1/accounting/books/purchase/` | api.v1.views.accounting_phase3.PurchaseBookView |
-| ☐ | GET | `/api/v1/accounting/books/readiness/` | api.v1.views.accounting_books_readiness.AccountingBooksReadinessView |
+| ☑ | GET | `/api/v1/accounting/books/readiness/` | api.v1.views.accounting_books_readiness.AccountingBooksReadinessView |
 | ☑ | GET | `/api/v1/accounting/books/sales/` | api.v1.views.accounting_phase3.SalesBookView |
 | ☑ | GET | `/api/v1/accounting/books/upi/` | api.v1.views.accounting_phase3.UpiBookView |
 | ☑ | ANY | `/api/v1/accounting/bridge-postings.(?P<format>[a-z0-9]+)/?` | api.v1.views.accounting_phase3.AccountingBridgePostingViewSet |
 | ☑ | ANY | `/api/v1/accounting/bridge-postings/` | api.v1.views.accounting_phase3.AccountingBridgePostingViewSet |
 | ☑ | ANY | `/api/v1/accounting/bridge-postings/(?P<pk>[/.]+).(?P<format>[a-z0-9]+)/?` | api.v1.views.accounting_phase3.AccountingBridgePostingViewSet |
 | ☑ | ANY | `/api/v1/accounting/bridge-postings/(?P<pk>[/.]+)/` | api.v1.views.accounting_phase3.AccountingBridgePostingViewSet |
-| ☐ | POST | `/api/v1/accounting/bridges/run-commission-settlement/` | api.v1.views.accounting_commission_payout_bridge.CommissionSettlementBridgeRunView |
+| ☑ | POST | `/api/v1/accounting/bridges/run-commission-settlement/` | api.v1.views.accounting_commission_payout_bridge.CommissionSettlementBridgeRunView |
 | ☑ | POST | `/api/v1/accounting/bridges/run-emi-payment/` | api.v1.views.accounting_phase3.EmiPaymentBridgeRunView |
 | ☑ | POST | `/api/v1/accounting/bridges/run-emi-subscription/` | api.v1.views.accounting_phase3.EmiSubscriptionBridgeRunView |
 | ☑ | POST | `/api/v1/accounting/bridges/run-emi-waiver/` | api.v1.views.accounting_phase3.EmiWaiverBridgeRunView |
-| ☐ | POST | `/api/v1/accounting/bridges/run-inventory-posting/` | api.v1.views.accounting_purchase_vendor_bridge.InventoryBridgeRunView |
-| ☐ | POST | `/api/v1/accounting/bridges/run-payout-batch/` | api.v1.views.accounting_commission_payout_bridge.PayoutBatchBridgeRunView |
+| ☑ | POST | `/api/v1/accounting/bridges/run-inventory-posting/` | api.v1.views.accounting_purchase_vendor_bridge.InventoryBridgeRunView |
+| ☑ | POST | `/api/v1/accounting/bridges/run-payout-batch/` | api.v1.views.accounting_commission_payout_bridge.PayoutBatchBridgeRunView |
 | ☑ | POST | `/api/v1/accounting/bridges/run-retail-sale/` | api.v1.views.accounting_phase3.RetailSaleBridgeRunView |
 | ☑ | POST | `/api/v1/accounting/bridges/run/` | api.v1.views.accounting_phase2.BridgeRunView |
 | ☑ | ANY | `/api/v1/accounting/chart-of-accounts.(?P<format>[a-z0-9]+)/?` | api.v1.views.accounting.ChartOfAccountViewSet |
@@ -144,7 +144,7 @@ Total endpoints: **2543**, in **29** groups (by first path segment under `/api/v
 | ☑ | ANY | `/api/v1/accounting/periods/bulk-lock-open/` | api.v1.views.accounting_phase3.AccountingPeriodViewSet |
 | ☑ | ANY | `/api/v1/accounting/periods/current-period-status.(?P<format>[a-z0-9]+)/?` | api.v1.views.accounting_phase3.AccountingPeriodViewSet |
 | ☑ | ANY | `/api/v1/accounting/periods/current-period-status/` | api.v1.views.accounting_phase3.AccountingPeriodViewSet |
-| ☐ | POST | `/api/v1/accounting/periods/generate-current/` | api.v1.views.accounting_period_actions.AccountingGenerateCurrentPeriodView |
+| ☑ | POST | `/api/v1/accounting/periods/generate-current/` | api.v1.views.accounting_period_actions.AccountingGenerateCurrentPeriodView |
 | ☑ | ANY | `/api/v1/accounting/periods/readiness.(?P<format>[a-z0-9]+)/?` | api.v1.views.accounting_phase3.AccountingPeriodViewSet |
 | ☑ | ANY | `/api/v1/accounting/periods/readiness/` | api.v1.views.accounting_phase3.AccountingPeriodViewSet |
 | ☑ | ANY | `/api/v1/accounting/periods/reopen-current.(?P<format>[a-z0-9]+)/?` | api.v1.views.accounting_phase3.AccountingPeriodViewSet |
@@ -170,8 +170,8 @@ Total endpoints: **2543**, in **29** groups (by first path segment under `/api/v
 | ☑ | ANY | `/api/v1/accounting/salary-payments/` | api.v1.views.accounting.SalaryPaymentViewSet |
 | ☑ | ANY | `/api/v1/accounting/salary-payments/(?P<pk>[/.]+).(?P<format>[a-z0-9]+)/?` | api.v1.views.accounting.SalaryPaymentViewSet |
 | ☑ | ANY | `/api/v1/accounting/salary-payments/(?P<pk>[/.]+)/` | api.v1.views.accounting.SalaryPaymentViewSet |
-| ☐ | GET,POST | `/api/v1/accounting/salary-sheets/<int:sheet_id>/statutory-deductions/` | api.v1.views.admin_tds_tcs.AdminSalarySheetStatutoryView |
-| ☐ | GET | `/api/v1/accounting/setup/matrix/` | api.v1.views.admin_accounting_setup.AccountingSetupMatrixView |
+| ☑ | GET,POST | `/api/v1/accounting/salary-sheets/<int:sheet_id>/statutory-deductions/` | api.v1.views.admin_tds_tcs.AdminSalarySheetStatutoryView |
+| ☑ | GET | `/api/v1/accounting/setup/matrix/` | api.v1.views.admin_accounting_setup.AccountingSetupMatrixView |
 | ☑ | ANY | `/api/v1/accounting/tax-invoices.(?P<format>[a-z0-9]+)/?` | api.v1.views.accounting_phase2.TaxInvoiceViewSet |
 | ☑ | ANY | `/api/v1/accounting/tax-invoices/` | api.v1.views.accounting_phase2.TaxInvoiceViewSet |
 | ☑ | ANY | `/api/v1/accounting/tax-invoices/(?P<pk>[/.]+).(?P<format>[a-z0-9]+)/?` | api.v1.views.accounting_phase2.TaxInvoiceViewSet |
@@ -182,12 +182,12 @@ Total endpoints: **2543**, in **29** groups (by first path segment under `/api/v
 | ☑ | ANY | `/api/v1/accounting/tax-invoices/(?P<pk>[/.]+)/cancel/` | api.v1.views.accounting_phase2.TaxInvoiceViewSet |
 | ☑ | ANY | `/api/v1/accounting/tax-invoices/(?P<pk>[/.]+)/post.(?P<format>[a-z0-9]+)/?` | api.v1.views.accounting_phase2.TaxInvoiceViewSet |
 | ☑ | ANY | `/api/v1/accounting/tax-invoices/(?P<pk>[/.]+)/post/` | api.v1.views.accounting_phase2.TaxInvoiceViewSet |
-| ☐ | GET,POST | `/api/v1/accounting/tcs-collections/` | api.v1.views.admin_tds_tcs.AdminTCSCollectionListView |
-| ☐ | POST | `/api/v1/accounting/tcs-collections/<int:pk>/mark-deposited/` | api.v1.views.admin_tds_tcs.AdminTCSCollectionMarkDepositedView |
-| ☐ | GET | `/api/v1/accounting/tcs-collections/export-27eq/` | api.v1.views.admin_tds_tcs.AdminTCS27EQExportView |
-| ☐ | GET,POST | `/api/v1/accounting/tds-deductions/` | api.v1.views.admin_tds_tcs.AdminTDSDeductionListView |
-| ☐ | POST | `/api/v1/accounting/tds-deductions/<int:pk>/mark-deposited/` | api.v1.views.admin_tds_tcs.AdminTDSDeductionMarkDepositedView |
-| ☐ | GET | `/api/v1/accounting/tds-deductions/export-26q/` | api.v1.views.admin_tds_tcs.AdminTDS26QExportView |
+| ☑ | GET,POST | `/api/v1/accounting/tcs-collections/` | api.v1.views.admin_tds_tcs.AdminTCSCollectionListView |
+| ☑ | POST | `/api/v1/accounting/tcs-collections/<int:pk>/mark-deposited/` | api.v1.views.admin_tds_tcs.AdminTCSCollectionMarkDepositedView |
+| ☑ | GET | `/api/v1/accounting/tcs-collections/export-27eq/` | api.v1.views.admin_tds_tcs.AdminTCS27EQExportView |
+| ☑ | GET,POST | `/api/v1/accounting/tds-deductions/` | api.v1.views.admin_tds_tcs.AdminTDSDeductionListView |
+| ☑ | POST | `/api/v1/accounting/tds-deductions/<int:pk>/mark-deposited/` | api.v1.views.admin_tds_tcs.AdminTDSDeductionMarkDepositedView |
+| ☑ | GET | `/api/v1/accounting/tds-deductions/export-26q/` | api.v1.views.admin_tds_tcs.AdminTDS26QExportView |
 | ☑ | ANY | `/api/v1/accounting/vendor-settlements.(?P<format>[a-z0-9]+)/?` | api.v1.views.accounting_phase3.VendorSettlementViewSet |
 | ☑ | ANY | `/api/v1/accounting/vendor-settlements/` | api.v1.views.accounting_phase3.VendorSettlementViewSet |
 | ☑ | ANY | `/api/v1/accounting/vendor-settlements/(?P<pk>[/.]+).(?P<format>[a-z0-9]+)/?` | api.v1.views.accounting_phase3.VendorSettlementViewSet |
@@ -202,8 +202,8 @@ Total endpoints: **2543**, in **29** groups (by first path segment under `/api/v
 | ☑ | ANY | `/api/v1/accounting/vendors/(?P<pk>[/.]+)/` | api.v1.views.accounting.VendorViewSet |
 | ☑ | ANY | `/api/v1/accounting/vendors/(?P<pk>[/.]+)/operational-summary.(?P<format>[a-z0-9]+)/?` | api.v1.views.accounting.VendorViewSet |
 | ☑ | ANY | `/api/v1/accounting/vendors/(?P<pk>[/.]+)/operational-summary/` | api.v1.views.accounting.VendorViewSet |
-| ☐ | POST | `/api/v1/accounting/year-end/close/` | api.v1.views.accounting_year_end_close.AccountingYearEndCloseView |
-| ☐ | GET | `/api/v1/accounting/year-end/readiness/` | api.v1.views.accounting_year_end_close.AccountingYearEndReadinessView |
+| ☑ | POST | `/api/v1/accounting/year-end/close/` | api.v1.views.accounting_year_end_close.AccountingYearEndCloseView |
+| ☑ | GET | `/api/v1/accounting/year-end/readiness/` | api.v1.views.accounting_year_end_close.AccountingYearEndReadinessView |
 
 ## `admin` — 1741 endpoints
 
