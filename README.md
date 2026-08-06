@@ -201,3 +201,23 @@ subidha-lucky-plan/
 ├── LICENSE
 └── CHANGELOG.md
 ```
+
+---
+
+## Instructions for AI Agents (Claude, Gemini, Codex, etc.)
+
+**CRITICAL: All AI assistants MUST read and adhere to `AGENTS.md` and `docs/SUBIDHA_CORE_PROJECT_RULEBOOK.md` before making any changes.**
+
+### AI Agent Directives
+1. **Use Existing Files First**: Do not create new files at first. Reuse existing files, services, components, and patterns where reasonable.
+2. **Additive Improvements**: Prefer additive improvements on existing files, services, and tests. Check existing paginations and structures, and add to them rather than replacing or creating new ones.
+3. **Document New Needs**: If creating a new file or service is absolutely necessary, it **must** be explicitly documented with a justification.
+4. **Document All Updates**: All new updates and improvements must always be documented in the relevant artifact or summary.
+
+### Core Business Rules
+- One customer may have multiple subscriptions.
+- Each subscription is financially independent.
+- EMI records must be auditable and never silently altered.
+- Payment history is append-only in spirit (prefer reversal/adjustment entries over destructive mutation).
+- Winning a lucky draw may waive future EMI obligations only; never retroactively modify already-settled payments.
+- Schema evolution must be additive and non-breaking.
