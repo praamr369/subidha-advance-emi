@@ -19,6 +19,11 @@ from api.v1.serializers.inventory_admin import (
 from api.v1.serializers.operational_cancellation import OperationalCancellationActionSerializer
 from inventory.models import InventoryItem, PurchaseNeed
 from inventory.services.inventory_readiness_service import get_inventory_readiness_snapshot
+from inventory.services.readiness_diagnostic_service import (
+    get_readiness_with_dismissals,
+    dismiss_warning,
+    restore_warning,
+)
 from inventory.services.inventory_profile_service import (
     build_manufacturing_cost_profile,
     build_profile_stock_by_location,
@@ -28,6 +33,8 @@ from inventory.services.purchase_need_reconciliation_service import (
     recheck_purchase_need_availability,
     reconcile_direct_sale_stock_requirements,
 )
+from inventory.services.purchase_need_list_service import build_purchase_needs_list
+from inventory.services.profile_list_service import build_inventory_profiles_list, bulk_prepare_profiles
 from contracts.services.operational_cancellation_service import cancel_stock_requirement
 from subscriptions.models import AuditLog
 from subscriptions.services.audit_service import log_audit
@@ -38,24 +45,54 @@ class _AdminBase(APIView):
 
 
 class AdminInventoryReadinessView(_AdminBase):
+    """
+    GET /admin/inventory/readiness/
+
+    Returns inventory readiness diagnostic snapshot with dismissed warnings filtered out.
+    Includes all warnings and dismissal state for full transparency.
+    """
+
     def get(self, request):
-        payload = get_inventory_readiness_snapshot()
+        payload = get_readiness_with_dismissals(user=request.user)
         return Response(payload)
 
 
 class AdminInventoryProfileListView(_AdminBase):
+    """
+    GET /admin/inventory/profiles/?page=1&page_size=50&search=product_name&stock_tracking_enabled=true
+
+    Returns paginated inventory profiles with server-side filtering and KPI summary.
+    """
+
     def get(self, request):
-        queryset = InventoryItem.objects.select_related("product").order_by("product__name", "id")
-        q = (request.query_params.get("q") or "").strip()
-        if q:
-            queryset = queryset.filter(
-                Q(product__name__icontains=q)
-                | Q(product__product_code__icontains=q)
-                | Q(sku__icontains=q)
-                | Q(inventory_code__icontains=q)
-            )
-        payload = AdminInventoryProfileListSerializer(queryset, many=True)
-        return Response({"count": queryset.count(), "results": payload.data})
+        # Parse pagination params
+        try:
+            page = int(request.query_params.get("page", 1))
+            page_size = int(request.query_params.get("page_size", 50))
+            page = max(1, page)
+            page_size = min(page_size, 500)  # Cap at 500
+        except (ValueError, TypeError):
+            page = 1
+            page_size = 50
+
+        # Get filter params
+        search = (request.query_params.get("search") or "").strip()
+        stock_tracking_param = (request.query_params.get("stock_tracking_enabled") or "").strip().lower()
+        stock_tracking_enabled = None
+        if stock_tracking_param == "true":
+            stock_tracking_enabled = True
+        elif stock_tracking_param == "false":
+            stock_tracking_enabled = False
+
+        # Build the profiles list with all filters
+        payload = build_inventory_profiles_list(
+            search=search if search else None,
+            stock_tracking_enabled=stock_tracking_enabled,
+            page=page,
+            page_size=page_size,
+        )
+
+        return Response(payload)
 
 
 class AdminInventoryProfileDetailView(_AdminBase):
@@ -95,6 +132,51 @@ class AdminInventoryProfileManufacturingCostView(_AdminBase):
         serializer.save()
         item.refresh_from_db()
         return Response(build_manufacturing_cost_profile(inventory_item=item))
+
+
+class AdminInventoryProfileBulkPrepareView(_AdminBase):
+    """
+    POST /admin/inventory/profiles/bulk-prepare/
+
+    Bulk prepare inventory profiles with standard tracking rules.
+    """
+
+    @transaction.atomic
+    def post(self, request):
+        item_ids = request.data.get("item_ids", [])
+        default_location_id = request.data.get("default_location_id")
+        reorder_level_qty = request.data.get("reorder_level_qty", "0.000")
+        stock_item_type = request.data.get("stock_item_type", "FINISHED_GOOD")
+
+        if not item_ids or not isinstance(item_ids, list):
+            return Response(
+                {"detail": "item_ids must be a non-empty list."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Perform bulk prepare
+        result = bulk_prepare_profiles(
+            item_ids=item_ids,
+            default_location_id=default_location_id,
+            reorder_level_qty=reorder_level_qty,
+            stock_item_type=stock_item_type,
+        )
+
+        # Log audit trail
+        log_audit(
+            action="BULK_PREPARE",
+            actor=request.user,
+            target_model="InventoryItem",
+            details={
+                "item_count": len(item_ids),
+                "updated_count": result["updated_count"],
+                "default_location_id": default_location_id,
+                "reorder_level_qty": reorder_level_qty,
+                "stock_item_type": stock_item_type,
+            },
+        )
+
+        return Response(result)
 
 
 class AdminInventoryStockNeedListCreateView(_AdminBase):
@@ -234,3 +316,185 @@ class AdminInventoryStockNeedCancelView(_AdminBase):
             raise serializers.ValidationError({"detail": str(exc)}) from exc
         need = PurchaseNeed.objects.get(pk=pk)
         return Response({"updated": True, "result": result, "stock_requirement": AdminPurchaseNeedSerializer(need).data})
+
+
+class AdminPurchaseNeedsListView(_AdminBase):
+    """
+    GET /admin/inventory/requirements/?page=1&page_size=50&status=OPEN&source_module=DIRECT_SALE&search=customer_name
+
+    Returns paginated purchase needs with server-side filtering, search, and KPI summary.
+    """
+
+    def get(self, request):
+        # Parse pagination params
+        try:
+            page = int(request.query_params.get("page", 1))
+            page_size = int(request.query_params.get("page_size", 50))
+            page = max(1, page)
+            page_size = min(page_size, 500)  # Cap at 500
+        except (ValueError, TypeError):
+            page = 1
+            page_size = 50
+
+        # Get filter params
+        status_filter = (request.query_params.get("status") or "").strip().upper()
+        source_filter = (request.query_params.get("source_module") or "").strip().upper()
+        search = (request.query_params.get("search") or "").strip()
+
+        # Build the purchase needs list with all filters
+        payload = build_purchase_needs_list(
+            status=status_filter if status_filter else None,
+            source_module=source_filter if source_filter else None,
+            search=search,
+            page=page,
+            page_size=page_size,
+        )
+
+        return Response(payload)
+
+
+class AdminPurchaseNeedsUpdateStatusView(_AdminBase):
+    """
+    PATCH /admin/inventory/requirements/<id>/status/
+
+    Update the status of a purchase need (OPEN → ORDER_PLACED or DISMISSED).
+    """
+
+    @transaction.atomic
+    def patch(self, request, pk):
+        try:
+            need = PurchaseNeed.objects.get(pk=pk)
+        except PurchaseNeed.DoesNotExist:
+            return Response(
+                {"detail": "Purchase need not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        new_status = (request.data.get("status") or "").strip().upper()
+        if not new_status:
+            return Response(
+                {"detail": "Status is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Validate status choice
+        valid_statuses = ["OPEN", "ORDER_PLACED", "DISMISSED", "RESOLVED"]
+        if new_status not in valid_statuses:
+            return Response(
+                {"detail": f"Invalid status. Must be one of: {', '.join(valid_statuses)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        old_status = need.status
+        need.status = new_status
+        need.save()
+
+        # Log audit trail
+        log_audit(
+            action="UPDATE",
+            actor=request.user,
+            target_model="PurchaseNeed",
+            target_id=need.id,
+            details={
+                "need_no": need.need_no,
+                "status_changed": f"{old_status} → {new_status}",
+            },
+        )
+
+        return Response(
+            {
+                "updated": True,
+                "purchase_need": {
+                    "id": need.id,
+                    "need_no": need.need_no,
+                    "status": need.status,
+                    "product_name": need.product.name if need.product else need.product_name_snapshot,
+                    "customer_name": need.customer.name if need.customer else None,
+                },
+            }
+        )
+
+
+class AdminInventoryReadinessDismissView(_AdminBase):
+    """
+    POST /admin/inventory/readiness/dismiss/
+
+    Dismiss a warning from the inventory readiness diagnostic.
+    """
+
+    def post(self, request):
+        warning_key = (request.data.get("warning_key") or "").strip()
+        category = (request.data.get("category") or "").strip()
+        reason = (request.data.get("reason") or "").strip()
+
+        if not warning_key:
+            return Response(
+                {"detail": "warning_key is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not category:
+            category = "CONFIGURATION"  # Default category
+
+        dismissal = dismiss_warning(
+            warning_key=warning_key,
+            category=category,
+            user=request.user,
+            reason=reason,
+        )
+
+        # Log audit trail
+        log_audit(
+            action="DISMISS",
+            actor=request.user,
+            target_model="InventoryReadinessDismissal",
+            target_id=dismissal.id,
+            details={
+                "warning_key": warning_key,
+                "category": category,
+                "reason": reason,
+            },
+        )
+
+        return Response(
+            {
+                "dismissed": True,
+                "warning_key": warning_key,
+                "category": category,
+            }
+        )
+
+
+class AdminInventoryReadinessRestoreView(_AdminBase):
+    """
+    POST /admin/inventory/readiness/restore/
+
+    Restore a previously dismissed warning.
+    """
+
+    def post(self, request):
+        warning_key = (request.data.get("warning_key") or "").strip()
+
+        if not warning_key:
+            return Response(
+                {"detail": "warning_key is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        restored = restore_warning(warning_key=warning_key)
+
+        if not restored:
+            return Response(
+                {"detail": "Warning was not dismissed."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Log audit trail
+        log_audit(
+            action="RESTORE",
+            actor=request.user,
+            target_model="InventoryReadinessDismissal",
+            details={"warning_key": warning_key},
+        )
+
+        return Response({"restored": True, "warning_key": warning_key})

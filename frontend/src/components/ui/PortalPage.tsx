@@ -157,7 +157,10 @@ function getToneIcon(tone: PortalStat["tone"] | PortalStatusBadge["tone"] = "def
   }
 }
 
-function normalizeStatValue(value: string | number): string | number {
+function normalizeStatValue(value: string | number | undefined): string | number {
+  if (value === undefined || value === null) {
+    return "—";
+  }
   if (typeof value === "number") {
     return Number.isFinite(value) ? value : 0;
   }

@@ -1852,6 +1852,9 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
     paid_emi_count = serializers.SerializerMethodField()
     pending_emi_count = serializers.SerializerMethodField()
     waived_emi_count = serializers.SerializerMethodField()
+    overdue_emi_count = serializers.SerializerMethodField()
+    total_paid_amount = serializers.SerializerMethodField()
+    outstanding_amount = serializers.SerializerMethodField()
     subscription_number = serializers.SerializerMethodField()
     contract_reference = serializers.SerializerMethodField()
 
@@ -1937,6 +1940,9 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
             "paid_emi_count",
             "pending_emi_count",
             "waived_emi_count",
+            "overdue_emi_count",
+            "total_paid_amount",
+            "outstanding_amount",
         )
         read_only_fields = (
             "id",
@@ -1991,6 +1997,20 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
 
     def get_waived_emi_count(self, obj):
         return sum(1 for emi in obj.emis.all() if emi.status == EmiStatus.WAIVED)
+
+    def get_overdue_emi_count(self, obj):
+        return sum(1 for emi in obj.emis.all() if emi.status == EmiStatus.PENDING and emi.is_overdue())
+
+    def _get_financial_snapshot(self, obj):
+        if not hasattr(obj, "_cached_financial_snapshot"):
+            obj._cached_financial_snapshot = build_subscription_financial_snapshot(obj)
+        return obj._cached_financial_snapshot
+
+    def get_total_paid_amount(self, obj):
+        return str(self._get_financial_snapshot(obj)["paid_amount"])
+
+    def get_outstanding_amount(self, obj):
+        return str(self._get_financial_snapshot(obj)["remaining_amount"])
 
     def validate(self, attrs):
         instance = self.instance

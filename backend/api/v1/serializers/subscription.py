@@ -153,6 +153,7 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
             "paid_emi_count",
             "pending_emi_count",
             "waived_emi_count",
+            "overdue_emi_count",
             "total_paid_amount",
             "outstanding_amount",
             "financial_summary",
@@ -272,6 +273,9 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
         if self._use_canonical_financial_summary():
             return int(self._snapshot(obj)["emi_count_waived"])
         return sum(1 for emi in self._get_emis(obj) if emi.status == "WAIVED")
+
+    def get_overdue_emi_count(self, obj):
+        return sum(1 for emi in self._get_emis(obj) if emi.status == "PENDING" and getattr(emi, "is_overdue", lambda: False)())
 
     def get_total_paid_amount(self, obj):
         summary = self._compute_financial_summary(obj)

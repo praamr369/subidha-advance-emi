@@ -3450,6 +3450,7 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
         .prefetch_related(
             "emis",
             "emis__payments",
+            "emis__ledger_entries",
             "payments",
             "documents",
             get_subscription_delivery_prefetch(),

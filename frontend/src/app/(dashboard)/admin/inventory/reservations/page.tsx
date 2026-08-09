@@ -1,69 +1,120 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { useDebounce } from "@/hooks/useDebounce";
+
+import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
+import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
 import ERPPageShell from "@/components/erp/ERPPageShell";
-import ERPDataToolbar from "@/components/erp/ERPDataToolbar";
-import ERPEmptyState from "@/components/erp/ERPEmptyState";
-import ERPErrorState from "@/components/erp/ERPErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import ERPAuditNote from "@/components/erp/ERPAuditNote";
 import { ROUTES } from "@/lib/routes";
+import { listStockReservations, exportStockReservationsToCSV, type StockReservationRow, type StockReservationSummary } from "@/services/inventory";
+import { accountingErrorMessage } from "@/components/accounting/shared";
 
-interface StockReservation {
-  id: number;
-  inventory_item: number;
-  inventory_item_name: string;
-  reserved_for: string;
-  reserved_qty: number;
-  fulfilled_qty: number;
-  status: string;
-  created_at: string;
-  expires_at: string | null;
-  reference: string | null;
-}
-
-interface ReservationResponse {
-  results: StockReservation[];
+interface StockReservationPayload {
   count: number;
-}
-
-async function fetchReservations(search?: string): Promise<ReservationResponse> {
-  const params = new URLSearchParams();
-  if (search) params.set("search", search);
-  const res = await fetch(`/api/v1/inventory/reservations/?${params}`, { credentials: "include" });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+  page: number;
+  page_size: number;
+  num_pages: number;
+  summary: StockReservationSummary;
+  results: StockReservationRow[];
 }
 
 export default function AdminInventoryReservationsPage() {
-  const [data, setData] = useState<StockReservation[]>([]);
+  const [pagination, setPagination] = useState({ page: 1, page_size: 50, total_count: 0, num_pages: 0 });
+  const [rows, setRows] = useState<StockReservationRow[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearch = useDebounce(searchQuery, 350);
+
+  const [filters, setFilters] = useState({ status: "", source_module: "" });
+  const [summary, setSummary] = useState<StockReservationSummary | null>(null);
+  const [sourceModules, setSourceModules] = useState<string[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
+  const [exporting, setExporting] = useState(false);
 
-  const load = async () => {
+  async function loadPage() {
     setLoading(true);
-    setError(null);
     try {
-      const result = await fetchReservations(search || undefined);
-      setData(result.results ?? []);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load reservations");
+      const payload = await listStockReservations({
+        page: pagination.page,
+        page_size: pagination.page_size,
+        q: debouncedSearch || undefined,
+        status: filters.status || undefined,
+        source_module: filters.source_module || undefined,
+      });
+      setRows(payload.results);
+      setSummary(payload.summary);
+      setSourceModules(payload.summary.source_modules);
+      setPagination({
+        page: payload.count > 0 ? pagination.page : 1,
+        page_size: pagination.page_size,
+        total_count: payload.count,
+        num_pages: payload.num_pages,
+      });
+      setError(null);
+    } catch (err) {
+      setRows([]);
+      setError(accountingErrorMessage(err, "Failed to load stock reservations."));
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  useEffect(() => { void load(); }, [search]);
+  useEffect(() => {
+    void loadPage();
+  }, [pagination.page, debouncedSearch, filters.status, filters.source_module]);
 
-  const rows = useMemo(() => data, [data]);
+  async function handleExport() {
+    setExporting(true);
+    try {
+      await exportStockReservationsToCSV({
+        q: searchQuery,
+        status: filters.status,
+        source_module: filters.source_module,
+      });
+    } catch (err) {
+      alert(accountingErrorMessage(err, "Export failed."));
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  const columns: EnterpriseColumnDef<StockReservationRow>[] = [
+    { key: "id", header: "ID", render: (row) => `#${row.id}` },
+    { key: "product_code", header: "Product Code" },
+    { key: "product_name", header: "Product" },
+    { key: "warehouse_name", header: "Warehouse" },
+    { key: "quantity", header: "Qty Reserved" },
+    { key: "source_module", header: "Source Module" },
+    { key: "source_object_id", header: "Source ID" },
+    {
+      key: "status",
+      header: "Status",
+      render: (row) => (
+        <ERPStatusBadge
+          status={row.status}
+          label={row.status}
+        />
+      ),
+    },
+    { key: "created_by_username", header: "Created By" },
+    {
+      key: "created_at",
+      header: "Created",
+      render: (row) => row.created_at ? new Date(row.created_at).toLocaleDateString() : "—",
+    },
+    { key: "note", header: "Note" },
+  ];
 
   return (
     <ERPPageShell
       eyebrow="Inventory"
       title="Stock Reservations"
-      subtitle="Active stock reservations by item and purpose. Read-only visibility."
-      headerMode="erp"
+      subtitle="Active and historical stock reservations by item and purpose. Read-only visibility."
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Inventory", href: ROUTES.admin.inventory },
@@ -71,9 +122,10 @@ export default function AdminInventoryReservationsPage() {
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
       stats={[
-        { label: "Reservations", value: loading ? "—" : rows.length, tone: "info" },
-        { label: "Reserved Qty", value: loading ? "—" : rows.reduce((s, r) => s + Number(r.reserved_qty || 0), 0), tone: "default" },
-        { label: "Fulfilled Qty", value: loading ? "—" : rows.reduce((s, r) => s + Number(r.fulfilled_qty || 0), 0), tone: "success" },
+        { label: "Total Reservations", value: summary?.total_reservations ?? "—", tone: "info" },
+        { label: "Total Qty Reserved", value: summary?.total_reserved_qty ?? "—", tone: "default" },
+        { label: "Active Reservations", value: summary?.active_count ?? "—", tone: "success" },
+        { label: "Released", value: summary?.released_count ?? "—", tone: "warning" },
       ]}
     >
       <ERPAuditNote title="Read-only" tone="info">
@@ -81,64 +133,149 @@ export default function AdminInventoryReservationsPage() {
         source workflow (delivery, subscription, or direct-sale).
       </ERPAuditNote>
 
-      <ERPDataToolbar
-        left={
-          <input
-            type="search"
-            placeholder="Search item or reference…"
-            className="rounded-lg border border-border bg-background px-3 py-2 text-sm w-64"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        }
-        right={null}
-      />
+      <ERPSectionShell
+        title="Reservation Register"
+        description="Track inventory reserved for pending orders, subscriptions, and other business purposes."
+      >
+        {/* Search & Filters Bar */}
+        <div className="space-y-4 p-4 border rounded-lg bg-muted/20">
+          <div className="flex flex-wrap gap-4 items-end">
+            <div className="flex-1 min-w-[240px]">
+              <label className="text-sm font-medium text-foreground">Search</label>
+              <input
+                type="text"
+                placeholder="Search by product, warehouse, or source ID…"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setPagination((p) => ({ ...p, page: 1 }));
+                }}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 mt-2"
+              />
+            </div>
 
-      {loading && <LoadingBlock label="Loading reservations…" />}
-      {error && <ERPErrorState title="Load error" message={error} onRetry={() => void load()} />}
+            <div className="min-w-[180px]">
+              <label className="text-sm font-medium text-foreground">Status</label>
+              <select
+                value={filters.status}
+                onChange={(e) => {
+                  setFilters({ ...filters, status: e.target.value });
+                  setPagination((p) => ({ ...p, page: 1 }));
+                }}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 mt-2"
+              >
+                <option value="">All Statuses</option>
+                <option value="ACTIVE">Active</option>
+                <option value="RELEASED">Released</option>
+              </select>
+            </div>
 
-      {!loading && !error && rows.length === 0 && (
-        <ERPEmptyState
-          title="No reservations"
-          description="No active stock reservations found."
-        />
-      )}
-
-      {!loading && !error && rows.length > 0 && (
-        <div className="mt-4 overflow-x-auto rounded-xl border border-border">
-          <table className="w-full text-sm">
-            <thead className="bg-muted text-left">
-              <tr>
-                {["ID", "Item", "Reserved For", "Qty Reserved", "Qty Fulfilled", "Status", "Expires", "Reference"].map((h) => (
-                  <th key={h} className="px-4 py-2 font-medium text-muted-foreground">{h}</th>
+            <div className="min-w-[180px]">
+              <label className="text-sm font-medium text-foreground">Source Module</label>
+              <select
+                value={filters.source_module}
+                onChange={(e) => {
+                  setFilters({ ...filters, source_module: e.target.value });
+                  setPagination((p) => ({ ...p, page: 1 }));
+                }}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 mt-2"
+              >
+                <option value="">All Sources</option>
+                {sourceModules.map((module) => (
+                  <option key={module} value={module}>
+                    {module}
+                  </option>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.id} className="border-t border-border hover:bg-muted/40">
-                  <td className="px-4 py-2 font-mono text-xs">{r.id}</td>
-                  <td className="px-4 py-2">{r.inventory_item_name || r.inventory_item}</td>
-                  <td className="px-4 py-2">{r.reserved_for}</td>
-                  <td className="px-4 py-2">{r.reserved_qty}</td>
-                  <td className="px-4 py-2">{r.fulfilled_qty}</td>
-                  <td className="px-4 py-2">
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                      r.status === "ACTIVE" ? "bg-green-100 text-green-700" :
-                      r.status === "FULFILLED" ? "bg-blue-100 text-blue-700" :
-                      "bg-muted text-muted-foreground"
-                    }`}>
-                      {r.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2 text-xs text-muted-foreground">{r.expires_at ?? "—"}</td>
-                  <td className="px-4 py-2 text-xs text-muted-foreground">{r.reference ?? "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+              </select>
+            </div>
+
+            <button
+              onClick={handleExport}
+              disabled={exporting || rows.length === 0}
+              className="h-10 px-4 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/90 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+            >
+              {exporting ? "Exporting…" : "Export CSV"}
+            </button>
+          </div>
         </div>
-      )}
+
+        {/* Data Table */}
+        <EnterpriseDataTable
+          data={rows}
+          columns={columns}
+          loading={loading}
+          error={error}
+          emptyTitle="No stock reservations found"
+          emptyDescription="No reservations match the current filters."
+        />
+
+        {/* Pagination Controls */}
+        {pagination.num_pages > 1 && (
+          <div className="flex items-center justify-between gap-4 p-4 border-t">
+            <div className="text-sm text-muted-foreground">
+              Showing{" "}
+              {Math.min((pagination.page - 1) * pagination.page_size + 1, pagination.total_count)}{" "}
+              to {Math.min(pagination.page * pagination.page_size, pagination.total_count)} of{" "}
+              {pagination.total_count} reservations
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() =>
+                  setPagination((p) => ({ ...p, page: Math.max(1, p.page - 1) }))
+                }
+                disabled={pagination.page === 1 || loading}
+                className="h-9 px-3 rounded-md border border-input bg-background hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              >
+                Previous
+              </button>
+              <div className="flex items-center gap-1">
+                {Array.from(
+                  { length: Math.min(5, pagination.num_pages) },
+                  (_, i) => {
+                    let pageNum: number;
+                    if (pagination.num_pages <= 5) {
+                      pageNum = i + 1;
+                    } else if (pagination.page <= 3) {
+                      pageNum = i + 1;
+                    } else if (pagination.page >= pagination.num_pages - 2) {
+                      pageNum = pagination.num_pages - 4 + i;
+                    } else {
+                      pageNum = pagination.page - 2 + i;
+                    }
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() =>
+                          setPagination((p) => ({ ...p, page: pageNum }))
+                        }
+                        className={`h-9 px-3 rounded-md text-sm ${
+                          pageNum === pagination.page
+                            ? "bg-primary text-primary-foreground"
+                            : "border border-input bg-background hover:bg-muted"
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  }
+                )}
+              </div>
+              <button
+                onClick={() =>
+                  setPagination((p) => ({
+                    ...p,
+                    page: Math.min(p.num_pages, p.page + 1),
+                  }))
+                }
+                disabled={pagination.page === pagination.num_pages || loading}
+                className="h-9 px-3 rounded-md border border-input bg-background hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+      </ERPSectionShell>
     </ERPPageShell>
   );
 }

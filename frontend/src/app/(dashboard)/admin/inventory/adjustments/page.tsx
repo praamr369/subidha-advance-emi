@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useDebounce } from "@/hooks/useDebounce";
+import { Download, Search } from "lucide-react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
@@ -12,7 +14,7 @@ import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { ROUTES } from "@/lib/routes";
 import { accountingDate, accountingErrorMessage, accountingMoney } from "@/components/accounting/shared";
-import type { InventoryItem, StockAdjustment, StockLocation } from "@/services/inventory";
+import type { InventoryItem, StockAdjustment, StockLocation, StockAdjustmentsPayload } from "@/services/inventory";
 import {
   approveStockAdjustment,
   createStockAdjustment,
@@ -20,8 +22,10 @@ import {
   listStockAdjustments,
   listStockLocations,
   postStockAdjustment,
+  searchInventoryItems,
   setStockAdjustmentLineCosts,
 } from "@/services/inventory";
+import SearchableItemSelect from "@/components/inventory/SearchableItemSelect";
 import {
   adjustmentRowBlockerLabel,
   computeLineValuationPreview,
@@ -30,6 +34,33 @@ import {
 
 const FIELD_CLASS =
   "h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring disabled:cursor-not-allowed disabled:opacity-60";
+
+// Export adjustments to CSV
+function exportAdjustmentsToCSV(rows: StockAdjustment[], filename: string = "stock-adjustments.csv") {
+  const headers = ["Adjustment", "Date", "Status", "Location", "Reason", "Lines", "Created By"];
+  const csvContent = [
+    headers.join(","),
+    ...rows.map(row => [
+      row.adjustment_no || "",
+      row.adjustment_date || "",
+      row.status || "",
+      row.stock_location_name || "",
+      row.reason || "",
+      String(row.lines?.length || 0),
+      row.created_by_username || "",
+    ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(","))
+  ].join("\n");
+
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+  link.setAttribute("href", url);
+  link.setAttribute("download", filename);
+  link.style.visibility = "hidden";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
 
 type AdjustmentLineForm = {
   inventory_item: string;
@@ -70,14 +101,24 @@ function createInitialForm(defaultItemId?: number): AdjustmentFormState {
 }
 
 export default function InventoryAdjustmentsPage() {
+  // Pagination State
+  const [pagination, setPagination] = useState({ page: 1, page_size: 50, total_count: 0, num_pages: 0 });
+
+  // Filter & Search State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const debouncedSearch = useDebounce(searchQuery, 350);
+
+  // KPI State
+  const [kpiCounts, setKpiCounts] = useState({ draft: 0, approved: 0, posted: 0 });
+
+  // Data State
   const [rows, setRows] = useState<StockAdjustment[]>([]);
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [locations, setLocations] = useState<StockLocation[]>([]);
   const [form, setForm] = useState<AdjustmentFormState>(createInitialForm());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  // Separate error surfaces so a posting/validation blocker never renders as a
-  // record-loading failure (and vice versa).
   const [loadError, setLoadError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -87,11 +128,26 @@ export default function InventoryAdjustmentsPage() {
     setLoading(true);
     try {
       const [adjustmentPayload, itemPayload, locationPayload] = await Promise.all([
-        listStockAdjustments(),
+        listStockAdjustments({
+          page: pagination.page,
+          page_size: pagination.page_size,
+          status: statusFilter || undefined,
+          search: debouncedSearch || undefined,
+        }),
         listInventoryItems({ is_active: 1 }),
         listStockLocations({ is_active: 1 }),
       ]);
       setRows(adjustmentPayload.results);
+      setKpiCounts({
+        draft: adjustmentPayload.draft_count,
+        approved: adjustmentPayload.approved_count,
+        posted: adjustmentPayload.posted_count,
+      });
+      setPagination(prev => ({
+        ...prev,
+        total_count: adjustmentPayload.count,
+        num_pages: adjustmentPayload.num_pages,
+      }));
       setItems(itemPayload.results);
       setLocations(locationPayload.results);
       setLoadError(null);
@@ -111,7 +167,7 @@ export default function InventoryAdjustmentsPage() {
 
   useEffect(() => {
     void loadPage();
-  }, []);
+  }, [pagination.page, pagination.page_size, statusFilter, debouncedSearch]);
 
   const columns: EnterpriseColumnDef<StockAdjustment>[] = [
     { key: "adjustment_no", header: "Adjustment" },
@@ -261,10 +317,6 @@ export default function InventoryAdjustmentsPage() {
     }
   }
 
-  const draftCount = rows.filter((row) => row.status === "DRAFT").length;
-  const approvedCount = rows.filter((row) => row.status === "APPROVED").length;
-  const postedCount = rows.filter((row) => row.status === "POSTED").length;
-
   async function handleCreateAdjustment() {
     setSaving(true);
     setFormError(null);
@@ -328,9 +380,9 @@ export default function InventoryAdjustmentsPage() {
         { href: ROUTES.admin.inventoryItems, label: "Inventory Items", variant: "secondary" },
       ]}
       stats={[
-        { label: "Draft", value: draftCount, tone: draftCount > 0 ? "warning" : "default" },
-        { label: "Approved", value: approvedCount, tone: approvedCount > 0 ? "warning" : "success" },
-        { label: "Posted", value: postedCount, tone: "success" },
+        { label: "Draft", value: loading ? "—" : kpiCounts.draft, tone: kpiCounts.draft > 0 ? "warning" : "default" },
+        { label: "Approved", value: loading ? "—" : kpiCounts.approved, tone: kpiCounts.approved > 0 ? "warning" : "success" },
+        { label: "Posted", value: loading ? "—" : kpiCounts.posted, tone: "success" },
       ]}
       statusBadge={{ label: "Reason Required", tone: "info" }}
     >
@@ -422,21 +474,14 @@ export default function InventoryAdjustmentsPage() {
                 key={`line-${index}`}
                 className="grid gap-3 rounded-xl border border-border bg-muted/30 p-4 xl:grid-cols-[minmax(0,1.3fr)_140px_140px_minmax(0,1fr)_auto]"
               >
-                <select
-                  aria-label="Inventory item"
-                  title="Inventory item"
+                <SearchableItemSelect
                   value={line.inventory_item}
-                  onChange={(event) => updateLine(index, "inventory_item", event.target.value)}
+                  onChange={(value) => updateLine(index, "inventory_item", value)}
+                  onLoadItems={searchInventoryItems}
+                  allItems={items}
                   disabled={saving}
-                  className={FIELD_CLASS}
-                >
-                  <option value="">Select inventory item</option>
-                  {items.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.product_code} - {item.product_name}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Search by code, name, or SKU..."
+                />
                 <input
                   type="number"
                   step="0.001"
@@ -563,15 +608,120 @@ export default function InventoryAdjustmentsPage() {
       <ERPSectionShell
         title="Adjustment Register"
         description="Approve and post counted adjustments only after review so stock mutations remain explicit and auditable."
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => exportAdjustmentsToCSV(rows, `stock-adjustments-${new Date().toISOString().slice(0, 10)}.csv`)}
+              disabled={rows.length === 0}
+              className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg border border-border bg-background hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition"
+            >
+              <Download className="h-3.5 w-3.5" /> Export CSV
+            </button>
+          </div>
+        }
       >
+        {/* Search and Status Filter */}
+        <div className="mb-4 space-y-4">
+          <div className="grid gap-4 md:grid-cols-[1fr_220px]">
+            {/* Search Input */}
+            <div>
+              <label className="text-sm font-medium text-foreground">Search</label>
+              <div className="relative mt-2">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Search by adjustment number or reason…"
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setPagination(p => ({...p, page: 1}));
+                  }}
+                  className="h-10 w-full rounded-xl border border-border bg-background pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                />
+              </div>
+            </div>
+
+            {/* Status Filter */}
+            <div>
+              <label className="text-sm font-medium text-foreground">Status</label>
+              <select
+                className="mt-2 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                value={statusFilter}
+                onChange={(event) => {
+                  setStatusFilter(event.target.value);
+                  setPagination(p => ({...p, page: 1}));
+                }}
+              >
+                <option value="">All statuses</option>
+                <option value="DRAFT">Draft</option>
+                <option value="APPROVED">Approved</option>
+                <option value="POSTED">Posted</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
         <EnterpriseDataTable
           data={rows}
           columns={columns}
           loading={loading}
           error={loadError}
-          emptyTitle="No stock adjustments yet"
+          emptyTitle="No stock adjustments found"
           emptyDescription="Create a counted stock adjustment to move stock in or out safely."
         />
+
+        {/* Pagination Controls */}
+        {pagination.num_pages > 1 && (
+          <div className="flex items-center justify-between gap-4 p-4 border-t border-border">
+            <div className="text-sm text-muted-foreground">
+              Showing {Math.min((pagination.page - 1) * pagination.page_size + 1, pagination.total_count)} to {Math.min(pagination.page * pagination.page_size, pagination.total_count)} of {pagination.total_count} adjustments
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPagination(p => ({...p, page: Math.max(1, p.page - 1)}))}
+                disabled={pagination.page === 1 || loading}
+                className="h-9 px-3 rounded-md border border-input bg-background hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              >
+                Previous
+              </button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(5, pagination.num_pages) }, (_, i) => {
+                  let pageNum: number;
+                  if (pagination.num_pages <= 5) {
+                    pageNum = i + 1;
+                  } else if (pagination.page <= 3) {
+                    pageNum = i + 1;
+                  } else if (pagination.page >= pagination.num_pages - 2) {
+                    pageNum = pagination.num_pages - 4 + i;
+                  } else {
+                    pageNum = pagination.page - 2 + i;
+                  }
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setPagination(p => ({...p, page: pageNum}))}
+                      className={`h-9 px-3 rounded-md text-sm ${
+                        pageNum === pagination.page
+                          ? "bg-primary text-primary-foreground"
+                          : "border border-input bg-background hover:bg-muted"
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                onClick={() => setPagination(p => ({...p, page: Math.min(p.num_pages, p.page + 1)}))}
+                disabled={pagination.page === pagination.num_pages || loading}
+                className="h-9 px-3 rounded-md border border-input bg-background hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </ERPSectionShell>
     </ERPPageShell>
   );

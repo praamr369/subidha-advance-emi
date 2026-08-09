@@ -328,6 +328,64 @@ class Product(TimeStampedModel):
         return f"{self.product_code} - {self.name}"
 
 
+class ProductVariant(TimeStampedModel):
+    """Product variants represent different configurations (size, color, etc.) of a base product."""
+
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="variants",
+        help_text="Parent product"
+    )
+    variant_code = models.CharField(
+        max_length=50,
+        help_text="e.g., BLU, RED, L, M, S",
+    )
+    variant_name = models.CharField(
+        max_length=255,
+        help_text="e.g., Blue, Red, Large"
+    )
+    sku = models.CharField(
+        max_length=60,
+        unique=True,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Auto-generated: SKU-{PRODUCTCODE}-{SEQUENCE}-{VARIANT}"
+    )
+    barcode = models.CharField(
+        max_length=100,
+        unique=True,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Auto-generated: BC-{PRODUCTCODE}-{CHECKSUM}"
+    )
+    variant_price = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="If null, inherits base_price from product"
+    )
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        unique_together = [["product", "variant_code"]]
+        indexes = [
+            models.Index(fields=["product", "is_active"]),
+            models.Index(fields=["sku", "is_active"]),
+            models.Index(fields=["barcode", "is_active"]),
+        ]
+
+    def __str__(self):
+        return f"{self.product.product_code} - {self.variant_name} ({self.sku})"
+
+    @property
+    def effective_price(self):
+        """Return variant price if set, otherwise product base_price"""
+        return self.variant_price if self.variant_price is not None else self.product.base_price
+
 
 class ProductRelationship(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="related_products")

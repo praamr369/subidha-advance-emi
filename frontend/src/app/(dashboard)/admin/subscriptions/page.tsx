@@ -13,7 +13,9 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
 import { DataTableShell, DetailPanel, FormSection, WorkflowCard } from "@/components/ui/operations";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { RegistryPageShell } from "@/components/layout/page-shells";
+import { InfoIcon, CalendarClock, CheckCircle2, AlertCircle } from "lucide-react";
 import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
 import { apiFetch } from "@/lib/api";
 import { downloadCsv } from "@/lib/export/csv";
@@ -47,6 +49,7 @@ type SubscriptionRow = {
   lucky_number?: number | null;
   partner_id?: number | null;
   partner_name?: string;
+  partner_phone?: string;
   plan_type?: string;
   tenure_months?: number | null;
   start_date?: string | null;
@@ -61,6 +64,13 @@ type SubscriptionRow = {
     outstanding_amount: string;
   };
   deposit_status?: string;
+  emi_count?: number;
+  paid_emi_count?: number;
+  pending_emi_count?: number;
+  waived_emi_count?: number;
+  overdue_emi_count?: number;
+  total_paid_amount?: string;
+  outstanding_amount?: string;
 };
 
 type SubscriptionListPayload = {
@@ -259,6 +269,9 @@ function normalizeSubscriptionRow(raw: Record<string, unknown>): SubscriptionRow
       toStringValue(raw.partner_name) ||
       toStringValue(raw.partner_username) ||
       undefined,
+    partner_phone:
+      toStringValue(raw.partner_phone) ||
+      undefined,
     plan_type:
       toStringValue(raw.plan_type) ||
       toStringValue(raw.subscription_type) ||
@@ -281,6 +294,13 @@ function normalizeSubscriptionRow(raw: Record<string, unknown>): SubscriptionRow
       pending_amount: toMoneyString((raw.financial_summary as any).pending_amount),
       outstanding_amount: toMoneyString((raw.financial_summary as any).outstanding_amount),
     } : undefined,
+    emi_count: toNumber(raw.emi_count),
+    paid_emi_count: toNumber(raw.paid_emi_count),
+    pending_emi_count: toNumber(raw.pending_emi_count),
+    waived_emi_count: toNumber(raw.waived_emi_count),
+    overdue_emi_count: toNumber(raw.overdue_emi_count),
+    total_paid_amount: toNullableString(raw.total_paid_amount) ?? undefined,
+    outstanding_amount: toNullableString(raw.outstanding_amount) ?? undefined,
   };
 }
 
@@ -476,6 +496,7 @@ export default function AdminSubscriptionsPage() {
   const [searchInput, setSearchInput] = useState(currentSearchQuery);
   const [statusInput, setStatusInput] = useState<"" | SubscriptionStatus>(currentStatusFilter);
   const [planTypeInput, setPlanTypeInput] = useState(currentPlanTypeFilter);
+  const [partnerInput, setPartnerInput] = useState(currentPartnerFilter);
 
   const [kpis, setKpis] = useState<SubscriptionKpis | null>(null);
   const [batchBreakdown, setBatchBreakdown] = useState<BatchBreakdownRow[]>([]);
@@ -484,6 +505,7 @@ export default function AdminSubscriptionsPage() {
     setSearchInput(currentSearchQuery);
     setStatusInput(currentStatusFilter);
     setPlanTypeInput(currentPlanTypeFilter);
+    setPartnerInput(currentPartnerFilter);
     setPage(currentPage);
   }, [currentBatchFilter, currentCustomerFilter, currentPage, currentPartnerFilter, currentPlanTypeFilter, currentProductFilter, currentSearchQuery, currentStatusFilter]);
 
@@ -611,13 +633,12 @@ export default function AdminSubscriptionsPage() {
   function handleApplyFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const next = new URLSearchParams();
-    const nextSearch = searchInput.trim();
-    const nextPlanType = planTypeInput.trim();
-
-    if (nextSearch) next.set("q", nextSearch);
+    const next = new URLSearchParams(searchParams.toString());
+    next.set("page", "1");
+    if (searchInput.trim()) next.set("q", searchInput.trim());
     if (statusInput) next.set("status", statusInput);
-    if (nextPlanType) next.set("plan_type", nextPlanType);
+    if (planTypeInput.trim()) next.set("plan_type", planTypeInput.trim());
+    if (partnerInput.trim()) next.set("partner", parseIdFilter(partnerInput));
     if (currentCustomerFilter) next.set("customer", currentCustomerFilter);
     if (currentProductFilter) next.set("product", currentProductFilter);
     if (currentPartnerFilter) next.set("partner", currentPartnerFilter);
@@ -712,9 +733,11 @@ export default function AdminSubscriptionsPage() {
         product_name: row.product_name ?? "",
         product_code: row.product_code ?? "",
         batch_code: row.batch_code ?? "",
-        lucky_number:
-          typeof row.lucky_number === "number" ? String(row.lucky_number) : "",
+        lucky_id: row.lucky_id,
+        lucky_number: typeof row.lucky_number === "number" ? String(row.lucky_number) : "",
+        partner_id: row.partner_id,
         partner_name: row.partner_name ?? "",
+        partner_phone: row.partner_phone ?? "",
         plan_type: row.plan_type ?? "",
         tenure_months:
           typeof row.tenure_months === "number" ? String(row.tenure_months) : "",
@@ -898,7 +921,7 @@ export default function AdminSubscriptionsPage() {
           title="Filter register"
           description="Search by subscription, customer, phone, product, batch, lucky number, partner, or plan type."
         >
-          <form onSubmit={handleApplyFilters} className="grid gap-4 lg:grid-cols-6">
+          <form onSubmit={handleApplyFilters} className="grid gap-4 lg:grid-cols-7">
             <div className="lg:col-span-3">
               <label
                 htmlFor="subscription-search"
@@ -954,6 +977,23 @@ export default function AdminSubscriptionsPage() {
                 value={planTypeInput}
                 onChange={(event) => setPlanTypeInput(event.target.value)}
                 placeholder="EMI, lucky, etc."
+                className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="subscription-partner"
+                className="mb-2 block text-sm font-medium text-foreground"
+              >
+                Partner ID
+              </label>
+              <input
+                id="subscription-partner"
+                type="text"
+                value={partnerInput}
+                onChange={(event) => setPartnerInput(event.target.value)}
+                placeholder="ID"
                 className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
               />
             </div>
@@ -1195,6 +1235,14 @@ export default function AdminSubscriptionsPage() {
                             </div>
                             <div className="text-xs text-muted-foreground">{row.customer_phone || "No phone"}</div>
                           </div>
+
+                          {row.partner_name && (
+                            <div>
+                              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Partner</div>
+                              <div className="mt-1 text-sm font-medium">{row.partner_name}</div>
+                              {row.partner_phone && <div className="text-xs text-muted-foreground">{row.partner_phone}</div>}
+                            </div>
+                          )}
                           
                           <div>
                             <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Product Context</div>
@@ -1207,23 +1255,78 @@ export default function AdminSubscriptionsPage() {
                         </div>
 
                         <div className="space-y-3">
-                          <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Financial Ledger</div>
+                          <div className="flex items-center gap-1">
+                            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Financial Ledger</div>
+                            {row.plan_type === "EMI" && (
+                              <HoverCard>
+                                <HoverCardTrigger asChild>
+                                  <button type="button" className="text-muted-foreground hover:text-foreground transition-colors ml-1">
+                                    <InfoIcon className="h-3 w-3" />
+                                    <span className="sr-only">View EMI Details</span>
+                                  </button>
+                                </HoverCardTrigger>
+                                <HoverCardContent side="top" align="start" className="w-64">
+                                  <div className="space-y-3">
+                                    <h4 className="text-sm font-semibold flex items-center gap-2">
+                                      <CalendarClock className="h-4 w-4 text-primary" />
+                                      Contract Terms
+                                    </h4>
+                                    <div className="text-xs text-muted-foreground">
+                                      Total Tenure: <span className="font-medium text-foreground">{row.tenure_months || 0} Months</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2 mt-2">
+                                      <div className="flex flex-col gap-1 rounded-md bg-muted/30 p-2">
+                                        <div className="flex items-center gap-1 text-[10px] uppercase font-semibold text-emerald-600">
+                                          <CheckCircle2 className="h-3 w-3" /> Given
+                                        </div>
+                                        <div className="text-sm font-bold">{row.paid_emi_count || 0} <span className="text-xs font-normal text-muted-foreground">mo</span></div>
+                                      </div>
+                                      <div className="flex flex-col gap-1 rounded-md bg-muted/30 p-2">
+                                        <div className="flex items-center gap-1 text-[10px] uppercase font-semibold text-destructive">
+                                          <AlertCircle className="h-3 w-3" /> Fault
+                                        </div>
+                                        <div className="text-sm font-bold">{row.overdue_emi_count || 0} <span className="text-xs font-normal text-muted-foreground">mo</span></div>
+                                      </div>
+                                    </div>
+                                    {Number(row.waived_emi_count) > 0 && (
+                                      <div className="text-xs text-emerald-600 font-medium">
+                                        Waived: {row.waived_emi_count} months
+                                      </div>
+                                    )}
+                                  </div>
+                                </HoverCardContent>
+                              </HoverCard>
+                            )}
+                          </div>
                           <div className="grid grid-cols-2 gap-2 text-sm">
-                            <div className="rounded-lg border border-border bg-muted/20 px-3 py-2">
+                            <div className="rounded-lg border border-border bg-muted/20 px-3 py-2 transition-colors hover:bg-muted/40 cursor-default">
                               <div className="text-xs text-muted-foreground">Paid</div>
                               <div className="font-semibold text-foreground">
-                                {formatRupee(row.financial_summary?.paid_amount || 0)}
+                                {formatRupee(row.total_paid_amount || row.financial_summary?.paid_amount || 0)}
                               </div>
                             </div>
-                            <div className="rounded-lg border border-border bg-muted/20 px-3 py-2">
+                            <div className="rounded-lg border border-border bg-muted/20 px-3 py-2 transition-colors hover:bg-muted/40 cursor-default">
                               <div className="text-xs text-muted-foreground">Outstanding</div>
                               <div className="font-semibold text-foreground">
-                                {formatRupee(row.financial_summary?.outstanding_amount || row.total_amount)}
+                                {formatRupee(row.outstanding_amount || row.financial_summary?.outstanding_amount || row.total_amount)}
                               </div>
                             </div>
                           </div>
+                          {row.plan_type === "EMI" && Number(row.emi_count) > 0 && (
+                            <div className="mt-1 space-y-1.5 px-1">
+                              <div className="flex w-full h-1.5 rounded-full overflow-hidden bg-muted/60">
+                                <div style={{ width: `${(Number(row.paid_emi_count || 0) / Number(row.emi_count)) * 100}%` }} className="bg-emerald-500 transition-all duration-500" />
+                                <div style={{ width: `${(Number(row.overdue_emi_count || 0) / Number(row.emi_count)) * 100}%` }} className="bg-destructive transition-all duration-500" />
+                              </div>
+                              <div className="flex justify-between text-[10px] font-medium text-muted-foreground">
+                                <span className="text-emerald-600">{row.paid_emi_count || 0} Paid</span>
+                                {Number(row.overdue_emi_count) > 0 && <span className="text-destructive font-bold">{row.overdue_emi_count} Overdue</span>}
+                                <span>{row.emi_count} Total</span>
+                              </div>
+                            </div>
+                          )}
                           {Number(row.financial_summary?.waived_amount || 0) > 0 && (
-                            <div className="text-xs font-medium text-emerald-600">
+                            <div className="text-xs font-medium text-emerald-600 px-1">
                               Waived: {formatRupee(row.financial_summary?.waived_amount || 0)}
                             </div>
                           )}

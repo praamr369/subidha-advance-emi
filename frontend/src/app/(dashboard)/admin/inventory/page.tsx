@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   AlertTriangle,
   ArrowRight,
@@ -16,6 +16,8 @@ import {
   Truck,
   Warehouse,
   Wrench,
+  Zap,
+  ArchiveX,
 } from "lucide-react";
 
 import Phase7Guidance from "@/components/admin/workflow/Phase7Guidance";
@@ -27,28 +29,19 @@ import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { ROUTES } from "@/lib/routes";
 import { accountingDate, accountingErrorMessage } from "@/components/accounting/shared";
 import {
-  getStockSummary,
-  listInventoryItems,
+  getInventoryDashboard,
   listInventoryMovements,
   listStockAdjustments,
   listStockLocations,
   type StockAdjustment,
   type StockLedgerRow,
   type StockLocation,
-  type StockSummaryRow,
-  type StockSummaryMetrics,
+  type InventoryDashboardResponse,
+  type InventoryDashboardShortage,
+  type InventoryDashboardMovement,
 } from "@/services/inventory";
 import { formatRupee } from "@/lib/utils/currency";
 
-function getStockStatus(row: StockSummaryRow) {
-  const onHand = parseFloat(row.on_hand_qty || "0");
-  const available = parseFloat(row.available_qty || row.on_hand_qty || "0");
-  const reorder = parseFloat(row.reorder_level_qty || "0");
-  if (onHand <= 0) return "out";
-  if (reorder > 0 && onHand <= reorder) return "low";
-  if (available <= 0 && onHand > 0) return "reserved";
-  return "ok";
-}
 
 function KPIBlock({ label, value, sub, tone, icon, href }: {
   label: string;
@@ -137,35 +130,32 @@ function CategoryRow({ label, count, inStock, low, out, value, icon, color }: {
 export default function AdminInventoryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [itemsCount, setItemsCount] = useState(0);
-  const [stockSummary, setStockSummary] = useState<StockSummaryRow[]>([]);
-  const [stockMetrics, setStockMetrics] = useState<StockSummaryMetrics | null>(null);
+  const [dashboard, setDashboard] = useState<InventoryDashboardResponse | null>(null);
   const [adjustments, setAdjustments] = useState<StockAdjustment[]>([]);
   const [locations, setLocations] = useState<StockLocation[]>([]);
   const [bridgeRows, setBridgeRows] = useState<StockLedgerRow[]>([]);
+  const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     async function loadPage() {
       setLoading(true);
       try {
-        const [itemsPayload, summaryPayload, adjPayload, locPayload, bridgePayload] = await Promise.all([
-          listInventoryItems(),
-          getStockSummary(),
+        const [dashboardPayload, adjPayload, locPayload, bridgePayload] = await Promise.all([
+          getInventoryDashboard({ location_id: selectedLocationId || undefined }),
           listStockAdjustments(),
           listStockLocations(),
           listInventoryMovements({ movement_type: "EMI_DELIVERY_OUT,EMI_RETURN_IN" }),
         ]);
         if (cancelled) return;
-        setItemsCount(itemsPayload.count);
-        setStockSummary(summaryPayload.results);
-        setStockMetrics(summaryPayload.summary ?? null);
+        setDashboard(dashboardPayload);
         setAdjustments(adjPayload.results);
         setLocations(locPayload.results);
         setBridgeRows(bridgePayload.results.slice(0, 10));
         setError(null);
       } catch (err) {
         if (cancelled) return;
+        setDashboard(null);
         setError(accountingErrorMessage(err, "Failed to load inventory operations."));
       } finally {
         if (!cancelled) setLoading(false);
@@ -173,36 +163,15 @@ export default function AdminInventoryPage() {
     }
     void loadPage();
     return () => { cancelled = true; };
-  }, []);
+  }, [selectedLocationId]);
 
-  const kpis = useMemo(() => {
-    const finished = stockSummary.filter(r => r.stock_item_type === "FINISHED_GOOD");
-    const raw = stockSummary.filter(r => r.stock_item_type === "RAW_MATERIAL");
-    const acc = stockSummary.filter(r => r.stock_item_type === "ACCESSORY");
-    const sumValue = (rows: StockSummaryRow[]) =>
-      rows.reduce((total, r) => total + parseFloat(r.valuation_amount || "0"), 0);
-    const byStatus = (rows: StockSummaryRow[]) => ({
-      ok: rows.filter(r => getStockStatus(r) === "ok").length,
-      low: rows.filter(r => getStockStatus(r) === "low").length,
-      out: rows.filter(r => getStockStatus(r) === "out").length,
-      value: sumValue(rows),
-    });
-    return {
-      total: stockSummary.length,
-      finished: { count: finished.length, ...byStatus(finished) },
-      raw: { count: raw.length, ...byStatus(raw) },
-      acc: { count: acc.length, ...byStatus(acc) },
-      outOfStock: stockSummary.filter(r => getStockStatus(r) === "out").length,
-      lowStock: stockSummary.filter(r => getStockStatus(r) === "low").length,
-      inStock: stockSummary.filter(r => getStockStatus(r) === "ok").length,
-      belowReorder: stockSummary.filter(r => r.is_below_reorder).length,
-    };
-  }, [stockSummary]);
-
-  const activeLocations = useMemo(() => locations.filter(l => l.is_active).length, [locations]);
-  const draftAdjustments = useMemo(() => adjustments.filter(a => a.status === "DRAFT").length, [adjustments]);
+  const activeLocations = locations.filter(l => l.is_active).length;
+  const draftAdjustments = adjustments.filter(a => a.status === "DRAFT").length;
   const latestAdjustment = adjustments[0];
   const latestBridge = bridgeRows[0];
+  const selectedLocationName = selectedLocationId
+    ? locations.find(l => l.id === selectedLocationId)?.name
+    : "All Locations";
 
   return (
     <ERPPageShell
@@ -225,10 +194,10 @@ export default function AdminInventoryPage() {
         { href: ROUTES.admin.purchases, label: "Purchases", variant: "secondary" },
       ]}
       stats={[
-        { label: "Tracked Items", value: loading ? "—" : itemsCount, tone: "info" },
-        { label: "Stock Value", value: loading ? "—" : formatRupee(stockMetrics?.total_valuation_amount ?? 0), tone: "info" },
-        { label: "Below Reorder", value: loading ? "—" : kpis.belowReorder, tone: (!loading && kpis.belowReorder > 0 ? "warning" : "success") as "warning" | "success" },
-        { label: "Out of Stock", value: loading ? "—" : (stockMetrics?.out_of_stock_count ?? kpis.outOfStock), tone: (!loading && (stockMetrics?.out_of_stock_count ?? kpis.outOfStock) > 0 ? "danger" : "success") as "danger" | "success" },
+        { label: "Tracked Items", value: loading ? "—" : (dashboard?.kpis.status_summary.total_skus ?? 0), tone: "info" },
+        { label: "Stock Value", value: loading ? "—" : formatRupee(dashboard?.kpis.total_value ?? 0), tone: "info" },
+        { label: "Below Reorder", value: loading ? "—" : (dashboard?.kpis.status_summary.low_stock ?? 0), tone: (!loading && (dashboard?.kpis.status_summary.low_stock ?? 0) > 0 ? "warning" : "success") as "warning" | "success" },
+        { label: "Out of Stock", value: loading ? "—" : (dashboard?.kpis.status_summary.out_of_stock ?? 0), tone: (!loading && (dashboard?.kpis.status_summary.out_of_stock ?? 0) > 0 ? "danger" : "success") as "danger" | "success" },
       ]}
     >
       {loading ? <ERPLoadingState label="Loading inventory operations..." /> : null}
@@ -236,12 +205,32 @@ export default function AdminInventoryPage() {
 
       {!loading && !error ? (
         <>
+          {/* Location selector */}
+          <div className="flex items-center justify-between gap-4 p-4 border rounded-lg bg-muted/30">
+            <div>
+              <div className="text-sm font-medium text-foreground">Stock Location Filter</div>
+              <div className="text-xs text-muted-foreground">View KPIs for a specific location</div>
+            </div>
+            <select
+              value={selectedLocationId || ""}
+              onChange={(e) => setSelectedLocationId(e.target.value ? parseInt(e.target.value) : null)}
+              className="flex h-10 w-48 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <option value="">All Locations</option>
+              {locations.map((loc) => (
+                <option key={loc.id} value={loc.id}>
+                  {loc.name} ({loc.code})
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Primary KPI band */}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <KPIBlock
               label="Total SKUs"
-              value={kpis.total}
-              sub="Inventory profiles with active stock tracking."
+              value={dashboard?.kpis.status_summary.total_skus ?? 0}
+              sub={`Tracked across ${selectedLocationName}.`}
               icon={<Boxes className="h-5 w-5" />}
               tone="info"
               href={ROUTES.admin.inventoryStockOnHand}
@@ -255,56 +244,56 @@ export default function AdminInventoryPage() {
               href={ROUTES.admin.inventoryLocations}
             />
             <KPIBlock
-              label="Reorder Alerts"
-              value={kpis.belowReorder}
+              label="Low Stock Alerts"
+              value={dashboard?.kpis.status_summary.low_stock ?? 0}
               sub="Items at or below configured reorder level."
               icon={<TrendingDown className="h-5 w-5" />}
-              tone={kpis.belowReorder > 0 ? "warning" : "success"}
+              tone={(dashboard?.kpis.status_summary.low_stock ?? 0) > 0 ? "warning" : "success"}
               href={ROUTES.admin.inventoryStockOnHand}
             />
             <KPIBlock
               label="Out of Stock"
-              value={kpis.outOfStock}
+              value={dashboard?.kpis.status_summary.out_of_stock ?? 0}
               sub="Zero on-hand — cannot fulfil new commitments."
               icon={<PackageX className="h-5 w-5" />}
-              tone={kpis.outOfStock > 0 ? "danger" : "success"}
+              tone={(dashboard?.kpis.status_summary.out_of_stock ?? 0) > 0 ? "danger" : "success"}
               href={ROUTES.admin.inventoryStockOnHand}
             />
           </div>
 
-          {/* Stock value & flow — authoritative totals from the stock ledger */}
+          {/* Stock value — authoritative totals from the stock ledger */}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <KPIBlock
               label="Total Stock Value"
-              value={formatRupee(stockMetrics?.total_valuation_amount ?? 0)}
-              sub="On-hand quantity × standard unit cost, valued across all tracked items."
+              value={formatRupee(dashboard?.kpis.total_value ?? 0)}
+              sub="On-hand quantity × unit cost across all items."
               icon={<Boxes className="h-5 w-5" />}
               tone="info"
               href={ROUTES.admin.inventoryValuation}
             />
             <KPIBlock
-              label="On Hand"
-              value={Number(stockMetrics?.total_on_hand_qty ?? 0).toLocaleString("en-IN")}
-              sub="Physical units present across all locations."
-              icon={<Layers className="h-5 w-5" />}
-              tone="default"
-              href={ROUTES.admin.inventoryStockOnHand}
-            />
-            <KPIBlock
-              label="Available"
-              value={Number(stockMetrics?.total_available_qty ?? 0).toLocaleString("en-IN")}
-              sub="Available-to-promise: on hand minus reservations."
+              label="Finished Goods"
+              value={dashboard?.kpis.by_category.finished_goods.count ?? 0}
+              sub={`${dashboard?.kpis.by_category.finished_goods.in_stock ?? 0} in stock · ${formatRupee(dashboard?.kpis.by_category.finished_goods.value ?? 0)}`}
               icon={<Package className="h-5 w-5" />}
-              tone="success"
+              tone="info"
               href={ROUTES.admin.inventoryStockOnHand}
             />
             <KPIBlock
-              label="Reserved"
-              value={Number(stockMetrics?.total_reserved_qty ?? 0).toLocaleString("en-IN")}
-              sub="Committed to winners and confirmed orders pending handover."
-              icon={<ClipboardCheck className="h-5 w-5" />}
-              tone={Number(stockMetrics?.total_reserved_qty ?? 0) > 0 ? "warning" : "default"}
-              href={ROUTES.admin.inventoryReservations}
+              label="Raw Materials"
+              value={dashboard?.kpis.by_category.raw_materials.count ?? 0}
+              sub={`${dashboard?.kpis.by_category.raw_materials.in_stock ?? 0} in stock · ${formatRupee(dashboard?.kpis.by_category.raw_materials.value ?? 0)}`}
+              icon={<Factory className="h-5 w-5" />}
+              tone="info"
+              href={ROUTES.admin.inventoryStockOnHand}
+            />
+            <KPIBlock
+              label="Accessories"
+              value={dashboard?.kpis.by_category.accessories.count ?? 0}
+              sub={`${dashboard?.kpis.by_category.accessories.in_stock ?? 0} in stock · ${formatRupee(dashboard?.kpis.by_category.accessories.value ?? 0)}`}
+              icon={<Wrench className="h-5 w-5" />}
+              tone="info"
+              href={ROUTES.admin.inventoryStockOnHand}
             />
           </div>
 
@@ -314,45 +303,49 @@ export default function AdminInventoryPage() {
             description="Stock posture broken down by product type — Finished Goods (for sale/delivery), Raw Materials (manufacturing input), Accessories (components and add-ons)."
           >
             <div className="space-y-2">
-              <CategoryRow
-                label="Finished Goods"
-                count={kpis.finished.count}
-                inStock={kpis.finished.ok}
-                low={kpis.finished.low}
-                out={kpis.finished.out}
-                value={kpis.finished.value}
-                icon={<Package className="h-4 w-4 text-sky-700" />}
-                color="bg-sky-100"
-              />
-              <CategoryRow
-                label="Raw Materials"
-                count={kpis.raw.count}
-                inStock={kpis.raw.ok}
-                low={kpis.raw.low}
-                out={kpis.raw.out}
-                value={kpis.raw.value}
-                icon={<Factory className="h-4 w-4 text-violet-700" />}
-                color="bg-violet-100"
-              />
-              <CategoryRow
-                label="Accessories"
-                count={kpis.acc.count}
-                inStock={kpis.acc.ok}
-                low={kpis.acc.low}
-                out={kpis.acc.out}
-                value={kpis.acc.value}
-                icon={<Wrench className="h-4 w-4 text-amber-700" />}
-                color="bg-amber-100"
-              />
+              {dashboard && (
+                <>
+                  <CategoryRow
+                    label="Finished Goods"
+                    count={dashboard.kpis.by_category.finished_goods?.count ?? 0}
+                    inStock={dashboard.kpis.by_category.finished_goods?.in_stock ?? 0}
+                    low={dashboard.kpis.by_category.finished_goods?.low_stock ?? 0}
+                    out={dashboard.kpis.by_category.finished_goods?.out_of_stock ?? 0}
+                    value={parseFloat(dashboard.kpis.by_category.finished_goods?.value ?? "0")}
+                    icon={<Package className="h-4 w-4 text-sky-700" />}
+                    color="bg-sky-100"
+                  />
+                  <CategoryRow
+                    label="Raw Materials"
+                    count={dashboard.kpis.by_category.raw_materials?.count ?? 0}
+                    inStock={dashboard.kpis.by_category.raw_materials?.in_stock ?? 0}
+                    low={dashboard.kpis.by_category.raw_materials?.low_stock ?? 0}
+                    out={dashboard.kpis.by_category.raw_materials?.out_of_stock ?? 0}
+                    value={parseFloat(dashboard.kpis.by_category.raw_materials?.value ?? "0")}
+                    icon={<Factory className="h-4 w-4 text-violet-700" />}
+                    color="bg-violet-100"
+                  />
+                  <CategoryRow
+                    label="Accessories"
+                    count={dashboard.kpis.by_category.accessories?.count ?? 0}
+                    inStock={dashboard.kpis.by_category.accessories?.in_stock ?? 0}
+                    low={dashboard.kpis.by_category.accessories?.low_stock ?? 0}
+                    out={dashboard.kpis.by_category.accessories?.out_of_stock ?? 0}
+                    value={parseFloat(dashboard.kpis.by_category.accessories?.value ?? "0")}
+                    icon={<Wrench className="h-4 w-4 text-amber-700" />}
+                    color="bg-amber-100"
+                  />
+                </>
+              )}
             </div>
 
             {/* Alert strip */}
-            {kpis.outOfStock > 0 || kpis.lowStock > 0 ? (
-              <div className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-sm ${kpis.outOfStock > 0 ? "border-red-200 bg-red-50 text-red-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
+            {dashboard && (dashboard.kpis.status_summary.out_of_stock > 0 || dashboard.kpis.status_summary.low_stock > 0) ? (
+              <div className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-sm ${dashboard.kpis.status_summary.out_of_stock > 0 ? "border-red-200 bg-red-50 text-red-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
                 <AlertTriangle className="h-4 w-4 shrink-0" />
                 <span>
-                  {kpis.outOfStock > 0 ? <><strong>{kpis.outOfStock}</strong> items out of stock — </> : null}
-                  {kpis.lowStock > 0 ? <><strong>{kpis.lowStock}</strong> items below reorder level — </> : null}
+                  {dashboard.kpis.status_summary.out_of_stock > 0 ? <><strong>{dashboard.kpis.status_summary.out_of_stock}</strong> items out of stock — </> : null}
+                  {dashboard.kpis.status_summary.low_stock > 0 ? <><strong>{dashboard.kpis.status_summary.low_stock}</strong> items below reorder level — </> : null}
                   review before creating new delivery or sale commitments.
                 </span>
                 <Link href={ROUTES.admin.inventoryStockOnHand} className="ml-auto shrink-0 rounded-lg border border-current/30 px-3 py-1 text-xs font-semibold hover:opacity-80">
@@ -367,8 +360,86 @@ export default function AdminInventoryPage() {
             )}
           </ERPSectionShell>
 
+          {/* Critical Shortages & Movement Velocity */}
+          <div className="grid gap-5 lg:grid-cols-2">
+            {/* Critical Shortages Widget */}
+            <ERPSectionShell
+              title="Critical Shortages"
+              description="Top 5 out-of-stock items with pending customer orders. Order these immediately."
+            >
+              {dashboard && dashboard.critical_shortages.length > 0 ? (
+                <div className="space-y-2">
+                  {dashboard.critical_shortages.map((item, idx) => (
+                    <div key={idx} className="flex items-start justify-between gap-3 rounded-lg border border-red-200 bg-red-50 p-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-semibold text-red-900">{item.product_code}</div>
+                        <div className="text-xs text-red-800">{item.product_name}</div>
+                        <div className="mt-1 text-xs text-red-700">Orders waiting: <strong>{item.required_for_orders}</strong> units</div>
+                      </div>
+                      <Link
+                        href={ROUTES.admin.inventoryStockOnHand}
+                        className="shrink-0 rounded px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-100"
+                      >
+                        Reorder
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-center text-sm text-emerald-800">
+                  <span className="text-lg">✓</span> No critical shortages — stock is healthy.
+                </div>
+              )}
+            </ERPSectionShell>
+
+            {/* Movement Velocity Widget */}
+            <ERPSectionShell
+              title="Capital Efficiency"
+              description="Fast movers (last 30 days) and dead stock (no movement in 90 days)."
+            >
+              {dashboard && (dashboard.movement_velocity.fast_movers.length > 0 || dashboard.movement_velocity.dead_stock.length > 0) ? (
+                <div className="space-y-4">
+                  {dashboard.movement_velocity.fast_movers.length > 0 && (
+                    <div>
+                      <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-emerald-700">
+                        <Zap className="h-4 w-4" /> Fast Movers (30-day volume)
+                      </div>
+                      <div className="space-y-1.5">
+                        {dashboard.movement_velocity.fast_movers.slice(0, 5).map((item, idx) => (
+                          <div key={idx} className="flex items-center justify-between gap-2 rounded bg-emerald-50 p-2 text-xs">
+                            <span className="font-medium text-emerald-900">{item.product_code}</span>
+                            <span className="text-emerald-700">{item.quantity_out_30d} units</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {dashboard.movement_velocity.dead_stock.length > 0 && (
+                    <div>
+                      <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-amber-700">
+                        <ArchiveX className="h-4 w-4" /> Dead Stock (90+ days no movement)
+                      </div>
+                      <div className="space-y-1.5">
+                        {dashboard.movement_velocity.dead_stock.slice(0, 5).map((item, idx) => (
+                          <div key={idx} className="flex items-center justify-between gap-2 rounded bg-amber-50 p-2 text-xs">
+                            <span className="font-medium text-amber-900">{item.product_code}</span>
+                            <span className="text-amber-700">{item.on_hand_qty} units on hand</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-muted bg-muted/20 p-4 text-center text-sm text-muted-foreground">
+                  Movement data loading...
+                </div>
+              )}
+            </ERPSectionShell>
+          </div>
+
           {/* Stock concept definitions + workflow guidance */}
-          <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="grid gap-5 lg:grid-cols-[1fr_1fr]">
             <ERPSectionShell
               title="Stock movement concepts"
               description="Each stock category has a distinct meaning. No stock count is fabricated — all values come from the live ledger."

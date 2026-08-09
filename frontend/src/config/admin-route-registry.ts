@@ -285,6 +285,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Delivery & Service", "Delivery Returns", ROUTES.admin.deliveryReturns, "Delivery return workflow."),
   item("Delivery & Service", "Possession / Handover", `${ROUTES.admin.deliveries}?plan_type=RENT_LEASE`, "Rent and lease possession and handover queue."),
   item("Delivery & Service", "Return Inspections", `${ROUTES.admin.serviceDeskReturns}?plan_type=RENT_LEASE`, "Rent and lease return inspection queue.", { badgeSource: "queue.return_inspections_pending" }),
+  item("Delivery & Service", "Service Control Center", ROUTES.admin.serviceDesk, "Unified control center — find any customer product issue (service, warranty, return, exchange, void, cancel) by customer name/phone, sales ID, service ID, return ID, or contract ID."),
   item("Delivery & Service", "Cases", ROUTES.admin.serviceDeskCases, "Service desk cases.", { badgeSource: "open_support_ticket_count" }),
   item("Delivery & Service", "Complaints", ROUTES.admin.serviceDeskComplaints, "Complaint register."),
   item("Delivery & Service", "Returns", ROUTES.admin.serviceDeskReturns, "Return queue."),

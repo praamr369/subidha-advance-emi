@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import csv
+import io
 from datetime import date
 from decimal import Decimal
 
 from django.db import transaction
+from django.db.models import Q, Sum, DecimalField, F, Case, When, Value
+from django.db.models.functions import Coalesce
 
-from inventory.models import InventoryItem, InventoryValuation, InventoryValuationMethod
+from inventory.models import InventoryItem, InventoryValuation, InventoryValuationMethod, StockLedger
 
 
 def _decimal(value) -> Decimal:
@@ -35,44 +39,171 @@ def _latest_weighted_cost(item: InventoryItem) -> Decimal:
     return weighted_average_unit_cost(item)
 
 
-def build_inventory_valuation(*, as_of_date: date | None = None):
+def _calculate_on_hand_qty_bulk(inventory_item_id: int, stock_location_id: int | None = None) -> Decimal:
+    """Calculate on-hand quantity using bulk aggregation for a single item."""
+    from django.db.models import Q as DjangoQ
+
+    ledger_filter = DjangoQ(inventory_item_id=inventory_item_id)
+    if stock_location_id:
+        ledger_filter &= DjangoQ(stock_location_id=stock_location_id)
+
+    result = StockLedger.objects.filter(ledger_filter).aggregate(
+        total_in=Sum('quantity_in', output_field=DecimalField()),
+        total_out=Sum('quantity_out', output_field=DecimalField())
+    )
+
+    total_in = result['total_in'] or Decimal("0.000")
+    total_out = result['total_out'] or Decimal("0.000")
+    return total_in - total_out
+
+
+def build_inventory_valuation(
+    *,
+    as_of_date: date | None = None,
+    search: str | None = None,
+    category: str | None = None,
+    exclude_zero: bool = False,
+    stock_location_id: int | None = None,
+    page: int = 1,
+    page_size: int = 25,
+):
     if isinstance(as_of_date, str):
         effective_date = date.fromisoformat(as_of_date)
     else:
         effective_date = as_of_date or date.today()
+
     rows = []
     total_value = Decimal("0.00")
+    total_count = 0
+
     queryset = (
         InventoryItem.objects.select_related("product")
-        .prefetch_related("purchase_bill_lines")
-        .all()
-        .order_by("product__name", "id")
+        .filter(is_active=True)
     )
-    for item in queryset:
-        on_hand = item.current_stock_quantity()
+
+    if search:
+        queryset = queryset.filter(
+            Q(product__name__icontains=search) | Q(sku__icontains=search) | Q(product__product_code__icontains=search)
+        )
+    if category:
+        queryset = queryset.filter(product__category__iexact=category)
+
+    queryset = queryset.order_by("product__name", "id")
+
+    # First pass: calculate totals across all filtered items
+    all_items = list(queryset)
+    temp_rows = []
+
+    for item in all_items:
+        on_hand = _calculate_on_hand_qty_bulk(item.id, stock_location_id)
+        if exclude_zero and on_hand <= Decimal("0.000"):
+            continue
         unit_cost = _latest_weighted_cost(item)
         stock_value = (Decimal(str(on_hand)) * unit_cost).quantize(Decimal("0.01"))
         total_value += stock_value
-        rows.append(
-            {
-                "inventory_item_id": item.id,
-                "product_code": item.product.product_code,
-                "product_name": item.product.name,
-                "sku": item.sku,
-                "valuation_method": item.valuation_method,
-                "as_of_date": effective_date.isoformat(),
-                "on_hand_qty": f"{on_hand:.3f}",
-                "unit_cost": f"{unit_cost:.2f}",
-                "stock_value": f"{stock_value:.2f}",
-            }
-        )
+
+        temp_rows.append({
+            "inventory_item_id": item.id,
+            "product_code": item.product.product_code,
+            "product_name": item.product.name,
+            "sku": item.sku,
+            "valuation_method": item.valuation_method,
+            "as_of_date": effective_date.isoformat(),
+            "on_hand_qty": f"{on_hand:.3f}",
+            "unit_cost": f"{unit_cost:.2f}",
+            "stock_value": f"{stock_value:.2f}",
+        })
+
+    total_count = len(temp_rows)
+
+    # Apply pagination to temp_rows
+    start_idx = (page - 1) * page_size
+    end_idx = start_idx + page_size
+    rows = temp_rows[start_idx:end_idx]
+
+    num_pages = (total_count + page_size - 1) // page_size
 
     return {
         "as_of_date": effective_date.isoformat(),
-        "count": len(rows),
+        "count": total_count,
+        "page": page,
+        "page_size": page_size,
+        "num_pages": num_pages,
         "total_value": f"{total_value:.2f}",
         "rows": rows,
     }
+
+
+def build_inventory_valuation_csv(
+    *,
+    as_of_date: date | None = None,
+    search: str | None = None,
+    category: str | None = None,
+    exclude_zero: bool = False,
+    stock_location_id: int | None = None,
+) -> str:
+    """Generate CSV export of the complete filtered inventory valuation."""
+    if isinstance(as_of_date, str):
+        effective_date = date.fromisoformat(as_of_date)
+    else:
+        effective_date = as_of_date or date.today()
+
+    rows = []
+    total_value = Decimal("0.00")
+
+    queryset = (
+        InventoryItem.objects.select_related("product")
+        .filter(is_active=True)
+    )
+
+    if search:
+        queryset = queryset.filter(
+            Q(product__name__icontains=search) | Q(sku__icontains=search) | Q(product__product_code__icontains=search)
+        )
+    if category:
+        queryset = queryset.filter(product__category__iexact=category)
+
+    queryset = queryset.order_by("product__name", "id")
+
+    csv_buffer = io.StringIO()
+    writer = csv.writer(csv_buffer)
+
+    # Write header
+    writer.writerow([
+        "Product Code",
+        "Product Name",
+        "SKU",
+        "Valuation Method",
+        "On Hand Qty",
+        "Unit Cost",
+        "Stock Value",
+    ])
+
+    # Write data rows
+    for item in queryset:
+        on_hand = _calculate_on_hand_qty_bulk(item.id, stock_location_id)
+        if exclude_zero and on_hand <= Decimal("0.000"):
+            continue
+        unit_cost = _latest_weighted_cost(item)
+        stock_value = (Decimal(str(on_hand)) * unit_cost).quantize(Decimal("0.01"))
+        total_value += stock_value
+
+        writer.writerow([
+            item.product.product_code,
+            item.product.name,
+            item.sku or "",
+            item.valuation_method,
+            f"{on_hand:.3f}",
+            f"{unit_cost:.2f}",
+            f"{stock_value:.2f}",
+        ])
+
+    # Write summary row
+    writer.writerow([])
+    writer.writerow(["Total Stock Value", f"{total_value:.2f}"])
+    writer.writerow(["As Of Date", effective_date.isoformat()])
+
+    return csv_buffer.getvalue()
 
 
 @transaction.atomic

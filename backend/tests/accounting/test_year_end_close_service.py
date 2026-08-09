@@ -61,7 +61,11 @@ class BridgeReconciliationRemediationTests(TestCase):
         payload = build_accounting_bridge_reconciliation(BridgeReconciliationFilters(financial_year=str(financial_year.id)))
         self.assertEqual(payload["summary"]["ready_unposted_count"], 1)
         self.assertEqual(payload["summary"]["blocked_by_mapping_count"], 2)
-        self.assertEqual(payload["summary"]["unsupported_source_count"], 1)
+        # staff_advance is a synthetic boundary row (not a real transaction): it is
+        # surfaced as staff_advance_boundary and deliberately excluded from the
+        # real-unsupported count consumed by year-end close.
+        self.assertEqual(payload["summary"]["unsupported_source_count"], 0)
+        self.assertEqual(payload["summary"]["staff_advance_boundary"], 1)
         self.assertIn("emi_payment", payload["summary"]["ready_unposted_by_event"])
         self.assertIn("inventory_delivery_out", payload["summary"]["blocked_by_mapping_by_event"])
         blocked = {row["event_key"]: row for row in payload["results"] if row["status"] == "BLOCKED_BY_MAPPING"}

@@ -50,6 +50,13 @@ from api.v1.views.admin_inventory_catalog import (
     AdminServiceCatalogListCreateView,
     AdminServiceTypeChoicesView,
 )
+from api.v1.views.inventory import (
+    AdminStockReservationListView,
+    AdminPurchaseNeedsListView,
+    AdminLotTrackingListView,
+    AdminStockOnHandView,
+    AdminStockLedgerListView,
+)
 from api.v1.views.admin_inventory_quick_create import (
     AdminAccessoryVariantGroupDetailView,
     AdminAccessoryVariantGroupListCreateView,
@@ -59,7 +66,7 @@ from api.v1.views.admin_inventory_quick_create import (
     AdminQuickCreateAccessoryView,
     AdminQuickCreateRawMaterialView,
 )
-from api.v1.views.admin_product_register import AdminProductRegisterView
+from api.v1.views.admin_product_register import AdminProductRegisterView, AdminProductCreateView
 from api.v1.views import (
     admin_solopreneur_today,
 )
@@ -78,6 +85,7 @@ urlpatterns = [
     path("auth/", include("api.v1.routes.auth")),
     path("admin/payments/collect/", IdempotentAdminPaymentCollectView.as_view()),
     path("admin/solopreneur/today/", admin_solopreneur_today.AdminSolopreneurTodayView.as_view()),
+    path("admin/products/", AdminProductCreateView.as_view()),
     path("admin/products/register/", AdminProductRegisterView.as_view()),
     path("admin/catalog/", include("api.v1.routes.catalog")),
     path("admin/smart/pincode/<str:pincode>/", SmartPincodeLookupView.as_view()),
@@ -86,6 +94,7 @@ urlpatterns = [
     path("admin/smart/confirm/", SmartConfirmView.as_view()),
     path("admin/products/<int:pk>/prepare-inventory-profile/", AdminProductInventoryProfilePrepareView.as_view()),
     # Inventory catalog: finished goods, raw materials, accessories, services
+    path("admin/inventory/lots/", AdminLotTrackingListView.as_view()),
     path("admin/inventory/overview/", AdminInventoryOverviewView.as_view()),
     path("admin/inventory/finished-goods/", AdminFinishedGoodsListView.as_view()),
     path("admin/inventory/finished-goods/<int:pk>/profile/", AdminFinishedGoodProfileView.as_view()),
@@ -98,6 +107,10 @@ urlpatterns = [
     path("admin/inventory/service-catalog/", AdminServiceCatalogListCreateView.as_view()),
     path("admin/inventory/service-catalog/<int:pk>/", AdminServiceCatalogDetailView.as_view()),
     path("admin/inventory/service-type-choices/", AdminServiceTypeChoicesView.as_view()),
+    path("admin/inventory/reservations/", AdminStockReservationListView.as_view()),
+    path("admin/inventory/requirements/", AdminPurchaseNeedsListView.as_view()),
+    path("admin/inventory/stock-on-hand/", AdminStockOnHandView.as_view()),
+    path("admin/inventory/ledger/", AdminStockLedgerListView.as_view()),
     # Accessory variant groups
     path("admin/inventory/accessory-variant-groups/", AdminAccessoryVariantGroupListCreateView.as_view()),
     path("admin/inventory/accessory-variant-groups/<int:pk>/", AdminAccessoryVariantGroupDetailView.as_view()),

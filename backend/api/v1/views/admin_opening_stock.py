@@ -23,6 +23,7 @@ from inventory.services.opening_stock_entry_service import (
     post_opening_stock_entry,
     update_opening_stock_entry_draft,
 )
+from inventory.services.opening_stock_service import build_opening_stock_entries
 from api.v1.permissions import IsAdmin
 from api.v1.serializers.inventory import (
     OpeningStockBulkApplySerializer,
@@ -55,6 +56,26 @@ class AdminOpeningStockEntryViewSet(CapabilityRequiredMixin, viewsets.ModelViewS
     )
 
     serializer_class = OpeningStockEntrySerializer
+
+    def list(self, request, *args, **kwargs):
+        # Parse pagination params
+        try:
+            page = int(request.query_params.get("page", 1))
+            page_size = int(request.query_params.get("page_size", 50))
+            page = max(1, page)
+            page_size = min(page_size, 500)  # Cap at 500
+        except (ValueError, TypeError):
+            page = 1
+            page_size = 50
+
+        payload = build_opening_stock_entries(
+            status=request.query_params.get("status"),
+            search=request.query_params.get("search") or request.query_params.get("q"),
+            stock_location_id=request.query_params.get("stock_location"),
+            page=page,
+            page_size=page_size,
+        )
+        return Response(payload)
 
     def get_queryset(self):
         qs = super().get_queryset()

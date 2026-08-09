@@ -260,3 +260,29 @@ export async function createPurchaseSuggestionForNeed(
     body: JSON.stringify(payload),
   });
 }
+
+/** Dismiss a non-blocking warning from inventory readiness diagnostic. */
+export async function dismissInventoryWarning(
+  warningKey: string,
+  category: string,
+  reason: string = ""
+) {
+  return request(`/admin/inventory/readiness/dismiss/`, {
+    method: "POST",
+    body: JSON.stringify({
+      warning_key: warningKey,
+      category,
+      reason,
+    }),
+  });
+}
+
+/** Restore a previously dismissed warning from inventory readiness diagnostic. */
+export async function restoreInventoryWarning(warningKey: string) {
+  return request(`/admin/inventory/readiness/restore/`, {
+    method: "POST",
+    body: JSON.stringify({
+      warning_key: warningKey,
+    }),
+  });
+}

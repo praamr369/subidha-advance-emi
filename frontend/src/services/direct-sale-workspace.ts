@@ -164,3 +164,64 @@ export async function listAdminInventoryRequirements(params: {
     `/admin/inventory/requirements/${qs.toString() ? `?${qs}` : ""}`
   );
 }
+
+// Enterprise Purchase Needs Workbench Types
+export type PurchaseNeedsRow = {
+  id: number;
+  need_no: string;
+  product_id: number;
+  product_name: string;
+  product_code: string;
+  source_module: string;
+  required_quantity: string;
+  available_quantity: string;
+  shortage_quantity: string;
+  customer_name?: string | null;
+  priority: string;
+  status: string;
+  created_at: string;
+};
+
+export type PurchaseNeedsPayload = {
+  count: number;
+  page: number;
+  page_size: number;
+  num_pages: number;
+  summary: {
+    total_open: number;
+    total_all: number;
+    by_source: Record<string, number>;
+  };
+  results: PurchaseNeedsRow[];
+};
+
+export async function getBulkPurchaseNeeds(params: {
+  page?: number;
+  page_size?: number;
+  status?: string;
+  source_module?: string;
+  search?: string;
+}): Promise<PurchaseNeedsPayload> {
+  const qs = new URLSearchParams();
+  if (params.page) qs.set("page", String(params.page));
+  if (params.page_size) qs.set("page_size", String(params.page_size));
+  if (params.status) qs.set("status", params.status);
+  if (params.source_module) qs.set("source_module", params.source_module);
+  if (params.search) qs.set("search", params.search);
+  return apiFetch<PurchaseNeedsPayload>(
+    `/admin/inventory/requirements/${qs.toString() ? `?${qs}` : ""}`
+  );
+}
+
+export async function updatePurchaseNeedStatus(
+  needId: number,
+  status: string
+): Promise<{ updated: boolean; purchase_need: Record<string, unknown> }> {
+  return apiFetch<{ updated: boolean; purchase_need: Record<string, unknown> }>(
+    `/admin/inventory/requirements/${needId}/status/`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    }
+  );
+}

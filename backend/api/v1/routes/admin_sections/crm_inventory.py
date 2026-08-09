@@ -32,11 +32,16 @@ from api.v1.views.admin_inventory_ops import AdminInventoryProfileDetailView
 from api.v1.views.admin_inventory_ops import AdminInventoryProfileListView
 from api.v1.views.admin_inventory_ops import AdminInventoryProfileManufacturingCostView
 from api.v1.views.admin_inventory_ops import AdminInventoryProfileStockByLocationView
+from api.v1.views.admin_inventory_ops import AdminInventoryProfileBulkPrepareView
 from api.v1.views.admin_inventory_ops import AdminInventoryReadinessView
 from api.v1.views.admin_inventory_ops import AdminInventoryStockNeedCancelView
 from api.v1.views.admin_inventory_ops import AdminInventoryStockNeedListCreateView
 from api.v1.views.admin_inventory_ops import AdminInventoryStockNeedPatchView
 from api.v1.views.admin_inventory_ops import AdminInventoryStockNeedRecheckView
+from api.v1.views.admin_inventory_ops import AdminPurchaseNeedsListView
+from api.v1.views.admin_inventory_ops import AdminPurchaseNeedsUpdateStatusView
+from api.v1.views.admin_inventory_ops import AdminInventoryReadinessDismissView
+from api.v1.views.admin_inventory_ops import AdminInventoryReadinessRestoreView
 from api.v1.views.admin_opening_stock import AdminOpeningStockBatchHistoryView
 from api.v1.views.admin_opening_stock import AdminOpeningStockBulkApplyView
 from api.v1.views.admin_opening_stock import AdminOpeningStockBulkPreviewView
@@ -75,7 +80,10 @@ urlpatterns = [
     path("product-operations/workspace/", AdminProductOperationsWorkspaceView.as_view()),
     path("inventory/workspace/", AdminInventoryWorkspaceView.as_view()),
     path("inventory/readiness/", AdminInventoryReadinessView.as_view()),
+    path("inventory/readiness/dismiss/", AdminInventoryReadinessDismissView.as_view()),
+    path("inventory/readiness/restore/", AdminInventoryReadinessRestoreView.as_view()),
     path("inventory/profiles/", AdminInventoryProfileListView.as_view()),
+    path("inventory/profiles/bulk-prepare/", AdminInventoryProfileBulkPrepareView.as_view()),
     path("inventory/profiles/<int:pk>/", AdminInventoryProfileDetailView.as_view()),
     path("inventory/profiles/<int:pk>/stock-by-location/", AdminInventoryProfileStockByLocationView.as_view()),
     path("inventory/profiles/<int:pk>/manufacturing-cost/", AdminInventoryProfileManufacturingCostView.as_view()),
@@ -86,6 +94,8 @@ urlpatterns = [
     path("inventory/stock-needs/<int:pk>/", AdminInventoryStockNeedPatchView.as_view()),
     path("inventory/stock-needs/<int:pk>/recheck/", AdminInventoryStockNeedRecheckView.as_view()),
     path("inventory/stock-needs/<int:pk>/cancel/", AdminInventoryStockNeedCancelView.as_view()),
+    path("inventory/requirements/", AdminPurchaseNeedsListView.as_view()),
+    path("inventory/requirements/<int:pk>/status/", AdminPurchaseNeedsUpdateStatusView.as_view()),
     path("sales/direct-sales/", AdminSalesDirectSaleListCreateView.as_view()),
     path("sales/direct-sales/<int:pk>/", AdminSalesDirectSaleDetailView.as_view()),
     path(

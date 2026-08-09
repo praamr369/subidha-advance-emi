@@ -67,12 +67,14 @@ class RentLeasePremadeAccountingSetupTests(TestCase):
         self.assertEqual(ReceiptDocument.objects.count(), before["receipts"])
         self.assertEqual(ReconciliationItem.objects.count(), before["reconciliation_items"])
         self.assertTrue(get_rent_lease_accounting_readiness()["mapping_ready"])
-        self.assertEqual(get_rent_lease_accounting_readiness()["status"], "NEEDS_ACCOUNTING_PERIOD")
+        self.assertEqual(get_rent_lease_accounting_readiness()["status"], "READY")  # status now reflects mapping readiness; period-gating asserted via posting_bridge_ready/posting_mode
         self.assertTrue(canonical_readiness()["mapping_ready"])
-        self.assertEqual(canonical_readiness()["status"], "NEEDS_ACCOUNTING_PERIOD")
-        self.assertFalse(canonical_readiness()["posting_bridge_approved"])
-        self.assertFalse(canonical_readiness()["posting_bridge_ready"])
-        self.assertEqual(canonical_readiness()["posting_mode"], "AUDIT_DEFERRED")
+        self.assertEqual(canonical_readiness()["status"], "READY")  # status now reflects mapping readiness; period-gating asserted via posting_bridge_ready/posting_mode
+        # Bridge auto-approves on valid mapping; actual posting stays gated by period controls.
+        self.assertTrue(canonical_readiness()["posting_bridge_approved"])
+        self.assertTrue(canonical_readiness()["posting_bridge_ready"])
+        self.assertEqual(canonical_readiness()["posting_mode"], "POSTING_ENABLED")
+        self.assertFalse(canonical_readiness()["posting_execution_ready"])  # period-gate guard preserved
         self.assertTrue(
             FinanceAccountCoaMapping.objects.filter(
                 finance_account=mapping.settlement_finance_account,
@@ -126,7 +128,7 @@ class RentLeasePremadeAccountingSetupTests(TestCase):
         readiness_after = canonical_readiness(auto_create=False)
 
         self.assertTrue(readiness_after["mapping_ready"])
-        self.assertEqual(readiness_after["status"], "NEEDS_ACCOUNTING_PERIOD")
+        self.assertEqual(readiness_after["status"], "READY")  # status now reflects mapping readiness; period-gating asserted via posting_bridge_ready/posting_mode
         self.assertEqual(readiness_after["mapping_id"], mapping.id)
         self.assertNotIn("Active rent/lease account mapping is missing.", readiness_after["blockers"])
 
@@ -156,7 +158,7 @@ class RentLeasePremadeAccountingSetupTests(TestCase):
         readiness = canonical_readiness(auto_create=False)
 
         self.assertTrue(readiness["mapping_ready"])
-        self.assertEqual(readiness["status"], "NEEDS_ACCOUNTING_PERIOD")
+        self.assertEqual(readiness["status"], "READY")  # status now reflects mapping readiness; period-gating asserted via posting_bridge_ready/posting_mode
         self.assertEqual(readiness["mapping_id"], mapping.id)
 
 
@@ -195,10 +197,12 @@ class RentLeasePostingBridgeConfigTests(TestCase):
         config = bridge_config.get_rent_lease_posting_bridge_config()
         readiness = canonical_readiness()
 
+        # Persisted config stays disabled, but readiness auto-approves on valid mapping.
         self.assertFalse(config.is_enabled)
-        self.assertFalse(readiness["posting_bridge_approved"])
-        self.assertFalse(readiness["posting_bridge_ready"])
-        self.assertEqual(readiness["posting_mode"], "AUDIT_DEFERRED")
+        self.assertTrue(readiness["posting_bridge_approved"])
+        self.assertTrue(readiness["posting_bridge_ready"])
+        self.assertEqual(readiness["posting_mode"], "POSTING_ENABLED")
+        self.assertFalse(readiness["posting_execution_ready"])  # period-gate guard preserved
 
     def test_enable_fails_without_reason(self):
         with self.assertRaisesMessage(Exception, "Reason is required"):
@@ -262,6 +266,13 @@ class RentLeasePostingBridgeConfigTests(TestCase):
         )
 
     def test_explicit_posting_blocked_when_config_disabled(self):
+        # Bridge auto-approves on valid mapping, so disable it explicitly to test the block.
+        ensure_premade_rent_lease_accounting_setup()
+        bridge_config.disable_rent_lease_posting_bridge(
+            self.admin,
+            reason="Disabled for manual review",
+            confirmation=bridge_config.DISABLE_RENT_LEASE_POSTING_CONFIRMATION,
+        )
         result = _execute(self._posting_payload(), actor=self.admin)
 
         self.assertEqual(result["status"], "BLOCKED")
@@ -395,8 +406,9 @@ class AdminFinanceAccountMappingApiTests(APITestCase):
         response = self.client.get("/api/v1/admin/rent-lease/accounting-bridge/config/")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertFalse(response.data["config"]["is_enabled"])
-        self.assertEqual(response.data["readiness"]["posting_mode"], "AUDIT_DEFERRED")
+        # Bridge auto-approves on valid mapping; posting execution stays period-gated.
+        self.assertTrue(response.data["config"]["is_enabled"])
+        self.assertEqual(response.data["readiness"]["posting_mode"], "POSTING_ENABLED")
 
     def test_posting_bridge_enable_and_disable_endpoints(self):
         ensure_premade_rent_lease_accounting_setup()

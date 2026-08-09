@@ -5,6 +5,7 @@ from typing import Any
 
 from django.db.models import Count, Q, Sum
 from rest_framework import permissions, status
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -13,6 +14,8 @@ from api.v1.serializers.admin_resources import ProductAdminSerializer
 from api.v1.pagination import get_page_params
 from subscriptions.enums import ProductItemType
 from subscriptions.models import Product
+from products_core.models import ProductVariant
+import json
 
 PAGE_SIZE_OPTIONS = {20, 50, 100}
 
@@ -211,3 +214,108 @@ class AdminProductRegisterView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+class AdminProductCreateView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+    parser_classes = (MultiPartParser, FormParser)
+
+    def post(self, request):
+        """Create a new product with optional variants"""
+        try:
+            # Extract form data
+            product_code = _normalize(request.data.get("product_code"))
+            name = _normalize(request.data.get("name"))
+            base_price = request.data.get("base_price", "")
+            sku = _normalize(request.data.get("sku"))
+            unit_of_measure = _normalize(request.data.get("unit_of_measure")) or "PCS"
+            category = _normalize(request.data.get("category"))
+            subcategory = _normalize(request.data.get("subcategory"))
+            catalog_category = request.data.get("catalog_category")
+            base_specs = request.data.get("base_specs", "{}")
+            description = _normalize(request.data.get("description"))
+            hsn_sac_code = _normalize(request.data.get("hsn_sac_code"))
+            gst_rate = request.data.get("gst_rate")
+            item_type = _normalize(request.data.get("item_type")) or "FINISHED_GOOD"
+            stock_type = _normalize(request.data.get("stock_type")) or "STOCK_ITEM"
+            is_active = request.data.get("is_active", "true").lower() in {"true", "1", "yes"}
+            is_emi_enabled = request.data.get("is_emi_enabled", "false").lower() in {"true", "1", "yes"}
+            is_rent_enabled = request.data.get("is_rent_enabled", "false").lower() in {"true", "1", "yes"}
+            is_lease_enabled = request.data.get("is_lease_enabled", "false").lower() in {"true", "1", "yes"}
+            is_direct_sale_enabled = request.data.get("is_direct_sale_enabled", "true").lower() in {"true", "1", "yes"}
+            image = request.data.get("image")
+            has_variants = request.data.get("has_variants", "false").lower() in {"true", "1", "yes"}
+            variants_json = request.data.get("variants", "[]")
+
+            # Validate required fields
+            if not product_code:
+                return Response({"error": "product_code is required"}, status=status.HTTP_400_BAD_REQUEST)
+            if not name:
+                return Response({"error": "name is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Create product
+            product_data = {
+                "product_code": product_code,
+                "name": name,
+                "base_price": Decimal(base_price or "0"),
+                "sku": sku,
+                "unit_of_measure": unit_of_measure,
+                "category": category,
+                "subcategory": subcategory,
+                "description": description,
+                "hsn_sac_code": hsn_sac_code,
+                "item_type": item_type,
+                "stock_type": stock_type,
+                "is_active": is_active,
+                "is_emi_enabled": is_emi_enabled and item_type == "FINISHED_GOOD",
+                "is_rent_enabled": is_rent_enabled and item_type == "FINISHED_GOOD",
+                "is_lease_enabled": is_lease_enabled and item_type == "FINISHED_GOOD",
+                "is_direct_sale_enabled": is_direct_sale_enabled and item_type in {"FINISHED_GOOD", "ADD_ON", "ACCESSORY"},
+            }
+
+            if gst_rate:
+                try:
+                    product_data["gst_rate"] = Decimal(gst_rate)
+                except:
+                    pass
+
+            if base_specs and isinstance(base_specs, str):
+                try:
+                    product_data["base_specs"] = json.loads(base_specs)
+                except:
+                    product_data["base_specs"] = {}
+
+            if catalog_category:
+                product_data["catalog_category_id"] = int(catalog_category)
+
+            if image:
+                product_data["image"] = image
+
+            product = Product.objects.create(**product_data)
+
+            # Create variants if provided
+            if has_variants and variants_json:
+                try:
+                    variants_list = json.loads(variants_json)
+                    for variant_data in variants_list:
+                        ProductVariant.objects.create(
+                            product=product,
+                            variant_code=variant_data.get("variant_code", ""),
+                            variant_name=variant_data.get("variant_name", ""),
+                            sku=variant_data.get("sku"),
+                            barcode=variant_data.get("barcode"),
+                            variant_price=Decimal(variant_data.get("variant_price")) if variant_data.get("variant_price") else None,
+                            is_active=variant_data.get("is_active", True),
+                        )
+                except (json.JSONDecodeError, ValueError):
+                    pass  # Continue without variants if JSON parsing fails
+
+            # Serialize response
+            serializer = ProductAdminSerializer(product, context={"request": request})
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )

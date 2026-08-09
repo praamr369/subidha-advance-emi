@@ -9,6 +9,8 @@ import {
   useRef,
   useState,
 } from "react";
+import { useDebounce } from "@/hooks/useDebounce";
+import { Download, Search } from "lucide-react";
 
 import { INVENTORY_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
 import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
@@ -32,6 +34,8 @@ import {
   previewOpeningStockImport,
   type OpeningStockBulkPreview,
   type OpeningStockEntryRow,
+  type OpeningStockEntriesRow,
+  type OpeningStockEntriesPayload,
   type OpeningStockPreview,
   type StockLocation,
 } from "@/services/inventory";
@@ -67,11 +71,48 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+// Export to CSV helper
+function exportOpeningStockToCSV(rows: OpeningStockEntriesRow[], filename: string = "opening-stock.csv") {
+  const headers = ["SKU", "Product Code", "Product Name", "Location", "Qty", "Unit Cost", "Status", "Date"];
+  const csvContent = [
+    headers.join(","),
+    ...rows.map(row => [
+      row.inventory_item_sku || "",
+      row.product_code || "",
+      row.product_name || "",
+      row.stock_location_name || "",
+      row.opening_qty || "",
+      row.unit_cost_snapshot || "",
+      row.status || "",
+      row.effective_date || "",
+    ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(","))
+  ].join("\n");
+
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+  link.setAttribute("href", url);
+  link.setAttribute("download", filename);
+  link.style.visibility = "hidden";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
 export default function InventoryOpeningStockPage() {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<TabKey>("manual");
 
-  const [entries, setEntries] = useState<OpeningStockEntryRow[]>([]);
+  // Pagination & Filter State
+  const [pagination, setPagination] = useState({ page: 1, page_size: 50, total_count: 0, num_pages: 0 });
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const debouncedSearch = useDebounce(searchQuery, 350);
+
+  // KPI State
+  const [kpiCounts, setKpiCounts] = useState({ draft: 0, posted: 0 });
+
+  const [entries, setEntries] = useState<OpeningStockEntriesRow[]>([]);
   const [entriesLoading, setEntriesLoading] = useState(false);
   const [entriesError, setEntriesError] = useState<string | null>(null);
 
@@ -87,7 +128,7 @@ export default function InventoryOpeningStockPage() {
   const [manualFieldErrors, setManualFieldErrors] = useState<Record<string, string>>({});
   const [editingDraftId, setEditingDraftId] = useState<number | null>(null);
 
-  const [correctionFor, setCorrectionFor] = useState<OpeningStockEntryRow | null>(null);
+  const [correctionFor, setCorrectionFor] = useState<OpeningStockEntriesRow | null>(null);
   const [corrReason, setCorrReason] = useState("");
   const [corrDelta, setCorrDelta] = useState("");
   const [corrBusy, setCorrBusy] = useState(false);
@@ -126,15 +167,26 @@ export default function InventoryOpeningStockPage() {
     setEntriesLoading(true);
     setEntriesError(null);
     try {
-      const payload = await listAdminOpeningStockEntries({ page_size: 100 });
+      const payload = await listAdminOpeningStockEntries({
+        page: pagination.page,
+        page_size: pagination.page_size,
+        status: statusFilter || undefined,
+        search: debouncedSearch || undefined,
+      }) as OpeningStockEntriesPayload;
       setEntries(payload.results ?? []);
+      setKpiCounts({ draft: payload.draft_count, posted: payload.posted_count });
+      setPagination(prev => ({
+        ...prev,
+        total_count: payload.count,
+        num_pages: payload.num_pages,
+      }));
     } catch (e) {
       setEntries([]);
       setEntriesError(e instanceof Error ? e.message : "Failed to load opening stock rows.");
     } finally {
       setEntriesLoading(false);
     }
-  }, []);
+  }, [pagination.page, pagination.page_size, statusFilter, debouncedSearch]);
 
   const loadLocations = useCallback(async () => {
     try {
@@ -180,26 +232,26 @@ export default function InventoryOpeningStockPage() {
     setEditingDraftId(null);
   }
 
-  function beginEditDraft(row: OpeningStockEntryRow) {
+  function beginEditDraft(row: OpeningStockEntriesRow) {
     if (row.status !== "DRAFT") return;
     setEditingDraftId(row.id);
-    if (row.inventory_item) {
+    if (row.inventory_item_id) {
       setPickedItem({
-        id: row.inventory_item,
-        sku: row.sku ?? "",
-        product_name: row.product_name ?? `Item #${row.inventory_item}`,
-        product_code: "",
+        id: row.inventory_item_id,
+        sku: row.inventory_item_sku ?? "",
+        product_name: row.product_name ?? `Item #${row.inventory_item_id}`,
+        product_code: row.product_code ?? "",
         category: "",
         subcategory: "",
         standard_unit_cost: row.unit_cost_snapshot ?? null,
         unit_of_measure: "",
       });
     }
-    setManualLocationId(row.stock_location);
-    setManualQty(row.quantity);
+    setManualLocationId(row.stock_location_id);
+    setManualQty(row.opening_qty);
     setManualUnitCost(row.unit_cost_snapshot ?? "");
-    setManualDate(row.effective_date.slice(0, 10));
-    setManualNote(row.note ?? "");
+    setManualDate(row.effective_date ? row.effective_date.slice(0, 10) : todayIso());
+    setManualNote("");
     setTab("manual");
     setManualFieldErrors({});
   }
@@ -317,10 +369,10 @@ export default function InventoryOpeningStockPage() {
   const canBulkApply = Boolean(bulkFile) && Boolean(bulkPreview) && !bulkHasFatalErrors && !bulkApplying && !bulkPreviewing;
 
   const stats = useMemo(() => [
-    { label: "Draft rows", value: String(entries.filter(r => r.status === "DRAFT").length), tone: "warning" as const },
-    { label: "Posted rows", value: String(entries.filter(r => r.status === "POSTED").length), tone: "success" as const },
-    { label: "Total rows", value: entriesLoading ? "…" : String(entries.length), tone: "default" as const },
-  ], [entries, entriesLoading]);
+    { label: "Draft rows", value: entriesLoading ? "—" : kpiCounts.draft, tone: "warning" as const },
+    { label: "Posted rows", value: entriesLoading ? "—" : kpiCounts.posted, tone: "success" as const },
+    { label: "Total rows", value: entriesLoading ? "—" : pagination.total_count, tone: "default" as const },
+  ], [entriesLoading, kpiCounts, pagination.total_count]);
 
   const TABS: Array<[TabKey, string]> = [
     ["manual", "Manual entry"],
@@ -569,13 +621,63 @@ export default function InventoryOpeningStockPage() {
                   <div className="text-sm font-semibold text-foreground">Opening stock rows</div>
                   <p className="mt-0.5 text-xs text-muted-foreground">Drafts are editable and postable. Posted rows create an immutable ledger entry.</p>
                 </div>
-                <button
-                  type="button"
-                  className="rounded-lg border border-border bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
-                  onClick={() => void loadEntries()}
-                >
-                  Refresh
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => exportOpeningStockToCSV(entries, `opening-stock-${new Date().toISOString().slice(0, 10)}.csv`)}
+                    disabled={entries.length === 0}
+                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg border border-border bg-background hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition"
+                  >
+                    <Download className="h-3.5 w-3.5" /> Export CSV
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-lg border border-border bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+                    onClick={() => void loadEntries()}
+                  >
+                    Refresh
+                  </button>
+                </div>
+              </div>
+
+              {/* Search and Filter Controls */}
+              <div className="border-b border-border px-5 py-4 space-y-3">
+                <div className="grid gap-4 md:grid-cols-[1fr_220px]">
+                  {/* Search Input */}
+                  <div>
+                    <label className="text-sm font-medium text-foreground">Search</label>
+                    <div className="relative mt-2">
+                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                      <input
+                        type="text"
+                        placeholder="Search by SKU, product code, or name…"
+                        value={searchQuery}
+                        onChange={(e) => {
+                          setSearchQuery(e.target.value);
+                          setPagination(p => ({...p, page: 1}));
+                        }}
+                        className="h-10 w-full rounded-xl border border-border bg-background pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Status Filter */}
+                  <div>
+                    <label className="text-sm font-medium text-foreground">Status</label>
+                    <select
+                      className="mt-2 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                      value={statusFilter}
+                      onChange={(event) => {
+                        setStatusFilter(event.target.value);
+                        setPagination(p => ({...p, page: 1}));
+                      }}
+                    >
+                      <option value="">All statuses</option>
+                      <option value="DRAFT">Draft</option>
+                      <option value="POSTED">Posted</option>
+                    </select>
+                  </div>
+                </div>
               </div>
 
               {entriesLoading ? (
@@ -608,14 +710,14 @@ export default function InventoryOpeningStockPage() {
                           <td className="px-4 py-3 text-xs text-muted-foreground font-mono">{row.id}</td>
                           <td className="px-4 py-3">
                             <div className="font-medium text-foreground">{row.product_name ?? "—"}</div>
-                            {row.sku ? <div className="text-xs font-mono text-muted-foreground">{row.sku}</div> : null}
+                            {row.inventory_item_sku ? <div className="text-xs font-mono text-muted-foreground">{row.inventory_item_sku}</div> : null}
                           </td>
-                          <td className="px-4 py-3 text-xs font-mono text-muted-foreground">{row.stock_location_code ?? "—"}</td>
-                          <td className="px-4 py-3 text-right font-semibold text-foreground">{fmt(row.quantity)}</td>
+                          <td className="px-4 py-3 text-xs font-mono text-muted-foreground">{row.stock_location_name ?? "—"}</td>
+                          <td className="px-4 py-3 text-right font-semibold text-foreground">{fmt(row.opening_qty)}</td>
                           <td className="px-4 py-3 text-right text-foreground">
                             {row.unit_cost_snapshot ? `₹${fmt(row.unit_cost_snapshot)}` : "—"}
                           </td>
-                          <td className="px-4 py-3 text-xs text-muted-foreground">{row.effective_date.slice(0, 10)}</td>
+                          <td className="px-4 py-3 text-xs text-muted-foreground">{row.effective_date ? row.effective_date.slice(0, 10) : "—"}</td>
                           <td className="px-4 py-3">
                             <StatusBadge status={row.status} />
                           </td>
@@ -656,6 +758,58 @@ export default function InventoryOpeningStockPage() {
                       ))}
                     </tbody>
                   </table>
+
+                  {/* Pagination Controls */}
+                  {pagination.num_pages > 1 && (
+                    <div className="flex items-center justify-between gap-4 p-4 border-t border-border">
+                      <div className="text-sm text-muted-foreground">
+                        Showing {Math.min((pagination.page - 1) * pagination.page_size + 1, pagination.total_count)} to {Math.min(pagination.page * pagination.page_size, pagination.total_count)} of {pagination.total_count} rows
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setPagination(p => ({...p, page: Math.max(1, p.page - 1)}))}
+                          disabled={pagination.page === 1 || entriesLoading}
+                          className="h-9 px-3 rounded-md border border-input bg-background hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                        >
+                          Previous
+                        </button>
+                        <div className="flex items-center gap-1">
+                          {Array.from({ length: Math.min(5, pagination.num_pages) }, (_, i) => {
+                            let pageNum: number;
+                            if (pagination.num_pages <= 5) {
+                              pageNum = i + 1;
+                            } else if (pagination.page <= 3) {
+                              pageNum = i + 1;
+                            } else if (pagination.page >= pagination.num_pages - 2) {
+                              pageNum = pagination.num_pages - 4 + i;
+                            } else {
+                              pageNum = pagination.page - 2 + i;
+                            }
+                            return (
+                              <button
+                                key={pageNum}
+                                onClick={() => setPagination(p => ({...p, page: pageNum}))}
+                                className={`h-9 px-3 rounded-md text-sm ${
+                                  pageNum === pagination.page
+                                    ? "bg-primary text-primary-foreground"
+                                    : "border border-input bg-background hover:bg-muted"
+                                }`}
+                              >
+                                {pageNum}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <button
+                          onClick={() => setPagination(p => ({...p, page: Math.min(p.num_pages, p.page + 1)}))}
+                          disabled={pagination.page === pagination.num_pages || entriesLoading}
+                          className="h-9 px-3 rounded-md border border-input bg-background hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -890,8 +1044,8 @@ export default function InventoryOpeningStockPage() {
               </div>
             </div>
             <div className="mt-3 rounded-xl border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
-              <span className="font-semibold text-foreground">{correctionFor.product_name ?? correctionFor.sku ?? `Item #${correctionFor.inventory_item}`}</span>
-              {" · "}{correctionFor.stock_location_code}{" · "}Qty: {correctionFor.quantity}
+              <span className="font-semibold text-foreground">{correctionFor.product_name ?? correctionFor.inventory_item_sku ?? `Item #${correctionFor.inventory_item_id}`}</span>
+              {" · "}{correctionFor.stock_location_name}{" · "}Qty: {correctionFor.opening_qty}
             </div>
             <form className="mt-4 space-y-4" onSubmit={(ev) => void submitCorrection(ev)}>
               <div className="space-y-1">

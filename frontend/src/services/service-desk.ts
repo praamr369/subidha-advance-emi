@@ -198,6 +198,53 @@ export function getServiceDeskOverview() {
   return apiFetch<ServiceDeskOverview>("/service-desk/overview/");
 }
 
+// --- Unified control-center search ------------------------------------------
+
+export type ControlSearchRow = {
+  kind: string;
+  id: number;
+  label: string;
+  sublabel: string | null;
+  href: string;
+  status: string | null;
+  customer_name: string | null;
+  customer_phone: string | null;
+  amount: string | null;
+  date: string | null;
+};
+
+export type ControlSearchGroup = {
+  kind: string;
+  label: string;
+  results: ControlSearchRow[];
+};
+
+export type ControlSearchResponse = {
+  query: string;
+  groups: ControlSearchGroup[];
+  total: number;
+};
+
+export function serviceControlSearch(q: string) {
+  return apiFetch<ControlSearchResponse>(`/service-desk/control-search/${buildQuery({ q })}`);
+}
+
+export type IssueTimeline = {
+  customer: ControlSearchRow | null;
+  service_cases: ControlSearchRow[];
+  warranty_claims: ControlSearchRow[];
+  returns: ControlSearchRow[];
+  counts: { service_cases: number; warranty_claims: number };
+};
+
+export function serviceControlResolve(params: {
+  customer?: number;
+  direct_sale?: number;
+  subscription?: number;
+}) {
+  return apiFetch<IssueTimeline>(`/service-desk/control-resolve/${buildQuery(params)}`);
+}
+
 export function listServiceDeskCases(params: Record<string, QueryValue> = {}) {
   return apiFetch<PaginatedResponse<ServiceDeskCase>>(
     `/service-desk/cases/${buildQuery(params)}`
