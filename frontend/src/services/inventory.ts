@@ -341,6 +341,46 @@ export interface QuickCreatePayload {
 }
 
 // ============================================================================
+// Dashboard Stock Summary
+// ============================================================================
+
+export type StockSummaryRow = {
+  item_id: number;
+  product_code: string;
+  product_name: string;
+  sku?: string;
+  current_qty: number;
+  reorder_point: number;
+  status: string;
+};
+
+export type StockSummaryResponse = {
+  results: StockSummaryRow[];
+  count: number;
+};
+
+export interface StockSummaryParams {
+  branch?: number | string;
+}
+
+/**
+ * Get stock summary for dashboard (low stock items)
+ * GET /api/v1/admin/inventory/stock-summary/
+ */
+export function getStockSummary(
+  params?: StockSummaryParams
+): Promise<StockSummaryResponse> {
+  const queryParams = new URLSearchParams();
+  if (params?.branch) queryParams.append("branch", String(params.branch));
+
+  const url = queryParams.toString()
+    ? `/admin/inventory/stock-summary/?${queryParams}`
+    : "/admin/inventory/stock-summary/";
+
+  return apiFetch<StockSummaryResponse>(url, { method: "GET" });
+}
+
+// ============================================================================
 // Quick Create API Functions
 // ============================================================================
 
