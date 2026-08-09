@@ -21,6 +21,11 @@ find_python_candidate() {
     "${REPO_ROOT}/.venv/bin/python"
     "${BACKEND_ROOT}/.venv/bin/python"
     "${BACKEND_ROOT}/.playwright-venv/bin/python"
+    # Windows virtualenv layout (Scripts/python.exe) — without these the script
+    # falls through to a system python3 that lacks project deps (drf_spectacular).
+    "${REPO_ROOT}/.venv/Scripts/python.exe"
+    "${BACKEND_ROOT}/.venv/Scripts/python.exe"
+    "${BACKEND_ROOT}/.playwright-venv/Scripts/python.exe"
     "python3"
   )
 

@@ -1,7 +1,9 @@
-import { redirect } from "next/navigation";
+import DirectSaleWorkspace from "../DirectSaleWorkspace";
 
-import { ROUTES } from "@/lib/routes";
+export const metadata = {
+  title: "Create Direct Sale Invoice - Subidha Admin",
+};
 
-export default function AdminDirectSaleCreateRoutePage() {
-  redirect(`${ROUTES.admin.billingDirectSaleWorkspace}?mode=create`);
+export default function CreateDirectSalePage() {
+  return <DirectSaleWorkspace orchestrationCreate />;
 }

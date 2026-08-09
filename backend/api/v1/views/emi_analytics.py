@@ -1,4 +1,5 @@
 from django.db.models import Sum, Count
+from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAdminUser
@@ -9,7 +10,7 @@ class BatchAnalyticsView(APIView):
     permission_classes = [IsAdminUser]
 
     def get(self, request, batch_id):
-        batch = Batch.objects.get(pk=batch_id)
+        batch = get_object_or_404(Batch, pk=batch_id)
 
         total_emis = Emi.objects.filter(
             subscription__batch=batch

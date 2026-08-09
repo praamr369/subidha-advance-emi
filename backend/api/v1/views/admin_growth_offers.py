@@ -14,7 +14,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.v1.permissions import IsAdmin
-from subscriptions.services.growth_offer_service import (
+from crm.services.growth_offer_service import (
     build_offer_package_preview,
     build_plan_template_preview,
     list_active_offer_packages,

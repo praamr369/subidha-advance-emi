@@ -5,11 +5,11 @@ from django.core.cache import cache
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from subscriptions.services.lucky_draw_service import (
+from lucky_plan.services.lucky_draw_service import (
     create_lucky_draw_commit,
     reveal_and_execute_draw,
 )
-from subscriptions.services.payment_service import record_emi_payment
+from payments.services.payment_service import record_emi_payment
 from subscriptions.models import SubscriptionStatus
 from tests.helpers import (
     create_admin_user,

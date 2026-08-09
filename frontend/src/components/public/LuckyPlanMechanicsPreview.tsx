@@ -1,3 +1,5 @@
+import { getPublicDictionary } from "@/lib/public-i18n";
+import { getPublicLocale } from "@/lib/public-i18n.server";
 import Link from "next/link";
 import { ArrowRight, BadgeCheck, ShieldCheck, Sparkles, Wallet } from "lucide-react";
 
@@ -6,42 +8,47 @@ import PublicSectionShell from "@/components/public/PublicSectionShell";
 import SectionHeader from "@/components/public/SectionHeader";
 import { ROUTES } from "@/lib/routes";
 
+
+
+export default async function LuckyPlanMechanicsPreview() {
+  const locale = await getPublicLocale();
+  const dict = getPublicDictionary(locale);
+
 const mechanics = [
   {
     icon: BadgeCheck,
-    title: "Batch and Lucky ID",
-    description: "A customer joins an approved batch and receives a controlled Lucky ID. Public UI does not assign IDs.",
+    title: dict.public.LuckyPlanMechanicsPreview_prop1,
+    description: dict.public.LuckyPlanMechanicsPreview_prop2,
   },
   {
     icon: Wallet,
-    title: "Monthly EMI record",
-    description: "Payment collection, receipt status, and customer ledger remain handled by authenticated workflows.",
+    title: dict.public.LuckyPlanMechanicsPreview_prop3,
+    description: dict.public.LuckyPlanMechanicsPreview_prop4,
   },
   {
     icon: Sparkles,
-    title: "Winner publication",
-    description: "Published winners come from revealed draw records. Public pages do not calculate or alter winners.",
+    title: dict.public.LuckyPlanMechanicsPreview_prop5,
+    description: dict.public.LuckyPlanMechanicsPreview_prop6,
   },
   {
     icon: ShieldCheck,
-    title: "Waiver boundary",
-    description: "Winner waiver applies only to future EMI obligations and does not reverse paid EMI history.",
+    title: dict.public.LuckyPlanMechanicsPreview_prop7,
+    description: dict.public.LuckyPlanMechanicsPreview_prop8,
   },
 ] as const;
 
-export default function LuckyPlanMechanicsPreview() {
   return (
     <PublicSectionShell className="grid gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-center">
       <div className="space-y-5">
         <SectionHeader
-          eyebrow="Plan mechanics"
-          title="A simple public explanation for a controlled financial workflow"
-          description="Customers can understand the Lucky Plan visually, while actual contracts, payments, draw reveal, waiver posting, and audit evidence stay inside the production system."
+          eyebrow={dict.public.LuckyPlanMechanicsPreview_attr9}
+          title={dict.public.LuckyPlanMechanicsPreview_attr10}
+          description={dict.public.LuckyPlanMechanicsPreview_attr11}
         />
         <div className="relative w-full overflow-hidden rounded-[1.6rem] shadow-[0_24px_54px_-24px_rgba(15,23,42,0.6)]">
           <Image
             src="/images/banner_draw.jpg"
-            alt="Winner Draw"
+            alt={dict.public.LuckyPlanMechanicsPreview_attr12}
             width={800}
             height={533}
             className="w-full object-cover min-h-[18rem]"
@@ -61,8 +68,8 @@ export default function LuckyPlanMechanicsPreview() {
         ))}
         <div className="public-card-sm flex flex-col justify-between gap-4 p-5 sm:col-span-2 sm:flex-row sm:items-center">
           <div>
-            <h3 className="text-base font-semibold text-foreground">Review before enrollment</h3>
-            <p className="mt-1 text-sm leading-6 text-muted-foreground">Read the fair draw page and policy section before applying.</p>
+            <h3 className="text-base font-semibold text-foreground">{dict.public.LuckyPlanMechanicsPreview_text13}</h3>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">{dict.public.LuckyPlanMechanicsPreview_text14}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Link href={ROUTES.public.fairDraw} className="public-action-secondary">

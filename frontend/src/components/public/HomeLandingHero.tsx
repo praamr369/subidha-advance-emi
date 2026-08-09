@@ -1,3 +1,5 @@
+import { getPublicDictionary } from "@/lib/public-i18n";
+import { getPublicLocale } from "@/lib/public-i18n.server";
 import Link from "next/link";
 import { ArrowRight, BadgeCheck, ReceiptText, ShieldCheck, Sparkles } from "lucide-react";
 
@@ -20,30 +22,35 @@ type HomeLandingHeroProps = {
   stats: HomeLandingHeroStats;
 };
 
+
+
+export default async function HomeLandingHero({ title, subtitle, companyName, tagline, stats }: HomeLandingHeroProps) {
+  const locale = await getPublicLocale();
+  const dict = getPublicDictionary(locale);
+
 const trustPoints = [
   {
     icon: ShieldCheck,
-    title: "Transparent plan rules",
-    description: "Know tenure, EMI and winner benefit scope before enrollment.",
+    title: dict.public.HomeLandingHero_prop1,
+    description: dict.public.HomeLandingHero_prop2,
   },
   {
     icon: ReceiptText,
-    title: "Receipted monthly payments",
-    description: "Payments stay separate from public marketing and are tracked inside the portal.",
+    title: dict.public.HomeLandingHero_prop3,
+    description: dict.public.HomeLandingHero_prop4,
   },
   {
     icon: BadgeCheck,
-    title: "Rent / Lease ready",
-    description: "Public messaging supports EMI, rent, lease and direct-sale discovery.",
+    title: dict.public.HomeLandingHero_prop5,
+    description: dict.public.HomeLandingHero_prop6,
   },
 ] as const;
 
-export default function HomeLandingHero({ title, subtitle, companyName, tagline, stats }: HomeLandingHeroProps) {
   const heroStats = stats
     ? [
-        { label: "Published batches", value: stats.total_batches.toLocaleString("en-IN") },
-        { label: "Active subscriptions", value: stats.active_subscriptions.toLocaleString("en-IN") },
-        { label: "Published winners", value: stats.total_winners.toLocaleString("en-IN") },
+        { label: dict.public.HomeLandingHero_prop7, value: stats.total_batches.toLocaleString("en-IN") },
+        { label: dict.public.HomeLandingHero_prop8, value: stats.active_subscriptions.toLocaleString("en-IN") },
+        { label: dict.public.HomeLandingHero_prop9, value: stats.total_winners.toLocaleString("en-IN") },
       ]
     : [];
 
@@ -102,7 +109,7 @@ export default function HomeLandingHero({ title, subtitle, companyName, tagline,
           <div className="relative w-full overflow-hidden rounded-[1.6rem] shadow-[0_24px_54px_-24px_rgba(15,23,42,0.6)]">
             <Image
               src="/images/hero_living_room.jpg"
-              alt="Home Showroom"
+              alt={dict.public.HomeLandingHero_attr14}
               width={800}
               height={533}
               priority
@@ -110,12 +117,12 @@ export default function HomeLandingHero({ title, subtitle, companyName, tagline,
             />
           </div>
           <div className="pointer-events-none absolute -left-4 top-8 hidden rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_84%,transparent)] px-4 py-3 shadow-[0_22px_54px_-38px_rgba(15,23,42,0.74)] backdrop-blur md:block">
-            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Lucky Plan</div>
-            <div className="mt-1 text-sm font-semibold text-foreground">Future EMI waiver only</div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">{dict.public.HomeLandingHero_text15}</div>
+            <div className="mt-1 text-sm font-semibold text-foreground">{dict.public.HomeLandingHero_text16}</div>
           </div>
           <div className="pointer-events-none absolute -right-2 bottom-8 hidden rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_84%,transparent)] px-4 py-3 shadow-[0_22px_54px_-38px_rgba(15,23,42,0.74)] backdrop-blur md:block">
-            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Rent / Lease</div>
-            <div className="mt-1 text-sm font-semibold text-foreground">Monthly invoice workflow</div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">{dict.public.HomeLandingHero_text17}</div>
+            <div className="mt-1 text-sm font-semibold text-foreground">{dict.public.HomeLandingHero_text18}</div>
           </div>
         </div>
       </div>

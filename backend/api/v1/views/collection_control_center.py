@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.v1.permissions import IsAdmin, IsCashierOrAdmin
-from subscriptions.services.collection_control_center_service import build_collection_control_center_payload
+from payments.services.collection_control_center_service import build_collection_control_center_payload
 
 
 class AdminCollectionControlCenterView(APIView):

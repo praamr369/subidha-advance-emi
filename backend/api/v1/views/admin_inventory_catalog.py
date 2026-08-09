@@ -30,6 +30,7 @@ from inventory.models import (
     ServiceCatalogItemStatus,
     ServiceType,
 )
+from inventory.services.service_catalog_list_service import build_service_catalog_list
 
 MONEY_ZERO = Decimal("0.00")
 
@@ -192,20 +193,32 @@ class AdminServiceCatalogListCreateView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def get(self, request):
-        qs = ServiceCatalogItem.objects.all()
-        q = (request.query_params.get("q") or "").strip()
-        if q:
-            qs = qs.filter(Q(name__icontains=q) | Q(code__icontains=q) | Q(category__icontains=q))
+        # Parse pagination params
+        try:
+            page = int(request.query_params.get("page", 1))
+            page_size = int(request.query_params.get("page_size", 50))
+            page = max(1, page)
+            page_size = min(page_size, 500)  # Cap at 500
+        except (ValueError, TypeError):
+            page = 1
+            page_size = 50
+
+        # Get filter params
+        search = (request.query_params.get("q") or "").strip()
         status_filter = (request.query_params.get("status") or "").strip().upper()
-        if status_filter in {s[0] for s in ServiceCatalogItemStatus.choices}:
-            qs = qs.filter(status=status_filter)
         category = (request.query_params.get("category") or "").strip()
-        if category:
-            qs = qs.filter(category__icontains=category)
-        svc_type = (request.query_params.get("service_type") or "").strip().upper()
-        if svc_type in {s[0] for s in ServiceType.choices}:
-            qs = qs.filter(service_type=svc_type)
-        payload = _paginate(qs, request, lambda i: ServiceCatalogItemSerializer(i).data)
+        service_type = (request.query_params.get("service_type") or "").strip().upper()
+
+        # Build the service catalog list with KPI aggregation
+        payload = build_service_catalog_list(
+            search=search if search else None,
+            status=status_filter if status_filter else None,
+            category=category if category else None,
+            service_type=service_type if service_type else None,
+            page=page,
+            page_size=page_size,
+        )
+
         return Response(payload)
 
     @transaction.atomic

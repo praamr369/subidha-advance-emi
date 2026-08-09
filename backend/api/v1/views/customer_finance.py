@@ -22,7 +22,7 @@ from subscriptions.models import (
     RentLeaseReturnInspection,
     Subscription,
 )
-from subscriptions.services.phase4_finance_service import (
+from payments.services.phase4_finance_service import (
     FinanceFilter,
     customer_account_statement,
     customer_archive,
@@ -32,7 +32,7 @@ from subscriptions.services.phase4_finance_service import (
     customer_payment_schedule,
     customer_receipt_list,
 )
-from subscriptions.services.document_pdf_service import (
+from contracts.services.document_pdf_service import (
     render_invoice_pdf,
     render_lease_contract_pdf,
     render_receipt_pdf,
@@ -308,7 +308,12 @@ class CustomerDirectSaleSummaryView(APIView):
         customer = _customer_or_404(request)
         if customer is None:
             return _customer_missing_response()
-        queryset = _direct_sale_queryset_for_customer(customer).exclude(status__in=INACTIVE_DIRECT_SALE_STATUSES)
+        # Draft sales are not finalized payable dues, so exclude them from the
+        # customer-facing summary alongside cancelled/void statuses (a draft's
+        # balance must not show up as an outstanding due).
+        queryset = _direct_sale_queryset_for_customer(customer).exclude(
+            status__in=INACTIVE_DIRECT_SALE_STATUSES | {"DRAFT"}
+        )
         latest = queryset.first()
         latest_payload = None
         if latest is not None:

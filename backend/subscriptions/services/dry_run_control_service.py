@@ -49,7 +49,7 @@ from subscriptions.models import (
 from subscriptions.services.business_reset_service import BusinessResetOptions, build_business_reset_plan
 from subscriptions.services.business_setup_service import get_reset_preview
 from subscriptions.services.setup_checklist_service import compute_setup_checklist
-from subscriptions.services.document_numbering_service import get_document_numbering_state
+from contracts.services.document_numbering_service import get_document_numbering_state
 
 # Check category keys (API contract)
 CHECK_SETUP_READINESS = "SETUP_READINESS"

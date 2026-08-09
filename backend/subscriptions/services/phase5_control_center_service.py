@@ -45,8 +45,8 @@ from subscriptions.services.dashboard_canonical_financial_summary_service import
     DashboardWindowParams,
     resolve_dashboard_window,
 )
-from subscriptions.services.phase4_finance_service import FinanceFilter, build_admin_finance_dashboard
-from subscriptions.services.rent_lease_billing_service import list_admin_deposit_register
+from payments.services.phase4_finance_service import FinanceFilter, build_admin_finance_dashboard
+from contracts.services.rent_lease_billing_service import list_admin_deposit_register
 
 
 def _money(value) -> str:

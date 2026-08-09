@@ -39,7 +39,7 @@ class AdminMoneyInOutView(APIView):
         date_from = (request.query_params.get("date_from") or "").strip() or None
         date_to = (request.query_params.get("date_to") or "").strip() or None
 
-        Payment = apps.get_model("subscriptions", "Payment")
+        Payment = apps.get_model("payments", "Payment")
         ExpenseVoucher = apps.get_model("accounting", "ExpenseVoucher")
         VendorPayment = apps.get_model("inventory", "VendorPayment")
         SalaryPayment = apps.get_model("accounting", "SalaryPayment")

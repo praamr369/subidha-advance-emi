@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 import BrandLockup from "@/components/public/BrandLockup";
+import GlobalSearch from "@/components/public/GlobalSearch";
 import LanguageSwitcher from "@/components/public/LanguageSwitcher";
 import ThemeToggle from "@/components/ui/ThemeToggle";
 import {
@@ -79,13 +80,45 @@ export default function PublicNavClient({
   return (
     <nav className="public-nav" aria-label="Primary navigation">
       <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6 lg:px-8 lg:py-4">
-        <div className="flex items-center justify-between gap-3">
-          <Link href={ROUTES.public.home} className="min-w-0" onClick={() => setMobileOpen(false)}>
+        <div className="flex items-center justify-between gap-4">
+          <Link href={ROUTES.public.home} className="min-w-0 shrink-0" onClick={() => setMobileOpen(false)}>
             <BrandLockup compact logoSrc={logoSrc} companyName={companyName} subtitle={brandSubtitle} />
           </Link>
-          <div className="hidden lg:flex">
+          
+          {/* GlobalSearch moved to the second row to prevent squishing */}
+          
+          <div className="hidden lg:flex shrink-0 items-center gap-3">
+            <ThemeToggle variant="public" />
             <LanguageSwitcher value={language} />
+            
+            <div className="h-5 w-px bg-border/60 mx-1" aria-hidden="true" />
+            
+            {showWhatsApp ? (
+              <Link
+                href={whatsappLink as string}
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_88%,transparent)] px-3 text-sm font-medium text-foreground shadow-[0_16px_32px_-26px_rgba(15,23,42,0.72)] transition hover:-translate-y-0.5 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2 dark:shadow-[0_16px_32px_-26px_rgba(0,0,0,0.5)]"
+              >
+                <MessageCircle className="h-4 w-4" />
+                {dictionary.whatsapp}
+              </Link>
+            ) : null}
+
+            {actions.map((action) => (
+              <Link
+                key={action.href}
+                href={action.href}
+                className={cn(
+                  "inline-flex h-9 items-center rounded-lg border px-4 text-sm font-medium shadow-[0_16px_32px_-26px_rgba(15,23,42,0.72)] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2 dark:shadow-[0_16px_32px_-26px_rgba(0,0,0,0.5)]",
+                  action.variant === "primary"
+                    ? "border-primary/25 bg-primary text-primary-foreground hover:-translate-y-0.5"
+                    : "border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_88%,transparent)] text-foreground hover:-translate-y-0.5 hover:bg-muted/50"
+                )}
+              >
+                {action.label}
+              </Link>
+            ))}
           </div>
+
           <div className="flex items-center gap-2 lg:hidden">
             <ThemeToggle variant="public" />
             <button
@@ -101,9 +134,9 @@ export default function PublicNavClient({
           </div>
         </div>
 
-        <div className="hidden items-center justify-between gap-6 lg:flex">
-          <NavigationMenu className="flex max-w-none flex-1 justify-center">
-            <NavigationMenuList className="flex-wrap justify-center gap-2">
+        <div className="hidden lg:flex items-center justify-between border-t border-border/40 pt-3 gap-6">
+          <NavigationMenu className="flex max-w-none shrink-0">
+            <NavigationMenuList className="flex-wrap gap-1">
               {links.map((link) => {
                 const active = isActivePath(pathname, link.href);
                 return (
@@ -111,7 +144,10 @@ export default function PublicNavClient({
                     <NavigationMenuLink asChild active={active}>
                       <Link
                         href={link.href}
-                        className={cn(!active && "text-muted-foreground")}
+                        className={cn(
+                          "px-3 py-1.5 text-[13px] font-semibold rounded-md transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2",
+                          active ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground"
+                        )}
                         aria-current={active ? "page" : undefined}
                       >
                         {link.label}
@@ -123,33 +159,8 @@ export default function PublicNavClient({
             </NavigationMenuList>
           </NavigationMenu>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <ThemeToggle variant="public" />
-            <LanguageSwitcher value={language} />
-            {showWhatsApp ? (
-              <Link
-                href={whatsappLink as string}
-                className="inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_88%,transparent)] px-4 text-sm font-semibold text-foreground shadow-[0_16px_32px_-26px_rgba(15,23,42,0.72)] transition hover:-translate-y-0.5 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2 dark:shadow-[0_16px_32px_-26px_rgba(0,0,0,0.5)]"
-              >
-                <MessageCircle className="h-4 w-4" />
-                {dictionary.whatsapp}
-              </Link>
-            ) : null}
-
-            {actions.map((action) => (
-              <Link
-                key={action.href}
-                href={action.href}
-                className={cn(
-                  "inline-flex h-10 items-center rounded-xl border px-4 text-sm font-semibold shadow-[0_16px_32px_-26px_rgba(15,23,42,0.72)] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2 dark:shadow-[0_16px_32px_-26px_rgba(0,0,0,0.5)]",
-                  action.variant === "primary"
-                    ? "border-primary/25 bg-primary text-primary-foreground hover:-translate-y-0.5"
-                    : "border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_88%,transparent)] text-foreground hover:-translate-y-0.5 hover:bg-muted/50"
-                )}
-              >
-                {action.label}
-              </Link>
-            ))}
+          <div className="flex flex-1 justify-end max-w-2xl">
+            <GlobalSearch />
           </div>
         </div>
 
@@ -176,8 +187,18 @@ export default function PublicNavClient({
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                   {dictionary.navigate}
                 </div>
-                <div className="mt-2 grid gap-1">
-                  {links.map((link) => {
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.2 }}
+                      className="mt-2 mb-4 px-1"
+                    >
+                      <GlobalSearch />
+                    </motion.div>
+
+                    <div className="grid gap-1">
+                      {links.map((link) => {
                     const active = isActivePath(pathname, link.href);
                     return (
                       <Link

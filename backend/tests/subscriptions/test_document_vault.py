@@ -40,10 +40,10 @@ from subscriptions.models import (
     SubscriptionDocumentType,
     SubscriptionStatus,
 )
-from subscriptions.services.contract_activation_readiness_service import (
+from contracts.services.contract_activation_readiness_service import (
     evaluate_contract_activation_readiness,
 )
-from subscriptions.services.document_vault_service import (
+from contracts.services.document_vault_service import (
     build_required_document_checklist,
     calculate_document_checksum,
     document_is_expired,
@@ -51,11 +51,11 @@ from subscriptions.services.document_vault_service import (
     reject_document,
     verify_document,
 )
-from subscriptions.services.rent_lease_contract_service import (
+from contracts.services.rent_lease_contract_service import (
     create_lease_contract,
     create_rent_contract,
 )
-from subscriptions.services.rent_lease_billing_service import (
+from contracts.services.rent_lease_billing_service import (
     collect_security_deposit,
 )
 from tests.helpers import (

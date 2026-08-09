@@ -1,3 +1,5 @@
+import { getPublicDictionary } from "@/lib/public-i18n";
+import { getPublicLocale } from "@/lib/public-i18n.server";
 import type { PublicWinner } from "@/lib/public-api";
 
 type WinnerPublicationCardProps = {
@@ -17,7 +19,10 @@ function verificationLabel(value?: string | null): string {
     .join(" ");
 }
 
-export default function WinnerPublicationCard({ winner }: WinnerPublicationCardProps) {
+export default async function WinnerPublicationCard({ winner }: WinnerPublicationCardProps) {
+  const locale = await getPublicLocale();
+  const dict = getPublicDictionary(locale);
+
   const hash = winner.public_commit_hash || winner.committed_hash || "—";
 
   return (
@@ -36,16 +41,16 @@ export default function WinnerPublicationCard({ winner }: WinnerPublicationCardP
 
       <div className="mt-4 grid gap-3 text-sm leading-6 text-muted-foreground">
         <div className="rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_78%,transparent)] px-3 py-2">
-          <span className="font-semibold text-foreground">Public display label:</span> {winner.winner_name_masked || "Not published"}
+          <span className="font-semibold text-foreground">{dict.public.WinnerPublicationCard_text4}</span> {winner.winner_name_masked || "Not published"}
         </div>
         <div className="rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_78%,transparent)] px-3 py-2">
-          <span className="font-semibold text-foreground">Draw:</span> {formatWinnerDate(winner)}
+          <span className="font-semibold text-foreground">{dict.public.WinnerPublicationCard_text5}</span> {formatWinnerDate(winner)}
         </div>
         <div className="rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_78%,transparent)] px-3 py-2">
-          <span className="font-semibold text-foreground">Product:</span> {winner.product_name || "—"}
+          <span className="font-semibold text-foreground">{dict.public.WinnerPublicationCard_text6}</span> {winner.product_name || "—"}
         </div>
         <div className="break-all rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_78%,transparent)] px-3 py-2 text-xs">
-          <span className="font-semibold text-foreground">Public commit hash:</span> {hash}
+          <span className="font-semibold text-foreground">{dict.public.WinnerPublicationCard_text7}</span> {hash}
         </div>
       </div>
 

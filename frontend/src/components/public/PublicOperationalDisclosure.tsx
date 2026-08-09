@@ -1,24 +1,28 @@
+import { getPublicDictionary } from "@/lib/public-i18n";
+import { getPublicLocale } from "@/lib/public-i18n.server";
 import { ClipboardCheck, ReceiptText, ShieldCheck } from "lucide-react";
 
-const disclosures = [
-  {
-    icon: ClipboardCheck,
-    title: "Public pages are enquiry-first",
-    description: "Browsing, applying, or selecting a product publicly does not create contracts, subscriptions, Lucky IDs, deposits, invoices, or receipts.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Branch review stays mandatory",
-    description: "Stock, plan type, tenure, monthly amount, deposit posture, delivery, and documents require staff-controlled workflow.",
-  },
-  {
-    icon: ReceiptText,
-    title: "Financial records stay protected",
-    description: "Payments, waivers, refunds, reconciliation, and accounting records remain inside authenticated operational systems.",
-  },
-] as const;
+export default async function PublicOperationalDisclosure() {
+  const locale = await getPublicLocale();
+  const dict = getPublicDictionary(locale);
+    const disclosures = [
+      {
+        icon: ClipboardCheck,
+        title: dict.public.PublicOperationalDisclosure_prop1,
+        description: dict.public.PublicOperationalDisclosure_prop2,
+      },
+      {
+        icon: ShieldCheck,
+        title: dict.public.PublicOperationalDisclosure_prop3,
+        description: dict.public.PublicOperationalDisclosure_prop4,
+      },
+      {
+        icon: ReceiptText,
+        title: dict.public.PublicOperationalDisclosure_prop5,
+        description: dict.public.PublicOperationalDisclosure_prop6,
+      },
+    ] as const;
 
-export default function PublicOperationalDisclosure() {
   return (
     <aside
       aria-label="Public site operational disclosure"

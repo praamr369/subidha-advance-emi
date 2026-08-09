@@ -1,4 +1,5 @@
 "use client";
+import { useI18n } from "@/components/i18n/I18nProvider";
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
@@ -28,6 +29,8 @@ function formatDrawDate(value: string | null | undefined): string {
 }
 
 export default function PublicLatestWinnerWidget() {
+  const { t } = useI18n();
+
   const [winner, setWinner] = useState<PublicWinner | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -52,13 +55,13 @@ export default function PublicLatestWinnerWidget() {
   }, [loadWinner]);
 
   if (loading) {
-    return <LoadingBlock label="Loading latest winner..." />;
+    return <LoadingBlock label={t('public.PublicLatestWinnerWidget_attr1')} />;
   }
 
   if (error) {
     return (
       <ErrorState
-        title="Latest winner unavailable"
+        title={t('public.PublicLatestWinnerWidget_attr2')}
         description={error}
         onRetry={() => void loadWinner()}
       />
@@ -68,8 +71,8 @@ export default function PublicLatestWinnerWidget() {
   if (!winner) {
     return (
       <EmptyState
-        title="No winner published yet"
-        description="Latest winner details will appear here after a revealed lucky draw is published."
+        title={t('public.PublicLatestWinnerWidget_attr3')}
+        description={t('public.PublicLatestWinnerWidget_attr4')}
       />
     );
   }

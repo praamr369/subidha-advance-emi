@@ -18,11 +18,11 @@ from subscriptions.models import (
     SubscriptionDocument,
     q2,
 )
-from subscriptions.services.delivery_service import get_subscription_delivery_prefetch
-from subscriptions.services.subscription_status_service import (
+from deliveries.services.delivery_service import get_subscription_delivery_prefetch
+from contracts.services.subscription_status_service import (
     resolve_expected_subscription_status,
 )
-from subscriptions.services.winner_state_service import get_subscription_winner_evidence
+from lucky_plan.services.winner_state_service import get_subscription_winner_evidence
 
 
 CONSISTENCY_TOLERANCE = Decimal("0.01")

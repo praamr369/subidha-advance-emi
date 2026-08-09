@@ -51,9 +51,9 @@ def load_snapshot(snapshot_path: str) -> bool:
         'accounting.AccountingPostingProfile',
         'accounting.RentLeaseAccountingAccountMapping',
         'branch_control.CashCounter',
-        'subscriptions.ProductCategoryMaster',
-        'subscriptions.ProductSubcategoryMaster',
-        'subscriptions.ProductUnitOfMeasureMaster',
+        'products_core.ProductCategoryMaster',
+        'products_core.ProductSubcategoryMaster',
+        'products_core.ProductUnitOfMeasureMaster',
         'accounting.ProductTaxProfile',
         'reminders.NotificationTemplate',
     ]

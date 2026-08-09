@@ -206,42 +206,42 @@ def build_admin_erp_summary() -> dict:
                 key="pending_approvals",
                 label="Pending approvals",
                 count=active_contracts.filter(status="PENDING_APPROVAL").count(),
-                source="subscriptions.Subscription",
+                source="contracts.Subscription",
                 deep_link="/admin/subscriptions",
             ),
             _queue_card(
                 key="payments_due",
                 label="Payments due",
                 count=due_emis.count(),
-                source="subscriptions.Emi",
+                source="payments.Emi",
                 deep_link="/admin/emis/overdue",
             ),
             _queue_card(
                 key="delivery_due",
                 label="Delivery due",
                 count=due_deliveries.count(),
-                source="subscriptions.Subscription",
+                source="contracts.Subscription",
                 deep_link="/admin/deliveries",
             ),
             _queue_card(
                 key="return_due",
                 label="Return due",
                 count=return_due.count(),
-                source="subscriptions.RentLeaseReturnInspection",
+                source="deliveries.RentLeaseReturnInspection",
                 deep_link="/admin/service-desk/returns",
             ),
             _queue_card(
                 key="kyc_pending",
                 label="KYC pending",
                 count=pending_kyc.count(),
-                source="subscriptions.CustomerKycDocument",
+                source="customers.CustomerKycDocument",
                 deep_link="/admin/customers",
             ),
             _queue_card(
                 key="partner_requests",
                 label="Partner requests",
                 count=pending_partner_requests.count(),
-                source="subscriptions.PartnerCollectionRequest",
+                source="payments.PartnerCollectionRequest",
                 deep_link="/admin/partner-payment-requests",
             ),
             _queue_card(
@@ -258,7 +258,7 @@ def build_admin_erp_summary() -> dict:
                 label="Today collection",
                 count=payments_today.count(),
                 value=str(_sum_decimal(payments_today, "amount")),
-                source="subscriptions.Payment",
+                source="payments.Payment",
                 deep_link="/admin/payments",
             ),
             _queue_card(
@@ -266,7 +266,7 @@ def build_admin_erp_summary() -> dict:
                 label="Pending dues",
                 count=due_emis.count(),
                 value=str(_sum_decimal(due_emis, "amount")),
-                source="subscriptions.Emi",
+                source="payments.Emi",
                 deep_link="/admin/emis/overdue",
             ),
             _queue_card(
@@ -274,14 +274,14 @@ def build_admin_erp_summary() -> dict:
                 label="Overdue amount",
                 count=overdue_emis.count(),
                 value=str(_sum_decimal(overdue_emis, "amount")),
-                source="subscriptions.Emi",
+                source="payments.Emi",
                 deep_link="/admin/emis/overdue",
             ),
             _queue_card(
                 key="active_contracts",
                 label="Active contracts",
                 count=active_contracts.count(),
-                source="subscriptions.Subscription",
+                source="contracts.Subscription",
                 deep_link="/admin/subscriptions",
             ),
             _queue_card(
@@ -302,7 +302,7 @@ def build_admin_erp_summary() -> dict:
                 label="Rent/Lease deposits held",
                 count=Subscription.objects.filter(plan_type__in=["RENT", "LEASE"]).count(),
                 value=str(deposit_held),
-                source="subscriptions.Subscription",
+                source="contracts.Subscription",
                 deep_link="/admin/finance/deposits",
             ),
             _queue_card(
@@ -316,7 +316,7 @@ def build_admin_erp_summary() -> dict:
                 key="unreconciled_payments",
                 label="Unreconciled payments",
                 count=unreconciled.count(),
-                source="subscriptions.PaymentReconciliation",
+                source="payments.PaymentReconciliation",
                 deep_link="/admin/reconciliation",
             ),
         ],
@@ -325,7 +325,7 @@ def build_admin_erp_summary() -> dict:
                 key="new_leads",
                 label="New leads",
                 count=crm_new_leads.count(),
-                source="subscriptions.SubscriptionRequest",
+                source="crm.SubscriptionRequest",
                 deep_link="/admin/subscription-requests",
             ),
             _queue_card(
@@ -339,21 +339,21 @@ def build_admin_erp_summary() -> dict:
                 key="converted_customers",
                 label="Converted customers",
                 count=converted_customers.count(),
-                source="subscriptions.Customer",
+                source="customers.Customer",
                 deep_link="/admin/customers",
             ),
             _queue_card(
                 key="pending_kyc",
                 label="Pending KYC",
                 count=pending_kyc.count(),
-                source="subscriptions.CustomerKycDocument",
+                source="customers.CustomerKycDocument",
                 deep_link="/admin/customers",
             ),
             _queue_card(
                 key="inactive_customers",
                 label="Inactive customers",
                 count=inactive_customers.count(),
-                source="subscriptions.Customer",
+                source="customers.Customer",
                 deep_link="/admin/customers",
             ),
             _queue_card(
@@ -369,7 +369,7 @@ def build_admin_erp_summary() -> dict:
                 key="public_enquiries",
                 label="Public enquiries",
                 count=crm_new_leads.count(),
-                source="subscriptions.SubscriptionRequest",
+                source="crm.SubscriptionRequest",
                 deep_link="/admin/leads",
             ),
             _queue_card(
@@ -383,7 +383,7 @@ def build_admin_erp_summary() -> dict:
                 key="subscription_requests",
                 label="Subscription requests",
                 count=SubscriptionRequest.objects.count(),
-                source="subscriptions.SubscriptionRequest",
+                source="crm.SubscriptionRequest",
                 deep_link="/admin/subscription-requests",
             ),
             _queue_card(
@@ -392,7 +392,7 @@ def build_admin_erp_summary() -> dict:
                 count=SubscriptionRequest.objects.filter(
                     Q(product__is_rent_enabled=True) | Q(product__is_lease_enabled=True)
                 ).count(),
-                source="subscriptions.SubscriptionRequest",
+                source="crm.SubscriptionRequest",
                 deep_link="/admin/subscription-requests",
             ),
             _queue_card(
@@ -422,21 +422,21 @@ def build_admin_erp_summary() -> dict:
                 key="delivery_pending",
                 label="Delivery pending",
                 count=due_deliveries.count(),
-                source="subscriptions.Subscription",
+                source="contracts.Subscription",
                 deep_link="/admin/delivery/workspace",
             ),
             _queue_card(
                 key="delivery_blocked",
                 label="Delivery blocked",
                 count=blocked_deliveries.count(),
-                source="subscriptions.Subscription",
+                source="contracts.Subscription",
                 deep_link="/admin/delivery/workspace",
             ),
             _queue_card(
                 key="return_inspection_pending",
                 label="Return inspection pending",
                 count=return_inspection_pending.count(),
-                source="subscriptions.RentLeaseReturnInspection",
+                source="deliveries.RentLeaseReturnInspection",
                 deep_link="/admin/delivery/workspace",
             ),
             _queue_card(
@@ -489,7 +489,7 @@ def build_admin_erp_summary() -> dict:
                 "contract_demand",
                 "Contract demand",
                 SubscriptionRequest.objects.count(),
-                "subscriptions.SubscriptionRequest",
+                "crm.SubscriptionRequest",
                 "/admin/subscription-requests",
             ),
             _queue_card(
@@ -519,18 +519,18 @@ def build_admin_erp_summary() -> dict:
                 "inventory.StockLedger",
                 "/admin/inventory/adjustments",
             ),
-            _queue_card("delivery_blocked_stock", "Delivery-blocked stock", blocked_deliveries.count(), "subscriptions.Subscription", "/admin/delivery/workspace"),
+            _queue_card("delivery_blocked_stock", "Delivery-blocked stock", blocked_deliveries.count(), "contracts.Subscription", "/admin/delivery/workspace"),
         ]
     }
     results["finance_workspace"] = {
         "cards": [
-            _queue_card("collections", "Collections", Payment.objects.count(), "subscriptions.Payment", "/admin/payments"),
-            _queue_card("dues", "Dues", due_emis.count(), "subscriptions.Emi", "/admin/emis/overdue"),
-            _queue_card("overdue", "Overdue", overdue_emis.count(), "subscriptions.Emi", "/admin/emis/overdue"),
+            _queue_card("collections", "Collections", Payment.objects.count(), "payments.Payment", "/admin/payments"),
+            _queue_card("dues", "Dues", due_emis.count(), "payments.Emi", "/admin/emis/overdue"),
+            _queue_card("overdue", "Overdue", overdue_emis.count(), "payments.Emi", "/admin/emis/overdue"),
             _queue_card("receipts", "Receipts", ReceiptDocument.objects.count(), "billing.ReceiptDocument", "/admin/billing/receipts"),
             _queue_card("invoices", "Invoices", BillingInvoice.objects.count(), "billing.BillingInvoice", "/admin/billing/invoices"),
-            _queue_card("deposits", "Deposits", Subscription.objects.filter(plan_type__in=["RENT", "LEASE"]).count(), "subscriptions.Subscription", "/admin/finance/deposits"),
-            _queue_card("reconciliation", "Reconciliation", unreconciled.count(), "subscriptions.PaymentReconciliation", "/admin/reconciliation"),
+            _queue_card("deposits", "Deposits", Subscription.objects.filter(plan_type__in=["RENT", "LEASE"]).count(), "contracts.Subscription", "/admin/finance/deposits"),
+            _queue_card("reconciliation", "Reconciliation", unreconciled.count(), "payments.PaymentReconciliation", "/admin/reconciliation"),
         ]
     }
     ds_active_cases = ServiceDeskCase.objects.filter(
@@ -646,18 +646,18 @@ def build_admin_erp_summary() -> dict:
     User = get_user_model()
     results["partner_workspace"] = {
         "cards": [
-            _queue_card("partner_requests", "Partner requests", pending_partner_requests.count(), "subscriptions.PartnerCollectionRequest", "/admin/partner-payment-requests"),
+            _queue_card("partner_requests", "Partner requests", pending_partner_requests.count(), "payments.PartnerCollectionRequest", "/admin/partner-payment-requests"),
             _queue_card(
                 "partner_customers",
                 "Partner customers",
                 Customer.objects.filter(created_by_partner_user__isnull=False).count(),
-                "subscriptions.Customer",
+                "customers.Customer",
                 "/admin/partners",
             ),
-            _queue_card("partner_payments", "Partner payments", Payment.objects.filter(collected_by__role="PARTNER").count(), "subscriptions.Payment", "/admin/partners/workspace"),
-            _queue_card("partner_collections", "Partner collections", pending_partner_requests.count(), "subscriptions.PartnerCollectionRequest", "/admin/partner-payment-requests"),
-            _queue_card("commission", "Commission", Subscription.objects.filter(partner__isnull=False).count(), "subscriptions.Subscription", "/admin/finance/commissions"),
-            _queue_card("payout", "Payout", Subscription.objects.filter(partner__isnull=False).count(), "subscriptions.Subscription", "/admin/finance/payout-batches"),
+            _queue_card("partner_payments", "Partner payments", Payment.objects.filter(collected_by__role="PARTNER").count(), "payments.Payment", "/admin/partners/workspace"),
+            _queue_card("partner_collections", "Partner collections", pending_partner_requests.count(), "payments.PartnerCollectionRequest", "/admin/partner-payment-requests"),
+            _queue_card("commission", "Commission", Subscription.objects.filter(partner__isnull=False).count(), "contracts.Subscription", "/admin/finance/commissions"),
+            _queue_card("payout", "Payout", Subscription.objects.filter(partner__isnull=False).count(), "contracts.Subscription", "/admin/finance/payout-batches"),
             _queue_card("partner_performance", "Partner performance", User.objects.filter(role="PARTNER").count(), "accounts.User", "/admin/reports/partners"),
         ]
     }

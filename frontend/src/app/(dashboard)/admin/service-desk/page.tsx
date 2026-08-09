@@ -5,6 +5,7 @@ import { MessageSquareWarning, RotateCcw, Wrench } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
+import ServiceControlCenter from "@/components/admin/control-center/ServiceControlCenter";
 import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
@@ -128,6 +129,8 @@ export default function AdminServiceDeskOverviewPage() {
       headerMode="erp"
     >
       <div className="space-y-6">
+        <ServiceControlCenter />
+
         {loading ? <ERPLoadingState label="Loading service desk overview..." /> : null}
         {!loading && error ? (
           <ERPErrorState

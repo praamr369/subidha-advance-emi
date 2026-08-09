@@ -205,7 +205,7 @@ _SUBSCRIPTION_TERMINAL_FAILURE = {"FAILED", "CANCELLED"}
 
 def _subscription_readiness(invoice: BillingInvoice, subscription) -> dict:
     from subscriptions.models import DeliveryStatus
-    from subscriptions.services.delivery_service import get_current_subscription_delivery
+    from deliveries.services.delivery_service import get_current_subscription_delivery
 
     current = get_current_subscription_delivery(subscription)
     invoice_active = _invoice_is_active(invoice)
@@ -216,7 +216,7 @@ def _subscription_readiness(invoice: BillingInvoice, subscription) -> dict:
     readiness_failure_code: str | None = None
     activation: dict | None = None
     try:
-        from subscriptions.services.contract_activation_readiness_service import (
+        from contracts.services.contract_activation_readiness_service import (
             evaluate_contract_activation_readiness,
         )
     except ImportError:
@@ -453,8 +453,8 @@ def _create_direct_sale_delivery(invoice, sale, performed_by, payload) -> dict:
 
 
 def _create_subscription_delivery(invoice, subscription, performed_by, payload) -> dict:
-    from subscriptions.services.delivery_service import create_subscription_delivery
-    from subscriptions.services.kyc_readiness_service import KycGateError
+    from deliveries.services.delivery_service import create_subscription_delivery
+    from customers.services.kyc_readiness_service import KycGateError
 
     try:
         delivery = create_subscription_delivery(
@@ -535,11 +535,11 @@ def _confirm_direct_sale_delivery(invoice, sale, performed_by) -> dict:
 
 def _confirm_subscription_delivery(invoice, subscription, performed_by) -> dict:
     from subscriptions.models import DeliveryStatus
-    from subscriptions.services.delivery_service import (
+    from deliveries.services.delivery_service import (
         get_current_subscription_delivery,
         mark_subscription_delivery_delivered,
     )
-    from subscriptions.services.kyc_readiness_service import KycGateError
+    from customers.services.kyc_readiness_service import KycGateError
 
     delivery = get_current_subscription_delivery(subscription)
     if delivery is None:

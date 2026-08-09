@@ -427,7 +427,7 @@ class SettlementAllocation(SettlementTimeStampedModel):
     )
     source_id = models.CharField(max_length=64, db_index=True)
     payment = models.ForeignKey(
-        "subscriptions.Payment",
+        "payments.Payment",
         on_delete=models.PROTECT,
         null=True,
         blank=True,

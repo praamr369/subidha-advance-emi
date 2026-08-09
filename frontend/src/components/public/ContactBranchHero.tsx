@@ -1,3 +1,5 @@
+import { getPublicDictionary } from "@/lib/public-i18n";
+import { getPublicLocale } from "@/lib/public-i18n.server";
 import Link from "next/link";
 import { ArrowRight, MapPin, MessageCircle, Phone, ShieldCheck } from "lucide-react";
 
@@ -10,25 +12,30 @@ type ContactBranchHeroProps = {
   profile: ResolvedPublicBusinessProfile;
 };
 
+
+
+export default async function ContactBranchHero({ profile }: ContactBranchHeroProps) {
+  const locale = await getPublicLocale();
+  const dict = getPublicDictionary(locale);
+
 const proofPoints = [
   {
     icon: Phone,
-    title: "Phone-first support",
-    description: "Use contact details for product, plan, document, delivery, or branch visit guidance.",
+    title: dict.public.ContactBranchHero_prop1,
+    description: dict.public.ContactBranchHero_prop2,
   },
   {
     icon: MessageCircle,
-    title: "Enquiry handoff",
-    description: "Messages create public lead context only; staff review remains required.",
+    title: dict.public.ContactBranchHero_prop3,
+    description: dict.public.ContactBranchHero_prop4,
   },
   {
     icon: ShieldCheck,
-    title: "No public financial posting",
-    description: "Contact actions do not create subscriptions, payments, receipts, deposits, or accounting records.",
+    title: dict.public.ContactBranchHero_prop5,
+    description: dict.public.ContactBranchHero_prop6,
   },
 ] as const;
 
-export default function ContactBranchHero({ profile }: ContactBranchHeroProps) {
   const phoneHref = profile.support_phone ? `tel:${profile.support_phone.replace(/\s+/g, "")}` : null;
 
   return (
@@ -49,7 +56,7 @@ export default function ContactBranchHero({ profile }: ContactBranchHeroProps) {
               Call, message, or visit for product guidance, Lucky Plan clarity, rent/lease suitability, direct-sale questions, documents, and delivery support.
             </p>
             <div className="public-card-sm max-w-3xl px-4 py-3 text-sm leading-6 text-muted-foreground">
-              <strong className="font-semibold text-foreground">Important:</strong> Contact and message actions are support handoffs only. Final product allocation, plan approval, payment, receipt, deposit, and delivery records stay inside authenticated branch workflows.
+              <strong className="font-semibold text-foreground">{dict.public.ContactBranchHero_text10}</strong> Contact and message actions are support handoffs only. Final product allocation, plan approval, payment, receipt, deposit, and delivery records stay inside authenticated branch workflows.
             </div>
           </div>
 
@@ -76,7 +83,7 @@ export default function ContactBranchHero({ profile }: ContactBranchHeroProps) {
           <div className="relative w-full overflow-hidden rounded-[1.6rem] shadow-[0_24px_54px_-24px_rgba(15,23,42,0.6)]">
             <Image
               src="/images/banner_contact.jpg"
-              alt="Contact Branch"
+              alt={dict.public.ContactBranchHero_attr15}
               width={800}
               height={533}
               priority
@@ -84,12 +91,12 @@ export default function ContactBranchHero({ profile }: ContactBranchHeroProps) {
             />
           </div>
           <div className="pointer-events-none absolute -left-3 top-8 hidden rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_84%,transparent)] px-4 py-3 shadow-[0_22px_54px_-38px_rgba(15,23,42,0.74)] backdrop-blur md:block">
-            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Branch help</div>
-            <div className="mt-1 text-sm font-semibold text-foreground">Plan guidance</div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">{dict.public.ContactBranchHero_text16}</div>
+            <div className="mt-1 text-sm font-semibold text-foreground">{dict.public.ContactBranchHero_text17}</div>
           </div>
           <div className="pointer-events-none absolute -right-3 bottom-8 hidden rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_84%,transparent)] px-4 py-3 shadow-[0_22px_54px_-38px_rgba(15,23,42,0.74)] backdrop-blur md:block">
-            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Visit support</div>
-            <div className="mt-1 text-sm font-semibold text-foreground">Asansol branch</div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">{dict.public.ContactBranchHero_text18}</div>
+            <div className="mt-1 text-sm font-semibold text-foreground">{dict.public.ContactBranchHero_text19}</div>
           </div>
         </div>
       </div>

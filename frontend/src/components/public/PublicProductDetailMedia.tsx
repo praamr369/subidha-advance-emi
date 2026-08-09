@@ -17,16 +17,40 @@ export default function PublicProductDetailMedia({
   nextLabel: string;
 }) {
   const extras = product.gallery_images ?? [];
-  const urls = [...new Set([product.image, ...extras].filter(Boolean))] as string[];
+  const imageUrls = [...new Set([product.image, ...extras].filter(Boolean))] as string[];
+  
+  type MediaItem = { type: "video" | "image"; src: string };
+  const items: MediaItem[] = [];
+  
+  if (product.video) {
+    items.push({ type: "video", src: product.video });
+  }
+  imageUrls.forEach((url) => {
+    items.push({ type: "image", src: url });
+  });
+
   const badge = product.category || "Public catalogue";
 
-  const renderSlide = (src: string | null | undefined, index: number) => {
+  const renderSlide = (item: MediaItem, index: number) => {
     const isPrimaryImage = index === 0;
+
+    if (item.type === "video") {
+      return (
+        <AspectRatio ratio={5 / 4} className="w-full relative overflow-hidden rounded-[1.7rem] bg-black">
+          <video
+            src={item.src}
+            controls
+            playsInline
+            className="absolute inset-0 size-full object-contain"
+          />
+        </AspectRatio>
+      );
+    }
 
     return (
       <AspectRatio ratio={5 / 4} className="w-full">
         <PublicProductMedia
-          src={src}
+          src={item.src}
           alt={
             isPrimaryImage ? product.name : `${product.name} (${String(index + 1)})`
           }
@@ -42,7 +66,7 @@ export default function PublicProductDetailMedia({
     );
   };
 
-  if (urls.length >= 2) {
+  if (items.length >= 2) {
     return (
       <PublicContentCarousel
         ariaLabel={carouselAriaLabel}
@@ -50,14 +74,19 @@ export default function PublicProductDetailMedia({
         nextLabel={nextLabel}
         className="rounded-[inherit]"
       >
-        {urls.map((src, index) => (
-          <div key={`${src}-${index}`} className="w-full">
-            {renderSlide(src, index)}
+        {items.map((item, index) => (
+          <div key={`${item.src}-${index}`} className="w-full">
+            {renderSlide(item, index)}
           </div>
         ))}
       </PublicContentCarousel>
     );
   }
 
-  return renderSlide(urls[0] ?? product.image, 0);
+  if (items.length === 1) {
+    return renderSlide(items[0], 0);
+  }
+
+  // Fallback for no media at all
+  return renderSlide({ type: "image", src: "" }, 0);
 }

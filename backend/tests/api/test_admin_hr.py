@@ -217,7 +217,8 @@ class AdminHrApiTests(APITestCase):
 
     def test_leave_approval_and_rejection_work(self):
         staff = EmployeeProfile.objects.create(name="Staff L", phone="919300000030", joining_date=date(2026, 4, 1))
-        leave_type = LeaveType.objects.create(code="CL", name="Casual Leave")
+        # "CL" is seeded by migration 0050_seed_default_leave_types; reuse it.
+        leave_type, _ = LeaveType.objects.get_or_create(code="CL", defaults={"name": "Casual Leave"})
         leave = LeaveRequest.objects.create(
             employee=staff,
             leave_type=leave_type,

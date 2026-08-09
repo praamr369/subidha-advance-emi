@@ -19,7 +19,7 @@ from rest_framework.views import APIView
 from rest_framework.exceptions import ValidationError
 
 from api.v1.permissions import IsAdmin
-from subscriptions.services.kyc_workflow_service import (
+from customers.services.kyc_workflow_service import (
     admin_upload_customer_kyc,
     admin_request_customer_kyc_resubmission,
     admin_upload_partner_kyc,
@@ -48,6 +48,11 @@ from subscriptions.models_kyc_workflow import KycOwnerType
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
+
+def _parse_bool(value) -> bool:
+    """Parse a multipart/form-data flag into a boolean."""
+    return str(value or "").strip().lower() in ("1", "true", "yes", "on")
+
 
 def _stream_file(document, filename_fallback: str):
     from django.http import FileResponse
@@ -96,6 +101,7 @@ class AdminCustomerKycUploadView(APIView):
                 document_reference=(request.data.get("document_reference") or "").strip(),
                 expiry_date=(request.data.get("expiry_date") or None),
                 performed_by=request.user,
+                force_review=_parse_bool(request.data.get("force_review")),
             )
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)})
@@ -173,7 +179,7 @@ class AdminPartnerKycDocumentListUploadView(APIView):
         return get_object_or_404(User, pk=pk, role=UserRole.PARTNER)
 
     def get(self, request, pk):
-        from subscriptions.models_kyc_workflow import PartnerKycDocument
+        from customers.models import PartnerKycDocument
 
         partner = self._get_partner(pk)
         docs = (
@@ -219,6 +225,7 @@ class AdminPartnerKycDocumentListUploadView(APIView):
                 document_reference=(request.data.get("document_reference") or "").strip(),
                 expiry_date=(request.data.get("expiry_date") or None),
                 performed_by=request.user,
+                force_review=_parse_bool(request.data.get("force_review")),
             )
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)})
@@ -234,7 +241,7 @@ class AdminPartnerKycDocumentApproveView(APIView):
 
     def post(self, request, pk, doc_id):
         from accounts.models import User, UserRole
-        from subscriptions.models_kyc_workflow import PartnerKycDocument
+        from customers.models import PartnerKycDocument
 
         partner = get_object_or_404(User, pk=pk, role=UserRole.PARTNER)
         document = get_object_or_404(PartnerKycDocument, pk=doc_id, partner_user=partner)
@@ -248,7 +255,7 @@ class AdminPartnerKycDocumentRejectView(APIView):
 
     def post(self, request, pk, doc_id):
         from accounts.models import User, UserRole
-        from subscriptions.models_kyc_workflow import PartnerKycDocument
+        from customers.models import PartnerKycDocument
 
         partner = get_object_or_404(User, pk=pk, role=UserRole.PARTNER)
         document = get_object_or_404(PartnerKycDocument, pk=doc_id, partner_user=partner)
@@ -270,7 +277,7 @@ class AdminPartnerKycDocumentResubmitView(APIView):
 
     def post(self, request, pk, doc_id):
         from accounts.models import User, UserRole
-        from subscriptions.models_kyc_workflow import PartnerKycDocument
+        from customers.models import PartnerKycDocument
 
         partner = get_object_or_404(User, pk=pk, role=UserRole.PARTNER)
         document = get_object_or_404(PartnerKycDocument, pk=doc_id, partner_user=partner)
@@ -292,7 +299,7 @@ class AdminPartnerKycDocumentDownloadView(APIView):
 
     def get(self, request, pk, doc_id):
         from accounts.models import User, UserRole
-        from subscriptions.models_kyc_workflow import PartnerKycDocument
+        from customers.models import PartnerKycDocument
 
         partner = get_object_or_404(User, pk=pk, role=UserRole.PARTNER)
         document = get_object_or_404(PartnerKycDocument, pk=doc_id, partner_user=partner)
@@ -372,6 +379,7 @@ class AdminVendorKycDocumentListUploadView(APIView):
                 document_reference=(request.data.get("document_reference") or "").strip(),
                 expiry_date=(request.data.get("expiry_date") or None),
                 performed_by=request.user,
+                force_review=_parse_bool(request.data.get("force_review")),
             )
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)})
@@ -521,6 +529,7 @@ class AdminStaffKycDocumentListUploadView(APIView):
                 document_reference=(request.data.get("document_reference") or "").strip(),
                 expiry_date=(request.data.get("expiry_date") or None),
                 performed_by=request.user,
+                force_review=_parse_bool(request.data.get("force_review")),
             )
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)})

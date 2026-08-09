@@ -102,7 +102,7 @@ function PayModal({ item, accounts, onClose, onPaid }: PayModalProps) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  const needsAccount = !["commission"].includes(item.payable_type);
+  const needsAccount = true; // All payables require a finance account selection
   const selectedAccount = accounts.find((a) => String(a.id) === financeAccountId);
   const journalExplanation = JOURNAL_EXPLANATION[item.payable_type] ?? "Journal entry will be posted automatically.";
   const sourceLinks = SOURCE_LINKS[item.payable_type] ?? [];

@@ -32,7 +32,7 @@ from subscriptions.models import (
     RentLeaseDepositTransactionStatus,
     RentLeaseDepositTransactionType,
 )
-from subscriptions.services.rent_lease_accounting_bridge_service import (
+from contracts.services.rent_lease_accounting_bridge_service import (
     PURPOSE_SECURITY_DEPOSIT_DAMAGE_DEDUCTION,
     post_security_deposit_damage_deduction,
 )

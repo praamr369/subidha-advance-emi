@@ -8,6 +8,16 @@ from rest_framework.views import APIView
 
 from accounting.models import Vendor
 from accounts.capabilities import require_capability
+from inventory.services.dashboard_service import (
+    build_inventory_dashboard,
+    build_critical_shortages,
+    build_movement_velocity,
+)
+from inventory.services.bulk_operations_service import (
+    bulk_update_items,
+    export_items_csv,
+    import_items_csv,
+)
 from inventory.models import (
     GoodsReceipt,
     InventoryItem,
@@ -36,8 +46,10 @@ from inventory.services.opening_stock_import_service import (
     post_opening_stock_import,
     preview_opening_stock_import,
 )
+from inventory.services.stock_location_service import build_stock_locations
 from inventory.services.stock_service import (
     approve_stock_adjustment,
+    build_stock_adjustments,
     build_stock_ledger,
     build_stock_summary,
     compute_adjustment_posting_readiness,
@@ -46,6 +58,11 @@ from inventory.services.stock_service import (
     UNIT_COST_REQUIRED_BEFORE_POSTING_MSG,
     UNIT_COST_REQUIRED_CODE,
 )
+from inventory.services.stock_reservation_list_service import build_stock_reservations_list
+from inventory.services.purchase_needs_list_service import build_purchase_needs_list
+from inventory.services.lot_tracking_list_service import build_lot_tracking_list, export_lots_csv
+from inventory.services.stock_on_hand_service import build_stock_on_hand_summary, get_critical_shortages
+from inventory.services.stock_ledger_service import build_stock_ledger_list, export_ledger_csv
 from billing.services.reversal_service import _location_quantity
 from subscriptions.models import AuditLog
 from inventory.services.valuation_service import build_inventory_valuation
@@ -186,6 +203,31 @@ class InventoryLotViewSet(AdminInventoryModelViewSet):
             queryset = queryset.filter(expiry_date__isnull=False, expiry_date__lte=today + timedelta(days=30))
         return queryset
 
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        
+        # Calculate summary KPIs over the entire base queryset
+        from django.utils import timezone
+        from datetime import timedelta
+        today = timezone.localdate()
+        
+        base_qs = InventoryLot.objects.all()
+        active_lots = base_qs.filter(status="ACTIVE").count()
+        quarantined = base_qs.filter(status="QUARANTINED").count()
+        expiring = base_qs.filter(
+            status="ACTIVE", 
+            expiry_date__isnull=False, 
+            expiry_date__lte=today + timedelta(days=30)
+        ).count()
+        
+        if isinstance(response.data, dict):
+            response.data['summary'] = {
+                "active_lots": active_lots,
+                "quarantined_lots": quarantined,
+                "expiring_lots": expiring,
+            }
+        return response
+
     def perform_create(self, serializer):
         lot = serializer.save(created_by=self.request.user)
         log_inventory_event(
@@ -227,6 +269,25 @@ class StockAdjustmentViewSet(AdminInventoryModelViewSet):
     search_fields = ["adjustment_no", "reason"]
     ordering_fields = ["adjustment_date", "created_at", "adjustment_no"]
     ordering = ["-adjustment_date", "-created_at", "-id"]
+
+    def list(self, request, *args, **kwargs):
+        # Parse pagination params
+        try:
+            page = int(request.query_params.get("page", 1))
+            page_size = int(request.query_params.get("page_size", 50))
+            page = max(1, page)
+            page_size = min(page_size, 500)  # Cap at 500
+        except (ValueError, TypeError):
+            page = 1
+            page_size = 50
+
+        payload = build_stock_adjustments(
+            status=request.query_params.get("status"),
+            search=request.query_params.get("search") or request.query_params.get("q"),
+            page=page,
+            page_size=page_size,
+        )
+        return Response(payload)
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -611,6 +672,31 @@ class StockLocationViewSet(AdminInventoryModelViewSet):
             queryset = queryset.filter(branch_id=branch_id)
         return queryset
 
+    def list(self, request, *args, **kwargs):
+        # Parse pagination params
+        try:
+            page = int(request.query_params.get("page", 1))
+            page_size = int(request.query_params.get("page_size", 50))
+            page = max(1, page)
+            page_size = min(page_size, 500)  # Cap at 500
+        except (ValueError, TypeError):
+            page = 1
+            page_size = 50
+
+        # Parse filters
+        is_active = _parse_bool_query(request.query_params.get("is_active"))
+        location_type = request.query_params.get("location_type")
+        search = request.query_params.get("search") or request.query_params.get("q")
+
+        payload = build_stock_locations(
+            is_active=is_active,
+            location_type=location_type,
+            search=search,
+            page=page,
+            page_size=page_size,
+        )
+        return Response(payload)
+
     def perform_create(self, serializer):
         location = serializer.save()
         log_inventory_event(
@@ -647,6 +733,16 @@ class StockLedgerViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = StockLedger.objects.select_related("inventory_item", "inventory_item__product", "posted_by").all()
 
     def list(self, request, *args, **kwargs):
+        # Parse pagination params
+        try:
+            page = int(request.query_params.get("page", 1))
+            page_size = int(request.query_params.get("page_size", 50))
+            page = max(1, page)
+            page_size = min(page_size, 500)  # Cap at 500
+        except (ValueError, TypeError):
+            page = 1
+            page_size = 50
+
         payload = build_stock_ledger(
             item_id=request.query_params.get("item_id"),
             location_id=request.query_params.get("location_id"),
@@ -660,6 +756,10 @@ class StockLedgerViewSet(viewsets.ReadOnlyModelViewSet):
             exchange_return_id=request.query_params.get("exchange"),
             purchase_return_id=request.query_params.get("purchase_return"),
             credit_note_id=request.query_params.get("credit_note"),
+            search=request.query_params.get("search") or request.query_params.get("q"),
+            reference_search=request.query_params.get("reference_search"),
+            page=page,
+            page_size=page_size,
         )
         return Response(payload)
 
@@ -680,8 +780,83 @@ class InventoryValuationView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def get(self, request):
+        export_format = request.query_params.get("export")
+
+        # Parse pagination params
+        try:
+            page = int(request.query_params.get("page", 1))
+            page_size = int(request.query_params.get("page_size", 25))
+            page = max(1, page)
+            page_size = min(page_size, 500)  # Cap at 500
+        except (ValueError, TypeError):
+            page = 1
+            page_size = 25
+
+        # Parse location filter
+        try:
+            stock_location_id = int(request.query_params.get("stock_location_id")) if request.query_params.get("stock_location_id") else None
+        except (ValueError, TypeError):
+            stock_location_id = None
+
+        if export_format == "csv":
+            from inventory.services.valuation_service import build_inventory_valuation_csv
+            csv_data = build_inventory_valuation_csv(
+                as_of_date=request.query_params.get("as_of_date"),
+                search=request.query_params.get("search") or request.query_params.get("q"),
+                category=request.query_params.get("category"),
+                exclude_zero=request.query_params.get("exclude_zero") == "true" or request.query_params.get("exclude_zero") == "1",
+                stock_location_id=stock_location_id,
+            )
+            response = Response(csv_data, content_type="text/csv")
+            response["Content-Disposition"] = "attachment; filename=inventory_valuation.csv"
+            return response
+
         payload = build_inventory_valuation(
             as_of_date=request.query_params.get("as_of_date"),
+            search=request.query_params.get("search") or request.query_params.get("q"),
+            category=request.query_params.get("category"),
+            exclude_zero=request.query_params.get("exclude_zero") == "true" or request.query_params.get("exclude_zero") == "1",
+            stock_location_id=stock_location_id,
+            page=page,
+            page_size=page_size,
+        )
+        return Response(payload)
+
+
+class InventoryDashboardView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        try:
+            location_id = int(request.query_params.get("location_id")) if request.query_params.get("location_id") else None
+        except (ValueError, TypeError):
+            location_id = None
+
+        # Get main dashboard KPIs
+        kpis = build_inventory_dashboard(location_id=location_id)
+
+        # Get critical shortages (top 5 out-of-stock items with pending orders)
+        shortages = build_critical_shortages(location_id=location_id, limit=5)
+
+        # Get movement velocity (fast movers and dead stock)
+        velocity = build_movement_velocity(location_id=location_id)
+
+        return Response({
+            "kpis": kpis,
+            "critical_shortages": shortages,
+            "movement_velocity": velocity,
+        })
+
+
+class PurchasePipelineSummaryView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        from inventory.services.procurement_service import build_purchase_pipeline_summary
+
+        branch_id = request.query_params.get("branch")
+        payload = build_purchase_pipeline_summary(
+            branch_id=int(branch_id) if branch_id and str(branch_id).isdigit() else None,
         )
         return Response(payload)
 
@@ -804,6 +979,99 @@ class AdminInventoryCategoriesView(APIView):
         })
 
 
+class AdminInventoryItemsBulkView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def patch(self, request):
+        """Bulk update inventory items."""
+        try:
+            item_ids = request.data.get("item_ids", [])
+            updates = request.data.get("updates", {})
+
+            if not isinstance(item_ids, list) or not item_ids:
+                return Response(
+                    {"detail": "item_ids must be a non-empty list"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            if not isinstance(updates, dict) or not updates:
+                return Response(
+                    {"detail": "updates must be a non-empty object"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            result = bulk_update_items(item_ids=item_ids, updates=updates)
+            return Response(result)
+
+        except Exception as e:
+            return Response(
+                {"detail": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+class AdminInventoryItemsExportView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        """Export inventory items to CSV."""
+        try:
+            item_ids = request.query_params.getlist("item_ids")
+            item_ids = [int(id) for id in item_ids if id.isdigit()] if item_ids else None
+            stock_item_type = request.query_params.get("stock_item_type")
+            bridge_enabled_str = request.query_params.get("bridge_enabled")
+            bridge_enabled = None
+            if bridge_enabled_str:
+                bridge_enabled = bridge_enabled_str.lower() in ("true", "1", "yes")
+
+            try:
+                location_id = int(request.query_params.get("location_id")) if request.query_params.get("location_id") else None
+            except (ValueError, TypeError):
+                location_id = None
+
+            csv_data = export_items_csv(
+                item_ids=item_ids,
+                stock_item_type=stock_item_type,
+                bridge_enabled=bridge_enabled,
+                location_id=location_id,
+            )
+
+            response = Response(csv_data, content_type="text/csv")
+            response["Content-Disposition"] = "attachment; filename=inventory_items.csv"
+            return response
+
+        except Exception as e:
+            return Response(
+                {"detail": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+class AdminInventoryItemsImportView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        """Import inventory items from CSV."""
+        try:
+            csv_file = request.FILES.get("file")
+            if not csv_file:
+                return Response(
+                    {"detail": "No file provided"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            csv_content = csv_file.read().decode("utf-8")
+            result = import_items_csv(csv_content)
+            return Response(result)
+
+        except Exception as e:
+            return Response(
+                {"detail": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
 class AdminReturnLocationsSetupView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
@@ -867,3 +1135,220 @@ class OpeningStockImportPostView(APIView):
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)}) from exc
         return Response(payload, status=status.HTTP_200_OK)
+
+
+class AdminStockReservationListView(APIView):
+    """
+    GET /admin/inventory/reservations/?page=1&page_size=50&search=item_name&status=ACTIVE&reserved_for=SUBSCRIPTION
+
+    Returns paginated stock reservations with server-side filtering and KPI summary.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        # Parse pagination params
+        try:
+            page = int(request.query_params.get("page", 1))
+            page_size = int(request.query_params.get("page_size", 50))
+            page = max(1, page)
+            page_size = min(page_size, 500)  # Cap at 500
+        except (ValueError, TypeError):
+            page = 1
+            page_size = 50
+
+        # Get filter params
+        search = (request.query_params.get("search") or "").strip()
+        status_filter = (request.query_params.get("status") or "").strip().upper()
+        source_module = (request.query_params.get("source_module") or "").strip()
+
+        # Build the reservations list with all filters
+        payload = build_stock_reservations_list(
+            search=search if search else None,
+            status=status_filter if status_filter else None,
+            source_module=source_module if source_module else None,
+            page=page,
+            page_size=page_size,
+        )
+
+        return Response(payload)
+
+
+class AdminPurchaseNeedsListView(APIView):
+    """
+    GET /admin/inventory/requirements/?page=1&page_size=50&search=product&status=OPEN&source_module=SUBSCRIPTION_DEMAND
+
+    Returns paginated purchase needs with server-side filtering and KPI summary.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        # Parse pagination params
+        try:
+            page = int(request.query_params.get("page", 1))
+            page_size = int(request.query_params.get("page_size", 50))
+            page = max(1, page)
+            page_size = min(page_size, 500)  # Cap at 500
+        except (ValueError, TypeError):
+            page = 1
+            page_size = 50
+
+        # Get filter params
+        search = (request.query_params.get("search") or "").strip()
+        status_filter = (request.query_params.get("status") or "").strip()
+        source_module = (request.query_params.get("source_module") or "").strip()
+        priority = (request.query_params.get("priority") or "").strip()
+
+        # Build the purchase needs list with all filters
+        payload = build_purchase_needs_list(
+            search=search if search else "",
+            status=status_filter if status_filter else "",
+            source_module=source_module if source_module else "",
+            priority=priority if priority else "",
+            page=page,
+            page_size=page_size,
+        )
+
+        return Response(payload)
+
+
+class AdminLotTrackingListView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        """List lots with pagination, filtering, KPI aggregation, or CSV export"""
+        export_format = request.query_params.get("format", "").lower()
+
+        # Get filter params
+        search = (request.query_params.get("q") or request.query_params.get("search") or "").strip()
+        status_filter = (request.query_params.get("status") or "").strip()
+        source_filter = (request.query_params.get("source") or "").strip()
+        priority_filter = (request.query_params.get("priority") or "").strip()
+
+        if export_format == "csv":
+            rows = export_lots_csv(search, status_filter, source_filter)
+
+            # Create CSV response
+            import csv
+            import io
+            from django.http import HttpResponse
+
+            output = io.StringIO()
+            writer = csv.DictWriter(output, fieldnames=[
+                'Lot Code', 'Product Code', 'Product Name', 'SKU', 'Barcode',
+                'Quantity', 'Reorder Point', 'Status', 'Source', 'Priority',
+                'Warehouse', 'Created At'
+            ])
+            writer.writeheader()
+            writer.writerows(rows)
+
+            response = HttpResponse(output.getvalue(), content_type='text/csv')
+            response['Content-Disposition'] = 'attachment; filename="lots_export.csv"'
+            return response
+
+        # Default: return JSON list
+        try:
+            page = int(request.query_params.get("page", 1))
+            page_size = int(request.query_params.get("page_size", 50))
+        except (ValueError, TypeError):
+            page = 1
+            page_size = 50
+
+        if page_size not in {20, 50, 100}:
+            page_size = 50
+
+        payload = build_lot_tracking_list(
+            search_query=search if search else "",
+            status_filter=status_filter if status_filter else "",
+            source_filter=source_filter if source_filter else "",
+            priority_filter=priority_filter if priority_filter else "",
+            page=page,
+            page_size=page_size,
+        )
+
+        return Response(payload)
+
+
+class AdminStockOnHandView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        """Get stock on hand summary with KPI aggregation and critical shortages"""
+        filter_type = request.query_params.get("filter", "").lower()
+
+        try:
+            page = int(request.query_params.get("page", 1))
+            page_size = int(request.query_params.get("page_size", 50))
+        except (ValueError, TypeError):
+            page = 1
+            page_size = 50
+
+        if page_size not in {20, 50, 100}:
+            page_size = 50
+
+        if filter_type == "critical":
+            # Return only critical shortages (paginated)
+            payload = get_critical_shortages(page=page, page_size=page_size)
+        else:
+            # Return full summary with critical shortages list
+            payload = build_stock_on_hand_summary()
+
+        return Response(payload)
+
+
+class AdminStockLedgerListView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        """List stock ledger with pagination, filtering, KPI aggregation, or CSV export"""
+        export_format = request.query_params.get("format", "").lower()
+
+        # Get filter params
+        search = (request.query_params.get("q") or request.query_params.get("search") or "").strip()
+        transaction_type = (request.query_params.get("transaction_type") or "").strip()
+        reference_type = (request.query_params.get("reference_type") or "").strip()
+        date_from = (request.query_params.get("date_from") or "").strip()
+        date_to = (request.query_params.get("date_to") or "").strip()
+
+        if export_format == "csv":
+            rows = export_ledger_csv(search, transaction_type, reference_type, date_from, date_to)
+
+            # Create CSV response
+            import csv
+            import io
+            from django.http import HttpResponse
+
+            output = io.StringIO()
+            writer = csv.DictWriter(output, fieldnames=[
+                'Created', 'Product Code', 'Product Name', 'SKU', 'Barcode',
+                'Transaction Type', 'Quantity', 'Reference Type', 'Reference ID',
+                'Reference Display', 'Warehouse'
+            ])
+            writer.writeheader()
+            writer.writerows(rows)
+
+            response = HttpResponse(output.getvalue(), content_type='text/csv')
+            response['Content-Disposition'] = 'attachment; filename="stock_ledger_export.csv"'
+            return response
+
+        # Default: return JSON list
+        try:
+            page = int(request.query_params.get("page", 1))
+            page_size = int(request.query_params.get("page_size", 50))
+        except (ValueError, TypeError):
+            page = 1
+            page_size = 50
+
+        if page_size not in {20, 50, 100}:
+            page_size = 50
+
+        payload = build_stock_ledger_list(
+            search_query=search if search else "",
+            transaction_type_filter=transaction_type if transaction_type else "",
+            reference_type_filter=reference_type if reference_type else "",
+            date_from=date_from if date_from else "",
+            date_to=date_to if date_to else "",
+            page=page,
+            page_size=page_size,
+        )
+
+        return Response(payload)

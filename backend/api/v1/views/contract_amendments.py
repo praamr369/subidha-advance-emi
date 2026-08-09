@@ -23,16 +23,16 @@ from api.v1.serializers.contract_amendments import (
 )
 from reconciliation.models import ReconciliationEvidence
 from subscriptions.models import ContractAmendment, ContractRecontractEvent, Subscription
-from subscriptions.services.product_recontract_accounting_service import POSTING_PURPOSE
-from subscriptions.services.contract_amendment_service import (
+from contracts.services.product_recontract_accounting_service import POSTING_PURPOSE
+from contracts.services.contract_amendment_service import (
     approve_amendment,
     create_amendment,
     implement_approved_amendment,
     mark_under_review,
     reject_amendment,
 )
-from subscriptions.services.product_recontract_execution_service import execute_product_recontract_event
-from subscriptions.services.product_recontract_preview_service import (
+from contracts.services.product_recontract_execution_service import execute_product_recontract_event
+from contracts.services.product_recontract_preview_service import (
     create_product_recontract_schedule_preview,
     create_product_recontract_preview_snapshot,
     create_product_recontract_financial_impact_preview,
@@ -571,7 +571,7 @@ class AdminContractAmendmentLuckyBatchPreviewView(APIView):
         if not amendment:
             return Response({"detail": "Amendment not found."}, status=status.HTTP_404_NOT_FOUND)
         
-        from subscriptions.services.lucky_batch_preview_service import preview_lucky_id_batch_amendment
+        from lucky_plan.services.lucky_batch_preview_service import preview_lucky_id_batch_amendment
         try:
             preview = preview_lucky_id_batch_amendment(amendment)
         except DjangoValidationError as exc:
@@ -591,7 +591,7 @@ class AdminContractAmendmentRentLeasePreviewView(APIView):
         if not amendment:
             return Response({"detail": "Amendment not found."}, status=status.HTTP_404_NOT_FOUND)
         
-        from subscriptions.services.rent_lease_preview_service import preview_rent_lease_amendment
+        from contracts.services.rent_lease_preview_service import preview_rent_lease_amendment
         try:
             preview = preview_rent_lease_amendment(amendment)
         except DjangoValidationError as exc:
@@ -611,7 +611,7 @@ class AdminContractAmendmentDepositSecurityPreviewView(APIView):
         if not amendment:
             return Response({"detail": "Amendment not found."}, status=status.HTTP_404_NOT_FOUND)
         
-        from subscriptions.services.deposit_security_preview_service import preview_deposit_security_amendment
+        from contracts.services.deposit_security_preview_service import preview_deposit_security_amendment
         try:
             preview = preview_deposit_security_amendment(amendment)
         except DjangoValidationError as exc:

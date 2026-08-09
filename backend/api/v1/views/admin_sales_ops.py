@@ -19,7 +19,7 @@ from billing.services.direct_sale_workflow_service import (
 )
 from subscriptions.models import AuditLog
 from subscriptions.services.audit_service import log_audit
-from subscriptions.services.document_numbering_service import get_document_numbering_state
+from contracts.services.document_numbering_service import get_document_numbering_state
 
 
 class _AdminBase(APIView):

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
+from api.v1.permissions import IsAdmin
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -62,7 +63,7 @@ def _attribute_schema(pim):
 class ProductPimDetailView(APIView):
     """GET /admin/products/<product_id>/pim/ — linked PIM record + attribute schema."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdmin]
 
     def get(self, request, product_id):
         product = _resolve_product(product_id)
@@ -135,7 +136,7 @@ class ProductPimAttributesView(APIView):
     so the change shows in the PIM module immediately.
     """
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdmin]
 
     def put(self, request, product_id):
         product = _resolve_product(product_id)

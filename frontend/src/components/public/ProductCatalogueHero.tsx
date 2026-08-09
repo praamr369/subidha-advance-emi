@@ -1,3 +1,5 @@
+import { getPublicDictionary } from "@/lib/public-i18n";
+import { getPublicLocale } from "@/lib/public-i18n.server";
 import Link from "next/link";
 import { ArrowRight, PackageCheck, ReceiptText, ShieldCheck, Sparkles } from "lucide-react";
 
@@ -13,35 +15,37 @@ type ProductCatalogueHeroProps = {
   categoryCount: number;
 };
 
-const proofPoints = [
-  {
-    icon: PackageCheck,
-    title: "Live catalogue only",
-    description: "Product names, codes and prices come from public product records, not hardcoded cards.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "No fake stock promise",
-    description: "Stock, delivery, batch seats and eligibility are confirmed only after branch review.",
-  },
-  {
-    icon: ReceiptText,
-    title: "Plan handoff ready",
-    description: "A selected product can be carried into enquiry without creating a contract automatically.",
-  },
-] as const;
-
-export default function ProductCatalogueHero({
+export default async function ProductCatalogueHero({
   title,
   subtitle,
   count,
   mediaReadyCount,
   categoryCount,
 }: ProductCatalogueHeroProps) {
+  const locale = await getPublicLocale();
+  const dict = getPublicDictionary(locale);
+    const proofPoints = [
+      {
+        icon: PackageCheck,
+        title: dict.public.ProductCatalogueHero_prop1,
+        description: dict.public.ProductCatalogueHero_prop2,
+      },
+      {
+        icon: ShieldCheck,
+        title: dict.public.ProductCatalogueHero_prop3,
+        description: dict.public.ProductCatalogueHero_prop4,
+      },
+      {
+        icon: ReceiptText,
+        title: dict.public.ProductCatalogueHero_prop5,
+        description: dict.public.ProductCatalogueHero_prop6,
+      },
+    ] as const;
+
   const stats = [
-    { label: "Published products", value: count.toLocaleString("en-IN") },
-    { label: "Categories", value: categoryCount.toLocaleString("en-IN") },
-    { label: "Media-ready", value: mediaReadyCount.toLocaleString("en-IN") },
+    { label: dict.public.ProductCatalogueHero_prop7, value: count.toLocaleString("en-IN") },
+    { label: dict.public.ProductCatalogueHero_prop8, value: categoryCount.toLocaleString("en-IN") },
+    { label: dict.public.ProductCatalogueHero_prop9, value: mediaReadyCount.toLocaleString("en-IN") },
   ];
 
   return (
@@ -62,7 +66,7 @@ export default function ProductCatalogueHero({
               {subtitle}
             </p>
             <div className="public-card-sm max-w-3xl px-4 py-3 text-sm leading-6 text-muted-foreground">
-              <strong className="font-semibold text-foreground">Important:</strong> This catalogue supports discovery and enquiry only. Final stock, delivery, plan type, tenure, EMI, rent, lease, invoice, and receipt posture are confirmed through controlled branch workflows.
+              <strong className="font-semibold text-foreground">{dict.public.ProductCatalogueHero_text11}</strong> This catalogue supports discovery and enquiry only. Final stock, delivery, plan type, tenure, EMI, rent, lease, invoice, and receipt posture are confirmed through controlled branch workflows.
             </div>
           </div>
 
@@ -93,7 +97,7 @@ export default function ProductCatalogueHero({
           <div className="relative w-full overflow-hidden rounded-[1.6rem] shadow-[0_24px_54px_-24px_rgba(15,23,42,0.6)]">
             <Image
               src="/images/category_sofa.jpg"
-              alt="Product Catalogue"
+              alt={dict.public.ProductCatalogueHero_attr16}
               width={800}
               height={533}
               priority
@@ -101,12 +105,12 @@ export default function ProductCatalogueHero({
             />
           </div>
           <div className="pointer-events-none absolute -left-3 top-8 hidden rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_84%,transparent)] px-4 py-3 shadow-[0_22px_54px_-38px_rgba(15,23,42,0.74)] backdrop-blur md:block">
-            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Furniture + appliances</div>
-            <div className="mt-1 text-sm font-semibold text-foreground">Category discovery</div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">{dict.public.ProductCatalogueHero_text17}</div>
+            <div className="mt-1 text-sm font-semibold text-foreground">{dict.public.ProductCatalogueHero_text18}</div>
           </div>
           <div className="pointer-events-none absolute -right-3 bottom-8 hidden rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_84%,transparent)] px-4 py-3 shadow-[0_22px_54px_-38px_rgba(15,23,42,0.74)] backdrop-blur md:block">
-            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Product handoff</div>
-            <div className="mt-1 text-sm font-semibold text-foreground">Enquiry-ready context</div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">{dict.public.ProductCatalogueHero_text19}</div>
+            <div className="mt-1 text-sm font-semibold text-foreground">{dict.public.ProductCatalogueHero_text20}</div>
           </div>
         </div>
       </div>

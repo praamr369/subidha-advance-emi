@@ -6,6 +6,10 @@ from api.v1.views.service_desk import (
     ServiceDeskComplaintRegisterView,
     ServiceDeskOverviewView,
 )
+from api.v1.views.service_control_center import (
+    AdminServiceControlResolveView,
+    AdminServiceControlSearchView,
+)
 
 router = DefaultRouter()
 router.register(r"cases", ServiceDeskCaseViewSet, basename="service-desk-cases")
@@ -13,5 +17,7 @@ router.register(r"cases", ServiceDeskCaseViewSet, basename="service-desk-cases")
 urlpatterns = [
     path("overview/", ServiceDeskOverviewView.as_view()),
     path("complaints/", ServiceDeskComplaintRegisterView.as_view()),
+    path("control-search/", AdminServiceControlSearchView.as_view()),
+    path("control-resolve/", AdminServiceControlResolveView.as_view()),
     path("", include(router.urls)),
 ]

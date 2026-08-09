@@ -380,7 +380,7 @@ class MigrationRollbackView(AdminMigrationView):
 
 
 class MigrationReconciliationView(AdminMigrationView):
-    def get(self, request):
+    def get(self, request, batch_id: int = None):
         return Response(reconciliation_service.overall_reconciliation())
 
     def post(self, request, batch_id: int):

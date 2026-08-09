@@ -199,8 +199,8 @@ export default function KycReadinessPanel({
 
   const kycOk = readiness.can_activate;
   const kycStatusLabel = readiness.exception_approved
-    ? "Exception Approved"
-    : (readiness.kyc_status || "NOT VERIFIED");
+    ? "Reviewed (Exception)"
+    : (readiness.kyc_status || "NOT REVIEWED");
   const kycStatusClass =
     readiness.kyc_verified || readiness.exception_approved
       ? "bg-green-100 text-green-700"

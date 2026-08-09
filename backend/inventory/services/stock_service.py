@@ -1004,6 +1004,10 @@ def build_stock_ledger(
     exchange_return_id: int | None = None,
     purchase_return_id: int | None = None,
     credit_note_id: int | None = None,
+    search: str | None = None,
+    reference_search: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
 ):
     queryset = StockLedger.objects.select_related(
         "inventory_item",
@@ -1046,7 +1050,39 @@ def build_stock_ledger(
         queryset = queryset.filter(reference_model="PurchaseReturnLine", reference_id__startswith=f"{purchase_return_id}:")
     if credit_note_id:
         queryset = queryset.filter(reference_model="BillingCreditNoteLine", reference_id__startswith=f"{credit_note_id}:")
+
+    # Deep search: product name, SKU, or product code
+    if search:
+        queryset = queryset.filter(
+            Q(inventory_item__product__name__icontains=search)
+            | Q(inventory_item__sku__icontains=search)
+            | Q(inventory_item__product__product_code__icontains=search)
+        )
+
+    # Reference traceability: search by invoice ID or delivery ID
+    if reference_search:
+        queryset = queryset.filter(reference_id__icontains=reference_search)
+
     queryset = queryset.order_by("-movement_date", "-created_at", "-id")
+
+    # Calculate totals across entire filtered dataset BEFORE pagination
+    total_count = queryset.count()
+    from django.db.models import Sum, DecimalField
+    totals = queryset.aggregate(
+        total_in=Sum('quantity_in', output_field=DecimalField()),
+        total_out=Sum('quantity_out', output_field=DecimalField())
+    )
+    total_in = totals['total_in'] or Decimal('0.000')
+    total_out = totals['total_out'] or Decimal('0.000')
+
+    # Apply pagination
+    page = max(1, page)
+    page_size = min(page_size, 500)  # Cap at 500
+    start_idx = (page - 1) * page_size
+    end_idx = start_idx + page_size
+    paginated_queryset = queryset[start_idx:end_idx]
+
+    num_pages = (total_count + page_size - 1) // page_size
 
     results = [
         {
@@ -1069,6 +1105,106 @@ def build_stock_ledger(
             "posted_by_username": getattr(row.posted_by, "username", None),
             "posted_journal_entry_id": row.posted_journal_entry_id,
         }
-        for row in queryset
+        for row in paginated_queryset
     ]
-    return {"count": len(results), "results": results}
+
+    return {
+        "count": total_count,
+        "page": page,
+        "page_size": page_size,
+        "num_pages": num_pages,
+        "total_in": f"{total_in:.3f}",
+        "total_out": f"{total_out:.3f}",
+        "results": results,
+    }
+
+
+def build_stock_adjustments(
+    *,
+    status: str | None = None,
+    search: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
+):
+    """Build paginated stock adjustments with KPI counts at database level."""
+    queryset = StockAdjustment.objects.select_related(
+        "stock_location", "created_by", "approved_by", "posted_by"
+    ).prefetch_related("lines", "lines__inventory_item", "lines__inventory_item__product").all()
+
+    # Filter by status if provided
+    if status:
+        status = status.strip().upper()
+        queryset = queryset.filter(status=status)
+
+    # Search by adjustment number or reason
+    if search:
+        search = search.strip()
+        queryset = queryset.filter(
+            Q(adjustment_no__icontains=search) | Q(reason__icontains=search)
+        )
+
+    # Order by date and creation time
+    queryset = queryset.order_by("-adjustment_date", "-created_at", "-id")
+
+    # Calculate KPI counts for each status at database level (entire filtered dataset)
+    all_adjustments = StockAdjustment.objects.all()
+    kpi_counts = all_adjustments.values("status").annotate(count=models.Count("id"))
+    kpi_map = {item["status"]: item["count"] for item in kpi_counts}
+
+    # Get total count for pagination
+    total_count = queryset.count()
+
+    # Apply pagination
+    page = max(1, page)
+    page_size = min(page_size, 500)  # Cap at 500
+    start_idx = (page - 1) * page_size
+    end_idx = start_idx + page_size
+    paginated_queryset = queryset[start_idx:end_idx]
+
+    num_pages = (total_count + page_size - 1) // page_size
+
+    results = []
+    for row in paginated_queryset:
+        result = {
+            "id": row.id,
+            "adjustment_no": row.adjustment_no,
+            "adjustment_date": row.adjustment_date.isoformat(),
+            "status": row.status,
+            "stock_location_id": row.stock_location_id,
+            "stock_location_name": getattr(row.stock_location, "name", None),
+            "reason": row.reason,
+            "lines": [
+                {
+                    "id": line.id,
+                    "inventory_item_id": line.inventory_item_id,
+                    "inventory_item_sku": getattr(line.inventory_item, "sku", None),
+                    "product_code": getattr(line.inventory_item.product, "product_code", None),
+                    "product_name": getattr(line.inventory_item.product, "name", None),
+                    "quantity_delta": f"{line.quantity_delta:.3f}",
+                    "unit_cost_snapshot": f"{line.unit_cost_snapshot:.2f}" if line.unit_cost_snapshot else None,
+                    "valuation_amount_snapshot": f"{line.valuation_amount_snapshot:.2f}" if line.valuation_amount_snapshot else None,
+                    "line_valuation": line.line_valuation,
+                    "requires_unit_cost": line.requires_unit_cost,
+                    "notes": line.notes,
+                }
+                for line in row.lines.all()
+            ],
+            "requires_unit_cost": row.requires_unit_cost,
+            "can_post": row.can_post,
+            "created_by_username": getattr(row.created_by, "username", None),
+            "approved_by_username": getattr(row.approved_by, "username", None),
+            "posted_by_username": getattr(row.posted_by, "username", None),
+            "created_at": row.created_at.isoformat(),
+        }
+        results.append(result)
+
+    return {
+        "count": total_count,
+        "page": page,
+        "page_size": page_size,
+        "num_pages": num_pages,
+        "draft_count": kpi_map.get("DRAFT", 0),
+        "approved_count": kpi_map.get("APPROVED", 0),
+        "posted_count": kpi_map.get("POSTED", 0),
+        "results": results,
+    }

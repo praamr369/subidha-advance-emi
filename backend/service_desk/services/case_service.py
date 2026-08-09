@@ -35,7 +35,7 @@ from service_desk.models import (
 )
 from subscriptions.models import AuditLog, DeliveryStatus
 from subscriptions.services.audit_service import log_audit
-from subscriptions.services.delivery_service import (
+from deliveries.services.delivery_service import (
     mark_subscription_delivery_returned,
     request_subscription_delivery_return,
 )

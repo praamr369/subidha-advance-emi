@@ -35,7 +35,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         from billing.models import DirectSale
-        from subscriptions.services.contract_number_service import assign_direct_sale_number
+        from contracts.services.contract_number_service import assign_direct_sale_number
 
         dry_run: bool = options["dry_run"]
 

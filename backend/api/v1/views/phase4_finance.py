@@ -27,11 +27,11 @@ from subscriptions.models import (
     SubscriptionDocument,
 )
 from subscriptions.services.audit_service import log_audit
-from subscriptions.services.contract_pdf_service import (
+from contracts.services.contract_pdf_service import (
     generate_advance_emi_contract_pdf,
     generate_contract_pdf_for_subscription,
 )
-from subscriptions.services.phase4_finance_service import (
+from payments.services.phase4_finance_service import (
     FinanceFilter,
     build_admin_finance_dashboard,
     customer_account_statement,
@@ -49,7 +49,7 @@ from subscriptions.services.phase4_finance_service import (
     reconciliation_report,
     waiver_loss_report,
 )
-from subscriptions.services.document_pdf_service import (
+from contracts.services.document_pdf_service import (
     render_deposit_deduction_pdf,
     render_deposit_refund_pdf,
     render_invoice_pdf,
@@ -59,17 +59,17 @@ from subscriptions.services.document_pdf_service import (
     render_return_inspection_pdf,
     render_security_deposit_pdf,
 )
-from subscriptions.services.rent_lease_billing_service import (
+from contracts.services.rent_lease_billing_service import (
     list_admin_deposit_register,
     record_damage_deduction,
     approve_deposit_refund,
     record_deposit_refund,
 )
-from subscriptions.services.rent_lease_finance_sync_service import (
+from contracts.services.rent_lease_finance_sync_service import (
     ensure_premade_rent_lease_accounting_setup,
     get_active_account_mapping,
 )
-from subscriptions.services.rent_lease_accounting_readiness_service import get_rent_lease_accounting_readiness
+from contracts.services.rent_lease_accounting_readiness_service import get_rent_lease_accounting_readiness
 
 
 POSTING_READY_NOTE = "Operational source collection and mapping are ready. Accounting bridge posting remains audit-deferred until approval is enabled."

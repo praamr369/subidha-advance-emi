@@ -5,7 +5,7 @@ from rest_framework import serializers
 
 from accounts.models import User
 from subscriptions.models import AuditLog, Customer
-from subscriptions.services.customer_account_service import (
+from customers.services.customer_account_service import (
     build_customer_profile_summary,
     sync_customer_login_identity,
 )

@@ -94,6 +94,7 @@ SYSTEM_POSTING_PROFILE_ACCOUNTS: tuple[CanonicalChartAccountSpec, ...] = (
     CanonicalChartAccountSpec(key="OFFICE_SUPPLIES_EXPENSE", code="OFF-5320", name="Office Supplies & Stationery", account_type=ChartOfAccountType.EXPENSE),
     CanonicalChartAccountSpec(key="PETROL_TRAVEL_EXPENSE", code="TRV-5330", name="Petrol & Travel Expense", account_type=ChartOfAccountType.EXPENSE),
     CanonicalChartAccountSpec(key="GENERAL_EXPENSE", code="GEN-5390", name="General / Miscellaneous Expense", account_type=ChartOfAccountType.EXPENSE),
+    CanonicalChartAccountSpec(key="PERSONAL_EXPENSE", code="PER-5400", name="Personal Expenses / Owner Drawings", account_type=ChartOfAccountType.EXPENSE),
     CanonicalChartAccountSpec(key="ACCUMULATED_DEPRECIATION", code="DEP-1250", name="Accumulated Depreciation", account_type=ChartOfAccountType.ASSET),
     CanonicalChartAccountSpec(key="OWNER_CAPITAL", code="EQ-3000", name="Owner Capital", account_type=ChartOfAccountType.EQUITY),
     CanonicalChartAccountSpec(key="RETAINED_EARNINGS", code="EQ-3100", name="Retained Earnings / Opening Balance Adjustment", account_type=ChartOfAccountType.EQUITY),

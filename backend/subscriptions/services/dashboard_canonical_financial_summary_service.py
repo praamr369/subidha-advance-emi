@@ -29,7 +29,7 @@ from subscriptions.services.dashboard_scopes import (
     PartnerScope,
 )
 from subscriptions.services.financial_health_service import system_financial_health
-from subscriptions.services.risk_service import evaluate_all_active_subscriptions
+from customers.services.risk_service import evaluate_all_active_subscriptions
 from core.services.operational_visibility import get_payment_collection_totals
 from subscriptions.services.subscription_financial_service import (
     build_customer_dashboard_summary,

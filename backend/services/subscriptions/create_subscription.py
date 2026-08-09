@@ -1,6 +1,6 @@
 from datetime import date
 
-from subscriptions.services.subscription_service import create_emi_subscription
+from contracts.services.subscription_service import create_emi_subscription
 
 
 def create_subscription(*, customer, product, batch, lucky_number: int, tenure_months: int, partner=None, start_date: date | None = None, performed_by=None):

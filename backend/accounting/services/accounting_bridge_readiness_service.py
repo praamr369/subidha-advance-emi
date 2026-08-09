@@ -355,8 +355,8 @@ EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
     BridgeEventSpec(
         event_key="commission_accrual",
         label="Commission accrual",
-        source_module="subscriptions",
-        source_app="subscriptions",
+        source_module="commissions",
+        source_app="commissions",  # Commission moved subscriptions -> commissions app in the split
         source_model="Commission",
         event_group="Commission",
         debit_requirements=("COMMISSION_EXPENSE",),
@@ -367,8 +367,8 @@ EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
     BridgeEventSpec(
         event_key="commission_payout",
         label="Commission payout",
-        source_module="subscriptions",
-        source_app="subscriptions",
+        source_module="commissions",
+        source_app="commissions",  # CommissionPayoutBatch moved subscriptions -> commissions app in the split
         source_model="CommissionPayoutBatch",
         event_group="Commission",
         debit_requirements=("COMMISSION_PAYABLE",),
@@ -518,9 +518,16 @@ EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
 def _source_model_exists(spec: BridgeEventSpec) -> bool:
     try:
         apps.get_model(spec.source_app, spec.source_model, require_ready=False)
+        return True
     except LookupError:
-        return False
-    return True
+        # The declared source_app can drift when a model is relocated between apps
+        # (e.g. the subscriptions split moved Payment/Subscription/Commission out).
+        # A readiness event must not silently vanish just because its label moved:
+        # fall back to resolving the model by name across all installed apps.
+        return any(
+            model.__name__ == spec.source_model
+            for model in apps.get_models()
+        )
 
 
 def _chart_payload(account: ChartOfAccount | None, *, requirement: str | None = None, purpose: str | None = None) -> dict[str, Any] | None:

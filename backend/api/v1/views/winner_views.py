@@ -4,7 +4,7 @@ from rest_framework.permissions import IsAdminUser
 from rest_framework import status
 from django.core.exceptions import ValidationError
 
-from subscriptions.services.winner_service import WinnerService
+from lucky_plan.services.winner_service import WinnerService
 
 
 class ExecuteWinnerView(APIView):

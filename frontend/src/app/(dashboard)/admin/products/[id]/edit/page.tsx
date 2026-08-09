@@ -3,8 +3,9 @@ import { formatRupee } from "@/lib/utils/currency";
 
 import Link from "next/link";
 import Image from "next/image";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
+import { UploadCloud, Trash2, ImagePlus, Video } from "lucide-react";
 
 import ProductQuickActions from "@/components/admin/products/ProductQuickActions";
 import RelatedProductsSection from "@/components/admin/products/RelatedProductsSection";
@@ -21,7 +22,7 @@ import PimSyncSection from "@/components/admin/pim/PimSyncSection";
 import { pimService, type PimProduct } from "@/services/pim";
 import { shouldBypassNextImageOptimization } from "@/lib/media";
 import { getProduct, getProductCatalogOptions, updateProduct, type ProductCatalogOptions, type ProductRecord } from "@/services/products";
-
+import ImageCropperModal from "@/components/admin/products/ImageCropperModal";
 
 function fieldClass() {
   return "mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none transition focus:border-ring";
@@ -105,6 +106,11 @@ export default function AdminProductEditPage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [clearImage, setClearImage] = useState(false);
+  const [showCropper, setShowCropper] = useState(false);
+  const [tempImageSrc, setTempImageSrc] = useState<string | null>(null);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoPreview, setVideoPreview] = useState<string | null>(null);
+  const [clearVideo, setClearVideo] = useState(false);
 
   function hydrate(next: ProductRecord) {
     setProduct(next);
@@ -134,6 +140,9 @@ export default function AdminProductEditPage() {
     setImageFile(null);
     setImagePreview(null);
     setClearImage(false);
+    setVideoFile(null);
+    setVideoPreview(null);
+    setClearVideo(false);
   }
 
   const loadPage = useCallback(async () => {
@@ -160,10 +169,54 @@ export default function AdminProductEditPage() {
 
   function onImageChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] ?? null;
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setTempImageSrc(url);
+      setShowCropper(true);
+    }
+    // Clear input so the same file can be selected again if canceled
+    event.target.value = '';
+  }
+
+  function handleCropComplete(croppedBlob: Blob) {
+    const file = new File([croppedBlob], "cropped.jpg", { type: "image/jpeg" });
     setImageFile(file);
     setClearImage(false);
     if (imagePreview) URL.revokeObjectURL(imagePreview);
-    setImagePreview(file ? URL.createObjectURL(file) : null);
+    setImagePreview(URL.createObjectURL(file));
+    setShowCropper(false);
+    if (tempImageSrc) URL.revokeObjectURL(tempImageSrc);
+    setTempImageSrc(null);
+  }
+
+  function handleCropCancel() {
+    setShowCropper(false);
+    if (tempImageSrc) URL.revokeObjectURL(tempImageSrc);
+    setTempImageSrc(null);
+  }
+
+  function handleClearImage() {
+    setClearImage(true);
+    setImageFile(null);
+    setImagePreview(null);
+  }
+
+  function handleClearVideo() {
+    setClearVideo(true);
+    setVideoFile(null);
+    setVideoPreview(null);
+  }
+
+  function onVideoChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    if (file && file.size > 10 * 1024 * 1024) {
+      alert("Video file size must be less than 10MB");
+      return;
+    }
+    setVideoFile(file);
+    setClearVideo(false);
+    if (videoPreview) URL.revokeObjectURL(videoPreview);
+    setVideoPreview(file ? URL.createObjectURL(file) : null);
   }
 
   function effectiveDefault(): "EMI" | "RENT" | "LEASE" {
@@ -181,7 +234,7 @@ export default function AdminProductEditPage() {
     setError(null);
     setMessage(null);
     try {
-      const hasImage = Boolean(imageFile || clearImage);
+      const hasImage = Boolean(imageFile || clearImage || videoFile || clearVideo);
       const payload = hasImage ? new FormData() : {
         name,
         product_code: productCode,
@@ -233,6 +286,8 @@ export default function AdminProductEditPage() {
         payload.set("extended_warranty_cost_percentage", extendedWarrantyCostPct.trim() || "7.50");
         if (imageFile) payload.set("image", imageFile);
         if (clearImage) payload.set("clear_image", "true");
+        if (videoFile) payload.set("video", videoFile);
+        if (clearVideo) payload.set("clear_video", "true");
       }
       const updated = await updateProduct(productId, payload);
       hydrate(updated);
@@ -392,10 +447,79 @@ export default function AdminProductEditPage() {
                 <RelatedProductsSection productId={productId ? Number(productId) : 0} productName={name} saving={saving} />
               </ERPSectionShell>
 
-              <ERPSectionShell title="Image" description="Single image used for catalog completeness and daily product lookup." id="image">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-3"><input type="file" accept="image/*" onChange={onImageChange} className={fieldClass()} /><label className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm">Remove existing image<input type="checkbox" checked={clearImage} onChange={(event) => { setClearImage(event.target.checked); if (event.target.checked) setImageFile(null); }} /></label></div>
-                  <div className="relative h-56 overflow-hidden rounded-xl border border-border bg-muted/30">{imagePreview || (product.image && !clearImage) ? <Image src={imagePreview || product.image || ""} alt={name} fill sizes="(min-width: 1280px) 360px, (min-width: 768px) 50vw, 100vw" className="object-cover" unoptimized={Boolean(imagePreview) || shouldBypassNextImageOptimization(product.image)} /> : <div className="flex h-56 items-center justify-center text-sm text-muted-foreground">No image selected</div>}</div>
+              <ERPSectionShell title="Image & Video" description="Single image used for catalog completeness and a short video." id="image">
+                <div className="grid gap-6 md:grid-cols-2">
+                  
+                  {/* Image Upload Card */}
+                  <div className="flex flex-col gap-3">
+                    <label className="text-sm font-semibold text-foreground">Product Image</label>
+                    <div className="group relative overflow-hidden rounded-2xl border-2 border-dashed border-border bg-muted/20 transition-all hover:bg-muted/40">
+                      {imagePreview || (product.image && !clearImage) ? (
+                        <div className="relative aspect-square w-full sm:aspect-[4/3] bg-muted/10">
+                          <Image 
+                            src={imagePreview || product.image || ""} 
+                            fill 
+                            className="object-cover" 
+                            alt={name} 
+                            unoptimized={Boolean(imagePreview) || shouldBypassNextImageOptimization(product.image)} 
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 transition-opacity group-hover:opacity-100 flex items-center justify-center gap-4">
+                            <label className="cursor-pointer rounded-full bg-white/20 p-3 text-white backdrop-blur-md hover:bg-white/30 transition shadow-sm" title="Replace & Crop">
+                              <UploadCloud className="h-5 w-5" />
+                              <input type="file" accept="image/*" className="hidden" onChange={onImageChange} />
+                            </label>
+                            <button type="button" onClick={handleClearImage} className="rounded-full bg-red-500/80 p-3 text-white backdrop-blur-md hover:bg-red-500 transition shadow-sm" title="Delete image">
+                              <Trash2 className="h-5 w-5" />
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <label className="flex aspect-square w-full sm:aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-3 p-6 text-muted-foreground transition hover:text-foreground">
+                          <div className="rounded-full bg-background p-4 shadow-sm ring-1 ring-border">
+                            <ImagePlus className="h-6 w-6 text-primary" />
+                          </div>
+                          <span className="text-sm font-medium">Click to select image</span>
+                          <span className="text-xs">PNG, JPG, WEBP (Square or 4:3)</span>
+                          <input type="file" accept="image/*" className="hidden" onChange={onImageChange} />
+                        </label>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Video Upload Card */}
+                  <div className="flex flex-col gap-3">
+                    <label className="text-sm font-semibold text-foreground">Product Video</label>
+                    <div className="group relative overflow-hidden rounded-2xl border-2 border-dashed border-border bg-muted/20 transition-all hover:bg-muted/40">
+                      {videoPreview || (product.video && !clearVideo) ? (
+                        <div className="relative aspect-square w-full sm:aspect-[4/3] bg-black">
+                          <video 
+                            src={videoPreview || product.video || ""} 
+                            controls 
+                            className="h-full w-full object-contain" 
+                          />
+                          <div className="absolute top-3 right-3 flex items-center gap-2 z-10 opacity-0 transition-opacity group-hover:opacity-100">
+                            <label className="cursor-pointer rounded-full bg-black/60 p-2 text-white backdrop-blur-md hover:bg-black/80 transition shadow-sm" title="Replace video">
+                              <UploadCloud className="h-4 w-4" />
+                              <input type="file" accept="video/mp4,video/quicktime,video/webm" className="hidden" onChange={onVideoChange} />
+                            </label>
+                            <button type="button" onClick={handleClearVideo} className="rounded-full bg-red-500/80 p-2 text-white backdrop-blur-md hover:bg-red-500 transition shadow-sm" title="Delete video">
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <label className="flex aspect-square w-full sm:aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-3 p-6 text-muted-foreground transition hover:text-foreground">
+                          <div className="rounded-full bg-background p-4 shadow-sm ring-1 ring-border">
+                            <Video className="h-6 w-6 text-primary" />
+                          </div>
+                          <span className="text-sm font-medium">Click to select video</span>
+                          <span className="text-xs">MP4, WebM, MOV (Max 10MB)</span>
+                          <input type="file" accept="video/mp4,video/quicktime,video/webm" className="hidden" onChange={onVideoChange} />
+                        </label>
+                      )}
+                    </div>
+                  </div>
+
                 </div>
               </ERPSectionShell>
             </div>
@@ -441,6 +565,14 @@ export default function AdminProductEditPage() {
             <ProductPimAttributesEditor productId={productId} />
           </ERPSectionShell>
         ) : null}
+
+        {showCropper && tempImageSrc && (
+          <ImageCropperModal
+            imageSrc={tempImageSrc}
+            onCropComplete={handleCropComplete}
+            onCancel={handleCropCancel}
+          />
+        )}
 
         {showCostEditor && product && (
           <InventoryProfileCostEditor

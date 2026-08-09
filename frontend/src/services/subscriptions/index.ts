@@ -28,6 +28,13 @@ export type SubscriptionRecord = {
   waived_amount?: string;
   contract_reference?: string | null;
   fulfillment_status?: string;
+  emi_count?: number;
+  paid_emi_count?: number;
+  pending_emi_count?: number;
+  waived_emi_count?: number;
+  overdue_emi_count?: number;
+  total_paid_amount?: string;
+  outstanding_amount?: string;
   product_snapshot?: Record<string, unknown> | null;
   pricing_snapshot?: Record<string, unknown> | null;
   financial_summary?: {

@@ -8,6 +8,7 @@ from decimal import Decimal
 
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
+from api.v1.permissions import IsAdmin
 from rest_framework.response import Response
 from rest_framework import status
 from django.http import FileResponse
@@ -19,7 +20,7 @@ from subscriptions.models import Delivery, DeliveryOrderStatus, ProofOfDelivery,
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdmin])
 def pod_capture_view(request, delivery_id):
     """
     Capture POD (photos + signature) at delivery.
@@ -119,7 +120,7 @@ def pod_capture_view(request, delivery_id):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdmin])
 def pod_list_view(request):
     """List PODs with optional year/month filter."""
     year = request.query_params.get('year')
@@ -166,7 +167,7 @@ def pod_list_view(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdmin])
 def pod_detail_view(request, pod_id):
     """Get POD detail with photo/signature URLs."""
     pod = get_object_or_404(ProofOfDelivery, pk=pod_id)
@@ -195,7 +196,7 @@ def pod_detail_view(request, pod_id):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdmin])
 def pod_export_year_view(request):
     """
     Year-end batch export of PODs.

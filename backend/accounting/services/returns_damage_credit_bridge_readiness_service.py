@@ -16,6 +16,9 @@ from accounting.services.accounting_bridge_readiness_service import (
 from accounting.services.inventory_manufacturing_bridge_readiness_service import (
     build_accounting_bridge_readiness_with_inventory_manufacturing,
 )
+from accounting.services.commission_payout_bridge_readiness_service import (
+    build_commission_payout_readiness_events,
+)
 
 RETURNS_DAMAGE_CREDIT_EVENT_KEYS = {
     "customer_return",
@@ -388,6 +391,13 @@ def build_accounting_bridge_readiness_with_returns_damage_credit() -> dict[str, 
         if event.get("event_key") not in RETURNS_DAMAGE_CREDIT_EVENT_KEYS
     ]
     events = [*retained_events, *build_returns_damage_credit_readiness_events()]
+    # Fold in the commission-payout supplemental audit-deferred events (commission_approval,
+    # commission_payout) so the composed endpoint payload surfaces the full Commission group.
+    existing_keys = {event.get("event_key") for event in events}
+    for event in build_commission_payout_readiness_events():
+        if event.get("event_key") not in existing_keys:
+            events.append(event)
+            existing_keys.add(event.get("event_key"))
     summary = build_accounting_bridge_readiness_summary(events=events)
     period_readiness = payload.get("accounting_period_readiness") or payload.get("financial_year_readiness") or {}
     return {

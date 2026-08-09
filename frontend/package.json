@@ -15,6 +15,7 @@
     "typecheck": "node scripts/run-typecheck.mjs",
     "validate": "npm run check:routes && npm run lint && npm run typecheck && npm run test:dashboard-presets && npm run build",
     "test:e2e:smoke": "npm run build:smoke && playwright test --project=chromium-smoke",
+    "test:e2e:route-smoke": "npm run build:smoke && playwright test --project=chromium-route-smoke",
     "test:e2e:release-smoke": "npm run build:smoke && playwright test --project=chromium-release-smoke",
     "test:e2e:smoke:headed": "npm run build:smoke && playwright test --project=chromium-smoke --headed",
     "test:e2e:auth-smoke": "playwright test --project=chromium-auth-smoke",
@@ -29,6 +30,7 @@
     "test:invoice-delivery": "node scripts/run-invoice-delivery-tests.mjs"
   },
   "dependencies": {
+    "@hookform/resolvers": "^3.3.4",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-aspect-ratio": "^1.1.8",
     "@radix-ui/react-avatar": "^1.1.11",
@@ -49,9 +51,14 @@
     "lucide-react": "^0.577.0",
     "next": "^16.2.6",
     "react": "19.2.3",
+    "react-barcode": "^1.6.1",
     "react-dom": "19.2.3",
+    "react-easy-crop": "^6.2.3",
+    "react-hook-form": "^7.51.3",
+    "react-qr-code": "^2.2.0",
     "react-resizable-panels": "^2.1.9",
-    "tailwind-merge": "^3.5.0"
+    "tailwind-merge": "^3.5.0",
+    "zod": "^3.22.4"
   },
   "overrides": {
     "postcss": "8.5.12"
@@ -67,6 +74,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
+    "ts-morph": "^28.0.0",
     "typescript": "^5"
   }
 }

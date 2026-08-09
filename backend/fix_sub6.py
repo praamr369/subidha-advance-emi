@@ -23,7 +23,7 @@ for emi in sub.emis.filter(status=EmiStatus.PAID):
         )
 
 print("Re-evaluating reconciliations...")
-from subscriptions.services.reconciliation_service import reconcile_subscription, reconcile_emi_ledger
+from payments.services.reconciliation_service import reconcile_subscription, reconcile_emi_ledger
 
 res = reconcile_subscription(sub)
 print("Sub recon:", res)

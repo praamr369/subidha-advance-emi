@@ -1,3 +1,5 @@
+import { getPublicDictionary } from "@/lib/public-i18n";
+import { getPublicLocale } from "@/lib/public-i18n.server";
 import Link from "next/link";
 import { Landmark, Home, Handshake, ShoppingBag } from "lucide-react";
 
@@ -5,52 +7,57 @@ import SectionHeader from "@/components/public/SectionHeader";
 import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
+
+
+export default async function PlanCategoryShowcase({ className }: { className?: string }) {
+  const locale = await getPublicLocale();
+  const dict = getPublicDictionary(locale);
+
 const categories = [
   {
     key: "advance-emi",
-    title: "Advance EMI (Lucky Plan)",
+    title: dict.public.PlanCategoryShowcase_prop1,
     icon: Landmark,
     summary:
       "Structured monthly EMI for furniture purchase with transparent winner publishing. Winner benefit is future EMI waiver only.",
     forWho: "Best for customers who want ownership with predictable monthly commitments.",
-    cta: { href: ROUTES.public.luckyPlan, label: "Understand Lucky Plan" },
+    cta: { href: ROUTES.public.luckyPlan, label: dict.public.PlanCategoryShowcase_prop2 },
   },
   {
     key: "rent",
-    title: "Rent",
+    title: dict.public.PlanCategoryShowcase_prop3,
     icon: Home,
     summary:
       "Flexible access where you pay for usage over time. Availability and eligibility depend on product readiness and branch workflow.",
     forWho: "Best for customers who want flexibility with shorter commitments.",
-    cta: { href: ROUTES.public.rent, label: "Read rent policy" },
+    cta: { href: ROUTES.public.rent, label: dict.public.PlanCategoryShowcase_prop4 },
   },
   {
     key: "lease",
-    title: "Lease",
+    title: dict.public.PlanCategoryShowcase_prop5,
     icon: Handshake,
     summary:
       "Longer-term access with structured documentation and controlled operational steps. Availability depends on product readiness and branch workflow.",
     forWho: "Best for customers and partners who need longer-term, documented access.",
-    cta: { href: ROUTES.public.lease, label: "Read lease policy" },
+    cta: { href: ROUTES.public.lease, label: dict.public.PlanCategoryShowcase_prop6 },
   },
   {
     key: "direct-sale",
-    title: "Direct Sale",
+    title: dict.public.PlanCategoryShowcase_prop7,
     icon: ShoppingBag,
     summary:
       "Standard purchase flow with invoice, receipt, delivery controls, and warranty/service terms based on product and policy.",
     forWho: "Best for customers ready for normal purchase against invoice and receipt.",
-    cta: { href: ROUTES.public.directSale, label: "Read direct sale policy" },
+    cta: { href: ROUTES.public.directSale, label: dict.public.PlanCategoryShowcase_prop8 },
   },
 ] as const;
 
-export default function PlanCategoryShowcase({ className }: { className?: string }) {
   return (
     <section className={cn("public-surface space-y-6 p-6", className)}>
       <SectionHeader
-        eyebrow="Plan categories"
-        title="Advance EMI, Rent, Lease, and Direct Sale"
-        description="Public pages explain each path clearly. Availability and approval depend on product, records, and branch readiness."
+        eyebrow={dict.public.PlanCategoryShowcase_attr9}
+        title={dict.public.PlanCategoryShowcase_attr10}
+        description={dict.public.PlanCategoryShowcase_attr11}
       >
         <div className="mt-3 flex flex-wrap gap-2">
           <Link href={ROUTES.public.apply} className="public-action-primary h-10 !min-h-0">
@@ -75,7 +82,7 @@ export default function PlanCategoryShowcase({ className }: { className?: string
               </div>
               <p className="mt-4 text-sm leading-6 text-muted-foreground">{category.summary}</p>
               <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                <span className="font-semibold text-foreground">For:</span> {category.forWho}
+                <span className="font-semibold text-foreground">{dict.public.PlanCategoryShowcase_text14}</span> {category.forWho}
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Link

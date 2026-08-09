@@ -47,9 +47,9 @@ from subscriptions.models import (
     Product,
     Subscription,
 )
-from subscriptions.services.lucky_draw_service import reveal_and_execute_draw
-from subscriptions.services.payment_service import record_emi_payment, verify_payment
-from subscriptions.services.winner_state_service import WAIVER_SCOPE_FUTURE_ONLY
+from lucky_plan.services.lucky_draw_service import reveal_and_execute_draw
+from payments.services.payment_service import record_emi_payment, verify_payment
+from lucky_plan.services.winner_state_service import WAIVER_SCOPE_FUTURE_ONLY
 
 SMOKE_META_FILENAME = "playwright-smoke-meta.json"
 REAL_LOGIN_SECRET = "SmokeLogin123!"

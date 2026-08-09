@@ -3,11 +3,11 @@ from decimal import Decimal
 
 from django.test import TestCase
 
-from subscriptions.services.lucky_draw_service import (
+from lucky_plan.services.lucky_draw_service import (
     create_lucky_draw_commit,
     reveal_and_execute_draw,
 )
-from subscriptions.services.payment_service import (
+from payments.services.payment_service import (
     record_emi_payment,
     reverse_payment_for_admin,
 )

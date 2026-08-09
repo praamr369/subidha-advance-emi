@@ -16,7 +16,7 @@ from api.v1.permissions import IsAdmin
 from api.v1.serializers.admin_resources import PaymentAdminSerializer
 from api.v1.throttles.auth_password_reset import PaymentMutationThrottle
 from subscriptions.models import Emi, EmiStatus, FinancialLedger, LedgerEntryType, MONEY_ZERO, PaymentMethod, SubscriptionStatus
-from subscriptions.services.payment_service import record_emi_payment
+from payments.services.payment_service import record_emi_payment
 from billing.services.billing_service import generate_emi_payment_receipt
 from api.v1.serializers.billing import ReceiptDocumentSerializer
 

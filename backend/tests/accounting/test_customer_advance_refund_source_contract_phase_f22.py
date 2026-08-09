@@ -8,7 +8,7 @@ from accounting.models import AccountingBridgePosting, JournalEntry
 from reconciliation.models import ReconciliationItem
 from subscriptions.models import CustomerAdvance, CustomerAdvanceAllocation, Payment
 from subscriptions.models_customer_advance_refund import CustomerAdvanceRefund, CustomerAdvanceRefundStatus
-from subscriptions.services.customer_advance_refund_source_contract_service import (
+from contracts.services.customer_advance_refund_source_contract_service import (
     EVENT_KEY,
     SOURCE_MODEL,
     classify_customer_advance_refund_source,
@@ -16,8 +16,8 @@ from subscriptions.services.customer_advance_refund_source_contract_service impo
     list_customer_advance_refund_sources,
     record_customer_advance_refund,
 )
-from subscriptions.services.customer_advance_service import CustomerAdvanceService
-from subscriptions.services.payment_allocation_service import PaymentAllocationService
+from payments.services.customer_advance_service import CustomerAdvanceService
+from payments.services.payment_allocation_service import PaymentAllocationService
 from tests.accounting.helpers import seed_bridge_ready_environment
 from tests.helpers import create_admin_user, create_batch, create_customer_profile, create_emi, create_lucky_id, create_product, create_subscription
 

@@ -1250,7 +1250,7 @@ export default function AdminProductCreatePage() {
           onClose={() => setQuickCreateType(null)}
           onCreated={(result) => {
             setQuickCreateType(null);
-            alert(`Created: ${result.product_name} (${result.product_code})`);
+            alert(`Created: ${result.name || "Unknown"} (${result.product_code})`);
           }}
         />
       )}

@@ -42,23 +42,23 @@ from accounting.models import (
 from billing.models import ReceiptDocument
 from inventory.models import StockLedger
 from reconciliation.models import ReconciliationItem
-from subscriptions.services.contract_activation_readiness_service import (
+from contracts.services.contract_activation_readiness_service import (
     ContractActivationNotReady,
     assert_contract_activation_ready,
     classify_legacy_activation_compatibility,
     evaluate_contract_activation_readiness,
 )
-from subscriptions.services.contract_lifecycle_service import (
+from contracts.services.contract_lifecycle_service import (
     activate_contract,
     approve_contract,
 )
-from subscriptions.services.delivery_service import create_subscription_delivery
-from subscriptions.services.emi_engine import generate_emi_schedule
-from subscriptions.services.rent_lease_contract_service import (
+from deliveries.services.delivery_service import create_subscription_delivery
+from payments.services.emi_engine import generate_emi_schedule
+from contracts.services.rent_lease_contract_service import (
     create_lease_contract,
     create_rent_contract,
 )
-from subscriptions.services.rent_lease_billing_service import (
+from contracts.services.rent_lease_billing_service import (
     collect_security_deposit,
 )
 from tests.helpers import (

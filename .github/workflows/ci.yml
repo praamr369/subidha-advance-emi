@@ -1,0 +1,94 @@
+name: ci
+
+# PR gate: fast, deterministic checks on every pull request and on pushes to the
+# long-lived branches. Complements release-candidate-validation.yml (which runs
+# the heavier Playwright smoke suite).
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - update
+      - develop
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: backend (check + migrations + tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Blocking: configuration/model integrity.
+      - name: Django system check
+        run: python manage.py check --settings=core.settings.test
+
+      # Blocking: model/migration drift. Catches the exact class of bug the
+      # app-split work guarded against (models changed without a migration).
+      # Scoped to first-party apps so third-party migration quirks don't flake.
+      - name: Migration drift check
+        run: |
+          python manage.py makemigrations --check --dry-run --settings=core.settings.test \
+            subscriptions customers contracts payments deliveries commissions \
+            lucky_plan crm accounting billing inventory growth business_setup \
+            finance_control audit products_core
+
+      # Blocking: Layer-A verification gate. Walks the whole /api/v1 surface and
+      # asserts (1) no auth-gated endpoint serves data to anon, (2) no admin-only
+      # endpoint serves data to ANY non-admin portal role (customer/partner/
+      # cashier/vendor/staff), (3) no GET endpoint 500s on empty data, (4) the
+      # OpenAPI schema still generates for the whole surface. This is the
+      # automated replacement for hand-checking 2,500+ endpoints; a new privilege
+      # leak, crash, or schema break fails the PR here.
+      - name: Layer-A auth matrix + endpoint smoke + schema
+        run: python manage.py test tests.verification --settings=core.settings.test --verbosity 2
+
+      # Reported but NON-BLOCKING until the ~pre-existing suite failures
+      # (uq_payment_per_emi + accounting-fixture gaps) are triaged. Flip
+      # continue-on-error to false to make the full suite a hard gate.
+      - name: Test suite (reported)
+        continue-on-error: true
+        run: python manage.py test --settings=core.settings.test --parallel --verbosity 1
+
+  frontend:
+    name: frontend (lint + typecheck)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.18.0"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck

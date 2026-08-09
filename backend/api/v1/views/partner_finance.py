@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.v1.permissions import IsPartner
-from subscriptions.services.phase4_finance_service import (
+from payments.services.phase4_finance_service import (
     partner_finance_summary,
     partner_linked_customer_payments,
     partner_receipt_list,

@@ -35,7 +35,7 @@ from subscriptions.services.phase5_control_center_service import (
     build_accounting_waiver_loss,
 )
 from subscriptions.services.phase5_filter_service import AdminReportFilter
-from subscriptions.services.rent_lease_billing_service import list_admin_deposit_register
+from contracts.services.rent_lease_billing_service import list_admin_deposit_register
 
 
 def _money(v) -> str:

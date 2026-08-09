@@ -23,6 +23,7 @@ from inventory.services.demand_service import (
 )
 from inventory.services.demand_planning_service import (
     calculate_product_demand,
+    calculate_product_demand_bulk,
     get_product_stock_availability,
     upsert_purchase_need_for_product,
 )
@@ -158,3 +159,178 @@ class PurchaseNeedGenerateView(APIView):
                 "status": need.status,
             }
         )
+
+
+class BulkDemandPlanningView(APIView):
+    """
+    GET /api/v1/inventory/demand-planning/bulk/?page=1&page_size=50&search=SKU&critical_shortage=true&demand_sources=subscriptions,direct_sales,rent_lease
+
+    Returns paginated demand planning data for multiple products.
+    Uses calculate_product_demand_bulk to fetch demand data in 5 queries total.
+
+    Query Parameters:
+      page: Page number (default 1)
+      page_size: Items per page (default 50, max 500)
+      search: Search by SKU, product code, or name
+      critical_shortage: Filter for products with shortages (true/false)
+      demand_sources: Comma-separated list of demand sources to include:
+        - subscriptions (active subs + locked batch + winners)
+        - direct_sales
+        - rent_lease
+    """
+
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        from inventory.models import InventoryItem
+        from products_core.models import Product
+        from django.db.models import Q
+
+        # Parse pagination params
+        try:
+            page = int(request.query_params.get("page", 1))
+            page_size = int(request.query_params.get("page_size", 50))
+            page = max(1, page)
+            page_size = min(page_size, 500)  # Cap at 500
+        except (ValueError, TypeError):
+            page = 1
+            page_size = 50
+
+        # Get search and filter params
+        search = (request.query_params.get("search") or "").strip()
+        critical_shortage = request.query_params.get("critical_shortage", "").lower() == "true"
+
+        # Parse demand source filters
+        demand_sources_param = (request.query_params.get("demand_sources") or "").strip().lower()
+        selected_sources = set()
+        if demand_sources_param:
+            sources = [s.strip() for s in demand_sources_param.split(",") if s.strip()]
+            selected_sources = set(sources)
+
+        # Step 1: Get ALL products (including those without inventory items)
+        # This ensures we show demand even for products not yet in inventory system
+        products_queryset = Product.objects.all()
+
+        # Apply search filter
+        if search:
+            products_queryset = products_queryset.filter(
+                Q(product_code__icontains=search) |
+                Q(name__icontains=search)
+            )
+
+        # Get all products
+        all_products = list(products_queryset.order_by("name", "id"))
+        product_ids = [p.id for p in all_products]
+
+        # Step 2: Get demand data for ALL products in bulk (5 queries)
+        # This will return demand even for products without inventory items
+        demand_map = calculate_product_demand_bulk(product_ids)
+
+        # Step 3: Get inventory items for products that have them (optional enhancement)
+        inventory_items_map = {}
+        if product_ids:
+            inventory_items = InventoryItem.objects.filter(product_id__in=product_ids).values(
+                "product_id", "sku", "current_stock_qty", "stock_tracking_enabled"
+            )
+            for item in inventory_items:
+                inventory_items_map[item["product_id"]] = item
+
+        # Get total count BEFORE filtering (count of products with demand)
+        total_count = len(all_products)
+
+        # Build enriched list with demand data (including products without inventory items)
+        enriched_items = []
+        for product in all_products:
+            demand = demand_map.get(product.id, {})
+
+            # Skip products with zero demand
+            total_required = float(demand.get("total_required", "0"))
+            if total_required == 0 and not demand:
+                continue
+
+            # Get on-hand quantity (if inventory item exists)
+            on_hand = 0.0
+            sku = ""
+            inventory_item = inventory_items_map.get(product.id)
+            if inventory_item:
+                try:
+                    on_hand = float(inventory_item.get("current_stock_qty") or 0)
+                except (ValueError, TypeError):
+                    on_hand = 0.0
+                sku = inventory_item.get("sku") or ""
+
+            # Extract demand components
+            active_subs = demand.get("active_subscriptions", 0)
+            locked_batch = demand.get("locked_batch_demand", 0)
+            winners = demand.get("winners_pending_delivery", 0)
+            direct_sales = demand.get("direct_sale_orders", 0)
+            rent_lease = demand.get("rent_lease_commitments", 0)
+
+            result = {
+                "product": product,
+                "on_hand": on_hand,
+                "sku": sku,
+                "demand": demand,
+                "total_required": total_required,
+                "shortage": max(0, total_required - on_hand),
+            }
+
+            # Apply demand source filter (if specified)
+            if selected_sources:
+                has_subscription_demand = (active_subs + locked_batch + winners) > 0
+                has_direct_sales_demand = direct_sales > 0
+                has_rent_lease_demand = rent_lease > 0
+
+                matches_filter = False
+                if "subscriptions" in selected_sources and has_subscription_demand:
+                    matches_filter = True
+                if "direct_sales" in selected_sources and has_direct_sales_demand:
+                    matches_filter = True
+                if "rent_lease" in selected_sources and has_rent_lease_demand:
+                    matches_filter = True
+
+                if not matches_filter:
+                    continue
+
+            # Apply critical shortage filter (if enabled)
+            if not critical_shortage or result["shortage"] > 0:
+                enriched_items.append(result)
+
+        # Now apply pagination to filtered results
+        filtered_count = len(enriched_items)
+        start_idx = (page - 1) * page_size
+        end_idx = start_idx + page_size
+        paginated_results = enriched_items[start_idx:end_idx]
+
+        num_pages = (filtered_count + page_size - 1) // page_size if filtered_count > 0 else 1
+
+        # Build final response
+        results = []
+        for item_data in paginated_results:
+            product = item_data["product"]
+            demand = item_data["demand"]
+            on_hand = item_data["on_hand"]
+            sku = item_data["sku"]
+
+            result = {
+                "product_id": product.id,
+                "sku": sku if sku else f"NOSKU-{product.id}",  # Provide fallback for products without inventory items
+                "product_code": product.product_code,
+                "product_name": product.name,
+                "on_hand": f"{on_hand:.3f}",
+                "active_subscriptions": demand.get("active_subscriptions", 0),
+                "locked_batch_demand": demand.get("locked_batch_demand", 0),
+                "winners_pending_delivery": demand.get("winners_pending_delivery", 0),
+                "direct_sale_orders": demand.get("direct_sale_orders", 0),
+                "rent_lease_commitments": demand.get("rent_lease_commitments", 0),
+                "total_required": demand.get("total_required", "0.000"),
+            }
+            results.append(result)
+
+        return Response({
+            "count": filtered_count if (critical_shortage or selected_sources) else total_count,
+            "page": page,
+            "page_size": page_size,
+            "num_pages": num_pages,
+            "results": results,
+        })

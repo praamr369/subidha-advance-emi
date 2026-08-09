@@ -413,6 +413,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "corsheaders",
     "rest_framework",
+    "drf_spectacular",
     "django_filters",
     "rest_framework_simplejwt.token_blacklist",
     "accounts",
@@ -429,6 +430,17 @@ INSTALLED_APPS = [
     "brochures",
     "reminders",
     "system_jobs",
+    "customers",
+    "contracts",
+    "payments",
+    "lucky_plan",
+    "deliveries",
+    "commissions",
+    "growth",
+    "business_setup",
+    "finance_control",
+    "audit",
+    "products_core",
     "subscriptions",
     "reconciliation",
     "settlements",
@@ -510,6 +522,7 @@ STORAGES = {
 AUTH_USER_MODEL = "accounts.User"
 
 REST_FRAMEWORK = {
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
@@ -521,6 +534,12 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
+    # Global baseline throttling. Endpoint-specific scoped throttles (login,
+    # payment_mutation, …) still apply on top of these.
+    "DEFAULT_THROTTLE_CLASSES": [
+        "api.v1.throttles.role_aware.RoleAwareUserRateThrottle",
+        "rest_framework.throttling.AnonRateThrottle",
+    ],
     "DEFAULT_THROTTLE_RATES": {
         "auth_login": "20/minute",
         "forgot_password": "10/hour",
@@ -528,6 +547,40 @@ REST_FRAMEWORK = {
         "reset_password": "20/hour",
         "payment_mutation": "60/minute",
         "username_change_self": "5/hour",
+        # Anonymous baseline.
+        "anon": "120/minute",
+        # Role-aware per-user baselines (generous — a cap on abuse, not normal
+        # use). Admin/staff run bulk dashboards and hit many endpoints, so they
+        # get much higher ceilings than partner/customer portals. Tune per env.
+        "role_admin": "6000/minute",
+        "role_staff": "3000/minute",
+        "role_cashier": "3000/minute",
+        "role_partner": "600/minute",
+        "role_vendor": "600/minute",
+        "role_customer": "300/minute",
+        "role_default": "300/minute",
+    },
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Subidha Advance EMI API",
+    "DESCRIPTION": (
+        "Internal API for the Subidha ERP (subscriptions/EMI, rent/lease, "
+        "payments, accounting, CRM, lucky plan, and admin operations). "
+        "All endpoints are served under /api/v1/."
+    ),
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,  # don't expose the raw schema on the Swagger view
+    "SCHEMA_PATH_PREFIX": r"/api/v1",
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SORT_OPERATIONS": True,
+    # Large surface (~1,300 endpoints) — keep schema generation resilient so one
+    # bad view doesn't abort the whole document.
+    "DISABLE_ERRORS_AND_WARNINGS": False,
+    "SWAGGER_UI_SETTINGS": {
+        "deepLinking": True,
+        "persistAuthorization": True,
+        "displayOperationId": False,
     },
 }
 
@@ -741,12 +794,27 @@ LOGGING = {
     },
 }
 
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        "LOCATION": "subidha-core-cache",
+# Prefer a shared Redis cache (survives restarts, shared across workers) when a
+# URL is configured; fall back to in-process LocMemCache for local/test only.
+_CACHE_REDIS_URL = (
+    (os.getenv("CACHE_REDIS_URL") or "").strip()
+    or (os.getenv("REDIS_URL") or "").strip()
+)
+if _CACHE_REDIS_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": _CACHE_REDIS_URL,
+            "KEY_PREFIX": "subidha",
+        }
     }
-}
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "subidha-core-cache",
+        }
+    }
 
 # ---------------------------------------------------------------------------
 # Celery (additive background jobs). Core finance DB transactions must not

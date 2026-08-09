@@ -32,7 +32,7 @@ from subscriptions.services.dashboard_canonical_financial_summary_service import
     get_dashboard_summary,
 )
 from subscriptions.services.dashboard_scopes import PartnerScope
-from subscriptions.services.winner_state_service import winner_history_q
+from lucky_plan.services.winner_state_service import winner_history_q
 
 
 def _money(value) -> str:

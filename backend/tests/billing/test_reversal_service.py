@@ -259,7 +259,7 @@ class ReversalServiceTests(TestCase):
         post_billing_invoice(invoice_id=invoice.id, posted_by=self.admin)
         receipt = invoice.receipts.first()
         void_receipt_with_reason(receipt_id=receipt.id, reason="Void for test", performed_by=self.admin)
-        from subscriptions.services.operational_cancellation_service import cancel_billing_invoice
+        from contracts.services.operational_cancellation_service import cancel_billing_invoice
         cancel_billing_invoice(invoice_id=invoice.id, actor=self.admin, reason="Cancel for returnability test")
         eligibility = get_direct_sale_return_eligibility(direct_sale_id=sale.id)
         self.assertEqual(eligibility["invoice_status"], BillingDocumentStatus.VOID)
@@ -277,7 +277,7 @@ class ReversalServiceTests(TestCase):
         DirectSale.objects.filter(pk=sale.id).update(delivered_at=invoice.created_at)
         receipt = invoice.receipts.first()
         void_receipt_with_reason(receipt_id=receipt.id, reason="Void for delivered return", performed_by=self.admin)
-        from subscriptions.services.operational_cancellation_service import cancel_billing_invoice
+        from contracts.services.operational_cancellation_service import cancel_billing_invoice
         cancel_billing_invoice(invoice_id=invoice.id, actor=self.admin, reason="Void invoice")
 
         ret = create_direct_sale_return(
@@ -313,7 +313,7 @@ class ReversalServiceTests(TestCase):
         DirectSale.objects.filter(pk=sale.id).update(delivered_at=invoice.created_at)
         receipt = invoice.receipts.first()
         void_receipt_with_reason(receipt_id=receipt.id, reason="Void for delivered return", performed_by=self.admin)
-        from subscriptions.services.operational_cancellation_service import cancel_billing_invoice
+        from contracts.services.operational_cancellation_service import cancel_billing_invoice
         cancel_billing_invoice(invoice_id=invoice.id, actor=self.admin, reason="Void invoice")
         ret = create_direct_sale_return(
             direct_sale_id=sale.id,

@@ -11,7 +11,7 @@ from subscriptions.models import (
     Commission,
     LuckyDraw,
 )
-from subscriptions.services.winner_state_service import winner_history_q
+from lucky_plan.services.winner_state_service import winner_history_q
 
 
 def executive_dashboard_summary():

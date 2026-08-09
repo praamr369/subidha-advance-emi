@@ -19,6 +19,9 @@ import {
 import { useRouter } from "next/navigation";
 
 import { API_BASE_URL } from "@/lib/constants";
+import ActionButton from "@/components/ui/ActionButton";
+import AuthBrand from "@/components/auth/AuthBrand";
+import { useI18n } from "@/components/i18n/I18nProvider";
 
 type RegisterResponse = {
   access?: string;
@@ -152,6 +155,7 @@ function FeatureCard({
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { t } = useI18n();
 
   const [username, setUsername] = useState("");
   const [phone, setPhone] = useState("");
@@ -279,50 +283,50 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="auth-shell grid w-full overflow-hidden bg-background/95 backdrop-blur xl:grid-cols-[1fr_1fr]">
+    <div className="auth-shell grid w-full overflow-hidden bg-background xl:grid-cols-[1fr_1fr] min-h-[calc(100vh-4rem)]">
       {/* Left Panel - Desktop Only */}
-      <section className="relative hidden overflow-hidden xl:block">
-        <div className="absolute inset-0 bg-slate-950" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.2),_transparent_34%),radial-gradient(circle_at_bottom_right,_rgba(160,110,72,0.18),_transparent_36%)]" />
+      <section className="relative hidden overflow-hidden xl:block bg-slate-950 border-r border-border">
+        <div className="absolute inset-0 pointer-events-none bg-[url('https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-40 mix-blend-luminosity" />
+        <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-slate-950/90 via-slate-950/60 to-slate-900/90" />
         <div className="relative z-10 flex h-full w-full flex-col justify-between overflow-y-auto p-8 2xl:p-12">
           <div className="space-y-8">
+            <AuthBrand tone="dark" />
+            
             <div className="inline-flex w-fit items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-slate-200">
               <ShieldCheck className="h-3.5 w-3.5" />
-              SUBIDHA CORE
+              Customer Registration
             </div>
 
             <div className="max-w-xl space-y-5">
               <div className="space-y-3">
                 <h1 className="text-3xl font-semibold tracking-tight text-white 2xl:text-4xl">
-                  Customer registration built for a production workflow
+                  {t("auth.register.pageTitle")}
                 </h1>
                 <p className="text-base leading-7 text-slate-300">
-                  Create a customer account to access subscription tracking,
-                  payment visibility, EMI history, and future account
-                  services in a structured and secure way.
+                  {t("auth.register.pageDescription")}
                 </p>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <FeatureCard
                   icon={<UserPlus className="h-5 w-5" />}
-                  title="Customer-only public access"
-                  description="Admin, cashier, and partner identities remain internally controlled."
+                  title={t("auth.register.feature1Title")}
+                  description={t("auth.register.feature1Desc")}
                 />
                 <FeatureCard
                   icon={<KeyRound className="h-5 w-5" />}
-                  title="Secure credential setup"
-                  description="Password validation and confirmation are enforced before registration."
+                  title={t("auth.register.feature2Title")}
+                  description={t("auth.register.feature2Desc")}
                 />
                 <FeatureCard
                   icon={<BadgeCheck className="h-5 w-5" />}
-                  title="Operationally clean onboarding"
-                  description="Only essential profile data is collected during initial account creation."
+                  title={t("auth.register.feature3Title")}
+                  description={t("auth.register.feature3Desc")}
                 />
                 <FeatureCard
                   icon={<ShieldCheck className="h-5 w-5" />}
-                  title="Future-ready access"
-                  description="Supports later expansion into broader customer-facing service modules."
+                  title={t("auth.register.feature4Title")}
+                  description={t("auth.register.feature4Desc")}
                 />
               </div>
             </div>
@@ -331,46 +335,49 @@ export default function RegisterPage() {
           <div className="mt-8 grid gap-4 sm:grid-cols-3">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
               <div className="text-xs uppercase tracking-[0.16em] text-slate-400">
-                Access type
+                {t("auth.register.accessTypeLabel")}
               </div>
               <div className="mt-2 text-sm font-semibold text-white">
-                Customer account
+                {t("auth.register.accessTypeValue")}
               </div>
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
               <div className="text-xs uppercase tracking-[0.16em] text-slate-400">
-                Workflow
+                {t("auth.register.workflowLabel")}
               </div>
               <div className="mt-2 text-sm font-semibold text-white">
-                Self registration
+                {t("auth.register.workflowValue")}
               </div>
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
               <div className="text-xs uppercase tracking-[0.16em] text-slate-400">
-                Security
+                {t("auth.register.securityLabel")}
               </div>
               <div className="mt-2 text-sm font-semibold text-white">
-                Password protected
+                {t("auth.register.securityValue")}
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Right Panel - Form (Always Visible) */}
-      <section className="flex min-h-full items-center">
-        <div className="mx-auto flex w-full max-w-2xl flex-col px-4 py-6 sm:px-6 md:px-8 lg:px-10 xl:px-12 xl:py-10">
+      {/* Right Panel - Form */}
+      <section className="relative flex flex-col items-center justify-center py-10">
+        <div className="relative mx-auto w-full max-w-[34rem] px-6 sm:px-8">
+          <div className="xl:hidden mb-8">
+            <AuthBrand tone="light" className="dark:hidden" />
+            <AuthBrand tone="dark" className="hidden dark:flex" />
+          </div>
           <div className="mb-6 xl:hidden">
             <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
               <ShieldCheck className="h-3.5 w-3.5" />
               Customer Registration
             </div>
             <h1 className="mt-4 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-              Create your customer account
+              {t("auth.register.mobileFormTitle")}
             </h1>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Register to view subscriptions, payment history, EMI tracking,
-              and future customer services.
+              {t("auth.register.mobileFormDesc")}
             </p>
           </div>
 
@@ -380,12 +387,10 @@ export default function RegisterPage() {
               Customer Registration
             </div>
             <h2 className="mt-4 text-3xl font-semibold tracking-tight text-foreground">
-              Create your customer account
+              {t("auth.register.desktopFormTitle")}
             </h2>
             <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
-              Public registration is limited to customers. Partner, admin,
-              and cashier accounts remain managed internally by authorized
-              staff.
+              {t("auth.register.desktopFormDesc")}
             </p>
           </div>
 
@@ -395,47 +400,47 @@ export default function RegisterPage() {
               <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <h3 className="text-lg font-semibold text-card-foreground">
-                    Identity details
+                    {t("auth.register.identitySectionTitle")}
                   </h3>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Used for login and basic customer profile setup.
+                    {t("auth.register.identitySectionDesc")}
                   </p>
                 </div>
                 <div className="rounded-2xl border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
-                  Step 1 of 2
+                  {t("auth.register.step1Label")}
                 </div>
               </div>
 
-              <div className="grid gap-5 md:grid-cols-2">
-                <div className="space-y-2 md:col-span-2">
-                  <label
-                    htmlFor="username"
-                    className="text-sm font-medium text-foreground"
-                  >
-                    Username
-                  </label>
-                  <div className="relative">
-                    <UserRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <input
-                      id="username"
-                      name="username"
-                      autoComplete="username"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      placeholder="Choose a username"
-                      className="h-12 w-full rounded-xl border border-input bg-background pl-10 pr-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
-                      required
-                      disabled={submitting}
-                    />
+                <div className="grid gap-5 md:grid-cols-2">
+                  <div className="space-y-2 md:col-span-2">
+                    <label
+                      htmlFor="username"
+                      className="text-sm font-medium text-foreground"
+                    >
+                      {t("auth.register.usernameLabel")}
+                    </label>
+                    <div className="relative">
+                      <UserRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <input
+                        id="username"
+                        name="username"
+                        autoComplete="username"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        placeholder={t("auth.register.usernamePlaceholder")}
+                        className="h-12 w-full rounded-xl border border-border bg-card pl-10 pr-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-[var(--ring)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
+                        required
+                        disabled={submitting}
+                      />
+                    </div>
                   </div>
-                </div>
 
                 <div className="space-y-2">
                   <label
                     htmlFor="phone"
                     className="text-sm font-medium text-foreground"
                   >
-                    Phone
+                    {t("auth.register.phoneLabel")}
                   </label>
                   <div className="relative">
                     <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -445,8 +450,8 @@ export default function RegisterPage() {
                       autoComplete="tel"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      placeholder="Enter phone number"
-                      className="h-12 w-full rounded-xl border border-input bg-background pl-10 pr-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
+                      placeholder={t("auth.register.phonePlaceholder")}
+                      className="h-12 w-full rounded-xl border border-border bg-card pl-10 pr-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-[var(--ring)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
                       required
                       disabled={submitting}
                     />
@@ -458,7 +463,7 @@ export default function RegisterPage() {
                     htmlFor="email"
                     className="text-sm font-medium text-foreground"
                   >
-                    Email
+                    {t("auth.register.emailLabel")}
                   </label>
                   <div className="relative">
                     <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -469,8 +474,8 @@ export default function RegisterPage() {
                       autoComplete="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="Enter email"
-                      className="h-12 w-full rounded-xl border border-input bg-background pl-10 pr-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
+                      placeholder={t("auth.register.emailPlaceholder")}
+                      className="h-12 w-full rounded-xl border border-border bg-card pl-10 pr-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-[var(--ring)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
                       required
                       disabled={submitting}
                     />
@@ -482,7 +487,7 @@ export default function RegisterPage() {
                     htmlFor="firstName"
                     className="text-sm font-medium text-foreground"
                   >
-                    First name
+                    {t("auth.register.firstNameLabel")}
                   </label>
                   <input
                     id="firstName"
@@ -490,8 +495,8 @@ export default function RegisterPage() {
                     autoComplete="given-name"
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
-                    placeholder="First name"
-                    className="h-12 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
+                    placeholder={t("auth.register.firstNamePlaceholder")}
+                    className="h-12 w-full rounded-xl border border-border bg-card px-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-[var(--ring)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
                     disabled={submitting}
                   />
                 </div>
@@ -501,7 +506,7 @@ export default function RegisterPage() {
                     htmlFor="lastName"
                     className="text-sm font-medium text-foreground"
                   >
-                    Last name
+                    {t("auth.register.lastNameLabel")}
                   </label>
                   <input
                     id="lastName"
@@ -509,8 +514,8 @@ export default function RegisterPage() {
                     autoComplete="family-name"
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
-                    placeholder="Last name"
-                    className="h-12 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
+                    placeholder={t("auth.register.lastNamePlaceholder")}
+                    className="h-12 w-full rounded-xl border border-border bg-card px-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-[var(--ring)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
                     disabled={submitting}
                   />
                 </div>
@@ -522,14 +527,14 @@ export default function RegisterPage() {
               <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <h3 className="text-lg font-semibold text-card-foreground">
-                    Password setup
+                    {t("auth.register.passwordSetupTitle")}
                   </h3>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Create a secure password for account access.
+                    {t("auth.register.passwordSetupDesc")}
                   </p>
                 </div>
                 <div className="rounded-2xl border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
-                  Step 2 of 2
+                  {t("auth.register.step2Label")}
                 </div>
               </div>
 
@@ -539,7 +544,7 @@ export default function RegisterPage() {
                     htmlFor="password"
                     className="text-sm font-medium text-foreground"
                   >
-                    Password
+                    {t("auth.register.passwordLabel")}
                   </label>
                   <div className="relative">
                     <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -550,8 +555,8 @@ export default function RegisterPage() {
                       autoComplete="new-password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Create a password"
-                      className="h-12 w-full rounded-xl border border-input bg-background pl-10 pr-11 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
+                      placeholder={t("auth.register.passwordPlaceholder")}
+                      className="h-12 w-full rounded-xl border border-border bg-card pl-10 pr-11 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-[var(--ring)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
                       required
                       disabled={submitting}
                     />
@@ -575,7 +580,7 @@ export default function RegisterPage() {
                   <div className="workspace-filter-bar space-y-2 p-3">
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-muted-foreground">
-                        Password strength
+                        {t("auth.register.passwordStrengthLabel")}
                       </span>
                       <span
                         className={`text-xs font-medium ${passwordStrength.className}`}
@@ -599,7 +604,7 @@ export default function RegisterPage() {
                     htmlFor="confirmPassword"
                     className="text-sm font-medium text-foreground"
                   >
-                    Confirm password
+                    {t("auth.register.confirmPasswordLabel")}
                   </label>
                   <div className="relative">
                     <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -610,8 +615,8 @@ export default function RegisterPage() {
                       autoComplete="new-password"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="Re-enter password"
-                      className="h-12 w-full rounded-xl border border-input bg-background pl-10 pr-11 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
+                      placeholder={t("auth.register.confirmPasswordPlaceholder")}
+                      className="h-12 w-full rounded-xl border border-border bg-card pl-10 pr-11 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-[var(--ring)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
                       required
                       disabled={submitting}
                     />
@@ -636,14 +641,13 @@ export default function RegisterPage() {
 
                   <div className="workspace-filter-bar p-3">
                     <div className="text-xs text-muted-foreground">
-                      Account type
+                      {t("auth.register.accountTypeLabel")}
                     </div>
                     <div className="mt-1 text-sm font-medium text-foreground">
-                      Customer
+                      {t("auth.register.accountTypeValue")}
                     </div>
                     <div className="mt-3 text-xs leading-5 text-muted-foreground">
-                      Internal roles such as admin, cashier, and partner are
-                      not created from this page.
+                      {t("auth.register.accountTypeDesc")}
                     </div>
                   </div>
                 </div>
@@ -673,10 +677,7 @@ export default function RegisterPage() {
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
               <div className="space-y-4">
                 <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-                  Public self-registration is limited to{" "}
-                  <span className="font-semibold">customer accounts</span>.
-                  Partner, admin, and cashier accounts are created
-                  internally by authorized staff.
+                  {t("auth.register.alertText")}
                 </div>
 
                 {error ? (
@@ -695,43 +696,39 @@ export default function RegisterPage() {
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="public-action-primary h-12 flex-1 justify-center disabled:opacity-50"
                   >
-                    <span>
-                      {submitting
-                        ? "Creating account..."
-                        : "Create customer account"}
-                    </span>
-                    {!submitting ? <ArrowRight className="h-4 w-4" /> : null}
+                    {submitting ? t("auth.register.creatingAccount") : t("auth.register.createAccountBtn")}
+                    {!submitting && <ArrowRight className="h-4 w-4 ml-2" />}
                   </button>
 
                   <Link
                     href="/login"
-                    className="inline-flex h-12 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
+                    className="inline-flex h-11 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
                   >
-                    Back to sign in
+                    {t("auth.register.backToSignIn")}
                   </Link>
                 </div>
               </div>
 
               <aside className="rounded-3xl border border-border bg-card p-4 shadow-sm sm:p-5">
                 <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                  Registration summary
+                  {t("auth.register.summaryTitle")}
                 </h3>
 
                 <dl className="mt-4 space-y-4">
                   <div>
                     <dt className="text-xs text-muted-foreground">
-                      Account type
+                      {t("auth.register.accountTypeLabel")}
                     </dt>
                     <dd className="mt-1 text-sm font-medium text-foreground break-words">
-                      Customer
+                      {t("auth.register.accountTypeValue")}
                     </dd>
                   </div>
 
                   <div>
                     <dt className="text-xs text-muted-foreground">
-                      Username
+                      {t("auth.register.usernameLabel")}
                     </dt>
                     <dd className="mt-1 text-sm font-medium text-foreground break-words">
                       {username.trim() || "—"}
@@ -739,14 +736,14 @@ export default function RegisterPage() {
                   </div>
 
                   <div>
-                    <dt className="text-xs text-muted-foreground">Phone</dt>
+                    <dt className="text-xs text-muted-foreground">{t("auth.register.phoneLabel")}</dt>
                     <dd className="mt-1 text-sm font-medium text-foreground break-words">
                       {phone.trim() || "—"}
                     </dd>
                   </div>
 
                   <div>
-                    <dt className="text-xs text-muted-foreground">Email</dt>
+                    <dt className="text-xs text-muted-foreground">{t("auth.register.emailLabel")}</dt>
                     <dd className="mt-1 text-sm font-medium text-foreground break-words">
                       {email.trim() || "—"}
                     </dd>
@@ -754,7 +751,7 @@ export default function RegisterPage() {
 
                   <div>
                     <dt className="text-xs text-muted-foreground">
-                      Display name
+                      {t("auth.register.displayNameLabel")}
                     </dt>
                     <dd className="mt-1 text-sm font-medium text-foreground break-words">
                       {[firstName.trim(), lastName.trim()]
@@ -766,13 +763,13 @@ export default function RegisterPage() {
 
                 <div className="mt-6 border-t border-border pt-5">
                   <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                    Before you submit
+                    {t("auth.register.beforeSubmitTitle")}
                   </h4>
                   <ul className="mt-3 space-y-3 text-sm text-muted-foreground">
-                    <li>Use a unique username you can remember.</li>
-                    <li>Use your working phone number for account linkage.</li>
-                    <li>Keep your password private.</li>
-                    <li>Partner access is not created from this page.</li>
+                    <li>{t("auth.register.rule1")}</li>
+                    <li>{t("auth.register.rule2")}</li>
+                    <li>{t("auth.register.rule3")}</li>
+                    <li>{t("auth.register.rule4")}</li>
                   </ul>
                 </div>
               </aside>
@@ -780,12 +777,12 @@ export default function RegisterPage() {
           </form>
 
           <div className="mt-8 border-t border-border pt-5 text-center text-sm text-muted-foreground">
-            Already have an account?{" "}
+            {t("auth.register.alreadyHaveAccount")}{" "}
             <Link
               href="/login"
               className="rounded font-medium text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
             >
-              Sign in
+              {t("auth.login.signIn")}
             </Link>
           </div>
         </div>

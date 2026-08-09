@@ -1,16 +1,21 @@
+import { getPublicDictionary } from "@/lib/public-i18n";
+import { getPublicLocale } from "@/lib/public-i18n.server";
 import Link from "next/link";
 import { AlertCircle } from "lucide-react";
 
 import { ROUTES } from "@/lib/routes";
 
-export default function ProductNotFound() {
+export default async function ProductNotFound() {
+  const locale = await getPublicLocale();
+  const dict = getPublicDictionary(locale);
+
   return (
     <div className="mx-auto flex w-full max-w-[1280px] flex-col px-4 py-16 text-center sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-md rounded-[2rem] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] p-8 shadow-[0_26px_72px_-54px_rgba(15,23,42,0.78)]">
+      <div className="mx-auto max-w-md rounded-[2rem] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] dark:bg-[linear-gradient(180deg,rgba(30,41,59,0.5),rgba(15,23,42,0.8))] p-8 shadow-[0_26px_72px_-54px_rgba(15,23,42,0.78)] dark:shadow-none">
         <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-red-200/80 bg-red-50 text-destructive shadow-[0_18px_40px_-30px_rgba(15,23,42,0.62)]">
           <AlertCircle className="h-8 w-8" />
         </div>
-        <h1 className="text-2xl font-semibold text-foreground">Product Not Found</h1>
+        <h1 className="text-2xl font-semibold text-foreground">{dict.public.notfound_text1}</h1>
         <p className="mt-2 text-muted-foreground">
           The product you&apos;re looking for doesn&apos;t exist or is not published.
         </p>

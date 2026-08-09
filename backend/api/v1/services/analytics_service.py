@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from subscriptions.models import Subscription, SubscriptionStatus
-from subscriptions.services.winner_state_service import winner_history_q
+from lucky_plan.services.winner_state_service import winner_history_q
 
 
 def get_subscription_counts() -> dict:

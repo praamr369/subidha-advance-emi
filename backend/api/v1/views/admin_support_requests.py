@@ -13,7 +13,7 @@ from api.v1.serializers.support_requests import (
     AdminSupportRequestStatusUpdateSerializer,
 )
 from subscriptions.models import CustomerSupportRequest, SupportRequestStatus
-from subscriptions.services.customer_support_service import (
+from customers.services.customer_support_service import (
     assign_customer_support_request,
     resolve_customer_support_request,
     update_customer_support_request_notes,

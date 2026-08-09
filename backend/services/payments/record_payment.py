@@ -13,7 +13,7 @@ migration to the canonical payment service.
 from decimal import Decimal, InvalidOperation
 from typing import Any, Optional
 
-from subscriptions.services.payment_service import record_emi_payment
+from payments.services.payment_service import record_emi_payment
 
 
 def _normalize_amount(value: Any) -> Decimal:

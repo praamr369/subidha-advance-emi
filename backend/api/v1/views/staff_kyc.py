@@ -21,7 +21,7 @@ from rest_framework.views import APIView
 from accounts.models import StaffIdentity
 from api.v1.permissions import IsStaff
 from subscriptions.models_kyc_workflow import KycOwnerType
-from subscriptions.services.kyc_workflow_service import (
+from customers.services.kyc_workflow_service import (
     get_kyc_audit_trail,
     staff_self_upload_kyc,
 )

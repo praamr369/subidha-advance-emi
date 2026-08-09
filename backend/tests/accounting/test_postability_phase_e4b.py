@@ -34,7 +34,7 @@ class AccountingPostabilityPhaseE4BTests(APITestCase):
 
     def test_bridge_reconciliation_uses_canonical_postability_statuses(self):
         response = self.assert_no_journal_or_sequence_created(
-            lambda: self.client.get("/api/v1/accounting/bridge-reconciliation/")
+            lambda: self.client.get("/api/v1/admin/accounting/bridge-reconciliation/")
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertIn("canonical_statuses", response.data)
@@ -62,7 +62,7 @@ class AccountingPostabilityPhaseE4BTests(APITestCase):
 
     def test_bridges_and_reconciliation_agree_on_staff_advance(self):
         bridge = self.client.get("/api/v1/admin/accounting/bridge-readiness/")
-        reconciliation = self.client.get("/api/v1/accounting/bridge-reconciliation/")
+        reconciliation = self.client.get("/api/v1/admin/accounting/bridge-reconciliation/")
         self.assertEqual(bridge.status_code, status.HTTP_200_OK, bridge.data)
         self.assertEqual(reconciliation.status_code, status.HTTP_200_OK, reconciliation.data)
         bridge_row = {row["event_key"]: row for row in bridge.data["events"]}["staff_advance"]

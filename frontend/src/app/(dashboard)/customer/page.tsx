@@ -184,9 +184,9 @@ export default function CustomerDashboardPage() {
     enabled: coreQuery.isSuccess,
   });
   const productsQuery = useQuery({
-    queryKey: ["public", "products", "customer-dashboard"],
-    queryFn: listPublicProducts,
-    enabled: coreQuery.isSuccess,
+    queryKey: ["publicProducts", "dashboard"],
+    queryFn: () => listPublicProducts(),
+    staleTime: 5 * 60 * 1000,
   });
 
   const legacy: LegacyDashboardResponse | null = coreQuery.data ?? null;

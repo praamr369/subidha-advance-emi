@@ -1,6 +1,7 @@
 from django.db import models
 from django.core.validators import MinValueValidator
 from django.utils.text import slugify
+import uuid
 
 
 class AttributeDataType(models.TextChoices):
@@ -109,14 +110,16 @@ class AttributeOption(models.Model):
 
 
 class PimProduct(models.Model):
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, db_index=True)
     code = models.CharField(max_length=100, unique=True)
+    brand = models.CharField(max_length=150, blank=True)
     # Link to the operational product master (subscriptions.Product). This makes the
     # PIM record the rich-editing layer of a single operational product, so editing
     # attributes/variants here reflects on the product used for inventory,
     # subscription, EMI, rent, lease, and direct sale. Nullable so the FK can be
     # added additively and backfilled by matching code == product_code.
     source_product = models.ForeignKey(
-        "subscriptions.Product",
+        "products_core.Product",
         on_delete=models.PROTECT,
         related_name="pim",
         null=True,
@@ -179,11 +182,20 @@ class ProductAttribute(models.Model):
 
 
 class ProductVariant(models.Model):
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, db_index=True)
     product = models.ForeignKey(PimProduct, on_delete=models.CASCADE, related_name="variants")
+    operational_product = models.OneToOneField(
+        "products_core.Product",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="pim_variant"
+    )
     sku = models.CharField(max_length=150, unique=True)
     barcode = models.CharField(max_length=100, unique=True, null=True, blank=True)
     price = models.DecimalField(max_digits=14, decimal_places=2, validators=[MinValueValidator(0)])
     cost_price = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    image = models.ImageField(upload_to="pim/variants/", null=True, blank=True)
     quantity_on_hand = models.IntegerField(default=0)
     reorder_level = models.IntegerField(default=0)
     is_active = models.BooleanField(default=True)
@@ -215,3 +227,23 @@ class VariantAttributeValue(models.Model):
 
     def __str__(self):
         return f"{self.variant.sku} / {self.attribute.name}"
+
+
+class ProductAsset(models.Model):
+    product = models.ForeignKey(PimProduct, on_delete=models.CASCADE, related_name="assets")
+    image = models.ImageField(upload_to="pim/assets/")
+    is_hero = models.BooleanField(default=False)
+    mapped_attribute_option = models.ForeignKey(
+        AttributeOption, on_delete=models.SET_NULL, null=True, blank=True, related_name="mapped_assets"
+    )
+    display_order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["display_order", "-created_at"]
+        verbose_name = "Product Asset"
+        verbose_name_plural = "Product Assets"
+
+    def __str__(self):
+        return f"{self.product.code} - Asset {self.id}"
+

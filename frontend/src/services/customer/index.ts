@@ -1209,13 +1209,15 @@ export async function listAdminCustomerKycDocuments(
 
 export async function uploadAdminCustomerKycDocument(
   customerId: number | string,
-  input: { file: File; document_type: string; category?: string; notes?: string }
+  input: { file: File; document_type: string; category?: string; notes?: string; force_review?: boolean }
 ): Promise<{ id: number; status: string; document_type: string }> {
   const form = new FormData();
   form.append("file", input.file);
   form.append("document_type", input.document_type);
   if (input.category) form.append("category", input.category);
   if (input.notes) form.append("notes", input.notes);
+  // Admin uploads auto-accept by default; pass force_review to route to the queue.
+  if (input.force_review) form.append("force_review", "true");
   return apiFetch<{ id: number; status: string; document_type: string }>(
     `/admin/customers/${customerId}/kyc-documents/upload/`,
     { method: "POST", body: form }

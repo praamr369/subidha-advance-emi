@@ -51,7 +51,7 @@ export default function RulebookPage() {
           <section
             key={section.id}
             id={section.id}
-            className="rounded-[2rem] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] p-6 shadow-[0_24px_70px_-50px_rgba(15,23,42,0.62)]"
+            className="rounded-[2rem] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] dark:bg-[linear-gradient(180deg,rgba(30,41,59,0.5),rgba(15,23,42,0.8))] p-6 shadow-[0_24px_70px_-50px_rgba(15,23,42,0.62)] dark:shadow-none"
           >
             <h2 className="text-lg font-semibold text-foreground">{section.title}</h2>
             <ol className="mt-4 space-y-3">

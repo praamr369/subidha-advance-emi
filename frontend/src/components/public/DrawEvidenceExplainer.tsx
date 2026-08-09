@@ -1,9 +1,17 @@
+import { getPublicDictionary } from "@/lib/public-i18n";
+import { getPublicLocale } from "@/lib/public-i18n.server";
 import { CheckCircle2, EyeOff, FileSearch, ShieldCheck } from "lucide-react";
+
+
+
+export default async function DrawEvidenceExplainer() {
+  const locale = await getPublicLocale();
+  const dict = getPublicDictionary(locale);
 
 const evidenceCards = [
   {
     icon: FileSearch,
-    title: "What is shown publicly",
+    title: dict.public.DrawEvidenceExplainer_prop1,
     points: [
       "Batch code and draw month when available.",
       "Masked winner display name.",
@@ -13,7 +21,7 @@ const evidenceCards = [
   },
   {
     icon: EyeOff,
-    title: "What is never shown publicly",
+    title: dict.public.DrawEvidenceExplainer_prop2,
     points: [
       "Phone number, address, KYC IDs, and private documents.",
       "Internal customer IDs and staff-only workflow notes.",
@@ -23,7 +31,7 @@ const evidenceCards = [
   },
   {
     icon: ShieldCheck,
-    title: "What public pages cannot do",
+    title: dict.public.DrawEvidenceExplainer_prop3,
     points: [
       "They cannot select or change a winner.",
       "They cannot assign Lucky IDs or create subscriptions.",
@@ -33,11 +41,10 @@ const evidenceCards = [
   },
 ] as const;
 
-export default function DrawEvidenceExplainer() {
   return (
     <section className="public-surface p-6">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Evidence boundary</div>
-      <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">How to read public draw records</h2>
+      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{dict.public.DrawEvidenceExplainer_text4}</div>
+      <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">{dict.public.DrawEvidenceExplainer_text5}</h2>
       <p className="mt-3 max-w-4xl text-sm leading-7 text-muted-foreground sm:text-base">
         Public draw pages explain revealed records without exposing private customer or internal financial data. Operational truth stays in the authenticated system.
       </p>

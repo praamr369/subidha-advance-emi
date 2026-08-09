@@ -13,15 +13,15 @@ from subscriptions.models import (
     RentLeaseDepositTransactionType,
 )
 from subscriptions.models_rent_lease_collection import RentLeaseCollection
-from subscriptions.services.rent_lease_billing_service import (
+from contracts.services.rent_lease_billing_service import (
     generate_monthly_demands_for_subscription,
     record_deposit_refund,
 )
-from subscriptions.services.rent_lease_collection_workflow_service import (
+from contracts.services.rent_lease_collection_workflow_service import (
     collect_rent_lease_monthly_demand,
     collect_security_deposit_with_metadata,
 )
-from subscriptions.services.rent_lease_contract_service import create_rent_contract
+from contracts.services.rent_lease_contract_service import create_rent_contract
 from tests.helpers import (
     create_admin_user,
     create_customer_profile,
@@ -45,7 +45,7 @@ class RentLeaseSecurityDepositSourceContractPhaseF16Tests(TestCase):
         # The rent/lease bridge is auto-ready when mapping is valid, so keep it
         # explicitly deferred here to preserve the no-posting-side-effects intent.
         from django.utils import timezone as _tz
-        from subscriptions.services.rent_lease_posting_bridge_config_service import (
+        from contracts.services.rent_lease_posting_bridge_config_service import (
             get_rent_lease_posting_bridge_config,
         )
 

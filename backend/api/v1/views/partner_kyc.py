@@ -19,7 +19,7 @@ from rest_framework.views import APIView
 
 from api.v1.permissions import IsPartner
 from subscriptions.models_kyc_workflow import KycOwnerType
-from subscriptions.services.kyc_workflow_service import (
+from customers.services.kyc_workflow_service import (
     get_kyc_audit_trail,
     partner_self_upload_kyc,
 )

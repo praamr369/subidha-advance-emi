@@ -135,10 +135,10 @@ export default function ContactLeadForm() {
               value={topic}
               onChange={(event) => setTopic(event.target.value as SupportTopic)}
               disabled={loading}
-              className="public-control-focus h-11 rounded-xl border border-border bg-background px-4 text-sm"
+              className="public-control-focus h-11 rounded-xl border border-border bg-background dark:bg-slate-950 px-4 text-sm text-foreground"
             >
               {TOPIC_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
+                <option key={option.value} value={option.value} className="dark:bg-slate-950">
                   {option.label}
                 </option>
               ))}

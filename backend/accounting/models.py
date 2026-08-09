@@ -10,7 +10,7 @@ from django.db import models
 from django.db.models import Q
 from django.utils import timezone
 
-from subscriptions.models import PaymentMethod
+from subscriptions.enums import PaymentMethod
 
 MONEY_ZERO = Decimal("0.00")
 SYSTEM_LEDGER_POSTING_PROFILE_NAME = "ledger posting profiles (system)"
@@ -476,7 +476,7 @@ class BusinessTaxProfile(AccountingTimeStampedModel):
 
 class ProductTaxProfile(AccountingTimeStampedModel):
     product = models.ForeignKey(
-        "subscriptions.Product",
+        "products_core.Product",
         on_delete=models.PROTECT,
         related_name="tax_profiles",
     )
@@ -1670,7 +1670,7 @@ class VendorServiceArea(AccountingTimeStampedModel):
 
 class VendorProduct(AccountingTimeStampedModel):
     vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name="products")
-    internal_product = models.ForeignKey("subscriptions.Product", on_delete=models.SET_NULL, null=True, blank=True, related_name="vendor_products")
+    internal_product = models.ForeignKey("products_core.Product", on_delete=models.SET_NULL, null=True, blank=True, related_name="vendor_products")
     vendor_sku = models.CharField(max_length=80, blank=True, default="", db_index=True)
     product_name = models.CharField(max_length=180)
     category_text = models.CharField(max_length=120, blank=True, default="", db_index=True)
@@ -1732,12 +1732,12 @@ class VendorQuoteRequest(AccountingTimeStampedModel):
         db_index=True,
     )
     source_id = models.PositiveBigIntegerField(null=True, blank=True, db_index=True)
-    customer = models.ForeignKey("subscriptions.Customer", on_delete=models.SET_NULL, null=True, blank=True, related_name="vendor_quote_requests")
+    customer = models.ForeignKey("customers.Customer", on_delete=models.SET_NULL, null=True, blank=True, related_name="vendor_quote_requests")
     customer_pincode = models.CharField(max_length=20, blank=True, default="", db_index=True)
     customer_city = models.CharField(max_length=100, blank=True, default="", db_index=True)
     customer_district = models.CharField(max_length=100, blank=True, default="", db_index=True)
     customer_state = models.CharField(max_length=100, blank=True, default="", db_index=True)
-    product = models.ForeignKey("subscriptions.Product", on_delete=models.SET_NULL, null=True, blank=True, related_name="vendor_quote_requests")
+    product = models.ForeignKey("products_core.Product", on_delete=models.SET_NULL, null=True, blank=True, related_name="vendor_quote_requests")
     product_name = models.CharField(max_length=180, blank=True, default="")
     category_text = models.CharField(max_length=120, blank=True, default="")
     quantity = models.DecimalField(max_digits=12, decimal_places=3, default=Decimal("1.000"))
@@ -1814,7 +1814,7 @@ class CustomerPurchaseEnquiry(AccountingTimeStampedModel):
 
     enquiry_no = models.CharField(max_length=60, unique=True, db_index=True)
     customer = models.ForeignKey(
-        "subscriptions.Customer",
+        "customers.Customer",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -1824,7 +1824,7 @@ class CustomerPurchaseEnquiry(AccountingTimeStampedModel):
     phone = models.CharField(max_length=20, db_index=True)
     email = models.EmailField(blank=True, default="")
     product = models.ForeignKey(
-        "subscriptions.Product",
+        "products_core.Product",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -1847,7 +1847,7 @@ class CustomerPurchaseEnquiry(AccountingTimeStampedModel):
         db_index=True,
     )
     public_lead = models.ForeignKey(
-        "subscriptions.PublicLead",
+        "crm.PublicLead",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -4537,7 +4537,7 @@ class LeaseContractType(models.TextChoices):
 class LeaseContract(models.Model):
     """IFRS-16 lease contracts with ROU asset & lease liability."""
     subscription = models.OneToOneField(
-        "subscriptions.Subscription",
+        "contracts.Subscription",
         on_delete=models.CASCADE,
         related_name="lease_contract",
     )
@@ -4841,7 +4841,7 @@ class CustomerOpeningOutstanding(AccountingTimeStampedModel):
     """Opening receivable balance migrated from a previous system (e.g. BillBook)."""
 
     customer = models.ForeignKey(
-        "subscriptions.Customer",
+        "customers.Customer",
         null=True, blank=True,
         on_delete=models.SET_NULL,
         related_name="opening_outstandings",

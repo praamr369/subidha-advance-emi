@@ -6,12 +6,12 @@ from django.core.management import call_command
 from django.test import TestCase
 
 from subscriptions.models import AuditLog, LuckyIdStatus, SubscriptionStatus
-from subscriptions.services.lucky_draw_service import (
+from lucky_plan.services.lucky_draw_service import (
     create_lucky_draw_commit,
     reveal_and_execute_draw,
 )
-from subscriptions.services.winner_state_service import winner_history_q
-from subscriptions.services.winner_service import WinnerService
+from lucky_plan.services.winner_state_service import winner_history_q
+from lucky_plan.services.winner_service import WinnerService
 from tests.helpers import (
     create_admin_user,
     create_batch,

@@ -129,16 +129,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
       item("Sales & Contracts", "Product Recontract Report", ROUTES.admin.contractAmendmentsRecontractReport, "Read-only evidence report for recontract previews and addendum eligibility."),
     ],
   }),
-  item("Sales & Contracts", "Products", ROUTES.admin.products, "Product catalog used by contract and sale workflows."),
-  item("Sales & Contracts", "Product Brochures", ROUTES.admin.brochures, "Read-only customer catalog PDF generation and sharing. No stock reservation, billing, contract, payment, or accounting posting."),
-  item("Sales & Contracts", "Brochure Settings", ROUTES.admin.brochureSettings, "Operational publication visibility, brochure pricing, descriptions, featured order, and badges. Settings only; no operational or financial posting."),
-  item("Sales & Contracts", "Brochure Enquiries", ROUTES.admin.brochureEnquiries, "Customer interest captured from public brochure links with CRM lead tracking and staff follow-up."),
-  item("Sales & Contracts", "Brochure Quotations", ROUTES.admin.brochureQuotations, "Non-financial quotation drafts, PDFs, public share links, and agreement-in-principle status tracking."),
-  item("Sales & Contracts", "Product Workspace", ROUTES.admin.productsWorkspace, "Product operations workspace."),
-  item("Sales & Contracts", "Product Masters", ROUTES.admin.productsMasters, "Product category, subcategory, and UOM setup."),
-  item("Sales & Contracts", "PIM Products", ROUTES.admin.pimProducts, "Enterprise PIM — category-specific attributes and SKU variants."),
-  item("Sales & Contracts", "PIM Categories", ROUTES.admin.pimCategories, "PIM category tree with attribute templates."),
-  item("Sales & Contracts", "PIM Manage Categories", ROUTES.admin.pimCategoriesManage, "Create and edit PIM categories, subcategories and attribute types."),
+
   // Rent / lease contract sub-section
   item("Sales & Contracts", "Rent/Lease Cockpit", ROUTES.admin.rentLease, "Rent and lease cockpit."),
   item("Sales & Contracts", "Rent Contracts", `${ROUTES.admin.subscriptions}?plan_type=RENT`, "Rent contract register."),
@@ -228,6 +219,16 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
 
   // ── 10. Inventory & Stock ──────────────────────────────────────────────────
   item("Inventory & Stock", "Inventory Dashboard", ROUTES.admin.inventory, "Inventory operations workspace."),
+  item("Inventory & Stock", "Products", ROUTES.admin.products, "Product catalog used by contract and sale workflows."),
+  item("Inventory & Stock", "Product Workspace", ROUTES.admin.productsWorkspace, "Product operations workspace."),
+  item("Inventory & Stock", "Product Masters", ROUTES.admin.productsMasters, "Product category, subcategory, and UOM setup."),
+  item("Inventory & Stock", "PIM Products", ROUTES.admin.pimProducts, "Enterprise PIM — category-specific attributes and SKU variants."),
+  item("Inventory & Stock", "PIM Categories", ROUTES.admin.pimCategories, "PIM category tree with attribute templates."),
+  item("Inventory & Stock", "PIM Manage Categories", ROUTES.admin.pimCategoriesManage, "Create and edit PIM categories, subcategories and attribute types."),
+  item("Inventory & Stock", "Product Brochures", ROUTES.admin.brochures, "Read-only customer catalog PDF generation and sharing. No stock reservation, billing, contract, payment, or accounting posting."),
+  item("Inventory & Stock", "Brochure Settings", ROUTES.admin.brochureSettings, "Operational publication visibility, brochure pricing, descriptions, featured order, and badges. Settings only; no operational or financial posting."),
+  item("Inventory & Stock", "Brochure Enquiries", ROUTES.admin.brochureEnquiries, "Customer interest captured from public brochure links with CRM lead tracking and staff follow-up."),
+  item("Inventory & Stock", "Brochure Quotations", ROUTES.admin.brochureQuotations, "Non-financial quotation drafts, PDFs, public share links, and agreement-in-principle status tracking."),
   item("Inventory & Stock", "Items / Products", ROUTES.admin.inventoryItems, "Inventory item master."),
   item("Inventory & Stock", "Barcode / Lots", ROUTES.admin.inventoryLots, "Barcode, QR, lot, and expiry tracking."),
   item("Inventory & Stock", "Stock on Hand", ROUTES.admin.inventoryStockOnHand, "Current stock posture.", { badgeSource: "low_stock_count" }),
@@ -242,6 +243,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Inventory & Stock", "Readiness", ROUTES.admin.inventoryReadiness, "Inventory readiness checks."),
   item("Inventory & Stock", "Profiles", ROUTES.admin.inventoryProfiles, "Inventory profiles."),
   item("Inventory & Stock", "Reservations", ROUTES.admin.inventoryReservations, "Active stock reservations by item and purpose. Read-only; release via source workflow."),
+  item("Inventory & Stock", "Service Profile", ROUTES.admin.inventoryServiceCatalog, "Admin-managed catalog of services (installation, warranty, maintenance, AMC, etc.)."),
 
   // ── 10. Purchases & Vendors ───────────────────────────────────────────────
   // Purchase source workflow: vendor profile → request → order → receipt → stock increase
@@ -283,10 +285,13 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Delivery & Service", "Delivery Returns", ROUTES.admin.deliveryReturns, "Delivery return workflow."),
   item("Delivery & Service", "Possession / Handover", `${ROUTES.admin.deliveries}?plan_type=RENT_LEASE`, "Rent and lease possession and handover queue."),
   item("Delivery & Service", "Return Inspections", `${ROUTES.admin.serviceDeskReturns}?plan_type=RENT_LEASE`, "Rent and lease return inspection queue.", { badgeSource: "queue.return_inspections_pending" }),
+  item("Delivery & Service", "Service Control Center", ROUTES.admin.serviceDesk, "Unified control center — find any customer product issue (service, warranty, return, exchange, void, cancel) by customer name/phone, sales ID, service ID, return ID, or contract ID."),
   item("Delivery & Service", "Cases", ROUTES.admin.serviceDeskCases, "Service desk cases.", { badgeSource: "open_support_ticket_count" }),
   item("Delivery & Service", "Complaints", ROUTES.admin.serviceDeskComplaints, "Complaint register."),
   item("Delivery & Service", "Returns", ROUTES.admin.serviceDeskReturns, "Return queue."),
   item("Delivery & Service", "Tickets", ROUTES.admin.serviceDeskTickets, "Service ticket register.", { badgeSource: "open_support_ticket_count" }),
+  item("Delivery & Service", "Warranty Claims", ROUTES.admin.warrantyClaims, "Warranty claim register — filing, review, and approval."),
+  item("Delivery & Service", "Service Schedule", ROUTES.admin.warrantyServiceSchedule, "Schedule technicians and dates for approved warranty service jobs."),
 
   // ── 13. HR & Staff ────────────────────────────────────────────────────────
   // Phase 7: HR & Staff owns people operations only.

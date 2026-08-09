@@ -22,6 +22,20 @@ DEFAULT_TARGET_APP_LABELS: set[str] = {
     "reminders",
     "subscriptions",
     "accounts",
+    # Apps the subscriptions monolith was split into — the operational data
+    # (customers, contracts, payments, lucky-plan, deliveries, etc.) now lives
+    # here, so they must be cleared too or User deletion hits their PROTECT FKs.
+    "customers",
+    "contracts",
+    "payments",
+    "lucky_plan",
+    "deliveries",
+    "commissions",
+    "growth",
+    "business_setup",
+    "finance_control",
+    "audit",
+    "products_core",
 }
 
 
@@ -63,6 +77,69 @@ def _resolve_models_for_apps(*, app_labels: Iterable[str], excluded_model_labels
         resolved.append(model)
 
     return resolved
+
+
+def _fk_safe_delete_tables(target_models: list[type], *, excluded_model_labels: set[str]) -> list[str]:
+    """Ordered db_tables for the SQLite delete path.
+
+    SQLite ignores ``PRAGMA foreign_keys=OFF`` inside a transaction, so the raw
+    DELETEs run with FK enforcement on. To emulate PostgreSQL's
+    ``TRUNCATE ... CASCADE`` we (1) expand the target set with every model that
+    transitively FK-references it, then (2) topologically sort so a referencing
+    table is deleted before the table it points at. accounts.User is excluded —
+    it is deleted separately after its referencers are gone.
+    """
+    all_models = list(apps.get_models())
+    referencers: dict[type, set[type]] = {}
+    for model in all_models:
+        for field in model._meta.get_fields():
+            if getattr(field, "concrete", False) and (field.many_to_one or field.one_to_one) and field.related_model:
+                referencers.setdefault(field.related_model, set()).add(model)
+
+    expanded: set[type] = set(target_models)
+    stack = list(target_models)
+    while stack:
+        current = stack.pop()
+        for ref in referencers.get(current, ()):
+            if ref not in expanded:
+                expanded.add(ref)
+                stack.append(ref)
+
+    expanded = {m for m in expanded if m._meta.label not in excluded_model_labels}
+
+    # deps[model] = models that must be deleted before it (its referencers).
+    deps: dict[type, set[type]] = {m: set() for m in expanded}
+    for model in expanded:
+        for field in model._meta.get_fields():
+            if getattr(field, "concrete", False) and (field.many_to_one or field.one_to_one):
+                parent = field.related_model
+                if parent in expanded and parent is not model:
+                    deps[parent].add(model)
+
+    ordered: list[type] = []
+    emitted: set[type] = set()
+    remaining = list(expanded)
+    while remaining:
+        progressed = False
+        for model in list(remaining):
+            if deps[model] <= emitted:
+                ordered.append(model)
+                emitted.add(model)
+                remaining.remove(model)
+                progressed = True
+        if not progressed:  # cycle — append the rest as-is
+            ordered.extend(remaining)
+            break
+
+    # De-dup db_tables (multiple models can share a table) preserving order.
+    tables: list[str] = []
+    seen_tables: set[str] = set()
+    for model in ordered:
+        t = model._meta.db_table
+        if t not in seen_tables:
+            seen_tables.add(t)
+            tables.append(t)
+    return tables
 
 
 def _resolve_auth_artifact_models() -> list[type]:
@@ -205,19 +282,17 @@ def execute_business_reset(*, options: BusinessResetOptions, confirm: str, dry_r
                         f"TRUNCATE TABLE {', '.join(auth_tables)} RESTART IDENTITY CASCADE;"
                     )
         else:
-            # SQLite and other lightweight DBs can raise ProtectedError during ORM
-            # cascade order resolution. Use table-level deletes to keep reset behavior
-            # aligned with the PostgreSQL truncate path.
-            tables = [model._meta.db_table for model in target_models]
+            # Non-PostgreSQL path (SQLite in tests). PRAGMA foreign_keys=OFF is a
+            # no-op inside a transaction, so emulate TRUNCATE ... CASCADE: expand
+            # to referencing tables and delete referencing-before-referenced.
+            tables = _fk_safe_delete_tables(target_models, excluded_model_labels=excluded_model_labels)
             if options.clear_auth_artifacts:
-                tables.extend(model._meta.db_table for model in auth_models)
+                for model in auth_models:
+                    if model._meta.db_table not in tables:
+                        tables.append(model._meta.db_table)
             with connection.cursor() as cursor:
-                if connection.vendor == "sqlite":
-                    cursor.execute("PRAGMA foreign_keys = OFF;")
                 for table in tables:
                     cursor.execute(f"DELETE FROM {_quote_table(table)};")
-                if connection.vendor == "sqlite":
-                    cursor.execute("PRAGMA foreign_keys = ON;")
 
         if options.delete_non_preserved_users:
             User.objects.exclude(id__in=preserved_user_ids).delete()

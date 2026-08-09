@@ -9,12 +9,12 @@ from rest_framework.views import APIView
 
 from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, RentLeaseAccountingAccountMapping
 from api.v1.permissions import IsAdmin
-from subscriptions.services import rent_lease_accounting_posting_service as bridge
-from subscriptions.services.rent_lease_finance_sync_service import (
+from contracts.services import rent_lease_accounting_posting_service as bridge
+from contracts.services.rent_lease_finance_sync_service import (
     ensure_premade_rent_lease_accounting_setup,
     get_active_account_mapping,
 )
-from subscriptions.services.rent_lease_posting_bridge_config_service import (
+from contracts.services.rent_lease_posting_bridge_config_service import (
     disable_rent_lease_posting_bridge,
     enable_rent_lease_posting_bridge,
     get_rent_lease_posting_bridge_state,
@@ -252,45 +252,45 @@ class AdminRentLeaseAccountingSummaryView(APIView):
 
 class _ActionView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
-    action = None
+    service_fn = None
 
     def post(self, request, pk: int):
         try:
-            return Response(self.action(pk, actor=request.user))
+            return Response(self.service_fn(pk, actor=request.user))
         except Exception as exc:
             return _error(exc)
 
 
 class AdminDepositPostingPreviewView(_ActionView):
-    action = staticmethod(bridge.preview_security_deposit_collection_posting)
+    service_fn = staticmethod(bridge.preview_security_deposit_collection_posting)
 
 
 class AdminDepositPostingExecuteView(_ActionView):
-    action = staticmethod(bridge.execute_security_deposit_collection_posting)
+    service_fn = staticmethod(bridge.execute_security_deposit_collection_posting)
 
 
 class AdminDepositRefundPostingPreviewView(_ActionView):
-    action = staticmethod(bridge.preview_security_deposit_refund_posting)
+    service_fn = staticmethod(bridge.preview_security_deposit_refund_posting)
 
 
 class AdminDepositRefundPostingExecuteView(_ActionView):
-    action = staticmethod(bridge.execute_security_deposit_refund_posting)
+    service_fn = staticmethod(bridge.execute_security_deposit_refund_posting)
 
 
 class AdminDepositDamagePostingPreviewView(_ActionView):
-    action = staticmethod(bridge.preview_damage_recovery_posting)
+    service_fn = staticmethod(bridge.preview_damage_recovery_posting)
 
 
 class AdminDepositDamagePostingExecuteView(_ActionView):
-    action = staticmethod(bridge.execute_damage_recovery_posting)
+    service_fn = staticmethod(bridge.execute_damage_recovery_posting)
 
 
 class AdminRentLeaseDemandPostingPreviewView(_ActionView):
-    action = staticmethod(bridge.preview_rent_lease_monthly_posting)
+    service_fn = staticmethod(bridge.preview_rent_lease_monthly_posting)
 
 
 class AdminRentLeaseDemandPostingExecuteView(_ActionView):
-    action = staticmethod(bridge.execute_rent_lease_monthly_posting)
+    service_fn = staticmethod(bridge.execute_rent_lease_monthly_posting)
 
 
 class AdminCustomerAdvanceListCreateView(APIView):
@@ -327,8 +327,8 @@ class AdminCustomerAdvanceDetailView(APIView):
 
 
 class AdminCustomerAdvancePostingPreviewView(_ActionView):
-    action = staticmethod(bridge.preview_customer_advance_posting)
+    service_fn = staticmethod(bridge.preview_customer_advance_posting)
 
 
 class AdminCustomerAdvancePostingExecuteView(_ActionView):
-    action = staticmethod(bridge.execute_customer_advance_posting)
+    service_fn = staticmethod(bridge.execute_customer_advance_posting)

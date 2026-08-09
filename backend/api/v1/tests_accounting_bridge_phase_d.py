@@ -24,12 +24,12 @@ from subscriptions.models import (
     Subscription,
     SubscriptionStatus,
 )
-from subscriptions.services.rent_lease_accounting_posting_service import (
+from contracts.services.rent_lease_accounting_posting_service import (
     execute_rent_lease_monthly_posting,
     get_rent_lease_accounting_readiness,
     preview_rent_lease_monthly_posting,
 )
-from subscriptions.services.rent_lease_posting_bridge_config_service import (
+from contracts.services.rent_lease_posting_bridge_config_service import (
     ENABLE_RENT_LEASE_POSTING_CONFIRMATION,
     enable_rent_lease_posting_bridge,
 )

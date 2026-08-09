@@ -1,4 +1,5 @@
 "use client";
+import { useI18n } from "@/components/i18n/I18nProvider";
 
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -9,12 +10,14 @@ type LuckyIdGridProps = {
 };
 
 export default function LuckyIdGrid({ highlightSlot, className }: LuckyIdGridProps) {
+  const { t } = useI18n();
+
   const cells = Array.from({ length: 100 }, (_, i) => i);
 
   return (
     <section
       className={cn(
-        "rounded-[2rem] border border-border bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] p-6 shadow-[0_24px_70px_-50px_rgba(15,23,42,0.62)]",
+        "rounded-[2rem] border border-border bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] dark:bg-[linear-gradient(180deg,rgba(30,41,59,0.5),rgba(15,23,42,0.8))] p-6 shadow-[0_24px_70px_-50px_rgba(15,23,42,0.62)] dark:shadow-none",
         className
       )}
     >
@@ -64,7 +67,7 @@ export default function LuckyIdGrid({ highlightSlot, className }: LuckyIdGridPro
       </div>
 
       <p className="mt-4 text-[11px] leading-5 text-muted-foreground">
-        <strong className="font-semibold text-foreground/70">Disclaimer:</strong>{" "}
+        <strong className="font-semibold text-foreground/70">{t('public.LuckyIdGrid_text4')}</strong>{" "}
         This grid is for customer education only. Lucky IDs are assigned inside the core system by branch staff. A customer may hold multiple Lucky IDs across different batches. Lucky ID assignment does not guarantee winning the monthly draw.
       </p>
     </section>

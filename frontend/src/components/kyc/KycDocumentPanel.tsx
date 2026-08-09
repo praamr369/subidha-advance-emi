@@ -211,6 +211,8 @@ export default function KycDocumentPanel(props: KycDocumentPanelProps) {
   const [file, setFile] = useState<File | null>(null);
   const [notes, setNotes] = useState("");
   const [expiryDate, setExpiryDate] = useState("");
+  // Admin-only: when true, skip auto-accept and route the upload through review.
+  const [forceReview, setForceReview] = useState(false);
   const [resubmissionOf, setResubmissionOf] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -318,6 +320,7 @@ export default function KycDocumentPanel(props: KycDocumentPanelProps) {
           file,
           notes: trimmedNotes,
           expiry_date: expiryDate.trim() || undefined,
+          force_review: forceReview || undefined,
         });
       } else {
         const payload = {
@@ -334,12 +337,15 @@ export default function KycDocumentPanel(props: KycDocumentPanelProps) {
         resubmissionOf != null
           ? "Document resubmitted for review."
           : isAdmin
-          ? "Document uploaded."
+          ? forceReview
+            ? "Document uploaded and sent for review."
+            : "Document uploaded and accepted."
           : "Document submitted for review. An admin will review it shortly."
       );
       setFile(null);
       setNotes("");
       setExpiryDate("");
+      setForceReview(false);
       setResubmissionOf(null);
       await refresh();
     } catch (err) {
@@ -428,8 +434,8 @@ export default function KycDocumentPanel(props: KycDocumentPanelProps) {
   const description =
     props.description ??
     (isAdmin
-      ? "Review uploaded identity documents. Approvals, rejections, and resubmission requests are recorded in the audit trail."
-      : "Upload identity documents for KYC verification. Admin approval is required — documents do not auto-approve.");
+      ? "Documents you upload here are trusted and accepted automatically. Documents submitted by the customer/partner/vendor/staff themselves stay pending until you approve them. All actions are recorded in the audit trail."
+      : "Upload identity documents for KYC. An admin reviews and accepts each document — documents do not auto-approve.");
 
   const overallEmpty = documents.length === 0;
 
@@ -523,11 +529,39 @@ export default function KycDocumentPanel(props: KycDocumentPanelProps) {
               <p className="text-[10px] text-muted-foreground">Leave blank for non-expiring documents (e.g. PAN, Voter ID).</p>
             </div>
           )}
+          {props.mode === "admin" && (
+            <div className="space-y-1.5 sm:col-span-2">
+              <label className="flex items-start gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={forceReview}
+                  onChange={(e) => setForceReview(e.target.checked)}
+                  disabled={uploading}
+                  className="mt-0.5 h-4 w-4 rounded border-border"
+                />
+                <span>
+                  <span className="font-medium text-foreground">Send for review instead of auto-accepting</span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    By default, documents you upload are accepted immediately. Tick this to route this document
+                    through the normal review queue (it stays pending until approved).
+                  </span>
+                </span>
+              </label>
+            </div>
+          )}
         </div>
         <p className="mt-2 text-xs text-muted-foreground">Accepted: JPG, PNG, or PDF up to 5 MB.</p>
         <div className="mt-3 flex justify-end">
           <button type="button" className={btnPrimary} onClick={() => void performUpload()} disabled={uploading || !file}>
-            {uploading ? "Uploading…" : resubmissionOf != null ? "Resubmit document" : "Submit for review"}
+            {uploading
+              ? "Uploading…"
+              : resubmissionOf != null
+              ? "Resubmit document"
+              : isAdmin
+              ? forceReview
+                ? "Upload for review"
+                : "Upload & accept"
+              : "Submit for review"}
           </button>
         </div>
       </div>

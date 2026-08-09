@@ -13,9 +13,9 @@ from django.db import transaction
 from billing.services.direct_sale_collection_service import collect_direct_sale_payment
 from billing.services.billing_service import generate_emi_payment_receipt
 from subscriptions.models import ContractReferenceType, PlanType, RentLeaseDemandType, Subscription
-from subscriptions.services.payment_service import record_emi_payment
-from subscriptions.services import contract_reference_service as crs
-from subscriptions.services.rent_lease_collection_workflow_service import (
+from payments.services.payment_service import record_emi_payment
+from contracts.services import contract_reference_service as crs
+from contracts.services.rent_lease_collection_workflow_service import (
     collect_rent_lease_monthly_demand,
     collect_security_deposit_with_metadata,
     rent_lease_receivable_position,
@@ -190,7 +190,7 @@ def route_collection(
                 "subscription_id": subscription.id,
                 "demand_id": demand.id,
                 "demand_type": demand.demand_type,
-                "deposit_source_model": "subscriptions.RentLeaseDepositTransaction",
+                "deposit_source_model": "payments.RentLeaseDepositTransaction",
                 "message": "Security deposit collection recorded against the separate deposit source workflow.",
             }
             if deposit_source is not None:
@@ -218,7 +218,7 @@ def route_collection(
             "subscription_id": subscription.id,
             "demand_id": demand.id,
             "demand_type": demand.demand_type,
-            "collection_source_model": "subscriptions.RentLeaseCollection",
+            "collection_source_model": "payments.RentLeaseCollection",
             "message": "Rent/lease monthly collection evidence recorded. Accounting posting remains deferred.",
         }
         if collection is not None:

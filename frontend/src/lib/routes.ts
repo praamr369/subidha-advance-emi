@@ -78,14 +78,14 @@ export const ROUTES = {
     // Phase 9B (deferred): move more page content into the canonical path, then
     // flip each redirect so the legacy path becomes the alias (migrate_then_alias).
     profiles: "/admin/profiles",
-    profilesCustomers: "/admin/profiles/customers",
-    profilesPartners: "/admin/profiles/partners",
-    profilesVendors: "/admin/profiles/vendors",
-    profilesStaff: "/admin/profiles/staff",
-    profilesBranches: "/admin/profiles/branches",
-    profilesParties: "/admin/profiles/parties",
+    profilesCustomers: "/admin/customers", // repointed: unified profile lives on the role page
+    profilesPartners: "/admin/partners", // repointed
+    profilesVendors: "/admin/vendors", // repointed
+    profilesStaff: "/admin/hr/staff", // repointed
+    profilesBranches: "/admin/branches", // repointed
+    profilesParties: "/admin/crm/parties", // repointed
 
-    analytics: "/admin/analytics",
+    analytics: "/admin/bi", // repointed: BI dashboard is the analytics index (churn/risk sub-pages keep their own routes)
     analyticsRiskMonitor: "/admin/analytics/risk-monitor",
     analyticsChurnAnalysis: "/admin/analytics/churn-analysis",
     operations: "/admin/operations",
@@ -122,7 +122,7 @@ export const ROUTES = {
     aiReadiness: "/admin/ai/readiness",
     partnerPaymentRequests: "/admin/partners/collection-requests", // Unified with partnersCollectionRequests
     auditLogs: "/admin/audit-logs",
-    auditEvents: "/admin/audit/events",
+    auditEvents: "/admin/audit-logs", // repointed: canonical audit page is /admin/audit-logs
     settings: "/admin/settings",
     settingsNavigation: "/admin/settings/navigation",
     settingsUsers: "/admin/settings/users",
@@ -164,9 +164,9 @@ export const ROUTES = {
     finance: "/admin/finance",
     financeDailyClose: "/admin/finance/daily-close",
     financeCollect: "/admin/finance/collect",
-    financeOutstandings: "/admin/finance/outstandings",
+    financeOutstandings: "/admin/outstandings", // repointed: canonical customer outstandings page
     financeCustomerCredits: "/admin/finance/customer-credits",
-    financeCustomerAdvances: "/admin/finance/customer-advances",
+    financeCustomerAdvances: "/admin/finance/customer-credits", // repointed: advances tracked as customer credits
     financeCanonicalReconciliation: "/admin/accounting/bridge-reconciliation",
     financeReconciliation: "/admin/finance/reconciliation",
     financeCommissions: "/admin/finance/commissions",
@@ -196,12 +196,12 @@ export const ROUTES = {
     supportRequests: "/admin/requests/support", // was /admin/support-requests — now canonical is requests/support
     customers: "/admin/customers",
     deliveries: "/admin/deliveries",
-    delivery: "/admin/delivery",
-    deliveryCreate: "/admin/delivery/create",
-    deliveryWorkspace: "/admin/delivery/workspace",
-    deliveryReturns: "/admin/delivery/returns",
-    deliveryPODCapture: "/admin/delivery/pod-capture",
-    deliveryPODArchive: "/admin/delivery/pod-archive",
+    delivery: "/admin/deliveries", // repointed: no /admin/delivery page; canonical is /admin/deliveries
+    deliveryCreate: "/admin/deliveries", // repointed: deliveries are spawned from sale/contract cases, no standalone create page. TODO: confirm
+    deliveryWorkspace: "/admin/deliveries", // repointed: no dedicated workspace page. TODO: confirm
+    deliveryReturns: "/admin/deliveries", // repointed: no customer-returns page (vendor returns live under purchases). TODO: confirm
+    deliveryPODCapture: "/admin/deliveries/pod-capture",
+    deliveryPODArchive: "/admin/deliveries/pod-archive",
     logisticsCockpit: "/admin/logistics",
     rentLease: "/admin/rent-lease",
     subscriptions: "/admin/subscriptions",
@@ -231,7 +231,7 @@ export const ROUTES = {
     productsImport: "/admin/products/import",
     productsWorkspace: "/admin/products/workspace",
     productsMasters: "/admin/products/masters",
-    pimProducts: "/admin/pim/products",
+    pimProducts: "/admin/products", // repointed: no /admin/pim/products page; canonical product catalog is /admin/products
     pimProductsCreate: "/admin/pim/products/create",
     pimCategories: "/admin/pim/categories",
     pimCategoriesManage: "/admin/pim/categories/manage",
@@ -245,9 +245,9 @@ export const ROUTES = {
     luckyDraws: "/admin/lucky-draws",
 
     luckyPlanControl: "/admin/lucky-plan",
-    luckyPlanBatches: "/admin/lucky-plan/batches",
-    luckyPlanLuckyIds: "/admin/lucky-plan/lucky-ids",
-    luckyPlanDraws: "/admin/lucky-plan/draws",
+    luckyPlanBatches: "/admin/lucky-ids", // repointed: no batches page; lucky-ids is the closest register. TODO: confirm
+    luckyPlanLuckyIds: "/admin/lucky-ids", // repointed: canonical page is /admin/lucky-ids
+    luckyPlanDraws: "/admin/lucky-draws", // repointed: canonical page is /admin/lucky-draws
     luckyPlanWinners: "/admin/lucky-plan/winners",
     luckyPlanAnalytics: "/admin/lucky-plan/analytics",
 
@@ -292,7 +292,7 @@ export const ROUTES = {
     billingDirectSales: "/admin/billing/direct-sale", // was /admin/billing/direct-sales — duplicate
     billingDirectSaleWorkspace: "/admin/billing/direct-sale",
     billingDirectSaleCreate: "/admin/billing/direct-sale/create",
-    salesDirectSaleCreate: "/admin/billing/direct-sale/create", // was /admin/sales/direct-sale/create — duplicate
+    salesDirectSaleCreate: "/admin/billing/direct-sale/create",
     billingRegister: "/admin/billing/register",
     billingDailyBook: "/admin/billing/dailybook",
     billingCashBook: "/admin/billing/cashbook",
@@ -344,8 +344,8 @@ export const ROUTES = {
     purchaseBills: "/admin/purchases/bills",
     purchaseRequests: "/admin/purchases/requests",
     purchaseVendorAgreements: "/admin/purchases/vendor-agreements",
-    purchaseVendorPayables: "/admin/purchases/vendor-payables",
-    purchaseVendorPayments: "/admin/purchases/vendor-payments",
+    purchaseVendorPayables: "/admin/vendors/outstanding", // repointed: payables = vendor outstanding
+    purchaseVendorPayments: "/admin/vendors/payments", // repointed: canonical vendor payments page
     purchaseVendorReturns: "/admin/purchases/vendor-returns",
 
     manufacturing: "/admin/manufacturing",
@@ -357,6 +357,8 @@ export const ROUTES = {
     serviceDeskComplaints: "/admin/service-desk/complaints",
     serviceDeskReturns: "/admin/service-desk/returns",
     serviceDeskTickets: "/admin/service-desk/tickets",
+    warrantyClaims: "/admin/warranty/claims",
+    warrantyServiceSchedule: "/admin/warranty/service-schedule",
 
     accounting: "/admin/accounting",
     accountingControlCenter: "/admin/accounting",
@@ -370,7 +372,7 @@ export const ROUTES = {
     accountingBooks: "/admin/accounting/books",
     accountingBooksCash: "/admin/accounting/books/cash",
     accountingBooksBank: "/admin/accounting/books/bank",
-    accountingBooksUpi: "/admin/accounting/books/upi",
+    accountingBooksUpi: "/admin/accounting/books/bank", // repointed: two-account model settles UPI into the bank book. TODO: confirm dedicated UPI book intended
     accountingBooksSales: "/admin/accounting/books/sales",
     accountingBooksPurchase: "/admin/accounting/books/purchase",
     accountingGst: "/admin/accounting/gst",
@@ -399,7 +401,7 @@ export const ROUTES = {
     // Session 4: HR Consolidation - Routes moved to HR module
     accountingStaff: "/admin/hr/staff", // Redirects to HR (backward compat)
     accountingStaffLedger: "/admin/accounting/staff-ledger", // Financial report - keep in accounting
-    accountingExpenseClaims: "/admin/hr/expense-claims", // Redirects to HR (backward compat)
+    accountingExpenseClaims: "/admin/hr/expenses", // repointed: canonical HR expenses page
     accountingAttendance: "/admin/hr/attendance", // Redirects to HR (backward compat)
     accountingLeave: "/admin/hr/leave", // Redirects to HR (backward compat)
     accountingSalary: "/admin/hr/payroll", // Redirects to HR (backward compat)

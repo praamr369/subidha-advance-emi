@@ -4,7 +4,7 @@ from decimal import Decimal
 from django.test import TestCase
 
 from subscriptions.models import AuditLog, BatchStatus, LuckyIdStatus, Subscription
-from subscriptions.services.operational_cancellation_service import cancel_subscription
+from contracts.services.operational_cancellation_service import cancel_subscription
 from tests.helpers import (
     create_admin_user,
     create_batch,

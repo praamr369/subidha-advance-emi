@@ -7,7 +7,7 @@ from rest_framework.test import APITestCase
 from billing.services.billing_service import create_direct_sale
 from inventory.models import InventoryItem
 from subscriptions.models import AuditLog, PublicLead, PublicLeadIntent, PublicLeadStatus
-from subscriptions.services.public_lead_service import create_public_lead
+from crm.services.public_lead_service import create_public_lead
 from tests.helpers import (
     create_admin_user,
     create_batch,
@@ -372,6 +372,8 @@ class AdminLeadApiTests(APITestCase):
             sku="LEAD-RETAIL-SKU-001",
             opening_stock_qty=Decimal("4.000"),
         )
+        from tests.helpers import ensure_test_accounting_posting_prerequisites
+        ensure_test_accounting_posting_prerequisites(posting_date=date(2026, 4, 10))
         direct_sale = create_direct_sale(
             payload={
                 "sale_date": date(2026, 4, 10),

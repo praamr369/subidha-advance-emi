@@ -1,4 +1,4 @@
-from subscriptions.services.reconciliation_service import reconcile_subscription
+from payments.services.reconciliation_service import reconcile_subscription
 
 
 def check_subscription_integrity(*, subscription):

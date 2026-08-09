@@ -47,7 +47,7 @@ def _date_or_today(value) -> date:
 
 def _import_customer(row: MigrationStagingRow, data: dict[str, Any], actor) -> tuple[str, int, list, dict | None]:
     from subscriptions.models import Customer, CustomerSource
-    from subscriptions.services.customer_service import find_or_create_customer, normalize_phone
+    from customers.services.customer_service import find_or_create_customer, normalize_phone
 
     resolution = row.duplicate_resolution
     phone = str(data.get("mobile") or "")
@@ -68,7 +68,7 @@ def _import_customer(row: MigrationStagingRow, data: dict[str, Any], actor) -> t
             elif resolution == DuplicateResolution.MERGE and value and not getattr(existing, attr):
                 setattr(existing, attr, value)
         existing.save()
-        return "subscriptions.Customer", existing.pk, [], {"action": "updated", **prior}
+        return "customers.Customer", existing.pk, [], {"action": "updated", **prior}
 
     customer, created = find_or_create_customer(
         name=str(data.get("full_name") or ""),
@@ -81,7 +81,7 @@ def _import_customer(row: MigrationStagingRow, data: dict[str, Any], actor) -> t
     )
     if not created and resolution != DuplicateResolution.CREATE_NEW:
         # Existed already (race with duplicate scan) — treat as merge no-op.
-        return "subscriptions.Customer", customer.pk, [], {"action": "already_existed"}
+        return "customers.Customer", customer.pk, [], {"action": "already_existed"}
     updates: list[str] = []
     for attr, key in (("district", "district"), ("state", "state"), ("pincode", "pin")):
         value = str(data.get(key) or "")
@@ -107,7 +107,7 @@ def _import_customer(row: MigrationStagingRow, data: dict[str, Any], actor) -> t
             notes=f"Migrated opening balance ({row.batch.batch_number})", created_by=actor,
         )
         extra.append({"model": "accounting.CustomerOpeningOutstanding", "pk": outstanding.pk})
-    return "subscriptions.Customer", customer.pk, extra, {"action": "created" if created else "matched"}
+    return "customers.Customer", customer.pk, extra, {"action": "created" if created else "matched"}
 
 
 def _import_vendor(row: MigrationStagingRow, data: dict[str, Any], actor) -> tuple[str, int, list, dict | None]:
@@ -187,8 +187,8 @@ def _import_product(row: MigrationStagingRow, data: dict[str, Any], actor) -> tu
             if data.get("gst") not in ("", None):
                 existing.gst_rate = _dec(data.get("gst"))
             existing.save()
-            return "subscriptions.Product", existing.pk, [], {"action": "updated", **prior}
-        return "subscriptions.Product", existing.pk, [], {"action": "already_existed"}
+            return "products_core.Product", existing.pk, [], {"action": "updated", **prior}
+        return "products_core.Product", existing.pk, [], {"action": "already_existed"}
     if selling_price <= 0:
         raise ValueError("Selling price (base/contract price) must be greater than zero.")
     code_base = (sku or name or "PRODUCT").upper().replace(" ", "-")[:38]
@@ -210,7 +210,7 @@ def _import_product(row: MigrationStagingRow, data: dict[str, Any], actor) -> tu
         is_active=str(data.get("status") or "ACTIVE") == "ACTIVE",
         description=f"Migrated via {row.batch.batch_number}",
     )
-    return "subscriptions.Product", product.pk, [], {"action": "created"}
+    return "products_core.Product", product.pk, [], {"action": "created"}
 
 
 def _import_opening_stock(row: MigrationStagingRow, data: dict[str, Any], actor) -> tuple[str, int, list, dict | None]:
@@ -259,7 +259,7 @@ def _import_opening_stock(row: MigrationStagingRow, data: dict[str, Any], actor)
 def _import_customer_outstanding(row: MigrationStagingRow, data: dict[str, Any], actor) -> tuple[str, int, list, dict | None]:
     from accounting.models import CustomerOpeningOutstanding
     from subscriptions.models import CustomerSource
-    from subscriptions.services.customer_service import find_or_create_customer
+    from customers.services.customer_service import find_or_create_customer
 
     amount = _dec(data.get("outstanding"))
     if amount <= 0:
@@ -290,7 +290,7 @@ def _import_customer_outstanding(row: MigrationStagingRow, data: dict[str, Any],
         )
         if created:
             extra.append({"model": "accounts.User", "pk": customer.user_id})
-            extra.append({"model": "subscriptions.Customer", "pk": customer.pk})
+            extra.append({"model": "customers.Customer", "pk": customer.pk})
 
     outstanding = CustomerOpeningOutstanding.objects.create(
         customer=customer,

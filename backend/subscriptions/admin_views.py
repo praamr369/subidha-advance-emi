@@ -4,7 +4,7 @@ from django.conf import settings
 import os
 
 from subscriptions.models import Subscription
-from subscriptions.services.statement_service import (
+from payments.services.statement_service import (
     generate_subscription_statement_pdf
 )
 

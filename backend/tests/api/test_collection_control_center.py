@@ -127,10 +127,12 @@ class CollectionControlCenterApiTests(APITestCase):
         self.assertFalse(diagnostic[0]["selectable_for_collection"])
         self.assertIn("diagnostic only", diagnostic[0]["collection_blocker_reason"])
 
-    def test_rent_lease_lane_remains_deferred(self):
+    def test_rent_lease_lane_is_enabled(self):
+        # Rent/lease collection is now an enabled lane (consistent with cashiers
+        # being able to collect rent); it routes to the unified collection search.
         self.client.force_authenticate(self.admin)
         response = self.client.get("/api/v1/admin/collections/control-center/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         lane = next(item for item in response.data["collection_lanes"] if item["key"] == "rent_lease")
-        self.assertFalse(lane["enabled"])
-        self.assertIsNone(lane["route"])
+        self.assertTrue(lane["enabled"])
+        self.assertIsNotNone(lane["route"])

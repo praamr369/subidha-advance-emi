@@ -12,7 +12,7 @@ from api.v1.serializers.address import (
 )
 from api.v1.permissions import IsCustomer, IsAdmin
 from subscriptions.models import Address, Customer, PincodeDatabase
-from subscriptions.services.address_service import (
+from customers.services.address_service import (
     lookup_pincode, create_address, check_service_availability,
     find_vendors_for_area, set_primary_address
 )

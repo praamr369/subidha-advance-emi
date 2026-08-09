@@ -11,7 +11,7 @@ from django.db.models import Q, Sum
 from django.utils import timezone
 
 from accounting.models import FinanceAccount, JournalEntry, Vendor
-from subscriptions.models import Product
+from products_core.models import Product
 
 MONEY_ZERO = Decimal("0.00")
 QUANTITY_ZERO = Decimal("0.000")
@@ -71,6 +71,8 @@ class StockLocationType(models.TextChoices):
     STORE = "STORE", "Store"
     WAREHOUSE = "WAREHOUSE", "Warehouse"
     SHOWROOM = "SHOWROOM", "Showroom"
+    QUARANTINE = "QUARANTINE", "Quarantine"
+    TRANSIT = "TRANSIT", "Transit"
 
 
 class StockMovementType(models.TextChoices):
@@ -163,6 +165,9 @@ class StockLocation(InventoryTimeStampedModel):
     )
     is_active = models.BooleanField(default=True, db_index=True)
     notes = models.TextField(blank=True, default="")
+    address = models.TextField(blank=True, default="", help_text="Physical address for delivery dispatch and warehouse navigation")
+    phone = models.CharField(max_length=20, blank=True, default="", help_text="Contact phone number for location staff")
+    is_default_receiving_location = models.BooleanField(default=False, help_text="Default receiving dock for supplier deliveries to this branch")
 
     class Meta:
         db_table = "inventory_stock_locations"
@@ -244,7 +249,7 @@ class InventoryItem(InventoryTimeStampedModel):
     valuation_method = models.CharField(
         max_length=10,
         choices=InventoryValuationMethod.choices,
-        default=InventoryValuationMethod.FIFO,
+        default=InventoryValuationMethod.AVG,
         db_index=True,
     )
     costing_method = models.CharField(max_length=20, blank=True, default="")
@@ -1554,7 +1559,7 @@ class PurchaseNeed(InventoryTimeStampedModel):
         blank=True,
     )
     customer = models.ForeignKey(
-        "subscriptions.Customer",
+        "customers.Customer",
         on_delete=models.PROTECT,
         related_name="inventory_purchase_needs",
         null=True,
@@ -1896,3 +1901,60 @@ class FinishedGoodServiceLink(InventoryTimeStampedModel):
 
     def __str__(self):
         return f"{self.finished_good_id} ↔ SVC:{self.service_id}"
+
+
+class InventoryReadinessDismissal(models.Model):
+    """
+    Track dismissed/acknowledged warnings from the Inventory Readiness diagnostic.
+    Allows operators to ignore intentional legacy data issues.
+    """
+
+    # Warning identifier from the diagnostic snapshot
+    warning_key = models.CharField(
+        max_length=255,
+        db_index=True,
+        unique=True,
+        help_text="Unique key for the warning (e.g., 'PRODUCT_MISSING_SKU_123')"
+    )
+
+    # Category of the warning (for filtering)
+    category = models.CharField(
+        max_length=50,
+        choices=[
+            ("PRODUCT", "Product Master"),
+            ("STOCK", "Stock/Inventory"),
+            ("LOCATION", "Location Setup"),
+            ("CONFIGURATION", "System Configuration"),
+        ],
+        db_index=True,
+    )
+
+    # User who dismissed the warning
+    dismissed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="inventory_readiness_dismissals",
+    )
+
+    # Timestamp
+    dismissed_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    # Notes on why dismissed
+    reason = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Optional note on why this warning was dismissed",
+    )
+
+    class Meta:
+        db_table = "inventory_readiness_dismissals"
+        ordering = ["-dismissed_at"]
+        indexes = [
+            models.Index(fields=["warning_key", "dismissed_at"]),
+            models.Index(fields=["category", "dismissed_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.warning_key} (dismissed by {self.dismissed_by})"

@@ -111,9 +111,11 @@ class AdminRolePermissionUpdateView(APIView):
 class AdminUserCapabilityOverrideView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
-    def get(self, request):
+    def get(self, request, user_id: int = None):
         q = (request.query_params.get("q") or "").strip()
         queryset = User.objects.filter(role__in=MANAGED_ROLES).order_by("username", "id")
+        if user_id is not None:
+            queryset = queryset.filter(id=user_id)
         if q:
             queryset = queryset.filter(username__icontains=q)[:50]
         else:

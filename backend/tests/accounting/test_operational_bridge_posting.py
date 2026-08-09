@@ -22,16 +22,16 @@ from accounting.services.commission_payout_bridge_guard_service import (
     run_payout_batch_bridges_guarded as run_payout_batch_bridges,
 )
 from billing.services.billing_service import generate_emi_payment_receipt
-from subscriptions.services.commission_payout_service import (
+from commissions.services.commission_payout_service import (
     create_commission_payout_batch,
     finalize_commission_payout_batch,
 )
-from subscriptions.services.commission_service import settle_commission
-from subscriptions.services.payment_service import (
+from commissions.services.commission_service import settle_commission
+from payments.services.payment_service import (
     record_emi_payment,
     reverse_payment_for_admin,
 )
-from subscriptions.services.winner_state_service import apply_winner_state
+from lucky_plan.services.winner_state_service import apply_winner_state
 from tests.helpers import (
     create_admin_user,
     create_batch,

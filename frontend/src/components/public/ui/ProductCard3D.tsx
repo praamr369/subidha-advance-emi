@@ -1,4 +1,5 @@
 "use client";
+import { useI18n } from "@/components/i18n/I18nProvider";
 
 import Image from "next/image";
 import Link from "next/link";
@@ -25,6 +26,8 @@ export default function ProductCard3D({
   href,
   className,
 }: ProductCard3DProps) {
+  const { t } = useI18n();
+
   return (
     <div
       className={cn(
@@ -40,7 +43,7 @@ export default function ProductCard3D({
         {imageUrl ? (
           <Image src={imageUrl} alt={title} fill className="object-cover" sizes="(max-width: 768px) 100vw, 33vw" />
         ) : (
-          <div className="text-muted-foreground/40 font-medium text-sm">Image Pending</div>
+          <div className="text-muted-foreground/40 font-medium text-sm">{t('public.ProductCard3D_text2')}</div>
         )}
         <div className="absolute top-2 left-2 z-20 rounded border border-white/40 bg-white/80 px-2 py-0.5 text-[10px] font-semibold text-slate-800 backdrop-blur-md dark:border-black/40 dark:bg-black/60 dark:text-slate-200">
           {category}
@@ -54,11 +57,11 @@ export default function ProductCard3D({
         
         <div className="mt-2 flex items-end justify-between">
           <div className="flex flex-col">
-            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">From</span>
-            <span className="text-lg font-bold text-primary">₹{emiAmount.toLocaleString()}<span className="text-xs font-medium text-muted-foreground">/mo</span></span>
+            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{t('public.ProductCard3D_text3')}</span>
+            <span className="text-lg font-bold text-primary">₹{emiAmount.toLocaleString()}<span className="text-xs font-medium text-muted-foreground">{t('public.ProductCard3D_text4')}</span></span>
           </div>
           <div className="flex flex-col items-end">
-            <span className="text-[10px] font-medium text-muted-foreground">Cash Price</span>
+            <span className="text-[10px] font-medium text-muted-foreground">{t('public.ProductCard3D_text5')}</span>
             <span className="text-sm font-semibold text-foreground">₹{price.toLocaleString()}</span>
           </div>
         </div>

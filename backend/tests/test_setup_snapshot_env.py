@@ -99,7 +99,7 @@ class SetupSnapshotImportEnvTests(TestCase):
         bad = {
             "kind": "setup_snapshot",
             "schema_version": SCHEMA_VERSION,
-            "sections": {"subscriptions.Payment": [{"pk": 1, "fields": {}}]},
+            "sections": {"payments.Payment": [{"pk": 1, "fields": {}}]},
         }
         errors = validate_setup_snapshot_payload(bad)
         self.assertTrue(any("Payment" in e for e in errors))

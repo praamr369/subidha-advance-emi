@@ -19,7 +19,7 @@ from reconciliation.services.financial_source_lifecycle_event_service import (
 )
 from settlements.models import SettlementAllocation
 from subscriptions.models import OperationalCancellation, Payment
-from subscriptions.services.payment_service import reverse_payment_for_admin
+from payments.services.payment_service import reverse_payment_for_admin
 from billing.services.billing_service import void_receipt_document
 from tests.helpers import (
     create_admin_user,

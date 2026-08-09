@@ -15,12 +15,12 @@ from subscriptions.models import (
     RentLeaseDemandType,
     RentLeaseDepositTransaction,
 )
-from subscriptions.services.rent_lease_billing_service import (
+from contracts.services.rent_lease_billing_service import (
     collect_security_deposit,
     ensure_security_deposit_demand,
     generate_monthly_demands_for_subscription,
 )
-from subscriptions.services.rent_lease_contract_service import create_lease_contract, create_rent_contract
+from contracts.services.rent_lease_contract_service import create_lease_contract, create_rent_contract
 from tests.helpers import (
     create_admin_user,
     create_cashier_user,
@@ -114,7 +114,7 @@ class RentLeaseUnifiedCollectionRouterTests(APITestCase):
             demand=demand,
             transaction_type="DEPOSIT_RECEIPT",
         ).latest("id")
-        self.assertEqual(response.data["deposit_source_model"], "subscriptions.RentLeaseDepositTransaction")
+        self.assertEqual(response.data["deposit_source_model"], "payments.RentLeaseDepositTransaction")
         self.assertEqual(response.data["deposit_source_transaction_id"], tx.id)
         self.assertEqual(tx.metadata["reference_no"], "RL-DEP-COLLECT-001")
         self.assertEqual(tx.metadata["finance_account_id"], self.finance_account.id)

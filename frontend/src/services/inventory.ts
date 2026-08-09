@@ -1,1515 +1,332 @@
 import { apiFetch } from "@/lib/api";
 
-type PaginatedResponse<T> = {
-  count: number;
-  next: string | null;
-  previous: string | null;
-  results: T[];
+// ============================================================================
+// Types for Lot Tracking
+// ============================================================================
+
+export type LotTrackingKPIS = {
+  total_lots: number;
+  active_lots: number;
+  depleted_lots: number;
+  quarantined_lots: number;
+  expired_lots: number;
+  total_quantity: string;
+  critical_shortage_count: number;
 };
 
-type QueryValue = string | number | boolean | undefined | null;
-
-function buildQuery(params: Record<string, QueryValue>): string {
-  const search = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (value === undefined || value === null || value === "") continue;
-    search.set(key, String(value));
-  }
-  const query = search.toString();
-  return query ? `?${query}` : "";
-}
-
-export type InventoryItem = {
+export type LotTrackingResult = {
   id: number;
-  product: number;
-  product_code?: string;
-  product_name?: string;
-  sku?: string | null;
-  unit_of_measure: string;
-  default_stock_location?: number | null;
-  default_stock_location_code?: string | null;
-  default_stock_location_name?: string | null;
-  stock_tracking_enabled: boolean;
-  stock_item_type: "FINISHED_GOOD" | "ACCESSORY" | "RAW_MATERIAL";
-  delivery_stock_bridge_enabled: boolean;
-  opening_stock_qty: string;
-  reorder_level_qty: string;
-  valuation_method: "FIFO" | "AVG";
-  standard_unit_cost?: string | null;
-  barcode?: string | null;
-  qr_code?: string | null;
-  lot_tracking_enabled?: boolean;
-  expiry_tracking_enabled?: boolean;
-  is_active: boolean;
-  current_stock_qty?: string;
-  active_lot_count?: number;
-  expiring_lot_count?: number;
-};
-
-export type InventoryLot = {
-  id: number;
-  inventory_item: number;
-  inventory_item_sku?: string | null;
-  product_code?: string | null;
-  product_name?: string | null;
-  stock_location?: number | null;
-  stock_location_code?: string | null;
-  stock_location_name?: string | null;
   lot_code: string;
-  barcode: string;
-  qr_code: string;
-  received_date?: string | null;
-  expiry_date?: string | null;
-  quantity_on_hand: string;
-  status: "ACTIVE" | "QUARANTINED" | "EXPIRED" | "CLOSED";
-  source_model?: string;
-  source_id?: string;
-  notes?: string;
-  created_by?: number | null;
-  created_by_username?: string | null;
-  created_at?: string;
-  updated_at?: string;
-};
-
-export type InventoryLotPayload = {
-  inventory_item: number;
-  stock_location?: number | null;
-  lot_code: string;
-  barcode?: string;
-  qr_code?: string;
-  received_date?: string | null;
-  expiry_date?: string | null;
-  quantity_on_hand: string | number;
-  status?: InventoryLot["status"];
-  source_model?: string;
-  source_id?: string;
-  notes?: string;
-};
-
-export type AdminInventoryItemSearchLocationRow = {
-  stock_location_id: number;
-  stock_location_name: string;
-  stock_location_code: string;
-  available_quantity: string;
-};
-
-export type AdminInventoryItemSearchRow = {
-  id: number;
-  inventory_item_id: number;
   product_id: number;
   product_name: string;
   product_code: string;
   sku: string;
-  category: string;
-  subcategory: string;
-  stock_item_type: "FINISHED_GOOD" | "ACCESSORY" | "RAW_MATERIAL";
-  unit_of_measure: string;
-  standard_unit_cost: string | null;
   barcode: string;
-  default_stock_location_id?: number | null;
-  default_stock_location_code?: string | null;
-  available_by_location?: AdminInventoryItemSearchLocationRow[];
-};
-
-export type StockLedgerRow = {
-  id: number;
-  inventory_item_id: number;
-  product_code: string;
-  product_name: string;
-  stock_item_type?: "FINISHED_GOOD" | "ACCESSORY" | "RAW_MATERIAL";
-  movement_type: string;
-  quantity_in: string;
-  quantity_out: string;
-  movement_date: string;
-  stock_location_id?: number | null;
-  stock_location_code?: string | null;
-  stock_location_name?: string | null;
-  branch_id?: number | null;
-  reference_model: string;
-  reference_id: string;
-  notes?: string;
-  posted_by_username?: string | null;
-  posted_journal_entry_id?: number | null;
-};
-
-export type StockSummaryRow = {
-  item_id: number;
-  product_id: number;
-  product_code: string;
-  product_name: string;
-  sku?: string | null;
-  unit_of_measure: string;
-  stock_tracking_enabled: boolean;
-  stock_item_type: "FINISHED_GOOD" | "ACCESSORY" | "RAW_MATERIAL";
-  delivery_stock_bridge_enabled: boolean;
-  opening_stock_qty: string;
-  reorder_level_qty: string;
-  on_hand_qty: string;
-  // Phase 2: reserved and available-to-promise quantities
-  reserved_qty?: string;
-  available_qty?: string;
-  incoming_qty?: string;
-  required_for_winners?: string;
-  required_for_confirmed_orders?: string;
-  is_below_reorder: boolean;
-  default_stock_location_id?: number | null;
-  default_stock_location_code?: string | null;
-  default_stock_location_name?: string | null;
-  branch_id?: number | null;
-  category?: string;
-  subcategory?: string;
-  hsn_sac_code?: string;
-  gst_rate?: string;
-  base_price?: string;
-  standard_unit_cost?: string;
-  valuation_amount?: string;
-  stock_tracking_status?: string;
-  lifecycle_status?: string;
-};
-
-export type StockSummaryMetrics = {
-  total_on_hand_qty?: string;
-  total_reserved_qty?: string;
-  total_available_qty?: string;
-  total_valuation_amount?: string;
-  in_stock_count?: number;
-  low_stock_count?: number;
-  out_of_stock_count?: number;
-};
-
-export type ProductDemandPlanning = {
-  product_id: number;
-  active_subscriptions: number;
-  locked_batch_demand: number;
-  winners_pending_delivery: number;
-  direct_sale_orders: number;
-  rent_lease_commitments: number;
-  total_required: string;
-};
-
-export type ProductAvailability = {
-  product_id: number;
-  on_hand: string;
-  reserved: string;
-  available: string;
-  incoming: string;
-  required_for_winners: string;
-  required_for_confirmed_orders: string;
-  demand: ProductDemandPlanning;
-};
-
-export type StockLocation = {
-  id: number;
-  code: string;
-  name: string;
-  branch?: number | null;
-  branch_code?: string | null;
-  branch_name?: string | null;
-  location_type: "STORE" | "WAREHOUSE" | "SHOWROOM";
-  is_active: boolean;
-  notes?: string;
-  created_at?: string;
-  updated_at?: string;
-};
-
-export type OpeningStockPreviewRow = {
-  row: number;
-  product_code?: string | null;
-  sku?: string | null;
-  quantity?: string | null;
-  inventory_item_id?: number | null;
-  location_code?: string | null;
-  location_name?: string | null;
-  action: string;
-  message?: string | null;
-};
-
-export type OpeningStockPreview = {
-  total_rows: number;
-  error_rows: number;
-  ready_rows: number;
-  rows: OpeningStockPreviewRow[];
-};
-
-export type OpeningStockPostResponse = {
-  processed_rows: number;
-  created_count: number;
-  existing_count: number;
-  movement_date: string;
-  digest: string;
-};
-
-/** Admin `/admin/inventory/opening-stock/` workflow (draft → post, auditable). */
-export type OpeningStockEntryRow = {
-  id: number;
-  batch: number | null;
-  batch_key: string | null;
-  csv_row_number: number | null;
-  inventory_item: number;
-  product_code: string;
-  product_name: string;
-  sku: string | null;
-  stock_location: number;
-  stock_location_code: string;
-  stock_location_name: string;
   quantity: string;
-  unit_cost_snapshot: string | null;
-  valuation_amount_snapshot: string | null;
-  effective_date: string;
-  note: string;
-  status: "DRAFT" | "POSTED" | "CANCELLED";
-  source: string;
-  created_by: number | null;
-  posted_by: number | null;
-  posted_at: string | null;
-  cancelled_at: string | null;
-  correction_adjustment: number | null;
-  created_at: string;
-  updated_at: string;
-};
-
-export type OpeningStockBulkPreviewRow = OpeningStockPreviewRow & {
-  unit_cost?: string | null;
-  effective_date?: string | null;
-  update_mode?: string | null;
-  quantity_delta?: string | null;
-};
-
-export type OpeningStockBulkPreview = {
-  batch_key: string;
-  total_rows: number;
-  error_rows: number;
-  warning_rows: number;
-  ready_rows: number;
-  total_quantity_preview: string;
-  total_valuation_preview: string;
-  rows: OpeningStockBulkPreviewRow[];
-};
-
-export type OpeningStockBulkApplySummary = {
-  batch_key: string;
-  dry_run: boolean;
-  created: number;
-  updated: number;
-  posted: number;
-  skipped: number;
-  corrections_created: number;
-  failed: number;
-};
-
-export type OpeningStockBatchHistoryRow = {
-  batch_key: string;
-  original_filename: string;
-  created_at: string;
-  created_by_username: string | null;
-  last_apply_summary: OpeningStockBulkApplySummary | Record<string, unknown> | null;
-};
-
-export type InventoryValuationRow = {
-  inventory_item_id: number;
-  product_code: string;
-  product_name: string;
-  sku?: string | null;
-  valuation_method: "FIFO" | "AVG";
-  as_of_date: string;
-  on_hand_qty: string;
-  unit_cost: string;
-  stock_value: string;
-};
-
-export type InventoryValuationReport = {
-  as_of_date: string;
-  count: number;
-  total_value: string;
-  rows: InventoryValuationRow[];
-};
-
-export type AdjustmentValuationStatus =
-  | "READY"
-  | "MISSING_UNIT_COST"
-  | "NOT_APPLICABLE";
-
-export type StockAdjustmentLine = {
-  id?: number;
-  inventory_item: number;
-  inventory_item_sku?: string;
-  product_name?: string;
-  inventory_item_standard_unit_cost?: string | null;
-  quantity_delta: string;
-  unit_cost_snapshot?: string | null;
-  valuation_amount_snapshot?: string | null;
-  // Additive, read-only valuation readiness (null = unknown, never ₹0).
-  effective_unit_cost?: string | null;
-  line_valuation?: string | null;
-  valuation_status?: AdjustmentValuationStatus;
-  has_standard_cost?: boolean;
-  requires_unit_cost?: boolean;
-  line_blocker?: string | null;
-  notes?: string;
-};
-
-export type StockAdjustment = {
-  id: number;
-  adjustment_no: string;
-  adjustment_date: string;
-  status: "DRAFT" | "APPROVED" | "POSTED" | "CANCELLED";
-  reason?: string;
-  stock_location?: number | null;
-  stock_location_code?: string | null;
-  stock_location_name?: string | null;
-  lines: StockAdjustmentLine[];
-  approved_by_username?: string | null;
-  posted_by_username?: string | null;
-  posted_journal_entry?: number | null;
-  // Additive, read-only posting readiness.
-  can_post?: boolean;
-  posting_blockers?: string[];
-  valuation_status?: AdjustmentValuationStatus;
-  requires_unit_cost?: boolean;
-};
-
-export type VendorLite = {
-  id: number;
-  name: string;
-  phone?: string;
-  email?: string;
-  gstin?: string | null;
-  state_code?: string | null;
-  state_name?: string | null;
-  is_active: boolean;
-};
-
-// ── Procurement types ────────────────────────────────────────────────────────
-
-export type PurchaseOrderLine = {
-  id?: number;
-  inventory_item: number;
-  inventory_item_sku?: string;
-  inventory_item_product_name?: string;
-  description?: string;
-  quantity: string;
-  unit_cost: string;
-  tax_amount?: string;
-  created_at?: string;
-  updated_at?: string;
-};
-
-export type PurchaseOrder = {
-  id: number;
-  po_no: string;
-  po_date: string;
-  vendor: number;
-  vendor_name?: string;
-  status: "DRAFT" | "SENT" | "PARTIALLY_RECEIVED" | "RECEIVED" | "BILLED" | "CANCELLED";
-  expected_date?: string | null;
-  branch?: number | null;
-  stock_location?: number | null;
-  stock_location_name?: string | null;
-  notes?: string;
-  lines: PurchaseOrderLine[];
-  created_at?: string;
-  updated_at?: string;
-};
-
-export type GoodsReceiptLine = {
-  id?: number;
-  purchase_order_line?: number | null;
-  inventory_item: number;
-  inventory_item_sku?: string;
-  inventory_item_product_name?: string;
-  quantity_received: string;
-  unit_cost?: string;
-  notes?: string;
-  created_at?: string;
-  updated_at?: string;
-};
-
-export type GoodsReceipt = {
-  id: number;
-  receipt_no: string;
-  receipt_date: string;
-  purchase_order: number;
-  purchase_order_no?: string;
-  vendor_name?: string;
-  status: "DRAFT" | "RECEIVED" | "CANCELLED";
-  branch?: number | null;
-  stock_location?: number | null;
-  stock_location_name?: string | null;
-  notes?: string;
-  allow_over_receive?: boolean;
-  over_receive_reason?: string;
-  posted_at?: string | null;
-  posted_by?: number | null;
-  posted_by_username?: string | null;
-  lines: GoodsReceiptLine[];
-  created_at?: string;
-  updated_at?: string;
-};
-
-export type VendorBillLine = {
-  id?: number;
-  inventory_item: number;
-  inventory_item_sku?: string;
-  inventory_item_product_name?: string;
-  description?: string;
-  quantity: string;
-  unit_cost: string;
-  taxable_value?: string;
-  tax_amount?: string;
-  line_total?: string;
-  created_at?: string;
-  updated_at?: string;
-};
-
-export type VendorBill = {
-  id: number;
-  bill_no: string;
-  bill_date: string;
-  vendor: number;
-  vendor_name?: string;
-  purchase_order?: number | null;
-  purchase_order_no?: string | null;
-  goods_receipt?: number | null;
-  goods_receipt_no?: string | null;
-  finance_account?: number | null;
-  finance_account_name?: string | null;
-  status: "DRAFT" | "POSTED" | "CANCELLED";
-  subtotal: string;
-  tax_total: string;
-  grand_total: string;
-  posted_paid_amount?: string;
-  outstanding_amount?: string;
-  posted_journal_entry?: number | null;
-  posted_journal_entry_no?: string | null;
-  notes?: string;
-  lines: VendorBillLine[];
-  created_at?: string;
-  updated_at?: string;
-};
-
-export type VendorPayment = {
-  id: number;
-  payment_no: string;
-  payment_date: string;
-  vendor: number;
-  vendor_name?: string;
-  vendor_bill?: number | null;
-  vendor_bill_no?: string;
-  amount: string;
-  finance_account?: number | null;
-  finance_account_name?: string | null;
-  status: "DRAFT" | "POSTED" | "CANCELLED";
-  posted_journal_entry?: number | null;
-  posted_journal_entry_no?: string | null;
-  reference_no?: string;
-  notes?: string;
-  created_at?: string;
-  updated_at?: string;
-};
-
-export type VendorAgreement = {
-  id: number;
-  agreement_no: string;
-  vendor: number;
-  vendor_name?: string;
-  effective_from: string;
-  effective_to?: string | null;
-  status: "DRAFT" | "ACTIVE" | "EXPIRED" | "TERMINATED";
-  payment_terms?: string;
-  credit_period_days: number;
-  notes?: string;
-  created_at?: string;
-  updated_at?: string;
-};
-
-export type PurchaseRequestLine = {
-  id?: number;
-  inventory_item: number;
-  inventory_item_sku?: string;
-  inventory_item_product_name?: string;
-  quantity_requested: string;
-  notes?: string;
-};
-
-export type PurchaseRequest = {
-  id: number;
-  request_no: string;
-  request_date: string;
-  requested_by?: number | null;
-  requested_by_username?: string | null;
-  status: "DRAFT" | "APPROVED" | "PARTIALLY_ORDERED" | "ORDERED" | "CANCELLED";
-  branch?: number | null;
-  stock_location?: number | null;
-  stock_location_name?: string | null;
-  vendor?: number | null;
-  vendor_name?: string;
-  source_purchase_need?: number | null;
-  notes?: string;
-  lines: PurchaseRequestLine[];
-  created_at?: string;
-  updated_at?: string;
-};
-
-export type StockLocationPayload = {
-  code: string;
-  name: string;
-  branch?: number | null;
-  location_type: "STORE" | "WAREHOUSE" | "SHOWROOM";
-  is_active: boolean;
-  notes?: string;
-};
-
-export type InventoryProfileRow = {
-  id: number;
-  inventory_code?: string | null;
-  product: number;
-  product_name?: string;
-  product_code?: string;
-  sku?: string | null;
-  stock_tracking_enabled: boolean;
-  stock_tracking_status: string;
-  is_active: boolean;
-};
-
-export type InventoryProfileDetail = InventoryProfileRow & {
-  product_base_price: string;
-  unit_of_measure: string;
-  reorder_level_qty: string;
-  default_stock_location?: number | null;
-  preferred_stock_location?: number | null;
-  valuation_method: "FIFO" | "AVG";
-  costing_method?: string;
-  standard_unit_cost?: string | null;
-  purchase_unit_cost?: string | null;
-  manufacturing_cost_enabled: boolean;
-  manufacturing_raw_material_cost: string;
-  manufacturing_labour_cost: string;
-  manufacturing_overhead_cost: string;
-  manufacturing_finished_goods_output_qty: string;
-  margin_preview?: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-export type InventoryProfileStockByLocation = {
-  warehouse_qty: string;
-  showroom_qty: string;
-  total_on_hand_qty: string;
-  reserved_qty: string;
-  available_qty: string;
-  last_movement_date?: string | null;
-  locations: Array<{
-    stock_location_id?: number | null;
-    stock_location_code?: string | null;
-    stock_location_name?: string | null;
-    stock_location_type?: string | null;
-    on_hand_qty: string;
-  }>;
-};
-
-export type InventoryProfileManufacturingCost = {
-  supported: boolean;
-  manufacturing_cost_enabled: boolean;
-  raw_material_cost: string;
-  labour_cost: string;
-  overhead_cost: string;
-  total_estimated_manufacturing_cost: string;
-  finished_goods_output_qty: string;
-  bom_id?: number | null;
-  bom_no?: string | null;
-  bom_lines: Array<{
-    bom_line_id: number;
-    inventory_item_id: number;
-    inventory_item_sku?: string | null;
-    inventory_item_name?: string | null;
-    required_quantity: string;
-    material_unit_cost: string;
-    line_estimated_cost: string;
-  }>;
-};
-
-export type InventoryItemUpdatePayload = Partial<
-  Pick<
-    InventoryItem,
-    | "default_stock_location"
-    | "stock_tracking_enabled"
-    | "stock_item_type"
-    | "delivery_stock_bridge_enabled"
-    | "reorder_level_qty"
-    | "standard_unit_cost"
-    | "barcode"
-    | "qr_code"
-    | "lot_tracking_enabled"
-    | "expiry_tracking_enabled"
-    | "is_active"
-  >
->;
-
-export function listInventoryProfiles(params: Record<string, QueryValue> = {}) {
-  return apiFetch<PaginatedResponse<InventoryProfileRow>>(`/admin/inventory/profiles/${buildQuery(params)}`);
-}
-
-export function getInventoryProfile(id: number | string) {
-  return apiFetch<InventoryProfileDetail>(`/admin/inventory/profiles/${id}/`);
-}
-
-export function updateInventoryProfile(id: number | string, payload: Record<string, unknown>) {
-  return apiFetch<InventoryProfileDetail>(`/admin/inventory/profiles/${id}/`, {
-    method: "PATCH",
-    body: JSON.stringify(payload),
-  });
-}
-
-export function getInventoryProfileStockByLocation(id: number | string) {
-  return apiFetch<InventoryProfileStockByLocation>(`/admin/inventory/profiles/${id}/stock-by-location/`);
-}
-
-export function getInventoryProfileManufacturingCost(id: number | string) {
-  return apiFetch<InventoryProfileManufacturingCost>(`/admin/inventory/profiles/${id}/manufacturing-cost/`);
-}
-
-export function updateInventoryProfileManufacturingCost(id: number | string, payload: Record<string, unknown>) {
-  return apiFetch<InventoryProfileManufacturingCost>(`/admin/inventory/profiles/${id}/manufacturing-cost/`, {
-    method: "PATCH",
-    body: JSON.stringify(payload),
-  });
-}
-
-export type CreateStockAdjustmentPayload = {
-  adjustment_no?: string;
-  adjustment_date: string;
-  reason: string;
-  stock_location?: number | null;
-  lines: Array<{
-    inventory_item: number;
-    quantity_delta: string;
-    unit_cost_snapshot?: string | null;
-    notes?: string;
-  }>;
-};
-
-export function listInventoryItems(params: Record<string, QueryValue> = {}) {
-  return apiFetch<PaginatedResponse<InventoryItem>>(`/inventory/items/${buildQuery(params)}`);
-}
-
-export function getInventoryItem(id: number | string) {
-  return apiFetch<InventoryItem>(`/inventory/items/${id}/`);
-}
-
-export type InventoryPickerParams = {
-  q?: string;
-  category?: string;
-  subcategory?: string;
-  stock_item_type?: string;
-  include_locations?: boolean;
-};
-
-export type InventoryCategoriesResponse = {
-  categories: string[];
-  subcategories: { category: string; subcategory: string }[];
-  stock_item_types: { value: string; label: string }[];
-};
-
-export function searchAdminInventoryItems(params: InventoryPickerParams = {}) {
-  const { include_locations, ...rest } = params;
-  const query: Record<string, string> = {};
-  if (rest.q) query.q = rest.q;
-  if (rest.category) query.category = rest.category;
-  if (rest.subcategory) query.subcategory = rest.subcategory;
-  if (rest.stock_item_type) query.stock_item_type = rest.stock_item_type;
-  if (include_locations) query.include_locations = "1";
-  return apiFetch<{ count: number; results: AdminInventoryItemSearchRow[] }>(
-    `/admin/inventory/items/search/${buildQuery(query)}`
-  );
-}
-
-export function listInventoryCategories() {
-  return apiFetch<InventoryCategoriesResponse>("/admin/inventory/categories/");
-}
-
-export function updateInventoryItem(
-  id: number,
-  payload: InventoryItemUpdatePayload
-) {
-  return apiFetch<InventoryItem>(`/inventory/items/${id}/`, {
-    method: "PATCH",
-    body: JSON.stringify(payload),
-  });
-}
-
-export function listInventoryLots(params: Record<string, QueryValue> = {}) {
-  return apiFetch<PaginatedResponse<InventoryLot>>(`/inventory/lots/${buildQuery(params)}`);
-}
-
-export function createInventoryLot(payload: InventoryLotPayload) {
-  return apiFetch<InventoryLot>("/inventory/lots/", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-}
-
-export function updateInventoryLot(id: number | string, payload: Partial<InventoryLotPayload>) {
-  return apiFetch<InventoryLot>(`/inventory/lots/${id}/`, {
-    method: "PATCH",
-    body: JSON.stringify(payload),
-  });
-}
-
-export function listStockLedger(params: Record<string, QueryValue> = {}) {
-  return apiFetch<{ count: number; results: StockLedgerRow[] }>(
-    `/inventory/stock-ledger/${buildQuery(params)}`
-  );
-}
-
-export function listInventoryMovements(params: Record<string, QueryValue> = {}) {
-  return apiFetch<{ count: number; results: StockLedgerRow[] }>(
-    `/inventory/movements/${buildQuery(params)}`
-  );
-}
-
-export function getStockSummary(params: Record<string, QueryValue> = {}) {
-  return apiFetch<{ count: number; summary?: StockSummaryMetrics; results: StockSummaryRow[] }>(
-    `/inventory/stock-summary/${buildQuery(params)}`
-  );
-}
-
-export function getProductDemandPlanning(productId: number | string) {
-  return apiFetch<ProductDemandPlanning>(`/inventory/products/${productId}/demand-planning/`);
-}
-
-export function getProductAvailability(productId: number | string) {
-  return apiFetch<ProductAvailability>(`/inventory/products/${productId}/availability/`);
-}
-
-export function generatePurchaseNeed(productId: number | string) {
-  return apiFetch<{
-    created: boolean;
-    detail?: string;
-    purchase_need_id?: number;
-    required_quantity?: string;
-    available_quantity?: string;
-    shortage_quantity?: string;
-    status?: string;
-  }>(`/inventory/products/${productId}/purchase-needs/generate/`, {
-    method: "POST",
-    body: JSON.stringify({}),
-  });
-}
-
-export function getInventoryValuation(params: Record<string, QueryValue> = {}) {
-  return apiFetch<InventoryValuationReport>(
-    `/inventory/valuation/${buildQuery(params)}`
-  );
-}
-
-export function listStockAdjustments(params: Record<string, QueryValue> = {}) {
-  return apiFetch<PaginatedResponse<StockAdjustment>>(
-    `/inventory/stock-adjustments/${buildQuery(params)}`
-  );
-}
-
-export function createStockAdjustment(payload: CreateStockAdjustmentPayload) {
-  return apiFetch<StockAdjustment>("/inventory/stock-adjustments/", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-}
-
-export function listStockLocations(params: Record<string, QueryValue> = {}) {
-  return apiFetch<PaginatedResponse<StockLocation>>(
-    `/inventory/locations/${buildQuery(params)}`
-  );
-}
-
-export function createStockLocation(payload: StockLocationPayload) {
-  return apiFetch<StockLocation>("/inventory/locations/", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-}
-
-export function updateStockLocation(id: number, payload: Partial<StockLocationPayload>) {
-  return apiFetch<StockLocation>(`/inventory/locations/${id}/`, {
-    method: "PATCH",
-    body: JSON.stringify(payload),
-  });
-}
-
-export function approveStockAdjustment(id: number) {
-  return apiFetch<{ updated: boolean; stock_adjustment: StockAdjustment }>(
-    `/inventory/stock-adjustments/${id}/approve/`,
-    {
-      method: "POST",
-      body: JSON.stringify({}),
-    }
-  );
-}
-
-export function postStockAdjustment(id: number) {
-  return apiFetch<{ updated: boolean; stock_adjustment: StockAdjustment }>(
-    `/inventory/stock-adjustments/${id}/post/`,
-    {
-      method: "POST",
-      body: JSON.stringify({}),
-    }
-  );
-}
-
-export function setStockAdjustmentLineCosts(
-  id: number,
-  unitCosts: Record<string, string | null>
-) {
-  return apiFetch<{ updated: number; stock_adjustment: StockAdjustment }>(
-    `/inventory/stock-adjustments/${id}/set-line-costs/`,
-    {
-      method: "POST",
-      body: JSON.stringify({ unit_costs: unitCosts }),
-    }
-  );
-}
-
-export function listVendorsLite(params: Record<string, QueryValue> = {}) {
-  return apiFetch<{ count: number; results: VendorLite[] }>(`/inventory/vendors/${buildQuery(params)}`);
-}
-
-// ── Purchase Orders ──────────────────────────────────────────────────────────
-
-export function listPurchaseOrders(params: Record<string, QueryValue> = {}) {
-  return apiFetch<PaginatedResponse<PurchaseOrder>>(`/inventory/purchase-orders/${buildQuery(params)}`);
-}
-
-export function getPurchaseOrder(id: number | string) {
-  return apiFetch<PurchaseOrder>(`/inventory/purchase-orders/${id}/`);
-}
-
-export function createPurchaseOrder(payload: {
-  po_date: string;
-  vendor: number;
-  expected_date?: string | null;
-  branch?: number | null;
-  stock_location?: number | null;
-  notes?: string;
-  lines: Array<{ inventory_item: number; description?: string; quantity: string; unit_cost: string; tax_amount?: string }>;
-}) {
-  return apiFetch<PurchaseOrder>("/inventory/purchase-orders/", { method: "POST", body: JSON.stringify(payload) });
-}
-
-export function updatePurchaseOrder(id: number | string, payload: Partial<Parameters<typeof createPurchaseOrder>[0]>) {
-  return apiFetch<PurchaseOrder>(`/inventory/purchase-orders/${id}/`, { method: "PATCH", body: JSON.stringify(payload) });
-}
-
-export function cancelPurchaseOrder(id: number | string) {
-  return apiFetch<{ updated: boolean; purchase_order: PurchaseOrder }>(`/inventory/purchase-orders/${id}/cancel/`, { method: "POST", body: JSON.stringify({}) });
-}
-
-// ── Goods Receipts ───────────────────────────────────────────────────────────
-
-export function listGoodsReceipts(params: Record<string, QueryValue> = {}) {
-  return apiFetch<PaginatedResponse<GoodsReceipt>>(`/inventory/goods-receipts/${buildQuery(params)}`);
-}
-
-export function getGoodsReceipt(id: number | string) {
-  return apiFetch<GoodsReceipt>(`/inventory/goods-receipts/${id}/`);
-}
-
-export function createGoodsReceipt(payload: {
-  receipt_date: string;
-  purchase_order: number;
-  branch?: number | null;
-  stock_location?: number | null;
-  notes?: string;
-  allow_over_receive?: boolean;
-  over_receive_reason?: string;
-  lines: Array<{ purchase_order_line?: number | null; inventory_item: number; quantity_received: string; unit_cost?: string; notes?: string }>;
-}) {
-  return apiFetch<GoodsReceipt>("/inventory/goods-receipts/", { method: "POST", body: JSON.stringify(payload) });
-}
-
-export function postGoodsReceipt(id: number | string) {
-  return apiFetch<{ updated: boolean; goods_receipt: GoodsReceipt }>(`/inventory/goods-receipts/${id}/post/`, { method: "POST", body: JSON.stringify({}) });
-}
-
-// ── Vendor Bills ─────────────────────────────────────────────────────────────
-
-export function listVendorBills(params: Record<string, QueryValue> = {}) {
-  return apiFetch<PaginatedResponse<VendorBill>>(`/inventory/vendor-bills/${buildQuery(params)}`);
-}
-
-export function getVendorBill(id: number | string) {
-  return apiFetch<VendorBill>(`/inventory/vendor-bills/${id}/`);
-}
-
-export function createVendorBill(payload: {
-  bill_no?: string;
-  bill_date: string;
-  vendor: number;
-  purchase_order?: number | null;
-  goods_receipt?: number | null;
-  finance_account?: number | null;
-  notes?: string;
-  lines: Array<{ inventory_item: number; description?: string; quantity: string; unit_cost: string; taxable_value?: string; tax_amount?: string; line_total?: string }>;
-}) {
-  return apiFetch<VendorBill>("/inventory/vendor-bills/", { method: "POST", body: JSON.stringify(payload) });
-}
-
-export function updateVendorBill(id: number | string, payload: Partial<Parameters<typeof createVendorBill>[0]>) {
-  return apiFetch<VendorBill>(`/inventory/vendor-bills/${id}/`, { method: "PATCH", body: JSON.stringify(payload) });
-}
-
-export function postVendorBill(id: number | string) {
-  return apiFetch<{ updated: boolean; vendor_bill: VendorBill }>(`/inventory/vendor-bills/${id}/post/`, { method: "POST", body: JSON.stringify({}) });
-}
-
-// ── Vendor Payments ──────────────────────────────────────────────────────────
-
-export function listVendorPayments(params: Record<string, QueryValue> = {}) {
-  return apiFetch<PaginatedResponse<VendorPayment>>(`/inventory/vendor-payments/${buildQuery(params)}`);
-}
-
-export function getVendorPayment(id: number | string) {
-  return apiFetch<VendorPayment>(`/inventory/vendor-payments/${id}/`);
-}
-
-export function createVendorPayment(payload: {
-  payment_date: string;
-  vendor: number;
-  vendor_bill?: number | null;
-  amount: string;
-  finance_account: number;
-  reference_no?: string;
-  notes?: string;
-}) {
-  return apiFetch<VendorPayment>("/inventory/vendor-payments/", { method: "POST", body: JSON.stringify(payload) });
-}
-
-export function postVendorPayment(id: number | string) {
-  return apiFetch<{ updated: boolean; vendor_payment: VendorPayment }>(`/inventory/vendor-payments/${id}/post/`, { method: "POST", body: JSON.stringify({}) });
-}
-
-// ── Vendor Agreements ────────────────────────────────────────────────────────
-
-export function listVendorAgreements(params: Record<string, QueryValue> = {}) {
-  return apiFetch<PaginatedResponse<VendorAgreement>>(`/inventory/vendor-agreements/${buildQuery(params)}`);
-}
-
-export function createVendorAgreement(payload: {
-  vendor: number;
-  effective_from: string;
-  effective_to?: string | null;
-  status?: string;
-  payment_terms?: string;
-  credit_period_days?: number;
-  notes?: string;
-}) {
-  return apiFetch<VendorAgreement>("/inventory/vendor-agreements/", { method: "POST", body: JSON.stringify(payload) });
-}
-
-export function updateVendorAgreement(id: number | string, payload: Partial<Parameters<typeof createVendorAgreement>[0]>) {
-  return apiFetch<VendorAgreement>(`/inventory/vendor-agreements/${id}/`, { method: "PATCH", body: JSON.stringify(payload) });
-}
-
-// ── Purchase Requests ────────────────────────────────────────────────────────
-
-export function listPurchaseRequests(params: Record<string, QueryValue> = {}) {
-  return apiFetch<PaginatedResponse<PurchaseRequest>>(`/inventory/purchase-requests/${buildQuery(params)}`);
-}
-
-export function getPurchaseRequest(id: number | string) {
-  return apiFetch<PurchaseRequest>(`/inventory/purchase-requests/${id}/`);
-}
-
-export function createPurchaseRequest(payload: {
-  request_date: string;
-  vendor?: number | null;
-  stock_location?: number | null;
-  notes?: string;
-  lines: Array<{ inventory_item: number; quantity_requested: string; notes?: string }>;
-}) {
-  return apiFetch<PurchaseRequest>("/inventory/purchase-requests/", { method: "POST", body: JSON.stringify(payload) });
-}
-
-export function approvePurchaseRequest(id: number | string) {
-  return apiFetch<{ updated: boolean; purchase_request: PurchaseRequest }>(
-    `/inventory/purchase-requests/${id}/approve/`,
-    { method: "POST", body: JSON.stringify({}) }
-  );
-}
-
-export function convertPurchaseRequestToPO(id: number | string, opts?: { po_date?: string; expected_date?: string }) {
-  return apiFetch<{ purchase_order: PurchaseOrder; purchase_request: PurchaseRequest }>(
-    `/inventory/purchase-requests/${id}/convert-to-po/`,
-    { method: "POST", body: JSON.stringify(opts ?? {}) }
-  );
-}
-
-export function listAdminOpeningStockEntries(params: Record<string, QueryValue> = {}) {
-  return apiFetch<PaginatedResponse<OpeningStockEntryRow>>(
-    `/admin/inventory/opening-stock/${buildQuery(params)}`
-  );
-}
-
-export function createAdminOpeningStockEntry(payload: {
-  inventory_item: number;
-  stock_location: number;
-  quantity: string;
-  effective_date: string;
-  unit_cost_snapshot?: string | null;
-  note?: string;
-}) {
-  return apiFetch<OpeningStockEntryRow>("/admin/inventory/opening-stock/", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-}
-
-export function patchAdminOpeningStockEntry(
-  id: number,
-  payload: Partial<{
-    inventory_item: number;
-    stock_location: number;
-    quantity: string;
-    effective_date: string;
-    unit_cost_snapshot: string | null;
-    note: string;
-  }>
-) {
-  return apiFetch<OpeningStockEntryRow>(`/admin/inventory/opening-stock/${id}/`, {
-    method: "PATCH",
-    body: JSON.stringify(payload),
-  });
-}
-
-export function postAdminOpeningStockEntry(id: number) {
-  return apiFetch<{ updated: boolean; opening_stock_entry: OpeningStockEntryRow }>(
-    `/admin/inventory/opening-stock/${id}/post/`,
-    { method: "POST", body: JSON.stringify({}) }
-  );
-}
-
-export function cancelAdminOpeningStockEntry(id: number) {
-  return apiFetch<{ opening_stock_entry: OpeningStockEntryRow }>(
-    `/admin/inventory/opening-stock/${id}/cancel/`,
-    { method: "POST", body: JSON.stringify({}) }
-  );
-}
-
-export function correctionAdminOpeningStockEntry(
-  id: number,
-  payload: {
-    reason: string;
-    quantity_delta: string;
-    unit_cost_snapshot?: string | null;
-    adjustment_date?: string | null;
-  }
-) {
-  return apiFetch<{ stock_adjustment: StockAdjustment }>(
-    `/admin/inventory/opening-stock/${id}/correction/`,
-    { method: "POST", body: JSON.stringify(payload) }
-  );
-}
-
-export async function previewAdminOpeningStockBulkCsv(file: File, defaultEffectiveDate?: string) {
-  const form = new FormData();
-  form.append("file", file);
-  if (defaultEffectiveDate) {
-    form.append("default_effective_date", defaultEffectiveDate);
-  }
-  return apiFetch<OpeningStockBulkPreview>("/admin/inventory/opening-stock/import/preview/", {
-    method: "POST",
-    body: form,
-  });
-}
-
-export async function applyAdminOpeningStockBulkCsv(
-  file: File,
-  opts: {
-    dry_run?: boolean;
-    auto_post?: boolean;
-    default_effective_date?: string | null;
-  } = {}
-) {
-  const form = new FormData();
-  form.append("file", file);
-  if (opts.dry_run) form.append("dry_run", "true");
-  if (opts.auto_post) form.append("auto_post", "true");
-  if (opts.default_effective_date) {
-    form.append("default_effective_date", opts.default_effective_date);
-  }
-  return apiFetch<OpeningStockBulkApplySummary>("/admin/inventory/opening-stock/import/apply/", {
-    method: "POST",
-    body: form,
-  });
-}
-
-export function listAdminOpeningStockBatches() {
-  return apiFetch<{ count: number; results: OpeningStockBatchHistoryRow[] }>(
-    "/admin/inventory/opening-stock/batches/"
-  );
-}
-
-export async function fetchOpeningStockCsvTemplateText(): Promise<string> {
-  return apiFetch<string>("/admin/inventory/opening-stock/template/", {
-    headers: { Accept: "text/csv, */*" },
-  });
-}
-
-export async function previewOpeningStockImport(file: File) {
-  const form = new FormData();
-  form.append("file", file);
-  return apiFetch<OpeningStockPreview>("/inventory/opening-stock/preview/", {
-    method: "POST",
-    body: form,
-  });
-}
-
-export async function postOpeningStockImport(file: File, asOfDate: string) {
-  const form = new FormData();
-  form.append("file", file);
-  form.append("as_of_date", asOfDate);
-  return apiFetch<OpeningStockPostResponse>("/inventory/opening-stock/post/", {
-    method: "POST",
-    body: form,
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Inventory Catalog — Finished Goods, Raw Materials, Accessories, Services
-// ---------------------------------------------------------------------------
-
-export type InventoryCatalogRow = {
-  id: number;
-  product_id: number;
-  product_code: string;
-  product_name: string;
-  sku: string | null;
-  stock_item_type: "FINISHED_GOOD" | "RAW_MATERIAL" | "ACCESSORY";
-  unit_of_measure: string;
-  stock_tracking_enabled: boolean;
-  stock_tracking_status: string;
-  standard_unit_cost: string;
-  reorder_level_qty: string;
-  valuation_method: string;
-  barcode: string | null;
-  is_active: boolean;
-  category: string;
-  subcategory: string;
-  base_price: string;
-};
-
-export type FinishedGoodRow = InventoryCatalogRow & {
-  accessory_count: number;
-  service_count: number;
-  has_bom: boolean;
-};
-
-export type RawMaterialRow = InventoryCatalogRow & {
-  bom_usage_count: number;
-};
-
-export type AccessoryRow = InventoryCatalogRow & {
-  linked_fg_count: number;
-};
-
-export type ServiceType = "WARRANTY" | "INSTALLATION" | "MAINTENANCE" | "POLISH" | "DELIVERY" | "REPAIR" | "ADDON" | "OTHER";
-
-export const SERVICE_TYPE_LABELS: Record<ServiceType, string> = {
-  WARRANTY: "Warranty",
-  INSTALLATION: "Installation",
-  MAINTENANCE: "Maintenance / AMC",
-  POLISH: "Polish / Finishing",
-  DELIVERY: "Delivery / Logistics",
-  REPAIR: "Repair",
-  ADDON: "Add-on / Upgrade",
-  OTHER: "Other",
-};
-
-export type ServiceCatalogItem = {
-  id: number;
-  code: string;
-  name: string;
-  description: string;
-  category: string;
-  service_type: ServiceType;
-  standard_price: string;
-  tax_rate_percent: string;
-  status: "ACTIVE" | "INACTIVE";
-  hsn_sac_code: string;
-  notes: string;
-  created_at: string;
-  updated_at: string;
-};
-
-export type FGAccessoryLink = {
-  id: number;
-  finished_good: number;
-  accessory: number;
-  accessory_id: number;
-  accessory_name: string;
-  accessory_sku: string | null;
-  accessory_code: string;
-  accessory_inv_id: number;
-  charge_mode: "FREE" | "CHARGEABLE";
-  sale_price: string;
-  is_default_included: boolean;
-  sort_order: number;
-  notes: string;
-  created_at: string;
-  updated_at: string;
-};
-
-export type FGServiceLink = {
-  id: number;
-  finished_good: number;
-  service: number;
-  service_code: string;
-  service_name: string;
-  service_category: string;
-  service_type: ServiceType;
-  service_standard_price: string;
-  service_hsn_sac_code: string;
-  service_tax_rate_percent: string;
-  charge_mode: "FREE" | "CHARGEABLE";
-  sale_price: string;
-  is_default_included: boolean;
-  sort_order: number;
-  notes: string;
-  created_at: string;
-  updated_at: string;
-};
-
-export type FGBomLine = {
-  id: number;
-  inventory_item_id: number;
-  product_name: string;
-  product_code: string;
-  item_type: string;
-  quantity_per_unit: string;
-  wastage_percent: string;
-  unit_of_measure: string;
-};
-
-export type FGActiveBom = {
-  id: number;
-  bom_no: string;
-  revision_no: number;
+  reorder_point: string;
   status: string;
-  lines: FGBomLine[];
+  source: string;
+  priority: string;
+  warehouse_code: string;
+  created_at: string | null;
+  updated_at: string | null;
 };
 
-export type FGProfileDetail = {
-  profile: InventoryCatalogRow;
-  accessories: FGAccessoryLink[];
-  services: FGServiceLink[];
-  active_bom: FGActiveBom | null;
-  bom_count: number;
-};
-
-export type InventoryOverview = {
-  finished_goods: number;
-  raw_materials: number;
-  accessories: number;
-  active_services: number;
-  accessory_links: number;
-  service_links: number;
-};
-
-type CatalogPage<T> = {
+export type LotTrackingListResponse = {
   count: number;
   page: number;
   page_size: number;
   num_pages: number;
-  results: T[];
+  has_next: boolean;
+  has_previous: boolean;
+  range_start: number;
+  range_end: number;
+  summary: LotTrackingKPIS;
+  results: LotTrackingResult[];
 };
 
-export function fetchInventoryOverview() {
-  return apiFetch<InventoryOverview>("/admin/inventory/overview/");
+// ============================================================================
+// Lot Tracking API Functions
+// ============================================================================
+
+export interface ListLotsParams {
+  q?: string;
+  status?: string;
+  source?: string;
+  priority?: string;
+  page?: number;
+  page_size?: number;
 }
 
-export function listFinishedGoods(params: { q?: string; page?: number; page_size?: number; tracking_status?: string } = {}) {
-  const sp = new URLSearchParams();
-  if (params.q) sp.set("q", params.q);
-  if (params.page) sp.set("page", String(params.page));
-  if (params.page_size) sp.set("page_size", String(params.page_size));
-  if (params.tracking_status) sp.set("tracking_status", params.tracking_status);
-  const qs = sp.toString();
-  return apiFetch<CatalogPage<FinishedGoodRow>>(`/admin/inventory/finished-goods/${qs ? `?${qs}` : ""}`);
-}
+/**
+ * List lots with pagination, search, and filters
+ * GET /api/v1/admin/inventory/lots/
+ */
+export function listLots(params: ListLotsParams = {}): Promise<LotTrackingListResponse> {
+  const queryParams = new URLSearchParams();
 
-export function fetchFGProfile(id: number) {
-  return apiFetch<FGProfileDetail>(`/admin/inventory/finished-goods/${id}/profile/`);
-}
+  if (params.q) queryParams.append("q", params.q);
+  if (params.status) queryParams.append("status", params.status);
+  if (params.source) queryParams.append("source", params.source);
+  if (params.priority) queryParams.append("priority", params.priority);
+  if (params.page) queryParams.append("page", String(params.page));
+  if (params.page_size) queryParams.append("page_size", String(params.page_size));
 
-export function listRawMaterials(params: { q?: string; page?: number; page_size?: number } = {}) {
-  const sp = new URLSearchParams();
-  if (params.q) sp.set("q", params.q);
-  if (params.page) sp.set("page", String(params.page));
-  if (params.page_size) sp.set("page_size", String(params.page_size));
-  const qs = sp.toString();
-  return apiFetch<CatalogPage<RawMaterialRow>>(`/admin/inventory/raw-materials/${qs ? `?${qs}` : ""}`);
-}
+  const queryString = queryParams.toString();
+  const url = queryString ? `/admin/inventory/lots/?${queryString}` : "/admin/inventory/lots/";
 
-export function listAccessories(params: { q?: string; page?: number; page_size?: number } = {}) {
-  const sp = new URLSearchParams();
-  if (params.q) sp.set("q", params.q);
-  if (params.page) sp.set("page", String(params.page));
-  if (params.page_size) sp.set("page_size", String(params.page_size));
-  const qs = sp.toString();
-  return apiFetch<CatalogPage<AccessoryRow>>(`/admin/inventory/accessories/${qs ? `?${qs}` : ""}`);
-}
-
-export function listServiceCatalog(params: { q?: string; page?: number; page_size?: number; status?: string; category?: string } = {}) {
-  const sp = new URLSearchParams();
-  if (params.q) sp.set("q", params.q);
-  if (params.page) sp.set("page", String(params.page));
-  if (params.page_size) sp.set("page_size", String(params.page_size));
-  if (params.status) sp.set("status", params.status);
-  if (params.category) sp.set("category", params.category);
-  const qs = sp.toString();
-  return apiFetch<CatalogPage<ServiceCatalogItem>>(`/admin/inventory/service-catalog/${qs ? `?${qs}` : ""}`);
-}
-
-export function createServiceCatalogItem(data: Partial<ServiceCatalogItem>) {
-  return apiFetch<ServiceCatalogItem>("/admin/inventory/service-catalog/", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
+  return apiFetch<LotTrackingListResponse>(url, {
+    method: "GET",
   });
 }
 
-export function updateServiceCatalogItem(id: number, data: Partial<ServiceCatalogItem>) {
-  return apiFetch<ServiceCatalogItem>(`/admin/inventory/service-catalog/${id}/`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
+/**
+ * Export lots to CSV
+ * GET /api/v1/admin/inventory/lots/?format=csv
+ */
+export function exportLotsCSV(params: ListLotsParams = {}): Promise<Blob> {
+  const queryParams = new URLSearchParams();
+
+  if (params.q) queryParams.append("q", params.q);
+  if (params.status) queryParams.append("status", params.status);
+  if (params.source) queryParams.append("source", params.source);
+  if (params.priority) queryParams.append("priority", params.priority);
+
+  queryParams.append("format", "csv");
+
+  const queryString = queryParams.toString();
+  const url = `/admin/inventory/lots/?${queryString}`;
+
+  return fetch(url, {
+    method: "GET",
+    headers: {
+      "Content-Type": "text/csv",
+    },
+  })
+    .then((response) => {
+      if (!response.ok) throw new Error(`CSV export failed: ${response.statusText}`);
+      return response.blob();
+    });
+}
+
+/**
+ * Download CSV file
+ * Utility function to trigger browser download
+ */
+export function downloadCSV(blob: Blob, filename: string = "lots.csv"): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ============================================================================
+// Lot Code Generation
+// ============================================================================
+
+/**
+ * Generate lot code: LOT-PRODUCTCODE-XXXX
+ */
+export function generateLotCode(productCode: string, sequence: number = 1): string {
+  const code = productCode.toUpperCase().trim();
+  const seq = String(sequence).padStart(4, "0");
+  return `LOT-${code}-${seq}`;
+}
+
+// ============================================================================
+// Types for Stock on Hand
+// ============================================================================
+
+export type StockOnHandKPIS = {
+  total_physical_qty: string;
+  total_reserved_qty: string;
+  total_available_qty: string;
+  critical_shortage_count: number;
+  total_value: string;
+};
+
+export type CriticalShortage = {
+  product_id: number;
+  product_code: string;
+  product_name: string;
+  sku: string;
+  physical_qty: string;
+  reserved_qty: string;
+  reorder_point: string;
+  shortage_qty: string;
+};
+
+export type StockOnHandSummaryResponse = {
+  summary: StockOnHandKPIS;
+  critical_shortages: CriticalShortage[];
+};
+
+export type CriticalShortagesListResponse = {
+  count: number;
+  page: number;
+  page_size: number;
+  num_pages: number;
+  results: CriticalShortage[];
+};
+
+// ============================================================================
+// Stock on Hand API Functions
+// ============================================================================
+
+/**
+ * Get stock on hand summary with KPI aggregation
+ * GET /api/v1/admin/inventory/stock-on-hand/
+ */
+export function getStockOnHandSummary(): Promise<StockOnHandSummaryResponse> {
+  return apiFetch<StockOnHandSummaryResponse>("/admin/inventory/stock-on-hand/", {
+    method: "GET",
   });
 }
 
-export function deleteServiceCatalogItem(id: number) {
-  return apiFetch<void>(`/admin/inventory/service-catalog/${id}/`, { method: "DELETE" });
-}
+/**
+ * Get critical shortages with pagination
+ * GET /api/v1/admin/inventory/stock-on-hand/?filter=critical&page=1&page_size=50
+ */
+export function getCriticalShortages(
+  page: number = 1,
+  pageSize: number = 50
+): Promise<CriticalShortagesListResponse> {
+  const queryParams = new URLSearchParams();
+  queryParams.append("filter", "critical");
+  queryParams.append("page", String(page));
+  queryParams.append("page_size", String(pageSize));
 
-export function listFGAccessoryLinks(fgId: number) {
-  return apiFetch<FGAccessoryLink[]>(`/admin/inventory/finished-goods/${fgId}/accessories/`);
-}
+  const url = `/admin/inventory/stock-on-hand/?${queryParams.toString()}`;
 
-export function addFGAccessoryLink(fgId: number, data: { accessory: number; charge_mode: string; sale_price: string; is_default_included: boolean; sort_order?: number; notes?: string }) {
-  return apiFetch<FGAccessoryLink>(`/admin/inventory/finished-goods/${fgId}/accessories/`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
+  return apiFetch<CriticalShortagesListResponse>(url, {
+    method: "GET",
   });
 }
 
-export function updateFGAccessoryLink(fgId: number, linkId: number, data: Partial<FGAccessoryLink>) {
-  return apiFetch<FGAccessoryLink>(`/admin/inventory/finished-goods/${fgId}/accessories/${linkId}/`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-}
+// ============================================================================
+// Types for Stock Ledger
+// ============================================================================
 
-export function deleteFGAccessoryLink(fgId: number, linkId: number) {
-  return apiFetch<void>(`/admin/inventory/finished-goods/${fgId}/accessories/${linkId}/`, { method: "DELETE" });
-}
+export type StockLedgerKPIS = {
+  total_inbound: string;
+  total_outbound: string;
+  net_change: string;
+  period: string;
+};
 
-export function listFGServiceLinks(fgId: number) {
-  return apiFetch<FGServiceLink[]>(`/admin/inventory/finished-goods/${fgId}/services/`);
-}
-
-export function addFGServiceLink(fgId: number, data: { service: number; charge_mode: string; sale_price: string; is_default_included: boolean; sort_order?: number; notes?: string }) {
-  return apiFetch<FGServiceLink>(`/admin/inventory/finished-goods/${fgId}/services/`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-}
-
-export function updateFGServiceLink(fgId: number, linkId: number, data: Partial<FGServiceLink>) {
-  return apiFetch<FGServiceLink>(`/admin/inventory/finished-goods/${fgId}/services/${linkId}/`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-}
-
-export function deleteFGServiceLink(fgId: number, linkId: number) {
-  return apiFetch<void>(`/admin/inventory/finished-goods/${fgId}/services/${linkId}/`, { method: "DELETE" });
-}
-
-// ---------------------------------------------------------------------------
-// Accessory Variant Groups
-// ---------------------------------------------------------------------------
-
-export type AccessoryVariantGroup = {
+export type StockLedgerResult = {
   id: number;
-  code: string;
+  product_id: number;
+  product_name: string;
+  product_code: string;
+  sku: string;
+  barcode: string;
+  transaction_type: string;
+  quantity: string;
+  reference_type: string;
+  reference_id: number | null;
+  reference_display: string;
+  warehouse_code: string;
+  created_at: string | null;
+};
+
+export type StockLedgerListResponse = {
+  count: number;
+  page: number;
+  page_size: number;
+  num_pages: number;
+  has_next: boolean;
+  has_previous: boolean;
+  range_start: number;
+  range_end: number;
+  summary: StockLedgerKPIS;
+  results: StockLedgerResult[];
+};
+
+// ============================================================================
+// Stock Ledger API Functions
+// ============================================================================
+
+export interface ListLedgerParams {
+  q?: string;
+  transaction_type?: string;
+  reference_type?: string;
+  date_from?: string;
+  date_to?: string;
+  page?: number;
+  page_size?: number;
+}
+
+/**
+ * List stock ledger with pagination, search, and filters
+ * GET /api/v1/admin/inventory/ledger/
+ */
+export function listStockLedger(params: ListLedgerParams = {}): Promise<StockLedgerListResponse> {
+  const queryParams = new URLSearchParams();
+
+  if (params.q) queryParams.append("q", params.q);
+  if (params.transaction_type) queryParams.append("transaction_type", params.transaction_type);
+  if (params.reference_type) queryParams.append("reference_type", params.reference_type);
+  if (params.date_from) queryParams.append("date_from", params.date_from);
+  if (params.date_to) queryParams.append("date_to", params.date_to);
+  if (params.page) queryParams.append("page", String(params.page));
+  if (params.page_size) queryParams.append("page_size", String(params.page_size));
+
+  const queryString = queryParams.toString();
+  const url = queryString ? `/admin/inventory/ledger/?${queryString}` : "/admin/inventory/ledger/";
+
+  return apiFetch<StockLedgerListResponse>(url, {
+    method: "GET",
+  });
+}
+
+/**
+ * Export stock ledger to CSV
+ * GET /api/v1/admin/inventory/ledger/?format=csv
+ */
+export function exportStockLedgerCSV(params: ListLedgerParams = {}): Promise<Blob> {
+  const queryParams = new URLSearchParams();
+
+  if (params.q) queryParams.append("q", params.q);
+  if (params.transaction_type) queryParams.append("transaction_type", params.transaction_type);
+  if (params.reference_type) queryParams.append("reference_type", params.reference_type);
+  if (params.date_from) queryParams.append("date_from", params.date_from);
+  if (params.date_to) queryParams.append("date_to", params.date_to);
+
+  queryParams.append("format", "csv");
+
+  const queryString = queryParams.toString();
+  const url = `/admin/inventory/ledger/?${queryString}`;
+
+  return fetch(url, {
+    method: "GET",
+    headers: {
+      "Content-Type": "text/csv",
+    },
+  })
+    .then((response) => {
+      if (!response.ok) throw new Error(`CSV export failed: ${response.statusText}`);
+      return response.blob();
+    });
+}
+
+// ============================================================================
+// Types for Quick Create
+// ============================================================================
+
+export type QuickCreateResult = {
+  id: number;
+  product_code: string;
   name: string;
-  category: string;
-  subcategory: string;
-  description: string;
-  is_required: boolean;
-  is_active: boolean;
-  sort_order: number;
-  variant_count: number;
-  created_at: string;
-  updated_at: string;
+  base_price: string;
+  status: string;
 };
 
-export type AccessoryVariantGroupDetail = AccessoryVariantGroup & {
-  variants: {
-    id: number;
-    product_id: number;
-    product_name: string;
-    product_code: string;
-    variant_label: string;
-    sku: string | null;
-    unit_of_measure: string;
-    base_price: string;
-    standard_unit_cost: string;
-    stock_tracking_status: string;
-  }[];
-};
-
-export function listAccessoryVariantGroups(params: { q?: string; category?: string; active_only?: boolean; page?: number; page_size?: number } = {}) {
-  const sp = new URLSearchParams();
-  if (params.q) sp.set("q", params.q);
-  if (params.category) sp.set("category", params.category);
-  if (params.active_only) sp.set("active_only", "true");
-  if (params.page) sp.set("page", String(params.page));
-  if (params.page_size) sp.set("page_size", String(params.page_size));
-  const qs = sp.toString();
-  return apiFetch<{ count: number; page: number; page_size: number; results: AccessoryVariantGroup[] }>(`/admin/inventory/accessory-variant-groups/${qs ? `?${qs}` : ""}`);
-}
-
-export function fetchAccessoryVariantGroup(id: number) {
-  return apiFetch<AccessoryVariantGroupDetail>(`/admin/inventory/accessory-variant-groups/${id}/`);
-}
-
-export function createAccessoryVariantGroup(data: Partial<AccessoryVariantGroup>) {
-  return apiFetch<AccessoryVariantGroup>("/admin/inventory/accessory-variant-groups/", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-}
-
-export function updateAccessoryVariantGroup(id: number, data: Partial<AccessoryVariantGroup>) {
-  return apiFetch<AccessoryVariantGroup>(`/admin/inventory/accessory-variant-groups/${id}/`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-}
-
-export function deleteAccessoryVariantGroup(id: number) {
-  return apiFetch<void>(`/admin/inventory/accessory-variant-groups/${id}/`, { method: "DELETE" });
-}
-
-// ---------------------------------------------------------------------------
-// Quick Create
-// ---------------------------------------------------------------------------
-
-export type QuickCreatePayload = {
+export interface QuickCreatePayload {
   product_code: string;
   name: string;
   base_price: string;
@@ -1520,119 +337,423 @@ export type QuickCreatePayload = {
   sku?: string;
   standard_unit_cost?: string;
   reorder_level_qty?: string;
-  variant_group?: number | null;
   variant_label?: string;
-};
+}
 
-export type QuickCreateResult = {
-  product_id: number;
+// ============================================================================
+// Dashboard Stock Summary
+// ============================================================================
+
+export type StockSummaryRow = {
+  item_id: number;
   product_code: string;
   product_name: string;
-  inventory_item_id: number;
-  stock_item_type: string;
-  variant_group?: number | null;
-  variant_label?: string;
+  sku?: string;
+  current_qty: number;
+  reorder_point: number;
+  status: string;
 };
 
-export function quickCreateAccessory(data: QuickCreatePayload) {
-  return apiFetch<QuickCreateResult>("/admin/inventory/quick-create/accessory/", {
+export type StockSummaryResponse = {
+  results: StockSummaryRow[];
+  count: number;
+};
+
+export interface StockSummaryParams {
+  branch?: number | string;
+}
+
+/**
+ * Get stock summary for dashboard (low stock items)
+ * GET /api/v1/admin/inventory/stock-summary/
+ */
+export function getStockSummary(
+  params?: StockSummaryParams
+): Promise<StockSummaryResponse> {
+  const queryParams = new URLSearchParams();
+  if (params?.branch) queryParams.append("branch", String(params.branch));
+
+  const url = queryParams.toString()
+    ? `/admin/inventory/stock-summary/?${queryParams}`
+    : "/admin/inventory/stock-summary/";
+
+  return apiFetch<StockSummaryResponse>(url, { method: "GET" });
+}
+
+// ============================================================================
+// Quick Create API Functions
+// ============================================================================
+
+/**
+ * Quick create an accessory
+ * POST /api/v1/admin/products/
+ */
+export function quickCreateAccessory(payload: QuickCreatePayload): Promise<QuickCreateResult> {
+  return apiFetch<QuickCreateResult>("/admin/products/", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
+    body: JSON.stringify({
+      ...payload,
+      product_type: "ACCESSORY",
+    }),
   });
 }
 
-export function quickCreateRawMaterial(data: QuickCreatePayload) {
-  return apiFetch<QuickCreateResult>("/admin/inventory/quick-create/raw-material/", {
+/**
+ * Quick create a raw material
+ * POST /api/v1/admin/products/
+ */
+export function quickCreateRawMaterial(payload: QuickCreatePayload): Promise<QuickCreateResult> {
+  return apiFetch<QuickCreateResult>("/admin/products/", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
+    body: JSON.stringify({
+      ...payload,
+      product_type: "RAW_MATERIAL",
+    }),
   });
 }
 
-// ---------------------------------------------------------------------------
-// Billing Accessory Options
-// ---------------------------------------------------------------------------
+// ============================================================================
+// Generic Inventory Types & Functions
+// ============================================================================
 
-export type BillingAccessoryVariant = {
+export type InventoryItem = {
+  id: number;
+  product_code: string;
+  name?: string;
+  product_name?: string;
+  sku?: string;
+  barcode?: string;
+  category?: string;
+  subcategory?: string;
+  base_price?: string;
+  standard_unit_cost?: string;
+  unit_of_measure?: string;
+  stock_item_type?: string;
+};
+
+export type PaginatedResponse<T> = {
+  count: number;
+  page: number;
+  page_size: number;
+  num_pages: number;
+  results: T[];
+  [key: string]: unknown;
+};
+
+export type StockLocation = {
+  id: number;
+  code: string;
+  name: string;
+  address?: string;
+};
+
+export type StockAdjustment = {
+  id: number;
+  adjustment_no?: string;
+  adjustment_date: string;
+  status: string;
+  stock_location_name?: string;
+  reason?: string;
+  lines?: Array<{ product_id: number; quantity: number; unit_cost_snapshot?: string }>;
+  created_by_username?: string;
+  draft_count?: number;
+  approved_count?: number;
+  posted_count?: number;
+  requires_unit_cost?: boolean;
+  can_post?: boolean;
+};
+
+export interface StockAdjustmentsPayload {
+  adjustment_date: string;
+  lines: Array<{ product_id: number; quantity: number }>;
+}
+
+export type AccessoryRow = {
+  id: number;
+  product_code: string;
+  name?: string;
+  product_name?: string;
+  variant_label?: string;
+  base_price?: string;
+  sku?: string;
+  unit_of_measure?: string;
+  standard_unit_cost?: string;
+  linked_fg_count?: number;
+  stock_tracking_status?: string;
+};
+
+export type AccessoryVariantGroup = {
+  id: number;
+  code?: string;
+  name: string;
+  category?: string;
+  subcategory?: string;
+  description?: string;
+  is_required?: boolean;
+  is_active?: boolean;
+  sort_order?: number;
+  variant_count?: number;
+  accessories?: AccessoryRow[];
+};
+
+export type DemandPlanningRow = {
+  product_id: number;
+  product_code: string;
+  name?: string;
+  product_name?: string;
+  sku?: string;
+  demand_qty?: number;
+  on_hand?: number;
+  total_required?: number;
+  safety_stock?: number;
+};
+
+export type DemandPlanningPayload = Record<string, unknown>;
+
+export type FGProfileDetail = {
+  id: number;
+  product_code: string;
+  name: string;
+  base_price: string;
+};
+
+export type FGAccessoryLink = {
+  id: number;
+  accessory_id: number;
+  accessory_name: string;
+};
+
+export type FGServiceLink = {
+  id: number;
+  service_id: number;
+  service_name: string;
+};
+
+export type ServiceCatalogItem = {
   id: number;
   product_id: number;
-  product_name: string;
-  product_code: string;
-  variant_label: string;
-  sku: string | null;
-  unit_of_measure: string;
-  base_price: string;
-  standard_unit_cost: string;
-};
-
-export type BillingAccessoryOption = {
-  link_id: number;
-  link_type: "group" | "single";
-  group_id: number | null;
-  group_name: string | null;
-  group_code: string | null;
-  group_category: string;
-  group_subcategory: string;
-  is_required: boolean;
-  charge_mode: "FREE" | "CHARGEABLE";
-  sale_price: string;
-  is_default_included: boolean;
-  notes: string;
-  sort_order: number;
-  variants: BillingAccessoryVariant[];
-  selected_variant_id: number | null;
-};
-
-export type BillingServiceOption = {
-  link_id: number;
-  service_id: number;
-  service_code: string;
   service_name: string;
-  service_category: string;
-  charge_mode: "FREE" | "CHARGEABLE";
-  sale_price: string;
-  standard_price: string;
-  tax_rate_percent: string;
-  hsn_sac_code: string;
-  is_default_included: boolean;
-  notes: string;
-  sort_order: number;
+  service_type: string;
+  price: string;
 };
 
-export type BillingAccessoryOptionsResponse = {
-  product_id: number;
-  inventory_item_id: number;
-  product_name: string;
-  accessory_options: BillingAccessoryOption[];
-  service_options: BillingServiceOption[];
-  has_options: boolean;
+export type ServiceType = "INSTALLATION" | "DELIVERY" | "WARRANTY" | "MAINTENANCE";
+
+export const SERVICE_TYPE_LABELS: Record<ServiceType, string> = {
+  INSTALLATION: "Installation",
+  DELIVERY: "Delivery",
+  WARRANTY: "Warranty",
+  MAINTENANCE: "Maintenance",
 };
 
-export function fetchBillingAccessoryOptions(productId: number) {
-  return apiFetch<BillingAccessoryOptionsResponse>(`/admin/inventory/finished-goods/${productId}/billing-accessories/`);
+// List functions - with pagination support
+export async function listInventoryItems(
+  page?: number,
+  pageSize?: number
+): Promise<PaginatedResponse<InventoryItem>> {
+  const params = new URLSearchParams();
+  if (page) params.append("page", String(page));
+  if (pageSize) params.append("page_size", String(pageSize));
+  const url = params.toString() ? `/admin/inventory/items/?${params}` : "/admin/inventory/items/";
+  return apiFetch<PaginatedResponse<InventoryItem>>(url, { method: "GET" });
 }
 
-// Assign variant group to an accessory item
-export function assignVariantGroupToAccessory(inventoryItemId: number, data: { variant_group: number | null; variant_label?: string }) {
-  return apiFetch<{ id: number; variant_group: number | null; variant_group_name: string | null; variant_label: string }>(
-    `/admin/inventory/accessories/${inventoryItemId}/assign-variant-group/`,
+export async function listStockLocations(
+  page?: number
+): Promise<PaginatedResponse<StockLocation>> {
+  const params = new URLSearchParams();
+  if (page) params.append("page", String(page));
+  const url = params.toString() ? `/admin/inventory/locations/?${params}` : "/admin/inventory/locations/";
+  return apiFetch<PaginatedResponse<StockLocation>>(url, { method: "GET" });
+}
+
+export async function listAccessories(
+  page?: number
+): Promise<PaginatedResponse<AccessoryRow>> {
+  const params = new URLSearchParams();
+  if (page) params.append("page", String(page));
+  const url = params.toString() ? `/admin/inventory/accessories/?${params}` : "/admin/inventory/accessories/";
+  return apiFetch<PaginatedResponse<AccessoryRow>>(url, { method: "GET" });
+}
+
+export async function listAccessoryVariantGroups(
+  page?: number
+): Promise<PaginatedResponse<AccessoryVariantGroup>> {
+  const params = new URLSearchParams();
+  if (page) params.append("page", String(page));
+  const url = params.toString()
+    ? `/admin/inventory/accessory-variant-groups/?${params}`
+    : "/admin/inventory/accessory-variant-groups/";
+  return apiFetch<PaginatedResponse<AccessoryVariantGroup>>(url, { method: "GET" });
+}
+
+export async function listServiceCatalog(): Promise<PaginatedResponse<ServiceCatalogItem>> {
+  return apiFetch<PaginatedResponse<ServiceCatalogItem>>("/admin/inventory/service-catalog/", {
+    method: "GET",
+  });
+}
+
+export async function getBulkDemandPlanning(): Promise<PaginatedResponse<DemandPlanningRow>> {
+  return apiFetch<PaginatedResponse<DemandPlanningRow>>("/admin/inventory/demand-planning/", {
+    method: "GET",
+  });
+}
+
+// Stock adjustments
+export async function listStockAdjustments(
+  page?: number
+): Promise<PaginatedResponse<StockAdjustment>> {
+  const params = new URLSearchParams();
+  if (page) params.append("page", String(page));
+  const url = params.toString() ? `/admin/inventory/adjustments/?${params}` : "/admin/inventory/adjustments/";
+  return apiFetch<PaginatedResponse<StockAdjustment>>(url, { method: "GET" });
+}
+
+export async function createStockAdjustment(payload: StockAdjustmentsPayload): Promise<StockAdjustment> {
+  return apiFetch<StockAdjustment>("/admin/inventory/adjustments/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function approveStockAdjustment(id: number): Promise<StockAdjustment> {
+  return apiFetch<StockAdjustment>(`/admin/inventory/adjustments/${id}/approve/`, {
+    method: "POST",
+  });
+}
+
+export async function postStockAdjustment(id: number): Promise<StockAdjustment> {
+  return apiFetch<StockAdjustment>(`/admin/inventory/adjustments/${id}/post/`, {
+    method: "POST",
+  });
+}
+
+export async function setStockAdjustmentLineCosts(id: number, lineId: number): Promise<void> {
+  return apiFetch<void>(`/admin/inventory/adjustments/${id}/lines/${lineId}/set-cost/`, {
+    method: "POST",
+  });
+}
+
+// Search
+export async function searchInventoryItems(
+  q: string
+): Promise<PaginatedResponse<InventoryItem>> {
+  return apiFetch<PaginatedResponse<InventoryItem>>(
+    `/admin/inventory/items/?q=${encodeURIComponent(q)}`,
+    { method: "GET" }
+  );
+}
+
+// Finished goods
+export async function fetchFGProfile(id: number): Promise<FGProfileDetail> {
+  return apiFetch<FGProfileDetail>(`/admin/inventory/finished-goods/${id}/`, {
+    method: "GET",
+  });
+}
+
+export async function addFGAccessoryLink(
+  fgId: number,
+  accessoryId: number
+): Promise<FGAccessoryLink> {
+  return apiFetch<FGAccessoryLink>(`/admin/inventory/finished-goods/${fgId}/accessories/`, {
+    method: "POST",
+    body: JSON.stringify({ accessory_id: accessoryId }),
+  });
+}
+
+export async function updateFGAccessoryLink(
+  fgId: number,
+  linkId: number,
+  data: unknown
+): Promise<FGAccessoryLink> {
+  return apiFetch<FGAccessoryLink>(
+    `/admin/inventory/finished-goods/${fgId}/accessories/${linkId}/`,
     {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     }
   );
 }
 
-// Add variant-group link to a finished good
-export function addFGAccessoryGroupLink(fgId: number, data: { variant_group: number; charge_mode?: string; sale_price?: string; is_default_included?: boolean; sort_order?: number; notes?: string }) {
-  return apiFetch<{ id: number; finished_good: number; variant_group: number; variant_group_name: string; charge_mode: string; sale_price: string; is_default_included: boolean }>(
-    `/admin/inventory/finished-goods/${fgId}/accessory-group-links/`,
+export async function deleteFGAccessoryLink(fgId: number, linkId: number): Promise<void> {
+  return apiFetch<void>(`/admin/inventory/finished-goods/${fgId}/accessories/${linkId}/`, {
+    method: "DELETE",
+  });
+}
+
+export async function addFGAccessoryGroupLink(
+  fgId: number,
+  groupId: number
+): Promise<FGAccessoryLink> {
+  return apiFetch<FGAccessoryLink>(
+    `/admin/inventory/finished-goods/${fgId}/accessory-groups/`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ group_id: groupId }),
+    }
+  );
+}
+
+export async function addFGServiceLink(fgId: number, serviceId: number): Promise<FGServiceLink> {
+  return apiFetch<FGServiceLink>(`/admin/inventory/finished-goods/${fgId}/services/`, {
+    method: "POST",
+    body: JSON.stringify({ service_id: serviceId }),
+  });
+}
+
+export async function updateFGServiceLink(
+  fgId: number,
+  linkId: number,
+  data: unknown
+): Promise<FGServiceLink> {
+  return apiFetch<FGServiceLink>(
+    `/admin/inventory/finished-goods/${fgId}/services/${linkId}/`,
+    {
+      method: "PATCH",
       body: JSON.stringify(data),
     }
   );
+}
+
+export async function deleteFGServiceLink(fgId: number, linkId: number): Promise<void> {
+  return apiFetch<void>(`/admin/inventory/finished-goods/${fgId}/services/${linkId}/`, {
+    method: "DELETE",
+  });
+}
+
+// Service catalog
+export async function createServiceCatalogItem(payload: unknown): Promise<ServiceCatalogItem> {
+  return apiFetch<ServiceCatalogItem>("/admin/inventory/service-catalog/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+// Accessory variant groups
+export async function createAccessoryVariantGroup(
+  payload: unknown
+): Promise<AccessoryVariantGroup> {
+  return apiFetch<AccessoryVariantGroup>("/admin/inventory/accessory-variant-groups/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateAccessoryVariantGroup(
+  id: number,
+  payload: unknown
+): Promise<AccessoryVariantGroup> {
+  return apiFetch<AccessoryVariantGroup>(
+    `/admin/inventory/accessory-variant-groups/${id}/`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function deleteAccessoryVariantGroup(id: number): Promise<void> {
+  return apiFetch<void>(`/admin/inventory/accessory-variant-groups/${id}/`, {
+    method: "DELETE",
+  });
 }

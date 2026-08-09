@@ -1,43 +1,12 @@
+"use client";
+
 import Link from "next/link";
 import { ArrowRight, BadgeCheck, ClipboardCheck, PackageCheck, ReceiptText, ShieldCheck, type LucideIcon } from "lucide-react";
 
 import { formatCurrency } from "@/lib/format";
 import { ROUTES } from "@/lib/routes";
 import type { PublicProduct } from "@/services/public";
-
-export type ProductPlanInterest = "NOT_SURE" | "LUCKY_PLAN" | "RENT" | "LEASE" | "DIRECT_SALE";
-
-const planOptions: Array<{
-  value: ProductPlanInterest;
-  title: string;
-  description: string;
-  icon: LucideIcon;
-}> = [
-  {
-    value: "LUCKY_PLAN",
-    title: "Lucky Plan EMI",
-    description: "Ask about batch, Lucky ID, monthly EMI, and future-EMI-only winner benefit.",
-    icon: BadgeCheck,
-  },
-  {
-    value: "RENT",
-    title: "Rent enquiry",
-    description: "Ask about short-term usage, deposit, monthly dues, and return inspection.",
-    icon: PackageCheck,
-  },
-  {
-    value: "LEASE",
-    title: "Lease enquiry",
-    description: "Ask about longer tenure, deposit, renewal, upgrade, and handover checks.",
-    icon: ClipboardCheck,
-  },
-  {
-    value: "DIRECT_SALE",
-    title: "Direct sale",
-    description: "Ask about invoice, receipt, delivery, warranty, and ownership handover.",
-    icon: ReceiptText,
-  },
-];
+import { type ProductPlanInterest, buildProductEnquiryHref } from "./product-enquiry-utils";
 
 const safetyPoints = [
   "Catalogue enquiry does not reserve stock.",
@@ -46,23 +15,45 @@ const safetyPoints = [
   "Public page does not create payments, receipts, invoices, deposits, or accounting records.",
 ] as const;
 
-export function buildProductEnquiryHref(product: PublicProduct, planInterest: ProductPlanInterest = "NOT_SURE") {
-  const params = new URLSearchParams();
-  params.set("product", String(product.id));
-  params.set("product_name", product.name);
-  params.set("product_code", product.product_code);
-  params.set("price", product.base_price);
-  params.set("plan_interest", planInterest);
-  params.set("source", "product_detail");
-
-  return `${ROUTES.public.apply}?${params.toString()}`;
-}
-
 type ProductEnquiryHandoffPanelProps = {
   product: PublicProduct;
+  dict: any;
 };
 
-export default function ProductEnquiryHandoffPanel({ product }: ProductEnquiryHandoffPanelProps) {
+export default function ProductEnquiryHandoffPanel({ product, dict }: ProductEnquiryHandoffPanelProps) {
+
+  const planOptions: Array<{
+    value: ProductPlanInterest;
+    title: string;
+    description: string;
+    icon: LucideIcon;
+  }> = [
+    {
+      value: "LUCKY_PLAN",
+      title: (dict.public as any).ProductEnquiryHandoffPanel_prop1 || "Lucky Plan Advance EMI",
+      description: (dict.public as any).ProductEnquiryHandoffPanel_prop2 || "Enquire about Lucky ID enrollment, monthly draw transparent rules, and transparent contract.",
+      icon: BadgeCheck,
+    },
+    {
+      value: "RENT",
+      title: (dict.public as any).ProductEnquiryHandoffPanel_prop3 || "Short-Term Rent",
+      description: (dict.public as any).ProductEnquiryHandoffPanel_prop4 || "Enquire about rental availability, deposit terms, and monthly rent options without ownership.",
+      icon: PackageCheck,
+    },
+    {
+      value: "LEASE",
+      title: (dict.public as any).ProductEnquiryHandoffPanel_prop5 || "Long-Term Lease",
+      description: (dict.public as any).ProductEnquiryHandoffPanel_prop6 || "Enquire about longer fixed-term lease arrangements, checkpoints, and transition to ownership.",
+      icon: ClipboardCheck,
+    },
+    {
+      value: "DIRECT_SALE",
+      title: (dict.public as any).ProductEnquiryHandoffPanel_prop7 || "Direct Sale Quote",
+      description: (dict.public as any).ProductEnquiryHandoffPanel_prop8 || "Enquire about direct upfront payment quote, standard warranty, and immediate branch delivery.",
+      icon: ReceiptText,
+    },
+  ];
+
   return (
     <aside className="grid gap-5">
       <section className="public-card p-6 shadow-[0_26px_62px_-40px_rgba(15,23,42,0.22)] dark:shadow-none">
@@ -77,7 +68,7 @@ export default function ProductEnquiryHandoffPanel({ product }: ProductEnquiryHa
         </p>
 
         <div className="mt-6 flex flex-wrap gap-3">
-          <Link href={buildProductEnquiryHref(product)} className="public-action-primary h-12 justify-center gap-2 !min-h-0 px-6">
+          <Link href={buildProductEnquiryHref(product, "NOT_SURE", product.product_code, product.stock_status)} className="public-action-primary h-12 justify-center gap-2 !min-h-0 px-6">
             Enquire now
             <ArrowRight className="h-4 w-4" />
           </Link>
@@ -88,8 +79,8 @@ export default function ProductEnquiryHandoffPanel({ product }: ProductEnquiryHa
       </section>
 
       <section className="public-card p-6">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Choose enquiry path</div>
-        <h2 className="mt-2 text-xl font-semibold tracking-tight text-foreground">Carry this product into the right workflow</h2>
+        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{(dict.public as any).ProductEnquiryHandoffPanel_text13 || "Specific Plan Enquiry"}</div>
+        <h2 className="mt-2 text-xl font-semibold tracking-tight text-foreground">{(dict.public as any).ProductEnquiryHandoffPanel_text14 || "Select your intent"}</h2>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
           These buttons prefill the public enquiry form only. They do not approve, reserve, post, or generate any operational record.
         </p>
@@ -98,7 +89,7 @@ export default function ProductEnquiryHandoffPanel({ product }: ProductEnquiryHa
           {planOptions.map((option) => (
             <Link
               key={option.value}
-              href={buildProductEnquiryHref(product, option.value)}
+              href={buildProductEnquiryHref(product, option.value, product.product_code, product.stock_status)}
               className="public-card-sm public-card-animated flex items-start gap-3 px-4 py-3 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2"
             >
               <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--primary)_12%,var(--surface-card-elevated)_88%)] text-primary shadow-[inset_0_1px_0_var(--hairline-shine)]">

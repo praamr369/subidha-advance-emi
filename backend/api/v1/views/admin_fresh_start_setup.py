@@ -16,8 +16,8 @@ from inventory.models import StockLocation, StockLocationType
 from subscriptions.models import Batch, BatchStatus, LuckyId, LuckyIdStatus, Product
 from subscriptions.models_business_setup import BusinessProfile
 from subscriptions.services.business_compliance_governance_service import seed_business_compliance_rows
-from subscriptions.services.document_numbering_service import get_document_numbering_state, seed_default_document_numbering
-from subscriptions.services.document_print_settings_service import get_or_create_document_print_settings
+from contracts.services.document_numbering_service import get_document_numbering_state, seed_default_document_numbering
+from contracts.services.document_print_settings_service import get_or_create_document_print_settings
 from subscriptions.services.policy_coverage_catalog import INTERNAL, PUBLIC, get_policy_coverage_specs
 from subscriptions.services.policy_governance_service import (
     accept_internal_policy,

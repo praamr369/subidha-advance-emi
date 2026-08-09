@@ -1,3 +1,5 @@
+import { getPublicDictionary } from "@/lib/public-i18n";
+import { getPublicLocale } from "@/lib/public-i18n.server";
 import Link from "next/link";
 import { ArrowRight, ClipboardCheck, PackageCheck, ShieldCheck, Wallet } from "lucide-react";
 
@@ -13,42 +15,44 @@ type RentLeaseAnimatedHeroProps = {
   subtitle: string;
 };
 
-const modeCopy = {
-  rent: {
-    eyebrow: "Rent workflow",
-    primaryCalloutTitle: "Short-term access",
-    primaryCalloutText: "Usage without ownership",
-    secondaryCalloutTitle: "Deposit control",
-    secondaryCalloutText: "Refund subject to terms",
-  },
-  lease: {
-    eyebrow: "Lease workflow",
-    primaryCalloutTitle: "Longer tenure",
-    primaryCalloutText: "Contract-backed access",
-    secondaryCalloutTitle: "Return checks",
-    secondaryCalloutText: "Condition-based closure",
-  },
-} as const;
+export default async function RentLeaseAnimatedHero({ mode, title, subtitle }: RentLeaseAnimatedHeroProps) {
+  const locale = await getPublicLocale();
+  const dict = getPublicDictionary(locale);
+    const modeCopy = {
+      rent: {
+        eyebrow: dict.public.RentLeaseAnimatedHero_prop1,
+        primaryCalloutTitle: "Short-term access",
+        primaryCalloutText: "Usage without ownership",
+        secondaryCalloutTitle: "Deposit control",
+        secondaryCalloutText: "Refund subject to terms",
+      },
+      lease: {
+        eyebrow: dict.public.RentLeaseAnimatedHero_prop2,
+        primaryCalloutTitle: "Longer tenure",
+        primaryCalloutText: "Contract-backed access",
+        secondaryCalloutTitle: "Return checks",
+        secondaryCalloutText: "Condition-based closure",
+      },
+    } as const;
 
-const proofPoints = [
-  {
-    icon: PackageCheck,
-    title: "No Lucky ID",
-    description: "Rent and lease do not use Lucky IDs or draw-based winner benefits.",
-  },
-  {
-    icon: Wallet,
-    title: "Monthly invoice flow",
-    description: "Monthly dues stay separate from Lucky Plan EMI and payment posting rules.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Deposit is controlled",
-    description: "Security deposit treatment remains subject to inspection, refund, and policy checks.",
-  },
-] as const;
+    const proofPoints = [
+      {
+        icon: PackageCheck,
+        title: dict.public.RentLeaseAnimatedHero_prop3,
+        description: dict.public.RentLeaseAnimatedHero_prop4,
+      },
+      {
+        icon: Wallet,
+        title: dict.public.RentLeaseAnimatedHero_prop5,
+        description: dict.public.RentLeaseAnimatedHero_prop6,
+      },
+      {
+        icon: ShieldCheck,
+        title: dict.public.RentLeaseAnimatedHero_prop7,
+        description: dict.public.RentLeaseAnimatedHero_prop8,
+      },
+    ] as const;
 
-export default function RentLeaseAnimatedHero({ mode, title, subtitle }: RentLeaseAnimatedHeroProps) {
   const copy = modeCopy[mode];
 
   return (
@@ -69,7 +73,7 @@ export default function RentLeaseAnimatedHero({ mode, title, subtitle }: RentLea
               {subtitle}
             </p>
             <div className="public-card-sm max-w-3xl px-4 py-3 text-sm leading-6 text-muted-foreground">
-              <strong className="font-semibold text-foreground">Important:</strong> This page explains public rent/lease terms. Actual monthly collections, deposits, refunds, inspections, contracts, and ledger posture remain controlled inside the production workflow.
+              <strong className="font-semibold text-foreground">{dict.public.RentLeaseAnimatedHero_text9}</strong> This page explains public rent/lease terms. Actual monthly collections, deposits, refunds, inspections, contracts, and ledger posture remain controlled inside the production workflow.
             </div>
           </div>
 
@@ -91,7 +95,7 @@ export default function RentLeaseAnimatedHero({ mode, title, subtitle }: RentLea
           <div className="relative w-full overflow-hidden rounded-[1.6rem] shadow-[0_24px_54px_-24px_rgba(15,23,42,0.6)]">
             <Image
               src="/images/banner_rent.jpg"
-              alt="Rent and Lease"
+              alt={dict.public.RentLeaseAnimatedHero_attr14}
               width={800}
               height={533}
               priority

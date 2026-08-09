@@ -292,7 +292,7 @@ def get_unified_payables(payable_type=None, search=None, status_category=None, p
     # 6. Customer Deposit & Credit Refunds
     if (not payable_type or payable_type in ("credit_refund", "deposit_refund")) and _party_ok("CUSTOMER"):
         if status_category in ["READY_TO_PAY", "ALL", None]:
-            from subscriptions.services.rent_lease_billing_service import list_admin_deposit_register
+            from contracts.services.rent_lease_billing_service import list_admin_deposit_register
             dep_data = list_admin_deposit_register(limit=500)
             for row in dep_data.get("results", []):
                 if row.get("can_record_refund") or row.get("can_approve_refund"):
@@ -474,7 +474,7 @@ def execute_unified_payable(payload, executed_by, idempotency_key=None, fingerpr
                 settlement_date=payment_date,
                 amount=amount,
                 status=VendorSettlementStatus.DRAFT,
-                finance_account_id_id=finance_account_id,
+                finance_account_id=finance_account_id,
                 reference_no=reference_no,
                 notes=notes
             )
@@ -488,7 +488,7 @@ def execute_unified_payable(payload, executed_by, idempotency_key=None, fingerpr
             if settlement.status == VendorSettlementStatus.POSTED:
                 raise ValueError("Vendor settlement is already paid.")
             if finance_account_id:
-                settlement.finance_account_id_id = finance_account_id
+                settlement.finance_account_id = finance_account_id
             settlement.reference_no = reference_no
             settlement.notes = notes
             settlement.save(update_fields=["finance_account_id", "reference_no", "notes"])
@@ -501,8 +501,12 @@ def execute_unified_payable(payload, executed_by, idempotency_key=None, fingerpr
                 raise ValueError("Commission batch is already paid.")
             batch.status = CommissionPayoutBatch.Status.PAID
             if finance_account_id:
-                batch.finance_account_id_id = finance_account_id
+                batch.finance_account_id = finance_account_id
             batch.save(update_fields=["status", "finance_account_id"])
+            
+            if finance_account_id:
+                from accounting.services.bridge_run_service import _post_payout_batch_bridge
+                _post_payout_batch_bridge(payout_batch=batch, performed_by=executed_by)
 
         elif payable_type == "commission":
             from subscriptions.models import Commission, CommissionStatus, CommissionPayoutBatch, CommissionPayoutLine
@@ -516,7 +520,7 @@ def execute_unified_payable(payload, executed_by, idempotency_key=None, fingerpr
                 payout_date=payment_date,
                 total_amount=amount,
                 status=CommissionPayoutBatch.Status.PAID,
-                finance_account_id_id=finance_account_id,
+                finance_account_id=finance_account_id,
                 processed_by=executed_by,
                 notes=notes or "Auto-generated batch for direct commission payment"
             )
@@ -528,6 +532,10 @@ def execute_unified_payable(payload, executed_by, idempotency_key=None, fingerpr
             )
             commission.status = CommissionStatus.SETTLED
             commission.save(update_fields=["status"])
+            
+            if finance_account_id:
+                from accounting.services.bridge_run_service import _post_payout_batch_bridge
+                _post_payout_batch_bridge(payout_batch=batch, performed_by=executed_by)
 
         elif payable_type == "expense_claim":
             from accounting.services.workforce_service import post_employee_expense_claim, post_employee_expense_claim_payment
@@ -547,7 +555,7 @@ def execute_unified_payable(payload, executed_by, idempotency_key=None, fingerpr
 
         elif payable_type in ("credit_refund", "deposit_refund"):
             from subscriptions.models import Subscription
-            from subscriptions.services.rent_lease_billing_service import record_deposit_refund
+            from contracts.services.rent_lease_billing_service import record_deposit_refund
             sub = Subscription.objects.get(id=payable_id)
             demand = record_deposit_refund(
                 subscription=sub,

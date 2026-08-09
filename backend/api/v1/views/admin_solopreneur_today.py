@@ -137,7 +137,7 @@ def build_solopreneur_today_payload() -> dict:
 
     # 3c. Deliveries pending dispatch
     from subscriptions.models import DeliveryStatus
-    from subscriptions.services.delivery_service import get_delivery_queryset
+    from deliveries.services.delivery_service import get_delivery_queryset
 
     deliveries_pending = (
         get_delivery_queryset()

@@ -12,7 +12,7 @@ from rest_framework.views import APIView
 
 from api.v1.permissions import IsPartner
 from subscriptions.models import Commission, CommissionStatus, MONEY_ZERO
-from subscriptions.services.commission_statement_service import (
+from commissions.services.commission_statement_service import (
     CommissionStatementFilters,
     build_commission_statement_payload,
     render_commission_statement_csv,

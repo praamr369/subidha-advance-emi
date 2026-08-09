@@ -16,15 +16,15 @@ from subscriptions.models_rent_lease_collection import (
     RentLeaseCollection,
     RentLeaseCollectionStatus,
 )
-from subscriptions.services.rent_lease_billing_service import (
+from contracts.services.rent_lease_billing_service import (
     collect_security_deposit,
     generate_monthly_demands_for_subscription,
     record_deposit_refund,
 )
-from subscriptions.services.rent_lease_collection_workflow_service import (
+from contracts.services.rent_lease_collection_workflow_service import (
     collect_rent_lease_monthly_demand,
 )
-from subscriptions.services.rent_lease_contract_service import (
+from contracts.services.rent_lease_contract_service import (
     create_lease_contract,
     create_rent_contract,
 )

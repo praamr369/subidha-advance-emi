@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { buildPublicMetadata } from "@/lib/public-seo";
 
+import ApplyEnquiryHero from "@/components/public/ApplyEnquiryHero";
 import ApplyPageClient from "./ApplyPageClient";
 
 export const metadata: Metadata = buildPublicMetadata({
@@ -12,5 +13,5 @@ export const metadata: Metadata = buildPublicMetadata({
 });
 
 export default function ApplyPage() {
-  return <ApplyPageClient />;
+  return <ApplyPageClient heroSlot={<ApplyEnquiryHero />} />;
 }

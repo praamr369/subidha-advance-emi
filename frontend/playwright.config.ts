@@ -75,7 +75,22 @@ export default defineConfig({
     {
       name: "chromium-smoke",
       dependencies: ["setup"],
-      testIgnore: [/.*\.setup\.ts/, /.*real-login-smoke\.spec\.ts/],
+      testIgnore: [
+        /.*\.setup\.ts/,
+        /.*real-login-smoke\.spec\.ts/,
+        /.*route_load_smoke\.spec\.ts/,
+      ],
+      use: {
+        ...devices["Desktop Chrome"],
+      },
+    },
+    {
+      // Layer-A.4 whole-surface route-load sweep. Heavy (hundreds of pages), so
+      // it is its own project — run via `npm run test:e2e:route-smoke`, not part
+      // of the default smoke run.
+      name: "chromium-route-smoke",
+      dependencies: ["setup"],
+      testMatch: /.*route_load_smoke\.spec\.ts/,
       use: {
         ...devices["Desktop Chrome"],
       },

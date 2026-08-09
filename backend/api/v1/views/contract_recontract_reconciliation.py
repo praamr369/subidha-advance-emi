@@ -5,7 +5,7 @@ from rest_framework.views import APIView
 
 from api.v1.permissions import IsAdmin
 from subscriptions.models import ContractAmendment, ContractRecontractEvent
-from subscriptions.services.product_recontract_reconciliation_service import execute_product_recontract_reconciliation
+from contracts.services.product_recontract_reconciliation_service import execute_product_recontract_reconciliation
 
 
 def _validation_response(exc: DjangoValidationError) -> Response:

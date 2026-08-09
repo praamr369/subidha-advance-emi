@@ -20,7 +20,7 @@ from tests.helpers import (
 
 class DocumentEngineServiceTests(TestCase):
     def test_receipt_document_meta_contract_is_stable(self):
-        from subscriptions.services.document_engine_service import (
+        from contracts.services.document_engine_service import (
             receipt_to_document_meta,
             resolve_document_source,
         )
@@ -65,7 +65,7 @@ class DocumentEngineServiceTests(TestCase):
         self.assertEqual(resolved.id, receipt.id)
 
     def test_subscription_document_meta_contract_is_stable(self):
-        from subscriptions.services.document_engine_service import subscription_document_to_document_meta
+        from contracts.services.document_engine_service import subscription_document_to_document_meta
 
         admin = create_admin_user(username="doc_admin2", phone="9000000094")
         customer = create_customer_profile(name="Doc Customer 2", phone="9000000095")
@@ -93,7 +93,7 @@ class DocumentEngineServiceTests(TestCase):
 
         meta = subscription_document_to_document_meta(doc=doc).to_dict()
         self.assertEqual(meta["document_type"], SubscriptionDocumentType.ADVANCE_EMI_CONTRACT_PDF)
-        self.assertEqual(meta["source_model"], "subscriptions.SubscriptionDocument")
+        self.assertEqual(meta["source_model"], "contracts.SubscriptionDocument")
         self.assertEqual(meta["source_object_id"], doc.id)
         self.assertEqual(meta["customer_id"], customer.id)
         self.assertEqual(meta["generated_by_user_id"], admin.id)
@@ -101,7 +101,7 @@ class DocumentEngineServiceTests(TestCase):
         self.assertEqual(meta["metadata"]["subscription_id"], subscription.id)
 
     def test_permission_helpers_do_not_leak_across_roles(self):
-        from subscriptions.services.document_engine_service import (
+        from contracts.services.document_engine_service import (
             user_can_view_receipt,
             user_can_view_subscription_document,
         )

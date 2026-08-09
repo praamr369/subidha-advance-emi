@@ -15,15 +15,15 @@ from api.v1.serializers.contract_references import (
 )
 from subscriptions.models import BusinessEventType, ContractReference
 from subscriptions.services.business_event_service import append_business_event
-from subscriptions.services.contract_reference_service import (
+from contracts.services.contract_reference_service import (
     collect_unified_receivable,
     search_contract_references,
 )
-from subscriptions.services.rent_lease_collection_workflow_service import (
+from contracts.services.rent_lease_collection_workflow_service import (
     preview_unified_receivable_allocation,
     search_receivables,
 )
-from subscriptions.services.rent_lease_contract_reference_adapter import (
+from contracts.services.rent_lease_contract_reference_adapter import (
     resolve_contract_reference_row,
 )
 
@@ -183,7 +183,7 @@ class UnifiedReceivableWorkbenchView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsCashierOrAdmin]
 
     def get(self, request, *args, **kwargs):
-        from subscriptions.services.receivable_workbench_service import build_receivable_workbench
+        from payments.services.receivable_workbench_service import build_receivable_workbench
 
         source_type = (request.query_params.get("source_type") or "").strip().upper()
         try:

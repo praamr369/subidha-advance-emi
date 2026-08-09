@@ -1,14 +1,8 @@
-import {
-  type AsyncRouteSearchParams,
-  redirectToCanonicalPath,
-} from "@/lib/route-redirect";
+import { redirect } from "next/navigation";
 
-type PageProps = {
-  searchParams?: AsyncRouteSearchParams;
-};
+import { ROUTES } from "@/lib/routes";
 
-export default async function AdminFinanceCommisionsPage({
-  searchParams,
-}: PageProps) {
-  await redirectToCanonicalPath("/admin/finance/commissions", searchParams);
+// Compatibility route (legacy misspelling): canonical is /admin/finance/commissions.
+export default function AdminFinanceCommisionsRedirect() {
+  redirect(ROUTES.admin.financeCommissions);
 }

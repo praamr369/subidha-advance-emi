@@ -96,7 +96,7 @@ class CustomerQuickCreateSerializer(serializers.Serializer):
     )
 
     def validate_phone(self, value):
-        from subscriptions.services.customer_service import normalize_phone
+        from customers.services.customer_service import normalize_phone
         try:
             return normalize_phone(value)
         except ValueError as exc:

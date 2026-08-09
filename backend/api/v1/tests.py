@@ -32,7 +32,7 @@ from subscriptions.models import (
     SubscriptionDocument,
     SubscriptionStatus,
 )
-from subscriptions.services.contract_reference_service import (
+from contracts.services.contract_reference_service import (
     ensure_contract_reference_for_direct_sale,
     ensure_contract_reference_for_subscription,
 )

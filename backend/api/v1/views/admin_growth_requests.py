@@ -13,7 +13,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.v1.permissions import IsAdmin
-from subscriptions.services.growth_request_service import (
+from crm.services.growth_request_service import (
     approve_growth_request,
     build_growth_request_preview,
     create_growth_request,

@@ -1,4 +1,4 @@
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 
 from django.db.models import Q, Sum
 from django.utils import timezone
@@ -20,29 +20,8 @@ from billing.models import DirectSale
 from core.services.operational_visibility import invoice_active_q
 from billing.services.direct_sale_collection_service import collect_direct_sale_payment
 from branch_control.services.branch_service import scope_queryset_to_user_branches
-from subscriptions.services.customer_advance_service import CustomerAdvanceService
-from subscriptions.services.payment_collection_service import PaymentCollectionService
-
-
-def _parse_amount(value) -> Decimal:
-    try:
-        amount = Decimal(str(value))
-    except (InvalidOperation, TypeError, ValueError):
-        raise ValueError("Invalid payment amount.")
-
-    if amount <= 0:
-        raise ValueError("Payment amount must be greater than zero.")
-
-    return amount
-
-
-def _parse_optional_int(value, *, field_name: str):
-    if value in (None, ""):
-        return None
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        raise ValueError(f"{field_name} must be a valid integer.")
+from payments.services.customer_advance_service import CustomerAdvanceService
+from payments.services.payment_collection_service import PaymentCollectionService
 
 
 def _value_error_payload(exc: ValueError):
@@ -266,6 +245,7 @@ class CashierCollectPayment(APIView):
 class CashierCollectAdvance(APIView):
     permission_classes = [permissions.IsAuthenticated, IsCashierOrAdmin]
 
+    @require_capability("billing.collect")
     def post(self, request, *args, **kwargs):
         serializer = CashierAdvanceCollectionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

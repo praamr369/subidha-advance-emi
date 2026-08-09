@@ -20,7 +20,7 @@ from subscriptions.models import (
     CustomerKycDocument,
     KycStatus,
 )
-from subscriptions.services.kyc_workflow_service import (
+from customers.services.kyc_workflow_service import (
     admin_approve_customer_kyc_document,
 )
 

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
+import { useI18n } from "@/components/i18n/I18nProvider";
 import { AuthLayoutShell } from "@/components/auth";
 import ActionButton from "@/components/ui/ActionButton";
 import { APP_NAME } from "@/lib/constants";
@@ -57,6 +58,7 @@ export default function LoginPage() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { login, isAuthenticated, role } = useAuth();
+  const { t } = useI18n();
 
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -142,18 +144,18 @@ export default function LoginPage() {
 
   return (
     <AuthLayoutShell
-      formTitle="Welcome back"
-      formSubtitle="Sign in to access the Subidha Furniture operations workspace."
-      panelTitle="Run daily Lucky Plan Advance EMI operations with confidence"
-      panelDescription="Sign in with your authorized account to access role-safe collections, CRM, and customer operations."
+      formTitle={t("auth.login.formTitle")}
+      formSubtitle={t("auth.login.formSubtitle")}
+      panelTitle={t("auth.login.panelTitle")}
+      panelDescription={t("auth.login.panelDescription")}
     >
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="space-y-2">
-          <label htmlFor="identifier" className="text-sm font-medium text-slate-800">
-            Username, email, or phone
+          <label htmlFor="identifier" className="text-sm font-medium text-foreground">
+            {t("auth.login.identifierLabel")}
           </label>
           <div className="relative">
-            <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+            <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
               id="identifier"
               name="identifier"
@@ -161,8 +163,8 @@ export default function LoginPage() {
               autoComplete="username"
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
-              placeholder="Enter your username, email, or phone"
-              className="h-12 w-full rounded-xl border border-slate-300 bg-white pl-10 pr-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus-visible:border-slate-500 focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
+              placeholder={t("auth.login.identifierPlaceholder")}
+              className="h-12 w-full rounded-xl border border-border bg-card pl-10 pr-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-[var(--ring)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
               required
               disabled={submitting}
             />
@@ -171,18 +173,18 @@ export default function LoginPage() {
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <label htmlFor="password" className="text-sm font-medium text-slate-800">
-              Password
+            <label htmlFor="password" className="text-sm font-medium text-foreground">
+              {t("auth.login.passwordLabel")}
             </label>
             <Link
               href="/forgot-password"
-              className="text-xs font-medium text-slate-600 transition hover:text-slate-900"
+              className="text-xs font-medium text-muted-foreground transition hover:text-foreground"
             >
-              Forgot password?
+              {t("auth.login.forgotPassword")}
             </Link>
           </div>
           <div className="relative">
-            <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+            <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
               id="password"
               name="password"
@@ -190,15 +192,15 @@ export default function LoginPage() {
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              className="h-12 w-full rounded-xl border border-slate-300 bg-white pl-10 pr-11 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus-visible:border-slate-500 focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
+              placeholder={t("auth.login.passwordPlaceholder")}
+              className="h-12 w-full rounded-xl border border-border bg-card pl-10 pr-11 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-[var(--ring)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
               required
               disabled={submitting}
             />
             <button
               type="button"
               onClick={() => setShowPassword((prev) => !prev)}
-              className="absolute right-3 top-1/2 inline-flex -translate-y-1/2 items-center justify-center rounded-md text-slate-500 transition hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/40 focus-visible:ring-offset-2"
+              className="absolute right-3 top-1/2 inline-flex -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/40 focus-visible:ring-offset-2"
               aria-label={showPassword ? "Hide password" : "Show password"}
               disabled={submitting}
             >
@@ -218,10 +220,10 @@ export default function LoginPage() {
             type="checkbox"
             checked={rememberMe}
             onChange={(e) => setRememberMe(e.target.checked)}
-            className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary/20"
+            className="h-4 w-4 rounded border-border text-primary focus:ring-primary/20"
           />
-          <label htmlFor="remember-me" className="text-sm text-slate-600">
-            Keep me signed in
+          <label htmlFor="remember-me" className="text-sm text-muted-foreground">
+            {t("auth.login.keepSignedIn")}
           </label>
         </div>
 
@@ -231,42 +233,40 @@ export default function LoginPage() {
           </div>
         ) : null}
 
-        <ActionButton
+        <button
           type="submit"
           disabled={submitting}
-          variant="primary"
-          size="lg"
-          fullWidth
-          rightIcon={!submitting ? <ArrowRight className="h-4 w-4" /> : null}
+          className="public-action-primary h-12 w-full justify-center disabled:opacity-50"
         >
-          {submitting ? "Authenticating..." : "Sign in"}
-        </ActionButton>
+          {submitting ? t("auth.login.authenticating") : t("auth.login.signIn")}
+          {!submitting && <ArrowRight className="h-4 w-4 ml-2" />}
+        </button>
 
-        <div className="workspace-filter-bar space-y-3 p-4">
+        <div className="rounded-2xl border border-border bg-card space-y-3 p-4">
           <div className="flex items-start gap-3">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-border bg-[var(--surface-card-elevated)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-border bg-card text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]">
               <ShieldCheck className="h-4 w-4" />
             </span>
             <div className="min-w-0">
-              <div className="text-sm font-semibold text-foreground">Authorized access only</div>
+              <div className="text-sm font-semibold text-foreground">{t("auth.login.authorizedOnly")}</div>
               <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                Internal staff and approved role accounts use this form. Public customer self-registration remains separate.
+                {t("auth.login.authorizedDescription")}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
             <BadgeCheck className="h-3.5 w-3.5" />
-            Login routing stays aligned to the existing role redirect contract.
+            {t("auth.login.loginRouting")}
           </div>
         </div>
 
-        <div className="text-center text-sm text-slate-600">
-          Don&apos;t have an account?{" "}
+        <div className="text-center text-sm text-muted-foreground">
+          {t("auth.login.noAccount")}{" "}
           <Link
             href={ROUTES.public.register}
-            className="rounded font-semibold text-slate-900 transition hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/40 focus-visible:ring-offset-2"
+            className="rounded font-semibold text-foreground transition hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/40 focus-visible:ring-offset-2"
           >
-            Create a customer account
+            {t("auth.login.createAccount")}
           </Link>
         </div>
       </form>

@@ -6,11 +6,11 @@ from django.utils import timezone
 
 from subscriptions.models import PlanType
 from subscriptions.models_business_setup import BusinessProfile
-from subscriptions.services.contract_pdf_service import (
+from contracts.services.contract_pdf_service import (
     generate_contract_pdf_for_subscription,
 )
 from subscriptions.services.pdf_branding_service import get_branding_context
-from subscriptions.services.rent_lease_contract_service import create_rent_contract
+from contracts.services.rent_lease_contract_service import create_rent_contract
 from tests.helpers import create_admin_user, create_customer_profile, create_product
 
 

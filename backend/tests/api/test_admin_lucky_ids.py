@@ -6,11 +6,11 @@ from django.core.management import call_command
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from subscriptions.services.lucky_draw_service import (
+from lucky_plan.services.lucky_draw_service import (
     create_lucky_draw_commit,
     reveal_and_execute_draw,
 )
-from subscriptions.services.operational_cancellation_service import cancel_subscription
+from contracts.services.operational_cancellation_service import cancel_subscription
 from tests.helpers import (
     create_admin_user,
     create_batch,

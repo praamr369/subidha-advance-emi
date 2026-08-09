@@ -29,12 +29,12 @@ from subscriptions.models import (
     Subscription,
     SubscriptionStatus,
 )
-from subscriptions.services.lucky_draw_service import create_lucky_draw_commit
-from subscriptions.services.contract_reference_service import (
+from lucky_plan.services.lucky_draw_service import create_lucky_draw_commit
+from contracts.services.contract_reference_service import (
     ensure_contract_reference_for_subscription,
     search_receivables,
 )
-from subscriptions.services.payment_service import record_emi_payment
+from payments.services.payment_service import record_emi_payment
 from tests.helpers import (
     ensure_default_payment_collection_accounts,
     ensure_test_accounting_posting_prerequisites,

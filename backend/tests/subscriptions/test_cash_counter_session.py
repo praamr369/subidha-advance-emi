@@ -52,7 +52,7 @@ from subscriptions.models_control_foundation import (
     ExceptionSeverity,
     ExceptionStatus,
 )
-from subscriptions.services.control_cash_counter_service import (
+from payments.services.control_cash_counter_service import (
     approve_cash_variance,
     close_cash_counter_session,
     open_cash_counter_session,

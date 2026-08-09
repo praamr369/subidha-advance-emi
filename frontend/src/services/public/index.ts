@@ -5,7 +5,12 @@ export type PublicStats = {
   total_batches: number;
   total_subscriptions: number;
   active_subscriptions: number;
+  active_rent_subscriptions: number;
+  active_lease_subscriptions: number;
   total_winners: number;
+  batch_total_capacity: number;
+  batch_available_seats: number;
+  batch_reserved_seats: number;
 };
 
 export type PublicWinner = {
@@ -124,9 +129,22 @@ export type PublicProduct = {
   category_slug?: string | null;
   subcategory?: string | null;
   image?: string | null;
+  video?: string | null;
   /** Optional extra gallery URLs when the API provides them (deduped with `image` on the client). */
   gallery_images?: string[] | null;
   description?: string | null;
+  pim_description?: string | null;
+  stock_status?: "IN_STOCK" | "MAKE_TO_ORDER";
+  pim_attributes?: Array<{ name: string; value: string }>;
+  pim_variants?: Array<{
+    id: number;
+    sku: string;
+    price: string;
+    attributes: Record<string, string>;
+    is_low_stock: boolean;
+    stock_status?: "IN_STOCK" | "MAKE_TO_ORDER";
+    image?: string | null;
+  }>;
 };
 
 export type PublicBusinessProfile = {
@@ -204,9 +222,20 @@ type PublicBusinessProfileResponse = {
   profile: PublicBusinessProfile | null;
 };
 
+export type PublicProductCategory = {
+  id: number;
+  name: string;
+  slug: string;
+  icon: string | null;
+  image: string | null;
+  display_order: number;
+};
+
 type PublicProductsResponse = {
-  count?: number;
-  results?: PublicProduct[];
+  count: number;
+  next?: string | null;
+  previous?: string | null;
+  results: PublicProduct[];
 };
 
 type FetchPublicOptions = RequestInit & {
@@ -412,12 +441,41 @@ export async function getPublicWinners(
   };
 }
 
-export async function listPublicProducts(): Promise<{
+export async function listPublicProductCategories(): Promise<PublicProductCategory[]> {
+  const payload = await fetchPublic<{ results: PublicProductCategory[] }>(
+    "/public/product-categories/",
+    { cache: "no-store" },
+    "Unable to load categories right now."
+  );
+  return payload.results || [];
+}
+
+export async function listPublicProducts(options?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  category?: string;
+  subcategory?: string;
+  min_price?: number;
+  max_price?: number;
+}): Promise<{
   products: PublicProduct[];
   count: number;
+  next?: string | null;
+  previous?: string | null;
 }> {
+  const params = new URLSearchParams();
+  if (options?.page) params.set("page", String(options.page));
+  if (options?.limit) params.set("page_size", String(options.limit));
+  if (options?.search) params.set("search", options.search);
+  if (options?.category) params.set("category", options.category);
+  if (options?.subcategory) params.set("subcategory", options.subcategory);
+  if (options?.min_price) params.set("min_price", String(options.min_price));
+  if (options?.max_price) params.set("max_price", String(options.max_price));
+
+  const qs = params.toString() ? `?${params.toString()}` : "";
   const payload = await fetchPublic<PublicProductsResponse>(
-    "/public/products/",
+    `/public/products/${qs}`,
     { cache: "no-store" },
     "Unable to load products right now."
   );
@@ -429,6 +487,8 @@ export async function listPublicProducts(): Promise<{
   return {
     products,
     count: typeof payload.count === "number" ? payload.count : products.length,
+    next: payload.next,
+    previous: payload.previous,
   };
 }
 

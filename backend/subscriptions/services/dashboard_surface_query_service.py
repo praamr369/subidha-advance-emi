@@ -23,7 +23,7 @@ from subscriptions.services.dashboard_scopes import (
 from subscriptions.services.subscription_financial_service import (
     build_customer_dashboard_summary,
 )
-from subscriptions.services.winner_state_service import (
+from lucky_plan.services.winner_state_service import (
     get_revealed_winning_draw,
     winner_history_q,
 )

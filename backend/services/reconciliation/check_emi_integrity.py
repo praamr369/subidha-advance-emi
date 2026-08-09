@@ -1,4 +1,4 @@
-from subscriptions.services.reconciliation_service import reconcile_emi_ledger
+from payments.services.reconciliation_service import reconcile_emi_ledger
 
 
 def check_emi_integrity(*, emi):

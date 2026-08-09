@@ -4,7 +4,7 @@ from decimal import Decimal
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from subscriptions.services.payment_service import record_emi_payment, reverse_payment_for_admin
+from payments.services.payment_service import record_emi_payment, reverse_payment_for_admin
 from tests.helpers import (
     create_admin_user,
     create_batch,

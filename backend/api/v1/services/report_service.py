@@ -12,7 +12,7 @@ from api.v1.selectors.subscription_selector import (
 )
 from api.v1.services.commission_service import get_commission_summary_for_partner
 from subscriptions.models import Commission, FinancialLedger, Payment, Subscription
-from subscriptions.services.winner_state_service import winner_history_q
+from lucky_plan.services.winner_state_service import winner_history_q
 
 
 def build_customer_subscription_report_for_user(user) -> List[Dict[str, str]]:

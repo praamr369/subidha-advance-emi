@@ -21,7 +21,7 @@ from accounting.services.setup_defaults_service import (
     MAIN_BANK_UPI_FINANCE_ACCOUNT_NAME,
     MAIN_CASH_FINANCE_ACCOUNT_NAME,
 )
-from subscriptions.services.rent_lease_posting_bridge_config_service import (
+from contracts.services.rent_lease_posting_bridge_config_service import (
     get_rent_lease_posting_bridge_state,
 )
 

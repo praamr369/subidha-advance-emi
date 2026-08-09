@@ -19,7 +19,7 @@ from api.v1.selectors.subscription_selector import (
     customer_has_emi_in_batch,
 )
 from subscriptions.models import PlanType, Subscription
-from subscriptions.services.subscription_service import create_emi_subscription
+from contracts.services.subscription_service import create_emi_subscription
 from tests.helpers import (
     create_batch,
     create_admin_user,

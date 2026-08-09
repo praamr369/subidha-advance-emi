@@ -1,4 +1,5 @@
 "use client";
+import { useI18n } from "@/components/i18n/I18nProvider";
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
@@ -18,10 +19,15 @@ type Chapter = {
   cta: string;
 };
 
+
+
+export default function CinematicStory() {
+  const { t } = useI18n();
+
 const CHAPTERS: Chapter[] = [
   {
-    eyebrow: "01 · The showroom",
-    title: "Furniture for real Asansol homes",
+    eyebrow: t('public.CinematicStory_prop1'),
+    title: t('public.CinematicStory_prop2'),
     body: "Beds, sofas, wardrobes, dining sets and mattresses — chosen for everyday family living. Visit the showroom to see current designs and availability.",
     icon: Home,
     asset: "/images/hero_living_room.jpg",
@@ -29,8 +35,8 @@ const CHAPTERS: Chapter[] = [
     cta: "Explore products",
   },
   {
-    eyebrow: "02 · The plan",
-    title: "Own it now, pay monthly",
+    eyebrow: t('public.CinematicStory_prop3'),
+    title: t('public.CinematicStory_prop4'),
     body: "Advance EMI lets eligible customers take furniture home and pay in monthly instalments, with clear tenure and receipted payments as per approved terms.",
     icon: Wallet,
     asset: "/images/banner_draw.jpg",
@@ -38,8 +44,8 @@ const CHAPTERS: Chapter[] = [
     cta: "Apply / Enquire",
   },
   {
-    eyebrow: "03 · The Lucky Plan",
-    title: "A transparent monthly benefit",
+    eyebrow: t('public.CinematicStory_prop5'),
+    title: t('public.CinematicStory_prop6'),
     body: "Lucky Plan EMI is a purchase plan where, if a customer wins as per the approved rulebook, future EMIs may be waived per the contract. No lottery, no guaranteed win.",
     icon: Sparkles,
     asset: "/images/banner_draw.jpg",
@@ -47,8 +53,8 @@ const CHAPTERS: Chapter[] = [
     cta: "View Lucky Plan",
   },
   {
-    eyebrow: "04 · Flexible ways",
-    title: "Rent and lease options too",
+    eyebrow: t('public.CinematicStory_prop7'),
+    title: t('public.CinematicStory_prop8'),
     body: "Prefer not to buy outright? Rent and lease options support monthly billing workflows for furniture, as per approved terms and availability.",
     icon: Boxes,
     asset: "/images/banner_rent.jpg",
@@ -56,8 +62,8 @@ const CHAPTERS: Chapter[] = [
     cta: "See options",
   },
   {
-    eyebrow: "05 · To your door",
-    title: "Delivery across Asansol",
+    eyebrow: t('public.CinematicStory_prop9'),
+    title: t('public.CinematicStory_prop10'),
     body: "We deliver in Asansol and nearby areas. Delivery availability and charges depend on the product and your location — confirm with us before ordering.",
     icon: Truck,
     asset: "/images/category_sofa.jpg",
@@ -66,7 +72,8 @@ const CHAPTERS: Chapter[] = [
   },
 ];
 
-export default function CinematicStory() {
+
+
   const sectionRef = useRef<HTMLElement>(null);
   const railRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);

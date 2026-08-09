@@ -17,8 +17,8 @@ COMMISSION_PAYOUT_SUPPLEMENTAL_EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
     BridgeEventSpec(
         event_key="commission_approval",
         label="Commission approval",
-        source_module="subscriptions",
-        source_app="subscriptions",
+        source_module="commissions",
+        source_app="commissions",  # Commission moved subscriptions -> commissions app in the split
         source_model="Commission",
         event_group="Commission",
         debit_requirements=("COMMISSION_EXPENSE",),
@@ -30,8 +30,8 @@ COMMISSION_PAYOUT_SUPPLEMENTAL_EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
     BridgeEventSpec(
         event_key="commission_payout",
         label="Commission payout",
-        source_module="subscriptions",
-        source_app="subscriptions",
+        source_module="commissions",
+        source_app="commissions",  # CommissionPayoutBatch moved subscriptions -> commissions app in the split
         source_model="CommissionPayoutBatch",
         event_group="Commission",
         debit_requirements=("COMMISSION_PAYABLE",),

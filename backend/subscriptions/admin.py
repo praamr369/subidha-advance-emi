@@ -1,5 +1,5 @@
 from django.contrib import messages
-from subscriptions.services.reconciliation_service import (
+from payments.services.reconciliation_service import (
     system_financial_health
 )
 
@@ -8,10 +8,10 @@ from django import forms
 from django.contrib.admin import AdminSite
 from django.core.exceptions import ValidationError
 from decimal import Decimal
-from subscriptions.services.lucky_draw_service import reveal_and_execute_draw
+from lucky_plan.services.lucky_draw_service import reveal_and_execute_draw
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
-from subscriptions.services.ledger_service import (
+from payments.services.ledger_service import (
     emi_ledger,
     subscription_summary,
 )
@@ -158,7 +158,7 @@ from django.utils.html import format_html
 from subscriptions.models import Subscription, LuckyId
 
 
-from subscriptions.services.ledger_service import (
+from payments.services.ledger_service import (
     emi_ledger,
     subscription_summary,
 )
@@ -344,7 +344,7 @@ class PaymentAdmin(admin.ModelAdmin):
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def receipt_no(self, obj):
-         from subscriptions.services.receipt_service import generate_receipt_no
+         from payments.services.receipt_service import generate_receipt_no
          return generate_receipt_no(obj)
 
          receipt_no.short_description = "Receipt No"    

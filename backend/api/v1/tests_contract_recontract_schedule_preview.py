@@ -26,7 +26,7 @@ from subscriptions.models import (
     Subscription,
     SubscriptionStatus,
 )
-from subscriptions.services.product_recontract_preview_service import (
+from contracts.services.product_recontract_preview_service import (
     create_product_recontract_preview_snapshot,
     record_product_recontract_admin_approval,
     record_product_recontract_customer_consent,

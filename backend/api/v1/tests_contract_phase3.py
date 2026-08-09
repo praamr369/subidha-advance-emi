@@ -66,31 +66,31 @@ from subscriptions.models import (
     SubscriptionDocumentType,
     SubscriptionStatus,
 )
-from subscriptions.services.contract_number_service import assign_subscription_number
-from subscriptions.services.contract_lifecycle_service import (
+from contracts.services.contract_number_service import assign_subscription_number
+from contracts.services.contract_lifecycle_service import (
     activate_contract,
     approve_contract,
     cancel_contract,
     close_contract,
 )
-from subscriptions.services.contract_amendment_service import (
+from contracts.services.contract_amendment_service import (
     apply_amendment,
     approve_amendment,
     create_amendment,
     reject_amendment,
 )
-from subscriptions.services.product_possession_service import (
+from deliveries.services.product_possession_service import (
     create_possession_record,
     initiate_return,
     record_handover,
 )
-from subscriptions.services.return_inspection_service import (
+from deliveries.services.return_inspection_service import (
     approve_inspection,
     create_return_inspection,
     record_inspection,
 )
-from subscriptions.services.subscription_service import create_emi_subscription as create_subscription
-from subscriptions.services.rent_lease_contract_service import (
+from contracts.services.subscription_service import create_emi_subscription as create_subscription
+from contracts.services.rent_lease_contract_service import (
     create_rent_contract,
     create_lease_contract,
 )
@@ -659,7 +659,7 @@ class DocumentVersioningTests(TestCase):
         )
         contract_no = sub.subscription_number
         # Verify contract number is immutable — assigning again returns same number
-        from subscriptions.services.contract_number_service import assign_subscription_number
+        from contracts.services.contract_number_service import assign_subscription_number
         assign_subscription_number(sub)
         sub.refresh_from_db()
         assert sub.subscription_number == contract_no

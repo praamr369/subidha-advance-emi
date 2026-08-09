@@ -16,7 +16,7 @@ from service_desk.services.case_service import (
     transition_service_desk_case_status,
 )
 from subscriptions.models import AuditLog, DeliveryStatus
-from subscriptions.services.delivery_service import (
+from deliveries.services.delivery_service import (
     create_subscription_delivery,
     mark_subscription_delivery_delivered,
     transition_subscription_delivery_status,

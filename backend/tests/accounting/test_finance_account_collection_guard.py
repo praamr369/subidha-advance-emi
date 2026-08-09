@@ -14,7 +14,7 @@ from accounting.models import (
 from billing.models import BillingInvoice
 from billing.services.billing_service import approve_billing_invoice, create_direct_sale, post_billing_invoice
 from billing.services.direct_sale_collection_service import collect_direct_sale_payment
-from subscriptions.services.payment_service import record_emi_payment
+from payments.services.payment_service import record_emi_payment
 from tests.helpers import (
     create_admin_user,
     create_batch,

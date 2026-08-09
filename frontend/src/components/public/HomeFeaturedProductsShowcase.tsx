@@ -33,7 +33,7 @@ export default function HomeFeaturedProductsShowcase({
   const withImages = featured.filter((product) => Boolean(product.image));
 
   const renderCard = (product: PublicProduct) => (
-    <article className="overflow-hidden rounded-[2rem] border border-border bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] shadow-[0_24px_60px_-46px_rgba(15,23,42,0.72)] contain-paint">
+    <article className="overflow-hidden rounded-[2rem] border border-border bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] dark:bg-[linear-gradient(180deg,rgba(30,41,59,0.5),rgba(15,23,42,0.8))] shadow-[0_24px_60px_-46px_rgba(15,23,42,0.72)] dark:shadow-none contain-paint">
       <div className="relative p-3">
         <AspectRatio ratio={4 / 3} className="w-full">
           <PublicProductMedia
@@ -53,13 +53,13 @@ export default function HomeFeaturedProductsShowcase({
         <div className="flex flex-wrap gap-2">
           <Link
             href={`${ROUTES.public.products}/${product.id}`}
-            className="inline-flex h-10 items-center rounded-xl border border-border bg-card px-4 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500/50 focus-visible:ring-offset-2"
+            className="public-action-secondary h-10 px-4 text-sm"
           >
             View
           </Link>
           <Link
             href={buildApplyHref(product)}
-            className="inline-flex h-10 items-center rounded-xl border border-foreground/15 bg-foreground px-4 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
+            className="public-action-primary h-10 px-4 text-sm"
           >
             Apply
           </Link>

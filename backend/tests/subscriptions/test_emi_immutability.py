@@ -15,7 +15,7 @@ from django.core.exceptions import ValidationError
 from django.test import TestCase
 
 from subscriptions.models import Emi, EmiStatus, FinancialLedger, LedgerDirection, LedgerEntryType
-from subscriptions.services.payment_service import _refresh_emi_status
+from payments.services.payment_service import _refresh_emi_status
 from tests.helpers import (
     create_admin_user,
     create_batch,

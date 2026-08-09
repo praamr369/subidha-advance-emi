@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useDebounce } from "@/hooks/useDebounce";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
@@ -16,8 +17,24 @@ import {
   accountingErrorMessage,
   AccountingPeriodFilters,
 } from "@/components/accounting/shared";
-import type { StockLedgerRow } from "@/services/inventory";
-import { listInventoryMovements } from "@/services/inventory";
+import type { StockLedgerRow, StockLedgerMovementsResponse, StockLocation } from "@/services/inventory";
+import { listInventoryMovements, listStockLocations } from "@/services/inventory";
+
+const MOVEMENT_TYPES = [
+  "OPENING_BALANCE_IN",
+  "PURCHASE_IN",
+  "SALE_OUT",
+  "EMI_DELIVERY_OUT",
+  "EMI_RETURN_IN",
+  "CUSTOMER_RETURN",
+  "SALE_RETURN_IN",
+  "PRODUCTION_ISSUE_OUT",
+  "PRODUCTION_RETURN_IN",
+  "PRODUCTION_RECEIPT_IN",
+  "PURCHASE_RETURN_OUT",
+  "ADJUSTMENT_IN",
+  "ADJUSTMENT_OUT",
+];
 
 function buildBillingMovementHref(row: StockLedgerRow): string | null {
   if (row.reference_model !== "BillingInvoiceLine") {
@@ -54,12 +71,46 @@ const columns: EnterpriseColumnDef<StockLedgerRow>[] = [
 ];
 
 export default function InventoryMovementsPage() {
-  const [rows, setRows] = useState<StockLedgerRow[]>([]);
+  const [response, setResponse] = useState<StockLedgerMovementsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [referenceSearch, setReferenceSearch] = useState("");
+  const [selectedMovementTypes, setSelectedMovementTypes] = useState<string[]>([]);
+  const [locationId, setLocationId] = useState<number | null>(null);
+  const [pageIndex, setPageIndex] = useState(1);
+  const [locations, setLocations] = useState<StockLocation[]>([]);
+  const [locationsLoading, setLocationsLoading] = useState(false);
 
+  const debouncedSearch = useDebounce(searchQuery, 350);
+  const debouncedReferenceSearch = useDebounce(referenceSearch, 350);
+
+  // Load locations on mount
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadLocations() {
+      setLocationsLoading(true);
+      try {
+        const result = await listStockLocations({ is_active: true });
+        if (cancelled) return;
+        setLocations(result.results || []);
+      } catch (err) {
+        if (!cancelled) console.error("Failed to load stock locations:", err);
+      } finally {
+        if (!cancelled) setLocationsLoading(false);
+      }
+    }
+
+    void loadLocations();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Load movements data
   useEffect(() => {
     let cancelled = false;
 
@@ -69,13 +120,19 @@ export default function InventoryMovementsPage() {
         const payload = await listInventoryMovements({
           start_date: startDate || undefined,
           end_date: endDate || undefined,
+          search: debouncedSearch || undefined,
+          reference_search: debouncedReferenceSearch || undefined,
+          movement_type: selectedMovementTypes.length > 0 ? selectedMovementTypes.join(",") : undefined,
+          location_id: locationId || undefined,
+          page: pageIndex,
+          page_size: 50,
         });
         if (cancelled) return;
-        setRows(payload.results);
+        setResponse(payload);
         setError(null);
       } catch (err) {
         if (cancelled) return;
-        setRows([]);
+        setResponse(null);
         setError(accountingErrorMessage(err, "Failed to load inventory movements."));
       } finally {
         if (!cancelled) setLoading(false);
@@ -86,7 +143,16 @@ export default function InventoryMovementsPage() {
     return () => {
       cancelled = true;
     };
-  }, [endDate, startDate]);
+  }, [startDate, endDate, debouncedSearch, debouncedReferenceSearch, selectedMovementTypes, locationId, pageIndex]);
+
+  const handleMovementTypeToggle = (type: string) => {
+    setSelectedMovementTypes((prev) =>
+      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
+    );
+    setPageIndex(1);
+  };
+
+  const rows = response?.results ?? [];
 
   return (
     <ERPPageShell
@@ -108,9 +174,9 @@ export default function InventoryMovementsPage() {
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
       stats={[
-        { label: "Movements", value: loading ? "—" : rows.length, tone: "info" },
-        { label: "Total In", value: loading ? "—" : rows.reduce((s, r) => s + Number(r.quantity_in || 0), 0), tone: "success" },
-        { label: "Total Out", value: loading ? "—" : rows.reduce((s, r) => s + Number(r.quantity_out || 0), 0), tone: "default" },
+        { label: "Page Rows", value: loading ? "—" : rows.length, tone: "info" },
+        { label: "Total Quantity In", value: loading ? "—" : response?.total_in || "0", tone: "success" },
+        { label: "Total Quantity Out", value: loading ? "—" : response?.total_out || "0", tone: "default" },
       ]}
     >
       <WorkspaceDirectory
@@ -119,24 +185,153 @@ export default function InventoryMovementsPage() {
         groups={INVENTORY_CONTROL_DIRECTORY_GROUPS}
       />
 
-      <ERPSectionShell title="Filters" description="Filter inventory movements by movement date.">
-        <AccountingPeriodFilters
-          startDate={startDate}
-          endDate={endDate}
-          onStartDateChange={setStartDate}
-          onEndDateChange={setEndDate}
-        />
+      <ERPSectionShell
+        title="Date & Reference Filters"
+        description="Filter inventory movements by date range and search for specific products or references."
+      >
+        <div className="flex flex-col gap-4">
+          <AccountingPeriodFilters
+            startDate={startDate}
+            endDate={endDate}
+            onStartDateChange={setStartDate}
+            onEndDateChange={setEndDate}
+          />
+
+          <div className="flex flex-wrap items-center gap-4 p-4 border rounded-md bg-muted/20">
+            <div className="flex flex-col gap-1.5 min-w-[240px] flex-1">
+              <label className="text-sm font-medium text-foreground">Product Search</label>
+              <input
+                type="text"
+                placeholder="Search by name, SKU, or code..."
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setPageIndex(1);
+                }}
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5 min-w-[240px] flex-1">
+              <label className="text-sm font-medium text-foreground">Reference Search</label>
+              <input
+                type="text"
+                placeholder="Search by invoice, delivery ID..."
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={referenceSearch}
+                onChange={(e) => {
+                  setReferenceSearch(e.target.value);
+                  setPageIndex(1);
+                }}
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5 min-w-[180px]">
+              <label className="text-sm font-medium text-foreground">Location</label>
+              <select
+                disabled={locationsLoading}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={locationId || ""}
+                onChange={(e) => {
+                  setLocationId(e.target.value ? parseInt(e.target.value) : null);
+                  setPageIndex(1);
+                }}
+              >
+                <option value="">All Locations</option>
+                {locations.map((loc) => (
+                  <option key={loc.id} value={loc.id}>
+                    {loc.name} ({loc.code})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+      </ERPSectionShell>
+
+      <ERPSectionShell
+        title="Movement Type Filter"
+        description="Select specific movement types to isolate stock flows (e.g., show only SALE_OUT and EMI_DELIVERY_OUT)."
+      >
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-4 border rounded-md bg-muted/20">
+          {MOVEMENT_TYPES.map((type) => (
+            <label key={type} className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selectedMovementTypes.includes(type)}
+                onChange={() => handleMovementTypeToggle(type)}
+                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+              />
+              <span className="text-sm font-medium">{type}</span>
+            </label>
+          ))}
+        </div>
       </ERPSectionShell>
 
       <ERPSectionShell title="Movement Register" description="Read-only movement register derived from ledger-backed stock events.">
-        <EnterpriseDataTable
-          data={rows}
-          columns={columns}
-          loading={loading}
-          error={error}
-          emptyTitle="No inventory movements found"
-          emptyDescription="Post purchase bills, retail invoices, or stock adjustments to populate this register."
-        />
+        <div className="space-y-4">
+          <EnterpriseDataTable
+            data={rows}
+            columns={columns}
+            loading={loading}
+            error={error}
+            emptyTitle="No inventory movements found"
+            emptyDescription="Post purchase bills, retail invoices, or stock adjustments to populate this register."
+          />
+
+          {/* Pagination Controls */}
+          {response && response.num_pages > 1 && (
+            <div className="flex items-center justify-between gap-4 p-4 border-t">
+              <div className="text-sm text-muted-foreground">
+                Showing {Math.min((pageIndex - 1) * 50 + 1, response.count)} to{" "}
+                {Math.min(pageIndex * 50, response.count)} of {response.count} movements
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setPageIndex(Math.max(1, pageIndex - 1))}
+                  disabled={pageIndex === 1 || loading}
+                  className="h-9 px-3 rounded-md border border-input bg-background hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                >
+                  Previous
+                </button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, response.num_pages) }, (_, i) => {
+                    let pageNum: number;
+                    if (response.num_pages <= 5) {
+                      pageNum = i + 1;
+                    } else if (pageIndex <= 3) {
+                      pageNum = i + 1;
+                    } else if (pageIndex >= response.num_pages - 2) {
+                      pageNum = response.num_pages - 4 + i;
+                    } else {
+                      pageNum = pageIndex - 2 + i;
+                    }
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setPageIndex(pageNum)}
+                        className={`h-9 px-3 rounded-md text-sm ${
+                          pageNum === pageIndex
+                            ? "bg-primary text-primary-foreground"
+                            : "border border-input bg-background hover:bg-muted"
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
+                <button
+                  onClick={() => setPageIndex(Math.min(response.num_pages, pageIndex + 1))}
+                  disabled={pageIndex === response.num_pages || loading}
+                  className="h-9 px-3 rounded-md border border-input bg-background hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </ERPSectionShell>
     </ERPPageShell>
   );

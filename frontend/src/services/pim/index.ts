@@ -73,6 +73,7 @@ export interface PimVariant {
   attribute_values: PimVariantAttributeValue[];
   is_low_stock: boolean;
   variant_label: string;
+  image?: string | null;
 }
 
 export interface PimProduct {
@@ -265,6 +266,15 @@ export const pimService = {
       method: "PATCH",
       body: JSON.stringify({ price, ...(costPrice ? { cost_price: costPrice } : {}) }),
     }),
+
+  updateVariantImage: (variantId: number, imageFile: File): Promise<PimVariant> => {
+    const formData = new FormData();
+    formData.append("image", imageFile);
+    return request<PimVariant>(`${BASE}/variants/${variantId}/`, {
+      method: "PATCH",
+      body: formData,
+    });
+  },
 
   deleteVariant: (variantId: number): Promise<void> =>
     request<void>(`${BASE}/variants/${variantId}/`, { method: "DELETE" }),

@@ -35,7 +35,7 @@ def _rollback_created(model_label: str, pk: int) -> tuple[bool, str]:
         return True, "already deleted"
     if model_label == "inventory.OpeningStockEntry":
         return _rollback_opening_stock_entry(instance)
-    if model_label == "subscriptions.Customer":
+    if model_label == "customers.Customer":
         return _rollback_created_customer(instance)
     try:
         instance.delete()

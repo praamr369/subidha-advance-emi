@@ -25,7 +25,7 @@ from api.v1.views.partner_dashboard import (
     _serialize_partner_customers,
 )
 from subscriptions.models import Customer, ProductRequest
-from subscriptions.services.product_request_service import (
+from products_core.services.product_request_service import (
     approve_product_request_for_admin,
     cancel_product_request,
     cancel_product_request_for_admin,

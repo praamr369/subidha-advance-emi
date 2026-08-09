@@ -101,3 +101,59 @@ jobs:
             frontend/playwright-report
             frontend/test-results
           if-no-files-found: ignore
+
+  # Layer-A.4: whole-surface route-load sweep. Loads every static page for each
+  # seeded role (admin/cashier/partner/customer) and fails on a runtime crash.
+  # Heavy (~460 pages), so it runs as its own job. Reported (non-blocking) until
+  # the full surface is confirmed clean, then flip continue-on-error to false.
+  frontend-route-load-smoke:
+    runs-on: ubuntu-latest
+    needs:
+      - backend-release-candidate
+      - frontend-release-candidate
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.18.0"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Route-load smoke (all static pages x role)
+        continue-on-error: true
+        working-directory: frontend
+        env:
+          PLAYWRIGHT_PYTHON: python
+        run: npm run test:e2e:route-smoke
+
+      - name: Upload route-load smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-route-load-artifacts
+          path: |
+            frontend/playwright-report
+            frontend/test-results
+          if-no-files-found: ignore

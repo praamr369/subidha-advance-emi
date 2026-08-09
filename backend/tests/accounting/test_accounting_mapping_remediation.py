@@ -127,7 +127,7 @@ class AccountingMappingRemediationApiTests(APITestCase):
         self.assertFalse(AccountingPostingProfile.objects.filter(key="STAFF_ADVANCE_ASSET").exists())
 
     def test_bridge_reconciliation_filter_accepts_ready_unposted_status(self):
-        response = self.client.get("/api/v1/accounting/bridge-reconciliation/?status=READY_UNPOSTED")
+        response = self.client.get("/api/v1/admin/accounting/bridge-reconciliation/?status=READY_UNPOSTED")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertIn("results", response.data)

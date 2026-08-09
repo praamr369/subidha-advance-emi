@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 
 from api.v1.permissions import IsAdmin
 from inventory.services.stock_service import build_stock_summary
-from subscriptions.services.delivery_service import get_delivery_queryset
+from deliveries.services.delivery_service import get_delivery_queryset
 from billing.services.direct_sale_delivery_queue import direct_sale_delivery_cases_queryset
 from subscriptions.models import DeliveryStatus
 from service_desk.models import ServiceDeskCase, ServiceDeskCaseStatus, ServiceDeskCaseType, ServiceDeskStockStatus
@@ -59,7 +59,7 @@ class AdminLogisticsCockpitView(APIView):
                 "id": c.id,
                 "type": "DIRECT_SALE",
                 "case_no": c.case_no,
-                "customer_name": c.reporter_name_snapshot or (c.direct_sale.customer_name if getattr(c, 'direct_sale_id', None) else ""),
+                "customer_name": c.reporter_name_snapshot or (c.direct_sale.customer_name_snapshot if getattr(c, 'direct_sale_id', None) else ""),
                 "status": c.status,
                 "scheduled_date": None,
                 "is_overdue": False,

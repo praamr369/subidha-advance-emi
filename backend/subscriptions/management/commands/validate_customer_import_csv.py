@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand, CommandError
 
-from subscriptions.services.onboarding_validation_service import (
+from customers.services.onboarding_validation_service import (
     load_csv_rows,
     missing_customer_headers,
     summarize_customer_import_validation,

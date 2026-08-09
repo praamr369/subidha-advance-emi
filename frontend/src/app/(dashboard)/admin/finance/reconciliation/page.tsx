@@ -1,5 +1,8 @@
 import { redirect } from "next/navigation";
 
-export default function AdminFinanceReconciliationPage() {
-  redirect("/admin/accounting/bridge-reconciliation");
+import { ROUTES } from "@/lib/routes";
+
+// Compatibility route: canonical reconciliation is /admin/accounting/bridge-reconciliation.
+export default function AdminFinanceReconciliationRedirect() {
+  redirect(ROUTES.admin.accountingBridgeReconciliation);
 }

@@ -7,8 +7,8 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from subscriptions.models import Payment, PaymentMethod
-from subscriptions.services.lucky_draw_service import create_lucky_draw_commit, reveal_and_execute_draw
-from subscriptions.services.rent_lease_contract_service import create_rent_contract
+from lucky_plan.services.lucky_draw_service import create_lucky_draw_commit, reveal_and_execute_draw
+from contracts.services.rent_lease_contract_service import create_rent_contract
 from tests.helpers import (
     create_admin_user,
     create_batch,

@@ -30,7 +30,7 @@ from subscriptions.services.dashboard_canonical_financial_summary_service import
     get_dashboard_summary,
 )
 from subscriptions.services.dashboard_scopes import AdminScope
-from subscriptions.services.delivery_service import (
+from deliveries.services.delivery_service import (
     build_delivery_report_summary,
     get_delivery_queryset,
 )

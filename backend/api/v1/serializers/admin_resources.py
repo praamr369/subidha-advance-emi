@@ -46,19 +46,19 @@ from subscriptions.models import (
     SubscriptionStatus,
     KycStatus,
 )
-from subscriptions.services.customer_account_service import sync_customer_login_identity
-from subscriptions.services.delivery_service import (
+from customers.services.customer_account_service import sync_customer_login_identity
+from deliveries.services.delivery_service import (
     build_subscription_delivery_history,
     build_subscription_delivery_summary,
     get_current_subscription_delivery,
 )
-from subscriptions.services.contract_number_service import (
+from contracts.services.contract_number_service import (
     get_or_assign_subscription_number,
 )
 from subscriptions.services.subscription_financial_service import (
     build_subscription_financial_snapshot,
 )
-from subscriptions.services.lucky_id_release_service import PRE_LOCK_BATCH_STATUSES
+from lucky_plan.services.lucky_id_release_service import PRE_LOCK_BATCH_STATUSES
 from core.services.operational_visibility import ACTIVE_BATCH_SUBSCRIPTION_STATUSES
 
 
@@ -624,7 +624,7 @@ class EmiAdminSerializer(serializers.ModelSerializer):
         return getattr(obj.subscription, "tenure_months", None)
 
     def get_installment_label(self, obj):
-        from subscriptions.services.emi_label_service import installment_label
+        from payments.services.emi_label_service import installment_label
 
         return installment_label(
             obj.month_no, getattr(obj.subscription, "tenure_months", None)
@@ -1177,7 +1177,7 @@ class LuckyIdAdminSerializer(serializers.ModelSerializer):
         instance = self.instance
         if instance and instance.batch_id and "status" in attrs:
             if attrs["status"] != instance.status:
-                from subscriptions.services.batch_draw_coordination_service import (
+                from lucky_plan.services.batch_draw_coordination_service import (
                     assert_subscription_eligibility_mutations_allowed,
                 )
 
@@ -1493,6 +1493,8 @@ class ProductAdminSerializer(serializers.ModelSerializer):
     product_code = serializers.CharField(max_length=50, required=False, allow_null=True, allow_blank=True)
     image = serializers.ImageField(required=False, allow_null=True)
     clear_image = serializers.BooleanField(required=False, write_only=True, default=False)
+    video = serializers.FileField(required=False, allow_null=True)
+    clear_video = serializers.BooleanField(required=False, write_only=True, default=False)
     category_master_name = serializers.CharField(source="category_master.name", read_only=True)
     subcategory_master_name = serializers.CharField(source="subcategory_master.name", read_only=True)
     unit_of_measure_master_name = serializers.CharField(source="unit_of_measure_master.name", read_only=True)
@@ -1524,6 +1526,8 @@ class ProductAdminSerializer(serializers.ModelSerializer):
             "gst_rate",
             "image",
             "clear_image",
+            "video",
+            "clear_video",
             "is_active",
             "plan_type_default",
             "is_emi_enabled",
@@ -1631,6 +1635,15 @@ class ProductAdminSerializer(serializers.ModelSerializer):
                 instance.image if instance else None,
             )
 
+        clear_video = data.get("clear_video", False)
+        if clear_video:
+            video = None
+        else:
+            video = data.get(
+                "video",
+                instance.video if instance else None,
+            )
+
         is_active = data.get(
             "is_active",
             instance.is_active if instance else True,
@@ -1670,6 +1683,7 @@ class ProductAdminSerializer(serializers.ModelSerializer):
             unit_of_measure=unit_of_measure,
             description=description,
             image=image,
+            video=video,
             is_active=is_active,
             plan_type_default=plan_type_default,
             is_emi_enabled=is_emi_enabled,
@@ -1710,12 +1724,16 @@ class ProductAdminSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data.pop("clear_image", None)
+        validated_data.pop("clear_video", None)
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
         clear_image = bool(validated_data.pop("clear_image", False))
         if clear_image:
             validated_data["image"] = None
+        clear_video = bool(validated_data.pop("clear_video", False))
+        if clear_video:
+            validated_data["video"] = None
         return super().update(instance, validated_data)
 
 
@@ -1834,6 +1852,9 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
     paid_emi_count = serializers.SerializerMethodField()
     pending_emi_count = serializers.SerializerMethodField()
     waived_emi_count = serializers.SerializerMethodField()
+    overdue_emi_count = serializers.SerializerMethodField()
+    total_paid_amount = serializers.SerializerMethodField()
+    outstanding_amount = serializers.SerializerMethodField()
     subscription_number = serializers.SerializerMethodField()
     contract_reference = serializers.SerializerMethodField()
 
@@ -1919,6 +1940,9 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
             "paid_emi_count",
             "pending_emi_count",
             "waived_emi_count",
+            "overdue_emi_count",
+            "total_paid_amount",
+            "outstanding_amount",
         )
         read_only_fields = (
             "id",
@@ -1974,6 +1998,20 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
     def get_waived_emi_count(self, obj):
         return sum(1 for emi in obj.emis.all() if emi.status == EmiStatus.WAIVED)
 
+    def get_overdue_emi_count(self, obj):
+        return sum(1 for emi in obj.emis.all() if emi.status == EmiStatus.PENDING and emi.is_overdue())
+
+    def _get_financial_snapshot(self, obj):
+        if not hasattr(obj, "_cached_financial_snapshot"):
+            obj._cached_financial_snapshot = build_subscription_financial_snapshot(obj)
+        return obj._cached_financial_snapshot
+
+    def get_total_paid_amount(self, obj):
+        return str(self._get_financial_snapshot(obj)["paid_amount"])
+
+    def get_outstanding_amount(self, obj):
+        return str(self._get_financial_snapshot(obj)["remaining_amount"])
+
     def validate(self, attrs):
         instance = self.instance
 
@@ -2024,7 +2062,7 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
             and instance.batch_id
             and instance.plan_type == PlanType.EMI
         ):
-            from subscriptions.services.batch_draw_coordination_service import (
+            from lucky_plan.services.batch_draw_coordination_service import (
                 assert_subscription_eligibility_mutations_allowed,
             )
 
@@ -2548,7 +2586,7 @@ class SubscriptionAdminDetailSerializer(SubscriptionAdminSerializer):
             }
 
         try:
-            from subscriptions.services.contract_activation_readiness_service import (
+            from contracts.services.contract_activation_readiness_service import (
                 evaluate_contract_activation_readiness,
             )
             data = evaluate_contract_activation_readiness(obj)

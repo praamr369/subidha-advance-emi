@@ -8,9 +8,10 @@ from decimal import Decimal, InvalidOperation
 from urllib import request
 
 from django.conf import settings
+from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.http import FileResponse, Http404
-from django.db import transaction
+from django.db import models, transaction
 from django.db.models import Count, Prefetch, Q, Sum, Value, DecimalField, IntegerField, OuterRef, Subquery
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404
@@ -93,34 +94,34 @@ from subscriptions.models import (
     KycStatus,
     BatchStatus,
 )
-from subscriptions.services.lucky_draw_service import (
+from lucky_plan.services.lucky_draw_service import (
     create_lucky_draw_commit,
     reveal_and_execute_draw,
 )
-from subscriptions.services.batch_service import BATCH_STATUS_TRANSITIONS
-from subscriptions.services.payment_service import (
+from lucky_plan.services.batch_service import BATCH_STATUS_TRANSITIONS
+from payments.services.payment_service import (
     record_emi_payment,
     reverse_payment_for_admin,
 )
 from subscriptions.services.audit_service import log_audit, log_customer_kyc_decision
-from subscriptions.services.customer_account_service import build_customer_operational_profile
-from subscriptions.services.batch_draw_coordination_service import (
+from customers.services.customer_account_service import build_customer_operational_profile
+from lucky_plan.services.batch_draw_coordination_service import (
     build_control_center,
     commit_batch_draw,
     execute_batch_draw,
     lock_batch_for_draw,
 )
-from subscriptions.services.delivery_service import get_subscription_delivery_prefetch
+from deliveries.services.delivery_service import get_subscription_delivery_prefetch
 from subscriptions.services.subscription_financial_service import (
     build_reconciliation_attention_payload,
     get_subscription_detail_queryset,
 )
-from subscriptions.services.winner_state_service import (
+from lucky_plan.services.winner_state_service import (
     get_subscription_winner_evidence,
     sync_winner_state,
     winner_history_q,
 )
-from subscriptions.services.lucky_id_release_service import PRE_LOCK_BATCH_STATUSES
+from lucky_plan.services.lucky_id_release_service import PRE_LOCK_BATCH_STATUSES
 from core.services.operational_visibility import (
     subscription_batch_active_q,
     subscription_collectible_q,
@@ -847,7 +848,7 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
     @action(detail=True, methods=["post"], url_path="kyc-decision")
     @transaction.atomic
     def kyc_decision(self, request, pk=None):
-        from subscriptions.services.customer_service import approve_kyc, reject_kyc
+        from customers.services.customer_service import approve_kyc, reject_kyc
 
         customer = self.get_object()
         serializer = CustomerKycDecisionSerializer(data=request.data)
@@ -970,7 +971,7 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
     @transaction.atomic
     def approve_kyc_document(self, request, pk=None, document_id=None):
         from subscriptions.models import CustomerKycDocument, CustomerKycDocumentStatus
-        from subscriptions.services.customer_service import approve_kyc
+        from customers.services.customer_service import approve_kyc
 
         customer = self.get_object()
         document = get_object_or_404(
@@ -994,7 +995,7 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
     @transaction.atomic
     def reject_kyc_document(self, request, pk=None, document_id=None):
         from subscriptions.models import CustomerKycDocument, CustomerKycDocumentStatus
-        from subscriptions.services.customer_service import reject_kyc
+        from customers.services.customer_service import reject_kyc
 
         reason = (request.data.get("reason") or "").strip()
         if not reason:
@@ -1054,7 +1055,7 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
         optional ``deposit_required`` (truthy/falsey), optional ``high_value``.
         """
         from subscriptions.models import Subscription
-        from subscriptions.services.kyc_readiness_service import (
+        from customers.services.kyc_readiness_service import (
             get_contract_kyc_readiness,
         )
 
@@ -1090,7 +1091,7 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
         # activation/handover milestone readiness (deposit receipt + lease
         # condition proof). Computation only — never enforced here.
         if subscription is not None:
-            from subscriptions.services.contract_activation_readiness_service import (
+            from contracts.services.contract_activation_readiness_service import (
                 evaluate_contract_activation_readiness,
             )
 
@@ -1103,7 +1104,7 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
     @transaction.atomic
     def kyc_exception_approve(self, request, pk=None):
         """Admin-only audited KYC exception override (requires a reason)."""
-        from subscriptions.services.customer_service import exception_approve_kyc
+        from customers.services.customer_service import exception_approve_kyc
 
         reason = (request.data.get("reason") or "").strip()
         if not reason:
@@ -1368,10 +1369,34 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='change-user-password')
     def change_user_password(self, request, pk=None):
-        return Response(
-            {"detail": "Security Upgrade: Cannot change password for non-staff users. Please instruct them to use the password reset flow."},
-            status=403
+        customer = self.get_object()
+        user = getattr(customer, "user", None)
+        if user is None:
+            return Response({"detail": "This customer has no login account."}, status=400)
+
+        new_password = (request.data.get("password") or "").strip()
+        if not new_password:
+            return Response({"detail": "Password is required."}, status=400)
+        try:
+            validate_password(new_password, user)
+        except ValidationError as exc:
+            return Response({"password": list(exc.messages)}, status=400)
+
+        user.set_password(new_password)
+        user.save(update_fields=["password"])
+
+        # Audited; the plaintext password is never stored or echoed back.
+        AuditLog.objects.create(
+            action_type=AuditLog.ActionType.USER_PASSWORD_RESET,
+            model_name="User",
+            object_id=customer.user_id,
+            performed_by=request.user,
+            metadata={
+                "origin": "ADMIN_CUSTOMER_WORKFLOW",
+                "customer_id": customer.id,
+            },
         )
+        return Response({"detail": "Password updated successfully."}, status=200)
 
     @action(detail=False, methods=["get"], url_path="operational-summary")
     def operational_summary(self, request):
@@ -3425,6 +3450,7 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
         .prefetch_related(
             "emis",
             "emis__payments",
+            "emis__ledger_entries",
             "payments",
             "documents",
             get_subscription_delivery_prefetch(),
@@ -3491,7 +3517,7 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
         subscription = self.get_object()
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        from subscriptions.services.rent_lease_billing_service import generate_monthly_demands_for_subscription
+        from contracts.services.rent_lease_billing_service import generate_monthly_demands_for_subscription
 
         if subscription.plan_type not in ("RENT", "LEASE"):
             return Response({"detail": "Only Rent and Lease contracts support ledger generation."}, status=status.HTTP_400_BAD_REQUEST)
@@ -3525,7 +3551,7 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
         subscription = self.get_object()
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        from subscriptions.services.operational_cancellation_service import cancel_subscription
+        from contracts.services.operational_cancellation_service import cancel_subscription
 
         try:
             result = cancel_subscription(
@@ -3791,6 +3817,91 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
             }
         )
 
+    @action(detail=False, methods=["get"], url_path="batch-breakdown")
+    def batch_breakdown(self, request):
+        """Per-batch rollup for the current filtered register.
+
+        Honors every list filter (plan_type, status, partner, product, q, ...).
+        For each batch that has at least one matching subscription it returns
+        the subscriber count, contract value, monthly demand, waived amount and
+        the derived outstanding (contract - collected + reversals - waived).
+        Rows without a batch (typical for Rent / Lease) are grouped under a
+        single null batch entry so the totals still reconcile.
+        """
+        queryset = self.get_queryset()
+
+        # Base per-batch aggregates straight off the subscription register.
+        batch_rows = (
+            queryset.values("batch_id", "batch__batch_code")
+            .annotate(
+                subscriber_count=Count("id", distinct=True),
+                contract_value=Coalesce(
+                    Sum("total_amount"), Value(MONEY_ZERO, output_field=DecimalField())
+                ),
+                monthly_value=Coalesce(
+                    Sum("monthly_amount"), Value(MONEY_ZERO, output_field=DecimalField())
+                ),
+                waived_value=Coalesce(
+                    Sum("waived_amount"), Value(MONEY_ZERO, output_field=DecimalField())
+                ),
+            )
+            .order_by("-subscriber_count", "batch__batch_code")
+        )
+
+        # Collected / reversed per batch, derived from the financial ledger so
+        # the outstanding figure matches the register-wide KPI arithmetic.
+        payments_by_batch = {
+            row["emi__subscription__batch_id"]: row["total"]
+            for row in FinancialLedger.objects.filter(
+                emi__subscription__in=queryset,
+                entry_type=LedgerEntryType.EMI_PAYMENT,
+            )
+            .values("emi__subscription__batch_id")
+            .annotate(total=Sum("amount"))
+        }
+        reversals_by_batch = {
+            row["emi__subscription__batch_id"]: row["total"]
+            for row in FinancialLedger.objects.filter(
+                emi__subscription__in=queryset,
+                entry_type=LedgerEntryType.PAYMENT_REVERSAL,
+            )
+            .values("emi__subscription__batch_id")
+            .annotate(total=Sum("amount"))
+        }
+
+        results = []
+        for row in batch_rows:
+            batch_id = row["batch_id"]
+            contract_value = row["contract_value"] or MONEY_ZERO
+            waived_value = row["waived_value"] or MONEY_ZERO
+            collected = payments_by_batch.get(batch_id) or MONEY_ZERO
+            reversed_amount = reversals_by_batch.get(batch_id) or MONEY_ZERO
+
+            outstanding = contract_value - collected + reversed_amount - waived_value
+            if outstanding < MONEY_ZERO:
+                outstanding = MONEY_ZERO
+
+            results.append(
+                {
+                    "batch_id": batch_id,
+                    "batch_code": row["batch__batch_code"],
+                    "subscriber_count": row["subscriber_count"],
+                    "contract_value": str(contract_value),
+                    "monthly_value": str(row["monthly_value"] or MONEY_ZERO),
+                    "collected_value": str(collected),
+                    "waived_value": str(waived_value),
+                    "outstanding_value": str(outstanding),
+                }
+            )
+
+        return Response(
+            {
+                "count": len(results),
+                "batch_count": sum(1 for r in results if r["batch_id"] is not None),
+                "results": results,
+            }
+        )
+
     @action(detail=False, methods=["get"], url_path="reconciliation-attention")
     def reconciliation_attention(self, request):
         queryset = self.get_queryset()
@@ -3804,7 +3915,7 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
         (MISSING / PRESENT / VERIFIED / REJECTED / EXPIRED / NOT_REQUIRED),
         expiry, signed_status, access_level, and overall ready + blocker_codes.
         """
-        from subscriptions.services.document_vault_service import build_required_document_checklist
+        from contracts.services.document_vault_service import build_required_document_checklist
 
         subscription = self.get_object()
         include_handover = str(
@@ -3938,7 +4049,7 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
     def verify_document(self, request, pk=None, document_id=None):
         subscription = self.get_object()
         from subscriptions.models import SubscriptionDocument
-        from subscriptions.services.document_vault_service import verify_document as svc_verify
+        from contracts.services.document_vault_service import verify_document as svc_verify
 
         doc = get_object_or_404(SubscriptionDocument, pk=document_id, subscription=subscription)
         notes = request.data.get("notes", "").strip()
@@ -3949,7 +4060,7 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
     def reject_document(self, request, pk=None, document_id=None):
         subscription = self.get_object()
         from subscriptions.models import SubscriptionDocument
-        from subscriptions.services.document_vault_service import reject_document as svc_reject
+        from contracts.services.document_vault_service import reject_document as svc_reject
 
         doc = get_object_or_404(SubscriptionDocument, pk=document_id, subscription=subscription)
         reason = request.data.get("reason", "").strip()
@@ -3967,7 +4078,7 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
         serializer = ContractReturnAssessmentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        from subscriptions.services.rent_lease_contract_service import assess_return_and_calculate_refund
+        from contracts.services.rent_lease_contract_service import assess_return_and_calculate_refund
 
         result = assess_return_and_calculate_refund(
             subscription=subscription,
@@ -4040,7 +4151,7 @@ class RentalAssetAdminViewSet(viewsets.ReadOnlyModelViewSet):
     def subscription_readiness(self, request, subscription_pk=None):
         """Asset condition readiness for a specific subscription (P3B integration)."""
         from subscriptions.models import AssetConditionSnapshotStage, RentalAsset
-        from subscriptions.services.contract_activation_readiness_service import (
+        from contracts.services.contract_activation_readiness_service import (
             evaluate_contract_activation_readiness,
         )
         subscription = get_object_or_404(Subscription, pk=subscription_pk)

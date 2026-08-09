@@ -18,9 +18,9 @@ from subscriptions.models import (
     RentLeaseDepositTransactionType,
 )
 from subscriptions.models_rent_lease_collection import RentLeaseCollection
-from subscriptions.services.rent_lease_billing_service import record_deposit_refund
-from subscriptions.services.rent_lease_collection_workflow_service import collect_security_deposit_with_metadata
-from subscriptions.services.rent_lease_contract_service import create_lease_contract, create_rent_contract
+from contracts.services.rent_lease_billing_service import record_deposit_refund
+from contracts.services.rent_lease_collection_workflow_service import collect_security_deposit_with_metadata
+from contracts.services.rent_lease_contract_service import create_lease_contract, create_rent_contract
 from tests.accounting.helpers import seed_bridge_ready_environment
 from tests.helpers import create_admin_user, create_cashier_user, create_customer_profile, create_customer_user, create_product
 

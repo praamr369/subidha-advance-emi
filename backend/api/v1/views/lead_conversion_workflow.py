@@ -9,7 +9,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from decimal import Decimal
 
-from subscriptions.services.lead_conversion_service import LeadConversionService
+from crm.services.lead_conversion_service import LeadConversionService
 from api.v1.permissions import IsAdmin
 
 

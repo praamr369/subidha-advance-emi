@@ -49,7 +49,7 @@ from accounts.services.password_reset_service import (
     PasswordResetServiceError,
     create_password_reset_request,
 )
-from subscriptions.services.customer_service import find_or_create_customer
+from customers.services.customer_service import find_or_create_customer
 
 
 def _money(value) -> Decimal:

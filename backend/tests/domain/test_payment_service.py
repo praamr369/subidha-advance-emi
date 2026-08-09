@@ -13,7 +13,7 @@ from subscriptions.models import (
     UnifiedCollectionIdempotency,
     UnifiedCollectionIdempotencyStatus,
 )
-from subscriptions.services.payment_service import (
+from payments.services.payment_service import (
     record_emi_payment,
     reverse_payment_for_admin,
     verify_payment,

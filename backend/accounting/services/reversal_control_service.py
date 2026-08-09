@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from django.db import transaction
 from django.db.models import Q
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
@@ -314,7 +315,7 @@ def list_reversal_cases(*, query: str = "", open_only: bool = False) -> dict:
 
 
 def get_reversal_case(*, case_id: int) -> dict:
-    case = OperationalCancellation.objects.get(pk=case_id)
+    case = get_object_or_404(OperationalCancellation, pk=case_id)
     payload = _serialize_case(case)
     checklist = build_reversal_reconciliation_checklist(case)
     payload["reconciliation_checklist"] = checklist

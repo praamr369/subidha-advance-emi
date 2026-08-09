@@ -201,24 +201,26 @@ Build for daily operational use by non-technical staff.
 
 ---
 
-## Code Change Policy for Codex
+## Code Change Policy for AI Agents (Claude, Codex, etc.)
 
 When making changes:
 
-1. First inspect the existing codebase and understand current conventions.
-2. Reuse existing patterns where reasonable.
-3. If architecture is weak, improve it incrementally without destabilizing working flows.
-4. Prefer small, reviewable diffs.
-5. For larger work, stage changes in vertical slices:
+1. **Use Existing Files First**: Do not create new files at first. Always inspect the existing codebase and reuse existing files, services, components, and patterns where reasonable.
+2. **Additive Improvements**: Prefer additive improvements on existing files, services, and tests. Check existing paginations and structures, and add to them rather than replacing or creating new ones.
+3. **Document New Needs**: If creating a new file or service is absolutely necessary, it **must** be explicitly documented.
+4. **Document All Updates**: All new updates and improvements must always be documented in the relevant artifact or summary.
+5. If architecture is weak, improve it incrementally without destabilizing working flows.
+6. Prefer small, reviewable diffs.
+7. For larger work, stage changes in vertical slices:
    - schema / backend
    - API
    - frontend integration
    - validation
    - testing
-6. Do not generate placeholder logic and call it complete.
-7. Do not leave dead code or duplicate components unless explicitly transitional.
-8. If creating new files, place them in the correct architectural boundary.
-9. If changing a public interface, update all affected usage points.
+8. Do not generate placeholder logic and call it complete.
+9. Do not leave dead code or duplicate components unless explicitly transitional.
+10. If creating new files (after justifying the need), place them in the correct architectural boundary.
+11. If changing a public interface, update all affected usage points.
 
 ---
 

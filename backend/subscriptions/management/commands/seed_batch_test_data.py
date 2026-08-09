@@ -14,7 +14,7 @@ from subscriptions.models import (
     LuckyIdStatus,
     Product,
 )
-from subscriptions.services.subscription_service import create_emi_subscription
+from contracts.services.subscription_service import create_emi_subscription
 
 
 def _assert_local_only() -> None:

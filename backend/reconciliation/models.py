@@ -272,7 +272,7 @@ class FinancialSourceLifecycleEvent(models.Model):
     )
     created_at = models.DateTimeField(default=timezone.now, db_index=True)
     related_payment = models.ForeignKey(
-        "subscriptions.Payment",
+        "payments.Payment",
         on_delete=models.PROTECT,
         null=True,
         blank=True,
@@ -300,7 +300,7 @@ class FinancialSourceLifecycleEvent(models.Model):
         related_name="lifecycle_events",
     )
     related_cancellation = models.ForeignKey(
-        "subscriptions.OperationalCancellation",
+        "contracts.OperationalCancellation",
         on_delete=models.PROTECT,
         null=True,
         blank=True,

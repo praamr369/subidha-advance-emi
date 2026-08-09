@@ -11,14 +11,22 @@ from django.utils import timezone
 from billing.models import BillingCreditNote, BillingDebitNote, BillingInvoice, DirectSale
 from crm.models import PartyMaster
 from inventory.models import InventoryItem
-from subscriptions.models import CustomerSupportRequest, Product, Subscription, SubscriptionDelivery
+from customers.models import CustomerSupportRequest
+from products_core.models import Product
+from contracts.models import Subscription
+from deliveries.models import SubscriptionDelivery
 
 MONEY_ZERO = Decimal("0.00")
 QUANTITY_ZERO = Decimal("0.000")
 
 
 def generate_service_case_no() -> str:
-    return f"SD-{timezone.now().strftime('%Y%m%d%H%M%S%f')}"
+    # Include a random suffix: two cases created in the same microsecond would
+    # otherwise collide on the unique case_no (wall-clock %f is not unique under
+    # rapid creation).
+    from django.utils.crypto import get_random_string
+
+    return f"SD-{timezone.now().strftime('%Y%m%d%H%M%S%f')}-{get_random_string(4).upper()}"
 
 
 def _status_transition_blocked(previous_status: str | None, next_status: str | None, *, allowed: set[tuple[str, str]]) -> bool:

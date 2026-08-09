@@ -1155,7 +1155,7 @@ def _finance_account_for_refund_method(method: str):
     """Auto-resolve the payout account from the refund method, mirroring the
     two-account collection model: cash refund -> cash desk; any bank/UPI refund
     -> the single Bank/UPI holding account."""
-    from subscriptions.services.payment_service import _fallback_finance_account_for_method
+    from payments.services.payment_service import _fallback_finance_account_for_method
 
     payment_method = "CASH" if method == RefundMethod.CASH_REFUND else "UPI"
     return _fallback_finance_account_for_method(payment_method)

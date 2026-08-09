@@ -1,3 +1,5 @@
+import { getPublicDictionary } from "@/lib/public-i18n";
+import { getPublicLocale } from "@/lib/public-i18n.server";
 import Link from "next/link";
 import { ArrowRight, ClipboardCheck, PackageCheck, Undo2, Wallet } from "lucide-react";
 
@@ -12,47 +14,49 @@ type RentLeaseWorkflowPreviewProps = {
   mode: RentLeaseMode;
 };
 
-const modeCopy = {
-  rent: {
-    eyebrow: "Rent operations",
-    title: "Flexible usage with monthly records and return checks",
-    description: "Rent stays separate from Lucky Plan EMI. Public pages explain terms; operational collection, deposit handling, inspection, and return closure stay controlled inside the system.",
-    closingTitle: "Need help choosing rent?",
-    closingDescription: "Use rent when the requirement is short-term or flexible and ownership is not the immediate goal.",
-  },
-  lease: {
-    eyebrow: "Lease operations",
-    title: "Longer-term access with contract-backed checkpoints",
-    description: "Lease stays separate from Lucky Plan EMI. Public pages explain terms; operational collection, deposit handling, inspection, renewal, and closure stay controlled inside the system.",
-    closingTitle: "Need lease planning support?",
-    closingDescription: "Use lease when the requirement is longer-term and contract discipline matters more than short-term flexibility.",
-  },
-} as const;
+export default async function RentLeaseWorkflowPreview({ mode }: RentLeaseWorkflowPreviewProps) {
+  const locale = await getPublicLocale();
+  const dict = getPublicDictionary(locale);
+    const modeCopy = {
+      rent: {
+        eyebrow: dict.public.RentLeaseWorkflowPreview_prop1,
+        title: dict.public.RentLeaseWorkflowPreview_prop2,
+        description: dict.public.RentLeaseWorkflowPreview_prop3,
+        closingTitle: "Need help choosing rent?",
+        closingDescription: "Use rent when the requirement is short-term or flexible and ownership is not the immediate goal.",
+      },
+      lease: {
+        eyebrow: dict.public.RentLeaseWorkflowPreview_prop4,
+        title: dict.public.RentLeaseWorkflowPreview_prop5,
+        description: dict.public.RentLeaseWorkflowPreview_prop6,
+        closingTitle: "Need lease planning support?",
+        closingDescription: "Use lease when the requirement is longer-term and contract discipline matters more than short-term flexibility.",
+      },
+    } as const;
 
-const steps = [
-  {
-    icon: PackageCheck,
-    title: "Choose eligible item",
-    description: "Product discovery can start publicly, but operational allocation remains controlled by staff workflow.",
-  },
-  {
-    icon: ClipboardCheck,
-    title: "Approve contract terms",
-    description: "Tenure, deposit, usage conditions and return duties must be understood before activation.",
-  },
-  {
-    icon: Wallet,
-    title: "Collect monthly dues",
-    description: "Monthly collection stays separate from Lucky Plan EMI and does not create draw participation.",
-  },
-  {
-    icon: Undo2,
-    title: "Inspect and close",
-    description: "Return, damage, refund and closure decisions depend on condition checks and policy rules.",
-  },
-] as const;
+    const steps = [
+      {
+        icon: PackageCheck,
+        title: dict.public.RentLeaseWorkflowPreview_prop7,
+        description: dict.public.RentLeaseWorkflowPreview_prop8,
+      },
+      {
+        icon: ClipboardCheck,
+        title: dict.public.RentLeaseWorkflowPreview_prop9,
+        description: dict.public.RentLeaseWorkflowPreview_prop10,
+      },
+      {
+        icon: Wallet,
+        title: dict.public.RentLeaseWorkflowPreview_prop11,
+        description: dict.public.RentLeaseWorkflowPreview_prop12,
+      },
+      {
+        icon: Undo2,
+        title: dict.public.RentLeaseWorkflowPreview_prop13,
+        description: dict.public.RentLeaseWorkflowPreview_prop14,
+      },
+    ] as const;
 
-export default function RentLeaseWorkflowPreview({ mode }: RentLeaseWorkflowPreviewProps) {
   const copy = modeCopy[mode];
 
   return (
@@ -62,7 +66,7 @@ export default function RentLeaseWorkflowPreview({ mode }: RentLeaseWorkflowPrev
         <div className="relative w-full overflow-hidden rounded-[1.6rem] shadow-[0_24px_54px_-24px_rgba(15,23,42,0.6)]">
           <Image
             src="/images/banner_rent.jpg"
-            alt="Rent Lease Workflow"
+            alt={dict.public.RentLeaseWorkflowPreview_attr15}
             width={800}
             height={533}
             className="w-full object-cover min-h-[18rem]"
