@@ -371,3 +371,349 @@ export function quickCreateRawMaterial(payload: QuickCreatePayload): Promise<Qui
     }),
   });
 }
+
+// ============================================================================
+// Generic Inventory Types & Functions
+// ============================================================================
+
+export type InventoryItem = {
+  id: number;
+  product_code: string;
+  name?: string;
+  product_name?: string;
+  sku?: string;
+  barcode?: string;
+  category?: string;
+  subcategory?: string;
+  base_price?: string;
+  standard_unit_cost?: string;
+  unit_of_measure?: string;
+  stock_item_type?: string;
+};
+
+export type PaginatedResponse<T> = {
+  count: number;
+  page: number;
+  page_size: number;
+  num_pages: number;
+  results: T[];
+  [key: string]: unknown;
+};
+
+export type StockLocation = {
+  id: number;
+  code: string;
+  name: string;
+  address?: string;
+};
+
+export type StockAdjustment = {
+  id: number;
+  adjustment_no?: string;
+  adjustment_date: string;
+  status: string;
+  stock_location_name?: string;
+  reason?: string;
+  lines?: Array<{ product_id: number; quantity: number; unit_cost_snapshot?: string }>;
+  created_by_username?: string;
+  draft_count?: number;
+  approved_count?: number;
+  posted_count?: number;
+  requires_unit_cost?: boolean;
+  can_post?: boolean;
+};
+
+export interface StockAdjustmentsPayload {
+  adjustment_date: string;
+  lines: Array<{ product_id: number; quantity: number }>;
+}
+
+export type AccessoryRow = {
+  id: number;
+  product_code: string;
+  name?: string;
+  product_name?: string;
+  variant_label?: string;
+  base_price?: string;
+  sku?: string;
+  unit_of_measure?: string;
+  standard_unit_cost?: string;
+  linked_fg_count?: number;
+  stock_tracking_status?: string;
+};
+
+export type AccessoryVariantGroup = {
+  id: number;
+  code?: string;
+  name: string;
+  category?: string;
+  subcategory?: string;
+  description?: string;
+  is_required?: boolean;
+  is_active?: boolean;
+  sort_order?: number;
+  variant_count?: number;
+  accessories?: AccessoryRow[];
+};
+
+export type DemandPlanningRow = {
+  product_id: number;
+  product_code: string;
+  name?: string;
+  product_name?: string;
+  sku?: string;
+  demand_qty?: number;
+  on_hand?: number;
+  total_required?: number;
+  safety_stock?: number;
+};
+
+export type DemandPlanningPayload = Record<string, unknown>;
+
+export type FGProfileDetail = {
+  id: number;
+  product_code: string;
+  name: string;
+  base_price: string;
+};
+
+export type FGAccessoryLink = {
+  id: number;
+  accessory_id: number;
+  accessory_name: string;
+};
+
+export type FGServiceLink = {
+  id: number;
+  service_id: number;
+  service_name: string;
+};
+
+export type ServiceCatalogItem = {
+  id: number;
+  product_id: number;
+  service_name: string;
+  service_type: string;
+  price: string;
+};
+
+export type ServiceType = "INSTALLATION" | "DELIVERY" | "WARRANTY" | "MAINTENANCE";
+
+export const SERVICE_TYPE_LABELS: Record<ServiceType, string> = {
+  INSTALLATION: "Installation",
+  DELIVERY: "Delivery",
+  WARRANTY: "Warranty",
+  MAINTENANCE: "Maintenance",
+};
+
+// List functions - with pagination support
+export async function listInventoryItems(
+  page?: number,
+  pageSize?: number
+): Promise<PaginatedResponse<InventoryItem>> {
+  const params = new URLSearchParams();
+  if (page) params.append("page", String(page));
+  if (pageSize) params.append("page_size", String(pageSize));
+  const url = params.toString() ? `/admin/inventory/items/?${params}` : "/admin/inventory/items/";
+  return apiFetch<PaginatedResponse<InventoryItem>>(url, { method: "GET" });
+}
+
+export async function listStockLocations(
+  page?: number
+): Promise<PaginatedResponse<StockLocation>> {
+  const params = new URLSearchParams();
+  if (page) params.append("page", String(page));
+  const url = params.toString() ? `/admin/inventory/locations/?${params}` : "/admin/inventory/locations/";
+  return apiFetch<PaginatedResponse<StockLocation>>(url, { method: "GET" });
+}
+
+export async function listAccessories(
+  page?: number
+): Promise<PaginatedResponse<AccessoryRow>> {
+  const params = new URLSearchParams();
+  if (page) params.append("page", String(page));
+  const url = params.toString() ? `/admin/inventory/accessories/?${params}` : "/admin/inventory/accessories/";
+  return apiFetch<PaginatedResponse<AccessoryRow>>(url, { method: "GET" });
+}
+
+export async function listAccessoryVariantGroups(
+  page?: number
+): Promise<PaginatedResponse<AccessoryVariantGroup>> {
+  const params = new URLSearchParams();
+  if (page) params.append("page", String(page));
+  const url = params.toString()
+    ? `/admin/inventory/accessory-variant-groups/?${params}`
+    : "/admin/inventory/accessory-variant-groups/";
+  return apiFetch<PaginatedResponse<AccessoryVariantGroup>>(url, { method: "GET" });
+}
+
+export async function listServiceCatalog(): Promise<PaginatedResponse<ServiceCatalogItem>> {
+  return apiFetch<PaginatedResponse<ServiceCatalogItem>>("/admin/inventory/service-catalog/", {
+    method: "GET",
+  });
+}
+
+export async function getBulkDemandPlanning(): Promise<PaginatedResponse<DemandPlanningRow>> {
+  return apiFetch<PaginatedResponse<DemandPlanningRow>>("/admin/inventory/demand-planning/", {
+    method: "GET",
+  });
+}
+
+// Stock adjustments
+export async function listStockAdjustments(
+  page?: number
+): Promise<PaginatedResponse<StockAdjustment>> {
+  const params = new URLSearchParams();
+  if (page) params.append("page", String(page));
+  const url = params.toString() ? `/admin/inventory/adjustments/?${params}` : "/admin/inventory/adjustments/";
+  return apiFetch<PaginatedResponse<StockAdjustment>>(url, { method: "GET" });
+}
+
+export async function createStockAdjustment(payload: StockAdjustmentsPayload): Promise<StockAdjustment> {
+  return apiFetch<StockAdjustment>("/admin/inventory/adjustments/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function approveStockAdjustment(id: number): Promise<StockAdjustment> {
+  return apiFetch<StockAdjustment>(`/admin/inventory/adjustments/${id}/approve/`, {
+    method: "POST",
+  });
+}
+
+export async function postStockAdjustment(id: number): Promise<StockAdjustment> {
+  return apiFetch<StockAdjustment>(`/admin/inventory/adjustments/${id}/post/`, {
+    method: "POST",
+  });
+}
+
+export async function setStockAdjustmentLineCosts(id: number, lineId: number): Promise<void> {
+  return apiFetch<void>(`/admin/inventory/adjustments/${id}/lines/${lineId}/set-cost/`, {
+    method: "POST",
+  });
+}
+
+// Search
+export async function searchInventoryItems(
+  q: string
+): Promise<PaginatedResponse<InventoryItem>> {
+  return apiFetch<PaginatedResponse<InventoryItem>>(
+    `/admin/inventory/items/?q=${encodeURIComponent(q)}`,
+    { method: "GET" }
+  );
+}
+
+// Finished goods
+export async function fetchFGProfile(id: number): Promise<FGProfileDetail> {
+  return apiFetch<FGProfileDetail>(`/admin/inventory/finished-goods/${id}/`, {
+    method: "GET",
+  });
+}
+
+export async function addFGAccessoryLink(
+  fgId: number,
+  accessoryId: number
+): Promise<FGAccessoryLink> {
+  return apiFetch<FGAccessoryLink>(`/admin/inventory/finished-goods/${fgId}/accessories/`, {
+    method: "POST",
+    body: JSON.stringify({ accessory_id: accessoryId }),
+  });
+}
+
+export async function updateFGAccessoryLink(
+  fgId: number,
+  linkId: number,
+  data: unknown
+): Promise<FGAccessoryLink> {
+  return apiFetch<FGAccessoryLink>(
+    `/admin/inventory/finished-goods/${fgId}/accessories/${linkId}/`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }
+  );
+}
+
+export async function deleteFGAccessoryLink(fgId: number, linkId: number): Promise<void> {
+  return apiFetch<void>(`/admin/inventory/finished-goods/${fgId}/accessories/${linkId}/`, {
+    method: "DELETE",
+  });
+}
+
+export async function addFGAccessoryGroupLink(
+  fgId: number,
+  groupId: number
+): Promise<FGAccessoryLink> {
+  return apiFetch<FGAccessoryLink>(
+    `/admin/inventory/finished-goods/${fgId}/accessory-groups/`,
+    {
+      method: "POST",
+      body: JSON.stringify({ group_id: groupId }),
+    }
+  );
+}
+
+export async function addFGServiceLink(fgId: number, serviceId: number): Promise<FGServiceLink> {
+  return apiFetch<FGServiceLink>(`/admin/inventory/finished-goods/${fgId}/services/`, {
+    method: "POST",
+    body: JSON.stringify({ service_id: serviceId }),
+  });
+}
+
+export async function updateFGServiceLink(
+  fgId: number,
+  linkId: number,
+  data: unknown
+): Promise<FGServiceLink> {
+  return apiFetch<FGServiceLink>(
+    `/admin/inventory/finished-goods/${fgId}/services/${linkId}/`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }
+  );
+}
+
+export async function deleteFGServiceLink(fgId: number, linkId: number): Promise<void> {
+  return apiFetch<void>(`/admin/inventory/finished-goods/${fgId}/services/${linkId}/`, {
+    method: "DELETE",
+  });
+}
+
+// Service catalog
+export async function createServiceCatalogItem(payload: unknown): Promise<ServiceCatalogItem> {
+  return apiFetch<ServiceCatalogItem>("/admin/inventory/service-catalog/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+// Accessory variant groups
+export async function createAccessoryVariantGroup(
+  payload: unknown
+): Promise<AccessoryVariantGroup> {
+  return apiFetch<AccessoryVariantGroup>("/admin/inventory/accessory-variant-groups/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateAccessoryVariantGroup(
+  id: number,
+  payload: unknown
+): Promise<AccessoryVariantGroup> {
+  return apiFetch<AccessoryVariantGroup>(
+    `/admin/inventory/accessory-variant-groups/${id}/`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function deleteAccessoryVariantGroup(id: number): Promise<void> {
+  return apiFetch<void>(`/admin/inventory/accessory-variant-groups/${id}/`, {
+    method: "DELETE",
+  });
+}
