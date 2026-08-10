@@ -447,6 +447,15 @@ export type StockLocation = {
   address?: string;
 };
 
+export type StockAdjustmentLine = {
+  id?: number;
+  product_id: number;
+  quantity: number;
+  unit_cost_snapshot?: string | null;
+  valuation_amount_snapshot?: string | null;
+  line_valuation?: string | null;
+};
+
 export type StockAdjustment = {
   id: number;
   adjustment_no?: string;
@@ -454,13 +463,14 @@ export type StockAdjustment = {
   status: string;
   stock_location_name?: string;
   reason?: string;
-  lines?: Array<{ product_id: number; quantity: number; unit_cost_snapshot?: string }>;
+  lines?: StockAdjustmentLine[];
   created_by_username?: string;
   draft_count?: number;
   approved_count?: number;
   posted_count?: number;
   requires_unit_cost?: boolean;
   can_post?: boolean;
+  posting_blockers?: string[];
 };
 
 export interface StockAdjustmentsPayload {
@@ -642,6 +652,56 @@ export async function searchInventoryItems(
     `/admin/inventory/items/?q=${encodeURIComponent(q)}`,
     { method: "GET" }
   );
+}
+
+export type AdminInventoryItemSearchRow = {
+  id: number;
+  inventory_item_id: number;
+  product_id: number;
+  product_name: string;
+  product_code: string;
+  sku: string;
+  category: string;
+  subcategory: string;
+  stock_item_type: string;
+  unit_of_measure: string;
+  standard_unit_cost: string | null;
+  barcode: string;
+  default_stock_location_id: number | null;
+  default_stock_location_code: string | null;
+  available_by_location?: Array<{
+    stock_location_id: number;
+    stock_location_name: string;
+    stock_location_code: string;
+    available_quantity: string;
+  }>;
+};
+
+export type InventoryCategoriesResponse = {
+  categories: string[];
+  subcategories: Array<{ category: string; subcategory: string }>;
+  stock_item_types: Array<{ value: string; label: string }>;
+};
+
+export async function searchAdminInventoryItems(params: {
+  q?: string;
+  category?: string;
+  subcategory?: string;
+  stock_item_type?: string;
+  include_locations?: boolean;
+}): Promise<{ count: number; results: AdminInventoryItemSearchRow[] }> {
+  const query = new URLSearchParams();
+  if (params.q) query.append("q", params.q);
+  if (params.category) query.append("category", params.category);
+  if (params.subcategory) query.append("subcategory", params.subcategory);
+  if (params.stock_item_type) query.append("stock_item_type", params.stock_item_type);
+  if (params.include_locations) query.append("include_locations", "1");
+  const qs = query.toString();
+  return apiFetch(`/admin/inventory/items/search/${qs ? `?${qs}` : ""}`);
+}
+
+export async function listInventoryCategories(): Promise<InventoryCategoriesResponse> {
+  return apiFetch<InventoryCategoriesResponse>("/admin/inventory/categories/");
 }
 
 // Finished goods
