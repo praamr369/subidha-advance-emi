@@ -365,7 +365,7 @@ export interface StockSummaryParams {
 
 /**
  * Get stock summary for dashboard (low stock items)
- * GET /api/v1/admin/inventory/stock-summary/
+ * GET /api/v1/inventory/stock-summary/
  */
 export function getStockSummary(
   params?: StockSummaryParams
@@ -374,8 +374,8 @@ export function getStockSummary(
   if (params?.branch) queryParams.append("branch", String(params.branch));
 
   const url = queryParams.toString()
-    ? `/admin/inventory/stock-summary/?${queryParams}`
-    : "/admin/inventory/stock-summary/";
+    ? `/inventory/stock-summary/?${queryParams}`
+    : "/inventory/stock-summary/";
 
   return apiFetch<StockSummaryResponse>(url, { method: "GET" });
 }
