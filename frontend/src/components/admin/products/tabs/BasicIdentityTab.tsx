@@ -310,7 +310,7 @@ export default function BasicIdentityTab() {
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  {...field}
+                  checked={field.value} onChange={field.onChange} name={field.name} onBlur={field.onBlur} ref={field.ref}
                   className="h-4 w-4 rounded border-border"
                 />
                 <span className="text-sm">Active product (available for orders and subscriptions)</span>

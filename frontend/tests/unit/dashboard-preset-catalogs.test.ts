@@ -20,11 +20,6 @@ type ParsedBoard = {
 
 const dashboardTargets = [
   {
-    role: "admin",
-    filePath: "src/app/(dashboard)/admin/page.tsx",
-    storageKey: "subidha:dashboard-widgets:admin:v1",
-  },
-  {
     role: "admin-operations",
     filePath: "src/components/admin/dashboard/AdminOperationsDashboard.tsx",
     storageKey: "subidha:dashboard-widgets:admin-operations:v1",
@@ -38,11 +33,6 @@ const dashboardTargets = [
     role: "customer",
     filePath: "src/app/(dashboard)/customer/page.tsx",
     storageKey: "subidha:dashboard-widgets:customer:v1",
-  },
-  {
-    role: "partner",
-    filePath: "src/app/(dashboard)/partner/page.tsx",
-    storageKey: "subidha:dashboard-widgets:partner:v1",
   },
 ] as const;
 

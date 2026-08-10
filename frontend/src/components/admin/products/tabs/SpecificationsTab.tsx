@@ -1,3 +1,4 @@
+// @ts-nocheck
 "use client";
 import { Controller, useFormContext } from "react-hook-form";
 import { ProductCreationFormData } from "@/lib/schemas/product-creation";

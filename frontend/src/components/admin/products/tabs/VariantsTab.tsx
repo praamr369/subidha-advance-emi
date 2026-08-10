@@ -71,7 +71,7 @@ export default function VariantsTab() {
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  {...field}
+                  checked={field.value} onChange={field.onChange} name={field.name} onBlur={field.onBlur} ref={field.ref}
                   className="h-4 w-4 rounded border-border"
                 />
                 <span className="text-sm">This product has multiple variants (sizes, colors, etc.)</span>

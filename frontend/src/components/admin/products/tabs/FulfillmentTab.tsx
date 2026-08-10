@@ -31,7 +31,7 @@ export default function FulfillmentTab() {
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  {...field}
+                  checked={field.value} onChange={field.onChange} name={field.name} onBlur={field.onBlur} ref={field.ref}
                   disabled={!isEmiEligible}
                   className="h-4 w-4 rounded border-border disabled:opacity-50"
                 />
@@ -65,7 +65,7 @@ export default function FulfillmentTab() {
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  {...field}
+                  checked={field.value} onChange={field.onChange} name={field.name} onBlur={field.onBlur} ref={field.ref}
                   disabled={!isEmiEligible}
                   className="h-4 w-4 rounded border-border disabled:opacity-50"
                 />
@@ -99,7 +99,7 @@ export default function FulfillmentTab() {
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  {...field}
+                  checked={field.value} onChange={field.onChange} name={field.name} onBlur={field.onBlur} ref={field.ref}
                   disabled={!isEmiEligible}
                   className="h-4 w-4 rounded border-border disabled:opacity-50"
                 />
@@ -133,7 +133,7 @@ export default function FulfillmentTab() {
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  {...field}
+                  checked={field.value} onChange={field.onChange} name={field.name} onBlur={field.onBlur} ref={field.ref}
                   disabled={!isSaleItem}
                   className="h-4 w-4 rounded border-border disabled:opacity-50"
                 />

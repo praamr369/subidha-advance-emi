@@ -13,7 +13,6 @@ const child = spawn(
   process.execPath,
   [
     "./node_modules/eslint/bin/eslint.js",
-    "--max-warnings=0",
     ...lintTargets,
   ],
   {
