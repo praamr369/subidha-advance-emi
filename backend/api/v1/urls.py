@@ -38,6 +38,7 @@ from api.v1.views.accounting_year_end_close import AccountingYearEndCloseView, A
 from api.v1.views.admin_product_inventory_profile import AdminProductInventoryProfilePrepareView
 from api.v1.views.admin_inventory_catalog import (
     AdminAccessoriesListView,
+    AdminAccessoryDetailView,
     AdminFGAccessoryLinkDetailView,
     AdminFGAccessoryLinksView,
     AdminFGServiceLinkDetailView,
@@ -46,6 +47,7 @@ from api.v1.views.admin_inventory_catalog import (
     AdminFinishedGoodsListView,
     AdminInventoryOverviewView,
     AdminRawMaterialsListView,
+    AdminRawMaterialDetailView,
     AdminServiceCatalogDetailView,
     AdminServiceCatalogListCreateView,
     AdminServiceTypeChoicesView,
@@ -56,7 +58,13 @@ from api.v1.views.inventory import (
     AdminLotTrackingListView,
     AdminStockOnHandView,
     AdminStockLedgerListView,
+    StockAdjustmentViewSet,
+    StockLocationViewSet,
+    InventoryItemViewSet,
+    InventoryValuationView,
+    InventoryDashboardView,
 )
+from api.v1.views.inventory_phase2 import BulkDemandPlanningView
 from api.v1.views.admin_inventory_quick_create import (
     AdminAccessoryVariantGroupDetailView,
     AdminAccessoryVariantGroupListCreateView,
@@ -103,7 +111,9 @@ urlpatterns = [
     path("admin/inventory/finished-goods/<int:fg_pk>/services/", AdminFGServiceLinksView.as_view()),
     path("admin/inventory/finished-goods/<int:fg_pk>/services/<int:pk>/", AdminFGServiceLinkDetailView.as_view()),
     path("admin/inventory/raw-materials/", AdminRawMaterialsListView.as_view()),
+    path("admin/inventory/raw-materials/<int:pk>/", AdminRawMaterialDetailView.as_view()),
     path("admin/inventory/accessories/", AdminAccessoriesListView.as_view()),
+    path("admin/inventory/accessories/<int:pk>/", AdminAccessoryDetailView.as_view()),
     path("admin/inventory/service-catalog/", AdminServiceCatalogListCreateView.as_view()),
     path("admin/inventory/service-catalog/<int:pk>/", AdminServiceCatalogDetailView.as_view()),
     path("admin/inventory/service-type-choices/", AdminServiceTypeChoicesView.as_view()),
@@ -176,6 +186,21 @@ urlpatterns = [
     path("accounting/year-end/close/", AccountingYearEndCloseView.as_view()),
     path("accounting/", include("api.v1.routes.accounting")),
     path("inventory/", include("api.v1.routes.inventory")),
+    # admin/inventory/* aliases so frontend /admin/inventory/... calls resolve correctly.
+    # The router in routes/inventory.py is registered under "inventory/" prefix only, so
+    # these explicit aliases bridge the gap for endpoints the frontend expects under admin/.
+    path("admin/inventory/items/", InventoryItemViewSet.as_view({"get": "list"})),
+    path("admin/inventory/items/<int:pk>/", InventoryItemViewSet.as_view({"get": "retrieve", "patch": "partial_update", "put": "update"})),
+    path("admin/inventory/locations/", StockLocationViewSet.as_view({"get": "list"})),
+    path("admin/inventory/locations/<int:pk>/", StockLocationViewSet.as_view({"get": "retrieve", "patch": "partial_update", "put": "update"})),
+    path("admin/inventory/adjustments/", StockAdjustmentViewSet.as_view({"get": "list", "post": "create"})),
+    path("admin/inventory/adjustments/<int:pk>/", StockAdjustmentViewSet.as_view({"get": "retrieve", "patch": "partial_update"})),
+    path("admin/inventory/adjustments/<int:pk>/approve/", StockAdjustmentViewSet.as_view({"post": "approve"})),
+    path("admin/inventory/adjustments/<int:pk>/post/", StockAdjustmentViewSet.as_view({"post": "post_adjustment"})),
+    path("admin/inventory/adjustments/<int:pk>/set-line-costs/", StockAdjustmentViewSet.as_view({"post": "set_line_costs"})),
+    path("admin/inventory/valuation/", InventoryValuationView.as_view()),
+    path("admin/inventory/demand-planning/", BulkDemandPlanningView.as_view()),
+    path("admin/inventory/dashboard/", InventoryDashboardView.as_view()),
     path("manufacturing/", include("api.v1.routes.manufacturing")),
     path("billing/", include("api.v1.routes.billing")),
     path("crm/", include("api.v1.routes.crm")),

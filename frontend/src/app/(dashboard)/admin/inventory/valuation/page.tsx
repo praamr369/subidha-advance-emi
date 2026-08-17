@@ -1,4 +1,3 @@
-// @ts-nocheck
 "use client";
 
 import { useEffect, useState } from "react";
@@ -108,7 +107,7 @@ export default function InventoryValuationPage() {
           as_of_date: asOfDate || undefined,
           search: debouncedSearch || undefined,
           category: debouncedCategory || undefined,
-          exclude_zero: excludeZero ? "true" : "false",
+          exclude_zero: excludeZero || undefined,
           stock_location_id: locationId || undefined,
           page: pageIndex,
           page_size: 25,

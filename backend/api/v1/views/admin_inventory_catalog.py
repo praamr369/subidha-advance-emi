@@ -12,7 +12,9 @@ from __future__ import annotations
 from decimal import Decimal
 
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import DecimalField, ExpressionWrapper, F, Q, Sum, Value
+from django.db.models.functions import Coalesce
+from inventory.models import SOFT_HOLD_MOVEMENT_TYPES
 from django.shortcuts import get_object_or_404
 from rest_framework import permissions, serializers, status
 from rest_framework.response import Response
@@ -33,6 +35,29 @@ from inventory.models import (
 from inventory.services.service_catalog_list_service import build_service_catalog_list
 
 MONEY_ZERO = Decimal("0.00")
+QUANTITY_ZERO = Decimal("0.000")
+_SOFT_HOLDS = list(SOFT_HOLD_MOVEMENT_TYPES)
+
+
+def _annotate_stock_qty(qs):
+    """Annotate queryset with physical_qty = opening + sum(in) - sum(out), excluding soft-holds."""
+    return qs.annotate(
+        _ledger_in=Coalesce(
+            Sum("stock_ledger__quantity_in", filter=~Q(stock_ledger__movement_type__in=_SOFT_HOLDS)),
+            Value(QUANTITY_ZERO),
+            output_field=DecimalField(),
+        ),
+        _ledger_out=Coalesce(
+            Sum("stock_ledger__quantity_out", filter=~Q(stock_ledger__movement_type__in=_SOFT_HOLDS)),
+            Value(QUANTITY_ZERO),
+            output_field=DecimalField(),
+        ),
+    ).annotate(
+        physical_qty=ExpressionWrapper(
+            Coalesce(F("opening_stock_qty"), Value(QUANTITY_ZERO), output_field=DecimalField()) + F("_ledger_in") - F("_ledger_out"),
+            output_field=DecimalField(),
+        )
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -167,6 +192,7 @@ def _inventory_item_summary(item: InventoryItem) -> dict:
         "category": prod.category or (prod.category_master.name if prod.category_master_id else ""),
         "subcategory": prod.subcategory or (prod.subcategory_master.name if prod.subcategory_master_id else ""),
         "base_price": str(prod.base_price),
+        "physical_qty": str(getattr(item, "physical_qty", None) or "0.00"),
     }
 
 
@@ -289,6 +315,7 @@ class AdminFinishedGoodsListView(APIView):
             .prefetch_related("accessory_links", "service_links")
             .order_by("product__name", "id")
         )
+        qs = _annotate_stock_qty(qs)
         q = (request.query_params.get("q") or "").strip()
         if q:
             qs = qs.filter(
@@ -374,6 +401,7 @@ class AdminRawMaterialsListView(APIView):
             .select_related("product", "product__category_master", "default_stock_location")
             .order_by("product__name", "id")
         )
+        qs = _annotate_stock_qty(qs)
         q = (request.query_params.get("q") or "").strip()
         if q:
             qs = qs.filter(
@@ -393,6 +421,79 @@ class AdminRawMaterialsListView(APIView):
         return Response(_paginate(qs, request, _row))
 
 
+class AdminRawMaterialDetailView(APIView):
+    """PATCH/DELETE a single raw material inventory item."""
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def _get(self, pk):
+        return get_object_or_404(
+            InventoryItem.objects.select_related("product"),
+            pk=pk, stock_item_type=InventoryItemType.RAW_MATERIAL,
+        )
+
+    def get(self, request, pk):
+        item = self._get(pk)
+        d = _inventory_item_summary(item)
+        d["bom_usage_count"] = item.manufacturing_bom_lines.count()
+        return Response(d)
+
+    @transaction.atomic
+    def patch(self, request, pk):
+        item = self._get(pk)
+        data = request.data
+        prod = item.product
+        if "name" in data:
+            prod.name = (data["name"] or "").strip()
+        if "base_price" in data:
+            from decimal import Decimal, InvalidOperation
+            try:
+                prod.base_price = Decimal(str(data["base_price"]))
+            except (InvalidOperation, TypeError):
+                pass
+        if "category" in data:
+            prod.category = (data["category"] or "").strip()
+        if "subcategory" in data:
+            prod.subcategory = (data["subcategory"] or "").strip()
+        if "is_active" in data:
+            prod.is_active = bool(data["is_active"])
+        prod.save(update_fields=["name", "base_price", "category", "subcategory", "is_active"])
+        if "unit_of_measure" in data:
+            item.unit_of_measure = (data["unit_of_measure"] or "").strip()
+        if "standard_unit_cost" in data:
+            from decimal import Decimal, InvalidOperation
+            try:
+                item.standard_unit_cost = Decimal(str(data["standard_unit_cost"]))
+            except (InvalidOperation, TypeError):
+                pass
+        if "reorder_level_qty" in data:
+            from decimal import Decimal, InvalidOperation
+            try:
+                item.reorder_level_qty = Decimal(str(data["reorder_level_qty"]))
+            except (InvalidOperation, TypeError):
+                pass
+        if "barcode" in data:
+            item.barcode = (data["barcode"] or "").strip() or None
+        if "is_active" in data:
+            item.is_active = bool(data["is_active"])
+        item.save()
+        d = _inventory_item_summary(item)
+        d["bom_usage_count"] = item.manufacturing_bom_lines.count()
+        return Response(d)
+
+    @transaction.atomic
+    def delete(self, request, pk):
+        item = self._get(pk)
+        if item.manufacturing_bom_lines.exists():
+            return Response(
+                {"detail": "Cannot delete: raw material is used in one or more BOMs."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        product = item.product
+        item.delete()
+        product.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 # ---------------------------------------------------------------------------
 # Accessories list
 # ---------------------------------------------------------------------------
@@ -407,6 +508,7 @@ class AdminAccessoriesListView(APIView):
             .select_related("product", "product__category_master", "default_stock_location")
             .order_by("product__name", "id")
         )
+        qs = _annotate_stock_qty(qs)
         q = (request.query_params.get("q") or "").strip()
         if q:
             qs = qs.filter(
@@ -421,6 +523,79 @@ class AdminAccessoriesListView(APIView):
             return d
 
         return Response(_paginate(qs, request, _row))
+
+
+class AdminAccessoryDetailView(APIView):
+    """PATCH/DELETE a single accessory inventory item."""
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def _get(self, pk):
+        return get_object_or_404(
+            InventoryItem.objects.select_related("product"),
+            pk=pk, stock_item_type=InventoryItemType.ACCESSORY,
+        )
+
+    def get(self, request, pk):
+        item = self._get(pk)
+        d = _inventory_item_summary(item)
+        d["linked_fg_count"] = item.linked_to_finished_goods.count()
+        return Response(d)
+
+    @transaction.atomic
+    def patch(self, request, pk):
+        item = self._get(pk)
+        data = request.data
+        prod = item.product
+        if "name" in data:
+            prod.name = (data["name"] or "").strip()
+        if "base_price" in data:
+            from decimal import Decimal, InvalidOperation
+            try:
+                prod.base_price = Decimal(str(data["base_price"]))
+            except (InvalidOperation, TypeError):
+                pass
+        if "category" in data:
+            prod.category = (data["category"] or "").strip()
+        if "subcategory" in data:
+            prod.subcategory = (data["subcategory"] or "").strip()
+        if "is_active" in data:
+            prod.is_active = bool(data["is_active"])
+        prod.save(update_fields=["name", "base_price", "category", "subcategory", "is_active"])
+        if "unit_of_measure" in data:
+            item.unit_of_measure = (data["unit_of_measure"] or "PCS").strip()
+        if "standard_unit_cost" in data:
+            from decimal import Decimal, InvalidOperation
+            try:
+                item.standard_unit_cost = Decimal(str(data["standard_unit_cost"]))
+            except (InvalidOperation, TypeError):
+                pass
+        if "reorder_level_qty" in data:
+            from decimal import Decimal, InvalidOperation
+            try:
+                item.reorder_level_qty = Decimal(str(data["reorder_level_qty"]))
+            except (InvalidOperation, TypeError):
+                pass
+        if "barcode" in data:
+            item.barcode = (data["barcode"] or "").strip() or None
+        if "is_active" in data:
+            item.is_active = bool(data["is_active"])
+        item.save()
+        d = _inventory_item_summary(item)
+        d["linked_fg_count"] = item.linked_to_finished_goods.count()
+        return Response(d)
+
+    @transaction.atomic
+    def delete(self, request, pk):
+        item = self._get(pk)
+        if item.linked_to_finished_goods.exists():
+            return Response(
+                {"detail": "Cannot delete: accessory is linked to one or more finished goods."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        product = item.product
+        item.delete()
+        product.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 # ---------------------------------------------------------------------------

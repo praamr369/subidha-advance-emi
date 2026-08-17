@@ -51,6 +51,17 @@ from api.v1.views.admin_sales_ops import AdminSalesDirectSaleListCreateView
 from api.v1.views.inventory import AdminInventoryCategoriesView
 from api.v1.views.inventory import AdminInventoryItemSearchView
 from api.v1.views.inventory import AdminReturnLocationsSetupView
+from api.v1.views.inventory_fg import (
+    FGProfileListView,
+    FGProfileDetailView,
+    FGAccessoryLinkView,
+    FGAccessoryGroupLinkView,
+    FGAccessoryLinkDetailView,
+    FGServiceLinkView,
+    FGServiceLinkDetailView,
+    FGBarcodePatchView,
+    FGQuickCreateAccessoryView,
+)
 
 urlpatterns = [
     path("erp/today-work/", AdminErpTodayWorkView.as_view()),
@@ -88,6 +99,16 @@ urlpatterns = [
     path("inventory/profiles/<int:pk>/stock-by-location/", AdminInventoryProfileStockByLocationView.as_view()),
     path("inventory/profiles/<int:pk>/manufacturing-cost/", AdminInventoryProfileManufacturingCostView.as_view()),
     path("inventory/items/search/", AdminInventoryItemSearchView.as_view()),
+    # Finished Good profile + accessory/service links
+    path("inventory/finished-goods/", FGProfileListView.as_view()),
+    path("inventory/finished-goods/<int:pk>/", FGProfileDetailView.as_view()),
+    path("inventory/finished-goods/<int:pk>/accessories/", FGAccessoryLinkView.as_view()),
+    path("inventory/finished-goods/<int:pk>/accessory-groups/", FGAccessoryGroupLinkView.as_view()),
+    path("inventory/finished-goods/<int:pk>/accessories/<int:lid>/", FGAccessoryLinkDetailView.as_view()),
+    path("inventory/finished-goods/<int:pk>/services/", FGServiceLinkView.as_view()),
+    path("inventory/finished-goods/<int:pk>/services/<int:lid>/", FGServiceLinkDetailView.as_view()),
+    path("inventory/finished-goods/<int:pk>/barcode/", FGBarcodePatchView.as_view()),
+    path("inventory/finished-goods/<int:pk>/quick-create-accessory/", FGQuickCreateAccessoryView.as_view()),
     path("inventory/categories/", AdminInventoryCategoriesView.as_view()),
     path("inventory/locations/setup-return-locations/", AdminReturnLocationsSetupView.as_view()),
     path("inventory/stock-needs/", AdminInventoryStockNeedListCreateView.as_view()),

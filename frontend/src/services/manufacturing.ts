@@ -244,6 +244,10 @@ export function deactivateManufacturingBom(id: number | string) {
   });
 }
 
+export function deleteManufacturingBom(id: number | string) {
+  return apiFetch<void>(`/manufacturing/boms/${id}/`, { method: "DELETE" });
+}
+
 export function listProductionJobs(params: Record<string, QueryValue> = {}) {
   return apiFetch<PaginatedResponse<ProductionJob>>(`/manufacturing/jobs/${buildQuery(params)}`);
 }
