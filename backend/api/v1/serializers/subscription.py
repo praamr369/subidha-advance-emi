@@ -101,6 +101,7 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
     paid_emi_count = serializers.SerializerMethodField()
     pending_emi_count = serializers.SerializerMethodField()
     waived_emi_count = serializers.SerializerMethodField()
+    overdue_emi_count = serializers.SerializerMethodField()
 
     total_paid_amount = serializers.SerializerMethodField()
     outstanding_amount = serializers.SerializerMethodField()

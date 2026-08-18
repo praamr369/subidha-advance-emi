@@ -58,8 +58,23 @@ jobs:
       # OpenAPI schema still generates for the whole surface. This is the
       # automated replacement for hand-checking 2,500+ endpoints; a new privilege
       # leak, crash, or schema break fails the PR here.
+      #
+      # Tee the output so the "Upload Layer-A output on failure" step below
+      # captures the exact traceback for anonymous log inspection via the
+      # workflow artifacts UI (job logs require repo admin scope on the REST API).
       - name: Layer-A auth matrix + endpoint smoke + schema
-        run: python manage.py test tests.verification --settings=core.settings.test --verbosity 2
+        run: |
+          set -o pipefail
+          python manage.py test tests.verification --settings=core.settings.test --verbosity 2 2>&1 \
+            | tee /tmp/layer-a-output.log
+      - name: Upload Layer-A output on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: layer-a-output
+          path: /tmp/layer-a-output.log
+          if-no-files-found: warn
+          retention-days: 7
 
       # Reported but NON-BLOCKING until the ~pre-existing suite failures
       # (uq_payment_per_emi + accounting-fixture gaps) are triaged. Flip

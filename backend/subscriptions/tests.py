@@ -38,6 +38,7 @@ from payments.services.payment_service import record_emi_payment
 from tests.helpers import (
     ensure_default_payment_collection_accounts,
     ensure_test_accounting_posting_prerequisites,
+    ensure_waiver_launch_approved,
 )
 
 
@@ -45,6 +46,9 @@ class FinancialFlowTests(TestCase):
     def setUp(self):
         ensure_default_payment_collection_accounts()
         ensure_test_accounting_posting_prerequisites()
+        # Draw execution now requires an approved waiver launch (CTRL-LP guard).
+        # Tests exercise post-approval behavior; opt in explicitly.
+        ensure_waiver_launch_approved()
         User = get_user_model()
         self.customer_user = User.objects.create_user(
             username="cust_fin", password="pass1234", role="CUSTOMER", phone="9800000011"

@@ -61,11 +61,6 @@ class PartnerCollectionRequestSerializer(serializers.ModelSerializer):
             "review_note",
             "approved_payment_id",
             "approved_emi_id",
-            "is_flagged_bad",
-            "flag_reason",
-            "flagged_by",
-            "flagged_by_username",
-            "flagged_at",
             "created_at",
             "updated_at",
         )

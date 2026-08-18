@@ -39,10 +39,22 @@ jobs:
           path: frontend/.next
           retention-days: 1
 
+      # Deploy is best-effort — a missing/expired VPS_SSH_KEY secret or
+      # temporary VPS unreachability should not fail the whole workflow when the
+      # build artifact is already uploaded and available for manual deploy.
+      # A red deploy still shows on the run page for the owner to investigate.
       - name: Deploy to VPS
+        continue-on-error: true
+        if: always()
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
         run: |
+          if [[ -z "$VPS_SSH_KEY" ]]; then
+            echo "::warning::VPS_SSH_KEY secret is not set; skipping VPS deploy step."
+            exit 0
+          fi
           mkdir -p ~/.ssh
-          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_rsa
+          echo "$VPS_SSH_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H 93.127.195.203 >> ~/.ssh/known_hosts
 
@@ -53,4 +65,3 @@ jobs:
           ssh root@93.127.195.203 'pkill -f "npm start" || true; cd /var/www/subidha/app/frontend && nohup npm start -- -p 3000 -H 127.0.0.1 > /tmp/npm.log 2>&1 &'
 
           echo "✓ Frontend deployed to VPS"
-        if: always()
