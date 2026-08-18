@@ -72,8 +72,21 @@ if ! python_has_django "${PYTHON_EXECUTABLE}"; then
   exit 1
 fi
 
-rm -f "${SMOKE_DB_PATH}" "${SMOKE_META_PATH}" "${SMOKE_MANIFEST_PATH}"
+# Skip the destructive migrate+seed rebuild when a caller (e.g. CI's explicit
+# pre-flight step) has already primed the DB, meta, and manifest. Playwright's
+# webServer boot is capped at 420s; on CI runners the full migrate chain plus
+# seed can burn most of that window, leaving no time for pytest.
+if [[ "${PLAYWRIGHT_SKIP_BOOTSTRAP:-0}" == "1" \
+      && -s "${SMOKE_DB_PATH}" \
+      && -s "${SMOKE_META_PATH}" ]]; then
+  # The smoke-manifest is written later by Playwright's auth.setup.ts; only
+  # the sqlite DB and meta file need to be primed here for the runserver to
+  # come up healthy.
+  echo "[playwright-backend] PLAYWRIGHT_SKIP_BOOTSTRAP=1 and primed DB+meta exist — starting runserver directly." >&2
+else
+  rm -f "${SMOKE_DB_PATH}" "${SMOKE_META_PATH}" "${SMOKE_MANIFEST_PATH}"
+  "${PYTHON_EXECUTABLE}" "${BACKEND_ROOT}/manage.py" migrate --noinput --settings "${DJANGO_SETTINGS}"
+  "${PYTHON_EXECUTABLE}" "${BACKEND_ROOT}/manage.py" seed_playwright_smoke --settings "${DJANGO_SETTINGS}"
+fi
 
-"${PYTHON_EXECUTABLE}" "${BACKEND_ROOT}/manage.py" migrate --noinput --settings "${DJANGO_SETTINGS}"
-"${PYTHON_EXECUTABLE}" "${BACKEND_ROOT}/manage.py" seed_playwright_smoke --settings "${DJANGO_SETTINGS}"
 "${PYTHON_EXECUTABLE}" "${BACKEND_ROOT}/manage.py" runserver 127.0.0.1:8100 --settings "${DJANGO_SETTINGS}" --noreload
