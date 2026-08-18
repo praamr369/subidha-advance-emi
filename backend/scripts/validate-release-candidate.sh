@@ -30,7 +30,9 @@ fi
 CHECK_SETTINGS_MODULE="${CHECK_SETTINGS_MODULE:-core.settings.test}"
 DEPLOY_CHECK_SETTINGS_MODULE="${DEPLOY_CHECK_SETTINGS_MODULE:-core.settings.production}"
 DEPLOY_CHECK_DJANGO_ENV="${DEPLOY_CHECK_DJANGO_ENV:-production}"
-DEPLOY_CHECK_SECRET_KEY="${DEPLOY_CHECK_SECRET_KEY:-release-candidate-deploy-check-secret}"
+# Must satisfy core.settings.base._validate_secret_value: ≥50 chars, ≥5 unique
+# chars, no django-insecure- prefix, not in DISALLOWED_SECRET_VALUES.
+DEPLOY_CHECK_SECRET_KEY="${DEPLOY_CHECK_SECRET_KEY:-release-candidate-deploy-check-secret-key-abc123-xyz789}"
 DEPLOY_CHECK_ALLOWED_HOSTS="${DEPLOY_CHECK_ALLOWED_HOSTS:-localhost}"
 DEPLOY_CHECK_DATABASE_URL="${DEPLOY_CHECK_DATABASE_URL:-postgresql://postgres:postgres@localhost:5432/subidha_rc}"
 DEPLOY_CHECK_CSRF_TRUSTED_ORIGINS="${DEPLOY_CHECK_CSRF_TRUSTED_ORIGINS:-http://localhost}"

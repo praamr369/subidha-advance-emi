@@ -20,7 +20,9 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          # Next.js 16 requires Node ≥20.9.0 (see frontend/node_modules/next/package.json engines).
+          # Matches the version used by release-candidate-validation.yml.
+          node-version: '20.18.0'
 
       - name: Install dependencies
         run: cd frontend && npm ci
