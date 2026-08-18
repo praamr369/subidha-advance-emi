@@ -75,8 +75,12 @@ class UnifiedReceivableCollectSerializer(serializers.Serializer):
     splits = CollectionSplitSerializer(many=True, required=False)
     finance_account = serializers.IntegerField(required=False, min_value=1)
     finance_account_id = serializers.IntegerField(required=False, min_value=1)
-    branch_id = serializers.IntegerField(required=False, min_value=1)
-    cash_counter_id = serializers.IntegerField(required=False, min_value=1)
+    # Frontend sends `null` for these when the operator hasn't picked a branch
+    # / counter (single-branch shops, direct-desk collections). Without
+    # allow_null=True DRF rejects null with "This field may not be null.",
+    # blocking the whole receivables collection surface.
+    branch_id = serializers.IntegerField(required=False, allow_null=True, min_value=1)
+    cash_counter_id = serializers.IntegerField(required=False, allow_null=True, min_value=1)
     reference = serializers.CharField(required=False, allow_blank=True, max_length=100)
     reference_no = serializers.CharField(required=False, allow_blank=True, max_length=100)
     payment_date = serializers.DateField(required=False, allow_null=True)
