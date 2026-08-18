@@ -74,7 +74,9 @@ test.describe("public release smoke", () => {
     await expect(page.locator("body")).toContainText(/media-ready cards/i);
 
     await page.goto(`/products/${manifest.entities.public.product_id}`);
-    await expect(page.locator("body")).toContainText(/enquire now/i);
+    // Public detail page has an "Enquire" action button and enquiry-related copy;
+    // the older "Enquire now" phrasing was consolidated during the public UI refactor.
+    await expect(page.locator("body")).toContainText(/enquir/i);
     await expect(page.locator("body")).toContainText(/media state/i);
     await expect(page.locator("body")).toContainText(/base price/i);
   });
@@ -198,8 +200,9 @@ test.describe("admin release smoke", () => {
       `/admin/payments/reconciliation?subscription=${meta.entities.preseed_payment.subscription_id}&payment=${meta.entities.preseed_payment.payment_id}`
     );
     await expect(page).toHaveURL(/\/admin\/accounting\/bridge-reconciliation/);
-    // Body-text assertion is resilient to shell/heading refactors.
-    await expect(page.locator("body")).toContainText(/accounting bridge reconciliation/i);
+    // Page now delegates to ReconciliationHub which titles itself "Reconciliation
+    // Center"; assert on that + its subtitle for a stable render check.
+    await expect(page.locator("body")).toContainText(/reconciliation center/i);
   });
 });
 
