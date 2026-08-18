@@ -130,38 +130,51 @@ test.describe("admin release smoke", () => {
     const target = meta.entities.admin_collection;
     const referenceNo = `SMOKE-ADMIN-${Date.now()}`;
 
-    await page.goto(`/admin/finance/collect?subscription=${target.subscription_id}&emi=${target.emi_id}`);
-    // Page shell renamed to "Universal Collection Workspace" — assert via body text
-    // to survive future heading-level refactors.
+    // Page shell renamed to "Universal Collection Workspace" and the workflow
+    // pivoted to auto-search-then-select. The `?subscription=X` URL param drives
+    // an auto-search that pre-selects the receivable when there is exactly one
+    // match; the Collection Form then appears with amount pre-filled from
+    // due_amount. No more #subscription_id / #emi_id inputs — the receivable
+    // is implicit.
+    await page.goto(`/admin/finance/collect?subscription=${target.subscription_id}`);
     await expect(page.locator("body")).toContainText(/universal collection workspace/i);
-    await expect(page.locator("#subscription_id")).toHaveValue(String(target.subscription_id));
-    await expect(page.locator("#emi_id")).toHaveValue(String(target.emi_id));
+
+    // Wait for auto-select → form render (Collection Form header).
+    await expect(
+      page.getByRole("heading", { name: /^collection form$/i })
+    ).toBeVisible({ timeout: 15_000 });
+
     await page.locator("#payment_method").selectOption("CASH");
     await selectFirstRealOption(page, "#finance_account_id");
     await page.locator("#reference_no").fill(referenceNo);
 
-    await page.getByRole("button", { name: /record payment/i }).click();
-    await expect(
-      page.getByRole("heading", { name: /confirm payment posting/i })
-    ).toBeVisible();
+    // Post now goes through ConfirmActionButton: a "Confirm Collection" trigger
+    // button opens a modal whose confirm action is labeled "Yes, post receipt".
+    // The unified collection endpoint moved from /admin/payments/collect/ to
+    // /admin/receivables/collect/.
+    await page.getByRole("button", { name: /^confirm collection$/i }).first().click();
+    await expect(page.getByRole("heading", { name: /^confirm collection$/i })).toBeVisible();
 
     const [collectResponse] = await Promise.all([
       page.waitForResponse(
         (response) =>
           response.request().method() === "POST" &&
-          response.url().includes("/admin/payments/collect/")
+          response.url().includes("/admin/receivables/collect/")
       ),
-      page.getByRole("button", { name: /confirm posting/i }).click(),
+      page.getByRole("button", { name: /yes, post receipt/i }).click(),
     ]);
 
     expect(collectResponse.ok()).toBeTruthy();
     const collectPayload = (await collectResponse.json()) as {
+      payment_id?: number;
       payment?: { id?: number };
     };
-    const paymentId = Number(collectPayload.payment?.id || 0);
+    const paymentId = Number(collectPayload.payment_id ?? collectPayload.payment?.id ?? 0);
     expect(paymentId).toBeGreaterThan(0);
 
-    await expect(page.locator("body")).toContainText(`Payment #${paymentId}`);
+    // Success banner shows "Payment Collected Successfully" — the older
+    // `Payment #{id}` inline text was removed in the workspace refactor.
+    await expect(page.locator("body")).toContainText(/payment collected successfully/i);
 
     await page.goto(`/admin/payments/${paymentId}`);
     await expect(page.getByRole("heading", { name: new RegExp(`payment #${paymentId}`, "i") })).toBeVisible();
@@ -271,10 +284,11 @@ test.describe("partner release smoke", () => {
   test("partner payments list loads", async ({ page }) => {
     const meta = getMeta();
     await page.goto("/partner/payments");
-    // Partner page now uses a plain "Payments" heading with "Verified partner
-    // payments" subtitle; assert via subtitle for stability.
+    // Partner list rows show customer_name, subscription_number, amount, method —
+    // but NOT the reference_no (only used to search). Assert on the seeded
+    // customer_name which the list DOES render per row.
     await expect(page.locator("body")).toContainText(/verified partner payments/i);
-    await expect(page.locator("body")).toContainText(meta.entities.preseed_payment.reference_no);
+    await expect(page.locator("body")).toContainText(meta.entities.preseed_payment.customer_name);
   });
 });
 
@@ -288,10 +302,11 @@ test.describe("customer release smoke", () => {
     await expect(page.locator("body")).toContainText(/next payment due/i);
 
     await page.goto("/customer/payments");
-    // Page now renders "Payments & Receipts" (via ERPPageShell title). Assert
-    // on the subtitle text for stability across future shell refactors.
+    // Page now renders "Payments & Receipts" (via ERPPageShell title). The row
+    // template shows subscription_number, method, date, amount but NOT the
+    // reference_no. Assert via the SUB-{id} label the row DOES render.
     await expect(page.locator("body")).toContainText(/your complete payment history/i);
-    await expect(page.locator("body")).toContainText(meta.entities.preseed_payment.reference_no);
+    await expect(page.locator("body")).toContainText(`SUB-${meta.entities.preseed_payment.subscription_id}`);
   });
 
   test("customer subscription detail renders lifecycle surfaces", async ({ page }) => {
