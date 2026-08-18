@@ -582,6 +582,27 @@ class Command(BaseCommand):
             DocumentType.JOURNAL_ENTRY,
             dates[0],
         )
+        # Playwright smoke exercises admin/cashier collection flows across
+        # multiple receivable source types (ADVANCE_EMI, DIRECT_SALE, RENT,
+        # LEASE). The unified receivables/collect endpoint issues a receipt
+        # per collection; without a numbering profile for the receipt type
+        # applicable to the target FY the whole POST 400s. Provision the
+        # common receipt/invoice profiles the smoke flow needs.
+        from accounting.services.document_sequence_service import upsert_numbering_profile
+        for doc_type in (
+            DocumentType.DIRECT_SALE,
+            DocumentType.TAX_INVOICE,
+            DocumentType.DIRECT_SALE_RECEIPT,
+            DocumentType.EMI_RECEIPT,
+            DocumentType.RENT_INVOICE,
+            DocumentType.LEASE_INVOICE,
+            DocumentType.SECURITY_DEPOSIT_RECEIPT,
+            DocumentType.CREDIT_NOTE,
+        ):
+            upsert_numbering_profile(
+                document_type=doc_type,
+                reference_date=dates[0],
+            )
         return {
             "financial_year": financial_year,
             "periods": periods,
