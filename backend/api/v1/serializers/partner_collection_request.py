@@ -29,11 +29,6 @@ class PartnerCollectionRequestSerializer(serializers.ModelSerializer):
     method = serializers.CharField(source="payment_method", read_only=True)
     submitted_at = serializers.DateTimeField(source="created_at", read_only=True)
 
-    flagged_by_username = serializers.CharField(
-        source="flagged_by.username",
-        read_only=True,
-    )
-
     class Meta:
         model = PartnerCollectionRequest
         fields = (
