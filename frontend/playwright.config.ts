@@ -119,6 +119,11 @@ export default defineConfig({
       // Backend bootstrap may create/install a dedicated playwright venv on first run.
       timeout: 420_000,
       cwd: ".",
+      // Surface backend stdout/stderr to the CI log so migration or startup
+      // failures are visible when the health check times out. Default is
+      // "ignore" which silently swallows every diagnostic line.
+      stdout: "pipe",
+      stderr: "pipe",
       env: {
         ...process.env,
         CORS_ALLOWED_ORIGINS: frontendBaseUrl,
@@ -139,6 +144,8 @@ export default defineConfig({
       reuseExistingServer: false,
       timeout: 240_000,
       cwd: ".",
+      stdout: "pipe",
+      stderr: "pipe",
       env: {
         ...process.env,
         NEXT_PUBLIC_API_BASE_URL: apiBaseUrl,

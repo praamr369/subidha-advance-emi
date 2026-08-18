@@ -35,6 +35,26 @@ class EndpointSmokeTest(APITestCase):
         )
         cls.endpoints = [e for e in iter_api_endpoints() if "GET" in e.methods]
 
+    # Substrings uniquely identifying controlled disabled-feature 5xx responses
+    # (not crashes) — safe to ignore. Each entry must be tied to a known feature
+    # flag whose OFF state raises a DRF APIException with a distinctive detail;
+    # do NOT use for generic upstream/backend errors.
+    CONTROLLED_5XX_DETAIL_SUBSTRINGS: tuple[str, ...] = (
+        "AI assistant is disabled",  # ai_assistant.permissions.AIAssistantDisabled
+    )
+
+    @classmethod
+    def _controlled_disabled_response(cls, resp) -> bool:
+        """True when a 5xx carries a well-known feature-flag guard message."""
+        try:
+            payload = resp.json()
+        except Exception:
+            return False
+        if not isinstance(payload, dict):
+            return False
+        detail = str(payload.get("detail", ""))
+        return any(marker in detail for marker in cls.CONTROLLED_5XX_DETAIL_SUBSTRINGS)
+
     def test_get_endpoints_do_not_500(self):
         self.client.force_authenticate(user=self.admin)
         failures = []
@@ -47,7 +67,7 @@ class EndpointSmokeTest(APITestCase):
             except Exception as exc:  # an unhandled exception is also a crash
                 failures.append((f"EXC:{type(exc).__name__}", ep.path, ep.view))
                 continue
-            if code >= 500:
+            if code >= 500 and not self._controlled_disabled_response(resp):
                 failures.append((code, ep.path, ep.view))
         self.client.force_authenticate(user=None)
         self.assertEqual(

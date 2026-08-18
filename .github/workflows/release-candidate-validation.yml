@@ -86,6 +86,22 @@ jobs:
         working-directory: frontend
         run: npx playwright install --with-deps chromium
 
+      # Sanity-check the Playwright backend can boot BEFORE Playwright kicks in.
+      # Playwright's webServer stdout is easy to lose; if migrate or startup
+      # fails here the CI log carries the real traceback.
+      - name: Boot Playwright backend (dry-run health check)
+        working-directory: backend
+        env:
+          DJANGO_SETTINGS_MODULE: core.settings.playwright
+          PLAYWRIGHT_DB_PATH: /tmp/subidha-playwright-smoke.sqlite3
+          PLAYWRIGHT_SMOKE_META_PATH: /tmp/subidha-playwright-smoke-meta.json
+          PLAYWRIGHT_SMOKE_MANIFEST_PATH: ${{ github.workspace }}/frontend/tests/e2e/.generated/smoke-manifest.json
+        run: |
+          rm -f "$PLAYWRIGHT_DB_PATH" "$PLAYWRIGHT_SMOKE_META_PATH"
+          mkdir -p "$(dirname "$PLAYWRIGHT_SMOKE_MANIFEST_PATH")"
+          python manage.py migrate --noinput
+          python manage.py seed_playwright_smoke
+
       - name: Focused release smoke suite
         working-directory: frontend
         env:

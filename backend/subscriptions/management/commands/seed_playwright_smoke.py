@@ -73,6 +73,19 @@ class Command(BaseCommand):
         emit_json = bool(options.get("emit_json"))
         User = get_user_model()
         today = timezone.localdate()
+
+        # Playwright smoke exercises the post-approval draw flow; a fresh
+        # sqlite DB starts with the business-rule policy risk_status = NONE,
+        # which blocks reveal_and_execute_draw via CTRL-LP. Approve up front so
+        # the seed can complete without touching the guard.
+        from subscriptions.models_business_setup import LegalRiskStatus
+        from subscriptions.services.business_rule_policy_service import (
+            get_or_create_active_business_rule_policy,
+        )
+        _policy = get_or_create_active_business_rule_policy()
+        if _policy.risk_status != LegalRiskStatus.APPROVED_FOR_PUBLIC_LAUNCH:
+            _policy.risk_status = LegalRiskStatus.APPROVED_FOR_PUBLIC_LAUNCH
+            _policy.save(update_fields=["risk_status", "updated_at"])
         meta_path = Path(
             getattr(
                 settings,
