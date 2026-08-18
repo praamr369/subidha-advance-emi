@@ -25,10 +25,6 @@ from api.v1.views.contract_references import AdminUnifiedReceivableCollectView
 from api.v1.views.contract_references import AdminUnifiedReceivablePreviewView
 from api.v1.views.contract_references import AdminUnifiedReceivableWorkbenchView
 from api.v1.views.customer_intelligence import CustomerOperationalSummaryView
-from api.v1.views.payables import AdminPayableActionView
-from api.v1.views.payables import AdminPayableExecuteView
-from api.v1.views.payables import AdminPayableFinanceAccountsView
-from api.v1.views.payables import AdminUnifiedPayableView
 from api.v1.views.username_change import AdminUserUsernameChangeView
 
 urlpatterns = [
@@ -68,9 +64,4 @@ urlpatterns = [
     path("receivables/collect/", AdminUnifiedReceivableCollectView.as_view()),
     path("receivables/workbench/", AdminUnifiedReceivableWorkbenchView.as_view()),
 
-    # Payables
-    path("payables/", AdminUnifiedPayableView.as_view()),
-    path("payables/action/", AdminPayableActionView.as_view()),
-    path("payables/finance-accounts/", AdminPayableFinanceAccountsView.as_view()),
-    path("payables/execute/", AdminPayableExecuteView.as_view()),
 ]

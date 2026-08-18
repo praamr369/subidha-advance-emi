@@ -4973,3 +4973,131 @@ class UnifiedPayableIdempotency(AccountingTimeStampedModel):
     class Meta:
         db_table = "unified_payable_idempotency"
         unique_together = (("user", "key"),)
+
+
+# ── Owner Fund Injection ─────────────────────────────────────────────────────
+
+OWNER_CAPITAL_SYSTEM_CODE = "OWNER_CAPITAL_EQUITY"
+OWNER_LOAN_SYSTEM_CODE = "OWNER_LOAN_LIABILITY"
+
+
+class OwnerFundInjectionType(models.TextChoices):
+    CAPITAL = "CAPITAL", "Capital Injection (non-repayable)"
+    LOAN = "LOAN", "Owner Loan (repayable)"
+
+
+class OwnerFundInjectionStatus(models.TextChoices):
+    DRAFT = "DRAFT", "Draft"
+    POSTED = "POSTED", "Posted"
+
+
+class OwnerLoanInterestType(models.TextChoices):
+    FLAT = "FLAT", "Flat Rate"
+    REDUCING = "REDUCING", "Reducing Balance"
+    NONE = "NONE", "Interest-Free"
+
+
+class OwnerLoanRepaymentFrequency(models.TextChoices):
+    MONTHLY = "MONTHLY", "Monthly"
+    QUARTERLY = "QUARTERLY", "Quarterly"
+    LUMP_SUM = "LUMP_SUM", "Lump Sum at End"
+
+
+class OwnerFundInjection(AccountingTimeStampedModel):
+    """Owner injects personal funds into the business — as equity or a loan."""
+
+    injection_type = models.CharField(
+        max_length=20, choices=OwnerFundInjectionType.choices
+    )
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    date = models.DateField()
+    finance_account = models.ForeignKey(
+        "accounting.FinanceAccount",
+        on_delete=models.PROTECT,
+        related_name="owner_fund_injections",
+    )
+    description = models.TextField(blank=True)
+    reference = models.CharField(max_length=120, blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=OwnerFundInjectionStatus.choices,
+        default=OwnerFundInjectionStatus.DRAFT,
+        db_index=True,
+    )
+    posted_journal_entry = models.ForeignKey(
+        "accounting.JournalEntry",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="owner_fund_injections",
+    )
+    loan_outstanding = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00")
+    )
+    # Loan-specific fields (null for CAPITAL injections)
+    tenure_months = models.PositiveIntegerField(null=True, blank=True)
+    interest_rate = models.DecimalField(
+        max_digits=6, decimal_places=2, null=True, blank=True,
+        help_text="Annual interest rate in %"
+    )
+    interest_type = models.CharField(
+        max_length=10,
+        choices=OwnerLoanInterestType.choices,
+        default=OwnerLoanInterestType.NONE,
+        blank=True,
+    )
+    repayment_frequency = models.CharField(
+        max_length=20,
+        choices=OwnerLoanRepaymentFrequency.choices,
+        default=OwnerLoanRepaymentFrequency.MONTHLY,
+        blank=True,
+    )
+    repayment_start_date = models.DateField(null=True, blank=True)
+    total_interest = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00")
+    )
+    performed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+
+    class Meta:
+        db_table = "owner_fund_injection"
+        ordering = ["-date", "-id"]
+
+    def __str__(self):
+        return f"{self.get_injection_type_display()} ₹{self.amount} on {self.date}"
+
+
+class OwnerLoanRepayment(AccountingTimeStampedModel):
+    """Records a repayment against an owner loan injection."""
+
+    injection = models.ForeignKey(
+        OwnerFundInjection,
+        on_delete=models.CASCADE,
+        related_name="repayments",
+    )
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    date = models.DateField()
+    finance_account = models.ForeignKey(
+        "accounting.FinanceAccount",
+        on_delete=models.PROTECT,
+        related_name="owner_loan_repayments",
+    )
+    notes = models.CharField(max_length=255, blank=True)
+    posted_journal_entry = models.ForeignKey(
+        "accounting.JournalEntry",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="owner_loan_repayments",
+    )
+    performed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+
+    class Meta:
+        db_table = "owner_loan_repayment"
+        ordering = ["-date", "-id"]
+
+    def __str__(self):
+        return f"Repayment ₹{self.amount} for Injection #{self.injection_id}"

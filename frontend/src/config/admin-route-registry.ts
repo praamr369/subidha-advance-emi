@@ -155,7 +155,6 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   // ── 6. Collections & Cashier ──────────────────────────────────────────────
 
   item("Collections & Cashier", "Collection", ROUTES.admin.financeCollect, "Unified collection workspace.", { badgeSource: "overdue_count" }),
-  item("Collections & Cashier", "Payables", ROUTES.admin.payables, "All outgoing obligations — salary, vendor settlements, commissions, expense claims, and customer refunds — with real double-entry journal posting."),
   item("Collections & Cashier", "Payments", ROUTES.admin.payments, "Payment register."),
   item("Collections & Cashier", "Settlements", ROUTES.admin.settlements, "Bank statement and UPI settlement evidence imports with manual allocations."),
   item("Collections & Cashier", "Day Closes", ROUTES.admin.settlementsDayCloses, "Cashier day close."),
@@ -167,6 +166,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   // Does NOT include COA, journals, accounting periods, trial balance, P&L,
   // or balance sheet — those are Accounting & Reconciliation.
   item("Finance Operations", "Finance Control Center", "/admin/finance-control", "Unified solopreneur finance control center.", { badgeSource: "outstanding_count" }),
+  item("Finance Operations", "Owner Fund Injections", ROUTES.admin.financeOwnerFunds, "Record capital injections or owner loans into the business. Every entry posts a real double-entry journal."),
   item("Finance Operations", "Finance Workspace", ROUTES.admin.finance, "Finance source workflow workspace: receivables, payables, deposits, commissions, payouts, and reversals.", { badgeSource: "today_work_count" }),
   item("Finance Operations", "Daily Close", ROUTES.admin.financeDailyClose, "Solopreneur end of day unified closing and ledger posting."),
   item("Finance Operations", "Outstandings", ROUTES.admin.financeOutstandings, "Unified collectible dues across EMI, rent, lease, direct sale, and invoices. Finance source workflow.", { badgeSource: "outstanding_count" }),

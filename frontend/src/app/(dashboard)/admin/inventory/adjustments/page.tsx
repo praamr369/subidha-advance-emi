@@ -1,4 +1,3 @@
-// @ts-nocheck
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -15,7 +14,7 @@ import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { ROUTES } from "@/lib/routes";
 import { accountingDate, accountingErrorMessage, accountingMoney } from "@/components/accounting/shared";
-import type { InventoryItem, StockAdjustment, StockLocation, StockAdjustmentsPayload } from "@/services/inventory";
+import type { InventoryItem, StockAdjustment, StockLocation } from "@/services/inventory";
 import {
   approveStockAdjustment,
   createStockAdjustment,
@@ -478,7 +477,7 @@ export default function InventoryAdjustmentsPage() {
                 <SearchableItemSelect
                   value={line.inventory_item}
                   onChange={(value) => updateLine(index, "inventory_item", value)}
-                  onLoadItems={searchInventoryItems}
+                  onLoadItems={async (q) => (await searchInventoryItems(q)).results}
                   allItems={items}
                   disabled={saving}
                   placeholder="Search by code, name, or SKU..."

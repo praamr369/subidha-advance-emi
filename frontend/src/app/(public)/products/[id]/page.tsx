@@ -38,11 +38,22 @@ export async function generateMetadata({
       });
     }
 
+    // For variant pages, build a richer title from the defining attributes
+    let title = product.name;
+    let description = product.description ?? "";
+    if (product.is_variant_page && product.selected_attributes) {
+      const attrParts = Object.entries(product.selected_attributes)
+        .filter(([k]) => ["Size", "Color", "Bed Type", "Type", "Variant"].includes(k))
+        .map(([, v]) => v);
+      if (attrParts.length) title = `${product.name} — ${attrParts.join(", ")}`;
+    }
+    if (!description) {
+      description = `${title} is available for enquiry at Subidha Furniture, Asansol. EMI, rent, lease and direct sale options available.`;
+    }
+
     return buildPublicMetadata({
-      title: product.name,
-      description:
-        product.description ||
-        `${product.name} is available in the live Subidha Furniture public catalogue for enquiry handoff.`,
+      title,
+      description,
       path: `/products/${id}`,
       imagePath: product.image || undefined,
     });
@@ -64,9 +75,12 @@ export default async function ProductDetailPage({ params, searchParams }: Produc
   }
 
   const resolvedSearchParams = (await searchParams) || {};
-  
-  // Build selected attributes from searchParams for initial hydration
-  const selectedAttributes: Record<string, string> = {};
+
+  // Build selected attributes: URL params take priority, then fall back to
+  // the product's own selected_attributes (set by backend for variant pages).
+  const selectedAttributes: Record<string, string> = {
+    ...(product.selected_attributes ?? {}),
+  };
   for (const [key, value] of Object.entries(resolvedSearchParams)) {
     if (key.startsWith("attr_") && typeof value === "string") {
       selectedAttributes[key.replace("attr_", "")] = value;

@@ -2,6 +2,8 @@
 
 import type { ReactNode } from "react";
 
+import QRCode from "react-qr-code";
+
 import {
   AmountSummary,
   CustomerInfoBlock,
@@ -15,6 +17,8 @@ import {
   StatusBadge,
   type DocumentField,
 } from "@/components/documents";
+
+import { useDocumentTheme } from "@/components/documents/document-shell";
 
 export type ReceiptField = DocumentField;
 
@@ -31,6 +35,8 @@ type PaymentReceiptDocumentProps = {
   referenceFields?: ReceiptField[];
   documentTitle?: string;
   footerNote?: string;
+  showUpiQr?: boolean;
+  upiId?: string;
 };
 
 export default function PaymentReceiptDocument({
@@ -45,7 +51,13 @@ export default function PaymentReceiptDocument({
   referenceFields = [],
   documentTitle = "Payment Receipt",
   footerNote = "Generated from live SUBIDHA CORE payment records. Print or save as PDF for business filing.",
+  showUpiQr,
+  upiId,
 }: PaymentReceiptDocumentProps) {
+  const theme = useDocumentTheme();
+  const resolvedShowUpiQr = showUpiQr ?? theme.showUpiQr;
+  const resolvedUpiId = upiId ?? theme.upiId;
+
   const statusTone =
     statusToneClassName.includes("red")
       ? "danger"
@@ -108,8 +120,22 @@ export default function PaymentReceiptDocument({
 
         <SignatureBlock />
 
-        <div className="print-doc-note print-doc-section rounded-xl border border-border bg-card px-3.5 py-3 text-[13px] leading-5 text-muted-foreground">
-          {footerNote}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between print-doc-section">
+          <div className="print-doc-note flex-1 rounded-xl border border-border bg-card px-3.5 py-3 text-[13px] leading-5 text-muted-foreground">
+            {footerNote}
+          </div>
+          
+          {resolvedShowUpiQr && resolvedUpiId ? (
+            <div className="flex shrink-0 items-center gap-3 rounded-xl border border-border bg-card p-3">
+              <div className="rounded-lg bg-white p-2">
+                <QRCode value={`upi://pay?pa=${resolvedUpiId}`} size={64} />
+              </div>
+              <div className="text-xs">
+                <p className="font-semibold text-foreground">Pay via UPI</p>
+                <p className="text-muted-foreground">{resolvedUpiId}</p>
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <DocumentFooter leftText="Prepared from SUBIDHA CORE payment records" />

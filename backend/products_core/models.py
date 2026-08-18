@@ -114,7 +114,13 @@ class ProductUnitOfMeasureMaster(TimeStampedModel):
 class Product(TimeStampedModel):
     product_code = models.CharField(max_length=50, unique=True)
     name = models.CharField(max_length=255)
-    base_price = models.DecimalField(max_digits=12, decimal_places=2)
+    brand = models.CharField(max_length=150, blank=True, default="")
+    base_price = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0"),
+        validators=[MinValueValidator(Decimal("0"))],
+    )
 
     category_master = models.ForeignKey(
         ProductCategoryMaster,
@@ -241,12 +247,7 @@ class Product(TimeStampedModel):
             models.Index(fields=["unit_of_measure"]),
             models.Index(fields=["is_active"]),
         ]
-        constraints = [
-            models.CheckConstraint(
-                condition=Q(base_price__gt=0),
-                name="chk_product_base_price_positive",
-            ),
-        ]
+        constraints = []
 
     def clean(self):
         errors = {}
@@ -255,8 +256,8 @@ class Product(TimeStampedModel):
             errors["product_code"] = "Product code is required."
         if not self.name or not self.name.strip():
             errors["name"] = "Product name is required."
-        if self.base_price is None or self.base_price <= MONEY_ZERO:
-            errors["base_price"] = "Base price must be greater than zero."
+        if self.base_price is None or self.base_price < MONEY_ZERO:
+            errors["base_price"] = "Base price cannot be negative."
         if self.subcategory_master_id and self.category_master_id:
             if self.subcategory_master.category_id != self.category_master_id:
                 errors["subcategory_master"] = "Subcategory must belong to the selected category."

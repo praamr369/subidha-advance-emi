@@ -4,7 +4,7 @@ import { formatRupee } from "@/lib/utils/currency";
 import Link from "next/link";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { UploadCloud, Trash2, ImagePlus, Video } from "lucide-react";
 
 import ProductQuickActions from "@/components/admin/products/ProductQuickActions";
@@ -15,10 +15,9 @@ import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
-import ProductPimAttributesEditor from "@/components/products/ProductPimAttributesEditor";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import SmartSuggestField from "@/components/forms/SmartSuggestField";
-import PimSyncSection from "@/components/admin/pim/PimSyncSection";
+import PimSyncSection, { type PimSyncSectionHandle } from "@/components/admin/pim/PimSyncSection";
 import { pimService, type PimProduct } from "@/services/pim";
 import { shouldBypassNextImageOptimization } from "@/lib/media";
 import { getProduct, getProductCatalogOptions, updateProduct, type ProductCatalogOptions, type ProductRecord } from "@/services/products";
@@ -79,6 +78,7 @@ export default function AdminProductEditPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [showCostEditor, setShowCostEditor] = useState(false);
+  const pimSyncRef = useRef<PimSyncSectionHandle>(null);
 
   const [name, setName] = useState("");
   const [productCode, setProductCode] = useState("");
@@ -291,6 +291,7 @@ export default function AdminProductEditPage() {
       }
       const updated = await updateProduct(productId, payload);
       hydrate(updated);
+      await pimSyncRef.current?.save();
       setMessage("Product saved. Existing contracts keep their saved pricing and plan snapshots.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save product.");
@@ -436,6 +437,7 @@ export default function AdminProductEditPage() {
 
               {/* PIM Sync — auto-matches category/subcategory, inline spec editing */}
               <PimSyncSection
+                ref={pimSyncRef}
                 productCode={productCode}
                 productName={name}
                 categoryText={category}
@@ -555,15 +557,6 @@ export default function AdminProductEditPage() {
               </ERPSectionShell>
             </aside>
           </form>
-        ) : null}
-
-        {product && productId ? (
-          <ERPSectionShell
-            title="PIM attributes"
-            description="Edit this product's rich attributes (specs, options, variants) right here. Pick a category to load its attribute set. Saves reflect in the PIM module — one product, one place to edit."
-          >
-            <ProductPimAttributesEditor productId={productId} />
-          </ERPSectionShell>
         ) : null}
 
         {showCropper && tempImageSrc && (

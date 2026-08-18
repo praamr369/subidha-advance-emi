@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "re
 import Link from "next/link";
 
 import { prepareProductInventoryProfile, updateProduct } from "@/services/products";
+import { createPortal } from "react-dom";
 
 type QuickProduct = {
   id: number;
@@ -47,7 +48,12 @@ function supportedDefault(defaultValue: string | null | undefined, emi: boolean,
 }
 
 function Drawer({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
-  return (
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  if (!mounted) return null;
+
+  return createPortal(
     <div className="fixed inset-0 z-50 flex justify-end bg-black/30" onClick={onClose}>
       <div className="h-full w-full max-w-xl overflow-y-auto border-l border-border bg-background p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
         <div className="mb-4 flex items-start justify-between gap-4">
@@ -59,7 +65,8 @@ function Drawer({ title, children, onClose }: { title: string; children: ReactNo
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -117,7 +124,9 @@ export default function ProductQuickActions({ product, mode = "compact", onChang
     setTrackStock(product.inventory_stock_tracking_enabled !== false);
   }, [product]);
 
-  const canUseSubscription = Boolean(product.product_code || product.sku) && Number(product.base_price || 0) > 0 && product.is_active !== false && product.is_emi_enabled !== false;
+  // Base/blueprint products carry price on their SKU variants, not on base_price,
+  // so we don't gate on price here — variants without a base_price are still valid.
+  const canUseSubscription = Boolean(product.product_code || product.sku) && product.is_active !== false && product.is_emi_enabled !== false;
   const badges = useMemo(() => [
     product.image ? "Catalog Image" : "No Image",
     product.sku ? "SKU Ready" : "SKU Pending",

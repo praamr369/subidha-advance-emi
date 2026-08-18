@@ -1,4 +1,18 @@
 import os
+from pathlib import Path
+
+# Load .env FIRST so .env values take precedence over the hardcoded fallbacks below.
+# base.py also calls _load_dotenv but by then the fallbacks below would already be set
+# via setdefault, blocking .env values from taking effect.
+_BASE_DIR = Path(__file__).resolve().parent.parent.parent
+_env_file = _BASE_DIR / ".env"
+if _env_file.exists():
+    for _line in _env_file.read_text(encoding="utf-8").splitlines():
+        _raw = _line.strip()
+        if not _raw or _raw.startswith("#") or "=" not in _raw:
+            continue
+        _key, _val = _raw.split("=", 1)
+        os.environ.setdefault(_key.strip(), _val.strip().strip('"').strip("'"))
 
 os.environ["DJANGO_ENV"] = "development"
 os.environ.setdefault("DJANGO_DEBUG", "true")

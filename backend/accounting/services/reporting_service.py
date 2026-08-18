@@ -269,15 +269,36 @@ def build_general_ledger(
     account_id: int,
     start_date: date | None = None,
     end_date: date | None = None,
+    category: str | None = None,
 ) -> dict:
     account = ChartOfAccount.objects.get(pk=account_id)
     rows = []
     running_debits = MONEY_ZERO
     running_credits = MONEY_ZERO
 
-    for line in _posted_lines_queryset(start_date=start_date, end_date=end_date).filter(
+    lines_qs = _posted_lines_queryset(start_date=start_date, end_date=end_date).filter(
         chart_account_id=account_id
-    ):
+    )
+    
+    if category:
+        cat = category.strip().upper()
+        from django.db.models import Q
+        if cat == "SALARY":
+            lines_qs = lines_qs.filter(Q(journal_entry__entry_type="SALARY") | Q(journal_entry__source_model__icontains="Salary"))
+        elif cat == "EXPENSE":
+            lines_qs = lines_qs.filter(Q(journal_entry__entry_type="EXPENSE") | Q(journal_entry__source_model__icontains="Expense") | Q(journal_entry__source_model__icontains="Voucher") | Q(journal_entry__source_model__icontains="Claim"))
+        elif cat == "COMMISSION":
+            lines_qs = lines_qs.filter(journal_entry__source_model__icontains="Commission")
+        elif cat == "PURCHASE":
+            lines_qs = lines_qs.filter(Q(journal_entry__source_model__icontains="Purchase") | Q(journal_entry__source_model__icontains="Inventory"))
+        elif cat == "MANUAL":
+            lines_qs = lines_qs.filter(journal_entry__entry_type="MANUAL")
+        elif cat == "MONEY_MOVEMENT":
+            lines_qs = lines_qs.filter(Q(journal_entry__entry_type="MONEY_MOVEMENT") | Q(journal_entry__source_model__icontains="Fund") | Q(journal_entry__source_model__icontains="Movement") | Q(journal_entry__source_model__icontains="Transfer"))
+        elif cat == "BILLING":
+            lines_qs = lines_qs.filter(Q(journal_entry__source_model__icontains="Billing") | Q(journal_entry__source_model__icontains="Invoice"))
+
+    for line in lines_qs:
         running_debits += _money(line.debit_amount)
         running_credits += _money(line.credit_amount)
         running_balance = _balance_for_account_type(

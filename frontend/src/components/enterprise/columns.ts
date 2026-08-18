@@ -7,7 +7,7 @@ export type EnterpriseColumnDef<T extends GenericRecord> = {
   key: keyof T | string;
 
   /** Column header label */
-  header: string;
+  header: ReactNode;
 
   /** Optional width control */
   width?: number | string;

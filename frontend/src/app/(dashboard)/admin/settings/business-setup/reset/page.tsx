@@ -31,9 +31,11 @@ import {
   getModularResetPreview,
   getResetScopes,
   getRestorePreview,
+  getSetupReadiness,
   listBackupJobs,
   listRestoreJobs,
   type ResetScope,
+  type SetupReadinessPayload,
 } from "@/services/business-setup";
 import { exportSetupSnapshot, importSetupSnapshot } from "@/services/local-sandbox";
 
@@ -166,6 +168,7 @@ function DryRunsSection() {
   const [runError, setRunError] = useState<string | null>(null);
   const [lastRun, setLastRun] = useState<DryRunRunResponse | null>(null);
   const [history, setHistory] = useState<DryRunHistoryRun[]>([]);
+  const [readiness, setReadiness] = useState<SetupReadinessPayload | null>(null);
 
   const allKeys = useMemo(() => checks.map((c) => c.key), [checks]);
 
@@ -173,9 +176,10 @@ function DryRunsSection() {
     try {
       setLoading(true);
       setOptionsError(null);
-      const [optRes, histRes] = await Promise.allSettled([getDryRunOptions(), getDryRunHistory(10)]);
+      const [optRes, histRes, readRes] = await Promise.allSettled([getDryRunOptions(), getDryRunHistory(10), getSetupReadiness()]);
       if (optRes.status === "fulfilled") setChecks(optRes.value.checks);
       if (histRes.status === "fulfilled") setHistory(histRes.value.runs);
+      if (readRes.status === "fulfilled") setReadiness(readRes.value);
     } catch (err) {
       setOptionsError(toErr(err));
     } finally {
@@ -330,13 +334,15 @@ function ResetRestoreSection() {
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [readiness, setReadiness] = useState<SetupReadinessPayload | null>(null);
 
   useEffect(() => {
     void (async () => {
-      const [scopeRes, backupsRes, restoreRes] = await Promise.allSettled([getResetScopes(), listBackupJobs(), listRestoreJobs()]);
+      const [scopeRes, backupsRes, restoreRes, readRes] = await Promise.allSettled([getResetScopes(), listBackupJobs(), listRestoreJobs(), getSetupReadiness()]);
       if (scopeRes.status === "fulfilled") setScopes(scopeRes.value.scopes || []);
       if (backupsRes.status === "fulfilled") setBackupJobs(recordRows(backupsRes.value.jobs));
       if (restoreRes.status === "fulfilled") setRestoreJobs(recordRows(restoreRes.value.jobs));
+      if (readRes.status === "fulfilled") setReadiness(readRes.value);
     })();
   }, []);
 
@@ -447,19 +453,13 @@ function ResetRestoreSection() {
   const snapAllowed = snapImportPreview ? snapImportPreview.import_allowed_here !== false : true;
   const snapErrors = Array.isArray(snapImportPreview?.validation_errors) ? (snapImportPreview?.validation_errors as string[]) : [];
 
-  const isProduction = process.env.NEXT_PUBLIC_APP_ENV === "production";
+  const allowReset = readiness?.allow_business_reset !== false;
 
   return (
     <div className="space-y-6">
-      {isProduction && (
-        <div className="rounded-xl border-2 border-red-500 bg-red-50 px-5 py-4 shadow-sm">
-          <div className="flex items-center gap-2 text-base font-bold text-red-700">
-            <span>⛔</span> Reset is disabled in production
-          </div>
-          <p className="mt-1 text-sm text-red-700">
-            This server is running in <strong>production mode</strong>. The Execute Reset button is blocked to prevent accidental data loss.
-            To enable resets on this server, set <code className="rounded bg-red-100 px-1 font-mono text-xs">ALLOW_BUSINESS_RESET=True</code> in your Django settings — but only do this in a test or staging environment.
-          </p>
+      {!allowReset && (
+        <div className="rounded-xl border border-rose-300 bg-rose-50 p-4 text-sm text-rose-900 shadow-sm">
+          <span className="font-semibold">Reset Disabled:</span> This environment is marked as production. Destructive resets, full restores, and snapshot imports are permanently disabled. Only dry-runs and previews are permitted.
         </div>
       )}
       {error ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">{error}</div> : null}
@@ -494,9 +494,14 @@ function ResetRestoreSection() {
                 className="rounded-lg border border-border bg-background px-4 py-2 text-sm font-semibold disabled:opacity-50">
                 {snapBusy === "preview" ? "Validating…" : "Preview / validate"}
               </button>
-              <button type="button" onClick={() => void handleSnapshotImportApply()} disabled={snapBusy !== null || !snapImportFile || !snapImportPreview || !snapAllowed || snapErrors.length > 0}
-                className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
-                {snapBusy === "apply" ? "Importing…" : "Apply import"}
+              <button
+                type="button"
+                onClick={() => void handleSnapshotImportApply()}
+                disabled={snapBusy !== null || !snapImportFile || !snapImportPreview || !snapAllowed || snapErrors.length > 0 || !allowReset}
+                className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 transition-colors data-[danger=true]:bg-destructive data-[danger=true]:text-destructive-foreground bg-foreground"
+                data-danger={allowReset}
+              >
+                {snapBusy === "apply" ? "Importing…" : !allowReset ? "Import blocked (production)" : "Apply import"}
               </button>
             </div>
             {snapImportPreview ? (
@@ -560,8 +565,14 @@ function ResetRestoreSection() {
               <button type="button" className="rounded-lg border border-border bg-background px-4 py-2 text-sm font-semibold" onClick={() => void runPreview()}>Run preview</button>
               <button type="button" className="rounded-lg border border-border bg-background px-4 py-2 text-sm font-semibold" onClick={() => void runBackup("SELECTED_SCOPES_EXPORT")}>Create scope backup</button>
               <button type="button" className="rounded-lg border border-border bg-background px-4 py-2 text-sm font-semibold" onClick={() => void runBackup("FULL_DATABASE_LOGICAL")}>Create full backup</button>
-              <button type="button" className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" disabled={hasBlockers || busy || isProduction} onClick={() => void runReset()}>
-                {busy ? "Resetting…" : isProduction ? "Reset blocked (production)" : "Execute reset"}
+              <button
+                type="button"
+                className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 transition-colors data-[danger=true]:bg-destructive data-[danger=true]:text-destructive-foreground bg-primary"
+                disabled={hasBlockers || busy || !allowReset || confirmation !== PHRASE}
+                onClick={() => void runReset()}
+                data-danger={allowReset && confirmation === PHRASE}
+              >
+                {busy ? "Resetting…" : !allowReset ? "Reset blocked (production)" : "Execute reset"}
               </button>
             </div>
 
@@ -635,7 +646,15 @@ function ResetRestoreSection() {
 
             <div className="flex flex-wrap gap-2">
               <button type="button" className="rounded-lg border border-border bg-background px-4 py-2 text-sm font-semibold" onClick={() => void runRestorePreview()} disabled={!restoreFile && !selectedBackupId}>Preview restore</button>
-              <button type="button" className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50" onClick={() => void runRestoreExecute()} disabled={!restorePreview || busy}>{busy ? "Restoring…" : "Execute restore"}</button>
+              <button
+                type="button"
+                className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 transition-colors data-[danger=true]:bg-destructive data-[danger=true]:text-destructive-foreground bg-foreground"
+                disabled={!restorePreview || busy || !allowReset || (restoreConfirm !== PHRASE && restoreConfirm !== "RESTORE SETUP SNAPSHOT")}
+                onClick={() => void runRestoreExecute()}
+                data-danger={allowReset && (restoreConfirm === PHRASE || restoreConfirm === "RESTORE SETUP SNAPSHOT")}
+              >
+                {busy ? "Restoring…" : !allowReset ? "Restore blocked (production)" : "Execute restore"}
+              </button>
             </div>
 
             {restorePreview ? (

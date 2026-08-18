@@ -126,6 +126,9 @@ function AttributeForm({ categoryId, subcategoryId, initial, onSave, onCancel }:
   // Options for CHOICE/MULTI_CHOICE
   const [optionInput, setOptionInput] = useState("");
   const [options, setOptions] = useState<PimOption[]>(initial?.options ?? []);
+  const [deletedOptionIds, setDeletedOptionIds] = useState<number[]>([]);
+  const [editingOptIndex, setEditingOptIndex] = useState<number | null>(null);
+  const [editingOptValue, setEditingOptValue] = useState("");
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -147,10 +150,18 @@ function AttributeForm({ categoryId, subcategoryId, initial, onSave, onCancel }:
       };
       if (initial?.id) {
         await api(`${BASE}/attributes/${initial.id}/`, { method: "PATCH", body: JSON.stringify(body) });
-        // save new options
-        for (const opt of options) {
+        // delete removed options
+        for (const delId of deletedOptionIds) {
+          await api(`${BASE}/attribute-options/${delId}/`, { method: "DELETE" }).catch(() => {});
+        }
+        // save/update options
+        for (let i = 0; i < options.length; i++) {
+          const opt = options[i];
+          const payload = { value: opt.value, display_name: opt.display_name, display_order: i, attribute: initial.id };
           if (!opt.id) {
-            await api(`${BASE}/attribute-options/`, { method: "POST", body: JSON.stringify({ value: opt.value, display_name: opt.display_name, display_order: opt.display_order, attribute: initial.id }) }).catch(() => {});
+            await api(`${BASE}/attribute-options/`, { method: "POST", body: JSON.stringify(payload) }).catch(() => {});
+          } else if (opt.display_name !== initial.options?.find(o => o.id === opt.id)?.display_name || opt.display_order !== i) {
+            await api(`${BASE}/attribute-options/${opt.id}/`, { method: "PATCH", body: JSON.stringify(payload) }).catch(() => {});
           }
         }
       } else {
@@ -207,8 +218,38 @@ function AttributeForm({ categoryId, subcategoryId, initial, onSave, onCancel }:
           <div className="flex flex-wrap gap-1.5">
             {options.map((opt, i) => (
               <span key={i} className="inline-flex items-center gap-1 rounded-full border bg-background px-2.5 py-0.5 text-xs">
-                {opt.display_name}
-                <button type="button" onClick={() => setOptions(prev => prev.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-destructive">×</button>
+                {editingOptIndex === i ? (
+                  <input 
+                    autoFocus
+                    className="bg-transparent border-none outline-none w-20 text-xs" 
+                    value={editingOptValue} 
+                    onChange={e => setEditingOptValue(e.target.value)}
+                    onBlur={() => {
+                      if (editingOptValue.trim()) {
+                        setOptions(prev => prev.map((o, j) => j === i ? { ...o, value: editingOptValue.trim(), display_name: editingOptValue.trim() } : o));
+                      }
+                      setEditingOptIndex(null);
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        e.currentTarget.blur();
+                      }
+                    }}
+                  />
+                ) : (
+                  <span 
+                    className="cursor-pointer hover:text-primary transition-colors" 
+                    title="Click to edit"
+                    onClick={() => { setEditingOptIndex(i); setEditingOptValue(opt.display_name); }}
+                  >
+                    {opt.display_name}
+                  </span>
+                )}
+                <button type="button" onClick={() => {
+                  if (opt.id) setDeletedOptionIds(prev => [...prev, opt.id!]);
+                  setOptions(prev => prev.filter((_, j) => j !== i));
+                }} className="text-muted-foreground hover:text-destructive">×</button>
               </span>
             ))}
           </div>

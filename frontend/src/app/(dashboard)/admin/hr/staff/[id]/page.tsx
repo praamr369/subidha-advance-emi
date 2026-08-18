@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
@@ -11,17 +11,12 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import KycDocumentPanel from "@/components/kyc/KycDocumentPanel";
 import { Party360Embed, UniversalQuickWidgetsEmbed } from "@/components/profile/Profile360";
-import { ProfilePayablesPanel } from "@/components/profile/ProfilePayablesPanel";
-import { WorkbenchFilterChips } from "@/components/workbench/WorkbenchFilterChips";
 import ActionButton from "@/components/ui/ActionButton";
 import {
   DataTableShell,
   DetailPanel,
   FormSection,
-  KpiCard,
-  QuickActionGrid,
   Timeline,
-  WorkflowCard,
 } from "@/components/ui/operations";
 import { ROUTES } from "@/lib/routes";
 import { listBranches, type BranchRecord } from "@/services/branch-control";
@@ -34,246 +29,257 @@ import {
 } from "@/services/staff";
 import {
   approveSalarySheet,
+  approveHrStaffAdvance,
+  createHrLeaveRequest,
+  createHrStaffAdvance,
   createHrStaffDocument,
-  getAdminAuditTimeline,
+  disburseHrStaffAdvance,
   downloadHrSalaryAgreementPdf,
   downloadHrStaffProfilePdf,
+  getAdminAuditTimeline,
   getHrPayroll,
   getHrStaff,
   getHrStaffLeaveBalance,
   listHrAttendance,
   listHrExpenseClaims,
   listHrLeaveRequests,
+  listHrLeaveTypes,
   listHrSalaryPayments,
+  listHrStaffAdvances,
   listHrStaffDocuments,
   markHrAttendance,
+  patchHrExpenseClaim,
+  patchHrLeaveRequest,
   patchHrStaff,
-  patchHrStaffDocument,
   postSalarySheet,
+  recoverHrStaffAdvance,
   recordSalaryPayment,
-  setHrStaffStatus,
   reviewHrStaffDocument,
-  type HrAttendance,
+  setHrStaffStatus,
   type AdminAuditEntry,
+  type HrAttendance,
   type HrExpenseClaim,
   type HrLeaveBalanceRow,
   type HrLeaveRequest,
+  type HrLeaveType,
   type HrPayrollSheet,
   type HrSalaryPayment,
   type HrStaff,
+  type HrStaffAdvance,
   type HrStaffDocument,
 } from "@/services/admin-hr";
 import { listFinanceAccounts, type FinanceAccount } from "@/services/accounting";
 
-const EMPLOYMENT_TYPES = ["PERMANENT_MONTHLY", "TEMPORARY", "DAILY_WAGE", "HOURLY", "PIECE_RATE", "MANUFACTURING", "SERVICE"];
-const DETAIL_TABS = ["Overview", "360 View", "Employment", "Attendance", "Payroll", "Payables", "Documents", "KYC", "Access", "Timeline"] as const;
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const DETAIL_TABS = [
+  "Overview", "360 View", "Employment", "Attendance",
+  "Payroll", "Advances", "Documents", "KYC", "Access", "Timeline",
+] as const;
 type DetailTab = (typeof DETAIL_TABS)[number];
+
+const ATT_STATUSES = ["PRESENT", "HALF_DAY", "ABSENT", "LATE", "LEAVE", "HOLIDAY", "WEEKLY_OFF"] as const;
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type StaffAuditEntry = AdminAuditEntry & { source_label: string };
 
 type EditForm = {
-  name: string;
-  phone: string;
-  designation: string;
-  department: string;
-  branch: string;
-  joining_date: string;
-  employment_type: string;
-  weekly_off: string;
-  base_salary: string;
-  daily_wage_rate: string;
-  hourly_wage_rate: string;
-  piece_rate_amount: string;
-  piece_rate_unit_label: string;
-  salary_effective_from: string;
-  salary_pay_day: string;
-  temporary_contract_end_date: string;
-  kyc_id_type: string;
-  kyc_id_number: string;
-  kyc_verified: boolean;
-  address: string;
-  emergency_contact_name: string;
-  emergency_contact_relation: string;
-  emergency_contact_phone: string;
-  cost_center_code: string;
-  payroll_expense_account: string;
-  employment_status: string;
-  reporting_manager: string;
-  work_location: string;
-  probation_end_date: string;
-  attendance_policy: string;
-  shift_name: string;
-  payroll_eligible: boolean;
-  payment_mode: string;
-  bank_account_name: string;
-  bank_account_number: string;
-  bank_ifsc: string;
-  upi_id: string;
+  name: string; phone: string; designation: string; department: string;
+  branch: string; joining_date: string; employment_type: string; weekly_off: string;
+  base_salary: string; daily_wage_rate: string; hourly_wage_rate: string;
+  piece_rate_amount: string; piece_rate_unit_label: string;
+  salary_effective_from: string; salary_pay_day: string;
+  temporary_contract_end_date: string; kyc_id_type: string; kyc_id_number: string;
+  kyc_verified: boolean; address: string; emergency_contact_name: string;
+  emergency_contact_relation: string; emergency_contact_phone: string;
+  cost_center_code: string; payroll_expense_account: string;
+  employment_status: string; reporting_manager: string; work_location: string;
+  probation_end_date: string; attendance_policy: string; shift_name: string;
+  payroll_eligible: boolean; payment_mode: string; bank_account_name: string;
+  bank_account_number: string; bank_ifsc: string; upi_id: string;
 };
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function fmt(iso?: string | null) {
+  if (!iso) return "—";
+  try { return new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }); }
+  catch { return iso; }
+}
+
+function fmtCur(v?: string | null) {
+  if (!v) return "—";
+  const n = parseFloat(v);
+  return isNaN(n) ? v : "₹" + n.toLocaleString("en-IN");
+}
+
+function fmtDatetime(iso?: string | null) {
+  if (!iso) return "—";
+  return iso.slice(0, 19).replace("T", " ");
+}
+
+function mask(value?: string | null) {
+  const text = (value || "").trim();
+  if (!text) return "—";
+  if (text.length <= 4) return "••••";
+  return `${"•".repeat(Math.max(4, text.length - 4))}${text.slice(-4)}`;
+}
+
+function initials(name: string) {
+  return name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+}
 
 function formFromStaff(staff: HrStaff): EditForm {
   return {
-    name: staff.name || "",
-    phone: staff.phone || "",
-    designation: staff.designation || "",
-    department: staff.department || "",
-    branch: staff.branch ? String(staff.branch) : "",
-    joining_date: staff.joining_date || "",
-    employment_type: staff.employment_type || "PERMANENT_MONTHLY",
-    weekly_off: staff.weekly_off || "",
-    base_salary: staff.base_salary || "",
-    daily_wage_rate: staff.daily_wage_rate || "",
-    hourly_wage_rate: staff.hourly_wage_rate || "",
-    piece_rate_amount: staff.piece_rate_amount || "",
-    piece_rate_unit_label: staff.piece_rate_unit_label || "",
+    name: staff.name || "", phone: staff.phone || "", designation: staff.designation || "",
+    department: staff.department || "", branch: staff.branch ? String(staff.branch) : "",
+    joining_date: staff.joining_date || "", employment_type: staff.employment_type || "PERMANENT_MONTHLY",
+    weekly_off: staff.weekly_off || "", base_salary: staff.base_salary || "",
+    daily_wage_rate: staff.daily_wage_rate || "", hourly_wage_rate: staff.hourly_wage_rate || "",
+    piece_rate_amount: staff.piece_rate_amount || "", piece_rate_unit_label: staff.piece_rate_unit_label || "",
     salary_effective_from: staff.salary_effective_from || "",
     salary_pay_day: staff.salary_pay_day != null ? String(staff.salary_pay_day) : "",
     temporary_contract_end_date: staff.temporary_contract_end_date || "",
-    kyc_id_type: staff.kyc_id_type || "",
-    kyc_id_number: staff.kyc_id_number || "",
-    kyc_verified: Boolean(staff.kyc_verified),
-    address: staff.address || "",
+    kyc_id_type: staff.kyc_id_type || "", kyc_id_number: staff.kyc_id_number || "",
+    kyc_verified: Boolean(staff.kyc_verified), address: staff.address || "",
     emergency_contact_name: staff.emergency_contact_name || "",
     emergency_contact_relation: staff.emergency_contact_relation || "",
     emergency_contact_phone: staff.emergency_contact_phone || "",
     cost_center_code: staff.cost_center_code || "",
     payroll_expense_account: staff.payroll_expense_account ? String(staff.payroll_expense_account) : "",
     employment_status: staff.employment_status || (staff.is_active ? "ACTIVE" : "DRAFT"),
-    reporting_manager: staff.reporting_manager || "",
-    work_location: staff.work_location || "",
-    probation_end_date: staff.probation_end_date || "",
-    attendance_policy: staff.attendance_policy || "",
-    shift_name: staff.shift_name || "",
-    payroll_eligible: Boolean(staff.payroll_eligible),
-    payment_mode: staff.payment_mode || "CASH",
-    bank_account_name: staff.bank_account_name || "",
-    bank_account_number: staff.bank_account_number || "",
-    bank_ifsc: staff.bank_ifsc || "",
+    reporting_manager: staff.reporting_manager || "", work_location: staff.work_location || "",
+    probation_end_date: staff.probation_end_date || "", attendance_policy: staff.attendance_policy || "",
+    shift_name: staff.shift_name || "", payroll_eligible: Boolean(staff.payroll_eligible),
+    payment_mode: staff.payment_mode || "CASH", bank_account_name: staff.bank_account_name || "",
+    bank_account_number: staff.bank_account_number || "", bank_ifsc: staff.bank_ifsc || "",
     upi_id: staff.upi_id || "",
   };
 }
 
-function mask(value?: string | null) {
-  const text = (value || "").trim();
-  if (!text) return "Unavailable";
-  if (text.length <= 4) return "••••";
-  return `${"•".repeat(Math.max(4, text.length - 4))}${text.slice(-4)}`;
-}
-
-function Detail({ label, value }: { label: string; value?: ReactNode }) {
-  return (
-    <div className="rounded-xl border border-border bg-card p-3">
-      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className="mt-1 text-sm font-medium text-foreground">{value || "Unavailable"}</div>
-    </div>
-  );
-}
-
-function ReadinessBadge({ ready, label }: { ready?: boolean; label: string }) {
-  return <span className={`rounded-full border px-2 py-1 text-[11px] font-semibold ${ready ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>{label}</span>;
+function formatAuditAction(actionType: string) {
+  return actionType.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function formatAuditMeta(metadata?: Record<string, unknown>) {
   if (!metadata) return "";
   const parts: string[] = [];
-  const documentType = metadata["document_type"] ? String(metadata["document_type"]) : "";
-  const title = metadata["title"] ? String(metadata["title"]) : "";
-  const status = metadata["status"] ? String(metadata["status"]) : "";
-  const reason = metadata["reason"] ? String(metadata["reason"]) : "";
-  const notes = metadata["notes"] ? String(metadata["notes"]) : "";
-  if (documentType || title) parts.push([documentType, title].filter(Boolean).join(" · "));
-  if (status) parts.push(`Status: ${status}`);
-  if (reason) parts.push(`Reason: ${reason}`);
-  if (notes) parts.push(notes);
+  const get = (k: string) => metadata[k] ? String(metadata[k]) : "";
+  if (get("document_type") || get("title")) parts.push([get("document_type"), get("title")].filter(Boolean).join(" · "));
+  if (get("status")) parts.push(`Status: ${get("status")}`);
+  if (get("reason")) parts.push(`Reason: ${get("reason")}`);
+  if (get("notes")) parts.push(get("notes"));
   return parts.join(" | ");
 }
 
-function formatAuditAction(actionType: string) {
-  return actionType
-    .replaceAll("_", " ")
-    .toLowerCase()
-    .replace(/\b\w/g, (char) => char.toUpperCase());
+// ─── Small UI components ──────────────────────────────────────────────────────
+
+function Detail({ label, value }: { label: string; value?: ReactNode }) {
+  return (
+    <div className="rounded-xl border border-border bg-card p-3">
+      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="mt-1 text-sm font-medium text-foreground">{value ?? "—"}</div>
+    </div>
+  );
 }
 
-function TinyTable({
-  empty,
-  columns,
-  rows,
-}: {
-  empty: string;
-  columns: string[];
-  rows: Array<Array<ReactNode>>;
-}) {
+function ReadinessBadge({ ready, label }: { ready?: boolean; label: string }) {
+  return (
+    <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${ready ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
+      {ready ? "✓" : "!"} {label}
+    </span>
+  );
+}
+
+function Kpi({ label, value, sub, tone = "neutral" }: { label: string; value: ReactNode; sub?: string; tone?: "ok" | "warn" | "bad" | "neutral" }) {
+  const bg = { ok: "border-emerald-200 bg-emerald-50", warn: "border-amber-200 bg-amber-50", bad: "border-red-200 bg-red-50", neutral: "border-border bg-card" };
+  const tx = { ok: "text-emerald-900", warn: "text-amber-900", bad: "text-red-900", neutral: "text-foreground" };
+  return (
+    <div className={`rounded-xl border px-4 py-3 ${bg[tone]}`}>
+      <p className="text-[11px] font-medium text-muted-foreground">{label}</p>
+      <p className={`mt-0.5 text-2xl font-bold leading-tight ${tx[tone]}`}>{value}</p>
+      {sub && <p className="mt-0.5 text-[11px] text-muted-foreground">{sub}</p>}
+    </div>
+  );
+}
+
+function TinyTable({ empty, columns, rows }: { empty: string; columns: string[]; rows: Array<Array<ReactNode>> }) {
   if (!rows.length) return <ERPEmptyState title={empty} />;
   return (
     <DataTableShell className="p-3">
-      <div className="overflow-auto">
-      <table className="min-w-full text-sm">
-        <thead className="text-left text-xs uppercase text-muted-foreground">
-          <tr>{columns.map((column) => <th key={column} className="py-2 pr-4">{column}</th>)}</tr>
-        </thead>
-        <tbody>{rows.map((row, index) => <tr key={index} className="border-t border-border/60">{row.map((cell, cellIndex) => <td key={cellIndex} className="py-2 pr-4 align-top">{cell || "Unavailable"}</td>)}</tr>)}</tbody>
-      </table>
+      <div className="overflow-x-auto">
+        <table className="min-w-full text-sm">
+          <thead className="text-left text-xs uppercase text-muted-foreground">
+            <tr>{columns.map((c) => <th key={c} className="py-2 pr-4 font-semibold">{c}</th>)}</tr>
+          </thead>
+          <tbody>
+            {rows.map((row, i) => (
+              <tr key={i} className="border-t border-border/60 hover:bg-muted/20">
+                {row.map((cell, j) => <td key={j} className="py-2 pr-4 align-top">{cell ?? "—"}</td>)}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </DataTableShell>
   );
 }
 
-function EditPanel({
-  staff,
-  branches,
-  onCancel,
-  onSaved,
-}: {
-  staff: HrStaff;
-  branches: BranchRecord[];
-  onCancel: () => void;
-  onSaved: () => void;
+function SectionTitle({ children }: { children: ReactNode }) {
+  return <h3 className="mb-3 text-sm font-bold text-foreground">{children}</h3>;
+}
+
+function Notice({ ok, children, onClose }: { ok?: boolean; children: ReactNode; onClose?: () => void }) {
+  const cls = ok
+    ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+    : "border-red-200 bg-red-50 text-red-900";
+  return (
+    <div className={`flex items-start gap-2 rounded-xl border px-4 py-3 text-sm ${cls}`}>
+      <span className="flex-1">{children}</span>
+      {onClose && <button type="button" onClick={onClose} className="ml-2 text-xs opacity-60 hover:opacity-100">✕</button>}
+    </div>
+  );
+}
+
+// ─── EditPanel ────────────────────────────────────────────────────────────────
+
+function EditPanel({ staff, branches, onCancel, onSaved }: {
+  staff: HrStaff; branches: BranchRecord[]; onCancel: () => void; onSaved: () => void;
 }) {
   const [tab, setTab] = useState("BASIC");
   const [form, setForm] = useState<EditForm>(() => formFromStaff(staff));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const update = <K extends keyof EditForm>(key: K, value: EditForm[K]) => setForm((current) => ({ ...current, [key]: value }));
+  const up = <K extends keyof EditForm>(k: K, v: EditForm[K]) => setForm((c) => ({ ...c, [k]: v }));
   const canSave = form.name.trim().length >= 2 && form.phone.trim().length >= 8;
+
+  const TABS = ["BASIC", "EMPLOYMENT", "PAYROLL", "KYC", "EMERGENCY", "ACCESS"];
 
   async function save() {
     if (!canSave) return;
+    setSaving(true); setError(null);
     try {
-      setSaving(true);
       await patchHrStaff(staff.id, {
-        name: form.name.trim(),
-        phone: form.phone.trim(),
-        designation: form.designation.trim(),
-        department: form.department.trim(),
-        branch: form.branch ? Number(form.branch) : null,
-        joining_date: form.joining_date || null,
-        employment_status: form.employment_status,
-        employment_type: form.employment_type,
-        weekly_off: form.weekly_off.trim(),
-        reporting_manager: form.reporting_manager.trim(),
-        work_location: form.work_location.trim(),
+        name: form.name.trim(), phone: form.phone.trim(), designation: form.designation.trim(),
+        department: form.department.trim(), branch: form.branch ? Number(form.branch) : null,
+        joining_date: form.joining_date || null, employment_status: form.employment_status,
+        employment_type: form.employment_type, weekly_off: form.weekly_off.trim(),
+        reporting_manager: form.reporting_manager.trim(), work_location: form.work_location.trim(),
         probation_end_date: form.probation_end_date || null,
-        attendance_policy: form.attendance_policy.trim(),
-        shift_name: form.shift_name.trim(),
-        base_salary: form.base_salary.trim() || null,
-        daily_wage_rate: form.daily_wage_rate.trim() || null,
+        attendance_policy: form.attendance_policy.trim(), shift_name: form.shift_name.trim(),
+        base_salary: form.base_salary.trim() || null, daily_wage_rate: form.daily_wage_rate.trim() || null,
         hourly_wage_rate: form.hourly_wage_rate.trim() || null,
         piece_rate_amount: form.piece_rate_amount.trim() || null,
         piece_rate_unit_label: form.piece_rate_unit_label.trim(),
-        payroll_eligible: form.payroll_eligible,
-        payment_mode: form.payment_mode,
+        payroll_eligible: form.payroll_eligible, payment_mode: form.payment_mode,
         bank_account_name: form.bank_account_name.trim(),
-        bank_account_number: form.bank_account_number.trim(),
-        bank_ifsc: form.bank_ifsc.trim(),
-        upi_id: form.upi_id.trim(),
-        salary_effective_from: form.salary_effective_from || null,
+        bank_account_number: form.bank_account_number.trim(), bank_ifsc: form.bank_ifsc.trim(),
+        upi_id: form.upi_id.trim(), salary_effective_from: form.salary_effective_from || null,
         salary_pay_day: form.salary_pay_day ? Number(form.salary_pay_day) : null,
         temporary_contract_end_date: form.temporary_contract_end_date || null,
-        kyc_id_type: form.kyc_id_type.trim(),
-        kyc_id_number: form.kyc_id_number.trim(),
-        kyc_verified: form.kyc_verified,
-        address: form.address.trim(),
+        kyc_id_type: form.kyc_id_type.trim(), kyc_id_number: form.kyc_id_number.trim(),
+        kyc_verified: form.kyc_verified, address: form.address.trim(),
         emergency_contact_name: form.emergency_contact_name.trim(),
         emergency_contact_relation: form.emergency_contact_relation.trim(),
         emergency_contact_phone: form.emergency_contact_phone.trim(),
@@ -282,92 +288,139 @@ function EditPanel({
       });
       onSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to save staff profile.");
+      setError(err instanceof Error ? err.message : "Unable to save changes.");
     } finally {
       setSaving(false);
     }
   }
 
-  const inputClass = "h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary";
-  const field = (label: string, input: ReactNode) => (
-    <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}{input}</label>
-  );
+  function inp(label: string, key: keyof EditForm, type = "text") {
+    return (
+      <label key={key} className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+        <input type={type} value={String(form[key])} onChange={(e) => up(key, e.target.value as EditForm[typeof key])}
+          className="h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary" />
+      </label>
+    );
+  }
 
   return (
-    <FormSection title="Edit Profile" description="Tabbed edit form backed by PATCH /api/v1/admin/hr/staff/{id}/.">
-      <div className="flex flex-wrap gap-2">
-        {["BASIC", "EMPLOYMENT", "PAYROLL", "KYC", "EMERGENCY", "ACCESS"].map((item) => (
-          <button key={item} type="button" onClick={() => setTab(item)} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${tab === item ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background"}`}>
-            {item}
+    <FormSection title="Edit Staff Profile" description="Changes are saved immediately to this employee's HR record.">
+      <div className="mb-4 flex flex-wrap gap-2">
+        {TABS.map((t) => (
+          <button key={t} type="button" onClick={() => setTab(t)}
+            className={`rounded-xl border px-3 py-1.5 text-xs font-semibold transition ${tab === t ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:bg-muted"}`}>
+            {t.replace("_", " ")}
           </button>
         ))}
       </div>
-      {error ? <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
-      <div className="mt-4 grid gap-3 md:grid-cols-3">
-        {tab === "BASIC" ? (
-          <>
-            {field("Full name", <input id="name" name="name" className={inputClass} value={form.name} onChange={(event) => update("name", event.target.value)} />)}
-            {field("Phone", <input id="phone" name="phone" className={inputClass} value={form.phone} onChange={(event) => update("phone", event.target.value)} />)}
-            {field("Role / title", <input id="designation" name="designation" className={inputClass} value={form.designation} onChange={(event) => update("designation", event.target.value)} />)}
-            {field("Department", <input id="department" name="department" className={inputClass} value={form.department} onChange={(event) => update("department", event.target.value)} />)}
-            {field("Branch", <select className={inputClass} value={form.branch} onChange={(event) => update("branch", event.target.value)}><option value="">Unassigned</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select>)}
-            {field("Joining date", <input id="joining_date" name="joining_date" type="date" className={inputClass} value={form.joining_date} onChange={(event) => update("joining_date", event.target.value)} />)}
-            {field("Employment status", <select className={inputClass} value={form.employment_status} onChange={(event) => update("employment_status", event.target.value)}><option value="DRAFT">Draft</option><option value="ACTIVE">Active</option></select>)}
-          </>
-        ) : null}
-        {tab === "EMPLOYMENT" ? (
-          <>
-            {field("Employment type", <select className={inputClass} value={form.employment_type} onChange={(event) => update("employment_type", event.target.value)}>{EMPLOYMENT_TYPES.map((item) => <option key={item} value={item}>{item}</option>)}</select>)}
-            {field("Weekly off", <input id="weekly_off" name="weekly_off" className={inputClass} value={form.weekly_off} onChange={(event) => update("weekly_off", event.target.value)} placeholder="SUNDAY" />)}
-            {field("Reporting manager", <input id="reporting_manager" name="reporting_manager" className={inputClass} value={form.reporting_manager} onChange={(event) => update("reporting_manager", event.target.value)} />)}
-            {field("Work location", <input id="work_location" name="work_location" className={inputClass} value={form.work_location} onChange={(event) => update("work_location", event.target.value)} />)}
-            {field("Probation end date", <input id="probation_end_date" name="probation_end_date" type="date" className={inputClass} value={form.probation_end_date} onChange={(event) => update("probation_end_date", event.target.value)} />)}
-            {field("Attendance policy", <input id="attendance_policy" name="attendance_policy" className={inputClass} value={form.attendance_policy} onChange={(event) => update("attendance_policy", event.target.value)} />)}
-            {field("Shift", <input id="shift_name" name="shift_name" className={inputClass} value={form.shift_name} onChange={(event) => update("shift_name", event.target.value)} />)}
-            {field("Salary effective date", <input id="salary_effective_from" name="salary_effective_from" type="date" className={inputClass} value={form.salary_effective_from} onChange={(event) => update("salary_effective_from", event.target.value)} />)}
-            {field("Contract end date", <input id="temporary_contract_end_date" name="temporary_contract_end_date" type="date" className={inputClass} value={form.temporary_contract_end_date} onChange={(event) => update("temporary_contract_end_date", event.target.value)} />)}
-          </>
-        ) : null}
-        {tab === "PAYROLL" ? (
-          <>
-            {field("Base salary", <input id="base_salary" name="base_salary" className={inputClass} value={form.base_salary} onChange={(event) => update("base_salary", event.target.value)} />)}
-            {field("Daily wage", <input id="daily_wage_rate" name="daily_wage_rate" className={inputClass} value={form.daily_wage_rate} onChange={(event) => update("daily_wage_rate", event.target.value)} />)}
-            {field("Hourly wage", <input id="hourly_wage_rate" name="hourly_wage_rate" className={inputClass} value={form.hourly_wage_rate} onChange={(event) => update("hourly_wage_rate", event.target.value)} />)}
-            {field("Piece rate", <input id="piece_rate_amount" name="piece_rate_amount" className={inputClass} value={form.piece_rate_amount} onChange={(event) => update("piece_rate_amount", event.target.value)} />)}
-            {field("Piece unit", <input id="piece_rate_unit_label" name="piece_rate_unit_label" className={inputClass} value={form.piece_rate_unit_label} onChange={(event) => update("piece_rate_unit_label", event.target.value)} />)}
-            {field("Payroll eligible", <select className={inputClass} value={form.payroll_eligible ? "true" : "false"} onChange={(event) => update("payroll_eligible", event.target.value === "true")}><option value="false">No</option><option value="true">Yes</option></select>)}
-            {field("Salary pay day (1-28)", <input id="salary_pay_day" name="salary_pay_day" type="number" min={1} max={28} className={inputClass} value={form.salary_pay_day} onChange={(event) => update("salary_pay_day", event.target.value)} placeholder="e.g. 2" />)}
-            {field("Payment mode", <select className={inputClass} value={form.payment_mode} onChange={(event) => update("payment_mode", event.target.value)}><option value="CASH">Cash</option><option value="BANK">Bank</option><option value="UPI">UPI</option></select>)}
-          </>
-        ) : null}
-        {tab === "KYC" ? (
-          <>
-            {field("KYC type", <input id="kyc_id_type" name="kyc_id_type" className={inputClass} value={form.kyc_id_type} onChange={(event) => update("kyc_id_type", event.target.value)} />)}
-            {field("KYC reference", <input id="kyc_id_number" name="kyc_id_number" className={inputClass} value={form.kyc_id_number} onChange={(event) => update("kyc_id_number", event.target.value)} />)}
-            {field("KYC status", <select className={inputClass} value={form.kyc_verified ? "true" : "false"} onChange={(event) => update("kyc_verified", event.target.value === "true")}><option value="false">Pending</option><option value="true">Verified</option></select>)}
-          </>
-        ) : null}
-        {tab === "EMERGENCY" ? (
-          <>
-            {field("Emergency contact", <input id="emergency_contact_name" name="emergency_contact_name" className={inputClass} value={form.emergency_contact_name} onChange={(event) => update("emergency_contact_name", event.target.value)} />)}
-            {field("Emergency relation", <input id="emergency_contact_relation" name="emergency_contact_relation" className={inputClass} value={form.emergency_contact_relation} onChange={(event) => update("emergency_contact_relation", event.target.value)} placeholder="SPOUSE" />)}
-            {field("Emergency phone", <input id="emergency_contact_phone" name="emergency_contact_phone" className={inputClass} value={form.emergency_contact_phone} onChange={(event) => update("emergency_contact_phone", event.target.value)} />)}
-            {field("Address", <textarea className="min-h-24 rounded-xl border border-border bg-background px-3 py-2 text-sm" value={form.address} onChange={(event) => update("address", event.target.value)} />)}
-          </>
-        ) : null}
-        {tab === "ACCESS" ? (
-          <>
-            {field("Cost center", <input id="cost_center_code" name="cost_center_code" className={inputClass} value={form.cost_center_code} onChange={(event) => update("cost_center_code", event.target.value)} />)}
-            {field("Payroll expense account ID", <input id="payroll_expense_account" name="payroll_expense_account" className={inputClass} value={form.payroll_expense_account} onChange={(event) => update("payroll_expense_account", event.target.value)} />)}
-            {field("Bank account name", <input id="bank_account_name" name="bank_account_name" className={inputClass} value={form.bank_account_name} onChange={(event) => update("bank_account_name", event.target.value)} />)}
-            {field("Bank account number", <input id="bank_account_number" name="bank_account_number" className={inputClass} value={form.bank_account_number} onChange={(event) => update("bank_account_number", event.target.value)} />)}
-            {field("IFSC", <input id="bank_ifsc" name="bank_ifsc" className={inputClass} value={form.bank_ifsc} onChange={(event) => update("bank_ifsc", event.target.value)} />)}
-            {field("UPI ID", <input id="upi_id" name="upi_id" className={inputClass} value={form.upi_id} onChange={(event) => update("upi_id", event.target.value)} />)}
-          </>
-        ) : null}
-      </div>
-      <div className="sticky bottom-3 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-background/95 p-3 shadow-sm">
-        <span className="text-xs text-muted-foreground">No delete button. Use deactivate/reactivate to preserve history.</span>
+
+      {tab === "BASIC" && (
+        <div className="grid gap-3 md:grid-cols-3">
+          {inp("Full name", "name")}
+          {inp("Phone", "phone")}
+          {inp("Role / title", "designation")}
+          <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Branch
+            <select value={form.branch} onChange={(e) => up("branch", e.target.value)}
+              className="h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary">
+              <option value="">No branch</option>
+              {branches.map((b) => <option key={b.id} value={b.id}>{b.name} ({b.code})</option>)}
+            </select>
+          </label>
+          {inp("Department", "department")}
+          {inp("Joining date", "joining_date", "date")}
+          {inp("Address", "address")}
+        </div>
+      )}
+
+      {tab === "EMPLOYMENT" && (
+        <div className="grid gap-3 md:grid-cols-3">
+          <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Status
+            <select value={form.employment_status} onChange={(e) => up("employment_status", e.target.value)}
+              className="h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary">
+              {["DRAFT", "ONBOARDING", "ACTIVE", "INACTIVE"].map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Employment type
+            <select value={form.employment_type} onChange={(e) => up("employment_type", e.target.value)}
+              className="h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary">
+              {["PERMANENT_MONTHLY", "TEMPORARY", "DAILY_WAGE", "HOURLY", "PIECE_RATE", "MANUFACTURING", "SERVICE"].map((t) => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
+            </select>
+          </label>
+          {inp("Reporting manager", "reporting_manager")}
+          {inp("Work location", "work_location")}
+          {inp("Probation end date", "probation_end_date", "date")}
+          {inp("Attendance policy", "attendance_policy")}
+          {inp("Shift", "shift_name")}
+          {inp("Weekly off", "weekly_off")}
+          {inp("Contract end date", "temporary_contract_end_date", "date")}
+        </div>
+      )}
+
+      {tab === "PAYROLL" && (
+        <div className="grid gap-3 md:grid-cols-3">
+          <label className="flex items-center gap-2 text-sm font-semibold text-foreground md:col-span-3">
+            <input type="checkbox" checked={form.payroll_eligible} onChange={(e) => up("payroll_eligible", e.target.checked)} />
+            Payroll eligible
+          </label>
+          {inp("Base salary", "base_salary")}
+          {inp("Daily wage rate", "daily_wage_rate")}
+          {inp("Hourly wage rate", "hourly_wage_rate")}
+          {inp("Piece rate amount", "piece_rate_amount")}
+          {inp("Piece rate unit", "piece_rate_unit_label")}
+          {inp("Salary effective from", "salary_effective_from", "date")}
+          {inp("Salary pay day (1–31)", "salary_pay_day")}
+          <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Payment mode
+            <select value={form.payment_mode} onChange={(e) => up("payment_mode", e.target.value)}
+              className="h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary">
+              <option value="CASH">Cash</option><option value="BANK">Bank</option><option value="UPI">UPI</option>
+            </select>
+          </label>
+          {inp("Bank account name", "bank_account_name")}
+          {inp("Bank account number", "bank_account_number")}
+          {inp("IFSC", "bank_ifsc")}
+          {inp("UPI ID", "upi_id")}
+          {inp("Cost center", "cost_center_code")}
+          {inp("Payroll expense account (ID)", "payroll_expense_account")}
+        </div>
+      )}
+
+      {tab === "KYC" && (
+        <div className="grid gap-3 md:grid-cols-3">
+          <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            KYC ID type
+            <select value={form.kyc_id_type} onChange={(e) => up("kyc_id_type", e.target.value)}
+              className="h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary">
+              {["AADHAAR", "PAN", "VOTER_ID", "DRIVING_LICENSE", "PASSPORT", "OTHER"].map((t) => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
+            </select>
+          </label>
+          {inp("KYC ID number", "kyc_id_number")}
+          <label className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <input type="checkbox" checked={form.kyc_verified} onChange={(e) => up("kyc_verified", e.target.checked)} />
+            KYC verified
+          </label>
+        </div>
+      )}
+
+      {tab === "EMERGENCY" && (
+        <div className="grid gap-3 md:grid-cols-3">
+          {inp("Emergency contact name", "emergency_contact_name")}
+          {inp("Emergency relation", "emergency_contact_relation")}
+          {inp("Emergency phone", "emergency_contact_phone")}
+        </div>
+      )}
+
+      {tab === "ACCESS" && (
+        <p className="text-sm text-muted-foreground">Login management is on the Access tab below. Use this panel for profile data only.</p>
+      )}
+
+      {error && <Notice>{error}</Notice>}
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <span className="text-xs text-muted-foreground">Changes save to HR record only — no payroll journals posted here.</span>
         <div className="flex gap-2">
           <ActionButton variant="ghost" onClick={onCancel}>Cancel</ActionButton>
           <ActionButton variant="primary" disabled={!canSave} loading={saving} onClick={() => void save()}>Save Profile</ActionButton>
@@ -377,57 +430,106 @@ function EditPanel({
   );
 }
 
+// ─── Main page ────────────────────────────────────────────────────────────────
+
 export default function AdminHrStaffProfilePage() {
   const params = useParams<{ id: string }>();
   const staffId = Number(params.id);
-  const [staff, setStaff] = useState<HrStaff | null>(null);
-  const [identity, setIdentity] = useState<AdminStaffIdentity | null>(null);
-  const [branches, setBranches] = useState<BranchRecord[]>([]);
-  const [documents, setDocuments] = useState<HrStaffDocument[]>([]);
-  const [attendance, setAttendance] = useState<HrAttendance[]>([]);
-  const [leave, setLeave] = useState<HrLeaveRequest[]>([]);
-  const [leaveBalance, setLeaveBalance] = useState<HrLeaveBalanceRow[]>([]);
-  const [expenses, setExpenses] = useState<HrExpenseClaim[]>([]);
-  const [salarySheets, setSalarySheets] = useState<HrPayrollSheet[]>([]);
+
+  // Core data
+  const [staff,          setStaff]          = useState<HrStaff | null>(null);
+  const [identity,       setIdentity]       = useState<AdminStaffIdentity | null>(null);
+  const [branches,       setBranches]       = useState<BranchRecord[]>([]);
+  const [documents,      setDocuments]      = useState<HrStaffDocument[]>([]);
+  const [attendance,     setAttendance]     = useState<HrAttendance[]>([]);
+  const [leave,          setLeave]          = useState<HrLeaveRequest[]>([]);
+  const [leaveBalance,   setLeaveBalance]   = useState<HrLeaveBalanceRow[]>([]);
+  const [leaveTypes,     setLeaveTypes]     = useState<HrLeaveType[]>([]);
+  const [expenses,       setExpenses]       = useState<HrExpenseClaim[]>([]);
+  const [salarySheets,   setSalarySheets]   = useState<HrPayrollSheet[]>([]);
   const [salaryPayments, setSalaryPayments] = useState<HrSalaryPayment[]>([]);
-  const [auditEntries, setAuditEntries] = useState<StaffAuditEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [editing, setEditing] = useState(false);
-  const [activeTab, setActiveTab] = useState<DetailTab>("Overview");
+  const [advances,       setAdvances]       = useState<HrStaffAdvance[]>([]);
+  const [auditEntries,   setAuditEntries]   = useState<StaffAuditEntry[]>([]);
+  const [financeAccounts,setFinanceAccounts]= useState<FinanceAccount[]>([]);
+
+  // UI
+  const [loading,      setLoading]      = useState(true);
+  const [error,        setError]        = useState<string | null>(null);
+  const [notice,       setNotice]       = useState<string | null>(null);
+  const [editing,      setEditing]      = useState(false);
+  const [activeTab,    setActiveTab]    = useState<DetailTab>("Overview");
+
+  // Deactivation
+  const [deactivateOpen,   setDeactivateOpen]   = useState(false);
+  const [deactivateReason, setDeactivateReason] = useState("");
+  const [warningsDismissed, setWarningsDismissed] = useState(false);
+  const [deactivateSaving, setDeactivateSaving] = useState(false);
+
+  // Documents
   const [uploadOpen, setUploadOpen] = useState(false);
   const [upload, setUpload] = useState({ document_type: "OTHER", title: "", document_no: "", notes: "", file: null as File | null });
+  const [uploadSaving, setUploadSaving] = useState(false);
   const [reviewModal, setReviewModal] = useState<{ documentId: number; action: "verify" | "reject"; title: string } | null>(null);
   const [reviewNotes, setReviewNotes] = useState("");
   const [reviewSaving, setReviewSaving] = useState(false);
-  const [loginUsername, setLoginUsername] = useState("");
-  const [loginEmail, setLoginEmail] = useState("");
-  const [accessSaving, setAccessSaving] = useState(false);
-  const [accessError, setAccessError] = useState<string | null>(null);
-  const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
-  const [financeAccounts, setFinanceAccounts] = useState<FinanceAccount[]>([]);
+
+  // Access
+  const [loginUsername,    setLoginUsername]    = useState("");
+  const [loginEmail,       setLoginEmail]       = useState("");
+  const [accessSaving,     setAccessSaving]     = useState(false);
+  const [accessError,      setAccessError]      = useState<string | null>(null);
+  const [generatedPassword,setGeneratedPassword]= useState<string | null>(null);
+
+  // Payroll
   const [payrollSaving, setPayrollSaving] = useState<number | null>(null);
-  const [payrollError, setPayrollError] = useState<string | null>(null);
+  const [payrollError,  setPayrollError]  = useState<string | null>(null);
   const [payForm, setPayForm] = useState<{ salarySheetId: number; amount: string; financeAccount: string; referenceNo: string; paymentDate: string } | null>(null);
+
+  // Attendance
   const [attMonth, setAttMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [attForm, setAttForm] = useState({ date: new Date().toISOString().slice(0, 10), status: "PRESENT", worked_hours: "", overtime_hours: "", notes: "" });
   const [attSaving, setAttSaving] = useState(false);
-  const [attError, setAttError] = useState<string | null>(null);
-  const [attMessage, setAttMessage] = useState<string | null>(null);
+  const [attError,  setAttError]  = useState<string | null>(null);
+  const [attMsg,    setAttMsg]    = useState<string | null>(null);
+
+  // Leave request form
+  const [leaveFormOpen, setLeaveFormOpen] = useState(false);
+  const [leaveForm, setLeaveForm] = useState({ leave_type: "", start_date: "", end_date: "", reason: "" });
+  const [leaveSaving, setLeaveSaving] = useState(false);
+  const [leaveFormErr, setLeaveFormErr] = useState<string | null>(null);
+
+  // Expense actions
+  const [expenseBusy, setExpenseBusy] = useState<number | null>(null);
+  const [expenseErr,  setExpenseErr]  = useState<string | null>(null);
+
+  // Advance form
+  const [advanceFormOpen, setAdvanceFormOpen] = useState(false);
+  const [advanceForm, setAdvanceForm] = useState({ amount: "", reason: "", notes: "", request_date: new Date().toISOString().slice(0, 10) });
+  const [advanceSaving, setAdvanceSaving] = useState(false);
+  const [advanceErr, setAdvanceErr] = useState<string | null>(null);
+
+  // Advance disburse
+  const [disburseForm, setDisburseForm] = useState<{ advanceId: number; finance_account: string; disbursement_date: string; reference_no: string } | null>(null);
+  const [disburseSaving, setDisburseSaving] = useState(false);
+
+  // Recovery form
+  const [recoverForm, setRecoverForm] = useState<{ advanceId: number; finance_account: string; recovery_date: string; amount: string; reference_no: string } | null>(null);
+  const [recoverSaving, setRecoverSaving] = useState(false);
 
   const attendanceSummary = useMemo(() => {
-    const count = (status: string) => attendance.filter((row) => row.status === status).length;
-    const [year, month] = attMonth.split("-").map(Number);
-    const daysInMonth = year && month ? new Date(year, month, 0).getDate() : 0;
+    const count = (s: string) => attendance.filter((r) => r.status === s).length;
+    const [y, m] = attMonth.split("-").map(Number);
+    const daysInMonth = y && m ? new Date(y, m, 0).getDate() : 0;
     return {
-      present: count("PRESENT"),
-      halfDay: count("HALF_DAY"),
-      absent: count("ABSENT"),
-      leave: count("LEAVE"),
-      notMarked: Math.max(daysInMonth - attendance.length, 0),
-      daysInMonth,
+      present: count("PRESENT"), halfDay: count("HALF_DAY"),
+      absent: count("ABSENT"), late: count("LATE"),
+      leave: count("LEAVE"), holiday: count("HOLIDAY"),
+      weeklyOff: count("WEEKLY_OFF"),
+      notMarked: Math.max(daysInMonth - attendance.length, 0), daysInMonth,
     };
   }, [attendance, attMonth]);
+
+  // ── Data loading ─────────────────────────────────────────────────────────────
 
   async function loadAttendanceMonth(month: string) {
     if (!staffId) return;
@@ -436,51 +538,18 @@ export default function AdminHrStaffProfilePage() {
     const lastDay = new Date(year, monthNo, 0).getDate();
     try {
       const payload = await listHrAttendance(`employee=${staffId}&from=${month}-01&to=${month}-${String(lastDay).padStart(2, "0")}`);
-      setAttendance([...payload.results].sort((a, b) => (a.attendance_date < b.attendance_date ? -1 : 1)));
+      setAttendance([...payload.results].sort((a, b) => a.attendance_date < b.attendance_date ? -1 : 1));
       setAttError(null);
     } catch (err) {
-      setAttError(err instanceof Error ? err.message : "Unable to load attendance for the month.");
+      setAttError(err instanceof Error ? err.message : "Unable to load attendance.");
     }
   }
 
-  useEffect(() => {
-    void loadAttendanceMonth(attMonth);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [staffId, attMonth]);
-
-  async function submitAttendance() {
-    if (!staff) return;
-    if (!attForm.date) {
-      setAttError("Pick a date to mark.");
-      return;
-    }
-    setAttSaving(true);
-    setAttError(null);
-    setAttMessage(null);
-    try {
-      await markHrAttendance({
-        employee: staff.id,
-        attendance_date: attForm.date,
-        status: attForm.status,
-        notes: attForm.notes || undefined,
-        worked_hours: attForm.worked_hours || null,
-        overtime_hours: attForm.overtime_hours || null,
-      });
-      setAttMessage(`Attendance saved: ${attForm.date} marked ${attForm.status}.`);
-      setAttForm((current) => ({ ...current, notes: "" }));
-      await loadAttendanceMonth(attMonth);
-    } catch (err) {
-      setAttError(err instanceof Error ? err.message : "Failed to save attendance.");
-    } finally {
-      setAttSaving(false);
-    }
-  }
-
-  async function load() {
+  const load = useCallback(async () => {
     if (!staffId) return;
     try {
       setLoading(true);
-      const [staffPayload, branchPayload, docsPayload, leavePayload, expensePayload, payrollPayload, paymentPayload, identityPayload, financeAccountPayload, leaveBalancePayload] = await Promise.all([
+      const [staffRes, branchRes, docsRes, leaveRes, expenseRes, payrollRes, paymentRes, identityRes, financeRes, leaveBalRes, advRes, leaveTypeRes] = await Promise.all([
         getHrStaff(staffId),
         listBranches({ status: "ACTIVE" }),
         listHrStaffDocuments({ employee: staffId }),
@@ -490,28 +559,35 @@ export default function AdminHrStaffProfilePage() {
         listHrSalaryPayments({ employee: staffId }),
         listAdminStaffIdentities(),
         listFinanceAccounts({ is_active: 1 }),
-        getHrStaffLeaveBalance(staffId),
+        getHrStaffLeaveBalance(staffId).catch(() => ({ results: [] as HrLeaveBalanceRow[], year: 0, employee_id: staffId })),
+        listHrStaffAdvances().catch(() => ({ count: 0, results: [] as HrStaffAdvance[] })),
+        listHrLeaveTypes().catch(() => ({ count: 0, results: [] as HrLeaveType[] })),
       ]);
-      setLeaveBalance(leaveBalancePayload.results);
-      setFinanceAccounts(financeAccountPayload.results);
-      const identity = identityPayload.results.find((item) => item.employee === staffPayload.id) || null;
+
+      const foundIdentity = identityRes.results.find((i) => i.employee === staffRes.id) ?? null;
+
       const auditPayloads = await Promise.all([
-        getAdminAuditTimeline("EmployeeProfile", staffPayload.id),
-        identity ? getAdminAuditTimeline("StaffIdentity", identity.id) : Promise.resolve([] as AdminAuditEntry[]),
-        getAdminAuditTimeline("EmployeeDocument", staffPayload.id),
+        getAdminAuditTimeline("EmployeeProfile", staffRes.id),
+        foundIdentity ? getAdminAuditTimeline("StaffIdentity", foundIdentity.id) : Promise.resolve([] as AdminAuditEntry[]),
+        getAdminAuditTimeline("EmployeeDocument", staffRes.id),
       ]);
-      setStaff(staffPayload);
-      setIdentity(identity);
-      setBranches(branchPayload.results);
-      setDocuments(docsPayload.results);
-      setLeave(leavePayload.results);
-      setExpenses(expensePayload.results);
-      setSalarySheets(payrollPayload.salary_sheets);
-      setSalaryPayments(paymentPayload.results);
+
+      setStaff(staffRes);
+      setIdentity(foundIdentity);
+      setBranches(branchRes.results ?? []);
+      setDocuments(docsRes.results ?? []);
+      setLeave(leaveRes.results ?? []);
+      setLeaveBalance(leaveBalRes.results ?? []);
+      setLeaveTypes(leaveTypeRes.results ?? []);
+      setExpenses(expenseRes.results ?? []);
+      setSalarySheets(payrollRes.salary_sheets ?? []);
+      setSalaryPayments(paymentRes.results ?? []);
+      setFinanceAccounts(financeRes.results ?? []);
+      setAdvances((advRes.results ?? []).filter((a) => a.employee === staffRes.id));
       setAuditEntries(
         auditPayloads
-          .flatMap((entries, index) => entries.map((entry) => ({ ...entry, source_label: index === 0 ? "EmployeeProfile" : index === 1 ? "StaffIdentity" : "EmployeeDocument" })))
-          .sort((left, right) => (left.created_at < right.created_at ? 1 : left.created_at > right.created_at ? -1 : right.id - left.id))
+          .flatMap((entries, idx) => entries.map((e) => ({ ...e, source_label: idx === 0 ? "EmployeeProfile" : idx === 1 ? "StaffIdentity" : "EmployeeDocument" })))
+          .sort((a, b) => a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : b.id - a.id)
       );
       setError(null);
     } catch (err) {
@@ -519,573 +595,1007 @@ export default function AdminHrStaffProfilePage() {
     } finally {
       setLoading(false);
     }
-  }
-
-  useEffect(() => {
-    void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [staffId]);
 
-  async function toggleStatus() {
+  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void loadAttendanceMonth(attMonth); }, [staffId, attMonth]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Actions ──────────────────────────────────────────────────────────────────
+
+  async function handleDeactivate() {
+    if (!staff || !deactivateReason.trim()) return;
+    setDeactivateSaving(true);
+    try {
+      await setHrStaffStatus(staff.id, "DEACTIVATE", deactivateReason.trim());
+      setNotice(`${staff.name} deactivated. All history preserved.`);
+      setDeactivateOpen(false); setDeactivateReason("");
+      await load();
+    } catch (err) { setError(err instanceof Error ? err.message : "Unable to deactivate."); }
+    finally { setDeactivateSaving(false); }
+  }
+
+  async function handleReactivate() {
     if (!staff) return;
-    const action = staff.is_active ? "DEACTIVATE" : "REACTIVATE";
-    const reason = staff.is_active ? window.prompt(`Deactivate ${staff.name}? Payroll, attendance, and documents will remain preserved. Enter reason:`) : "";
-    if (staff.is_active && !reason?.trim()) return;
-    await setHrStaffStatus(staff.id, action, reason?.trim());
-    await load();
-  }
-
-  async function createLoginForStaff() {
-    if (!staff) return;
-    const username = loginUsername.trim();
-    if (!username) {
-      setAccessError("Enter a username for the new login.");
-      return;
-    }
-    setAccessSaving(true);
-    setAccessError(null);
     try {
-      const created = await createAdminStaffIdentity({
-        employee: staff.id,
-        name: staff.name,
-        phone: staff.phone,
-        email: loginEmail.trim() || undefined,
-        username,
-        joining_date: staff.joining_date,
-        login_enabled: true,
-      });
-      setGeneratedPassword(created.temporary_password || null);
-      setLoginUsername("");
-      setLoginEmail("");
+      await setHrStaffStatus(staff.id, "REACTIVATE");
+      setNotice(`${staff.name} reactivated.`);
       await load();
-    } catch (err) {
-      setAccessError(err instanceof Error ? err.message : "Unable to create staff login.");
-    } finally {
-      setAccessSaving(false);
-    }
+    } catch (err) { setError(err instanceof Error ? err.message : "Unable to reactivate."); }
   }
 
-  async function toggleLoginEnabled() {
-    if (!identity) return;
-    setAccessSaving(true);
-    setAccessError(null);
+  async function submitAttendance() {
+    if (!staff || !attForm.date) { setAttError("Pick a date."); return; }
+    setAttSaving(true); setAttError(null); setAttMsg(null);
     try {
-      await updateAdminStaffLogin(identity.id, !identity.login_enabled);
-      await load();
-    } catch (err) {
-      setAccessError(err instanceof Error ? err.message : "Unable to update login status.");
-    } finally {
-      setAccessSaving(false);
-    }
+      await markHrAttendance({ employee: staff.id, attendance_date: attForm.date, status: attForm.status, notes: attForm.notes || undefined, worked_hours: attForm.worked_hours || null, overtime_hours: attForm.overtime_hours || null });
+      setAttMsg(`Attendance saved: ${attForm.date} — ${attForm.status}`);
+      setAttForm((c) => ({ ...c, notes: "", worked_hours: "", overtime_hours: "" }));
+      await loadAttendanceMonth(attMonth);
+    } catch (err) { setAttError(err instanceof Error ? err.message : "Failed to save."); }
+    finally { setAttSaving(false); }
   }
 
-  async function resetLoginPassword() {
-    if (!identity) return;
-    if (!window.confirm(`Reset the password for ${identity.username}? The old password stops working immediately.`)) return;
-    setAccessSaving(true);
-    setAccessError(null);
+  async function submitLeaveRequest() {
+    if (!staff || !leaveForm.leave_type || !leaveForm.start_date) { setLeaveFormErr("Leave type and start date are required."); return; }
+    setLeaveSaving(true); setLeaveFormErr(null);
     try {
-      const updated = await resetAdminStaffLoginPassword(identity.id);
-      setGeneratedPassword(updated.temporary_password || null);
+      await createHrLeaveRequest({ employee: staff.id, leave_type: Number(leaveForm.leave_type), start_date: leaveForm.start_date, end_date: leaveForm.end_date || undefined, reason: leaveForm.reason || undefined });
+      setNotice("Leave request submitted.");
+      setLeaveFormOpen(false); setLeaveForm({ leave_type: "", start_date: "", end_date: "", reason: "" });
       await load();
-    } catch (err) {
-      setAccessError(err instanceof Error ? err.message : "Unable to reset password.");
-    } finally {
-      setAccessSaving(false);
-    }
+    } catch (err) { setLeaveFormErr(err instanceof Error ? err.message : "Failed to submit."); }
+    finally { setLeaveSaving(false); }
   }
 
-  async function approveSheet(sheetId: number) {
-    setPayrollSaving(sheetId);
-    setPayrollError(null);
+  async function actOnExpense(id: number, action: "APPROVE" | "REJECT") {
+    setExpenseBusy(id); setExpenseErr(null);
     try {
-      await approveSalarySheet(sheetId);
+      await patchHrExpenseClaim(id, { action });
       await load();
-    } catch (err) {
-      setPayrollError(err instanceof Error ? err.message : "Unable to approve salary sheet.");
-    } finally {
-      setPayrollSaving(null);
-    }
+    } catch (err) { setExpenseErr(err instanceof Error ? err.message : "Action failed."); }
+    finally { setExpenseBusy(null); }
   }
 
-  async function postSheet(sheetId: number) {
-    setPayrollSaving(sheetId);
-    setPayrollError(null);
+  async function actOnLeave(id: number, action: "APPROVE" | "REJECT") {
     try {
-      await postSalarySheet(sheetId);
+      await patchHrLeaveRequest(id, { action });
       await load();
-    } catch (err) {
-      setPayrollError(err instanceof Error ? err.message : "Unable to post salary sheet.");
-    } finally {
-      setPayrollSaving(null);
-    }
+    } catch (err) { setError(err instanceof Error ? err.message : "Action failed."); }
   }
 
-  function openPayForm(sheet: HrPayrollSheet) {
-    setPayrollError(null);
-    setPayForm({
-      salarySheetId: sheet.id,
-      amount: sheet.outstanding_amount || sheet.net_amount,
-      financeAccount: financeAccounts[0] ? String(financeAccounts[0].id) : "",
-      referenceNo: "",
-      paymentDate: new Date().toISOString().slice(0, 10),
-    });
-  }
-
-  async function submitPayment() {
-    if (!payForm) return;
-    if (!payForm.financeAccount) {
-      setPayrollError("Select a cash/bank account to pay from.");
-      return;
-    }
-    setPayrollSaving(payForm.salarySheetId);
-    setPayrollError(null);
+  async function submitAdvance() {
+    if (!staff || !advanceForm.amount.trim() || !advanceForm.reason.trim()) { setAdvanceErr("Amount and reason are required."); return; }
+    setAdvanceSaving(true); setAdvanceErr(null);
     try {
-      await recordSalaryPayment({
-        salary_sheet: payForm.salarySheetId,
-        payment_date: payForm.paymentDate,
-        amount: payForm.amount,
-        finance_account: Number(payForm.financeAccount),
-        reference_no: payForm.referenceNo.trim() || undefined,
-      });
-      setPayForm(null);
+      await createHrStaffAdvance({ employee: staff.id, request_date: advanceForm.request_date, amount: advanceForm.amount.trim(), reason: advanceForm.reason.trim(), notes: advanceForm.notes.trim() || undefined });
+      setNotice("Staff advance request created.");
+      setAdvanceFormOpen(false); setAdvanceForm({ amount: "", reason: "", notes: "", request_date: new Date().toISOString().slice(0, 10) });
       await load();
-    } catch (err) {
-      setPayrollError(err instanceof Error ? err.message : "Unable to record salary payment.");
-    } finally {
-      setPayrollSaving(null);
-    }
+    } catch (err) { setAdvanceErr(err instanceof Error ? err.message : "Failed to create."); }
+    finally { setAdvanceSaving(false); }
+  }
+
+  async function advanceApprove(id: number) {
+    try {
+      await approveHrStaffAdvance(id);
+      setNotice("Advance approved.");
+      await load();
+    } catch (err) { setError(err instanceof Error ? err.message : "Failed to approve."); }
+  }
+
+  async function submitDisburse() {
+    if (!disburseForm) return;
+    setDisburseSaving(true);
+    try {
+      await disburseHrStaffAdvance(disburseForm.advanceId, { finance_account: Number(disburseForm.finance_account), disbursement_date: disburseForm.disbursement_date, reference_no: disburseForm.reference_no || undefined });
+      setNotice("Advance disbursed.");
+      setDisburseForm(null); await load();
+    } catch (err) { setError(err instanceof Error ? err.message : "Failed to disburse."); }
+    finally { setDisburseSaving(false); }
+  }
+
+  async function submitRecover() {
+    if (!recoverForm) return;
+    setRecoverSaving(true);
+    try {
+      await recoverHrStaffAdvance(recoverForm.advanceId, { finance_account: Number(recoverForm.finance_account), recovery_date: recoverForm.recovery_date, amount: recoverForm.amount, reference_no: recoverForm.reference_no || undefined });
+      setNotice("Recovery recorded.");
+      setRecoverForm(null); await load();
+    } catch (err) { setError(err instanceof Error ? err.message : "Failed to record recovery."); }
+    finally { setRecoverSaving(false); }
   }
 
   async function uploadDocument() {
     if (!staff || !upload.title.trim() || !upload.file) return;
-    const payload = new FormData();
-    payload.append("employee", String(staff.id));
-    payload.append("document_type", upload.document_type);
-    payload.append("title", upload.title.trim());
-    payload.append("document_no", upload.document_no.trim());
-    payload.append("notes", upload.notes.trim());
-    payload.append("file", upload.file);
-    await createHrStaffDocument(payload);
-    setUpload({ document_type: "OTHER", title: "", document_no: "", notes: "", file: null });
-    setUploadOpen(false);
-    await load();
-  }
-
-  function openReviewModal(documentId: number, action: "verify" | "reject", title: string) {
-    setReviewModal({ documentId, action, title });
-    setReviewNotes("");
+    setUploadSaving(true);
+    try {
+      const fd = new FormData();
+      fd.append("employee", String(staff.id));
+      fd.append("document_type", upload.document_type);
+      fd.append("title", upload.title.trim());
+      fd.append("document_no", upload.document_no.trim());
+      fd.append("notes", upload.notes.trim());
+      fd.append("file", upload.file);
+      await createHrStaffDocument(fd);
+      setUpload({ document_type: "OTHER", title: "", document_no: "", notes: "", file: null });
+      setUploadOpen(false);
+      await load();
+    } catch (err) { setError(err instanceof Error ? err.message : "Upload failed."); }
+    finally { setUploadSaving(false); }
   }
 
   async function submitReview() {
     if (!reviewModal) return;
+    setReviewSaving(true);
     try {
-      setReviewSaving(true);
       await reviewHrStaffDocument(reviewModal.documentId, reviewModal.action, reviewNotes);
-      setReviewModal(null);
-      setReviewNotes("");
+      setNotice(`Document ${reviewModal.action === "verify" ? "verified" : "rejected"}.`);
+      setReviewModal(null); setReviewNotes("");
       await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to update document review.");
-    } finally {
-      setReviewSaving(false);
-    }
+    } catch (err) { setError(err instanceof Error ? err.message : "Review failed."); }
+    finally { setReviewSaving(false); }
   }
 
-  if (loading) return <ERPPageShell title="Staff Profile"><ERPLoadingState label="Loading staff profile..." /></ERPPageShell>;
-  if (error) return <ERPPageShell title="Staff Profile"><ERPErrorState title="Staff profile unavailable" description={error} onRetry={() => void load()} /></ERPPageShell>;
-  if (!staff) return <ERPPageShell title="Staff Profile"><ERPEmptyState title="Staff profile not found" /></ERPPageShell>;
+  async function createLoginForStaff() {
+    if (!staff || !loginUsername.trim()) { setAccessError("Enter a username."); return; }
+    setAccessSaving(true); setAccessError(null);
+    try {
+      const created = await createAdminStaffIdentity({ employee: staff.id, name: staff.name, phone: staff.phone, email: loginEmail.trim() || undefined, username: loginUsername.trim(), joining_date: staff.joining_date, login_enabled: true });
+      setGeneratedPassword(created.temporary_password ?? null);
+      setLoginUsername(""); setLoginEmail("");
+      await load();
+    } catch (err) { setAccessError(err instanceof Error ? err.message : "Unable to create login."); }
+    finally { setAccessSaving(false); }
+  }
+
+  async function toggleLoginEnabled() {
+    if (!identity) return;
+    setAccessSaving(true); setAccessError(null);
+    try { await updateAdminStaffLogin(identity.id, !identity.login_enabled); await load(); }
+    catch (err) { setAccessError(err instanceof Error ? err.message : "Unable to toggle."); }
+    finally { setAccessSaving(false); }
+  }
+
+  async function resetLoginPassword() {
+    if (!identity) return;
+    setAccessSaving(true); setAccessError(null);
+    try {
+      const updated = await resetAdminStaffLoginPassword(identity.id);
+      setGeneratedPassword(updated.temporary_password ?? null);
+      await load();
+    } catch (err) { setAccessError(err instanceof Error ? err.message : "Unable to reset."); }
+    finally { setAccessSaving(false); }
+  }
+
+  async function approveSheet(id: number) {
+    setPayrollSaving(id); setPayrollError(null);
+    try { await approveSalarySheet(id); await load(); }
+    catch (err) { setPayrollError(err instanceof Error ? err.message : "Failed."); }
+    finally { setPayrollSaving(null); }
+  }
+
+  async function postSheet(id: number) {
+    setPayrollSaving(id); setPayrollError(null);
+    try { await postSalarySheet(id); await load(); }
+    catch (err) { setPayrollError(err instanceof Error ? err.message : "Failed."); }
+    finally { setPayrollSaving(null); }
+  }
+
+  async function submitPayment() {
+    if (!payForm?.financeAccount) { setPayrollError("Select an account."); return; }
+    setPayrollSaving(payForm.salarySheetId); setPayrollError(null);
+    try {
+      await recordSalaryPayment({ salary_sheet: payForm.salarySheetId, payment_date: payForm.paymentDate, amount: payForm.amount, finance_account: Number(payForm.financeAccount), reference_no: payForm.referenceNo.trim() || undefined });
+      setPayForm(null); await load();
+    } catch (err) { setPayrollError(err instanceof Error ? err.message : "Failed."); }
+    finally { setPayrollSaving(null); }
+  }
+
+  // ── Render states ─────────────────────────────────────────────────────────────
+
+  if (loading) return <ERPPageShell title="Staff Profile"><ERPLoadingState label="Loading staff profile…" /></ERPPageShell>;
+  if (error && !staff) return <ERPPageShell title="Staff Profile"><ERPErrorState title="Profile unavailable" description={error} onRetry={() => void load()} /></ERPPageShell>;
+  if (!staff) return <ERPPageShell title="Staff Profile"><ERPEmptyState title="Staff not found" /></ERPPageShell>;
+
+  const pendingLeave    = leave.filter((l) => l.status === "PENDING");
+  const pendingExpenses = expenses.filter((e) => e.status === "PENDING");
+  const pendingAdvances = advances.filter((a) => a.status === "DRAFT");
+  const outstandingAdv  = advances.filter((a) => ["DISBURSED", "PARTIALLY_RECOVERED"].includes(a.status));
+  const avatarBg        = staff.is_active ? "bg-primary" : "bg-muted";
 
   return (
     <ERPPageShell
-      eyebrow="Staff 360"
+      eyebrow="HR · Staff 360"
       title={staff.name}
-      subtitle={`${staff.employee_code || `Staff #${staff.id}`} · ${staff.department || "No department"} · ${staff.employment_type || "No staff type"}`}
+      subtitle={`${staff.employee_code || `Staff #${staff.id}`} · ${staff.department || "No department"} · ${staff.designation || staff.employment_type || "No role"}`}
       breadcrumbs={[
-        { label: "Admin", href: ROUTES.admin.dashboard },
-        { label: "HR", href: ROUTES.admin.hr },
+        { label: "Admin",          href: ROUTES.admin.dashboard },
+        { label: "HR",             href: ROUTES.admin.hr },
         { label: "Staff Register", href: ROUTES.admin.hrStaff },
         { label: staff.name },
       ]}
-      statusBadge={{ label: staff.is_active ? "Active" : "Inactive", tone: staff.is_active ? "success" : "warning" }}
+      statusBadge={{ label: staff.employment_status || (staff.is_active ? "Active" : "Inactive"), tone: staff.is_active ? "success" : "warning" }}
       maxWidth="1180px"
     >
-      <DetailPanel title="Staff profile summary" description="Operational identity and current status.">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
+      {/* ── Hero card ──────────────────────────────────────────────────────── */}
+      <div className="rounded-xl border border-border bg-card p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-5">
+          {/* Avatar */}
+          <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-full ${avatarBg} text-2xl font-bold text-primary-foreground`}>
+            {initials(staff.name)}
+          </div>
+
+          {/* Identity block */}
+          <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-semibold text-foreground">{staff.name}</h1>
+              <h1 className="text-xl font-bold text-foreground">{staff.name}</h1>
               <ERPStatusBadge status={staff.is_active ? "ACTIVE" : "INACTIVE"} label={staff.is_active ? "Active" : "Inactive"} size="md" />
+              {staff.employment_status && staff.employment_status !== "ACTIVE" && staff.employment_status !== "INACTIVE" && (
+                <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">{staff.employment_status}</span>
+              )}
             </div>
-            <div className="mt-2 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2 lg:grid-cols-4">
-              <span>ID: {staff.employee_code || staff.id}</span>
-              <span>Department: {staff.department || "Unassigned"}</span>
-              <span>Type: {staff.employment_type || "Unassigned"}</span>
-              <span>Branch: {staff.branch_name || "Unassigned"} / Counter not exposed</span>
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+              <span>ID: <strong className="text-foreground">{staff.employee_code || staff.id}</strong></span>
+              {staff.designation && <span>Role: <strong className="text-foreground">{staff.designation}</strong></span>}
+              {staff.department && <span>Dept: <strong className="text-foreground">{staff.department}</strong></span>}
+              {staff.branch_name && <span>Branch: <strong className="text-foreground">{staff.branch_name}</strong></span>}
+              {staff.phone && <span>Phone: <strong className="text-foreground">{staff.phone}</strong></span>}
+              {staff.joining_date && <span>Joined: <strong className="text-foreground">{fmt(staff.joining_date)}</strong></span>}
+            </div>
+
+            {/* Readiness strip */}
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              <ReadinessBadge ready={staff.profile_ready}    label="Profile" />
+              <ReadinessBadge ready={staff.employment_ready} label="Employment" />
+              <ReadinessBadge ready={staff.payroll_ready}    label="Payroll" />
+              <ReadinessBadge ready={staff.attendance_ready} label="Attendance" />
+              <ReadinessBadge ready={staff.documents_ready}  label="KYC Docs" />
+              <ReadinessBadge ready={staff.access_ready}     label="Portal Access" />
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
+
+          {/* Actions */}
+          <div className="flex flex-wrap gap-2 shrink-0">
             <ActionButton variant="primary" onClick={() => setEditing(true)}>Edit Profile</ActionButton>
-            <ActionButton variant={staff.is_active ? "destructive" : "secondary"} onClick={() => void toggleStatus()}>{staff.is_active ? "Deactivate" : "Reactivate"}</ActionButton>
-            <ActionButton onClick={() => void downloadHrStaffProfilePdf(staff.id, `staff-profile-${staff.employee_code || staff.id}.pdf`)}>Download Profile PDF</ActionButton>
-            <ActionButton onClick={() => void downloadHrSalaryAgreementPdf(staff.id, `salary-agreement-${staff.employee_code || staff.id}.pdf`)}>Download Salary Agreement PDF</ActionButton>
+            {staff.is_active ? (
+              <ActionButton variant="destructive" onClick={() => setDeactivateOpen(true)}>Deactivate</ActionButton>
+            ) : (
+              <ActionButton variant="secondary" onClick={() => void handleReactivate()}>Reactivate</ActionButton>
+            )}
+            <ActionButton onClick={() => void downloadHrStaffProfilePdf(staff.id, `staff-${staff.employee_code || staff.id}.pdf`)}>Profile PDF</ActionButton>
+            <ActionButton onClick={() => void downloadHrSalaryAgreementPdf(staff.id, `salary-agreement-${staff.employee_code || staff.id}.pdf`)}>Salary Agreement</ActionButton>
           </div>
         </div>
-      </DetailPanel>
 
-      {editing ? <EditPanel staff={staff} branches={branches} onCancel={() => setEditing(false)} onSaved={() => { setEditing(false); void load(); }} /> : null}
-
-      <QuickActionGrid>
-        <KpiCard label="Present days" value={attendanceSummary.present} helper="Current loaded attendance rows" />
-        <KpiCard label="Leave requests" value={leave.length} helper="Recent leave records" />
-        <KpiCard label="Expense claims" value={expenses.length} helper="Recent claims" />
-        <WorkflowCard
-          title="Staff workflow"
-          description="Use profile edit, document upload, and status toggle for controlled HR operations."
-        />
-      </QuickActionGrid>
-
-      <div className="sticky top-0 z-10 -mx-2 bg-background/95 px-2 py-3 backdrop-blur sm:-mx-6 sm:px-6">
-        <WorkbenchFilterChips
-          active={activeTab}
-          onSelect={(key) => setActiveTab(key as DetailTab)}
-          chips={DETAIL_TABS.map((tab) => ({ key: tab, label: tab }))}
-        />
+        {/* Setup checklist — info only, admin can act regardless */}
+        {!warningsDismissed && staff.readiness_warnings?.length ? (
+          <div className="mt-4 flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm text-blue-800">
+            <span className="flex-1">
+              <span className="font-semibold">Setup checklist: </span>
+              {staff.readiness_warnings.join(" · ")}
+              <span className="ml-2 text-blue-600 text-xs">(Admin can still mark attendance and run payroll)</span>
+            </span>
+            <button type="button" onClick={() => setWarningsDismissed(true)}
+              className="shrink-0 text-blue-400 hover:text-blue-700 transition">✕</button>
+          </div>
+        ) : null}
       </div>
 
-      {activeTab === "Overview" ? <DetailPanel title="Overview" description="Identity, readiness, and operational warnings.">
-        <div className="mb-5">
-          <UniversalQuickWidgetsEmbed role="STAFF" sourceId={staff.id} />
+      {/* Deactivation dialog */}
+      {deactivateOpen && (
+        <div className="rounded-xl border border-destructive/30 bg-card p-5 space-y-3">
+          <h3 className="text-sm font-bold text-foreground">Deactivate {staff.name}</h3>
+          <p className="text-xs text-muted-foreground">Payroll, attendance, documents, and audit history are fully preserved. The staff can be reactivated at any time.</p>
+          <textarea value={deactivateReason} onChange={(e) => setDeactivateReason(e.target.value)}
+            placeholder="Reason for deactivation (required)"
+            className="w-full min-h-20 rounded-xl border border-input bg-background px-3 py-2 text-sm" />
+          <div className="flex gap-2 justify-end">
+            <ActionButton variant="ghost" onClick={() => { setDeactivateOpen(false); setDeactivateReason(""); }}>Cancel</ActionButton>
+            <ActionButton variant="destructive" disabled={!deactivateReason.trim()} loading={deactivateSaving} onClick={() => void handleDeactivate()}>Confirm Deactivation</ActionButton>
+          </div>
         </div>
-        <div className="mb-4 flex flex-wrap gap-2">
-          <ReadinessBadge ready={staff.profile_ready} label="Profile ready" />
-          <ReadinessBadge ready={staff.employment_ready} label="Employment ready" />
-          <ReadinessBadge ready={staff.payroll_ready} label="Payroll ready" />
-          <ReadinessBadge ready={staff.attendance_ready} label="Attendance ready" />
-          <ReadinessBadge ready={staff.documents_ready} label="Documents ready" />
-          <ReadinessBadge ready={staff.access_ready} label="Access ready" />
-        </div>
-        {staff.readiness_warnings?.length ? (
-          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">{staff.readiness_warnings.join(" | ")}</div>
-        ) : null}
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Detail label="Phone" value={staff.phone} />
-          <Detail label="Alternate phone" value="Not available on current staff API" />
-          <Detail label="Email" value="Not available on current staff API" />
-          <Detail label="Role / title" value={staff.designation} />
-          <Detail label="Weekly off" value={staff.weekly_off} />
-          <Detail label="Address" value={staff.address} />
-          <Detail label="Emergency contact" value={`${staff.emergency_contact_name || "Unavailable"} ${staff.emergency_contact_phone || ""}`.trim()} />
-          <Detail label="Emergency relation" value={staff.emergency_contact_relation} />
-          <Detail label="Joining date" value={staff.joining_date} />
-          <Detail label="Leaving date" value="Not available on current staff API" />
-          <Detail label="KYC status" value={<ERPStatusBadge status={staff.kyc_verified ? "ACTIVE" : "PENDING"} label={staff.kyc_verified ? "Verified" : "Pending"} />} />
-          <Detail label="KYC reference" value={`${staff.kyc_id_type || "KYC"} ${mask(staff.kyc_id_number)}`} />
-        </div>
-      </DetailPanel> : null}
+      )}
 
-      {activeTab === "360 View" ? <Party360Embed role="STAFF" sourceId={staff.id} /> : null}
+      {/* Notices */}
+      {notice && <Notice ok onClose={() => setNotice(null)}>{notice}</Notice>}
+      {error  && <Notice onClose={() => setError(null)}>{error}</Notice>}
 
-      {activeTab === "Payables" ? (
-        <ProfilePayablesPanel
-          partyType="EMPLOYEE"
-          partyId={staff.id}
-          title="Salary & Expense Payables"
-          description="Approved salary sheets and expense claims for this employee. Paying posts a real Salary/Expense Payable → Finance Account journal."
-        />
-      ) : null}
+      {/* Edit panel */}
+      {editing && <EditPanel staff={staff} branches={branches} onCancel={() => setEditing(false)} onSaved={() => { setEditing(false); void load(); }} />}
 
-      {activeTab === "Employment" ? <DetailPanel title="Employment">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Detail label="Employment status" value={staff.employment_status || (staff.is_active ? "ACTIVE" : "DRAFT")} />
-          <Detail label="Employment type" value={staff.employment_type} />
-          <Detail label="Reporting manager" value={staff.reporting_manager} />
-          <Detail label="Work location" value={staff.work_location} />
-          <Detail label="Probation end date" value={staff.probation_end_date} />
-          <Detail label="Attendance policy" value={staff.attendance_policy} />
-          <Detail label="Shift" value={staff.shift_name} />
-          <Detail label="Deactivation reason" value={staff.deactivation_reason} />
-        </div>
-      </DetailPanel> : null}
+      {/* Quick KPI strip */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+        <Kpi label="Present (month)" value={attendanceSummary.present} tone={attendanceSummary.present > 0 ? "ok" : "neutral"} />
+        <Kpi label="Absent (month)"  value={attendanceSummary.absent}  tone={attendanceSummary.absent  > 0 ? "bad" : "ok"} />
+        <Kpi label="Leave balance"   value={leaveBalance.reduce((s, r) => s + parseFloat(r.available_now ?? "0"), 0).toFixed(0)} />
+        <Kpi label="Pending leave"   value={pendingLeave.length}    tone={pendingLeave.length    > 0 ? "warn" : "ok"} />
+        <Kpi label="Pending expenses" value={pendingExpenses.length} tone={pendingExpenses.length > 0 ? "warn" : "ok"} />
+        <Kpi label="Outstanding adv" value={fmtCur(outstandingAdv.reduce((s, a) => s + parseFloat(a.outstanding_amount ?? "0"), 0).toFixed(2))} tone={outstandingAdv.length > 0 ? "warn" : "ok"} />
+      </div>
 
-      {activeTab === "Payroll" ? <DetailPanel title="Payroll">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Detail label="Pay basis" value={staff.pay_basis || (staff.base_salary ? "Monthly base" : staff.daily_wage_rate ? "Daily wage" : staff.hourly_wage_rate ? "Hourly" : staff.piece_rate_amount ? "Piece rate" : "Not configured")} />
-          <Detail label="Payroll eligible" value={staff.payroll_eligible ? "Yes" : "No"} />
-          <Detail label="Base salary" value={staff.base_salary} />
-          <Detail label="Daily wage" value={staff.daily_wage_rate} />
-          <Detail label="Hourly wage" value={staff.hourly_wage_rate} />
-          <Detail label="Piece-rate info" value={staff.piece_rate_amount ? `${staff.piece_rate_amount} / ${staff.piece_rate_unit_label || "unit"}` : "Unavailable"} />
-          <Detail label="Payment mode" value={staff.payment_mode} />
-          <Detail label="Bank account" value={staff.bank_account_number ? mask(staff.bank_account_number) : "Unavailable"} />
-          <Detail label="UPI" value={staff.upi_id} />
-          <Detail label="Cost center" value={staff.cost_center_code} />
-          <Detail label="Payroll expense account" value={staff.payroll_expense_account || "Not mapped"} />
-          <Detail label="Salary effective date" value={staff.salary_effective_from} />
-          <Detail label="Salary pay day" value={staff.salary_pay_day ? `Day ${staff.salary_pay_day} of month` : "Not set"} />
-          <Detail label="Contract end date" value={staff.temporary_contract_end_date} />
-        </div>
-      </DetailPanel> : null}
+      {/* ── Tab bar ──────────────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-0 border-b border-border overflow-x-auto">
+        {DETAIL_TABS.map((t) => {
+          const badge = t === "Attendance" && pendingLeave.length > 0 ? pendingLeave.length
+            : t === "Advances" && pendingAdvances.length > 0 ? pendingAdvances.length : 0;
+          return (
+            <button key={t} type="button" onClick={() => setActiveTab(t)}
+              className={`flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-semibold transition ${activeTab === t ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
+              {t}
+              {badge > 0 && <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">{badge}</span>}
+            </button>
+          );
+        })}
+      </div>
 
-      {activeTab === "Documents" ? <DetailPanel title="Documents" description="Document actions use the staff document API and review endpoint. Verify and reject map to ACTIVE and INACTIVE status while preserving audit history.">
-        <div className="mb-3 flex justify-end"><ActionButton variant="primary" onClick={() => setUploadOpen(!uploadOpen)}>Upload Document</ActionButton></div>
-        {uploadOpen ? (
-          <div className="mb-4 rounded-xl border border-border bg-background p-3">
-            <div className="grid gap-3 md:grid-cols-3">
-              <select value={upload.document_type} onChange={(event) => setUpload({ ...upload, document_type: event.target.value })} className="h-10 rounded-xl border border-border bg-background px-3 text-sm">
-                <option value="ID_PROOF">ID Proof</option><option value="ADDRESS_PROOF">Address Proof</option><option value="SALARY_AGREEMENT">Salary Agreement</option><option value="APPOINTMENT_LETTER">Appointment Letter</option><option value="OTHER">Other</option>
-              </select>
-              <input id="upload_title" name="upload_title" value={upload.title} onChange={(event) => setUpload({ ...upload, title: event.target.value })} placeholder="Title" className="h-10 rounded-xl border border-border bg-background px-3 text-sm" />
-              <input id="upload_doc_no" name="upload_doc_no" value={upload.document_no} onChange={(event) => setUpload({ ...upload, document_no: event.target.value })} placeholder="Document number" className="h-10 rounded-xl border border-border bg-background px-3 text-sm" />
-              <input id="upload_notes" name="upload_notes" value={upload.notes} onChange={(event) => setUpload({ ...upload, notes: event.target.value })} placeholder="Notes" className="h-10 rounded-xl border border-border bg-background px-3 text-sm" />
-              <input id="upload_file" name="upload_file" type="file" onChange={(event) => setUpload({ ...upload, file: event.target.files?.[0] || null })} className="h-10 rounded-xl border border-border bg-background px-3 text-sm" />
-              <ActionButton variant="primary" disabled={!upload.title.trim() || !upload.file} onClick={() => void uploadDocument()}>Upload</ActionButton>
+      {/* ══════════════════════════════════════════ OVERVIEW */}
+      {activeTab === "Overview" && (
+        <DetailPanel title="Overview" description="Identity, KYC, emergency contacts, and current readiness.">
+          <div className="mb-5">
+            <UniversalQuickWidgetsEmbed role="STAFF" sourceId={staff.id} />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <Detail label="Employee code"  value={staff.employee_code || `#${staff.id}`} />
+            <Detail label="Phone"          value={staff.phone} />
+            <Detail label="Role / title"   value={staff.designation} />
+            <Detail label="Department"     value={staff.department} />
+            <Detail label="Branch"         value={staff.branch_name} />
+            <Detail label="Joining date"   value={fmt(staff.joining_date)} />
+            <Detail label="Weekly off"     value={staff.weekly_off} />
+            <Detail label="KYC status"     value={<ERPStatusBadge status={staff.kyc_verified ? "ACTIVE" : "PENDING"} label={staff.kyc_verified ? "Verified" : "Pending"} />} />
+            <Detail label="KYC reference"  value={`${staff.kyc_id_type || "KYC"} ${mask(staff.kyc_id_number)}`} />
+            <Detail label="Address"        value={staff.address} />
+            <Detail label="Emergency contact" value={[staff.emergency_contact_name, staff.emergency_contact_phone].filter(Boolean).join(" · ") || "—"} />
+            <Detail label="Emergency relation" value={staff.emergency_contact_relation} />
+          </div>
+          {staff.notes && (
+            <div className="mt-4 rounded-xl border border-border bg-muted/20 px-4 py-3 text-sm text-foreground">
+              <span className="mr-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Notes:</span>
+              {staff.notes}
             </div>
+          )}
+        </DetailPanel>
+      )}
+
+      {/* ══════════════════════════════════════════ 360 VIEW */}
+      {activeTab === "360 View" && <Party360Embed role="STAFF" sourceId={staff.id} />}
+
+      {/* ══════════════════════════════════════════ EMPLOYMENT */}
+      {activeTab === "Employment" && (
+        <DetailPanel title="Employment Details" description="Workflow status, reporting structure, shift, and probation.">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <Detail label="Employment status" value={<ERPStatusBadge status={staff.employment_status || (staff.is_active ? "ACTIVE" : "DRAFT")} label={staff.employment_status || (staff.is_active ? "Active" : "Draft")} />} />
+            <Detail label="Employment type"   value={(staff.employment_type || "—").replace(/_/g, " ")} />
+            <Detail label="Reporting manager" value={staff.reporting_manager} />
+            <Detail label="Work location"     value={staff.work_location} />
+            <Detail label="Probation end"     value={fmt(staff.probation_end_date)} />
+            <Detail label="Attendance policy" value={staff.attendance_policy} />
+            <Detail label="Shift"             value={staff.shift_name} />
+            <Detail label="Weekly off"        value={staff.weekly_off} />
+            <Detail label="Contract end"      value={fmt(staff.temporary_contract_end_date)} />
+            {staff.deactivation_reason && <Detail label="Deactivation reason" value={staff.deactivation_reason} />}
           </div>
-        ) : null}
-        <TinyTable
-          empty="No documents uploaded"
-          columns={["Type", "Title", "Document No", "Status", "Uploaded", "Uploaded By", "Actions"]}
-          rows={documents.map((doc) => [
-            doc.document_type,
-            doc.title,
-            doc.document_no || "Unavailable",
-            <ERPStatusBadge key="status" status={doc.status} />,
-            doc.created_at?.slice(0, 10),
-            doc.uploaded_by_username || "Unavailable",
-            <div key="actions" className="flex flex-wrap gap-2">
-              {doc.file_url ? <a href={doc.file_url} target="_blank" rel="noreferrer" className="rounded-md border border-border px-2 py-1 text-xs font-semibold">Open file</a> : <span className="text-xs text-muted-foreground">No file URL</span>}
-              <button type="button" className="rounded-md border border-border px-2 py-1 text-xs font-semibold" onClick={() => void patchHrStaffDocument(doc.id, { status: doc.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" }).then(load)}>{doc.status === "ACTIVE" ? "Mark inactive" : "Mark active"}</button>
-              <button type="button" className="rounded-md border border-emerald-500 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50" onClick={() => openReviewModal(doc.id, "verify", doc.title)}>Verify</button>
-              <button type="button" className="rounded-md border border-red-400 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50" onClick={() => openReviewModal(doc.id, "reject", doc.title)}>Reject</button>
-            </div>,
-          ])}
-        />
-      </DetailPanel> : null}
+        </DetailPanel>
+      )}
 
-      {activeTab === "KYC" ? <KycDocumentPanel mode="admin" owner="staff" ownerId={staff.id} /> : null}
+      {/* ══════════════════════════════════════════ ATTENDANCE */}
+      {activeTab === "Attendance" && (
+        <>
+          {/* Month summary */}
+          <DetailPanel title="Attendance" description="Month-wise attendance. Re-marking the same date corrects it.">
+            <div className="mb-4 flex flex-wrap items-center gap-3">
+              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Month</label>
+              <input type="month" value={attMonth} onChange={(e) => setAttMonth(e.target.value)}
+                className="rounded-lg border border-border bg-background px-3 py-2 text-sm" />
+              <span className="text-xs text-muted-foreground">{attendanceSummary.daysInMonth} days · {attendance.length} marked</span>
+            </div>
 
-      {activeTab === "Attendance" ? <DetailPanel title="Attendance" description="Month-wise attendance for this staff member. Marking a date that already has a record updates it (correction), so mistakes can be fixed by re-marking the same date.">
-        <div className="mb-4 flex flex-wrap items-center gap-3">
-          <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Month</label>
-          <input id="att_month" name="att_month" type="month" value={attMonth} onChange={(e) => setAttMonth(e.target.value)} className="rounded-lg border border-border bg-background px-3 py-2 text-sm" />
-          <span className="text-xs text-muted-foreground">{attendanceSummary.daysInMonth} days in month · {attendance.length} marked</span>
-        </div>
+            <div className="mb-4 grid gap-2 grid-cols-4 sm:grid-cols-7">
+              {[
+                { label: "Present",    value: attendanceSummary.present,   ok: true },
+                { label: "Half day",   value: attendanceSummary.halfDay },
+                { label: "Late",       value: attendanceSummary.late },
+                { label: "Leave",      value: attendanceSummary.leave },
+                { label: "Absent",     value: attendanceSummary.absent,    bad: true },
+                { label: "Holiday",    value: attendanceSummary.holiday },
+                { label: "Not marked", value: attendanceSummary.notMarked, bad: attendanceSummary.notMarked > 0 },
+              ].map(({ label, value, ok, bad }) => (
+                <div key={label} className={`rounded-xl border px-3 py-2 text-center ${ok ? "border-emerald-200 bg-emerald-50" : bad ? "border-red-200 bg-red-50" : "border-border bg-card"}`}>
+                  <p className={`text-xl font-bold ${ok ? "text-emerald-800" : bad ? "text-red-800" : "text-foreground"}`}>{value}</p>
+                  <p className="text-[10px] text-muted-foreground">{label}</p>
+                </div>
+              ))}
+            </div>
 
-        <div className="mb-4 grid gap-3 sm:grid-cols-5">
-          <Detail label="Present" value={attendanceSummary.present} />
-          <Detail label="Half day" value={attendanceSummary.halfDay} />
-          <Detail label="Leave" value={attendanceSummary.leave} />
-          <Detail label="Absent" value={attendanceSummary.absent} />
-          <Detail label="Not marked" value={attendanceSummary.notMarked} />
-        </div>
+            {attMsg   && <Notice ok onClose={() => setAttMsg(null)}>{attMsg}</Notice>}
+            {attError && <Notice onClose={() => setAttError(null)}>{attError}</Notice>}
 
-        {attMessage ? <div className="mb-3 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">{attMessage}</div> : null}
-        {attError ? <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{attError}</div> : null}
-
-        <div className="mb-4 rounded-2xl border border-border bg-muted/20 p-4">
-          <div className="text-sm font-semibold text-foreground">Mark / correct attendance</div>
-          <div className="mt-3 grid gap-3 sm:grid-cols-5">
-            <input id="att_date" name="att_date" type="date" value={attForm.date} onChange={(e) => setAttForm((c) => ({ ...c, date: e.target.value }))} className="rounded-lg border border-border bg-background px-3 py-2 text-sm" />
-            <select value={attForm.status} onChange={(e) => setAttForm((c) => ({ ...c, status: e.target.value }))} className="rounded-lg border border-border bg-background px-3 py-2 text-sm">
-              <option value="PRESENT">Present</option>
-              <option value="HALF_DAY">Half day</option>
-              <option value="ABSENT">Absent</option>
-              <option value="LEAVE">Leave</option>
-            </select>
-            <input id="att_worked_hours" name="att_worked_hours" type="number" step="0.5" min="0" placeholder="Worked hrs" value={attForm.worked_hours} onChange={(e) => setAttForm((c) => ({ ...c, worked_hours: e.target.value }))} className="rounded-lg border border-border bg-background px-3 py-2 text-sm" />
-            <input id="att_overtime_hours" name="att_overtime_hours" type="number" step="0.5" min="0" placeholder="OT hrs" value={attForm.overtime_hours} onChange={(e) => setAttForm((c) => ({ ...c, overtime_hours: e.target.value }))} className="rounded-lg border border-border bg-background px-3 py-2 text-sm" />
-            <input id="att_notes" name="att_notes" placeholder="Notes" value={attForm.notes} onChange={(e) => setAttForm((c) => ({ ...c, notes: e.target.value }))} className="rounded-lg border border-border bg-background px-3 py-2 text-sm" />
-          </div>
-          <button type="button" onClick={() => void submitAttendance()} disabled={attSaving} className="mt-3 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50">
-            {attSaving ? "Saving…" : "Save attendance"}
-          </button>
-        </div>
-
-        <TinyTable empty="No attendance marked in this month" columns={["Date", "Status", "Worked hrs", "OT hrs", "Notes"]} rows={attendance.map((row) => [row.attendance_date, row.status, row.worked_hours, row.overtime_hours, row.notes])} />
-        <Link href={ROUTES.admin.hrAttendance} className="mt-3 inline-flex text-sm font-semibold text-primary hover:underline">Open Attendance page</Link>
-      </DetailPanel> : null}
-
-      {activeTab === "Attendance" ? <DetailPanel title="Leave Balance" description="Earned = annual allowance accrued month by month this year (EL: 18/year = 1.5/month). Available now = earned so far minus approved days taken. The staff member sees these same numbers on their own portal login.">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {leaveBalance.length === 0 ? <p className="text-sm text-muted-foreground">No active leave types configured.</p> : leaveBalance.map((row) => (
-            <div key={row.leave_type_id} className="rounded-2xl border border-border bg-muted/20 p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{row.leave_type_name} ({row.leave_type_code})</span>
-                <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${row.is_paid ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>{row.is_paid ? "Paid" : "Unpaid"}</span>
+            {/* Mark form */}
+            <div className="rounded-2xl border border-border bg-muted/20 p-4">
+              <p className="mb-3 text-sm font-semibold text-foreground">Mark / correct attendance</p>
+              <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                <label className="grid gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Date
+                  <input type="date" value={attForm.date} onChange={(e) => setAttForm((c) => ({ ...c, date: e.target.value }))}
+                    className="h-9 rounded-lg border border-border bg-background px-3 text-sm" />
+                </label>
+                <label className="grid gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Status
+                  <select value={attForm.status} onChange={(e) => setAttForm((c) => ({ ...c, status: e.target.value }))}
+                    className="h-9 rounded-lg border border-border bg-background px-3 text-sm">
+                    {ATT_STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
+                  </select>
+                </label>
+                <label className="grid gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Worked hrs
+                  <input type="number" step="0.5" min="0" value={attForm.worked_hours} onChange={(e) => setAttForm((c) => ({ ...c, worked_hours: e.target.value }))}
+                    className="h-9 rounded-lg border border-border bg-background px-3 text-sm" />
+                </label>
+                <label className="grid gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  OT hrs
+                  <input type="number" step="0.5" min="0" value={attForm.overtime_hours} onChange={(e) => setAttForm((c) => ({ ...c, overtime_hours: e.target.value }))}
+                    className="h-9 rounded-lg border border-border bg-background px-3 text-sm" />
+                </label>
+                <label className="grid gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide lg:col-span-2">
+                  Notes
+                  <input value={attForm.notes} onChange={(e) => setAttForm((c) => ({ ...c, notes: e.target.value }))}
+                    placeholder="Optional" className="h-9 rounded-lg border border-border bg-background px-3 text-sm" />
+                </label>
               </div>
-              <div className="mt-2 text-2xl font-semibold text-foreground">{row.available_now ?? "—"} <span className="text-sm font-normal text-muted-foreground">available now</span></div>
-              <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                <dt>Earned to date</dt><dd className="text-right font-semibold text-foreground">{row.earned_to_date ?? "—"}</dd>
-                <dt>Used (approved)</dt><dd className="text-right font-semibold text-foreground">{row.taken_this_year}</dd>
-                <dt>Pending approval</dt><dd className="text-right font-semibold text-foreground">{row.pending_approval}</dd>
-                <dt>Annual allowance</dt><dd className="text-right font-semibold text-foreground">{row.annual_allowance_days ?? "Unlimited"}</dd>
-                <dt>Left this year</dt><dd className="text-right font-semibold text-foreground">{row.remaining_this_year ?? "—"}</dd>
-              </dl>
+              <button type="button" disabled={attSaving} onClick={() => void submitAttendance()}
+                className="mt-3 rounded-xl bg-primary px-5 py-2 text-sm font-bold text-primary-foreground hover:opacity-90 disabled:opacity-50 transition">
+                {attSaving ? "Saving…" : "Save attendance"}
+              </button>
             </div>
-          ))}
-        </div>
-      </DetailPanel> : null}
 
-      {activeTab === "Attendance" ? <DetailPanel title="Leave & Expense Summary">
-        <div className="grid gap-4 xl:grid-cols-2">
-          <div>
-            <TinyTable empty="No leave requests" columns={["Request", "Type", "Dates", "Status"]} rows={leave.slice(0, 8).map((row) => [row.request_no, row.leave_type_name, `${row.start_date} to ${row.end_date}`, row.status])} />
-            <Link href={ROUTES.admin.hrLeave} className="mt-3 inline-flex text-sm font-semibold text-primary hover:underline">Open Leave Requests</Link>
-          </div>
-          <div>
-            <TinyTable empty="No expense claims" columns={["Claim", "Date", "Amount", "Status"]} rows={expenses.slice(0, 8).map((row) => [row.claim_no, row.claim_date, row.amount, row.status])} />
-            <Link href={ROUTES.admin.hrExpenses} className="mt-3 inline-flex text-sm font-semibold text-primary hover:underline">Open Expense Claims</Link>
-          </div>
-        </div>
-      </DetailPanel> : null}
+            <TinyTable empty="No attendance marked this month"
+              columns={["Date", "Status", "Worked hrs", "OT hrs", "Notes"]}
+              rows={attendance.map((r) => [fmt(r.attendance_date), r.status.replace(/_/g, " "), r.worked_hours, r.overtime_hours, r.notes])} />
+            <Link href={ROUTES.admin.hrAttendance} className="mt-3 inline-flex text-sm font-semibold text-primary hover:underline">Open full attendance register →</Link>
+          </DetailPanel>
 
-      {activeTab === "Payroll" ? <DetailPanel title="Payroll History" description="Move a draft salary sheet through Approve -> Post -> Pay. Pay can be recorded any day once the sheet is posted -- it does not have to wait for the staff member's salary pay day.">
-        {payrollError ? <div className="mb-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{payrollError}</div> : null}
-        <div className="grid gap-4 xl:grid-cols-2">
-          <TinyTable
-            empty="No salary sheets"
-            columns={["Period", "Gross", "Net", "Outstanding", "Status", "Actions"]}
-            rows={salarySheets.slice(0, 8).map((row) => [
-              `${row.year}-${String(row.month).padStart(2, "0")}`,
-              row.gross_amount,
-              row.net_amount,
-              row.outstanding_amount || row.net_amount,
-              <ERPStatusBadge key="status" status={row.status} />,
-              <div key="actions" className="flex flex-wrap gap-2">
-                {row.status === "DRAFT" ? (
-                  <button type="button" disabled={payrollSaving === row.id} className="rounded-md border border-border px-2 py-1 text-xs font-semibold disabled:opacity-60" onClick={() => void approveSheet(row.id)}>Approve</button>
-                ) : null}
-                {row.status === "APPROVED" ? (
-                  <button type="button" disabled={payrollSaving === row.id} className="rounded-md border border-border px-2 py-1 text-xs font-semibold disabled:opacity-60" onClick={() => void postSheet(row.id)}>Post Salary</button>
-                ) : null}
-                {(row.status === "POSTED" || row.status === "PAID_PARTIAL") ? (
-                  <button type="button" disabled={payrollSaving === row.id} className="rounded-md border border-emerald-500 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-60" onClick={() => openPayForm(row)}>Pay</button>
-                ) : null}
-                {row.status === "PAID" ? <span className="text-xs text-muted-foreground">Fully paid</span> : null}
+          {/* Leave balance */}
+          <DetailPanel title="Leave Balance" description="Earned, used, and available per leave type for the current year.">
+            {leaveBalance.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No active leave types configured.</p>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {leaveBalance.map((row) => (
+                  <div key={row.leave_type_id} className="rounded-2xl border border-border bg-muted/20 p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{row.leave_type_name} ({row.leave_type_code})</span>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${row.is_paid ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>{row.is_paid ? "Paid" : "Unpaid"}</span>
+                    </div>
+                    <p className="text-2xl font-bold text-foreground">{row.available_now ?? "—"} <span className="text-sm font-normal text-muted-foreground">available</span></p>
+                    <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                      <dt>Earned to date</dt><dd className="text-right font-semibold text-foreground">{row.earned_to_date ?? "—"}</dd>
+                      <dt>Used (approved)</dt><dd className="text-right font-semibold text-foreground">{row.taken_this_year}</dd>
+                      <dt>Pending approval</dt><dd className="text-right font-semibold text-foreground">{row.pending_approval}</dd>
+                      <dt>Annual allowance</dt><dd className="text-right font-semibold text-foreground">{row.annual_allowance_days ?? "Unlimited"}</dd>
+                    </dl>
+                  </div>
+                ))}
+              </div>
+            )}
+          </DetailPanel>
+
+          {/* Leave requests */}
+          <DetailPanel title="Leave Requests">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">{pendingLeave.length} pending · {leave.length} total</p>
+              <button type="button" onClick={() => setLeaveFormOpen((v) => !v)}
+                className="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:opacity-90 transition">
+                + Request Leave
+              </button>
+            </div>
+
+            {leaveFormOpen && (
+              <div className="mb-4 rounded-xl border border-border bg-background p-4 space-y-3">
+                <p className="text-sm font-semibold text-foreground">Submit leave request on behalf of {staff.name}</p>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <label className="grid gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Leave type
+                    <select value={leaveForm.leave_type} onChange={(e) => setLeaveForm((c) => ({ ...c, leave_type: e.target.value }))}
+                      className="h-9 rounded-lg border border-input bg-background px-3 text-sm">
+                      <option value="">Select…</option>
+                      {leaveTypes.map((lt) => <option key={lt.id} value={lt.id}>{lt.name}</option>)}
+                    </select>
+                  </label>
+                  <label className="grid gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Start date
+                    <input type="date" value={leaveForm.start_date} onChange={(e) => setLeaveForm((c) => ({ ...c, start_date: e.target.value }))}
+                      className="h-9 rounded-lg border border-input bg-background px-3 text-sm" />
+                  </label>
+                  <label className="grid gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    End date
+                    <input type="date" value={leaveForm.end_date} onChange={(e) => setLeaveForm((c) => ({ ...c, end_date: e.target.value }))}
+                      className="h-9 rounded-lg border border-input bg-background px-3 text-sm" />
+                  </label>
+                  <label className="grid gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Reason
+                    <input value={leaveForm.reason} onChange={(e) => setLeaveForm((c) => ({ ...c, reason: e.target.value }))}
+                      className="h-9 rounded-lg border border-input bg-background px-3 text-sm" />
+                  </label>
+                </div>
+                {leaveFormErr && <Notice>{leaveFormErr}</Notice>}
+                <div className="flex gap-2">
+                  <button type="button" disabled={leaveSaving} onClick={() => void submitLeaveRequest()}
+                    className="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:opacity-90 disabled:opacity-50 transition">
+                    {leaveSaving ? "Submitting…" : "Submit Request"}
+                  </button>
+                  <button type="button" onClick={() => { setLeaveFormOpen(false); setLeaveFormErr(null); }}
+                    className="rounded-xl border border-border px-4 py-2 text-xs font-semibold hover:bg-muted transition">Cancel</button>
+                </div>
+              </div>
+            )}
+
+            <TinyTable empty="No leave requests" columns={["Request #", "Type", "From", "To", "Days", "Status", "Action"]}
+              rows={leave.slice(0, 12).map((r) => [
+                r.request_no,
+                r.leave_type_name,
+                fmt(r.start_date),
+                fmt(r.end_date),
+                r.day_count,
+                <ERPStatusBadge key="s" status={r.status} label={r.status} />,
+                r.status === "PENDING" ? (
+                  <div key="a" className="flex gap-1.5">
+                    <button type="button" onClick={() => void actOnLeave(r.id, "APPROVE")}
+                      className="rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-200 transition">Approve</button>
+                    <button type="button" onClick={() => void actOnLeave(r.id, "REJECT")}
+                      className="rounded-md bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700 hover:bg-red-200 transition">Reject</button>
+                  </div>
+                ) : null,
+              ])} />
+          </DetailPanel>
+
+          {/* Expense claims */}
+          <DetailPanel title="Expense Claims">
+            {expenseErr && <Notice onClose={() => setExpenseErr(null)}>{expenseErr}</Notice>}
+            <TinyTable empty="No expense claims" columns={["Claim #", "Date", "Amount", "Purpose", "Status", "Action"]}
+              rows={expenses.slice(0, 12).map((e) => [
+                e.claim_no,
+                fmt(e.claim_date),
+                fmtCur(e.amount),
+                e.purpose,
+                <ERPStatusBadge key="s" status={e.status} label={e.status} />,
+                e.status === "PENDING" ? (
+                  <div key="a" className="flex gap-1.5">
+                    <button type="button" disabled={expenseBusy === e.id} onClick={() => void actOnExpense(e.id, "APPROVE")}
+                      className="rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-200 disabled:opacity-50 transition">Approve</button>
+                    <button type="button" disabled={expenseBusy === e.id} onClick={() => void actOnExpense(e.id, "REJECT")}
+                      className="rounded-md bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700 hover:bg-red-200 disabled:opacity-50 transition">Reject</button>
+                  </div>
+                ) : null,
+              ])} />
+          </DetailPanel>
+        </>
+      )}
+
+      {/* ══════════════════════════════════════════ PAYROLL */}
+      {activeTab === "Payroll" && (
+        <>
+          <DetailPanel title="Payroll Setup">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <Detail label="Pay basis"          value={staff.pay_basis || (staff.base_salary ? "Monthly" : staff.daily_wage_rate ? "Daily" : staff.hourly_wage_rate ? "Hourly" : staff.piece_rate_amount ? "Piece rate" : "Not configured")} />
+              <Detail label="Payroll eligible"   value={staff.payroll_eligible ? "Yes" : "No"} />
+              <Detail label="Base salary"        value={fmtCur(staff.base_salary)} />
+              <Detail label="Daily wage"         value={fmtCur(staff.daily_wage_rate)} />
+              <Detail label="Hourly wage"        value={fmtCur(staff.hourly_wage_rate)} />
+              <Detail label="Piece rate"         value={staff.piece_rate_amount ? `${fmtCur(staff.piece_rate_amount)} / ${staff.piece_rate_unit_label || "unit"}` : "—"} />
+              <Detail label="Payment mode"       value={staff.payment_mode} />
+              <Detail label="Bank account"       value={staff.bank_account_number ? mask(staff.bank_account_number) : "—"} />
+              <Detail label="IFSC"               value={staff.bank_ifsc} />
+              <Detail label="UPI ID"             value={staff.upi_id} />
+              <Detail label="Cost center"        value={staff.cost_center_code} />
+              <Detail label="Salary effective"   value={fmt(staff.salary_effective_from)} />
+              <Detail label="Pay day"            value={staff.salary_pay_day ? `Day ${staff.salary_pay_day} of month` : "—"} />
+              <Detail label="Contract end"       value={fmt(staff.temporary_contract_end_date)} />
+            </div>
+          </DetailPanel>
+
+          <DetailPanel title="Payroll History" description="DRAFT → Approve → Post → Pay. Payment records a real salary journal.">
+            {payrollError && <Notice onClose={() => setPayrollError(null)}>{payrollError}</Notice>}
+            <div className="grid gap-4 xl:grid-cols-2">
+              <TinyTable empty="No salary sheets" columns={["Period", "Gross", "Net", "Outstanding", "Status", "Actions"]}
+                rows={salarySheets.slice(0, 10).map((r) => [
+                  `${r.year}-${String(r.month).padStart(2, "0")}`,
+                  fmtCur(r.gross_amount),
+                  fmtCur(r.net_amount),
+                  fmtCur(r.outstanding_amount || r.net_amount),
+                  <ERPStatusBadge key="s" status={r.status} />,
+                  <div key="a" className="flex flex-wrap gap-1.5">
+                    {r.status === "DRAFT" && <button type="button" disabled={payrollSaving === r.id} onClick={() => void approveSheet(r.id)} className="rounded-md border border-border px-2 py-0.5 text-xs font-semibold disabled:opacity-50 hover:bg-muted transition">Approve</button>}
+                    {r.status === "APPROVED" && <button type="button" disabled={payrollSaving === r.id} onClick={() => void postSheet(r.id)} className="rounded-md border border-border px-2 py-0.5 text-xs font-semibold disabled:opacity-50 hover:bg-muted transition">Post</button>}
+                    {(r.status === "POSTED" || r.status === "PAID_PARTIAL") && <button type="button" disabled={payrollSaving === r.id} onClick={() => setPayForm({ salarySheetId: r.id, amount: r.outstanding_amount || r.net_amount, financeAccount: financeAccounts[0] ? String(financeAccounts[0].id) : "", referenceNo: "", paymentDate: new Date().toISOString().slice(0, 10) })} className="rounded-md border border-emerald-500 px-2 py-0.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50 transition">Pay</button>}
+                    {r.status === "PAID" && <span className="text-xs text-muted-foreground">Fully paid</span>}
+                  </div>,
+                ])} />
+
+              <TinyTable empty="No salary payments" columns={["Date", "Amount", "Account", "Reference"]}
+                rows={salaryPayments.slice(0, 10).map((r) => [fmt(r.payment_date), fmtCur(r.amount), r.finance_account_name, r.reference_no])} />
+            </div>
+
+            {payForm && (
+              <div className="mt-4 rounded-xl border border-emerald-300 bg-emerald-50 p-4">
+                <p className="mb-3 text-sm font-semibold text-emerald-900">Record salary payment</p>
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <label className="grid gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Payment date
+                    <input type="date" value={payForm.paymentDate} onChange={(e) => setPayForm((c) => c && { ...c, paymentDate: e.target.value })}
+                      className="h-10 rounded-xl border border-border bg-background px-3 text-sm" />
+                  </label>
+                  <label className="grid gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Amount
+                    <input value={payForm.amount} onChange={(e) => setPayForm((c) => c && { ...c, amount: e.target.value })}
+                      className="h-10 rounded-xl border border-border bg-background px-3 text-sm" />
+                  </label>
+                  <label className="grid gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Pay from account
+                    <select value={payForm.financeAccount} onChange={(e) => setPayForm((c) => c && { ...c, financeAccount: e.target.value })}
+                      className="h-10 rounded-xl border border-border bg-background px-3 text-sm">
+                      <option value="">Select account</option>
+                      {financeAccounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    </select>
+                  </label>
+                  <label className="grid gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Reference
+                    <input value={payForm.referenceNo} onChange={(e) => setPayForm((c) => c && { ...c, referenceNo: e.target.value })}
+                      placeholder="Optional" className="h-10 rounded-xl border border-border bg-background px-3 text-sm" />
+                  </label>
+                </div>
+                <div className="mt-3 flex gap-2">
+                  <ActionButton variant="primary" loading={payrollSaving === payForm.salarySheetId} onClick={() => void submitPayment()}>Confirm Payment</ActionButton>
+                  <ActionButton variant="ghost" onClick={() => setPayForm(null)}>Cancel</ActionButton>
+                </div>
+              </div>
+            )}
+            <Link href={ROUTES.admin.hrPayroll} className="mt-3 inline-flex text-sm font-semibold text-primary hover:underline">Open full payroll page →</Link>
+          </DetailPanel>
+        </>
+      )}
+
+      {/* ══════════════════════════════════════════ ADVANCES */}
+      {activeTab === "Advances" && (
+        <>
+          <DetailPanel title="Staff Advances" description="Request, approve, disburse, and recover salary advances. All entries post to HR ledger.">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex gap-3 text-sm text-muted-foreground">
+                <span>{pendingAdvances.length} pending · {outstandingAdv.length} outstanding</span>
+              </div>
+              <button type="button" onClick={() => setAdvanceFormOpen((v) => !v)}
+                className="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:opacity-90 transition">
+                + New Advance
+              </button>
+            </div>
+
+            {advanceFormOpen && (
+              <div className="mb-4 rounded-xl border border-border bg-background p-4 space-y-3">
+                <p className="text-sm font-semibold text-foreground">Request advance for {staff.name}</p>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <label className="grid gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Request date
+                    <input type="date" value={advanceForm.request_date} onChange={(e) => setAdvanceForm((c) => ({ ...c, request_date: e.target.value }))}
+                      className="h-9 rounded-lg border border-input bg-background px-3 text-sm" />
+                  </label>
+                  <label className="grid gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Amount (₹)
+                    <input value={advanceForm.amount} onChange={(e) => setAdvanceForm((c) => ({ ...c, amount: e.target.value }))}
+                      placeholder="e.g. 5000" className="h-9 rounded-lg border border-input bg-background px-3 text-sm" />
+                  </label>
+                  <label className="grid gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide lg:col-span-2">
+                    Reason
+                    <input value={advanceForm.reason} onChange={(e) => setAdvanceForm((c) => ({ ...c, reason: e.target.value }))}
+                      placeholder="Reason for advance" className="h-9 rounded-lg border border-input bg-background px-3 text-sm" />
+                  </label>
+                  <label className="grid gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide lg:col-span-4">
+                    Notes (optional)
+                    <input value={advanceForm.notes} onChange={(e) => setAdvanceForm((c) => ({ ...c, notes: e.target.value }))}
+                      className="h-9 rounded-lg border border-input bg-background px-3 text-sm" />
+                  </label>
+                </div>
+                {advanceErr && <Notice>{advanceErr}</Notice>}
+                <div className="flex gap-2">
+                  <button type="button" disabled={advanceSaving} onClick={() => void submitAdvance()}
+                    className="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:opacity-90 disabled:opacity-50 transition">
+                    {advanceSaving ? "Creating…" : "Create Advance"}
+                  </button>
+                  <button type="button" onClick={() => { setAdvanceFormOpen(false); setAdvanceErr(null); }}
+                    className="rounded-xl border border-border px-4 py-2 text-xs font-semibold hover:bg-muted transition">Cancel</button>
+                </div>
+              </div>
+            )}
+
+            {/* Disburse form */}
+            {disburseForm && (
+              <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-4 space-y-3">
+                <p className="text-sm font-semibold text-blue-900">Disburse advance</p>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <label className="grid gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Finance account
+                    <select value={disburseForm.finance_account} onChange={(e) => setDisburseForm((c) => c && { ...c, finance_account: e.target.value })}
+                      className="h-9 rounded-lg border border-input bg-background px-3 text-sm">
+                      <option value="">Select…</option>
+                      {financeAccounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    </select>
+                  </label>
+                  <label className="grid gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Disbursement date
+                    <input type="date" value={disburseForm.disbursement_date} onChange={(e) => setDisburseForm((c) => c && { ...c, disbursement_date: e.target.value })}
+                      className="h-9 rounded-lg border border-input bg-background px-3 text-sm" />
+                  </label>
+                  <label className="grid gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Reference
+                    <input value={disburseForm.reference_no} onChange={(e) => setDisburseForm((c) => c && { ...c, reference_no: e.target.value })}
+                      placeholder="Optional" className="h-9 rounded-lg border border-input bg-background px-3 text-sm" />
+                  </label>
+                </div>
+                <div className="flex gap-2">
+                  <button type="button" disabled={disburseSaving} onClick={() => void submitDisburse()}
+                    className="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:opacity-90 disabled:opacity-50 transition">
+                    {disburseSaving ? "Disbursing…" : "Confirm Disburse"}
+                  </button>
+                  <button type="button" onClick={() => setDisburseForm(null)}
+                    className="rounded-xl border border-border px-4 py-2 text-xs font-semibold hover:bg-muted transition">Cancel</button>
+                </div>
+              </div>
+            )}
+
+            {/* Recovery form */}
+            {recoverForm && (
+              <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3">
+                <p className="text-sm font-semibold text-amber-900">Record recovery</p>
+                <div className="grid gap-3 sm:grid-cols-4">
+                  <label className="grid gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Finance account
+                    <select value={recoverForm.finance_account} onChange={(e) => setRecoverForm((c) => c && { ...c, finance_account: e.target.value })}
+                      className="h-9 rounded-lg border border-input bg-background px-3 text-sm">
+                      <option value="">Select…</option>
+                      {financeAccounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    </select>
+                  </label>
+                  <label className="grid gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Recovery date
+                    <input type="date" value={recoverForm.recovery_date} onChange={(e) => setRecoverForm((c) => c && { ...c, recovery_date: e.target.value })}
+                      className="h-9 rounded-lg border border-input bg-background px-3 text-sm" />
+                  </label>
+                  <label className="grid gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Amount
+                    <input value={recoverForm.amount} onChange={(e) => setRecoverForm((c) => c && { ...c, amount: e.target.value })}
+                      className="h-9 rounded-lg border border-input bg-background px-3 text-sm" />
+                  </label>
+                  <label className="grid gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Reference
+                    <input value={recoverForm.reference_no} onChange={(e) => setRecoverForm((c) => c && { ...c, reference_no: e.target.value })}
+                      placeholder="Optional" className="h-9 rounded-lg border border-input bg-background px-3 text-sm" />
+                  </label>
+                </div>
+                <div className="flex gap-2">
+                  <button type="button" disabled={recoverSaving} onClick={() => void submitRecover()}
+                    className="rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white hover:bg-amber-700 disabled:opacity-50 transition">
+                    {recoverSaving ? "Saving…" : "Record Recovery"}
+                  </button>
+                  <button type="button" onClick={() => setRecoverForm(null)}
+                    className="rounded-xl border border-border px-4 py-2 text-xs font-semibold hover:bg-muted transition">Cancel</button>
+                </div>
+              </div>
+            )}
+
+            {advances.length === 0 ? (
+              <ERPEmptyState title="No advances on record" description="Use the button above to request a staff advance." />
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-border">
+                <table className="w-full min-w-[700px] text-sm">
+                  <thead className="border-b border-border bg-muted/30">
+                    <tr>
+                      {["Date", "Amount", "Outstanding", "Reason", "Status", "Actions"].map((h) => (
+                        <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {advances.map((a) => (
+                      <tr key={a.id} className="border-b border-border/60 hover:bg-muted/20">
+                        <td className="px-4 py-3 text-xs text-muted-foreground">{fmt(a.request_date)}</td>
+                        <td className="px-4 py-3 font-mono">{fmtCur(a.amount)}</td>
+                        <td className="px-4 py-3 font-mono">{fmtCur(a.outstanding_amount)}</td>
+                        <td className="px-4 py-3 max-w-[200px] truncate text-muted-foreground" title={a.reason}>{a.reason}</td>
+                        <td className="px-4 py-3">
+                          <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                            a.status === "RECOVERED" ? "bg-emerald-100 text-emerald-800" :
+                            a.status === "DISBURSED" || a.status === "PARTIALLY_RECOVERED" ? "bg-blue-100 text-blue-800" :
+                            a.status === "APPROVED"  ? "bg-amber-100 text-amber-800" :
+                            a.status === "CANCELLED" ? "bg-muted text-muted-foreground" :
+                            "bg-amber-50 text-amber-700"
+                          }`}>
+                            {a.status.replace(/_/g, " ")}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex gap-1.5 flex-wrap">
+                            {a.status === "DRAFT" && (
+                              <button type="button" onClick={() => void advanceApprove(a.id)}
+                                className="rounded-md bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800 hover:bg-emerald-200 transition">Approve</button>
+                            )}
+                            {a.status === "APPROVED" && (
+                              <button type="button" onClick={() => setDisburseForm({ advanceId: a.id, finance_account: "", disbursement_date: new Date().toISOString().slice(0, 10), reference_no: "" })}
+                                className="rounded-md bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800 hover:bg-blue-200 transition">Disburse</button>
+                            )}
+                            {(a.status === "DISBURSED" || a.status === "PARTIALLY_RECOVERED") && (
+                              <button type="button" onClick={() => setRecoverForm({ advanceId: a.id, finance_account: "", recovery_date: new Date().toISOString().slice(0, 10), amount: a.outstanding_amount ?? "", reference_no: "" })}
+                                className="rounded-md bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-200 transition">Record Recovery</button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </DetailPanel>
+        </>
+      )}
+
+      {/* ══════════════════════════════════════════ DOCUMENTS */}
+      {activeTab === "Documents" && (
+        <DetailPanel title="Documents" description="Upload, verify, and reject staff documents. Verify/Reject preserves full audit history.">
+          <div className="mb-3 flex justify-end">
+            <button type="button" onClick={() => setUploadOpen((v) => !v)}
+              className="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:opacity-90 transition">
+              {uploadOpen ? "Cancel upload" : "Upload Document"}
+            </button>
+          </div>
+
+          {uploadOpen && (
+            <div className="mb-4 rounded-xl border border-border bg-background p-4 space-y-3">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="grid gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Document type
+                  <select value={upload.document_type} onChange={(e) => setUpload((c) => ({ ...c, document_type: e.target.value }))}
+                    className="h-9 rounded-lg border border-input bg-background px-3 text-sm">
+                    <option value="ID_PROOF">ID Proof</option>
+                    <option value="ADDRESS_PROOF">Address Proof</option>
+                    <option value="SALARY_AGREEMENT">Salary Agreement</option>
+                    <option value="APPOINTMENT_LETTER">Appointment Letter</option>
+                    <option value="OTHER">Other</option>
+                  </select>
+                </label>
+                <label className="grid gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Title
+                  <input value={upload.title} onChange={(e) => setUpload((c) => ({ ...c, title: e.target.value }))}
+                    placeholder="e.g. Aadhaar Card" className="h-9 rounded-lg border border-input bg-background px-3 text-sm" />
+                </label>
+                <label className="grid gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Document no.
+                  <input value={upload.document_no} onChange={(e) => setUpload((c) => ({ ...c, document_no: e.target.value }))}
+                    placeholder="Optional" className="h-9 rounded-lg border border-input bg-background px-3 text-sm" />
+                </label>
+                <label className="grid gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Notes
+                  <input value={upload.notes} onChange={(e) => setUpload((c) => ({ ...c, notes: e.target.value }))}
+                    placeholder="Optional" className="h-9 rounded-lg border border-input bg-background px-3 text-sm" />
+                </label>
+                <label className="grid gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide sm:col-span-2">
+                  File
+                  <input type="file" onChange={(e) => setUpload((c) => ({ ...c, file: e.target.files?.[0] ?? null }))}
+                    className="h-9 rounded-lg border border-input bg-background px-3 py-1.5 text-sm" />
+                </label>
+              </div>
+              <button type="button" disabled={!upload.title.trim() || !upload.file || uploadSaving} onClick={() => void uploadDocument()}
+                className="rounded-xl bg-primary px-5 py-2 text-xs font-bold text-primary-foreground hover:opacity-90 disabled:opacity-50 transition">
+                {uploadSaving ? "Uploading…" : "Upload"}
+              </button>
+            </div>
+          )}
+
+          <TinyTable empty="No documents uploaded" columns={["Type", "Title", "Doc No.", "Status", "Uploaded", "By", "Actions"]}
+            rows={documents.map((doc) => [
+              doc.document_type?.replace(/_/g, " "),
+              doc.title,
+              doc.document_no || "—",
+              <ERPStatusBadge key="s" status={doc.status} />,
+              fmt(doc.created_at?.slice(0, 10)),
+              doc.uploaded_by_username || "—",
+              <div key="a" className="flex flex-wrap gap-1.5">
+                {doc.file_url && <a href={doc.file_url} target="_blank" rel="noreferrer" className="rounded-md border border-border px-2 py-0.5 text-xs font-semibold hover:bg-muted transition">Open</a>}
+                <button type="button" onClick={() => { setReviewModal({ documentId: doc.id, action: "verify", title: doc.title }); setReviewNotes(""); }}
+                  className="rounded-md border border-emerald-500 px-2 py-0.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 transition">Verify</button>
+                <button type="button" onClick={() => { setReviewModal({ documentId: doc.id, action: "reject", title: doc.title }); setReviewNotes(""); }}
+                  className="rounded-md border border-red-400 px-2 py-0.5 text-xs font-semibold text-red-700 hover:bg-red-50 transition">Reject</button>
               </div>,
-            ])}
-          />
-          <TinyTable empty="No salary payments" columns={["Date", "Amount", "Account", "Reference"]} rows={salaryPayments.slice(0, 8).map((row) => [row.payment_date, row.amount, row.finance_account_name || "Unavailable", row.reference_no || "Unavailable"])} />
-        </div>
+            ])} />
+        </DetailPanel>
+      )}
 
-        {payForm ? (
-          <div className="mt-4 rounded-xl border border-emerald-300 bg-emerald-50 p-4">
-            <div className="text-sm font-semibold text-emerald-900">Record salary payment</div>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Payment date
-                <input id="pay_paymentDate" name="pay_paymentDate" type="date" className="h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary" value={payForm.paymentDate} onChange={(event) => setPayForm({ ...payForm, paymentDate: event.target.value })} />
-              </label>
-              <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Amount
-                <input id="pay_amount" name="pay_amount" className="h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary" value={payForm.amount} onChange={(event) => setPayForm({ ...payForm, amount: event.target.value })} />
-              </label>
-              <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Pay from account
-                <select className="h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary" value={payForm.financeAccount} onChange={(event) => setPayForm({ ...payForm, financeAccount: event.target.value })}>
-                  <option value="">Select account</option>
-                  {financeAccounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
-                </select>
-              </label>
-              <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Reference (optional)
-                <input id="pay_referenceNo" name="pay_referenceNo" className="h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary" value={payForm.referenceNo} onChange={(event) => setPayForm({ ...payForm, referenceNo: event.target.value })} />
-              </label>
-            </div>
-            <div className="mt-3 flex gap-2">
-              <ActionButton variant="primary" loading={payrollSaving === payForm.salarySheetId} onClick={() => void submitPayment()}>Confirm Payment</ActionButton>
-              <ActionButton variant="ghost" onClick={() => setPayForm(null)}>Cancel</ActionButton>
-            </div>
+      {/* ══════════════════════════════════════════ KYC */}
+      {activeTab === "KYC" && <KycDocumentPanel mode="admin" owner="staff" ownerId={staff.id} />}
+
+      {/* ══════════════════════════════════════════ ACCESS */}
+      {activeTab === "Access" && (
+        <DetailPanel title="Portal Access" description="Staff portal login tied to this employee profile.">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 mb-4">
+            <Detail label="Login created"  value={identity ? "Yes" : "No"} />
+            <Detail label="Username"       value={identity?.username} />
+            <Detail label="Login enabled"  value={identity ? (identity.login_enabled ? "Enabled" : "Disabled") : "—"} />
+            <Detail label="Role"           value={identity ? "STAFF" : "—"} />
           </div>
-        ) : null}
 
-        <Link href={ROUTES.admin.hrPayroll} className="mt-3 inline-flex text-sm font-semibold text-primary hover:underline">Open Payroll page</Link>
-      </DetailPanel> : null}
+          {accessError && <Notice onClose={() => setAccessError(null)}>{accessError}</Notice>}
 
-      {activeTab === "Access" ? <DetailPanel title="Access">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Detail label="Login created" value={identity ? "Yes" : "No"} />
-          <Detail label="Username" value={identity?.username} />
-          <Detail label="Login enabled" value={identity ? (identity.login_enabled ? "Yes" : "No") : "Unavailable"} />
-          <Detail label="Capability group" value="Staff role capability matrix is managed in role permissions." />
-        </div>
-
-        {accessError ? <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{accessError}</div> : null}
-
-        {generatedPassword ? (
-          <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            <div className="font-semibold">New password (shown once -- copy it now, it cannot be retrieved again):</div>
-            <div className="mt-1 font-mono text-base">{generatedPassword}</div>
-            <ActionButton variant="ghost" onClick={() => setGeneratedPassword(null)}>Dismiss</ActionButton>
-          </div>
-        ) : null}
-
-        {!identity ? (
-          <div className="mt-4 rounded-xl border border-border bg-card p-4">
-            <div className="text-sm font-semibold text-foreground">Create staff portal login</div>
-            <p className="mt-1 text-xs text-muted-foreground">Creates a STAFF-role login tied to this employee profile.</p>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Username
-                <input id="login_username" name="login_username" className="h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary" value={loginUsername} onChange={(event) => setLoginUsername(event.target.value)} />
-              </label>
-              <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Email (optional)
-                <input id="login_email" name="login_email" className="h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary" value={loginEmail} onChange={(event) => setLoginEmail(event.target.value)} />
-              </label>
+          {generatedPassword && (
+            <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3">
+              <p className="text-sm font-bold text-amber-900">New password — copy it now (shown once only):</p>
+              <p className="mt-1 font-mono text-base text-amber-900 select-all">{generatedPassword}</p>
+              <button type="button" onClick={() => setGeneratedPassword(null)} className="mt-2 text-xs text-amber-700 hover:underline">Dismiss</button>
             </div>
-            <div className="mt-3">
+          )}
+
+          {!identity ? (
+            <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+              <p className="text-sm font-semibold text-foreground">Create staff portal login</p>
+              <p className="text-xs text-muted-foreground">Creates a STAFF-role account tied to this employee. A temporary password will be generated.</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="grid gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Username
+                  <input value={loginUsername} onChange={(e) => setLoginUsername(e.target.value)}
+                    placeholder={staff.phone || "username"}
+                    className="h-10 rounded-xl border border-border bg-background px-3 text-sm" />
+                </label>
+                <label className="grid gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Email (optional)
+                  <input type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)}
+                    className="h-10 rounded-xl border border-border bg-background px-3 text-sm" />
+                </label>
+              </div>
               <ActionButton variant="primary" loading={accessSaving} onClick={() => void createLoginForStaff()}>Create Login</ActionButton>
             </div>
-          </div>
-        ) : (
-          <div className="mt-4 flex flex-wrap gap-2">
-            <ActionButton variant="ghost" loading={accessSaving} onClick={() => void toggleLoginEnabled()}>{identity.login_enabled ? "Disable Login" : "Enable Login"}</ActionButton>
-            <ActionButton variant="ghost" loading={accessSaving} onClick={() => void resetLoginPassword()}>Reset Password</ActionButton>
-          </div>
-        )}
-      </DetailPanel> : null}
-
-      {activeTab === "Timeline" ? (
-        <Timeline title="Audit / Activity Timeline">
-          {auditEntries.length ? (
-            auditEntries.map((entry) => (
-              <div key={`${entry.source_label}-${entry.id}`} className="rounded-xl border border-border bg-card p-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <div className="text-sm font-semibold text-foreground">{formatAuditAction(entry.action_type)}</div>
-                    <div className="text-xs text-muted-foreground">{entry.source_label} | {entry.performed_by_username || "system"}</div>
-                  </div>
-                  <div className="text-xs text-muted-foreground">{entry.created_at?.slice(0, 19).replace("T", " ")}</div>
-                </div>
-                {formatAuditMeta(entry.metadata) ? <div className="mt-2 text-sm text-muted-foreground">{formatAuditMeta(entry.metadata)}</div> : null}
-              </div>
-            ))
           ) : (
-            <ERPEmptyState title="No audit events yet" description="Staff profile, identity, and document changes will appear here after the first backend-backed action." />
+            <div className="flex flex-wrap gap-2">
+              <ActionButton variant="secondary" loading={accessSaving} onClick={() => void toggleLoginEnabled()}>
+                {identity.login_enabled ? "Disable Login" : "Enable Login"}
+              </ActionButton>
+              <ActionButton variant="secondary" loading={accessSaving} onClick={() => void resetLoginPassword()}>Reset Password</ActionButton>
+            </div>
+          )}
+        </DetailPanel>
+      )}
+
+      {/* ══════════════════════════════════════════ TIMELINE */}
+      {activeTab === "Timeline" && (
+        <Timeline title="Audit / Activity Timeline">
+          {auditEntries.length ? auditEntries.map((entry) => (
+            <div key={`${entry.source_label}-${entry.id}`} className="rounded-xl border border-border bg-card p-3">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">{formatAuditAction(entry.action_type)}</p>
+                  <p className="text-xs text-muted-foreground">{entry.source_label} · {entry.performed_by_username || "system"}</p>
+                </div>
+                <p className="text-xs text-muted-foreground">{fmtDatetime(entry.created_at)}</p>
+              </div>
+              {formatAuditMeta(entry.metadata) && <p className="mt-2 text-sm text-muted-foreground">{formatAuditMeta(entry.metadata)}</p>}
+            </div>
+          )) : (
+            <ERPEmptyState title="No audit events yet" description="Staff profile, identity, and document changes will appear here." />
           )}
         </Timeline>
-      ) : null}
+      )}
 
-      {reviewModal ? (
+      {/* ── Document review modal ─────────────────────────────────────────── */}
+      {reviewModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-xl">
-            <h2 className="text-lg font-bold">
+            <h2 className="text-lg font-bold text-foreground">
               {reviewModal.action === "verify" ? "Verify document" : "Reject document"}
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              {reviewModal.title} will be marked {reviewModal.action === "verify" ? "ACTIVE" : "INACTIVE"} and written to the audit timeline.
+              <strong>{reviewModal.title}</strong> will be marked {reviewModal.action === "verify" ? "verified (ACTIVE)" : "rejected (INACTIVE)"}.
             </p>
             <label className="mt-4 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Notes {reviewModal.action === "reject" ? "(recommended)" : "(optional)"}
+              Notes {reviewModal.action === "reject" ? "(strongly recommended)" : "(optional)"}
             </label>
-            <textarea
-              value={reviewNotes}
-              onChange={(event) => setReviewNotes(event.target.value)}
-              className="mt-1 min-h-24 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+            <textarea value={reviewNotes} onChange={(e) => setReviewNotes(e.target.value)}
               placeholder={reviewModal.action === "reject" ? "Reason for rejection" : "Optional review notes"}
-            />
+              className="mt-1 min-h-24 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary" />
             <div className="mt-4 flex justify-end gap-2">
               <ActionButton variant="ghost" onClick={() => setReviewModal(null)}>Cancel</ActionButton>
               <ActionButton variant={reviewModal.action === "verify" ? "primary" : "destructive"} loading={reviewSaving} onClick={() => void submitReview()}>
@@ -1094,7 +1604,7 @@ export default function AdminHrStaffProfilePage() {
             </div>
           </div>
         </div>
-      ) : null}
+      )}
     </ERPPageShell>
   );
 }

@@ -135,6 +135,16 @@ def get_customer_historical_subscription_contract_value(customer: Customer) -> D
 
 
 def build_customer_operational_profile(customer: Customer) -> dict[str, object]:
+    from accounting.models import CustomerOpeningOutstanding
+
+    opening_outstanding_qs = CustomerOpeningOutstanding.objects.filter(customer=customer)
+    opening_outstanding_totals = opening_outstanding_qs.aggregate(
+        total_count=Count("id"),
+        outstanding_total=Sum("outstanding_amount"),
+    )
+    legacy_outstanding_amount = opening_outstanding_totals["outstanding_total"] or Decimal("0.00")
+    legacy_outstanding_count = opening_outstanding_totals["total_count"] or 0
+
     subscriptions = list(
         get_subscription_detail_queryset()
         .filter(customer=customer)
@@ -510,8 +520,11 @@ def build_customer_operational_profile(customer: Customer) -> dict[str, object]:
             "city": customer.city,
             "kyc_status": customer.kyc_status,
             "user_is_active": getattr(customer.user, "is_active", False),
+            "customer_source": customer.customer_source,
         },
         "overview": {
+            "legacy_outstanding_amount": _money(legacy_outstanding_amount),
+            "legacy_outstanding_count": legacy_outstanding_count,
             "subscription_count": subscription_summary["subscription_count"],
             "active_subscriptions": len(active_subscriptions),
             "historical_subscriptions": len(historical_subscriptions),

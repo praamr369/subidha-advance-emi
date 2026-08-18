@@ -42,8 +42,7 @@ export type NavIconKey =
   | "auditLogs"
   | "profile"
   | "support"
-  | "collectPayment"
-  | "payables";
+  | "collectPayment";
 
 export type NavItem = {
   label: string;

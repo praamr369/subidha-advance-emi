@@ -18,6 +18,8 @@ export type DocumentBrandTheme = {
   logoPath: string;
   showLogo: boolean;
   showWatermark: boolean;
+  showUpiQr: boolean;
+  upiId: string;
   layoutDensity: "COMFORTABLE" | "COMPACT" | string;
   phone: string;
   email: string;
@@ -75,6 +77,8 @@ export const subidhaDocumentTheme: DocumentBrandTheme = {
   logoPath: "/logo.png",
   showLogo: true,
   showWatermark: true,
+  showUpiQr: true,
+  upiId: "",
   layoutDensity: "COMFORTABLE",
   phone: "+91 77972 80952",
   email: "support@subidhafurnitureasansol.com",
@@ -117,6 +121,8 @@ export function documentThemeFromSettings(settings?: DocumentPrintSettings | nul
     logoPath,
     showLogo: settings.show_logo !== false,
     showWatermark: settings.show_watermark !== false,
+    showUpiQr: settings.show_upi_qr !== false,
+    upiId: settings.upi_id || subidhaDocumentTheme.upiId,
     layoutDensity: settings.document_layout_density || subidhaDocumentTheme.layoutDensity,
     phone: settings.print_phone?.trim() || subidhaDocumentTheme.phone,
     email: settings.print_email?.trim() || subidhaDocumentTheme.email,

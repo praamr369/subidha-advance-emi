@@ -25,7 +25,6 @@ import {
   type FinanceAccount,
 } from "@/services/accounting";
 import { listBranches, type BranchRecord } from "@/services/branch-control";
-import { getUnifiedPayables, type UnifiedPayableData } from "@/services/payables";
 
 function formatDate(value?: string | null): string {
   if (!value) return "—";
@@ -58,7 +57,6 @@ export default function AccountingExpensesPage() {
   const [expenseAccounts, setExpenseAccounts] = useState<ChartOfAccount[]>([]);
   const [financeAccounts, setFinanceAccounts] = useState<FinanceAccount[]>([]);
   const [branches, setBranches] = useState<BranchRecord[]>([]);
-  const [unifiedData, setUnifiedData] = useState<UnifiedPayableData | null>(null);
 
   const [expenseForm, setExpenseForm] = useState({
     expense_date: new Date().toISOString().slice(0, 10),
@@ -79,13 +77,12 @@ export default function AccountingExpensesPage() {
     else setRefreshing(true);
 
     try {
-      const [expensesPayload, chartPayload, financePayload, branchesPayload, unifiedPayload] =
+      const [expensesPayload, chartPayload, financePayload, branchesPayload] =
         await Promise.all([
           listExpenses(),
           listChartOfAccounts(),
           listFinanceAccounts(),
           listBranches(),
-          getUnifiedPayables(),
         ]);
 
       setExpenses(expensesPayload.results);
@@ -94,7 +91,6 @@ export default function AccountingExpensesPage() {
       );
       setFinanceAccounts(financePayload.results);
       setBranches(branchesPayload.results || []);
-      setUnifiedData(unifiedPayload);
       setError(null);
     } catch (err) {
       setError(toErrorMessage(err));
@@ -183,8 +179,6 @@ export default function AccountingExpensesPage() {
   const postedCount = expenses.filter((item) => item.status === "POSTED").length;
   const draftCount = expenses.filter((item) => item.status === "DRAFT").length;
   
-  const expenseTypeSummary = unifiedData?.type_summary.find(s => s.payable_type === 'expense_claim');
-
   return (
     <ERPPageShell
       eyebrow="Accounting"
@@ -255,29 +249,16 @@ export default function AccountingExpensesPage() {
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-rose-200 bg-rose-50 dark:bg-rose-950/20 p-5 shadow-sm">
-                <div className="flex items-center gap-2 text-rose-700 dark:text-rose-400 mb-2">
-                  <AlertCircle className="h-4 w-4" />
-                  <h3 className="text-sm font-semibold">Pending Payables</h3>
-                </div>
-                <div className="text-3xl font-bold text-rose-700 dark:text-rose-400">
-                  {formatRupee(unifiedData?.total_outstanding || "0")}
-                </div>
-                <p className="text-xs text-rose-600/80 dark:text-rose-400/80 mt-1">
-                  All module payables combined
-                </p>
-              </div>
-              
               <div className="rounded-2xl border border-blue-200 bg-blue-50 dark:bg-blue-950/20 p-5 shadow-sm">
                  <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400 mb-2">
                   <Clock className="h-4 w-4" />
-                  <h3 className="text-sm font-semibold">Expense Claims Queue</h3>
+                  <h3 className="text-sm font-semibold">Pending Expenses</h3>
                 </div>
                 <div className="text-3xl font-bold text-blue-700 dark:text-blue-400">
-                  {formatRupee(expenseTypeSummary?.total || "0")}
+                  {draftCount}
                 </div>
                 <p className="text-xs text-blue-600/80 dark:text-blue-400/80 mt-1">
-                  {expenseTypeSummary?.count || 0} claims pending payment
+                  Claims awaiting approval or posting
                 </p>
               </div>
 
@@ -299,13 +280,13 @@ export default function AccountingExpensesPage() {
             <WorkspaceSection title="Ecosystem Connections" description="Jump directly into connected modules.">
               <div className="grid gap-3">
                 <Link
-                  href="/admin/payables"
+                  href="/admin/hr/payroll"
                   className="flex items-center justify-between rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary hover:bg-muted"
                 >
                   <div>
-                    <h4 className="text-sm font-semibold text-foreground">Unified Payables</h4>
+                    <h4 className="text-sm font-semibold text-foreground">Payroll Workbench</h4>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Execute and pay out all organization obligations from a single screen.
+                      Generate and pay salary sheets for all staff from the payroll workbench.
                     </p>
                   </div>
                   <ArrowRight className="h-4 w-4 text-muted-foreground" />

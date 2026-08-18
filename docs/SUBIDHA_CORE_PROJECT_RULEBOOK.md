@@ -12,9 +12,9 @@ This file separates:
 
 ## 2. System identity
 
-**SUBIDHA CORE – Lucky Plan EMI System** is the operational system for Subidha Furniture. It is not a demo app. It handles real shop operations involving money, customer contracts, Lucky IDs, batches, EMI schedules, payments, waivers, accounting, finance accounts, direct sales, inventory, delivery, reconciliation, and role-based dashboards.
+**SUBIDHA CORE – Lucky Plan EMI System** is the operational system for Subidha Furniture. It is not a demo app. It handles real shop operations involving money, customer contracts, Lucky IDs, batches, EMI schedules, payments, waivers, accounting, finance accounts, direct sales, rent, lease, inventory, delivery, reconciliation, and role-based dashboards.
 
-The system must remain suitable for today’s Lucky Plan EMI business and future expansion into rent, lease, manufacturing, service desk, reminders, CRM, HR/staff, and vendor/customer fulfillment.
+The system must remain suitable for today’s Lucky Plan EMI, Rent, Lease, and Direct Sale business, and future expansion into manufacturing, service desk, reminders, CRM, HR/staff, and vendor/customer fulfillment.
 
 ## 3. Approved stack
 

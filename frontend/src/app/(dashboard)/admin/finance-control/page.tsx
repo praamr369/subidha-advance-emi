@@ -15,7 +15,6 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import StatusBadge from "@/components/ui/status-badge";
 import { fetchSolopreneurLedgerHealth, postSolopreneurDailyClose, type LedgerHealthResponse } from "@/services/accounting";
-import { getUnifiedPayables, type UnifiedPayableData } from "@/services/payables";
 import { getAdminFinanceDashboard, type AdminFinanceDashboardResponse } from "@/services/phase4-finance";
 import { fetchFinancialIntelligence, type FinancialIntelligenceSnapshot } from "@/services/financial-intelligence";
 import { getMoneyInHand, type MoneyInHandResponse, getFinanceOperationalSummary, type FinanceOperationalSummaryResponse } from "@/services/finance-operations";
@@ -34,7 +33,6 @@ type TowerData = {
   moneyInHand: MoneyInHandResponse | null;
   operations: FinanceOperationalSummaryResponse | null;
   health: LedgerHealthResponse | null;
-  payables: UnifiedPayableData | null;
 };
 
 export default function FinanceControlPage() {
@@ -47,20 +45,19 @@ export default function FinanceControlPage() {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const [dashboard, intelligence, moneyInHand, operations, health, payables] = await Promise.all([
+    const [dashboard, intelligence, moneyInHand, operations, health] = await Promise.all([
       getAdminFinanceDashboard().catch(() => null),
       fetchFinancialIntelligence().catch(() => null),
       getMoneyInHand().catch(() => null),
       getFinanceOperationalSummary().catch(() => null),
       fetchSolopreneurLedgerHealth().catch(() => null),
-      getUnifiedPayables().catch(() => null),
     ]);
 
-    if (!dashboard && !moneyInHand && !health && !payables) {
+    if (!dashboard && !moneyInHand && !health) {
       setError("Finance control data is unavailable. Check that the API is reachable and try again.");
       setData(null);
     } else {
-      setData({ dashboard, intelligence, moneyInHand, operations, health, payables });
+      setData({ dashboard, intelligence, moneyInHand, operations, health });
     }
     setLoading(false);
   }, []);
@@ -89,7 +86,6 @@ export default function FinanceControlPage() {
 
   const cards = data?.dashboard?.cards;
   const health = data?.health;
-  const payables = data?.payables;
   const moneyInHand = data?.moneyInHand;
   const intelligence = data?.intelligence;
   const operations = data?.operations;
@@ -169,12 +165,9 @@ export default function FinanceControlPage() {
       className: toNumber(moneyInHand?.total_outflow) > 0 ? "border-rose-200" : undefined,
     },
     {
-      label: "Supplier & Salary Payables",
-      value: formatRupee(payables?.total_outstanding),
-      detail: payables
-        ? `${payables.total_items} item(s) · ${payables.needs_posting_count} awaiting posting`
-        : "Awaiting payables data",
-      className: (payables?.needs_posting_count ?? 0) > 0 ? "border-amber-200" : undefined,
+      label: "Pending Dues",
+      value: formatRupee(cards?.pending_dues),
+      detail: "Salary, expenses, and vendor payouts",
     },
     {
       label: "Deposits Held",
@@ -409,31 +402,21 @@ export default function FinanceControlPage() {
                       </ERPSectionShell>
 
                       {/* Payables Breakdown */}
-                      <ERPSectionShell title="Supplier Payable & Payroll" description="Outstanding payables by category — not yet posted to ledger.">
-                        {payables && payables.type_summary.length > 0 ? (
-                          <div className="space-y-2">
-                            {payables.type_summary.map((ts) => (
-                              <div key={ts.payable_type} className="flex justify-between items-center p-3 border rounded-xl bg-orange-50/30">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-sm font-medium text-muted-foreground">{ts.label}</span>
-                                  <span className="rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold text-orange-700">{ts.count}</span>
-                                </div>
-                                <span className="font-semibold text-orange-700">{formatRupee(ts.total)}</span>
-                              </div>
-                            ))}
-                            <div className="flex justify-between items-center pt-2 border-t text-sm font-semibold">
-                              <span>Total Outstanding</span>
-                              <span className="text-orange-700">{formatRupee(payables.total_outstanding)}</span>
-                            </div>
-                            <Link href={ROUTES.admin.payables ?? "/admin/payables"} className="text-sm font-medium text-primary hover:underline">
-                              Open Payable Command Center →
-                            </Link>
-                          </div>
-                        ) : (
-                          <div className="p-4 text-center text-sm text-muted-foreground border rounded-xl bg-muted/20">
-                            No outstanding payables.
-                          </div>
-                        )}
+                      <ERPSectionShell title="Payroll & Payouts" description="Dedicated windows for salary, expenses, commissions and vendor payouts.">
+                        <div className="space-y-2">
+                          <Link href="/admin/hr/payroll" className="flex items-center justify-between p-3 border rounded-xl hover:bg-muted/40 transition-colors">
+                            <span className="text-sm font-medium">Payroll Workbench</span>
+                            <span className="text-xs text-muted-foreground">Salary sheets →</span>
+                          </Link>
+                          <Link href="/admin/accounting/expenses" className="flex items-center justify-between p-3 border rounded-xl hover:bg-muted/40 transition-colors">
+                            <span className="text-sm font-medium">Expense Claims</span>
+                            <span className="text-xs text-muted-foreground">Staff expenses →</span>
+                          </Link>
+                          <Link href="/admin/vendors" className="flex items-center justify-between p-3 border rounded-xl hover:bg-muted/40 transition-colors">
+                            <span className="text-sm font-medium">Vendor Settlements</span>
+                            <span className="text-xs text-muted-foreground">Vendor payouts →</span>
+                          </Link>
+                        </div>
                       </ERPSectionShell>
 
                       {/* Recent Outflows */}

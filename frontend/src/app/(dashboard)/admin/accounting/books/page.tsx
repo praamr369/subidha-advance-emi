@@ -13,7 +13,7 @@ import { WorkspaceSection } from "@/components/ui/workspace";
 import { getAccountingBooksReadiness, type AccountingBooksReadiness, type AccountingBooksReadinessAccount } from "@/services/accounting-books";
 import {
   buildAdminFinanceAccountStatementPrintRoute,
-  buildAdminLedgerStatementPrintRoute,
+  buildAdminLedgerRoute,
 } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import { formatRupee } from "@/lib/utils/currency";
@@ -291,7 +291,7 @@ export default function AccountingBooksPage() {
                           </div>
                           <div className="flex flex-wrap gap-2 border-t border-border/60 px-4 py-2.5">
                             <Link href={buildAdminFinanceAccountStatementPrintRoute(account.id)} className="inline-flex h-8 items-center rounded-lg border border-border bg-background px-3 text-xs font-medium text-foreground transition hover:bg-muted">Finance Statement</Link>
-                            {account.chart_account_id ? <Link href={buildAdminLedgerStatementPrintRoute(account.chart_account_id)} className="inline-flex h-8 items-center rounded-lg border border-border bg-background px-3 text-xs font-medium text-foreground transition hover:bg-muted">Ledger Statement</Link> : null}
+                            {account.chart_account_id ? <Link href={buildAdminLedgerRoute(account.chart_account_id)} className="inline-flex h-8 items-center rounded-lg border border-border bg-background px-3 text-xs font-medium text-foreground transition hover:bg-muted">Ledger Statement</Link> : null}
                           </div>
                         </div>
                       ))}

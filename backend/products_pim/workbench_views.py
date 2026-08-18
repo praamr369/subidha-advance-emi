@@ -154,7 +154,7 @@ class PimProductWorkbenchViewSet(viewsets.ModelViewSet):
         for attr in all_attrs:
             options = AttributeOption.objects.filter(
                 attribute=attr, is_active=True
-            ).order_by('display_order').values('id', 'value', 'display_name')
+            ).order_by('display_order').values('id', 'value', 'display_name', 'extra_cost')
 
             attributes_data.append({
                 'id': attr.id,

@@ -1,4 +1,3 @@
-// @ts-nocheck
 "use client";
 
 import Link from "next/link";
@@ -20,6 +19,8 @@ import {
   listStockLocations,
   updateInventoryItem,
 } from "@/services/inventory";
+import QRLabelPrintModal from "@/components/inventory/QRLabelPrintModal";
+import type { QRLabelItem } from "@/components/inventory/QRLabelPrintModal";
 
 const FIELD_CLASS =
   "h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring disabled:cursor-not-allowed disabled:opacity-60";
@@ -63,6 +64,7 @@ export default function InventoryItemsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [printItem, setPrintItem] = useState<QRLabelItem | null>(null);
 
   async function loadPage() {
     setLoading(true);
@@ -116,7 +118,7 @@ export default function InventoryItemsPage() {
     {
       key: "stock_item_type",
       header: "Stock Type",
-      render: (row) => row.stock_item_type.replaceAll("_", " "),
+      render: (row) => row.stock_item_type?.replaceAll("_", " ") ?? "—",
     },
     {
       key: "default_stock_location_name",
@@ -155,6 +157,21 @@ export default function InventoryItemsPage() {
             className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-medium text-foreground transition hover:bg-muted"
           >
             Edit
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              setPrintItem({
+                productName: row.product_name ?? "—",
+                productCode: row.product_code ?? "",
+                sku: row.sku ?? undefined,
+                qrValue: row.qr_code?.trim() || row.sku || row.product_code || String(row.id),
+                unitOfMeasure: row.unit_of_measure ?? undefined,
+              })
+            }
+            className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-medium text-foreground transition hover:bg-muted"
+          >
+            Print QR
           </button>
           <Link
             href={`/admin/inventory/items/${row.id}`}
@@ -516,6 +533,10 @@ export default function InventoryItemsPage() {
           </p>
         )}
       </ERPSectionShell>
+
+      {printItem && (
+        <QRLabelPrintModal item={printItem} onClose={() => setPrintItem(null)} />
+      )}
     </ERPPageShell>
   );
 }

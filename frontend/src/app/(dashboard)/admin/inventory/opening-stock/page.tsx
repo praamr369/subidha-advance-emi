@@ -1,4 +1,3 @@
-// @ts-nocheck
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
@@ -34,7 +33,7 @@ import {
   previewAdminOpeningStockBulkCsv,
   previewOpeningStockImport,
   type OpeningStockBulkPreview,
-  type OpeningStockEntryRow,
+  type OpeningStockBulkPreviewRow,
   type OpeningStockEntriesRow,
   type OpeningStockEntriesPayload,
   type OpeningStockPreview,
@@ -914,7 +913,7 @@ export default function InventoryOpeningStockPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border">
-                        {bulkPreview.rows.map((r: any) => (
+                        {bulkPreview.rows.map((r: OpeningStockBulkPreviewRow) => (
                           <tr key={`${r.row}-${r.sku}`} className="hover:bg-muted/30">
                             <td className="px-3 py-2 font-mono text-xs">{r.row}</td>
                             <td className="px-3 py-2 font-mono text-xs">{r.sku ?? r.product_code ?? "—"}</td>

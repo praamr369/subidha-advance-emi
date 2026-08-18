@@ -1221,28 +1221,25 @@ class AdminLotTrackingListView(APIView):
         # Get filter params
         search = (request.query_params.get("q") or request.query_params.get("search") or "").strip()
         status_filter = (request.query_params.get("status") or "").strip()
-        source_filter = (request.query_params.get("source") or "").strip()
-        priority_filter = (request.query_params.get("priority") or "").strip()
+        source_model_filter = (request.query_params.get("source_model") or "").strip()
 
         if export_format == "csv":
-            rows = export_lots_csv(search, status_filter, source_filter)
-
-            # Create CSV response
             import csv
             import io
             from django.http import HttpResponse
 
+            rows = export_lots_csv(
+                search_query=search,
+                status_filter=status_filter,
+                source_model_filter=source_model_filter,
+            )
             output = io.StringIO()
-            writer = csv.DictWriter(output, fieldnames=[
-                'Lot Code', 'Product Code', 'Product Name', 'SKU', 'Barcode',
-                'Quantity', 'Reorder Point', 'Status', 'Source', 'Priority',
-                'Warehouse', 'Created At'
-            ])
-            writer.writeheader()
-            writer.writerows(rows)
-
-            response = HttpResponse(output.getvalue(), content_type='text/csv')
-            response['Content-Disposition'] = 'attachment; filename="lots_export.csv"'
+            if rows:
+                writer = csv.DictWriter(output, fieldnames=list(rows[0].keys()))
+                writer.writeheader()
+                writer.writerows(rows)
+            response = HttpResponse(output.getvalue(), content_type="text/csv")
+            response["Content-Disposition"] = 'attachment; filename="lots_export.csv"'
             return response
 
         # Default: return JSON list
@@ -1257,10 +1254,9 @@ class AdminLotTrackingListView(APIView):
             page_size = 50
 
         payload = build_lot_tracking_list(
-            search_query=search if search else "",
-            status_filter=status_filter if status_filter else "",
-            source_filter=source_filter if source_filter else "",
-            priority_filter=priority_filter if priority_filter else "",
+            search_query=search,
+            status_filter=status_filter,
+            source_model_filter=source_model_filter,
             page=page,
             page_size=page_size,
         )
@@ -1304,30 +1300,30 @@ class AdminStockLedgerListView(APIView):
 
         # Get filter params
         search = (request.query_params.get("q") or request.query_params.get("search") or "").strip()
-        transaction_type = (request.query_params.get("transaction_type") or "").strip()
-        reference_type = (request.query_params.get("reference_type") or "").strip()
-        date_from = (request.query_params.get("date_from") or "").strip()
-        date_to = (request.query_params.get("date_to") or "").strip()
+        movement_type = (request.query_params.get("movement_type") or "").strip()
+        reference_model = (request.query_params.get("reference_model") or "").strip()
+        date_from = (request.query_params.get("start_date") or request.query_params.get("date_from") or "").strip()
+        date_to = (request.query_params.get("end_date") or request.query_params.get("date_to") or "").strip()
 
         if export_format == "csv":
-            rows = export_ledger_csv(search, transaction_type, reference_type, date_from, date_to)
-
-            # Create CSV response
             import csv
             import io
             from django.http import HttpResponse
 
+            rows = export_ledger_csv(
+                search_query=search,
+                movement_type_filter=movement_type,
+                reference_model_filter=reference_model,
+                date_from=date_from,
+                date_to=date_to,
+            )
             output = io.StringIO()
-            writer = csv.DictWriter(output, fieldnames=[
-                'Created', 'Product Code', 'Product Name', 'SKU', 'Barcode',
-                'Transaction Type', 'Quantity', 'Reference Type', 'Reference ID',
-                'Reference Display', 'Warehouse'
-            ])
-            writer.writeheader()
-            writer.writerows(rows)
-
-            response = HttpResponse(output.getvalue(), content_type='text/csv')
-            response['Content-Disposition'] = 'attachment; filename="stock_ledger_export.csv"'
+            if rows:
+                writer = csv.DictWriter(output, fieldnames=list(rows[0].keys()))
+                writer.writeheader()
+                writer.writerows(rows)
+            response = HttpResponse(output.getvalue(), content_type="text/csv")
+            response["Content-Disposition"] = 'attachment; filename="stock_ledger_export.csv"'
             return response
 
         # Default: return JSON list
@@ -1342,11 +1338,11 @@ class AdminStockLedgerListView(APIView):
             page_size = 50
 
         payload = build_stock_ledger_list(
-            search_query=search if search else "",
-            transaction_type_filter=transaction_type if transaction_type else "",
-            reference_type_filter=reference_type if reference_type else "",
-            date_from=date_from if date_from else "",
-            date_to=date_to if date_to else "",
+            search_query=search,
+            movement_type_filter=movement_type,
+            reference_model_filter=reference_model,
+            date_from=date_from,
+            date_to=date_to,
             page=page,
             page_size=page_size,
         )

@@ -805,11 +805,22 @@ class AdminHrExpenseClaimPatchView(_AdminBase):
 class AdminHrPayrollView(_AdminBase):
     def get(self, request):
         period = PayrollPeriod.objects.order_by("-year", "-month", "-id").first()
-        sheets_qs = SalarySheet.objects.select_related("employee", "payroll_period").order_by("-created_at", "-id")
+        sheets_qs = (
+            SalarySheet.objects
+            .select_related("employee", "payroll_period", "posted_journal_entry")
+            .prefetch_related("salary_payments", "lines")
+            .order_by("-year", "-month", "-created_at", "-id")
+        )
         employee_id = request.query_params.get("employee")
+        year = request.query_params.get("year")
+        month = request.query_params.get("month")
         if employee_id:
             sheets_qs = sheets_qs.filter(employee_id=employee_id)
-        sheets = sheets_qs[:50]
+        if year:
+            sheets_qs = sheets_qs.filter(year=int(year))
+        if month:
+            sheets_qs = sheets_qs.filter(month=int(month))
+        sheets = sheets_qs[:100]
         return Response({"current_period": None if period is None else {"id": period.id, "code": period.code, "status": period.status}, "salary_sheets": SalarySheetSerializer(sheets, many=True, context={"request": request}).data})
 
     def post(self, request):
@@ -821,12 +832,20 @@ class AdminHrPayrollView(_AdminBase):
 
 class AdminHrSalaryPaymentsListCreateView(_AdminBase):
     def get(self, request):
-        qs = SalaryPayment.objects.select_related("salary_sheet", "branch", "finance_account").order_by("-payment_date", "-id")
+        qs = SalaryPayment.objects.select_related(
+            "salary_sheet", "salary_sheet__employee", "branch", "finance_account", "posted_journal_entry"
+        ).order_by("-payment_date", "-id")
         employee_id = request.query_params.get("employee")
+        year = request.query_params.get("year")
+        month = request.query_params.get("month")
         if employee_id:
             qs = qs.filter(salary_sheet__employee_id=employee_id)
+        if year:
+            qs = qs.filter(salary_sheet__year=int(year))
+        if month:
+            qs = qs.filter(salary_sheet__month=int(month))
         results = list(qs[:200])
-        return Response({"count": qs.count(), "results": SalaryPaymentSerializer(results, many=True, context={"request": request}).data})
+        return Response({"count": len(results), "results": SalaryPaymentSerializer(results, many=True, context={"request": request}).data})
 
     def post(self, request):
         serializer = SalaryPaymentSerializer(data=request.data, context={"request": request})

@@ -25,6 +25,7 @@ import {
   formatDocumentMoney,
   safeDocumentText,
 } from "@/lib/documents/formatters";
+import { getTransactionBadge } from "@/components/accounting/shared";
 import { ROUTES } from "@/lib/routes";
 import { getGeneralLedger, type GeneralLedgerReport } from "@/services/accounting";
 
@@ -39,7 +40,12 @@ function lineRows(report: GeneralLedgerReport): DocumentLineItem[] {
   return (report.rows || []).slice(0, 80).map((row, index) => ({
     key: `${row.journal_entry_id}-${index}`,
     description: safeDocumentText(row.memo || row.description, row.entry_no),
-    code: [row.entry_date, row.entry_no, row.source_type, row.source_reference]
+    code: [
+      row.entry_date, 
+      row.entry_no, 
+      getTransactionBadge(row.entry_type, row.source_model)?.label || row.source_type, 
+      row.source_reference
+    ]
       .map((part) => (part || "").trim())
       .filter(Boolean)
       .join(" · "),
@@ -57,6 +63,7 @@ export default function AdminLedgerStatementPrintPage() {
   const accountId = params?.accountId;
   const startDate = searchParams.get("start_date") || undefined;
   const endDate = searchParams.get("end_date") || undefined;
+  const category = searchParams.get("category") || undefined;
   const [report, setReport] = useState<GeneralLedgerReport | null>(null);
   const [copyLabel, setCopyLabel] = useState<DocumentCopyLabel>("Original");
   const [loading, setLoading] = useState(true);
@@ -69,7 +76,7 @@ export default function AdminLedgerStatementPrintPage() {
       setLoading(true);
       setError(null);
       try {
-        const payload = await getGeneralLedger({ account_id: accountId, start_date: startDate, end_date: endDate });
+        const payload = await getGeneralLedger({ account_id: accountId, start_date: startDate, end_date: endDate, category: category });
         if (!mounted) return;
         setReport(payload);
       } catch (err) {
@@ -84,7 +91,7 @@ export default function AdminLedgerStatementPrintPage() {
     return () => {
       mounted = false;
     };
-  }, [accountId, startDate, endDate]);
+  }, [accountId, startDate, endDate, category]);
 
   const generatedAt = useMemo(() => new Date().toISOString(), []);
 

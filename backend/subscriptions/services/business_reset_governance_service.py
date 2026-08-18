@@ -51,7 +51,7 @@ RESET_SCOPE_REGISTRY: tuple[ResetScopeSpec, ...] = (
     ResetScopeSpec("CUSTOMER_CRM_ONLY", "Customer CRM", "HIGH", ("customers.Customer", "crm.CrmParty", "crm.CrmLead", "crm.CrmInteraction", "customers.CustomerSupportRequest")),
     ResetScopeSpec("SALES_DIRECT_ONLY", "Direct sales", "HIGH", ("billing.DirectSale", "billing.SalesInvoice", "billing.SalesReceipt", "billing.CreditNote", "billing.DebitNote")),
     ResetScopeSpec("SUBSCRIPTION_EMI_ONLY", "Subscriptions/EMI", "VERY_HIGH", ("lucky_plan.Batch", "lucky_plan.LuckyId", "contracts.Subscription", "payments.Emi", "payments.Payment", "lucky_plan.LuckyDraw", "payments.PaymentReconciliation", "commissions.Commission", "commissions.CommissionPayoutBatch"), True),
-    ResetScopeSpec("RENT_LEASE_ONLY", "Rent/lease", "HIGH", ("contracts.RentSubscriptionProfile", "contracts.LeaseSubscriptionProfile", "subscriptions.RentLeaseDemand", "subscriptions.RentLeaseDepositLedger", "deliveries.ProductPossession", "deliveries.RentLeaseReturnInspection")),
+    ResetScopeSpec("RENT_LEASE_ONLY", "Rent/lease", "HIGH", ("contracts.RentSubscriptionProfile", "contracts.LeaseSubscriptionProfile", "payments.RentLeaseBillingDemand", "deliveries.ProductPossession", "deliveries.RentLeaseReturnInspection")),
     ResetScopeSpec("AUTH_ARTIFACTS_ONLY", "Auth artifacts", "MEDIUM", ("sessions.Session", "token_blacklist.OutstandingToken", "token_blacklist.BlacklistedToken", "accounts.PasswordResetRequest")),
     ResetScopeSpec("MIGRATION_CENTER_ONLY", "Migration / import staging data", "MEDIUM", ("migration_center.MigrationBatch", "migration_center.MigrationStagingRow", "migration_center.MigrationMappingRule", "migration_center.MigrationAuditLog")),
     ResetScopeSpec("FULL_BUSINESS_DATA_EXCEPT_PRESERVED_ADMIN", "Full business reset except preserved admin", "VERY_HIGH", (), True),
@@ -402,6 +402,9 @@ def create_setup_snapshot_restore_preview(*, requested_by, snapshot_payload: dic
 
 
 def execute_restore(*, restore_job: BusinessDataRestoreJob, confirmation_phrase: str, requested_by) -> BusinessDataRestoreJob:
+    if not getattr(settings, "ALLOW_BUSINESS_RESET", True):
+        raise ValueError("Business restore is disabled on this server. Set ALLOW_BUSINESS_RESET=True in settings to enable it.")
+
     if restore_job.status != BusinessDataRestoreJob.Status.PREVIEWED:
         raise ValueError("Restore preview is required before execute.")
 

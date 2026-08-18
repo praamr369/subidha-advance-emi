@@ -138,8 +138,8 @@ RETURNS_DAMAGE_CREDIT_SUPPLEMENTAL_EVENT_REGISTRY: tuple[BridgeEventSpec, ...] =
     BridgeEventSpec(
         event_key="security_deposit_damage_deduction",
         label="Security deposit damage deduction",
-        source_module="subscriptions",
-        source_app="subscriptions",
+        source_module="contracts",
+        source_app="contracts",
         source_model="Subscription",
         event_group="Returns, Damage & Credit",
         debit_requirements=("RentLeaseAccountingAccountMapping.deposit_liability_account",),
@@ -164,8 +164,8 @@ RETURNS_DAMAGE_CREDIT_SUPPLEMENTAL_EVENT_REGISTRY: tuple[BridgeEventSpec, ...] =
     BridgeEventSpec(
         event_key="cancellation_deduction",
         label="Cancellation deduction",
-        source_module="subscriptions",
-        source_app="subscriptions",
+        source_module="contracts",
+        source_app="contracts",
         source_model="OperationalCancellation",
         event_group="Cancellation / Reversal",
         debit_requirements=("CUSTOMER_ADVANCE_UNEARNED_REVENUE or CUSTOMER_RECEIVABLE",),
@@ -180,8 +180,8 @@ RETURNS_DAMAGE_CREDIT_SUPPLEMENTAL_EVENT_REGISTRY: tuple[BridgeEventSpec, ...] =
     BridgeEventSpec(
         event_key="rent_lease_adjustment",
         label="Rent/lease adjustment",
-        source_module="subscriptions",
-        source_app="subscriptions",
+        source_module="payments",
+        source_app="payments",
         source_model="RentLeaseDepositTransaction",
         event_group="Rent / Lease",
         debit_requirements=("RentLeaseAccountingAccountMapping.deposit_liability_account or CUSTOMER_RECEIVABLE",),
@@ -322,12 +322,12 @@ def _not_configured_event(spec: BridgeEventSpec) -> dict[str, Any]:
 
 
 def _damage_recovery_event() -> dict[str, Any]:
-    if _model_exists("subscriptions", "Subscription"):
+    if _model_exists("contracts", "Subscription"):
         spec = BridgeEventSpec(
             event_key="damage_recovery",
             label="Damage recovery",
-            source_module="subscriptions",
-            source_app="subscriptions",
+            source_module="contracts",
+            source_app="contracts",
             source_model="Subscription",
             event_group="Returns, Damage & Credit",
             debit_requirements=("Receivable or deposit liability",),
@@ -341,8 +341,8 @@ def _damage_recovery_event() -> dict[str, Any]:
         BridgeEventSpec(
             event_key="damage_recovery",
             label="Damage recovery",
-            source_module="subscriptions",
-            source_app="subscriptions",
+            source_module="contracts",
+            source_app="contracts",
             source_model="Subscription",
             event_group="Returns, Damage & Credit",
             debit_requirements=("Receivable or deposit liability",),

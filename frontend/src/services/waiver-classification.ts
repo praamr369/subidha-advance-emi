@@ -63,6 +63,6 @@ export async function getWaiverClassificationMatrix() {
 export async function classifyWaiver(input: WaiverClassificationInput) {
   return apiFetch<WaiverClassificationResult>("/admin/settings/waiver-classification/", {
     method: "POST",
-    body: JSON.stringify(input),
+    body: input,
   });
 }

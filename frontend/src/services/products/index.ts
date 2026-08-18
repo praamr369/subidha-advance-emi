@@ -83,6 +83,8 @@ export type ProductListParams = {
   stock_type?: string;
   page?: number;
   page_size?: number;
+  /** Default true — excludes products that are PIM variant SKUs (managed via base product) */
+  exclude_variant_skus?: boolean | string;
 };
 
 export type ProductRegisterSummary = {

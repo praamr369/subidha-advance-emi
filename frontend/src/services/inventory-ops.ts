@@ -223,10 +223,34 @@ export async function getInventoryReadiness(): Promise<InventoryReadinessRespons
   return normalizeReadiness(payload);
 }
 
-export async function listStockNeeds(params: Record<string, string> = {}) {
+export interface StockNeedRow {
+  id?: number;
+  need_no?: string;
+  product_name_snapshot?: string;
+  product?: string;
+  shortage_quantity?: string | number;
+  status?: string;
+  source_module?: string;
+  source_type?: string;
+  [key: string]: unknown;
+}
+
+export interface StockNeedsResponse {
+  results: StockNeedRow[];
+  count: number;
+}
+
+export interface RecheckStockNeedResponse {
+  recheck?: {
+    outcome?: string;
+    message?: string;
+  };
+}
+
+export async function listStockNeeds(params: Record<string, string> = {}): Promise<StockNeedsResponse> {
   const qs = new URLSearchParams(params).toString();
   const suffix = qs ? `?${qs}` : "";
-  return request(`/admin/inventory/stock-needs/${suffix}`);
+  return request<StockNeedsResponse>(`/admin/inventory/stock-needs/${suffix}`);
 }
 
 export async function createStockNeed(payload: Record<string, unknown>) {

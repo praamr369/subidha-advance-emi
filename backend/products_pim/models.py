@@ -95,6 +95,8 @@ class AttributeOption(models.Model):
     display_name = models.CharField(max_length=200, blank=True)
     display_order = models.PositiveIntegerField(default=0)
     is_active = models.BooleanField(default=True)
+    # Extra cost added to the base price when this option is selected (for add-ons: polish, hydraulic lift, etc.)
+    extra_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     class Meta:
         ordering = ["display_order", "value"]
@@ -132,13 +134,28 @@ class PimProduct(models.Model):
     subcategory = models.ForeignKey(
         ProductSubcategory, on_delete=models.PROTECT, related_name="products", null=True, blank=True
     )
-    base_price = models.DecimalField(max_digits=14, decimal_places=2, validators=[MinValueValidator(0)])
+    base_price = models.DecimalField(max_digits=14, decimal_places=2, default=0, validators=[MinValueValidator(0)])
     cost_price = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
     image = models.ImageField(upload_to="pim/products/", null=True, blank=True)
     is_active = models.BooleanField(default=True)
     is_published = models.BooleanField(default=False)
     variant_generating_attributes = models.ManyToManyField(
         CategoryAttribute, blank=True, related_name="used_for_variants"
+    )
+    locked_attributes = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Attribute IDs manually locked by operator",
+    )
+    # Self-referential FK: set when this PIM product is a variant SKU generated
+    # under a base product (its code matches a ProductVariant.sku).
+    parent = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="child_pim_products",
+        db_index=True,
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

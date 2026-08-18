@@ -18,7 +18,6 @@ import LoadingBlock from "@/components/feedback/LoadingBlock";
 import KycDocumentPanel from "@/components/kyc/KycDocumentPanel";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { Party360Embed, UniversalQuickWidgetsEmbed } from "@/components/profile/Profile360";
-import { ProfilePayablesPanel } from "@/components/profile/ProfilePayablesPanel";
 import { WorkbenchFilterChips } from "@/components/workbench/WorkbenchFilterChips";
 import {
   DetailItem as DetailValue,
@@ -37,12 +36,11 @@ type PartnerDetail = {
   total_commission: string | number;
 };
 
-type Segment = "overview" | "operations" | "payouts" | "account" | "kyc";
+type Segment = "overview" | "operations" | "account" | "kyc";
 
 const SEGMENTS: { key: Segment; label: string }[] = [
   { key: "overview", label: "Overview & Actions" },
   { key: "operations", label: "Operations 360" },
-  { key: "payouts", label: "Commissions & Payouts" },
   { key: "account", label: "Account Actions" },
   { key: "kyc", label: "KYC Documents" },
 ];
@@ -309,16 +307,6 @@ export default function AdminPartnerDetailPage() {
           {/* Operations 360 — full cross-module alerts, financials & tables */}
           {segment === "operations" && (
             <Party360Embed role="PARTNER" sourceId={partner.id} />
-          )}
-
-          {/* Commissions & Payouts — party-scoped payables queue with journal posting */}
-          {segment === "payouts" && (
-            <ProfilePayablesPanel
-              partyType="PARTNER"
-              partyId={partner.id}
-              title="Commissions & Payouts"
-              description="Pending commission payouts for this partner. Paying posts a real Commission Payable → Finance Account journal."
-            />
           )}
 
           {/* Account Actions */}

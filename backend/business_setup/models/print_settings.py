@@ -79,6 +79,7 @@ class DocumentPrintSettings(BusinessSetupTimeStampedModel):
     )
     show_watermark = models.BooleanField(default=True)
     show_logo = models.BooleanField(default=True)
+    show_upi_qr = models.BooleanField(default=True)
     is_active = models.BooleanField(default=True, db_index=True)
 
     class Meta:

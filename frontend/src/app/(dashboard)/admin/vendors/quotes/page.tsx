@@ -13,20 +13,23 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { ROUTES } from "@/lib/routes";
-import { createAdminQuoteRequest, listAdminQuoteRequests } from "@/services/vendor-ops";
-import { listVendors } from "@/services/vendors";
-
-type VendorLite = { id: number; display_name?: string; name?: string };
+import {
+  createAdminQuoteRequest,
+  listAdminQuoteRequests,
+  type CreateQuoteRequestPayload,
+  type QuoteRequest,
+} from "@/services/vendor-ops";
+import { listVendors, type Vendor } from "@/services/vendors";
 
 const SOURCE_OPTIONS = ["MANUAL", "CUSTOMER_ENQUIRY", "DIRECT_SALE_ORDER", "ONLINE_ORDER"] as const;
 
 export default function AdminVendorQuotesPage() {
   const searchParams = useSearchParams();
-  const [rows, setRows] = useState<Record<string, unknown>[]>([]);
+  const [rows, setRows] = useState<QuoteRequest[]>([]);
   const [listLoading, setListLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
 
-  const [vendors, setVendors] = useState<VendorLite[]>([]);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
   const [selectedVendorIds, setSelectedVendorIds] = useState<Record<number, boolean>>({});
 
   const [sourceType, setSourceType] = useState<string>("MANUAL");
@@ -54,18 +57,12 @@ export default function AdminVendorQuotesPage() {
 
   useEffect(() => {
     let active = true;
-    void Promise.all([
-      listAdminQuoteRequests(),
-      listVendors(),
-    ])
+    void Promise.all([listAdminQuoteRequests(), listVendors()])
       .then(([qPayload, vPayload]) => {
         if (!active) return;
-        const q = qPayload as { results?: Record<string, unknown>[] };
-        setRows(q.results ?? []);
-
-        const vListRaw = vPayload as { results?: VendorLite[] } | VendorLite[];
-        setVendors(Array.isArray(vListRaw) ? vListRaw : vListRaw.results ?? []);
-
+        setRows(qPayload.results ?? []);
+        const list = Array.isArray(vPayload) ? vPayload : (vPayload.results ?? []);
+        setVendors(list);
         setListError(null);
       })
       .catch((err) => {
@@ -89,7 +86,7 @@ export default function AdminVendorQuotesPage() {
       return;
     }
 
-    const payload: Record<string, unknown> = {
+    const payload: CreateQuoteRequestPayload = {
       source_type: sourceType,
       product_name: productName.trim(),
       category_text: categoryText.trim(),
@@ -110,7 +107,7 @@ export default function AdminVendorQuotesPage() {
     try {
       await createAdminQuoteRequest(payload);
       setSubmitBanner("Quote request recorded.");
-      const refreshed = (await listAdminQuoteRequests()) as { results?: Record<string, unknown>[] };
+      const refreshed = await listAdminQuoteRequests();
       setRows(refreshed.results ?? []);
       setSelectedVendorIds({});
     } catch (err) {
@@ -129,7 +126,10 @@ export default function AdminVendorQuotesPage() {
       eyebrow="Purchases & Vendors"
       title="Vendor quote requests"
       subtitle="Request quotes without posting procurement, payable, or billing documents."
-      breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Vendor quotes", href: ROUTES.admin.vendorsQuotes }]}
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Vendor quotes", href: ROUTES.admin.vendorsQuotes },
+      ]}
       actions={[
         { href: ROUTES.admin.vendorsSourcing, label: "Sourcing hints", variant: "secondary" },
         { href: ROUTES.admin.purchaseOrders, label: "Purchase orders", variant: "primary" },
@@ -152,7 +152,11 @@ export default function AdminVendorQuotesPage() {
           <div className="flex flex-wrap gap-2">
             <label className="flex flex-col text-xs uppercase text-muted-foreground">
               Source
-              <select className="h-10 min-w-[140px] rounded border bg-background px-2 normal-case" value={sourceType} onChange={(e) => setSourceType(e.target.value)}>
+              <select
+                className="h-10 min-w-[140px] rounded border bg-background px-2 normal-case"
+                value={sourceType}
+                onChange={(e) => setSourceType(e.target.value)}
+              >
                 {SOURCE_OPTIONS.map((o) => (
                   <option key={o} value={o}>{o}</option>
                 ))}
@@ -201,7 +205,11 @@ export default function AdminVendorQuotesPage() {
             Send to vendors immediately (otherwise stays draft)
           </label>
 
-          <button className="h-10 rounded border bg-primary px-4 text-primary-foreground disabled:opacity-50" disabled={submitting || vendors.length === 0} type="submit">
+          <button
+            className="h-10 rounded border bg-primary px-4 text-primary-foreground disabled:opacity-50"
+            disabled={submitting || vendors.length === 0}
+            type="submit"
+          >
             {submitting ? "Saving…" : "Create request"}
           </button>
         </form>
@@ -227,18 +235,21 @@ export default function AdminVendorQuotesPage() {
           <div className="space-y-2 text-sm">
             {rows.map((row) => (
               <div
-                key={String(row.id)}
+                key={row.id}
                 className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-border bg-card p-4"
               >
                 <div>
-                  <Link className="font-semibold text-primary underline" href={`${ROUTES.admin.vendorsQuotes}/${row.id}`}>
-                    {String(row.request_no || row.id)}
+                  <Link
+                    className="font-semibold text-primary underline"
+                    href={`${ROUTES.admin.vendorsQuotes}/${row.id}`}
+                  >
+                    {row.request_no}
                   </Link>
                   <div className="mt-1 text-xs text-muted-foreground">
-                    {(row.quotes as unknown[] | undefined)?.length ?? 0} invites · Product {String(row.product_name || "—")}
+                    {row.quotes.length} invites · Product {row.product_name || "—"}
                   </div>
                 </div>
-                <ERPStatusBadge status={String(row.status ?? "—")} />
+                <ERPStatusBadge status={row.status} />
               </div>
             ))}
           </div>

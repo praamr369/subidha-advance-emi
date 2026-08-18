@@ -1849,7 +1849,7 @@ class Phase9EPdfParityTests(TestCase):
             contract_reference="RC-P9E-002",
             subscription_number="SUB-P9E-R-002",
         )
-        from subscriptions.models import RentSubscriptionProfile, LeaseSubscriptionProfile
+        from contracts.models import RentSubscriptionProfile, LeaseSubscriptionProfile
 
         self.rent_profile = RentSubscriptionProfile.objects.create(
             subscription=self.rent_subscription,

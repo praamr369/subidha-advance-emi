@@ -172,6 +172,7 @@ function SetupChart({ sections }: { sections: SetupReadinessSection[] }) {
 }
 
 export default function BusinessSetupPage() {
+  const [activeTab, setActiveTab] = useState<"dashboard" | "workflows" | "checklist" | "ops">("dashboard");
   // — Readiness (overview) state —
   const [payload, setPayload] = useState<SetupReadinessPayload | null>(null);
   const [readinessLoading, setReadinessLoading] = useState(true);
@@ -295,16 +296,102 @@ export default function BusinessSetupPage() {
       <PageHeader title="Business Setup" description="Setup readiness, checklist, section cards, and controlled go-live reset — all in one place." />
       <BusinessSetupLinks />
 
-      {/* ── Overall status banner ── */}
+      {/* ── Tabs Navigation ── */}
+      <div className="border-b border-border">
+        <nav className="-mb-px flex space-x-6 overflow-x-auto" aria-label="Tabs">
+          {[
+            { id: "dashboard", name: "Overview Dashboard" },
+            { id: "workflows", name: "Readiness Workflows" },
+            { id: "checklist", name: "Go-Live Checklist" },
+            { id: "ops", name: "System Ops" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`whitespace-nowrap border-b-2 py-3 px-1 text-sm font-semibold transition-colors ${
+                activeTab === tab.id
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:border-muted-foreground/30 hover:text-foreground"
+              }`}
+            >
+              {tab.name}
+            </button>
+          ))}
+        </nav>
+      </div>
+
       {readinessError ? <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">{readinessError}</div> : null}
       {readinessLoading ? <div className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground shadow-sm">Loading production business setup…</div> : null}
 
-      {payload ? (
-        <>
+      {/* ── TAB: OVERVIEW DASHBOARD ── */}
+      {activeTab === "dashboard" && payload && (
+        <div className="space-y-6 animate-in fade-in duration-300">
+          {/* Solopreneur Control Room */}
+          {payload.operational_posture ? (
+            <section className="rounded-xl border border-primary/20 bg-gradient-to-r from-card via-card to-primary/5 p-5 shadow-sm">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-border pb-4">
+                <div>
+                  <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+                    Solopreneur Control Room
+                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                      payload.summary.blocker_count === 0 ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                    }`}>
+                      {payload.summary.blocker_count === 0 ? "100% OPERATIONAL READY" : `${payload.summary.blocker_count} CORE BLOCKER(S)`}
+                    </span>
+                  </h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">Unified master health monitoring powered by domain KPI scores.</p>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Last evaluated: {typeof (payload.operational_posture as any).last_evaluated === "string" ? new Date((payload.operational_posture as any).last_evaluated).toLocaleTimeString() : "Just now"}
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-3 grid-cols-2 sm:grid-cols-4 xl:grid-cols-4 mb-4">
+                {[
+                  { label: "Core Readiness", score: (payload.operational_posture as any).core_kpi_score ?? 0 },
+                  { label: "Accounting KPI", score: (payload.operational_posture as any).accounting_kpi_score ?? 0 },
+                  { label: "Inventory KPI", score: (payload.operational_posture as any).inventory_kpi_score ?? 0 },
+                  { label: "CRM KPI", score: (payload.operational_posture as any).crm_kpi_score ?? 0 },
+                ].map((kpi, idx) => (
+                  <div key={`${kpi.label}-${idx}`} className="rounded-xl border border-border bg-background p-4 shadow-sm relative overflow-hidden group">
+                    <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{kpi.label}</div>
+                    <div className="mt-2 text-3xl font-bold tracking-tight text-foreground flex items-end gap-1">
+                      {kpi.score}% <span className="text-xs font-medium text-muted-foreground mb-1">READY</span>
+                    </div>
+                    {/* Progress Bar Line */}
+                    <div className="absolute bottom-0 left-0 h-1 bg-primary/20 w-full">
+                      <div className={`h-full ${kpi.score === 100 ? "bg-emerald-500" : "bg-primary"}`} style={{ width: `${kpi.score}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-4 grid gap-3 grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 border-t border-border pt-4">
+                {[
+                  { label: "Active Admins", value: (payload.operational_posture as any).admin_count ?? 0, ready: ((payload.operational_posture as any).admin_count ?? 0) > 0 },
+                  { label: "Branches / Counters", value: `${(payload.operational_posture as any).branch_count ?? 0} / ${(payload.operational_posture as any).counter_count ?? 0}`, ready: ((payload.operational_posture as any).counter_count ?? 0) > 0 },
+                  { label: "Chart Accounts", value: (payload.operational_posture as any).active_chart_accounts_count ?? 0, ready: ((payload.operational_posture as any).active_chart_accounts_count ?? 0) > 0 },
+                  { label: "Products / Batches", value: `${(payload.operational_posture as any).product_count ?? 0} / ${(payload.operational_posture as any).batch_count ?? 0}`, ready: ((payload.operational_posture as any).product_count ?? 0) > 0 },
+                  { label: "Tax / GST Profile", value: (payload.operational_posture as any).has_tax_profile ? "Configured" : "Non-GST", ready: true },
+                  { label: "Print Branding", value: (payload.operational_posture as any).has_print_branding ? "Ready" : "Default", ready: true },
+                ].map((stat, idx) => (
+                  <div key={`${stat.label}-${idx}`} className="rounded-xl border border-border bg-background/50 p-3 shadow-sm">
+                    <div className="text-xs font-medium text-muted-foreground">{stat.label}</div>
+                    <div className="mt-1 text-lg font-semibold text-foreground flex items-center justify-between">
+                      <span>{stat.value}</span>
+                      <span className={`inline-block size-2 rounded-full ${stat.ready ? "bg-emerald-500" : "bg-amber-500"}`} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {/* Overall Status Banner */}
           <section className={`rounded-xl border p-5 shadow-sm ${statusClass(payload.summary.overall_status)}`}>
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <div className="text-sm font-semibold uppercase tracking-wide opacity-80">Business Setup Readiness</div>
+                <div className="text-sm font-semibold uppercase tracking-wide opacity-80">Global Setup Status</div>
                 <h2 className="mt-2 text-3xl font-semibold">{payload.summary.overall_status.replaceAll("_", " ")}</h2>
                 <p className="mt-2 max-w-4xl text-sm leading-6">Mutation policy: {payload.mutation_policy}</p>
               </div>
@@ -316,276 +403,253 @@ export default function BusinessSetupPage() {
             </div>
             <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
               <div className="rounded-xl border border-current/20 bg-card p-3"><div className="text-xs font-semibold uppercase tracking-wide">Core operational</div><div className="mt-1 text-2xl font-semibold">{collectionReady ? "READY" : "BLOCKED"}</div></div>
-              <div className="rounded-xl border border-current/20 bg-card p-3"><div className="text-xs font-semibold uppercase tracking-wide">Ready</div><div className="mt-1 text-2xl font-semibold">{payload.summary.ready_count}</div></div>
+              <div className="rounded-xl border border-current/20 bg-card p-3"><div className="text-xs font-semibold uppercase tracking-wide">Ready sections</div><div className="mt-1 text-2xl font-semibold">{payload.summary.ready_count}</div></div>
               <div className="rounded-xl border border-current/20 bg-card p-3"><div className="text-xs font-semibold uppercase tracking-wide">Pending/info</div><div className="mt-1 text-2xl font-semibold">{payload.summary.warning_count}</div></div>
               <div className="rounded-xl border border-current/20 bg-card p-3"><div className="text-xs font-semibold uppercase tracking-wide">Core blockers</div><div className="mt-1 text-2xl font-semibold">{payload.summary.blocker_count}</div></div>
-              <div className="rounded-xl border border-current/20 bg-card p-3"><div className="text-xs font-semibold uppercase tracking-wide">Read-only</div><div className="mt-1 text-2xl font-semibold">{payload.read_only ? "YES" : "NO"}</div></div>
+              <div className="rounded-xl border border-current/20 bg-card p-3"><div className="text-xs font-semibold uppercase tracking-wide">Read-only protection</div><div className="mt-1 text-2xl font-semibold">{payload.read_only ? "YES" : "NO"}</div></div>
             </div>
           </section>
 
           <FreshStartResult result={actionResult} />
-        </>
-      ) : null}
+          
+          <SetupChart sections={payload.sections} />
+        </div>
+      )}
 
-      {/* ── Checklist KPIs + Document Numbering ── */}
-      {checklistData ? (
-        <>
-          <section className="grid gap-4 md:grid-cols-4">
-            <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-              <div className="text-sm font-medium text-muted-foreground">Completion</div>
-              <div className="mt-2 text-3xl font-semibold text-foreground">{checklistData.percent_complete}%</div>
-            </div>
-            <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-              <div className="text-sm font-medium text-muted-foreground">Checklist items</div>
-              <div className="mt-2 text-3xl font-semibold text-foreground">{checklistData.items.length}</div>
-            </div>
-            <div className="col-span-2 rounded-xl border border-border bg-card p-5 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-medium text-muted-foreground">Go-live status</div>
-                <Link href={ROUTES.admin.settingsBusinessSetupDocumentNumbering} className="text-xs font-semibold text-primary hover:underline">Document Numbering →</Link>
-              </div>
-              <div className="mt-2 text-lg font-semibold text-foreground">{checklistData.is_ready_for_go_live ? "Ready for go-live" : "Not ready yet"}</div>
-              <div className="mt-3 grid gap-2 text-xs md:grid-cols-3">
-                {[
-                  { label: "Invoice numbering", ready: Boolean(checklistData.counts?.invoice_numbering_configured) },
-                  { label: "Receipt numbering", ready: Boolean(checklistData.counts?.receipt_numbering_configured) },
-                  { label: "Direct-sale invoice numbering", ready: Boolean(checklistData.counts?.direct_sale_invoice_numbering_configured) },
-                ].map((row) => (
-                  <div key={row.label} className={`rounded-lg border px-3 py-2 ${row.ready ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-amber-200 bg-amber-50 text-amber-950"}`}>
-                    <div className="font-semibold">{row.ready ? "Ready" : "Needs setup"}</div>
-                    <div className="mt-0.5 text-muted-foreground">{row.label}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          {/* ── Solopreneur Control Room & Operational Posture Dashboard ── */}
-          {payload?.operational_posture ? (
-            <section className="rounded-xl border border-primary/20 bg-gradient-to-r from-card via-card to-primary/5 p-5 shadow-sm">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-border pb-4">
-                <div>
-                  <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-                    Solopreneur Control Room & Operational Posture
-                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                      payload.summary.blocker_count === 0 ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
-                    }`}>
-                      {payload.summary.blocker_count === 0 ? "100% OPERATIONAL READY" : `${payload.summary.blocker_count} CORE BLOCKER(S)`}
-                    </span>
-                  </h2>
-                  <p className="text-xs text-muted-foreground mt-0.5">Unified ERP/POS master health monitoring without department segregation.</p>
+      {/* ── TAB: READINESS WORKFLOWS ── */}
+      {activeTab === "workflows" && payload && (
+        <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="text-sm text-muted-foreground mb-4">Categorized operational areas requiring attention or configuration before go-live.</div>
+          <div className="columns-1 md:columns-2 xl:columns-3 gap-6 space-y-6">
+            {groups.map((group) => (
+              <div key={group.key} className="break-inside-avoid-column bg-card rounded-2xl border border-border overflow-hidden shadow-sm">
+                <div className="bg-muted/30 border-b border-border px-4 py-3 flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-foreground">{group.label}</h2>
+                  <span className="text-xs font-medium bg-background border px-2 py-0.5 rounded-full text-muted-foreground">{group.rows.length} items</span>
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  Last evaluated: {typeof (payload.operational_posture as any).last_evaluated === "string" ? new Date((payload.operational_posture as any).last_evaluated).toLocaleTimeString() : "Just now"}
+                <div className="p-4 space-y-4">
+                  {group.rows.map((section) => (
+                    <SectionCard
+                      key={section.key}
+                      section={section}
+                      onSeedPolicies={section.key === "policy_governance" ? () => void runSeedPolicies() : undefined}
+                      policyBusy={section.key === "policy_governance" ? policyBusy : undefined}
+                      policyResult={section.key === "policy_governance" ? policyResult : undefined}
+                    />
+                  ))}
                 </div>
               </div>
+            ))}
+          </div>
+        </div>
+      )}
 
-              <div className="mt-4 grid gap-3 grid-cols-2 sm:grid-cols-3 xl:grid-cols-6">
-                {[
-                  { label: "Active Admins", value: (payload.operational_posture as any).admin_count ?? 0, ready: ((payload.operational_posture as any).admin_count ?? 0) > 0 },
-                  { label: "Branches / Counters", value: `${(payload.operational_posture as any).branch_count ?? 0} / ${(payload.operational_posture as any).counter_count ?? 0}`, ready: ((payload.operational_posture as any).counter_count ?? 0) > 0 },
-                  { label: "Chart Accounts", value: (payload.operational_posture as any).active_chart_accounts_count ?? 0, ready: ((payload.operational_posture as any).active_chart_accounts_count ?? 0) > 0 },
-                  { label: "Products / Batches", value: `${(payload.operational_posture as any).product_count ?? 0} / ${(payload.operational_posture as any).batch_count ?? 0}`, ready: ((payload.operational_posture as any).product_count ?? 0) > 0 },
-                  { label: "Tax / GST Profile", value: (payload.operational_posture as any).has_tax_profile ? "Configured" : "Non-GST / Optional", ready: true },
-                  { label: "Print Branding", value: (payload.operational_posture as any).has_print_branding ? "Ready" : "Default", ready: true },
-                ].map((stat, idx) => (
-                  <div key={`${stat.label}-${idx}`} className="rounded-xl border border-border bg-background/80 p-3.5 shadow-sm transition hover:border-primary/40">
-                    <div className="text-xs font-medium text-muted-foreground">{stat.label}</div>
-                    <div className="mt-1.5 text-lg font-semibold text-foreground flex items-center justify-between">
-                      <span>{stat.value}</span>
-                      <span className={`inline-block size-2 rounded-full ${stat.ready ? "bg-emerald-500" : "bg-amber-500"}`} />
+      {/* ── TAB: GO-LIVE CHECKLIST ── */}
+      {activeTab === "checklist" && (
+        <div className="space-y-6 animate-in fade-in duration-300">
+          {checklistData ? (
+            <section className="grid gap-4 md:grid-cols-4">
+              <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+                <div className="text-sm font-medium text-muted-foreground">Checklist Completion</div>
+                <div className="mt-2 text-4xl font-bold text-foreground">{checklistData.percent_complete}%</div>
+              </div>
+              <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+                <div className="text-sm font-medium text-muted-foreground">Total Items</div>
+                <div className="mt-2 text-4xl font-bold text-foreground">{checklistData.items.length}</div>
+              </div>
+              <div className="col-span-2 rounded-xl border border-border bg-card p-5 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-medium text-muted-foreground">Go-live status</div>
+                  <Link href={ROUTES.admin.settingsBusinessSetupDocumentNumbering} className="text-xs font-semibold text-primary hover:underline">Document Numbering →</Link>
+                </div>
+                <div className="mt-2 text-lg font-semibold text-foreground">{checklistData.is_ready_for_go_live ? "Ready for go-live" : "Not ready yet"}</div>
+                <div className="mt-3 grid gap-2 text-xs md:grid-cols-3">
+                  {[
+                    { label: "Invoice numbering", ready: Boolean(checklistData.counts?.invoice_numbering_configured) },
+                    { label: "Receipt numbering", ready: Boolean(checklistData.counts?.receipt_numbering_configured) },
+                    { label: "Direct-sale invoice numbering", ready: Boolean(checklistData.counts?.direct_sale_invoice_numbering_configured) },
+                  ].map((row) => (
+                    <div key={row.label} className={`rounded-lg border px-3 py-2 ${row.ready ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-amber-200 bg-amber-50 text-amber-950"}`}>
+                      <div className="font-semibold">{row.ready ? "Ready" : "Needs setup"}</div>
+                      <div className="mt-0.5 text-muted-foreground">{row.label}</div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </section>
+          ) : checklistQuery.isPending ? (
+            <div className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground shadow-sm">Loading checklist…</div>
           ) : null}
 
-          {/* ── Itemized checklist accordion ── */}
-          <section className="rounded-xl border border-border bg-card shadow-sm">
-            <div className="border-b border-border px-5 py-4 text-sm font-semibold text-foreground">
-              Itemized checklist
-            </div>
-            {checklistQuery.error ? (
-              <div className="px-5 py-4 text-sm text-destructive">
-                {toErr(checklistQuery.error)} —{" "}
-                <button type="button" className="underline" onClick={() => void checklistQuery.refetch()}>Retry</button>
+          {/* Itemized checklist accordion */}
+          {checklistData && (
+            <section className="rounded-xl border border-border bg-card shadow-sm">
+              <div className="border-b border-border px-5 py-4 text-sm font-semibold text-foreground">
+                Itemized checklist
               </div>
-            ) : null}
-            <Accordion type="multiple" defaultValue={["required"]} className="px-3 pb-2">
-              {[
-                { id: "required" as const, label: "Required", items: required },
-                { id: "recommended" as const, label: "Recommended", items: recommended },
-                { id: "optional" as const, label: "Optional", items: optional },
-              ].map((group) => (
-                <AccordionItem key={group.id} value={group.id} className="border-border">
-                  <AccordionTrigger className="py-4 hover:no-underline">
-                    <span className="flex w-full items-center gap-3">
-                      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group.label}</span>
-                      <span className="ml-auto text-[11px] font-normal normal-case text-muted-foreground">{group.items.length} items</span>
-                    </span>
-                  </AccordionTrigger>
-                  <AccordionContent className="pb-3 pt-0 text-foreground">
-                    <div className="divide-y divide-border rounded-xl border border-border">
-                      {group.items.map((item) => (
-                        <div key={item.key} className="flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between">
-                          <div>
-                            <div className="text-sm font-semibold text-foreground">{item.label}</div>
-                            <div className="mt-1 text-sm text-muted-foreground">{item.detail}</div>
+              {checklistQuery.error ? (
+                <div className="px-5 py-4 text-sm text-destructive">
+                  {toErr(checklistQuery.error)} —{" "}
+                  <button type="button" className="underline" onClick={() => void checklistQuery.refetch()}>Retry</button>
+                </div>
+              ) : null}
+              <Accordion type="multiple" defaultValue={["required"]} className="px-3 pb-2">
+                {[
+                  { id: "required" as const, label: "Required for Go-Live", items: required },
+                  { id: "recommended" as const, label: "Recommended", items: recommended },
+                  { id: "optional" as const, label: "Optional", items: optional },
+                ].map((group) => (
+                  <AccordionItem key={group.id} value={group.id} className="border-border">
+                    <AccordionTrigger className="py-4 hover:no-underline">
+                      <span className="flex w-full items-center gap-3">
+                        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group.label}</span>
+                        <span className="ml-auto text-[11px] font-normal normal-case text-muted-foreground">{group.items.length} items</span>
+                      </span>
+                    </AccordionTrigger>
+                    <AccordionContent className="pb-3 pt-0 text-foreground">
+                      <div className="divide-y divide-border rounded-xl border border-border">
+                        {group.items.map((item) => (
+                          <div key={item.key} className="flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between hover:bg-muted/30 transition-colors">
+                            <div>
+                              <div className="text-sm font-semibold text-foreground">{item.label}</div>
+                              <div className="mt-1 text-sm text-muted-foreground">{item.detail}</div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${item.status === "complete" ? "bg-emerald-500/10 text-emerald-600" : item.status === "warning" ? "bg-amber-500/10 text-amber-600" : "bg-rose-500/10 text-rose-600"}`}>{item.status}</span>
+                              {item.route ? <Link href={item.route} className="text-sm font-medium text-primary hover:underline">Open</Link> : null}
+                            </div>
                           </div>
-                          <div className="flex items-center gap-3">
-                            <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${item.status === "complete" ? "bg-emerald-500/10 text-emerald-600" : item.status === "warning" ? "bg-amber-500/10 text-amber-600" : "bg-rose-500/10 text-rose-600"}`}>{item.status}</span>
-                            {item.route ? <Link href={item.route} className="text-sm font-medium text-primary hover:underline">Open</Link> : null}
-                          </div>
-                        </div>
-                      ))}
-                      {group.items.length === 0 ? <div className="px-4 py-3 text-sm text-muted-foreground">No items.</div> : null}
+                        ))}
+                        {group.items.length === 0 ? <div className="px-4 py-3 text-sm text-muted-foreground">No items.</div> : null}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            </section>
+          )}
+
+          {/* Launch checklist items */}
+          {payload && (
+            <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
+              <h2 className="text-base font-semibold text-foreground">Final Launch Verification</h2>
+              <p className="mt-1 text-sm text-muted-foreground">These operational conditions must be met prior to processing live traffic.</p>
+              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {payload.launch_checklist.map((item) => (
+                  <div key={item.key} className="rounded-xl border border-border bg-background px-3 py-3 hover:border-primary/30 transition-colors">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-semibold text-foreground">{item.label}</span>
+                      <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${item.ready ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}>{item.ready ? "READY" : "BLOCKED"}</span>
                     </div>
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
-          </section>
-        </>
-      ) : checklistQuery.isPending ? (
-        <div className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground shadow-sm">Loading checklist…</div>
-      ) : null}
-
-      {/* ── Primary admin actions ── */}
-      <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
-        <h2 className="text-base font-semibold text-foreground">Quick navigation</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Real setup routes only — no placeholder links.</p>
-        <div className="mt-4 grid gap-2 md:grid-cols-3 xl:grid-cols-5">
-          {primaryActions.map((action) => (
-            <Link key={`${action.label}-${action.href}`} href={action.href} className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground hover:border-foreground/30">
-              {action.label}
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      {/* ── Setup chart ── */}
-      {payload ? (
-        <>
-          <SetupChart sections={payload.sections} />
-
-          {/* ── Section cards by category ── */}
-          {groups.map((group) => (
-            <section key={group.key} className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-lg font-semibold text-foreground">{group.label}</h2>
-                <span className="text-sm text-muted-foreground">{group.rows.length} item(s)</span>
-              </div>
-              <div className="grid gap-4 lg:grid-cols-2">
-                {group.rows.map((section) => (
-                  <SectionCard
-                    key={section.key}
-                    section={section}
-                    onSeedPolicies={section.key === "policy_governance" ? () => void runSeedPolicies() : undefined}
-                    policyBusy={section.key === "policy_governance" ? policyBusy : undefined}
-                    policyResult={section.key === "policy_governance" ? policyResult : undefined}
-                  />
+                    <div className="mt-1 text-[11px] text-muted-foreground">Source: {item.source_section.replaceAll("_", " ")}</div>
+                  </div>
                 ))}
               </div>
             </section>
-          ))}
+          )}
+        </div>
+      )}
 
-          {/* ── Launch checklist items ── */}
+      {/* ── TAB: SYSTEM OPS ── */}
+      {activeTab === "ops" && (
+        <div className="space-y-6 animate-in fade-in duration-300">
           <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
-            <h2 className="text-base font-semibold text-foreground">Launch checklist</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Inventory opening stock pending is visible and required as an admin workflow, but stock quantity is never faked.</p>
-            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {payload.launch_checklist.map((item) => (
-                <div key={item.key} className="rounded-xl border border-border bg-background px-3 py-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-semibold text-foreground">{item.label}</span>
-                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.ready ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>{item.ready ? "READY" : "BLOCKED"}</span>
+            <h2 className="text-base font-semibold text-foreground">Quick Action Workbench</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Direct jumps to setup workspaces across the ERP.</p>
+            <div className="mt-5 grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+              {primaryActions.map((action) => (
+                <Link key={`${action.label}-${action.href}`} href={action.href} className="group rounded-xl border border-border bg-background px-4 py-3 text-sm font-semibold text-foreground shadow-sm hover:border-primary hover:shadow-md transition-all">
+                  <div className="flex items-center justify-between">
+                    {action.label}
+                    <span className="text-muted-foreground group-hover:text-primary transition-colors">→</span>
                   </div>
-                  <div className="mt-1 text-xs text-muted-foreground">Source: {item.source_section.replaceAll("_", " ")}</div>
-                </div>
+                </Link>
               ))}
             </div>
           </section>
-        </>
-      ) : null}
 
-      {/* ── Go-live reset (controlled) ── */}
-      <Collapsible defaultOpen={false} className="rounded-xl border border-border bg-card shadow-sm">
-        <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 rounded-xl px-5 py-4 text-left text-sm font-medium text-muted-foreground transition hover:bg-muted/40 [&[data-state=open]>svg]:rotate-180">
-          <span className="flex min-w-0 flex-col gap-0.5">
-            <span className="text-foreground">Go-live reset (controlled)</span>
-            <span className="text-xs font-normal text-muted-foreground">High-impact reset — expand only when you intend to run or review it. Your superuser account (ID + password) is always preserved.</span>
-          </span>
-          <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform duration-200" />
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <div className="space-y-5 border-t border-border px-5 pb-5 pt-4">
-            {/* Superuser preservation notice */}
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-              <div className="font-semibold">Superuser account is always preserved</div>
-              <p className="mt-1">After any reset, the admin user whose username you enter below keeps their account record intact — including their password hash. You will still be able to log in with the same password after reset. Only business data (customers, invoices, payments, stock, journals etc.) is deleted.</p>
-            </div>
+          <Collapsible defaultOpen={false} className="rounded-xl border-2 border-rose-100 bg-card shadow-sm mt-8">
+            <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 rounded-xl px-5 py-4 text-left text-sm font-medium text-muted-foreground transition hover:bg-rose-50/50 [&[data-state=open]>svg]:rotate-180">
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <span className="text-rose-900 font-bold text-base">Danger Zone: Go-live reset (controlled)</span>
+                <span className="text-xs font-normal text-rose-700/80">High-impact reset — expand only when you intend to run or review it. Your superuser account is preserved.</span>
+              </span>
+              <ChevronDown className="size-5 shrink-0 text-rose-900/50 transition-transform duration-200" />
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="space-y-5 border-t border-rose-100 px-5 pb-5 pt-4">
+                <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
+                  <div className="font-bold flex items-center gap-2">⚠️ Superuser account is always preserved</div>
+                  <p className="mt-1 leading-relaxed">After any reset, the admin user whose username you enter below keeps their account record intact — including their password hash. You will still be able to log in with the same password after reset. Only business data (customers, invoices, payments, stock, journals etc.) is deleted.</p>
+                </div>
 
-            <p className="text-sm text-muted-foreground">Deletes business data using the backend reset service while preserving only the chosen admin username and password. Run dry-run first.</p>
+                {resetPreviewError ? (
+                  <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                    {resetPreviewError}
+                    <button type="button" className="ml-3 font-semibold underline underline-offset-2" onClick={() => void refreshResetPreview(resetUsername)}>Retry preview</button>
+                  </div>
+                ) : null}
 
-            {resetPreviewError ? (
-              <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-                {resetPreviewError}
-                <button type="button" className="ml-3 underline" onClick={() => void refreshResetPreview(resetUsername)}>Retry preview</button>
+                <div className="grid gap-4 md:grid-cols-2 mt-4 bg-background p-5 rounded-xl border border-border">
+                  <label className="text-sm font-medium text-foreground">
+                    Preserve username (ID + password kept)
+                    <input
+                      value={resetUsername}
+                      onChange={(e) => { setResetUsername(e.target.value); void refreshResetPreview(e.target.value); }}
+                      className="mt-1.5 w-full rounded-xl border border-input bg-card px-3 py-2 text-sm text-foreground shadow-sm focus:ring-2 focus:ring-primary/20"
+                      placeholder="subidhafurniture"
+                    />
+                  </label>
+                  <label className="text-sm font-medium text-foreground">
+                    Confirm string
+                    <input
+                      value={confirm}
+                      onChange={(e) => setConfirm(e.target.value)}
+                      className="mt-1.5 w-full rounded-xl border border-input bg-card px-3 py-2 text-sm text-foreground shadow-sm focus:border-destructive focus:ring-2 focus:ring-destructive/20"
+                      placeholder={RESET_CONFIRM_PHRASE}
+                    />
+                  </label>
+                  <label className="flex items-center gap-3 text-sm font-medium text-foreground py-2">
+                    <input type="checkbox" className="size-4 rounded border-input text-primary focus:ring-primary/20" checked={dryRun} onChange={(e) => setDryRun(e.target.checked)} disabled={payload?.allow_business_reset === false} />
+                    Dry run (recommended — no data deleted)
+                  </label>
+                  <div className="flex items-center justify-end">
+                    <button
+                      type="button"
+                      onClick={() => void runGoLiveReset()}
+                      disabled={resetRunning || (!dryRun && confirm !== RESET_CONFIRM_PHRASE) || (payload?.allow_business_reset === false && !dryRun)}
+                      className="rounded-xl bg-foreground px-5 py-2.5 text-sm font-bold text-background disabled:opacity-50 transition-colors data-[danger=true]:bg-destructive data-[danger=true]:text-destructive-foreground shadow-sm"
+                      data-danger={!dryRun}
+                    >
+                      {resetRunning ? "Running..." : dryRun ? "Run dry-run reset" : "Execute destructive reset"}
+                    </button>
+                  </div>
+                </div>
+
+                {payload?.allow_business_reset === false && !dryRun && (
+                  <div className="rounded-xl border border-destructive bg-destructive/10 p-4 text-sm text-destructive shadow-sm font-medium">
+                    <span className="font-bold uppercase tracking-wide">Reset Disabled:</span> This environment is marked as production. Destructive resets are permanently disabled. Only dry-runs are permitted.
+                  </div>
+                )}
+
+                {resetResult ? (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm shadow-sm">
+                    <div className="font-bold text-emerald-900">{resetResult.dry_run ? "Dry run complete — no data deleted" : "Reset executed"}</div>
+                    <pre className="mt-3 overflow-x-auto rounded-lg bg-emerald-950/5 p-4 text-xs text-emerald-950 max-h-96">{JSON.stringify(resetResult, null, 2)}</pre>
+                  </div>
+                ) : null}
+
+                {resetPreview ? (
+                  <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+                    <div className="text-sm font-bold text-foreground">Reset footprint preview</div>
+                    <pre className="mt-3 overflow-x-auto rounded-lg bg-muted p-4 text-xs text-muted-foreground max-h-96">{JSON.stringify(resetPreview, null, 2)}</pre>
+                  </div>
+                ) : null}
               </div>
-            ) : null}
-
-            <div className="grid gap-3 md:grid-cols-2">
-              <label className="text-sm text-muted-foreground">
-                Preserve username (ID + password both kept)
-                <input
-                  value={resetUsername}
-                  onChange={(e) => { setResetUsername(e.target.value); void refreshResetPreview(e.target.value); }}
-                  className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground"
-                  placeholder="subidhafurniture"
-                />
-              </label>
-              <label className="text-sm text-muted-foreground">
-                Confirm string
-                <input
-                  value={confirm}
-                  onChange={(e) => setConfirm(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground"
-                  placeholder={RESET_CONFIRM_PHRASE}
-                />
-              </label>
-              <label className="flex items-center gap-3 text-sm text-muted-foreground">
-                <input type="checkbox" checked={dryRun} onChange={(e) => setDryRun(e.target.checked)} />
-                Dry run (recommended — no data deleted)
-              </label>
-              <div className="flex items-center justify-end">
-                <button
-                  type="button"
-                  onClick={() => void runGoLiveReset()}
-                  disabled={resetRunning}
-                  className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
-                >
-                  {resetRunning ? "Running..." : dryRun ? "Run dry-run reset" : "Execute reset"}
-                </button>
-              </div>
-            </div>
-
-            {resetResult ? (
-              <div className="rounded-xl border border-border bg-muted/30 p-4 text-sm">
-                <div className="font-semibold text-foreground">{resetResult.dry_run ? "Dry run complete — no data deleted" : "Reset executed"}</div>
-                <pre className="mt-3 overflow-x-auto rounded-xl bg-muted p-4 text-xs text-foreground">{JSON.stringify(resetResult, null, 2)}</pre>
-              </div>
-            ) : null}
-
-            {resetPreview ? (
-              <div className="rounded-xl border border-border bg-muted/30 p-4">
-                <div className="text-sm font-medium text-muted-foreground">Reset preview</div>
-                <pre className="mt-3 overflow-x-auto rounded-xl bg-muted p-4 text-xs text-foreground">{JSON.stringify(resetPreview, null, 2)}</pre>
-              </div>
-            ) : null}
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
+      )}
     </div>
   );
 }

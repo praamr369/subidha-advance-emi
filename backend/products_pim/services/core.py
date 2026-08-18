@@ -21,9 +21,22 @@ def ensure_pim_product_for_product(product) -> "object | None":
     if not getattr(product, "product_code", ""):
         return None
 
-    # Already linked?
+    # Already linked? Update it to keep it in sync.
     existing = PimProduct.objects.filter(source_product=product).first()
     if existing is not None:
+        needs_save = False
+        if existing.code != product.product_code:
+            existing.code = product.product_code
+            needs_save = True
+        if existing.name != product.name:
+            existing.name = product.name
+            needs_save = True
+        if existing.base_price != product.base_price:
+            existing.base_price = product.base_price
+            needs_save = True
+        
+        if needs_save:
+            existing.save(update_fields=["code", "name", "base_price"])
         return existing
 
     # Link an existing PIM record that matches by code but predates the FK.

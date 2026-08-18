@@ -29,12 +29,15 @@ export type DocumentPrintSettings = {
   document_layout_density?: "COMFORTABLE" | "COMPACT" | string;
   show_watermark?: boolean;
   show_logo?: boolean;
+  show_upi_qr?: boolean;
+  upi_id?: string;
   is_active?: boolean;
   clear_logo?: boolean;
 };
 
 export type BusinessProfile = {
   id?: number;
+  is_legacy_migration?: boolean;
   legal_name: string;
   trade_name?: string;
   business_code?: string;
@@ -102,7 +105,7 @@ export type SetupReadinessSection = { key: string; title: string; status: SetupR
 export type SetupReadinessFinanceAccount = { id: number; name: string; kind: string; branch?: string | null; mapped_chart_account?: { id: number; code: string; name: string; account_type: string; allow_manual_posting?: boolean; is_active?: boolean } | null; posting_ready: boolean; collection_ready: boolean; blocker_reason?: string | null; recommended_action?: string | null };
 export type SetupLaunchChecklistItem = { key: string; label: string; ready: boolean; source_section: string; category?: SetupReadinessCategory };
 export type SetupReadinessCategorySummary = { key: SetupReadinessCategory; label: string; total: number; ready: number; blocked: number; info: number };
-export type SetupReadinessPayload = { summary: { overall_status: SetupReadinessStatus; ready_count: number; warning_count: number; blocker_count: number; next_recommended_action?: string; next_target_route?: string; core_operational_ready?: boolean; category_summary?: Record<string, { total: number; ready: number; blocked: number; info: number }> }; sections: SetupReadinessSection[]; finance_accounts: SetupReadinessFinanceAccount[]; launch_checklist: SetupLaunchChecklistItem[]; categories?: SetupReadinessCategorySummary[]; operational_posture?: Record<string, unknown>; read_only?: boolean; mutation_policy?: string };
+export type SetupReadinessPayload = { allow_business_reset?: boolean; summary: { overall_status: SetupReadinessStatus; ready_count: number; warning_count: number; blocker_count: number; next_recommended_action?: string; next_target_route?: string; core_operational_ready?: boolean; category_summary?: Record<string, { total: number; ready: number; blocked: number; info: number }> }; sections: SetupReadinessSection[]; finance_accounts: SetupReadinessFinanceAccount[]; launch_checklist: SetupLaunchChecklistItem[]; categories?: SetupReadinessCategorySummary[]; operational_posture?: Record<string, unknown>; read_only?: boolean; mutation_policy?: string };
 
 export type DocumentNumberingSequence = { key: string; name: string; series_code: string; document_type?: string; financial_year: string; active_financial_year_code?: string; financial_year_ref?: number | null; financial_year_name?: string; financial_year_date_range?: { start_date?: string; end_date?: string }; workflow_group?: string; doc_kind?: "invoice" | string; description?: string; required_for_go_live?: boolean; configured: boolean; prefix: string; pattern?: string; suffix?: string; reset_policy?: "NEVER" | "YEARLY" | "MONTHLY" | string; next_number: number; padding: number; preview_number?: string | null; next_number_preview: string | null; last_issued_number: string | null; issued_count?: number; max_issued_number?: number; min_safe_next_number?: number; duplicate_count?: number; inactive_duplicate_count?: number; setup_blockers?: string[]; status: "ready" | "needs_setup" | "duplicate_risk" | "blocked" | string; warnings?: string[]; blockers?: string[]; can_edit_prefix?: boolean; can_edit_next_number?: boolean; can_seed_default?: boolean; default_prefix?: string; default_pattern?: string; default_padding?: number };
 export type DocumentNumberingState = { financial_year: string; active_financial_year?: { id?: number; code?: string; name?: string; start_date?: string; end_date?: string } | null; active_financial_year_code?: string; active_financial_year_date_range?: { start_date?: string; end_date?: string }; current_period?: { id?: number; code?: string; name?: string; start_date?: string; end_date?: string; status?: string; is_locked?: boolean } | null; sequences: DocumentNumberingSequence[]; missing_required_profiles?: string[]; inactive_duplicate_profiles?: Record<string, number>; duplicate_issued_number_warnings?: Record<string, number>; setup_blockers?: string[]; checks: Record<string, boolean>; summary?: Record<string, number>; duplicate_issues: Record<string, number>; operator_rules?: string[] };

@@ -50,6 +50,7 @@ def _attribute_schema(pim):
                 "slug": attr.slug,
                 "data_type": attr.data_type,
                 "is_required": getattr(attr, "is_required", False),
+                "is_variant_defining": getattr(attr, "is_variant_defining", False),
                 "options": AttributeOptionSerializer(attr.options.all(), many=True).data,
                 "value_text": getattr(pa, "value_text", "") or "",
                 "value_number": str(pa.value_number) if pa and pa.value_number is not None else None,

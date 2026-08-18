@@ -1,6 +1,11 @@
 import { apiFetch } from "@/lib/api";
 
-export async function getVendorAccountLink(vendorId: number) {
+export interface AccountLink {
+  vendor_id: number;
+  linked_user_id: number | null;
+}
+
+export async function getVendorAccountLink(vendorId: number): Promise<AccountLink> {
   return apiFetch(`/admin/vendors/${vendorId}/account-link/`);
 }
 

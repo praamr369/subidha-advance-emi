@@ -1,4 +1,3 @@
-// @ts-nocheck
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
@@ -235,7 +234,7 @@ function RequestDetailDrawer({ req: initialReq, onUpdated, onClose }: DetailDraw
                   <tr><th className="py-1 pr-3">Item</th><th className="py-1">Qty Requested</th></tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {req.lines.map((l: any, i: any) => (
+                  {req.lines.map((l: PurchaseRequestLine, i: number) => (
                     <tr key={l.id ?? i}>
                       <td className="py-1.5 pr-3">{l.inventory_item_product_name ?? `Item #${l.inventory_item}`}</td>
                       <td className="py-1.5">{l.quantity_requested}</td>

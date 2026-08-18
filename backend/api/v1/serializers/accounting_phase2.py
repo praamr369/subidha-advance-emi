@@ -48,6 +48,7 @@ class BalanceSheetQuerySerializer(serializers.Serializer):
 
 class GeneralLedgerQuerySerializer(AccountingDateRangeQuerySerializer):
     account_id = serializers.IntegerField(min_value=1)
+    category = serializers.CharField(required=False, allow_blank=True)
 
 
 class CashbookQuerySerializer(AccountingDateRangeQuerySerializer):

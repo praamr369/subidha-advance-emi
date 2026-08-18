@@ -8,11 +8,9 @@ import OperationalResizableWorkspace from "./OperationalResizableWorkspace";
 
 import { cn } from "@/lib/utils";
 import { accountingErrorMessage } from "@/components/accounting/shared";
-import { recheckStockNeed } from "@/services/inventory-ops";
+import { recheckStockNeed, type RecheckStockNeedResponse, type StockNeedRow } from "@/services/inventory-ops";
 
-type Row = Record<string, unknown>;
-
-function rowId(row: Row) {
+function rowId(row: StockNeedRow) {
   return String(row.id ?? row.need_no ?? "");
 }
 
@@ -21,7 +19,7 @@ export function StockNeedsOperationalWorkspace({
   count,
   onRefresh,
 }: {
-  rows: Row[];
+  rows: StockNeedRow[];
   count: number;
   onRefresh?: () => void | Promise<void>;
 }) {
@@ -123,9 +121,7 @@ export function StockNeedsOperationalWorkspace({
             setRecheckError(null);
             setRecheckSummary(null);
             try {
-              const payload = (await recheckStockNeed(id)) as {
-                recheck?: { outcome?: string; message?: string };
-              };
+              const payload = (await recheckStockNeed(id)) as RecheckStockNeedResponse;
               const outcome = payload?.recheck?.outcome ?? "";
               const message = (payload?.recheck?.message ?? "").trim();
               setRecheckSummary(

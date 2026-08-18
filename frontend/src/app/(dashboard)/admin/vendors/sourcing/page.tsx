@@ -11,41 +11,13 @@ import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { ROUTES } from "@/lib/routes";
-import { requestVendorQuotesViaSourcing, suggestVendors } from "@/services/vendor-ops";
+import {
+  requestVendorQuotesViaSourcing,
+  suggestVendors,
+  type VendorSuggestionRow,
+} from "@/services/vendor-ops";
 
-type ScoreBreakdown = {
-  location?: string;
-  price_band?: string;
-  quality?: string;
-  delivery?: string;
-  warranty?: string;
-  reliability?: string;
-  catalog_filters_match?: boolean;
-};
-
-type SuggestionRow = {
-  vendor_id: number;
-  vendor_name: string;
-  location_match_level?: string;
-  category_match_indicator?: string;
-  overall_score?: string;
-  suggested_reason?: string;
-  price_score?: string;
-  quality_score?: string;
-  delivery_score?: string;
-  warranty_score?: string;
-  reliability_score?: string;
-  score_breakdown?: ScoreBreakdown;
-  matching_products?: Array<{
-    id: number;
-    product_name: string;
-    vendor_sku?: string;
-    base_quote_price?: string;
-    lead_time_days?: number;
-  }>;
-  latest_quote?: { quoted_price?: string; lead_time_days?: number; status?: string } | null;
-  actions?: { request_quote?: string; open_vendor?: string; compare_quotes?: string };
-};
+type ScoreBreakdown = NonNullable<VendorSuggestionRow["score_breakdown"]>;
 
 function BreakdownVisual({ breakdown }: { breakdown: ScoreBreakdown }) {
   const entries: { label: string; value: string }[] = [
@@ -99,7 +71,7 @@ export default function AdminVendorSourcingPage() {
   const [budgetAmount, setBudgetAmount] = useState("");
   const [includeOutOfArea, setIncludeOutOfArea] = useState(false);
 
-  const [rows, setRows] = useState<SuggestionRow[]>([]);
+  const [rows, setRows] = useState<VendorSuggestionRow[]>([]);
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
   const [picked, setPicked] = useState<Record<number, boolean>>({});
   const [loading, setLoading] = useState(false);
@@ -130,7 +102,8 @@ export default function AdminVendorSourcingPage() {
     setError(null);
     setLoading(true);
     try {
-      const payload: Record<string, unknown> = {
+      const pid = productId.trim();
+      const res = await suggestVendors({
         customer_pincode: pincode.trim(),
         customer_city: city.trim(),
         customer_district: district.trim(),
@@ -141,15 +114,11 @@ export default function AdminVendorSourcingPage() {
         material: material.trim(),
         quantity: quantity.trim() || "1.000",
         include_out_of_area: includeOutOfArea,
-      };
-      const pid = productId.trim();
-      if (pid) payload.product_id = Number(pid);
-      if (requiredBy.trim()) payload.required_by = requiredBy.trim();
-      if (budgetAmount.trim()) payload.budget_amount = budgetAmount.trim();
-
-      const res = (await suggestVendors(payload)) as { results?: SuggestionRow[] };
-      const list = Array.isArray(res.results) ? res.results : [];
-      setRows(list);
+        ...(pid ? { product_id: Number(pid) } : {}),
+        ...(requiredBy.trim() ? { required_by: requiredBy.trim() } : {}),
+        ...(budgetAmount.trim() ? { budget_amount: budgetAmount.trim() } : {}),
+      });
+      setRows(res.results ?? []);
       setExpanded({});
       setPicked({});
     } catch (err) {
@@ -168,28 +137,26 @@ export default function AdminVendorSourcingPage() {
       return;
     }
 
-    const payload: Record<string, unknown> = {
-      source_type: "MANUAL",
-      product_name: productName.trim(),
-      category_text: categoryText.trim(),
-      quantity: quantity.trim() || "1.000",
-      vendor_ids,
-      send_to_vendors: true,
-      customer_pincode: pincode.trim(),
-      customer_city: city.trim(),
-      customer_district: district.trim(),
-      customer_state: state.trim(),
-    };
-    if (requiredBy.trim()) payload.required_by = requiredBy.trim();
-    if (budgetAmount.trim()) payload.budget_amount = budgetAmount.trim();
     const pid = productId.trim();
-    if (pid) payload.product = Number(pid);
-
     setBanner(null);
     setError(null);
     setRqBusy(true);
     try {
-      await requestVendorQuotesViaSourcing(payload);
+      await requestVendorQuotesViaSourcing({
+        source_type: "MANUAL",
+        product_name: productName.trim(),
+        category_text: categoryText.trim(),
+        quantity: quantity.trim() || "1.000",
+        vendor_ids,
+        send_to_vendors: true,
+        customer_pincode: pincode.trim(),
+        customer_city: city.trim(),
+        customer_district: district.trim(),
+        customer_state: state.trim(),
+        ...(requiredBy.trim() ? { required_by: requiredBy.trim() } : {}),
+        ...(budgetAmount.trim() ? { budget_amount: budgetAmount.trim() } : {}),
+        ...(pid ? { product: Number(pid) } : {}),
+      });
       setBanner("Quote request drafted — review Vendor Quotes registry.");
       setPicked({});
     } catch (err) {
@@ -291,8 +258,8 @@ export default function AdminVendorSourcingPage() {
           {rows.map((row) => {
             const lq = row.latest_quote ?? null;
             const expandedRow = !!expanded[row.vendor_id];
-            const bd = row.score_breakdown || {};
-            const actions = row.actions || {};
+            const bd = row.score_breakdown;
+            const actions = row.actions;
             return (
               <div
                 key={row.vendor_id}
@@ -320,13 +287,13 @@ export default function AdminVendorSourcingPage() {
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Link className="h-9 rounded border px-3 text-xs leading-9 underline" href={actions.open_vendor || `${ROUTES.admin.vendors}/${row.vendor_id}`}>
+                    <Link className="h-9 rounded border px-3 text-xs leading-9 underline" href={actions?.open_vendor || `${ROUTES.admin.vendors}/${row.vendor_id}`}>
                       Open vendor
                     </Link>
                     <Link
                       className="h-9 rounded border px-3 text-xs leading-9 underline"
                       href={
-                        typeof actions.request_quote === "string" && actions.request_quote.startsWith("/")
+                        typeof actions?.request_quote === "string" && actions.request_quote.startsWith("/")
                           ? actions.request_quote
                           : `${ROUTES.admin.vendorsQuotes}?prefill_vendor=${row.vendor_id}`
                       }
@@ -339,7 +306,7 @@ export default function AdminVendorSourcingPage() {
                   </div>
                 </div>
 
-                {expandedRow && Object.keys(bd).length ? <BreakdownVisual breakdown={bd as ScoreBreakdown} /> : null}
+                {expandedRow && bd && Object.keys(bd).length ? <BreakdownVisual breakdown={bd} /> : null}
 
                 <div className="mt-3 overflow-auto rounded border">
                   <table className="w-full min-w-[860px] text-left text-xs">

@@ -22,7 +22,7 @@ export default function ModuleSearch({
   const categories = useMemo(() => {
     const cats = new Set<string>();
     const categoryMap: Record<string, string[]> = {
-      "Finance & Collections": ["finance", "accounting", "payables"],
+      "Finance & Collections": ["finance", "accounting"],
       "Billing & Invoicing": ["billing", "contracts", "invoices"],
       "Sales & CRM": ["sales", "crm", "leads"],
       "Inventory & Supply": ["inventory", "warehouse"],
@@ -55,7 +55,7 @@ export default function ModuleSearch({
 
     if (selectedCategory) {
       const categoryMap: Record<string, string[]> = {
-        "Finance & Collections": ["finance", "accounting", "payables"],
+        "Finance & Collections": ["finance", "accounting"],
         "Billing & Invoicing": ["billing", "contracts", "invoices"],
         "Sales & CRM": ["sales", "crm", "leads"],
         "Inventory & Supply": ["inventory", "warehouse"],

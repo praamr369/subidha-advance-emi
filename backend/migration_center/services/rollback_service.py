@@ -24,12 +24,20 @@ from migration_center.models import (
 from migration_center.services.pipeline_service import log_action
 
 
+def _normalize_model_label(model_label: str) -> str:
+    # Backward compatibility for models that were moved across apps
+    # between the time the migration batch was imported and rolled back.
+    if model_label == "subscriptions.Customer":
+        return "customers.Customer"
+    return model_label
+
 def _get_instance(model_label: str, pk: int):
-    model = apps.get_model(model_label)
+    model = apps.get_model(_normalize_model_label(model_label))
     return model.objects.filter(pk=pk).first()
 
 
 def _rollback_created(model_label: str, pk: int) -> tuple[bool, str]:
+    model_label = _normalize_model_label(model_label)
     instance = _get_instance(model_label, pk)
     if instance is None:
         return True, "already deleted"

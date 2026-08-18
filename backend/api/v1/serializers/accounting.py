@@ -792,8 +792,7 @@ class EmployeeProfileSerializer(serializers.ModelSerializer):
             warnings.append("Missing attendance policy")
         if not employee.kyc_verified:
             warnings.append("Missing KYC")
-        if not getattr(employee, "staff_identity", None):
-            warnings.append("Login not created")
+        # Login is optional for admin-controlled attendance — not a readiness warning
         return warnings
 
     def validate(self, attrs):
@@ -1182,6 +1181,9 @@ class SalarySheetSerializer(serializers.ModelSerializer):
     outstanding_amount = serializers.SerializerMethodField()
     lines = SalarySheetLineSerializer(many=True, required=False)
     auto_generate = serializers.BooleanField(write_only=True, required=False, default=False)
+    gross_amount = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True, default=None)
+    deductions_amount = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True, default=None)
+    net_amount = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True, default=None)
 
     class Meta:
         model = SalarySheet
@@ -1231,6 +1233,10 @@ class SalarySheetSerializer(serializers.ModelSerializer):
             SalarySheetStatus.PAID,
         }:
             raise serializers.ValidationError("Posted salary sheets cannot be edited.")
+        # Strip None amounts so upsert_salary_sheet_draft's setdefault can fill them
+        for field in ("gross_amount", "deductions_amount", "net_amount"):
+            if attrs.get(field) is None:
+                attrs.pop(field, None)
         return attrs
 
     def create(self, validated_data):

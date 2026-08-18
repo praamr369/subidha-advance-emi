@@ -44,19 +44,20 @@ class BusinessProfileSerializer(BusinessSetupModelSerializer):
     class Meta:
         model = BusinessProfile
         fields = "__all__"
-        read_only_fields = ("id", "created_at", "updated_at")
+        read_only_fields = ("id", "created_at", "updated_at", "legacy_migration_started_at", "legacy_migration_completed_at", "legacy_migration_completed_by")
 
 
 class DocumentPrintSettingsSerializer(BusinessSetupModelSerializer):
     business_logo_url = serializers.SerializerMethodField()
     authorized_signature_url = serializers.SerializerMethodField()
+    upi_id = serializers.SerializerMethodField()
     clear_logo = serializers.BooleanField(write_only=True, required=False, default=False)
     clear_signature = serializers.BooleanField(write_only=True, required=False, default=False)
 
     class Meta:
         model = DocumentPrintSettings
         fields = "__all__"
-        read_only_fields = ("id", "created_at", "updated_at", "business_logo_url", "authorized_signature_url")
+        read_only_fields = ("id", "created_at", "updated_at", "business_logo_url", "authorized_signature_url", "upi_id")
         extra_kwargs = {
             "business_logo": {"required": False, "allow_null": True},
             "authorized_signature": {"required": False, "allow_null": True},
@@ -80,6 +81,11 @@ class DocumentPrintSettingsSerializer(BusinessSetupModelSerializer):
 
     def get_authorized_signature_url(self, instance):
         return self._image_url(getattr(instance, "authorized_signature", None))
+
+    def get_upi_id(self, instance):
+        if instance.business_profile and instance.business_profile.upi_id:
+            return instance.business_profile.upi_id
+        return ""
 
     def _validate_image(self, value, max_bytes, label):
         if not value:

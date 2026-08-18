@@ -1,136 +1,102 @@
 """
 Stock on Hand Enterprise Service
 
-Provides real-time KPI dashboard data for warehouse command room:
-- Physical quantity summary
-- Reserved quantity summary
-- Available quantity (physical - reserved)
-- Critical shortages (qty <= reorder point)
-- Total inventory value
-
-Uses database-level aggregation for 100% accuracy on large datasets.
+InventoryLot → inventory_item (InventoryItem) → product (Product)
+Key field corrections vs. old service:
+  - InventoryLot.quantity        → quantity_on_hand
+  - InventoryLot.product_id      → inventory_item__product_id
+  - Product.inventory_status     → InventoryItem.is_active
+  - Product.reorder_point        → InventoryItem.reorder_level_qty
 """
 
-from django.db.models import Count, Q, Sum, F, DecimalField, Case, When, Value
-from django.db.models.functions import Coalesce
 from decimal import Decimal
-from inventory.models import InventoryLot, Product
+
+from django.db.models import DecimalField, F, Q, Sum
+from django.db.models.functions import Coalesce
+
+from inventory.models import InventoryItem, InventoryLot
+
+
+def _critical_qs():
+    """
+    InventoryItems whose total quantity_on_hand across active lots ≤ reorder_level_qty.
+    Returns an annotated queryset ordered worst-first.
+    """
+    return (
+        InventoryItem.objects.filter(is_active=True)
+        .annotate(
+            physical_qty=Coalesce(
+                Sum(
+                    "lots__quantity_on_hand",
+                    filter=Q(lots__status="ACTIVE"),
+                ),
+                Decimal("0"),
+                output_field=DecimalField(),
+            ),
+        )
+        .filter(physical_qty__lte=F("reorder_level_qty"))
+        .select_related("product")
+        .order_by(F("reorder_level_qty") - F("physical_qty"))  # worst shortage first
+    )
 
 
 def build_stock_on_hand_summary():
     """
-    Build KPI summary for stock on hand dashboard.
-
-    Returns:
-        {
-            'summary': {
-                'total_physical_qty': Decimal,
-                'total_reserved_qty': Decimal,
-                'total_available_qty': Decimal,
-                'critical_shortage_count': int,
-                'total_value': Decimal,
-            },
-            'critical_shortages': [
-                {
-                    'product_id': int,
-                    'product_code': str,
-                    'product_name': str,
-                    'sku': str,
-                    'physical_qty': Decimal,
-                    'reserved_qty': Decimal,
-                    'reorder_point': Decimal,
-                    'shortage_qty': Decimal,
-                    'last_movement': datetime,
-                },
-                ...
-            ]
-        }
+    KPI summary + full critical-shortage list for the warehouse command room.
     """
-    # Aggregate physical quantities by product
-    physical_qs = (
-        InventoryLot.objects
-        .filter(status="ACTIVE")
-        .values("product_id")
-        .annotate(
-            physical_qty=Coalesce(Sum("quantity"), Decimal("0"), output_field=DecimalField()),
-        )
-    )
-
-    physical_by_product = {item["product_id"]: item["physical_qty"] for item in physical_qs}
-
-    # Calculate summary totals
-    total_physical = Coalesce(
-        Sum("quantity", filter=Q(status="ACTIVE")),
-        Decimal("0"),
-        output_field=DecimalField(),
-    )
-
-    # Aggregate reserved quantities (would come from StockReservation model)
-    # For now, we'll assume this is tracked separately
-    total_reserved = Decimal("0")  # TODO: Integrate with StockReservation model
-    total_available = total_physical - total_reserved
-
-    # Calculate critical shortages
-    critical_qs = (
-        Product.objects
-        .filter(inventory_status="ACTIVE")
-        .annotate(
-            physical_qty=Coalesce(
-                Sum("inventorylot__quantity", filter=Q(inventorylot__status="ACTIVE")),
+    # Total physical stock across all active lots
+    total_physical = (
+        InventoryLot.objects.filter(status="ACTIVE")
+        .aggregate(
+            total=Coalesce(
+                Sum("quantity_on_hand"),
                 Decimal("0"),
                 output_field=DecimalField(),
-            ),
-            reserved_qty=Decimal("0"),  # TODO: Integrate with StockReservation
-        )
-        .filter(physical_qty__lte=F("reorder_point"))
-        .values(
-            "id",
-            "product_code",
-            "name",
-            "sku",
-            "physical_qty",
-            "reserved_qty",
-            "reorder_point",
-        )
-        .annotate(
-            shortage_qty=F("reorder_point") - F("physical_qty"),
-        )
+            )
+        )["total"]
     )
 
-    critical_shortages = []
-    for item in critical_qs:
-        critical_shortages.append({
-            "product_id": item["id"],
-            "product_code": item["product_code"],
-            "product_name": item["name"],
-            "sku": item["sku"] or "",
-            "physical_qty": item["physical_qty"],
-            "reserved_qty": item["reserved_qty"],
-            "reorder_point": item["reorder_point"] or Decimal("0"),
-            "shortage_qty": item["shortage_qty"],
-        })
+    # StockReservation integration is a future phase; treat reserved as 0 for now
+    total_reserved = Decimal("0")
+    total_available = total_physical - total_reserved
 
-    # Calculate total inventory value (base_price × physical quantity)
+    # Total inventory value: standard_unit_cost × active quantity per item
     value_qs = (
-        InventoryLot.objects
-        .filter(status="ACTIVE")
-        .select_related("product")
-        .values("product__base_price")
-        .annotate(qty=Sum("quantity"))
+        InventoryLot.objects.filter(status="ACTIVE")
+        .select_related("inventory_item")
+        .values("inventory_item__standard_unit_cost")
+        .annotate(qty=Sum("quantity_on_hand"))
     )
-
     total_value = Decimal("0")
-    for item in value_qs:
-        if item["product__base_price"]:
-            total_value += (item["product__base_price"] * (item["qty"] or Decimal("0")))
+    for row in value_qs:
+        cost = row["inventory_item__standard_unit_cost"] or Decimal("0")
+        qty = row["qty"] or Decimal("0")
+        total_value += cost * qty
+
+    # Critical shortages list
+    critical_shortages = []
+    for item in _critical_qs():
+        shortage = (item.reorder_level_qty or Decimal("0")) - item.physical_qty
+        critical_shortages.append(
+            {
+                "product_id": item.product_id,
+                "product_code": item.product.product_code if item.product else "",
+                "product_name": item.product.name if item.product else item.inventory_code,
+                "sku": item.sku or "",
+                "physical_qty": str(item.physical_qty),
+                "reserved_qty": "0",
+                "reorder_point": str(item.reorder_level_qty or Decimal("0")),
+                "shortage_qty": str(shortage),
+            }
+        )
 
     return {
         "summary": {
-            "total_physical_qty": total_physical,
-            "total_reserved_qty": total_reserved,
-            "total_available_qty": total_available,
+            "total_physical_qty": str(total_physical),
+            "total_reserved_qty": "0",
+            "total_available_qty": str(total_available),
             "critical_shortage_count": len(critical_shortages),
-            "total_value": total_value,
+            "total_value": str(total_value),
         },
         "critical_shortages": critical_shortages,
     }
@@ -138,65 +104,30 @@ def build_stock_on_hand_summary():
 
 def get_critical_shortages(page: int = 1, page_size: int = 50):
     """
-    Get paginated critical shortages with search/filter support.
-
-    Returns:
-        {
-            'count': int,
-            'page': int,
-            'page_size': int,
-            'num_pages': int,
-            'results': [ critical shortage items ]
-        }
+    Paginated critical shortages for the workbench table.
     """
-    critical_qs = (
-        Product.objects
-        .filter(inventory_status="ACTIVE")
-        .annotate(
-            physical_qty=Coalesce(
-                Sum("inventorylot__quantity", filter=Q(inventorylot__status="ACTIVE")),
-                Decimal("0"),
-                output_field=DecimalField(),
-            ),
-            reserved_qty=Decimal("0"),
-        )
-        .filter(physical_qty__lte=F("reorder_point"))
-        .values(
-            "id",
-            "product_code",
-            "name",
-            "sku",
-            "physical_qty",
-            "reserved_qty",
-            "reorder_point",
-        )
-        .annotate(
-            shortage_qty=F("reorder_point") - F("physical_qty"),
-        )
-        .order_by("-shortage_qty")  # Worst shortages first
-    )
+    qs = _critical_qs()
+    total_count = qs.count()
+    num_pages = max(1, (total_count + page_size - 1) // page_size) if total_count else 0
+    page = max(1, min(page, num_pages)) if num_pages else 1
+    start = (page - 1) * page_size
+    items = qs[start : start + page_size]
 
-    total_count = critical_qs.count()
-    num_pages = (total_count + page_size - 1) // page_size if total_count else 0
-    page = min(page, num_pages) if num_pages > 0 else 1
-    start_index = (page - 1) * page_size
-    end_index = start_index + page_size
-
-    paginated = critical_qs[start_index:end_index]
-
-    results = [
-        {
-            "product_id": item["id"],
-            "product_code": item["product_code"],
-            "product_name": item["name"],
-            "sku": item["sku"] or "",
-            "physical_qty": item["physical_qty"],
-            "reserved_qty": item["reserved_qty"],
-            "reorder_point": item["reorder_point"] or Decimal("0"),
-            "shortage_qty": item["shortage_qty"],
-        }
-        for item in paginated
-    ]
+    results = []
+    for item in items:
+        shortage = (item.reorder_level_qty or Decimal("0")) - item.physical_qty
+        results.append(
+            {
+                "product_id": item.product_id,
+                "product_code": item.product.product_code if item.product else "",
+                "product_name": item.product.name if item.product else item.inventory_code,
+                "sku": item.sku or "",
+                "physical_qty": str(item.physical_qty),
+                "reserved_qty": "0",
+                "reorder_point": str(item.reorder_level_qty or Decimal("0")),
+                "shortage_qty": str(shortage),
+            }
+        )
 
     return {
         "count": total_count,

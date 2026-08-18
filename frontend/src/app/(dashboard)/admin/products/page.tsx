@@ -3,8 +3,8 @@ import { formatRupee } from "@/lib/utils/currency";
 
 import Link from "next/link";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Download, RefreshCw, Search, SlidersHorizontal, X, Layers, ExternalLink } from "lucide-react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { Download, RefreshCw, Search, SlidersHorizontal, X, Layers, ExternalLink, ChevronRight, ChevronDown, GitBranch, CheckCircle2, AlertCircle, Star, Package2 } from "lucide-react";
 import { pimService, type PimProduct, type PimCategory } from "@/services/pim";
 
 import ProductQuickActions from "@/components/admin/products/ProductQuickActions";
@@ -132,16 +132,187 @@ function activeFilterCount(filters: FilterState): number {
 
 // ── PIM Quick Panel (inline within products page) ────────────────────────────
 
+interface PimTreeNode {
+  product: PimProduct;
+  children: PimProduct[];
+}
+
+function buildPimTree(products: PimProduct[]): { roots: PimTreeNode[]; orphanChildren: PimProduct[] } {
+  const byId = new Map(products.map((p) => [p.id, p]));
+  const childrenByParent = new Map<number, PimProduct[]>();
+  const rootProducts: PimProduct[] = [];
+  const orphanChildren: PimProduct[] = [];
+
+  for (const p of products) {
+    if (p.parent_id) {
+      if (byId.has(p.parent_id)) {
+        const arr = childrenByParent.get(p.parent_id) ?? [];
+        arr.push(p);
+        childrenByParent.set(p.parent_id, arr);
+      } else {
+        // Parent not in current result set (filtered out) — show as orphan root
+        orphanChildren.push(p);
+      }
+    } else {
+      rootProducts.push(p);
+    }
+  }
+
+  const roots: PimTreeNode[] = rootProducts.map((p) => ({
+    product: p,
+    children: (childrenByParent.get(p.id) ?? []).sort((a, b) => a.code.localeCompare(b.code)),
+  }));
+
+  return { roots, orphanChildren };
+}
+
+function PimProductRow({
+  p,
+  isChild = false,
+  expanded,
+  childCount,
+  onToggle,
+}: {
+  p: PimProduct;
+  isChild?: boolean;
+  expanded?: boolean;
+  childCount?: number;
+  onToggle?: () => void;
+}) {
+  const hasChildren = !isChild && (childCount ?? 0) > 0;
+
+  return (
+    <tr className={`hover:bg-muted/30 transition-colors ${isChild ? "bg-muted/20" : ""}`}>
+      {/* Code + expand toggle */}
+      <td className="px-4 py-2.5">
+        <div className={`flex items-center gap-1.5 ${isChild ? "pl-6" : ""}`}>
+          {isChild ? (
+            <GitBranch className="h-3 w-3 text-muted-foreground/60 shrink-0" />
+          ) : hasChildren ? (
+            <button
+              onClick={onToggle}
+              className="p-0.5 rounded hover:bg-muted text-muted-foreground"
+            >
+              {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+            </button>
+          ) : (
+            <span className="w-5" />
+          )}
+          <span className="font-mono text-xs text-muted-foreground">{p.code}</span>
+        </div>
+      </td>
+
+      {/* Name + badges */}
+      <td className="px-4 py-2.5">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-medium text-sm">{p.name}</span>
+          {!isChild && hasChildren && (
+            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-full px-1.5 py-0.5">
+              Base Product
+            </span>
+          )}
+          {isChild && (
+            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-violet-700 bg-violet-50 border border-violet-200 rounded-full px-1.5 py-0.5">
+              Variant SKU
+            </span>
+          )}
+        </div>
+        {isChild && p.parent_code && (
+          <p className="text-[10px] text-muted-foreground mt-0.5">
+            Under: <span className="font-mono">{p.parent_code}</span>
+          </p>
+        )}
+      </td>
+
+      {/* Category */}
+      <td className="px-4 py-2.5 text-muted-foreground text-xs">
+        {p.category_name ? (
+          <>{p.category_name}{p.subcategory_name ? ` / ${p.subcategory_name}` : ""}</>
+        ) : (
+          <span className="text-muted-foreground/50 italic text-[11px]">—</span>
+        )}
+      </td>
+
+      {/* Price */}
+      <td className="px-4 py-2.5 text-right tabular-nums text-sm">
+        {formatRupee(Number(p.base_price))}
+      </td>
+
+      {/* SKUs (variants) */}
+      <td className="px-4 py-2.5 text-center">
+        {isChild ? (
+          <span className="text-xs text-muted-foreground/40">—</span>
+        ) : (
+          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-semibold">
+            {p.variant_count ?? 0}
+          </span>
+        )}
+      </td>
+
+      {/* Status — variant SKUs inherit their blueprint's publish status */}
+      <td className="px-4 py-2.5 text-center">
+        {(() => {
+          const effectivePublished = isChild ? p.parent_is_published : p.is_published;
+          if (effectivePublished) {
+            return (
+              <span className="text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5">
+                Published
+              </span>
+            );
+          }
+          return (
+            <span className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+              Draft
+            </span>
+          );
+        })()}
+      </td>
+
+      {/* Manage */}
+      <td className="px-4 py-2.5">
+        <div className="flex flex-col gap-1.5 items-start">
+          <Link
+            href={`/admin/pim/products/${p.id}/edit`}
+            className="inline-flex items-center gap-1 text-primary text-xs hover:underline font-medium"
+          >
+            PIM Editor <ExternalLink className="h-3 w-3" />
+          </Link>
+          {p.code && (
+            <Link
+              href={`/admin/products?q=${encodeURIComponent(p.code)}`}
+              className="inline-flex items-center gap-1 text-violet-600 dark:text-violet-400 text-xs hover:underline font-medium"
+            >
+              View Register <ChevronRight className="h-3 w-3" />
+            </Link>
+          )}
+          {!isChild && p.is_published && (
+            <Link
+              href={`/admin/subscriptions/advance-emi/create?product_code=${encodeURIComponent(p.code)}`}
+              className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 text-xs hover:underline font-medium"
+            >
+              <Star className="h-2.5 w-2.5" /> New Contract
+            </Link>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 function PimPanel() {
   const [pimProducts, setPimProducts] = useState<PimProduct[]>([]);
   const [pimCategories, setPimCategories] = useState<PimCategory[]>([]);
   const [pimLoading, setPimLoading] = useState(true);
   const [pimSearch, setPimSearch] = useState("");
   const [pimCat, setPimCat] = useState<number | "">("");
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+  const [relinking, setRelinking] = useState(false);
+  const [relinkResult, setRelinkResult] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadPimProducts = useCallback(() => {
+    setPimLoading(true);
     Promise.all([
-      pimService.getProducts({ search: pimSearch || undefined, category: pimCat || undefined }).then(r => r.results),
+      pimService.getProducts({ search: pimSearch || undefined, category: pimCat || undefined, page_size: 200 }).then(r => r.results),
       pimService.getCategories(),
     ]).then(([prods, cats]) => {
       setPimProducts(Array.isArray(prods) ? prods : []);
@@ -149,18 +320,75 @@ function PimPanel() {
     }).catch(() => {}).finally(() => setPimLoading(false));
   }, [pimSearch, pimCat]);
 
+  useEffect(() => { loadPimProducts(); }, [loadPimProducts]);
+
+  const handleRelink = useCallback(async () => {
+    setRelinking(true);
+    setRelinkResult(null);
+    try {
+      const [relink, repair] = await Promise.all([
+        pimService.relinkParents(),
+        pimService.repairVariantCategories(),
+      ]);
+      const parts = [relink.message];
+      if (repair.count > 0) parts.push(repair.message);
+      setRelinkResult(parts.join(" · "));
+      loadPimProducts();
+    } catch {
+      setRelinkResult("Relink failed");
+    } finally {
+      setRelinking(false);
+    }
+  }, [loadPimProducts]);
+
+  const { roots, orphanChildren } = useMemo(() => buildPimTree(pimProducts), [pimProducts]);
+
+  const toggleExpand = useCallback((id: number) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const baseCount = roots.length;
+  const variantSkuCount = pimProducts.filter((p) => !!p.parent_id).length;
+
   return (
     <div className="space-y-4">
       {/* PIM header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <p className="text-sm text-muted-foreground">
-            Enterprise PIM — used strictly for managing category-specific attributes, SKU variants, and dynamic specs for existing base products.
-          </p>
+      <div className="flex items-start justify-between flex-wrap gap-4">
+        <div className="flex gap-4 flex-wrap">
+          {[
+            { label: "Blueprints", value: baseCount },
+            { label: "Variant SKUs", value: variantSkuCount },
+            { label: "Published", value: pimProducts.filter((p) => p.is_published && !p.parent_id).length },
+            { label: "Draft", value: pimProducts.filter((p) => !p.is_published && !p.parent_id).length },
+          ].map((m) => (
+            <div key={m.label} className="rounded-xl border bg-background px-4 py-2.5 min-w-[90px]">
+              <div className="text-lg font-bold tabular-nums">{m.value}</div>
+              <div className="text-xs text-muted-foreground">{m.label}</div>
+            </div>
+          ))}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center flex-wrap">
+          {relinkResult && (
+            <span className="text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-2 py-1">{relinkResult}</span>
+          )}
+          <button
+            type="button"
+            onClick={handleRelink}
+            disabled={relinking}
+            className="inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm hover:bg-muted disabled:opacity-50"
+          >
+            <GitBranch className="h-4 w-4" />
+            {relinking ? "Relinking…" : "Relink Orphans"}
+          </button>
           <Link href="/admin/pim/categories" className="inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm hover:bg-muted">
             Categories
+          </Link>
+          <Link href="/admin/pim/products" className="inline-flex items-center gap-1.5 rounded-xl bg-primary text-primary-foreground px-3 py-2 text-sm hover:opacity-90">
+            <Layers className="h-4 w-4" /> Full PIM
           </Link>
         </div>
       </div>
@@ -186,7 +414,7 @@ function PimPanel() {
         </select>
       </div>
 
-      {/* PIM product table */}
+      {/* PIM product hierarchical table */}
       <div className="rounded-xl border overflow-x-auto">
         {pimLoading ? (
           <div className="p-8 text-center text-sm text-muted-foreground">Loading PIM products…</div>
@@ -199,45 +427,48 @@ function PimPanel() {
             <thead className="bg-muted/50 border-b">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Code</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Name</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Name / Type</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Category</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">Price</th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground">SKUs</th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground">Status</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground">Manage</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y">
-              {pimProducts.map((p) => (
-                <tr key={p.id} className="hover:bg-muted/30 transition-colors">
-                  <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">{p.code}</td>
-                  <td className="px-4 py-2.5 font-medium">{p.name}</td>
-                  <td className="px-4 py-2.5 text-muted-foreground text-xs">{p.category_name}{p.subcategory_name ? ` / ${p.subcategory_name}` : ""}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums">{formatRupee(Number(p.base_price))}</td>
-                  <td className="px-4 py-2.5 text-center">
-                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-semibold">{p.variant_count ?? 0}</span>
-                  </td>
-                  <td className="px-4 py-2.5 text-center">
-                    {p.is_published
-                      ? <span className="text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5">Published</span>
-                      : <span className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">Draft</span>
-                    }
-                  </td>
-                  <td className="px-4 py-2.5 text-center">
-                    <Link href={`/admin/pim/products/${p.id}/edit`} className="inline-flex items-center gap-1 text-primary text-xs hover:underline font-medium">
-                      Edit <ExternalLink className="h-3 w-3" />
-                    </Link>
-                  </td>
-                </tr>
+              {roots.map((node) => {
+                const isExpanded = expandedIds.has(node.product.id);
+                return (
+                  <Fragment key={node.product.id}>
+                    <PimProductRow
+                      p={node.product}
+                      expanded={isExpanded}
+                      childCount={node.children.length}
+                      onToggle={() => toggleExpand(node.product.id)}
+                    />
+                    {isExpanded && node.children.map((child) => (
+                      <PimProductRow key={child.id} p={child} isChild />
+                    ))}
+                  </Fragment>
+                );
+              })}
+              {/* Orphan children — parent filtered out but child visible */}
+              {orphanChildren.map((p) => (
+                <PimProductRow key={p.id} p={p} isChild />
               ))}
             </tbody>
           </table>
         )}
       </div>
 
-      <div className="rounded-xl border border-blue-200 bg-blue-50 dark:bg-blue-900/10 dark:border-blue-800 px-4 py-3 text-xs text-blue-700 dark:text-blue-300">
-        <strong>PIM products</strong> support dynamic category attributes (bed size/material, fridge liters, AC tons, etc.) and per-SKU variants.
-        Create all products in the main register above, then sync them here to enrich them with attributes and descriptions.
+      <div className="rounded-xl border border-blue-200 bg-blue-50 dark:bg-blue-900/10 dark:border-blue-800 px-4 py-3 text-xs text-blue-700 dark:text-blue-300 flex items-start gap-3">
+        <Layers className="h-4 w-4 shrink-0 mt-0.5" />
+        <div>
+          <strong>Blueprint</strong> = base product with attribute schema and variant generator.
+          <strong className="ml-1">Variant SKUs</strong> inherit the base product&apos;s category and are managed from the base product&apos;s PIM editor.
+          Publish a blueprint to unlock all operations (subscription, direct sale, rent, lease).
+          <span className="ml-2">· Click <ChevronRight className="inline h-3 w-3" /> to expand variant SKUs inline.</span>
+        </div>
       </div>
     </div>
   );
@@ -256,6 +487,8 @@ export default function AdminProductsPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  // Subscription products: hide variant SKUs by default (they're managed via PIM base product)
+  const [showVariantSkus, setShowVariantSkus] = useState(false);
 
   // Filters live in URL — read them on mount and sync on change
   const [filters, setFilters] = useState<FilterState>(() => filtersFromParams(searchParams));
@@ -298,6 +531,7 @@ export default function AdminProductsPage() {
         active: filters.active || undefined,
         inventory: filters.inventory || undefined,
         image_status: filters.image_status || undefined,
+        exclude_variant_skus: showVariantSkus ? "false" : "true",
         page,
         page_size: pageSize,
       });
@@ -310,7 +544,7 @@ export default function AdminProductsPage() {
       if (mode === "initial") setLoading(false);
       else setRefreshing(false);
     }
-  }, [filters, page, pageSize]);
+  }, [filters, page, pageSize, showVariantSkus]);
 
   useEffect(() => { void loadPage("initial"); }, [loadPage]);
 
@@ -376,32 +610,37 @@ export default function AdminProductsPage() {
       title: "Product",
       sortable: true,
       render: (row) => (
-        <div className="space-y-1.5 min-w-[180px]">
-          <div className="font-medium text-foreground leading-tight">{row.name}</div>
-          <div className="text-xs text-muted-foreground">{row.product_code ?? `#${row.id}`} {row.sku ? `· SKU ${row.sku}` : "· SKU pending"}</div>
-          <div className="flex flex-wrap gap-1 mt-1">
+        <div className="space-y-1.5 min-w-[200px]">
+          <div className="font-semibold text-foreground leading-tight">{row.name}</div>
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground flex-wrap">
+            <span className="font-mono">{row.product_code ?? `#${row.id}`}</span>
+            {row.sku && <><span>·</span><span className="font-mono">SKU {row.sku}</span></>}
+          </div>
+          <div className="flex flex-wrap gap-1 mt-0.5">
             <ItemTypeBadge value={row.item_type} />
             <StockTypeBadge value={row.stock_type} />
           </div>
-          <div className="text-xs text-muted-foreground">{formatDateTime(row.created_at)}</div>
+          <div className="text-[10px] text-muted-foreground/60">{formatDateTime(row.created_at)}</div>
         </div>
       ),
     },
     {
       key: "category",
-      title: "Catalog",
+      title: "Category",
       render: (row) => (
         <div className="space-y-1 min-w-[130px]">
-          <div className="text-sm font-medium text-foreground">{label(row.category || row.category_master_name, "Uncategorized")}</div>
-          <div className="text-xs text-muted-foreground">{label(row.subcategory || row.subcategory_master_name, "No subcategory")}</div>
+          <div className="text-sm font-medium">{label(row.category || row.category_master_name, "—")}</div>
+          {(row.subcategory || row.subcategory_master_name) && (
+            <div className="text-xs text-muted-foreground">{label(row.subcategory || row.subcategory_master_name, "")}</div>
+          )}
           <div className="text-xs text-muted-foreground">{row.unit_of_measure || "PCS"}</div>
+          {row.description ? (
+            <div className="text-[10px] text-muted-foreground/70 max-w-[160px] truncate">
+              {row.description.slice(0, 60)}
+            </div>
+          ) : null}
         </div>
       ),
-    },
-    {
-      key: "description",
-      title: "Description",
-      render: (row) => <div className="max-w-xs text-xs text-muted-foreground">{truncate(row.description)}</div>,
     },
     {
       key: "base_price",
@@ -410,10 +649,10 @@ export default function AdminProductsPage() {
       sortable: true,
       sortAccessor: (row) => Number(row.base_price || 0),
       render: (row) => (
-        <div className="text-right space-y-0.5">
-          <div className="font-semibold text-foreground">{formatRupee(row.base_price)}</div>
-          {row.hsn_sac_code ? <div className="text-xs text-muted-foreground">HSN {row.hsn_sac_code}</div> : null}
-          {row.gst_rate != null ? <div className="text-xs text-muted-foreground">GST {row.gst_rate}%</div> : null}
+        <div className="text-right space-y-0.5 min-w-[90px]">
+          <div className="font-bold text-foreground">{formatRupee(row.base_price)}</div>
+          {row.hsn_sac_code ? <div className="text-[10px] text-muted-foreground">HSN {row.hsn_sac_code}</div> : null}
+          {row.gst_rate != null ? <div className="text-[10px] text-muted-foreground">GST {row.gst_rate}%</div> : null}
         </div>
       ),
     },
@@ -421,11 +660,20 @@ export default function AdminProductsPage() {
       key: "capabilities",
       title: "Modes",
       render: (row) => (
-        <div className="flex flex-wrap gap-1.5 min-w-[120px]">
-          <ERPStatusBadge status={row.is_emi_enabled !== false ? "AVAILABLE" : "PENDING"} label="EMI" />
-          <ERPStatusBadge status={row.is_direct_sale_enabled !== false ? "AVAILABLE" : "PENDING"} label="Direct" />
-          <ERPStatusBadge status={row.is_rent_enabled ? "AVAILABLE" : "PENDING"} label="Rent" />
-          <ERPStatusBadge status={row.is_lease_enabled ? "AVAILABLE" : "PENDING"} label="Lease" />
+        <div className="flex flex-col gap-1 min-w-[90px]">
+          {[
+            { label: "EMI", ok: row.is_emi_enabled !== false },
+            { label: "Direct", ok: row.is_direct_sale_enabled !== false },
+            { label: "Rent", ok: Boolean(row.is_rent_enabled) },
+            { label: "Lease", ok: Boolean(row.is_lease_enabled) },
+          ].map(({ label: lbl, ok }) => (
+            <div key={lbl} className="flex items-center gap-1.5">
+              {ok
+                ? <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
+                : <AlertCircle className="h-3 w-3 text-muted-foreground/40 shrink-0" />}
+              <span className={`text-xs ${ok ? "text-foreground font-medium" : "text-muted-foreground/50"}`}>{lbl}</span>
+            </div>
+          ))}
         </div>
       ),
     },
@@ -433,10 +681,25 @@ export default function AdminProductsPage() {
       key: "readiness",
       title: "Readiness",
       render: (row) => (
-        <div className="flex flex-wrap gap-1.5 min-w-[160px]">
-          <ERPStatusBadge status={row.inventory_ready ? "AVAILABLE" : "PENDING"} label={row.inventory_ready ? "Inventory ✓" : "Stock pending"} />
-          <ERPStatusBadge status={row.image ? "AVAILABLE" : "NOT_PROVIDED"} label={row.image ? "Image ✓" : "No image"} />
-          <ERPStatusBadge status={row.sku ? "AVAILABLE" : "PENDING"} label={row.sku ? "SKU ✓" : "SKU pending"} />
+        <div className="space-y-1.5 min-w-[130px]">
+          <div className="flex items-center gap-1.5">
+            {row.inventory_ready
+              ? <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
+              : <AlertCircle className="h-3 w-3 text-amber-500 shrink-0" />}
+            <span className="text-xs">{row.inventory_ready ? "Inventory ready" : "Stock pending"}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {row.image
+              ? <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
+              : <AlertCircle className="h-3 w-3 text-muted-foreground/40 shrink-0" />}
+            <span className={`text-xs ${row.image ? "" : "text-muted-foreground/50"}`}>{row.image ? "Image ✓" : "No image"}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {row.sku
+              ? <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
+              : <AlertCircle className="h-3 w-3 text-muted-foreground/40 shrink-0" />}
+            <span className={`text-xs font-mono ${row.sku ? "" : "text-muted-foreground/50"}`}>{row.sku || "SKU pending"}</span>
+          </div>
         </div>
       ),
     },
@@ -447,9 +710,9 @@ export default function AdminProductsPage() {
 
   return (
     <ERPPageShell
-      eyebrow="Inventory"
-      title="Product Register"
-      subtitle="Product operations register — finished goods, raw materials, accessories, services and add-ons. Filters are cached in the URL and survive page refresh."
+      eyebrow="Products"
+      title="Products & Blueprints"
+      subtitle="Product Register for all operations — create blueprints in PIM, publish to unlock subscriptions, inventory, and sales. Filters are URL-cached."
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Products" }]}
       actions={[
         { href: "/admin/products/create", label: "Create Product", variant: "primary" },
@@ -474,21 +737,21 @@ export default function AdminProductsPage() {
           { label: "Image missing", value: summary.image_missing, detail: "Catalog cleanup needed" },
         ]} />
 
-        {/* Tab switcher — Subscription Products vs PIM Products */}
+        {/* Tab switcher */}
         <div className="flex gap-1 p-1 rounded-xl bg-muted w-fit">
           <button
             type="button"
             onClick={() => setActiveTab("subscription")}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === "subscription" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === "subscription" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
           >
-            Subscription Products
+            <Package2 className="h-4 w-4" /> Product Register
           </button>
           <button
             type="button"
             onClick={() => setActiveTab("pim")}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 ${activeTab === "pim" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === "pim" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
           >
-            <Layers className="h-4 w-4" /> PIM Products
+            <Layers className="h-4 w-4" /> PIM Blueprints
           </button>
         </div>
 
@@ -497,6 +760,20 @@ export default function AdminProductsPage() {
 
         {/* Subscription products section */}
         {activeTab === "subscription" && <>
+        {/* Variant SKU toggle — hidden by default since they're managed via PIM */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => { setShowVariantSkus((v) => !v); setPage(1); }}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${showVariantSkus ? "bg-violet-50 border-violet-300 text-violet-700" : "bg-muted border-muted-foreground/20 text-muted-foreground hover:text-foreground"}`}
+          >
+            <GitBranch className="h-3 w-3" />
+            {showVariantSkus ? "Hiding base product only" : "Show Variant SKUs"}
+          </button>
+          {!showVariantSkus && (
+            <span className="text-xs text-muted-foreground">Variant SKUs are hidden — managed via PIM base product</span>
+          )}
+        </div>
         {/* Item-type segmented register — every type is a tab with a live count */}
         <nav aria-label="Product item type" className="flex flex-wrap gap-2">
           {([

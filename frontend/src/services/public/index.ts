@@ -124,6 +124,24 @@ export type PublicProduct = {
   product_code: string;
   name: string;
   base_price: string;
+  /** Min/max price across active variant SKUs. Present on blueprint products where base_price=0. */
+  price_range?: { min: string; max: string; count: number } | null;
+  /** True when this Product record is a variant SKU (not the base blueprint). */
+  is_variant_page?: boolean;
+  /** ID of the base Product when this is a variant page. */
+  parent_product_id?: number | null;
+  /** The attributes that define this specific variant (e.g. {Size: "King (6x7)"}). */
+  selected_attributes?: Record<string, string>;
+  /** Other variant Products under the same blueprint. */
+  sibling_variants?: Array<{
+    product_id: number;
+    sku: string;
+    label: string;
+    price: string;
+    image?: string | null;
+    attributes: Record<string, string>;
+    is_current: boolean;
+  }> | null;
   category?: string | null;
   /** Canonical public category slug from the category master (SEO-3). */
   category_slug?: string | null;
@@ -144,6 +162,7 @@ export type PublicProduct = {
     is_low_stock: boolean;
     stock_status?: "IN_STOCK" | "MAKE_TO_ORDER";
     image?: string | null;
+    product_id?: number | null;
   }>;
 };
 
@@ -458,6 +477,7 @@ export async function listPublicProducts(options?: {
   subcategory?: string;
   min_price?: number;
   max_price?: number;
+  include_variants?: boolean;
 }): Promise<{
   products: PublicProduct[];
   count: number;
@@ -472,6 +492,7 @@ export async function listPublicProducts(options?: {
   if (options?.subcategory) params.set("subcategory", options.subcategory);
   if (options?.min_price) params.set("min_price", String(options.min_price));
   if (options?.max_price) params.set("max_price", String(options.max_price));
+  if (options?.include_variants) params.set("include_variants", "true");
 
   const qs = params.toString() ? `?${params.toString()}` : "";
   const payload = await fetchPublic<PublicProductsResponse>(

@@ -1,4 +1,3 @@
-// @ts-nocheck
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -58,7 +57,7 @@ function toFormState(location: StockLocation): LocationFormState {
     name: location.name,
     branch: location.branch ? String(location.branch) : "",
     location_type: location.location_type,
-    is_active: location.is_active,
+    is_active: location.is_active ?? true,
     notes: location.notes ?? "",
     address: location.address ?? "",
     phone: location.phone ?? "",

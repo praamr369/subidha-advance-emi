@@ -1,4 +1,3 @@
-// @ts-nocheck
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
@@ -67,13 +66,13 @@ export default function AdminInventoryDemandPlanningPage() {
     setError(null);
     try {
       const demandSourcesArray = Array.from(demandSources);
-      const payload = (await getBulkDemandPlanning({
+      const payload = await getBulkDemandPlanning({
         page: pagination.page,
         page_size: pagination.page_size,
         search: debouncedSearch || undefined,
         critical_shortage: criticalShortageOnly ? "true" : undefined,
         demand_sources: demandSourcesArray.length > 0 ? demandSourcesArray.join(",") : undefined,
-      })) as DemandPlanningPayload;
+      });
 
       setRows(payload.results ?? []);
       setPagination(prev => ({

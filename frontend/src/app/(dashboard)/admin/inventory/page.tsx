@@ -96,7 +96,7 @@ function KPIBlock({ label, value, sub, tone, icon, href }: {
   return href ? <Link href={href}>{inner}</Link> : inner;
 }
 
-function CategoryRow({ label, count, inStock, low, out, value, icon, color }: {
+function CategoryRow({ label, count, inStock, low, out, value, icon, color, href }: {
   label: string;
   count: number;
   inStock: number;
@@ -105,6 +105,7 @@ function CategoryRow({ label, count, inStock, low, out, value, icon, color }: {
   value: number;
   icon: React.ReactNode;
   color: string;
+  href: string;
 }) {
   return (
     <div className="flex items-center gap-4 rounded-xl border border-border bg-muted/20 px-4 py-3">
@@ -119,7 +120,7 @@ function CategoryRow({ label, count, inStock, low, out, value, icon, color }: {
         {out > 0 ? <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-800">{out} out</span> : null}
       </div>
       <Link
-        href={ROUTES.admin.inventoryStockOnHand}
+        href={href}
         className="shrink-0 rounded-lg border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted"
       >
         View
@@ -315,6 +316,7 @@ export default function AdminInventoryPage() {
                     value={parseFloat(dashboard.kpis.by_category.finished_goods?.value ?? "0")}
                     icon={<Package className="h-4 w-4 text-sky-700" />}
                     color="bg-sky-100"
+                    href={ROUTES.admin.inventoryFinishedGoods}
                   />
                   <CategoryRow
                     label="Raw Materials"
@@ -325,6 +327,7 @@ export default function AdminInventoryPage() {
                     value={parseFloat(dashboard.kpis.by_category.raw_materials?.value ?? "0")}
                     icon={<Factory className="h-4 w-4 text-violet-700" />}
                     color="bg-violet-100"
+                    href={ROUTES.admin.inventoryRawMaterials}
                   />
                   <CategoryRow
                     label="Accessories"
@@ -335,6 +338,7 @@ export default function AdminInventoryPage() {
                     value={parseFloat(dashboard.kpis.by_category.accessories?.value ?? "0")}
                     icon={<Wrench className="h-4 w-4 text-amber-700" />}
                     color="bg-amber-100"
+                    href={ROUTES.admin.inventoryAccessories}
                   />
                 </>
               )}

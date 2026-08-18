@@ -18,7 +18,7 @@ RESET_SCOPE_MODELS: dict[str, tuple[str, ...]] = {
     "direct_sales": ("billing.DirectSale", "billing.DirectSaleLine", "billing.DirectSaleReturn", "billing.DirectSaleReturnLine"),
     "purchases": ("inventory.PurchaseBill", "inventory.PurchaseBillLine", "inventory.PurchaseOrder", "inventory.GoodsReceipt"),
     "inventory": ("inventory.StockLedger", "inventory.StockAdjustment", "inventory.StockAdjustmentLine", "inventory.StockReservation"),
-    "rent_lease": ("contracts.RentSubscriptionProfile", "contracts.LeaseSubscriptionProfile", "subscriptions.RentLeaseDemand"),
+    "rent_lease": ("contracts.RentSubscriptionProfile", "contracts.LeaseSubscriptionProfile", "payments.RentLeaseBillingDemand"),
     "deliveries": ("deliveries.SubscriptionDelivery",),
     "service_desk": ("service_desk.ServiceDeskCase", "service_desk.ServiceDeskCaseLine"),
     "commissions": ("commissions.Commission",),

@@ -36,6 +36,8 @@ export interface PimAttributeOption {
   value: string;
   display_name: string;
   display_order: number;
+  /** Extra cost in INR added when this option is selected (0 for standard options). */
+  extra_cost: string | number;
 }
 
 export interface PimProductAttribute {
@@ -79,6 +81,7 @@ export interface PimVariant {
 export interface PimProduct {
   id: number;
   code: string;
+  brand?: string;
   name: string;
   description: string;
   category: number;
@@ -89,9 +92,21 @@ export interface PimProduct {
   cost_price: string | null;
   is_active: boolean;
   is_published: boolean;
+  locked_attributes?: number[];
   variant_count?: number;
+  /** Set when this PIM product is a variant SKU under a base product */
+  parent_id?: number | null;
+  parent_code?: string | null;
+  parent_name?: string | null;
+  parent_is_published?: boolean | null;
+  /** Number of child variant-SKU PIM products under this base product */
+  child_count?: number;
   attributes?: PimProductAttribute[];
   variants?: PimVariant[];
+  /** Base product's ProductAttribute values (only set when this is a variant PimProduct) */
+  inherited_attribute_values?: PimProductAttribute[];
+  /** VariantAttributeValues from ProductVariant matching this PimProduct's SKU code */
+  variant_attribute_values?: PimVariantAttributeValue[];
   created_at?: string;
   updated_at?: string;
 }
@@ -106,6 +121,8 @@ export interface PimProductCreatePayload {
   cost_price?: string;
   is_active?: boolean;
   is_published?: boolean;
+  locked_attributes?: number[];
+  remove_attributes?: number[];
   attributes?: {
     attribute: number;
     value_text?: string;
@@ -182,6 +199,30 @@ export const pimService = {
     if (subcategoryId) params.set("subcategory", String(subcategoryId));
     return request<PaginatedOrArray<PimCategoryAttribute>>(`${BASE}/attributes/?${params}`).then(unwrap);
   },
+
+  getAllAttributes: (): Promise<PimCategoryAttribute[]> => {
+    return request<PaginatedOrArray<PimCategoryAttribute>>(`${BASE}/attributes/?page_size=1000`).then(unwrap);
+  },
+
+  createAttribute: (data: {
+    category: number;
+    subcategory?: number | null;
+    name: string;
+    data_type: PimCategoryAttribute["data_type"];
+    is_required?: boolean;
+    is_variant_defining?: boolean;
+    display_order?: number;
+  }): Promise<PimCategoryAttribute> =>
+    request<PimCategoryAttribute>(`${BASE}/attributes/`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  createAttributeOption: (attributeId: number, data: { value: string; display_name?: string; extra_cost?: number; display_order?: number }): Promise<PimAttributeOption> =>
+    request<PimAttributeOption>(`${BASE}/attribute-options/`, {
+      method: "POST",
+      body: JSON.stringify({ attribute: attributeId, ...data }),
+    }),
 
   // Products
   getProducts: (filters?: {
@@ -276,6 +317,30 @@ export const pimService = {
     });
   },
 
+  patchVariant: (
+    variantId: number,
+    data: Partial<Pick<PimVariant, "is_active" | "barcode">>
+  ): Promise<PimVariant> =>
+    request<PimVariant>(`${BASE}/variants/${variantId}/`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  updateVariantAttributes: (
+    variantId: number,
+    data: {
+      attribute_values?: { attribute: number; value_text?: string; value_number?: number | null; value_boolean?: boolean | null }[];
+      price?: string;
+      cost_price?: string;
+      barcode?: string;
+      reorder_level?: number;
+    }
+  ): Promise<PimVariant> =>
+    request<PimVariant>(`${BASE}/variants/${variantId}/update_attributes/`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
   deleteVariant: (variantId: number): Promise<void> =>
     request<void>(`${BASE}/variants/${variantId}/`, { method: "DELETE" }),
 
@@ -291,7 +356,7 @@ export const pimService = {
       is_variant_defining: boolean;
       is_selected_for_variants?: boolean;
       option_count: number;
-      options: { id: number; value: string; display_name: string }[];
+      options: { id: number; value: string; display_name: string; extra_cost?: string | number }[];
     }[];
   }> => request(`${BASE}/workbench/${encodeURIComponent(code)}/attributes/`),
 
@@ -342,6 +407,74 @@ export const pimService = {
     request(`${BASE}/workbench/${encodeURIComponent(code)}/clear_variants/`, {
       method: "DELETE",
     }),
+
+  relinkParents: (): Promise<{ linked: number; message: string }> =>
+    request(`${BASE}/products/relink_parents/`, { method: "POST" }),
+
+  repairVariantCategories: (): Promise<{ repaired: string[]; count: number; message: string }> =>
+    request(`${BASE}/products/repair_variant_categories/`, { method: "POST" }),
+
+  adoptOrphanVariants: (productId: number): Promise<{ adopted: string[]; skipped: string[]; errors: {code: string; error: string}[]; message: string }> =>
+    request(`${BASE}/products/${productId}/adopt_orphan_variants/`, { method: "POST" }),
+
+  cleanStaleLocks: (productId: number): Promise<{ before: number[]; after: number[]; removed: number[]; message: string }> =>
+    request(`${BASE}/products/${productId}/clean_stale_locks/`, { method: "POST" }),
+
+  pushToVariants: (
+    productId: number,
+    options: { push_description?: boolean; push_name?: boolean }
+  ): Promise<{ updated: number; total_variants: number }> =>
+    request(`${BASE}/products/${productId}/push_to_variants/`, {
+      method: "POST",
+      body: JSON.stringify(options),
+    }),
+
+  autoBom: (productId: number): Promise<{
+    created: boolean;
+    bom_no: string;
+    bom_id: number;
+    lines: number;
+    warnings: string[];
+    variant_attrs: Record<string, string>;
+  }> =>
+    request(`${BASE}/products/${productId}/auto_bom/`, { method: "POST" }),
+
+  getBomStatus: (productId: number): Promise<{
+    product_code: string;
+    inventory_item_id: number;
+    boms: {
+      id: number;
+      bom_no: string;
+      status: string;
+      revision_no: number;
+      is_default: boolean;
+      lines: { product_code: string; name: string; qty: string; unit: string; wastage_pct: string; notes: string }[];
+    }[];
+    services: {
+      service_code: string;
+      service_name: string;
+      service_type: string;
+      charge_mode: string;
+      price: string;
+      is_default: boolean;
+    }[];
+    warning?: string;
+  }> =>
+    request(`${BASE}/products/${productId}/bom_status/`),
+
+  publishBlueprint: (productId: number): Promise<{
+    published: boolean;
+    child_pim_published: number;
+    variants_activated: number;
+    total_variants: number;
+  }> =>
+    request(`${BASE}/products/${productId}/publish/`, { method: "POST" }),
+
+  unpublishBlueprint: (productId: number): Promise<{
+    published: boolean;
+    child_pim_unpublished: number;
+  }> =>
+    request(`${BASE}/products/${productId}/unpublish/`, { method: "POST" }),
 
   // Cross-module sync
   getRegisterStatus: (params?: {

@@ -66,6 +66,13 @@ class PolicyPlaceholderContext:
     business_address: str
     gst_status_text: str
     udyam_status_text: str
+    business_name: str = "Subidha Furniture"
+    owner_name: str = ""
+    gstin: str = ""
+    city: str = "Asansol"
+    state: str = "West Bengal"
+    udyam_number: str = ""
+    pan_number: str = ""
 
 
 def _clean_text(value: str | None) -> str:
@@ -222,6 +229,10 @@ def _resolve_public_status_text(*, has_verified_document: bool, fallback: str) -
 
 
 def get_policy_placeholder_context() -> PolicyPlaceholderContext:
+    from django.core.cache import cache
+    cached = cache.get("policy_placeholder_context")
+    if cached is not None:
+        return cached
     business_profile = BusinessProfile.objects.filter(is_active=True).order_by("-created_at", "-id").first()
     public_profile = PublicBusinessProfile.objects.filter(is_active=True).order_by("-created_at", "-id").first()
     website = _clean_text(getattr(business_profile, "website_url", "")) or "subidhafurnitureasansol.com"
@@ -241,29 +252,60 @@ def get_policy_placeholder_context() -> PolicyPlaceholderContext:
     gst_fallback = "Not provided / will be updated after registration."
     if _clean_text(getattr(business_profile, "gstin", "")):
         gst_fallback = "GST registration is available. Number is not publicly listed on this page."
-    return PolicyPlaceholderContext(
+    trade_name = _clean_text(getattr(business_profile, "trade_name", "")) or _clean_text(getattr(business_profile, "legal_name", "")) or "Subidha Furniture"
+    owner_name = _clean_text(getattr(business_profile, "authorized_signatory_name", ""))
+    gstin = _clean_text(getattr(business_profile, "gstin", ""))
+    pan_number = _clean_text(getattr(business_profile, "pan_number", ""))
+    city = _clean_text(getattr(business_profile, "city", "")) or "Asansol"
+    state = _clean_text(getattr(business_profile, "state", "")) or "West Bengal"
+    udyam_number = _clean_text(getattr(business_profile, "udyam_number", ""))
+    ctx = PolicyPlaceholderContext(
         website_url=website,
         business_phone=phone,
         business_email=email,
         business_address=address,
         gst_status_text=_resolve_public_status_text(has_verified_document=gst_verified_doc, fallback=gst_fallback),
         udyam_status_text=_resolve_public_status_text(has_verified_document=udyam_verified_doc, fallback="Not provided / will be updated after registration."),
+        business_name=trade_name,
+        owner_name=owner_name,
+        gstin=gstin,
+        city=city,
+        state=state,
+        udyam_number=udyam_number,
+        pan_number=pan_number,
     )
+    cache.set("policy_placeholder_context", ctx, timeout=300)
+    return ctx
 
 
 def render_policy_content(content: str, context: PolicyPlaceholderContext | None = None) -> str:
     context = context or get_policy_placeholder_context()
     rendered = content or ""
     replacements = {
-        "[WEBSITE_URL]": context.website_url,
+        # Token-based replacements (templates seeded after token system)
+        "[BUSINESS_NAME]": context.business_name,
         "[BUSINESS_PHONE]": context.business_phone,
         "[BUSINESS_EMAIL]": context.business_email,
+        "[WEBSITE_URL]": context.website_url,
         "[BUSINESS_ADDRESS]": context.business_address,
         "[GST_STATUS_PUBLIC_TEXT]": context.gst_status_text,
         "[UDYAM_STATUS_PUBLIC_TEXT]": context.udyam_status_text,
+        "[BUSINESS_OWNER]": context.owner_name,
+        "[GSTIN]": context.gstin,
+        "[CITY]": context.city,
+        "[STATE]": context.state,
+        "[UDYAM_NUMBER]": context.udyam_number,
+        "[PAN_NUMBER]": context.pan_number,
+        "[CITY], [STATE]": f"{context.city}, {context.state}",
+        # Legacy hardcoded-text replacements (policies seeded before token system)
+        "Subidha Furniture": context.business_name,
+        "{phone}": context.business_phone,
+        "{email}": context.business_email,
+        "{website}": context.website_url,
+        "{address}": context.business_address,
     }
     for key, value in replacements.items():
-        rendered = rendered.replace(key, value)
+        rendered = rendered.replace(key, value or "")
     return rendered
 
 

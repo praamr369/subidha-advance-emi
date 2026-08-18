@@ -14,6 +14,60 @@ type PeriodFiltersProps = {
   asOfLabel?: string;
 };
 
+export function getTransactionBadge(
+  entryType: string,
+  sourceModel?: string | null
+): { label: string; colorClass: string } | null {
+  if (entryType === "MANUAL") return null;
+
+  let label = "";
+  let colorClass = "border-sky-200 bg-sky-50 text-sky-700";
+
+  if (sourceModel) {
+    const sm = sourceModel.toLowerCase();
+    
+    if (sm.includes("rent") || sm.includes("lease")) {
+      label = "Rent Collection";
+      colorClass = "border-violet-200 bg-violet-50 text-violet-700";
+    } else if (sm.includes("vendor") || sm.includes("supplier") || sm.includes("purchase")) {
+      label = "Vendor Payment";
+      colorClass = "border-orange-200 bg-orange-50 text-orange-700";
+    } else if (sm.includes("partner") || sm.includes("commission") || sm.includes("payout")) {
+      label = "Partner Payment";
+      colorClass = "border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700";
+    } else if (sm.includes("salary") || sm.includes("payroll")) {
+      label = "Salary Payment";
+      colorClass = "border-blue-200 bg-blue-50 text-blue-700";
+    } else if (sm.includes("emi") || sm.includes("receipt") || sm === "payment") {
+      label = "EMI Collection";
+      colorClass = "border-emerald-200 bg-emerald-50 text-emerald-700";
+    } else if (sm.includes("billing") || sm.includes("invoice") || sm.includes("note")) {
+      label = "Billing & Invoice";
+      colorClass = "border-indigo-200 bg-indigo-50 text-indigo-700";
+    } else if (sm.includes("stock") || sm.includes("inventory")) {
+      label = "Stock Update";
+      colorClass = "border-amber-200 bg-amber-50 text-amber-700";
+    } else if (sm.includes("fund") || sm.includes("movement")) {
+      label = "Money Movement";
+      colorClass = "border-teal-200 bg-teal-50 text-teal-700";
+    } else {
+      label = sourceModel.replace(/([A-Z])/g, ' $1').trim();
+      colorClass = "border-slate-200 bg-slate-50 text-slate-700";
+    }
+  } else {
+    label = entryType.replace(/_/g, " ");
+    if (entryType === "EXPENSE") {
+      colorClass = "border-rose-200 bg-rose-50 text-rose-700";
+    } else if (entryType === "SALARY") {
+      colorClass = "border-blue-200 bg-blue-50 text-blue-700";
+    } else if (entryType === "MONEY_MOVEMENT") {
+      colorClass = "border-teal-200 bg-teal-50 text-teal-700";
+    }
+  }
+
+  return { label, colorClass };
+}
+
 export function accountingMoney(value: string | number | null | undefined): string {
   // null/undefined means the backend hasn't returned a value — show placeholder,
   // not ₹0.00, which would falsely imply a zero balance.

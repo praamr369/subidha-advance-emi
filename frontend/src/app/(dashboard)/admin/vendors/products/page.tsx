@@ -11,15 +11,13 @@ import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { ROUTES } from "@/lib/routes";
-import { listAdminVendorProducts } from "@/services/vendor-ops";
-import { listVendors } from "@/services/vendors";
-
-type VendorLite = { id: number; display_name?: string; name?: string };
+import { listAdminVendorProducts, type VendorProduct } from "@/services/vendor-ops";
+import { listVendors, type Vendor } from "@/services/vendors";
 
 export default function AdminVendorProductsHubPage() {
-  const [vendors, setVendors] = useState<VendorLite[]>([]);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
   const [vendorId, setVendorId] = useState<number | "">("");
-  const [rows, setRows] = useState<Record<string, unknown>[]>([]);
+  const [rows, setRows] = useState<VendorProduct[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,8 +29,7 @@ export default function AdminVendorProductsHubPage() {
     void listVendors()
       .then((payload) => {
         if (!active) return;
-        const p = payload as { results?: VendorLite[] } | VendorLite[];
-        const list = Array.isArray(p) ? p : p.results || [];
+        const list = Array.isArray(payload) ? payload : (payload.results ?? []);
         setVendors(list);
         setLoadingList(false);
         setError(null);
@@ -58,8 +55,7 @@ export default function AdminVendorProductsHubPage() {
     void listAdminVendorProducts(selectedVendorId)
       .then((payload) => {
         if (!active) return;
-        const parsed = payload as { results?: Record<string, unknown>[] };
-        setRows(parsed.results ?? []);
+        setRows(payload.results ?? []);
       })
       .catch((err) => {
         if (!active) return;
@@ -155,13 +151,13 @@ export default function AdminVendorProductsHubPage() {
               </thead>
               <tbody>
                 {visibleRows.map((row) => (
-                  <tr key={String(row.id)} className="border-t border-border">
-                    <td className="p-2">{String(row.product_name ?? "—")}</td>
-                    <td className="p-2">{String(row.vendor_sku ?? "—")}</td>
-                    <td className="p-2">{String(row.category_text ?? "—")}</td>
-                    <td className="p-2">{String(row.base_quote_price ?? "—")}</td>
-                    <td className="p-2">{String(row.lead_time_days ?? "—")}</td>
-                    <td className="p-2">{row.active === false ? "No" : "Yes"}</td>
+                  <tr key={row.id} className="border-t border-border">
+                    <td className="p-2">{row.product_name || "—"}</td>
+                    <td className="p-2">{row.vendor_sku || "—"}</td>
+                    <td className="p-2">{row.category_text || "—"}</td>
+                    <td className="p-2">{row.base_quote_price ?? "—"}</td>
+                    <td className="p-2">{row.lead_time_days ?? "—"}</td>
+                    <td className="p-2">{row.active ? "Yes" : "No"}</td>
                   </tr>
                 ))}
               </tbody>

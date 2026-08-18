@@ -74,22 +74,38 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority,
   }));
 
-  // Public product detail pages. The public products API already returns only
-  // active, finished-goods products (no private/archived/internal items), so
-  // these URLs are safe. On any API failure we fall back to static routes only
-  // so the sitemap (and build) never breaks.
+  // Base product pages (blueprint-level, one per product family)
   let productEntries: MetadataRoute.Sitemap = [];
+  // Variant SKU pages (one per variant — has its own price, attributes, URL)
+  let variantEntries: MetadataRoute.Sitemap = [];
+
   try {
-    const { products } = await listPublicProducts();
-    productEntries = products.map((product) => ({
-      url: `${siteUrl}/products/${product.id}`,
-      lastModified: now,
-      changeFrequency: WEEKLY,
-      priority: 0.6,
-    }));
+    // Fetch all published products including variant SKUs in one call
+    const { products } = await listPublicProducts({ include_variants: true });
+
+    for (const product of products) {
+      if (product.is_variant_page) {
+        // Variant pages: slightly lower priority than base, but still indexed
+        // so search engines can find size/type-specific pages directly
+        variantEntries.push({
+          url: `${siteUrl}/products/${product.id}`,
+          lastModified: now,
+          changeFrequency: WEEKLY,
+          priority: 0.55,
+        });
+      } else {
+        productEntries.push({
+          url: `${siteUrl}/products/${product.id}`,
+          lastModified: now,
+          changeFrequency: WEEKLY,
+          priority: 0.7,
+        });
+      }
+    }
   } catch {
     productEntries = [];
+    variantEntries = [];
   }
 
-  return [...staticEntries, ...productEntries];
+  return [...staticEntries, ...productEntries, ...variantEntries];
 }

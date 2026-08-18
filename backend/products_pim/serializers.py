@@ -15,7 +15,7 @@ from .models import (
 class AttributeOptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = AttributeOption
-        fields = ["id", "value", "display_name", "display_order"]
+        fields = ["id", "value", "display_name", "display_order", "extra_cost"]
 
 
 class CategoryAttributeSerializer(serializers.ModelSerializer):
@@ -112,20 +112,58 @@ class ProductVariantSerializer(serializers.ModelSerializer):
 
 
 class PimProductListSerializer(serializers.ModelSerializer):
-    category_name = serializers.CharField(source="category.name", read_only=True)
-    subcategory_name = serializers.CharField(source="subcategory.name", read_only=True)
+    category_name = serializers.SerializerMethodField()
+    subcategory_name = serializers.SerializerMethodField()
     variant_count = serializers.SerializerMethodField()
+    parent_id = serializers.IntegerField(source="parent.id", read_only=True, default=None)
+    parent_code = serializers.CharField(source="parent.code", read_only=True, default=None)
+    parent_name = serializers.CharField(source="parent.name", read_only=True, default=None)
+    parent_is_published = serializers.SerializerMethodField()
+    child_count = serializers.SerializerMethodField()
 
     class Meta:
         model = PimProduct
         fields = [
-            "id", "code", "name", "category", "category_name",
+            "id", "code", "brand", "name", "category", "category_name",
             "subcategory", "subcategory_name", "base_price",
             "is_active", "is_published", "variant_count",
+            "parent_id", "parent_code", "parent_name", "parent_is_published", "child_count",
         ]
+
+    def get_parent_is_published(self, obj):
+        if obj.parent_id and obj.parent:
+            return obj.parent.is_published
+        return None
+
+    def _effective_category(self, obj):
+        """Return own category unless it's the Unclassified sentinel; fall back to parent."""
+        cat = obj.category
+        if cat and cat.slug != "unclassified":
+            return cat
+        if obj.parent_id and obj.parent:
+            return obj.parent.category
+        return cat
+
+    def _effective_subcategory(self, obj):
+        if obj.subcategory:
+            return obj.subcategory
+        if obj.parent_id and obj.parent:
+            return obj.parent.subcategory
+        return None
+
+    def get_category_name(self, obj):
+        cat = self._effective_category(obj)
+        return cat.name if cat else None
+
+    def get_subcategory_name(self, obj):
+        sub = self._effective_subcategory(obj)
+        return sub.name if sub else None
 
     def get_variant_count(self, obj):
         return obj.variants.filter(is_active=True).count()
+
+    def get_child_count(self, obj):
+        return obj.child_pim_products.count()
 
 
 class PimProductDetailSerializer(serializers.ModelSerializer):
@@ -134,29 +172,63 @@ class PimProductDetailSerializer(serializers.ModelSerializer):
     attributes = ProductAttributeSerializer(many=True, read_only=True)
     variants = ProductVariantSerializer(many=True, read_only=True)
     variant_count = serializers.SerializerMethodField()
+    parent_id = serializers.IntegerField(source="parent.id", read_only=True, default=None)
+    parent_code = serializers.CharField(source="parent.code", read_only=True, default=None)
+    parent_name = serializers.CharField(source="parent.name", read_only=True, default=None)
+    # For variant PimProducts: the base product's locked/shared attribute values
+    inherited_attribute_values = serializers.SerializerMethodField()
+    # For variant PimProducts: the SKU-specific VariantAttributeValues from ProductVariant
+    variant_attribute_values = serializers.SerializerMethodField()
 
     class Meta:
         model = PimProduct
         fields = [
-            "id", "code", "name", "description", "category", "category_name",
+            "id", "code", "brand", "name", "description", "category", "category_name",
             "subcategory", "subcategory_name", "base_price", "cost_price",
-            "is_active", "is_published", "created_at", "updated_at",
+            "is_active", "is_published", "locked_attributes",
+            "parent_id", "parent_code", "parent_name",
+            "created_at", "updated_at",
             "attributes", "variants", "variant_count",
+            "inherited_attribute_values", "variant_attribute_values",
         ]
 
     def get_variant_count(self, obj):
         return obj.variants.filter(is_active=True).count()
 
+    def get_inherited_attribute_values(self, obj):
+        """Return base product's ProductAttribute values for variant PimProducts."""
+        if not obj.parent_id:
+            return []
+        attrs = ProductAttribute.objects.filter(
+            product_id=obj.parent_id
+        ).select_related("attribute")
+        return ProductAttributeSerializer(attrs, many=True).data
+
+    def get_variant_attribute_values(self, obj):
+        """Return VariantAttributeValues from the ProductVariant matching this PimProduct's code."""
+        if not obj.parent_id:
+            return []
+        variant = (
+            ProductVariant.objects
+            .filter(sku=obj.code)
+            .prefetch_related("attribute_values__attribute")
+            .first()
+        )
+        if not variant:
+            return []
+        return VariantAttributeValueSerializer(variant.attribute_values.all(), many=True).data
+
 
 class PimProductCreateUpdateSerializer(serializers.ModelSerializer):
     attributes = serializers.ListField(child=serializers.DictField(), write_only=True, required=False)
+    remove_attributes = serializers.ListField(child=serializers.IntegerField(), write_only=True, required=False)
 
     class Meta:
         model = PimProduct
         fields = [
-            "id", "code", "name", "description", "category",
+            "id", "code", "brand", "name", "description", "category",
             "subcategory", "base_price", "cost_price",
-            "is_active", "is_published", "attributes",
+            "is_active", "is_published", "locked_attributes", "attributes", "remove_attributes",
         ]
 
     def _save_attributes(self, product, attrs_data):
@@ -174,6 +246,26 @@ class PimProductCreateUpdateSerializer(serializers.ModelSerializer):
                     "value_date": attr_data.get("value_date"),
                 },
             )
+
+    def _clean_locked_attributes(self, product):
+        """Remove any locked_attributes IDs that have no actual saved value."""
+        if not product.locked_attributes:
+            return
+        valued_ids = set(
+            ProductAttribute.objects.filter(
+                product=product,
+                attribute_id__in=product.locked_attributes,
+            ).exclude(
+                value_text="",
+                value_number__isnull=True,
+                value_boolean__isnull=True,
+                value_date__isnull=True,
+            ).values_list("attribute_id", flat=True)
+        )
+        cleaned = [aid for aid in product.locked_attributes if aid in valued_ids]
+        if len(cleaned) != len(product.locked_attributes):
+            product.locked_attributes = cleaned
+            product.save(update_fields=["locked_attributes"])
 
     def _sync_to_register(self, pim_product):
         try:
@@ -201,15 +293,27 @@ class PimProductCreateUpdateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         attrs_data = validated_data.pop("attributes", [])
+        validated_data.pop("remove_attributes", [])
         product = super().create(validated_data)
         self._save_attributes(product, attrs_data)
+        self._clean_locked_attributes(product)
         self._sync_to_register(product)
         return product
 
     def update(self, instance, validated_data):
         attrs_data = validated_data.pop("attributes", [])
+        remove_ids = validated_data.pop("remove_attributes", [])
         product = super().update(instance, validated_data)
+        if remove_ids:
+            ProductAttribute.objects.filter(product=product, attribute_id__in=remove_ids).delete()
+            # Also remove from locked_attributes if present
+            if product.locked_attributes:
+                cleaned = [aid for aid in product.locked_attributes if aid not in remove_ids]
+                if len(cleaned) != len(product.locked_attributes):
+                    product.locked_attributes = cleaned
+                    product.save(update_fields=["locked_attributes"])
         self._save_attributes(product, attrs_data)
+        self._clean_locked_attributes(product)
         self._sync_to_register(product)
         return product
 

@@ -61,9 +61,13 @@ from api.v1.views.admin_recovery import AdminRecoveryCaseSettlementView
 from api.v1.views.admin_recovery import AdminSchemeDetailView
 from api.v1.views.admin_recovery import AdminSchemeListView
 from api.v1.views.admin_recovery import AdminStaffTargetListView
+from api.v1.views.admin_owner_funds import AdminOwnerFundDetailView
+from api.v1.views.admin_owner_funds import AdminOwnerFundsSummaryView
+from api.v1.views.admin_owner_funds import AdminOwnerFundsListCreateView
+from api.v1.views.admin_owner_funds import AdminOwnerLoanRepayView
+from api.v1.views.admin_owner_funds import AdminOwnerLoanScheduleView
 from api.v1.views.admin_scheduled_reports import scheduled_report_export_view
 from api.v1.views.admin_scheduled_reports import scheduled_report_types_view
-from api.v1.views.admin_unified_payable import AdminUnifiedPayableListView
 from api.v1.views.admin_warranty import extended_warranty_list_view
 from api.v1.views.admin_warranty import extended_warranty_mark_paid_view
 from api.v1.views.admin_warranty import service_pricing_view
@@ -78,9 +82,6 @@ from api.v1.views.admin_warranty_coverage import warranty_dashboard_summary_view
 from api.v1.views.admin_warranty_coverage import warranty_invoice_check_view
 from api.v1.views.admin_warranty_coverage import warranty_service_record_detail_view
 from api.v1.views.admin_warranty_coverage import warranty_service_records_view
-from api.v1.views.payables import AdminPayableExecuteView
-from api.v1.views.payables import AdminPayableFinanceAccountsView
-
 urlpatterns = [
 
     # ── GSTR Report + 2B Reconciliation ─────────────────────────────────────
@@ -187,11 +188,6 @@ urlpatterns = [
     path("batches/performance-check/", batch_performance_check_view),
     path("batches/performance-alert/", batch_performance_alert_notify_view),
 
-    # ── Unified Payable Center ────────────────────────────────────────────────
-    path("payables/", AdminUnifiedPayableListView.as_view()),
-    path("payables/finance-accounts/", AdminPayableFinanceAccountsView.as_view()),
-    path("payables/execute/", AdminPayableExecuteView.as_view()),
-
     # ── Payment reversal queue ────────────────────────────────────────────────
     path("payments/reversals/", AdminPaymentReversalsView.as_view()),
     path("payments/reversals/<int:pk>/approve/", AdminPaymentReversalActionView.as_view(), kwargs={"action": "approve"}),
@@ -208,4 +204,12 @@ urlpatterns = [
 
     # ── CRM Analytics ─────────────────────────────────────────────────────────
     path("crm/analytics/", include(crm_analytics_routes.urlpatterns)),
+
+    # ── Owner Fund Injections ─────────────────────────────────────────────────
+    path("finance/owner-funds/", AdminOwnerFundsListCreateView.as_view()),
+    path("finance/owner-funds/summary/", AdminOwnerFundsSummaryView.as_view()),
+    path("finance/owner-funds/schedule-preview/", AdminOwnerLoanScheduleView.as_view()),
+    path("finance/owner-funds/<int:pk>/", AdminOwnerFundDetailView.as_view()),
+    path("finance/owner-funds/<int:pk>/repay/", AdminOwnerLoanRepayView.as_view()),
+    path("finance/owner-funds/<int:pk>/schedule/", AdminOwnerLoanScheduleView.as_view()),
 ]

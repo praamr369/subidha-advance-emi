@@ -96,6 +96,7 @@ type AdminLeadsRouteParams = {
 type AdminLedgerStatementParams = {
   start_date?: string | null;
   end_date?: string | null;
+  category?: string | null;
 };
 
 function appendQueryValue(
@@ -217,6 +218,13 @@ export function buildAdminJournalEntryPrintRoute(id: number | string): string {
 
 export function buildAdminJournalEntryRoute(id: number | string): string {
   return `${ADMIN_ACCOUNTING_JOURNALS_ROUTE}/${id}`;
+}
+
+export function buildAdminLedgerRoute(
+  accountId: number | string,
+  params: AdminLedgerStatementParams = {}
+): string {
+  return buildRouteWithQuery(`${ADMIN_ACCOUNTING_LEDGER_ROUTE}/${accountId}`, params);
 }
 
 export function buildAdminLedgerStatementPrintRoute(

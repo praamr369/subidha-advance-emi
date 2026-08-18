@@ -12,7 +12,7 @@ from django.dispatch import receiver
 
 # Signal handlers for syncing reservations from various sources
 
-@receiver(post_save, sender='subscriptions.Subscription')
+@receiver(post_save, sender='contracts.Subscription')
 def sync_subscription_to_reservation(sender, instance, created, update_fields, **kwargs):
     """
     When a Subscription is created, create a stock reservation for the product.

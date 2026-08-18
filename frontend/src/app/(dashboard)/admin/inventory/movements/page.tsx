@@ -1,4 +1,3 @@
-// @ts-nocheck
 "use client";
 
 import Link from "next/link";
@@ -49,7 +48,7 @@ const columns: EnterpriseColumnDef<StockLedgerRow>[] = [
   { key: "movement_date", header: "Date", render: (row) => accountingDate(row.movement_date) },
   { key: "product_code", header: "Product" },
   { key: "product_name", header: "Item" },
-  { key: "stock_location_name", header: "Location", render: (row) => row.stock_location_name || "Default" },
+  { key: "stock_location", header: "Location", render: (row) => row.stock_location || "Default" },
   { key: "movement_type", header: "Movement" },
   { key: "quantity_in", header: "Qty In" },
   { key: "quantity_out", header: "Qty Out" },
@@ -122,7 +121,7 @@ export default function InventoryMovementsPage() {
           start_date: startDate || undefined,
           end_date: endDate || undefined,
           search: debouncedSearch || undefined,
-          reference_search: debouncedReferenceSearch || undefined,
+          reference_model: debouncedReferenceSearch || undefined,
           movement_type: selectedMovementTypes.length > 0 ? selectedMovementTypes.join(",") : undefined,
           location_id: locationId || undefined,
           page: pageIndex,
@@ -176,8 +175,8 @@ export default function InventoryMovementsPage() {
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
       stats={[
         { label: "Page Rows", value: loading ? "—" : rows.length, tone: "info" },
-        { label: "Total Quantity In", value: loading ? "—" : response?.total_in || "0", tone: "success" },
-        { label: "Total Quantity Out", value: loading ? "—" : response?.total_out || "0", tone: "default" },
+        { label: "Total Quantity In", value: loading ? "—" : response?.summary?.total_inbound || "0", tone: "success" },
+        { label: "Total Quantity Out", value: loading ? "—" : response?.summary?.total_outbound || "0", tone: "default" },
       ]}
     >
       <WorkspaceDirectory

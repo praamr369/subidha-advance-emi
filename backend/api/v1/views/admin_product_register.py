@@ -138,6 +138,12 @@ def _apply_filters(queryset, request):
     if stock_type:
         queryset = queryset.filter(stock_type=stock_type)
 
+    # By default, exclude products that are PIM variant SKUs (managed via base product).
+    # Pass exclude_variant_skus=false to show them.
+    exclude_variants_param = _normalize(request.query_params.get("exclude_variant_skus", "true")).lower()
+    if exclude_variants_param not in {"false", "0", "no"}:
+        queryset = queryset.filter(pim_variant__isnull=True)
+
     return queryset.distinct()
 
 
@@ -243,7 +249,15 @@ class AdminProductCreateView(APIView):
             is_rent_enabled = request.data.get("is_rent_enabled", "false").lower() in {"true", "1", "yes"}
             is_lease_enabled = request.data.get("is_lease_enabled", "false").lower() in {"true", "1", "yes"}
             is_direct_sale_enabled = request.data.get("is_direct_sale_enabled", "true").lower() in {"true", "1", "yes"}
+            plan_type_default = request.data.get("plan_type_default", "EMI")
+            warranty_enabled = request.data.get("warranty_enabled", "true").lower() in {"true", "1", "yes"}
+            warranty_months_manufacturing = request.data.get("warranty_months_manufacturing")
+            warranty_months_structural = request.data.get("warranty_months_structural")
+            warranty_months_extended_max = request.data.get("warranty_months_extended_max")
+            extended_warranty_cost_percentage = request.data.get("extended_warranty_cost_percentage")
             image = request.data.get("image")
+            video = request.data.get("video")
+            brand = _normalize(request.data.get("brand"))
             has_variants = request.data.get("has_variants", "false").lower() in {"true", "1", "yes"}
             variants_json = request.data.get("variants", "[]")
 
@@ -257,6 +271,7 @@ class AdminProductCreateView(APIView):
             product_data = {
                 "product_code": product_code,
                 "name": name,
+                "brand": brand or "",
                 "base_price": Decimal(base_price or "0"),
                 "sku": sku,
                 "unit_of_measure": unit_of_measure,
@@ -271,6 +286,8 @@ class AdminProductCreateView(APIView):
                 "is_rent_enabled": is_rent_enabled and item_type == "FINISHED_GOOD",
                 "is_lease_enabled": is_lease_enabled and item_type == "FINISHED_GOOD",
                 "is_direct_sale_enabled": is_direct_sale_enabled and item_type in {"FINISHED_GOOD", "ADD_ON", "ACCESSORY"},
+                "plan_type_default": plan_type_default,
+                "warranty_enabled": warranty_enabled,
             }
 
             if gst_rate:
@@ -285,13 +302,30 @@ class AdminProductCreateView(APIView):
                 except:
                     product_data["base_specs"] = {}
 
-            if catalog_category:
-                product_data["catalog_category_id"] = int(catalog_category)
+            if warranty_months_manufacturing:
+                product_data["warranty_months_manufacturing"] = int(warranty_months_manufacturing)
+            if warranty_months_structural:
+                product_data["warranty_months_structural"] = int(warranty_months_structural)
+            if warranty_months_extended_max:
+                product_data["warranty_months_extended_max"] = int(warranty_months_extended_max)
+            if extended_warranty_cost_percentage:
+                product_data["extended_warranty_cost_percentage"] = Decimal(extended_warranty_cost_percentage)
 
             if image:
                 product_data["image"] = image
 
+            if video:
+                product_data["video"] = video
+
             product = Product.objects.create(**product_data)
+
+            # Assign explicit PIM category if provided (signal auto-creates PimProduct)
+            if catalog_category:
+                from products_pim.models import PimProduct
+                pim_product = PimProduct.objects.filter(source_product=product).first()
+                if pim_product:
+                    pim_product.category_id = int(catalog_category)
+                    pim_product.save(update_fields=["category"])
 
             # Create variants if provided
             if has_variants and variants_json:

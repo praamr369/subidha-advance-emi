@@ -2,6 +2,7 @@
 "use client";
 
 import Link from "next/link";
+import QRCode from "react-qr-code";
 import {
   useCallback,
   useEffect,
@@ -910,7 +911,8 @@ export default function AdminDashboardPage() {
       }}
     >
       <div className="space-y-6">
-        <div className="surface-panel-elevated flex flex-wrap items-end justify-between gap-3 rounded-[1.5rem] border border-border bg-card p-4 shadow-sm">
+        <div className="flex flex-col gap-6 md:flex-row">
+          <div className="flex-1 surface-panel-elevated flex flex-wrap items-end justify-between gap-3 rounded-[1.5rem] border border-border bg-card p-4 shadow-sm">
           <label className="min-w-[240px] flex-1 text-sm text-muted-foreground md:max-w-sm">
             <span className="enterprise-eyebrow mb-2 block">
               Branch scope
@@ -943,6 +945,17 @@ export default function AdminDashboardPage() {
           >
             {refreshing ? "Refreshing..." : "Refresh"}
           </ActionButton>
+          </div>
+          
+          <div className="flex shrink-0 items-center justify-center gap-3 rounded-[1.5rem] border border-border bg-card p-4 shadow-sm sm:min-w-[200px]">
+            <div className="rounded-xl bg-white p-2 shadow-sm">
+              <QRCode value={typeof window !== "undefined" ? window.location.origin : "https://example.com"} size={64} />
+            </div>
+            <div className="text-sm">
+              <p className="font-semibold text-foreground">Storefront QR</p>
+              <p className="text-xs text-muted-foreground">Scan to visit</p>
+            </div>
+          </div>
         </div>
 
         <DashboardTimeWindowSelector

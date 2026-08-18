@@ -728,8 +728,6 @@ class RetailSaleBridgeRunView(_BridgeRunView):
     service = staticmethod(run_retail_sale_bridges)
 
 
-class InventoryBridgeRunView(_BridgeRunView):
-    service = staticmethod(run_inventory_posting_bridges)
 
 
 class EmiSubscriptionBridgeRunView(_BridgeRunView):
@@ -744,9 +742,5 @@ class EmiWaiverBridgeRunView(_BridgeRunView):
     service = staticmethod(run_emi_waiver_bridges)
 
 
-class CommissionSettlementBridgeRunView(_BridgeRunView):
-    service = staticmethod(run_commission_settlement_bridges)
 
 
-class PayoutBatchBridgeRunView(_BridgeRunView):
-    service = staticmethod(run_payout_batch_bridges)

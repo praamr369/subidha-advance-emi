@@ -15,10 +15,11 @@ Primary business today:
 - Payment collection and reconciliation
 - Lucky draw workflow
 - Admin, partner, and customer access
+- Furniture rental (LIVE)
+- Furniture leasing (LIVE)
+- Direct Sales and Billing (LIVE)
 
 Future expansion:
-- Furniture rental
-- Furniture leasing
 - Manufacturer-to-customer marketplace
 
 All changes must preserve backward compatibility for current Lucky Plan EMI data and workflows.

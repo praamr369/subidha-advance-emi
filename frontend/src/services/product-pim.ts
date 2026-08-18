@@ -10,6 +10,7 @@ export type PimAttributeRow = {
   slug: string;
   data_type: "TEXT" | "NUMBER" | "DECIMAL" | "CHOICE" | "MULTI_CHOICE" | "BOOLEAN" | string;
   is_required: boolean;
+  is_variant_defining: boolean;
   options: Array<{ id: number; value: string; display_name?: string }>;
   value_text: string;
   value_number: string | null;

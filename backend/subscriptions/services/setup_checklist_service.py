@@ -180,7 +180,7 @@ def compute_setup_checklist():
                     + ". Complete setup so posting flows can resolve ledger accounts."
                 )
             ),
-            route="/admin/settings/business-setup/finance-accounts",
+            route="/admin/accounting/setup",
         ),
         _item(
             key="manual_coa_available",
@@ -200,7 +200,7 @@ def compute_setup_checklist():
                 if active_finance_accounts.exists()
                 else "Create at least one cash account and at least one bank/UPI account."
             ),
-            route="/admin/settings/business-setup/finance-accounts",
+            route="/admin/accounting/finance-accounts",
         ),
         _item(
             key="accounting_period",

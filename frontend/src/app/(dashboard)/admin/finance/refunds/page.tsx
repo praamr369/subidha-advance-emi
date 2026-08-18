@@ -265,7 +265,7 @@ export default function AdminFinanceRefundsPage() {
                         </Link>
                         {row.can_record_refund && (
                           <Link
-                            href={ROUTES.admin.payables}
+                            href="/admin/finance"
                             className="inline-flex items-center rounded-md bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
                           >
                             Pay in Cash Desk

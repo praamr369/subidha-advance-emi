@@ -89,6 +89,13 @@ class BusinessProfile(BusinessSetupTimeStampedModel):
     default_currency_code = models.CharField(max_length=10, default="INR")
     timezone_name = models.CharField(max_length=64, default="Asia/Kolkata")
     logo_url = models.URLField(blank=True, default="")
+    
+    # Legacy Migration
+    is_legacy_migration = models.BooleanField(default=False, help_text="True if this is an existing business migrating legacy data.")
+    legacy_migration_started_at = models.DateTimeField(null=True, blank=True)
+    legacy_migration_completed_at = models.DateTimeField(null=True, blank=True)
+    legacy_migration_completed_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+
     is_active = models.BooleanField(default=True, db_index=True)
 
     class Meta:

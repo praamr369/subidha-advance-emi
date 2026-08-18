@@ -4,7 +4,6 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { ArrowRight, ArrowUpRight } from "lucide-react";
 
-import { PageSection, SectionHeader } from "@/components/ui/portal-primitives";
 import { cn } from "@/lib/utils";
 
 export type WorkspaceDirectoryItem = {
@@ -36,60 +35,55 @@ export function WorkspaceDirectory({
   className?: string;
 }) {
   return (
-    <PageSection className={cn("overflow-hidden rounded-[1.8rem] p-5", className)}>
-      <SectionHeader title={title} description={description} actions={actions} />
-      <div className="mt-5 grid gap-4 xl:grid-cols-3">
+    <div className={cn("mb-6 overflow-hidden rounded-2xl border border-border bg-[var(--surface-card-soft)] p-4 shadow-sm", className)}>
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-semibold tracking-tight text-foreground">{title}</h2>
+          {description && <p className="text-xs text-muted-foreground">{description}</p>}
+        </div>
+        {actions && <div>{actions}</div>}
+      </div>
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
         {groups.map((group) => (
-          <section
-            key={group.title}
-            className="rounded-[1.55rem] border border-[color-mix(in_oklab,var(--surface-border-strong)_82%,white_18%)] bg-[linear-gradient(180deg,color-mix(in_oklab,white_98%,var(--surface-muted)_2%),color-mix(in_oklab,var(--surface-card-soft)_84%,var(--surface-muted)_16%))] p-4 shadow-[0_18px_48px_-38px_rgba(15,23,42,0.38)]"
-          >
-            <div>
-              <div className="enterprise-eyebrow">{group.title}</div>
-              {group.description ? (
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  {group.description}
-                </p>
-              ) : null}
+          <div key={group.title} className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                {group.title}
+              </h3>
             </div>
-            <div className="mt-4 grid gap-3">
+            <div className="grid gap-2">
               {group.items.map((item) => (
                 <Link
                   key={`${group.title}:${item.href}:${item.title}`}
                   href={item.href}
-                  className="group rounded-xl border border-[color-mix(in_oklab,var(--surface-border-strong)_80%,white_20%)] bg-[linear-gradient(180deg,color-mix(in_oklab,white_97%,var(--surface-muted)_3%),color-mix(in_oklab,var(--surface-strong)_84%,var(--surface-muted)_16%))] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition hover:-translate-y-0.5 hover:border-border hover:bg-muted/50"
+                  className="group flex items-center gap-3 rounded-xl border border-border bg-background p-2.5 transition-all hover:border-foreground/30 hover:shadow-sm"
+                  title={item.description}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[color-mix(in_oklab,var(--surface-border-strong)_76%,white_24%)] bg-[var(--surface-card-elevated)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]">
-                      {item.icon ?? <ArrowUpRight className="h-4 w-4" />}
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[color-mix(in_oklab,var(--surface-border-strong)_76%,white_24%)] bg-[var(--surface-card-elevated)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]">
+                    {item.icon ?? <ArrowUpRight className="h-4 w-4" />}
+                  </div>
+                  <div className="flex-1 truncate">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-foreground group-hover:text-foreground">{item.title}</span>
+                      {item.badge && (
+                        <span className="workspace-pill px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                          {item.badge}
+                        </span>
+                      )}
                     </div>
-                    {item.badge ? (
-                      <span className="workspace-pill px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                        {item.badge}
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="mt-3">
-                    <div className="text-sm font-semibold text-foreground">{item.title}</div>
-                    <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
-                      {item.description}
-                    </p>
                     {item.detail ? (
-                      <p className="mt-2 text-xs font-medium leading-5 text-foreground/80">
+                      <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
                         {item.detail}
-                      </p>
+                      </div>
                     ) : null}
                   </div>
-                  <div className="mt-4 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-foreground">
-                    Open route
-                    <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
-                  </div>
+                  <ArrowRight className="h-4 w-4 text-muted-foreground/40 transition group-hover:translate-x-0.5 group-hover:text-foreground" />
                 </Link>
               ))}
             </div>
-          </section>
+          </div>
         ))}
       </div>
-    </PageSection>
+    </div>
   );
 }

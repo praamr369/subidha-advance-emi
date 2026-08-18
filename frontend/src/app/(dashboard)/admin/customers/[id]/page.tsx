@@ -204,6 +204,8 @@ type PartnerLinkageRow = {
 
 type CustomerOperationalProfile = {
   overview: {
+    legacy_outstanding_amount?: string;
+    legacy_outstanding_count?: number;
     subscription_count: number;
     active_subscriptions: number;
     historical_subscriptions?: number;
@@ -528,6 +530,8 @@ function normalizeCustomerOperationalProfile(
 
   return {
     overview: {
+      legacy_outstanding_amount: toMoneyString(overview.legacy_outstanding_amount),
+      legacy_outstanding_count: toNumber(overview.legacy_outstanding_count),
       subscription_count: toNumber(overview.subscription_count),
       active_subscriptions: toNumber(overview.active_subscriptions),
       historical_subscriptions: toNumber(overview.historical_subscriptions),
@@ -2264,6 +2268,14 @@ export default function AdminCustomerDetailPage() {
                         operationalProfile.overview.direct_sale_outstanding_total
                       )}
                     />
+                    {operationalProfile.overview.legacy_outstanding_amount && operationalProfile.overview.legacy_outstanding_amount !== "0.00" && (
+                      <DetailValue
+                        label="Legacy outstanding"
+                        value={formatRupee(
+                          operationalProfile.overview.legacy_outstanding_amount
+                        )}
+                      />
+                    )}
                     <DetailValue
                       label="Active receipts"
                       value={`${operationalProfile.receipts_documents.summary.active_receipt_count ?? 0} receipt(s)`}

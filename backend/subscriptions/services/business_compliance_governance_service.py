@@ -600,7 +600,7 @@ def build_business_compliance_readiness() -> dict[str, Any]:
         "status": status,
         "blockers": blockers,
         "warnings": warnings,
-        "route_hint": "/admin/settings/business-compliance",
+        "route_hint": "/admin/settings/compliance-policies",
         "missing_required_count": len(truly_missing_required),
         "pending_required_count": len(pending_required),
         "pending_review_count": pending_review_count,

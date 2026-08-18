@@ -70,8 +70,11 @@ export type AdminPolicyPage = {
   source_template_key?: string;
   lifecycle_actions?: PolicyLifecycleActions;
   title: string;
+  raw_title: string;
   summary: string;
+  raw_summary: string;
   content: string;
+  raw_content: string;
   status: PolicyStatus;
   effective_date?: string | null;
   last_reviewed_at?: string | null;

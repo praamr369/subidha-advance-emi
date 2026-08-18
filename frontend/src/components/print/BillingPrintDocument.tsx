@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-
+import QRCode from "react-qr-code";
 import {
   AmountSummary,
   BankQrBlock,
@@ -14,6 +14,8 @@ import {
   StatusBadge,
   type DocumentField,
 } from "@/components/documents";
+
+import { useDocumentTheme } from "@/components/documents/document-shell";
 
 export type BillingPrintField = DocumentField;
 
@@ -42,6 +44,8 @@ type BillingPrintDocumentProps = {
   qrReference?: string;
   lineItems?: PrintLineItem[];
   footerNote?: string;
+  showUpiQr?: boolean;
+  upiId?: string;
 };
 
 export default function BillingPrintDocument({
@@ -61,7 +65,13 @@ export default function BillingPrintDocument({
   qrReference,
   lineItems = [],
   footerNote = "Generated from live SUBIDHA CORE records. Print or save as PDF for business filing.",
+  showUpiQr,
+  upiId,
 }: BillingPrintDocumentProps) {
+  const theme = useDocumentTheme();
+  const resolvedShowUpiQr = showUpiQr ?? theme.showUpiQr;
+  const resolvedUpiId = upiId ?? theme.upiId;
+
   const statusTone =
     statusToneClassName?.includes("emerald")
       ? "success"
@@ -115,8 +125,22 @@ export default function BillingPrintDocument({
           columns="sm:grid-cols-2"
         />
 
-        <div className="print-doc-note print-doc-section rounded-xl border border-border bg-card px-3.5 py-3 text-[13px] leading-5 text-slate-700">
-          {footerNote}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between print-doc-section">
+          <div className="print-doc-note flex-1 rounded-xl border border-border bg-card px-3.5 py-3 text-[13px] leading-5 text-slate-700">
+            {footerNote}
+          </div>
+          
+          {resolvedShowUpiQr && resolvedUpiId ? (
+            <div className="flex shrink-0 items-center gap-3 rounded-xl border border-border bg-card p-3">
+              <div className="rounded-lg bg-white p-2">
+                <QRCode value={`upi://pay?pa=${resolvedUpiId}`} size={64} />
+              </div>
+              <div className="text-xs">
+                <p className="font-semibold text-foreground">Pay via UPI</p>
+                <p className="text-muted-foreground">{resolvedUpiId}</p>
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <DocumentFooter leftText="Prepared from live SUBIDHA CORE records" />

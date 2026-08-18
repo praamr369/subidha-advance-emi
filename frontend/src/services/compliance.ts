@@ -19,7 +19,7 @@ export async function getBusinessRulePolicy() {
 export async function updateBusinessRulePolicy(payload: BusinessRulePolicyPayload) {
   return apiFetch<BusinessRulePolicyReadiness>("/admin/settings/legal-controls/", {
     method: "PATCH",
-    body: JSON.stringify(payload),
+    body: payload,
   });
 }
 

@@ -261,12 +261,33 @@ class JournalEntryViewSet(AdminAccountingModelViewSet):
         source_type = self.request.query_params.get("source_type")
         voucher_type = self.request.query_params.get("voucher_type")
         status_value = self.request.query_params.get("status")
+        category = self.request.query_params.get("category")
+        
         if source_type:
             queryset = queryset.filter(source_type=source_type.strip().upper())
         if voucher_type:
             queryset = queryset.filter(voucher_type=voucher_type.strip().upper())
         if status_value:
             queryset = queryset.filter(status=status_value.strip().upper())
+            
+        if category:
+            cat = category.strip().upper()
+            from django.db.models import Q
+            if cat == "SALARY":
+                queryset = queryset.filter(Q(entry_type="SALARY") | Q(source_model__icontains="Salary"))
+            elif cat == "EXPENSE":
+                queryset = queryset.filter(Q(entry_type="EXPENSE") | Q(source_model__icontains="Expense") | Q(source_model__icontains="Voucher") | Q(source_model__icontains="Claim"))
+            elif cat == "COMMISSION":
+                queryset = queryset.filter(source_model__icontains="Commission")
+            elif cat == "PURCHASE":
+                queryset = queryset.filter(Q(source_model__icontains="Purchase") | Q(source_model__icontains="Inventory"))
+            elif cat == "MANUAL":
+                queryset = queryset.filter(entry_type="MANUAL")
+            elif cat == "MONEY_MOVEMENT":
+                queryset = queryset.filter(Q(entry_type="MONEY_MOVEMENT") | Q(source_model__icontains="Fund") | Q(source_model__icontains="Movement") | Q(source_model__icontains="Transfer"))
+            elif cat == "BILLING":
+                queryset = queryset.filter(Q(source_model__icontains="Billing") | Q(source_model__icontains="Invoice"))
+                
         return queryset
 
     def get_serializer_class(self):

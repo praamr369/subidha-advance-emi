@@ -298,13 +298,21 @@ export default function AdminManufacturingJobsPage() {
               <EntityLookupCombobox
                 label="BOM (optional)"
                 value={form.bom || null}
-                onChange={(value, option) =>
+                onChange={(value, option) => {
+                  const meta = option?.metadata as { finished_good_inventory_item_id?: number; finished_good_product_name?: string; finished_good_sku?: string } | undefined;
+                  const fgId = meta?.finished_good_inventory_item_id;
+                  const fgLabel = meta?.finished_good_product_name || meta?.finished_good_sku || "";
                   setForm((current) => ({
                     ...current,
                     bom: value || "",
                     bom_option: option ?? null,
-                  }))
-                }
+                    // Auto-fill finished good from BOM when not already set
+                    ...(fgId && !current.finished_good_inventory_item ? {
+                      finished_good_inventory_item: String(fgId),
+                      finished_good_inventory_item_option: { id: fgId, label: fgLabel },
+                    } : {}),
+                  }));
+                }}
                 search={searchBomOptions}
                 placeholder="Search BOM by number or finished-good name..."
               />

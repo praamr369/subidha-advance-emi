@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
 import { accountingErrorMessage } from "@/components/accounting/shared";
@@ -12,15 +12,19 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { ROUTES } from "@/lib/routes";
-import { acceptAdminVendorQuote, getAdminQuoteRequest, rejectAdminVendorQuote } from "@/services/vendor-ops";
-
-type QuoteRow = Record<string, unknown>;
+import {
+  acceptAdminVendorQuote,
+  getAdminQuoteRequest,
+  rejectAdminVendorQuote,
+  type AcceptQuoteResponse,
+  type QuoteRequest,
+} from "@/services/vendor-ops";
 
 export default function AdminVendorQuoteDetailPage() {
   const params = useParams<{ id: string }>();
   const rfqId = Number(params.id);
 
-  const [detail, setDetail] = useState<Record<string, unknown> | null>(null);
+  const [detail, setDetail] = useState<QuoteRequest | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionNote, setActionNote] = useState<string | null>(null);
@@ -29,7 +33,7 @@ export default function AdminVendorQuoteDetailPage() {
     setLoading(true);
     try {
       const payload = await getAdminQuoteRequest(rfqId);
-      setDetail(payload as Record<string, unknown>);
+      setDetail(payload);
       setError(null);
     } catch (err) {
       setError(accountingErrorMessage(err, "Could not load quote request."));
@@ -42,14 +46,12 @@ export default function AdminVendorQuoteDetailPage() {
     void load();
   }, [load]);
 
-  const quotes = (detail?.quotes as QuoteRow[] | undefined) ?? [];
-
   async function acceptQuote(quoteId: number) {
     setActionNote(null);
     try {
-      const res = (await acceptAdminVendorQuote(quoteId)) as Record<string, unknown>;
+      const res: AcceptQuoteResponse = await acceptAdminVendorQuote(quoteId);
       await load();
-      const hint = typeof res.suggested_purchase_order_url === "string" ? res.suggested_purchase_order_url : "";
+      const hint = res.suggested_purchase_order_url ?? "";
       setActionNote(hint ? `Accepted. Procurement handoff suggestion: ${hint}` : "Quote accepted.");
     } catch (err) {
       setError(accountingErrorMessage(err, "Accept failed."));
@@ -67,15 +69,17 @@ export default function AdminVendorQuoteDetailPage() {
     }
   }
 
+  const quotes = detail?.quotes ?? [];
+
   return (
     <ERPPageShell
       eyebrow="Purchases & Vendors"
-      title={String(detail?.request_no || rfqId)}
+      title={detail?.request_no ?? String(rfqId)}
       subtitle="Compare QUOTED lines; acceptance records the decision without posting ERP documents."
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Vendor quotes", href: ROUTES.admin.vendorsQuotes },
-        { label: String(detail?.request_no || rfqId) },
+        { label: detail?.request_no ?? String(rfqId) },
       ]}
       actions={[{ href: ROUTES.admin.purchaseOrders, label: "Purchase orders workspace", variant: "primary" }]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
@@ -94,16 +98,16 @@ export default function AdminVendorQuoteDetailPage() {
           <ERPSectionShell
             title="RFQ context"
             description="Acceptance records the decision only; procurement documents are posted through explicit purchase workflows."
-            actions={<ERPStatusBadge status={String(detail.status ?? "—")} />}
+            actions={<ERPStatusBadge status={detail.status} />}
           >
             <ERPDetailGrid
               columns={3}
               items={[
-                { label: "RFQ status", value: String(detail.status ?? "—") },
-                { label: "Product", value: String(detail.product_name || "—") },
+                { label: "RFQ status", value: detail.status },
+                { label: "Product", value: detail.product_name || "—" },
                 {
                   label: "Location",
-                  value: `${String(detail.customer_city || "—")} / ${String(detail.customer_pincode || "—")}`,
+                  value: `${detail.customer_city || "—"} / ${detail.customer_pincode || "—"}`,
                 },
               ]}
             />
@@ -128,36 +132,38 @@ export default function AdminVendorQuoteDetailPage() {
                 <tbody>
                   {quotes.map((row) => {
                     const actionable = row.status === "QUOTED";
-                    const qId = Number(row.id);
+                    const closed = detail.status === "CLOSED";
                     return (
-                      <tr key={String(row.id)} className="border-t border-border align-top">
+                      <tr key={row.id} className="border-t border-border align-top">
                         <td className="p-3">
-                          <div className="font-medium">{String(row.vendor_name ?? "—")}</div>
-                          <div className="text-xs text-muted-foreground">Vendor #{String(row.vendor)}</div>
+                          <div className="font-medium">{row.vendor_name ?? `Vendor #${row.vendor}`}</div>
+                          <div className="text-xs text-muted-foreground">#{row.vendor}</div>
                         </td>
-                        <td className="p-3 tabular-nums">{String(row.quoted_price ?? "—")}</td>
-                        <td className="p-3 tabular-nums">{String(row.delivery_charge ?? "—")}</td>
-                        <td className="p-3 tabular-nums">{String(row.available_quantity ?? "—")}</td>
-                        <td className="p-3 tabular-nums">{String(row.lead_time_days ?? "—")}</td>
-                        <td className="p-3 tabular-nums">{String(row.warranty_months ?? "—")}</td>
+                        <td className="p-3 tabular-nums">{row.quoted_price}</td>
+                        <td className="p-3 tabular-nums">{row.delivery_charge}</td>
+                        <td className="p-3 tabular-nums">{row.available_quantity}</td>
+                        <td className="p-3 tabular-nums">{row.lead_time_days}</td>
+                        <td className="p-3 tabular-nums">{row.warranty_months}</td>
                         <td className="p-3">
-                          <ERPStatusBadge status={String(row.status ?? "—")} />
+                          <ERPStatusBadge status={row.status} />
                         </td>
-                        <td className="p-3 max-w-[240px] text-xs text-muted-foreground">{String(row.quality_note || "—")}</td>
+                        <td className="p-3 max-w-[240px] text-xs text-muted-foreground">
+                          {row.quality_note || "—"}
+                        </td>
                         <td className="p-3 space-y-2">
                           <button
                             type="button"
-                            disabled={!actionable || detail.status === "CLOSED"}
+                            disabled={!actionable || closed}
                             className="block w-full rounded-xl border border-border px-3 py-2 text-xs font-semibold transition hover:bg-muted disabled:opacity-40"
-                            onClick={() => void acceptQuote(qId)}
+                            onClick={() => void acceptQuote(row.id)}
                           >
                             Accept
                           </button>
                           <button
                             type="button"
-                            disabled={!actionable || detail.status === "CLOSED"}
+                            disabled={!actionable || closed}
                             className="block w-full rounded-xl border border-border px-3 py-2 text-xs font-semibold transition hover:bg-muted disabled:opacity-40"
-                            onClick={() => void rejectQuote(qId)}
+                            onClick={() => void rejectQuote(row.id)}
                           >
                             Reject
                           </button>
@@ -168,7 +174,7 @@ export default function AdminVendorQuoteDetailPage() {
                 </tbody>
               </table>
               {quotes.length === 0 ? (
-                <div className="p-4 text-muted-foreground text-sm">No vendor rows assigned.</div>
+                <div className="p-4 text-sm text-muted-foreground">No vendor rows assigned.</div>
               ) : null}
             </div>
             <div className="text-sm">

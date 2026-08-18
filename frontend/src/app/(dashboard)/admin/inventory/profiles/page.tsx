@@ -1,4 +1,3 @@
-// @ts-nocheck
 "use client";
 
 import Link from "next/link";
@@ -30,7 +29,7 @@ export default function InventoryProfilesPage() {
   const debouncedSearch = useDebounce(searchQuery, 350);
 
   const [filters, setFilters] = useState({ stock_tracking_enabled: "" });
-  const [summary, setSummary] = useState<any>(null);
+  const [summary, setSummary] = useState<Record<string, unknown> | null>(null);
 
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [showBulkPrepareDialog, setShowBulkPrepareDialog] = useState(false);
@@ -60,7 +59,7 @@ export default function InventoryProfilesPage() {
                 ? false
                 : undefined,
         }),
-        listStockLocations({ is_active: 1 }),
+        listStockLocations({ is_active: true }),
       ]);
       setRows(profilesPayload.results);
       setSummary(profilesPayload.summary);
@@ -167,7 +166,7 @@ export default function InventoryProfilesPage() {
           onChange={toggleAllSelection}
           className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
         />
-      ) as any,
+      ),
       render: (row) => (
         <input
           type="checkbox"
@@ -227,9 +226,9 @@ export default function InventoryProfilesPage() {
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
       stats={[
-        { label: "Total Profiles", value: summary?.total_profiles ?? "—", tone: "info" },
-        { label: "Tracking Active", value: summary?.tracking_active ?? "—", tone: "success" },
-        { label: "Tracking Inactive", value: summary?.tracking_inactive ?? "—", tone: "warning" },
+        { label: "Total Profiles", value: String(summary?.total_profiles ?? "—"), tone: "info" },
+        { label: "Tracking Active", value: String(summary?.tracking_active ?? "—"), tone: "success" },
+        { label: "Tracking Inactive", value: String(summary?.tracking_inactive ?? "—"), tone: "warning" },
       ]}
     >
       {message ? (

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, forwardRef, useImperativeHandle } from "react";
 import { CheckCircle2, Layers, RefreshCw, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import DynamicAttributeForm, { type AttributeValues } from "./DynamicAttributeForm";
@@ -25,9 +25,7 @@ interface Props {
 function buildAttrPayload(attrs: PimCategoryAttribute[], values: AttributeValues) {
   return attrs.flatMap((attr) => {
     const v = values[attr.id];
-    if (!v) return [];
-    const hasValue = v.value_text !== "" || v.value_number !== "" || v.value_boolean !== null || v.value_date !== "";
-    if (!hasValue) return [];
+    if (v === undefined) return []; // never loaded → skip
     return [{
       attribute: attr.id,
       value_text: v.value_text || "",
@@ -44,7 +42,11 @@ function matchByName(list: { name: string }[], text: string): number {
   return list.findIndex((item) => item.name.toLowerCase() === q || item.name.toLowerCase().includes(q) || q.includes(item.name.toLowerCase()));
 }
 
-export default function PimSyncSection({ productCode, productName, categoryText, subcategoryText, basePrice }: Props) {
+export interface PimSyncSectionHandle {
+  save: () => Promise<boolean>;
+}
+
+const PimSyncSection = forwardRef<PimSyncSectionHandle, Props>(function PimSyncSection({ productCode, productName, categoryText, subcategoryText, basePrice }: Props, ref) {
   const [allCategories, setAllCategories] = useState<PimCategory[]>([]);
   const [subcategories, setSubcategories] = useState<PimSubcategory[]>([]);
   const [attributes, setAttributes] = useState<PimCategoryAttribute[]>([]);
@@ -53,6 +55,7 @@ export default function PimSyncSection({ productCode, productName, categoryText,
   const [selectedCatId, setSelectedCatId] = useState<number | "">("");
   const [selectedSubId, setSelectedSubId] = useState<number | "">("");
   const [attrValues, setAttrValues] = useState<AttributeValues>({});
+  const [lockedAttributes, setLockedAttributes] = useState<Set<number>>(new Set());
 
   const [status, setStatus] = useState<"idle" | "loading" | "saving" | "saved" | "error">("idle");
   const [msg, setMsg] = useState<string | null>(null);
@@ -101,7 +104,9 @@ export default function PimSyncSection({ productCode, productName, categoryText,
       if (match) {
         const full = await pimService.getProductWithAttributes(match.id);
         setPimProduct(full);
-        // Pre-fill attribute values
+        // Pre-fill attribute values.
+        // For variant PimProducts: start with inherited base-product attrs,
+        // then overlay variant-specific VariantAttributeValues on top.
         const prefilled: AttributeValues = {};
         for (const a of full.attributes ?? []) {
           prefilled[a.attribute] = {
@@ -111,7 +116,28 @@ export default function PimSyncSection({ productCode, productName, categoryText,
             value_date: a.value_date ?? "",
           };
         }
+        // Inherited from base product (only present when this is a variant PimProduct)
+        for (const a of full.inherited_attribute_values ?? []) {
+          if (!prefilled[a.attribute]) {
+            prefilled[a.attribute] = {
+              value_text: a.value_text ?? "",
+              value_number: a.value_number ?? "",
+              value_boolean: a.value_boolean,
+              value_date: a.value_date ?? "",
+            };
+          }
+        }
+        // Variant-specific VariantAttributeValues override inherited values
+        for (const a of full.variant_attribute_values ?? []) {
+          prefilled[a.attribute] = {
+            value_text: a.value_text ?? "",
+            value_number: a.value_number ?? "",
+            value_boolean: a.value_boolean ?? null,
+            value_date: "",
+          };
+        }
         setAttrValues(prefilled);
+        setLockedAttributes(new Set(full.locked_attributes ?? []));
         // Auto-select category/subcategory from existing PIM product
         setSelectedCatId(full.category);
         setSelectedSubId(full.subcategory ?? "");
@@ -128,11 +154,11 @@ export default function PimSyncSection({ productCode, productName, categoryText,
     void loadPimProduct();
   }, [loadPimProduct]);
 
-  const saveToPim = async () => {
-    if (!selectedCatId || !productCode || !productName || !basePrice) {
-      setMsg("Category and base price are required for PIM sync.");
+  const saveToPim = useCallback(async (): Promise<boolean> => {
+    if (!selectedCatId || !productCode || !productName) {
+      setMsg("Category is required for PIM sync.");
       setStatus("error");
-      return;
+      return false;
     }
     setStatus("saving");
     setMsg(null);
@@ -142,9 +168,10 @@ export default function PimSyncSection({ productCode, productName, categoryText,
         name: productName,
         category: Number(selectedCatId),
         subcategory: selectedSubId ? Number(selectedSubId) : null,
-        base_price: basePrice,
+        base_price: basePrice || "0",
         is_active: true,
         is_published: false,
+        locked_attributes: Array.from(lockedAttributes),
         attributes: buildAttrPayload(attributes, attrValues),
       };
       if (pimProduct) {
@@ -157,12 +184,32 @@ export default function PimSyncSection({ productCode, productName, categoryText,
       }
       setStatus("saved");
       setTimeout(() => setStatus("idle"), 3000);
+      // Reload so the form reflects the current PIM state (including attrs set elsewhere)
+      void loadPimProduct();
+      return true;
     } catch (err: unknown) {
       const e = err as { message?: string };
       setMsg(e?.message ?? "PIM save failed");
       setStatus("error");
+      return false;
     }
-  };
+  }, [selectedCatId, productCode, productName, selectedSubId, basePrice, attributes, attrValues, lockedAttributes, pimProduct, loadPimProduct]);
+
+  useImperativeHandle(ref, () => ({
+    // Only auto-save when a PIM product is already linked — don't create one silently
+    save: async () => {
+      if (!pimProduct) return true;
+      return saveToPim();
+    },
+  }), [pimProduct, saveToPim]);
+
+  const toggleLock = useCallback((attrId: number) => {
+    setLockedAttributes((prev) => {
+      const next = new Set(prev);
+      if (next.has(attrId)) next.delete(attrId); else next.add(attrId);
+      return next;
+    });
+  }, []);
 
   const linked = Boolean(pimProduct);
 
@@ -266,6 +313,8 @@ export default function PimSyncSection({ productCode, productName, categoryText,
                   values={attrValues}
                   onChange={setAttrValues}
                   existingAttributes={pimProduct?.attributes}
+                  lockedAttributes={lockedAttributes}
+                  onToggleLock={toggleLock}
                 />
               )}
             </div>
@@ -311,4 +360,6 @@ export default function PimSyncSection({ productCode, productName, categoryText,
       )}
     </div>
   );
-}
+});
+
+export default PimSyncSection;

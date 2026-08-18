@@ -15,8 +15,6 @@ def ensure_pim_link_on_product_save(sender, instance, created, **kwargs):
     are immediately editable with full PIM attributes/variants. Best-effort — a PIM
     linking hiccup must never block saving the operational product.
     """
-    if not created:
-        return
     try:
         from products_pim.services import ensure_pim_product_for_product
 

@@ -45,23 +45,6 @@ export const ADMIN_MODULE_DATA: Record<string, ModuleData> = {
     ],
   },
 
-  payables: {
-    kpi: { label: "Pending Bills", value: "₹2,79,000", trend: "down" },
-    workflows: [
-      { id: "1", label: "Process Bill", icon: Plus, action: "/admin/payables/bill/new" },
-      { id: "2", label: "Schedule Payment", icon: RefreshCw, action: "/admin/payables/payment" },
-      { id: "3", label: "Vendor Report", icon: FileText, action: "/admin/payables/vendor-report" },
-    ],
-    requests: [
-      { id: "1", label: "Approvals", count: 7, status: "critical" },
-      { id: "2", label: "Due Today", count: 3, status: "active" },
-    ],
-    quickActions: [
-      { label: "New Bill", href: "/admin/payables/bill/new" },
-      { label: "Pay", href: "/admin/payables/payment" },
-    ],
-  },
-
   // Billing & Invoicing
   billing: {
     kpi: { label: "Outstanding", value: "₹12,79,000", trend: "down" },

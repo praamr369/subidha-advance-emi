@@ -18,7 +18,6 @@ import {
 } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
-  ArrowUpFromLine,
   BarChart3,
   BellRing,
   Boxes,
@@ -164,7 +163,6 @@ const ICON_MAP: Record<NavIconKey, React.ComponentType<{ className?: string }>> 
   profile: UserCircle2,
   support: LifeBuoy,
   collectPayment: CircleDollarSign,
-  payables: ArrowUpFromLine,
 };
 
 const SIDEBAR_COLLAPSED_LEGACY_KEY = "subidha:dashboard-sidebar-collapsed:v1";

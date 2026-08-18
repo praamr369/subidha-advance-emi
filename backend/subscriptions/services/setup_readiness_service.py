@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from django.apps import apps
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
@@ -419,7 +420,7 @@ def _numbering_continuity_section() -> dict[str, Any]:
     )
 
 
-def _opening_stock_valuation_section() -> dict[str, Any]:
+def _opening_stock_valuation_section(is_legacy_migration: bool) -> dict[str, Any]:
     from decimal import Decimal
     from django.db.models import Q
     from inventory.models import OpeningStockEntry
@@ -428,12 +429,31 @@ def _opening_stock_valuation_section() -> dict[str, Any]:
     zero_cost = entries.filter(Q(unit_cost_snapshot__isnull=True) | Q(unit_cost_snapshot=Decimal("0.00"))).count()
     total = entries.count()
     warnings: list[str] = []
+    
+    if not is_legacy_migration:
+        return _section(
+            key="opening_stock_valuation",
+            title="Opening Stock Cost / Valuation",
+            status="NOT_APPLICABLE",
+            warnings=["This is a new business. Legacy opening stock is not applicable."],
+            recommended_action="No action required for new businesses.",
+            target_route="/admin/inventory/opening-stock",
+            why_this_matters="Only required when migrating historical stock from an older system.",
+            category=INVENTORY_REQUIRED,
+            repairable=False,
+            optional_for_initial_start=True,
+            metadata={"opening_stock_entries": total, "zero_cost_entries": zero_cost, "is_legacy_migration": False},
+        )
+
     if zero_cost:
         warnings.append(f"{zero_cost} opening-stock entry(ies) have zero/blank unit cost. COGS and margin will be wrong on the first sale of those items.")
+        
+    status = "BLOCKED" if total == 0 else ("REQUIRED_PENDING" if zero_cost > 0 else "READY")
+    
     return _section(
         key="opening_stock_valuation",
         title="Opening Stock Cost / Valuation",
-        status="READY" if total == 0 or zero_cost == 0 else "REQUIRED_PENDING",
+        status=status,
         warnings=warnings,
         recommended_action="Ensure every opening-stock line carries a real unit cost before posting, so inventory valuation, COGS, and margin are correct from day 1.",
         target_route="/admin/inventory/opening-stock",
@@ -441,7 +461,7 @@ def _opening_stock_valuation_section() -> dict[str, Any]:
         category=INVENTORY_REQUIRED,
         repairable=False,
         optional_for_initial_start=True,
-        metadata={"opening_stock_entries": total, "zero_cost_entries": zero_cost},
+        metadata={"opening_stock_entries": total, "zero_cost_entries": zero_cost, "is_legacy_migration": True},
     )
 
 
@@ -466,7 +486,7 @@ def _opening_balance_integrity_section() -> dict[str, Any]:
     )
 
 
-def _legacy_receivable_section() -> dict[str, Any]:
+def _legacy_receivable_section(is_legacy_migration: bool) -> dict[str, Any]:
     from accounting.models import CustomerOpeningOutstanding
     from django.db.models import Sum
     from decimal import Decimal
@@ -479,12 +499,31 @@ def _legacy_receivable_section() -> dict[str, Any]:
     collected = qs.aggregate(t=Sum("collected_amount"))["t"] or Decimal("0.00")
     remaining = original - collected
     warnings: list[str] = []
+    
+    if not is_legacy_migration:
+        return _section(
+            key="legacy_receivable_collection",
+            title="Opening financial position verified",
+            status="NOT_APPLICABLE",
+            warnings=["This is a new business. Legacy outstandings are not applicable."],
+            recommended_action="No action required for new businesses.",
+            target_route="/admin/finance/collect",
+            why_this_matters="Only required when migrating historical receivables from an older system.",
+            category=FINANCE_ACCOUNTING_REQUIRED,
+            repairable=False,
+            optional_for_initial_start=True,
+            metadata={"total": total, "is_legacy_migration": False},
+        )
+        
     if total == 0:
-        warnings.append("No legacy customer outstandings migrated yet. This is normal if there is no old-account receivable to carry over.")
+        warnings.append("No legacy customer outstandings migrated yet. This is required for legacy migration.")
+        
+    status = "BLOCKED" if total == 0 else ("REQUIRED_PENDING" if open_count > 0 else "READY")
+    
     return _section(
         key="legacy_receivable_collection",
-        title="Legacy Customer Outstandings (Old Account Collections)",
-        status="READY" if total == 0 or open_count == 0 else "REQUIRED_PENDING",
+        title="Opening financial position verified",
+        status=status,
         warnings=warnings,
         recommended_action="Migrate old-account customer outstandings, then collect them (full or partial) from the universal collection workspace so each payment posts to your cash/bank/UPI ledger.",
         target_route="/admin/finance/collect",
@@ -498,7 +537,8 @@ def _legacy_receivable_section() -> dict[str, Any]:
             "settled": settled_count,
             "total_original": f"{original:.2f}",
             "total_collected": f"{collected:.2f}",
-            "total_remaining": f"{remaining:.2f}",
+            "remaining": f"{remaining:.2f}",
+            "is_legacy_migration": True,
             "collection_route": "/admin/finance/collect?workflow=legacy-receivable",
         },
     )
@@ -565,23 +605,25 @@ def get_setup_readiness() -> dict[str, Any]:
     subscription_ready = active_products.exists() and batches.exists() and lucky_ids.exists() and numbering_ready
     inventory_account_ready = _active_system_account_exists("INVENTORY_ASSET") and _active_system_account_exists("PURCHASE_EXPENSE")
 
+    is_legacy_migration = bool(active_business_profile and getattr(active_business_profile, "is_legacy_migration", False))
+
     sections = [
         _section(key="admin_preserved", title="Admin Preserved", status="READY" if admin_users.exists() else "BLOCKED", blockers=[] if admin_users.exists() else ["Active admin user is missing."], recommended_action="Preserve admin user, especially username subidhafurniture where configured, before destructive reset or restore.", target_route="/admin/settings/users", why_this_matters="Setup/reset controls must remain admin-only and must preserve the primary business operator.", category=CORE_REQUIRED, repairable=False, metadata={"admin_users": admin_users.count(), "preserve_username": "subidhafurniture"}),
         _section(key="business_profile", title="Business Profile", status="READY" if active_business_profile else "BLOCKED", blockers=[] if active_business_profile else ["Active business profile is missing."], recommended_action="Configure business name, legal name, optional GSTIN/PAN/Udyam/MSME, address, phone, email, website, GST/non-GST status, logo, terms, and footer text.", target_route="/admin/settings/business-setup/profile", why_this_matters="Receipts, contracts, invoices, statements, public business data, and audit documents need reliable business identity. GSTIN and website are optional in non-GST mode.", category=CORE_REQUIRED, repairable=False, metadata={"configured": bool(active_business_profile), "gstin_optional_for_non_gst": True, "website_optional": True}),
         _business_compliance_section(),
-        _section(key="branch_cash_counter", title="Branch & Counter / Cash Desk", status="READY" if primary_branch_exists and active_counters.exists() else "BLOCKED", blockers=[] if primary_branch_exists and active_counters.exists() else ["Primary active branch or active cash counter is missing."], recommended_action="Create/activate the primary branch and at least one cash/UPI/bank counter before cashier operations.", target_route="/admin/settings/business-setup/cash-desks", why_this_matters="Daily collection, cashier assignment, receipt source, and day-close need branch/counter context.", category=CORE_REQUIRED, repairable=True, metadata={"active_branches": active_branches.count(), "primary_branch_exists": primary_branch_exists, "active_counters": active_counters.count()}),
-        _section(key="finance_accounts", title="Cash / Bank / UPI Finance Accounts", status="READY" if ready_collection_account_exists and active_finance_blockers == 0 else ("REQUIRED_PENDING" if ready_collection_account_exists else "BLOCKED"), blockers=[] if ready_collection_account_exists else ["No collection-ready cash/bank/UPI finance account is mapped to a posting-enabled leaf ASSET account."], warnings=finance_warnings, recommended_action="Map each active real cash, bank, and UPI account to a posting-enabled leaf ASSET chart account. At least one active collection account is enough to start controlled collection.", target_route="/admin/settings/business-setup/finance-accounts", why_this_matters="Cashier/admin collection selectors must show only accounts that can safely post, reconcile, and day-close.", category=CORE_REQUIRED, repairable=True, metadata=finance_counts),
-        _section(key="chart_of_accounts", title="Chart of Accounts", status="READY" if not required_coa_missing else "BLOCKED", blockers=[] if not required_coa_missing else [f"Missing required COA account(s): {', '.join(required_coa_missing)}"], recommended_action="Seed default accounting setup and review account names before live posting.", target_route="/admin/accounting/setup", why_this_matters="Payment collection, receipts, invoices, reversals, settlements, deposits, and reconciliation require stable posting accounts.", category=FINANCE_ACCOUNTING_REQUIRED, repairable=True, metadata={"active_accounts": active_chart_accounts.count(), "missing_required_codes": required_coa_missing}),
-        _section(key="finance_account_coa_mapping", title="FinanceAccount to COA Mapping", status="READY" if not required_mappings_missing and collection_mappings.exists() else "BLOCKED", blockers=[] if not required_mappings_missing and collection_mappings.exists() else ["FinanceAccount to COA collection mappings are incomplete."], recommended_action="Complete cash/bank/UPI collection mappings and system posting profiles before controlled posting.", target_route="/admin/settings/business-setup/finance-accounts", why_this_matters="Collection accounts must map to real posting-enabled ASSET accounts; setup must not auto-post journals.", category=FINANCE_ACCOUNTING_REQUIRED, repairable=True, metadata={"missing_mapping_purposes": required_mappings_missing, "collection_mappings": collection_mappings.count()}),
-        _section(key="accounting_bridge", title="Accounting Bridge Readiness", status="READY" if not required_coa_missing and not required_mappings_missing and posting_profiles_count else "BLOCKED", blockers=[] if not required_coa_missing and not required_mappings_missing and posting_profiles_count else ["Accounting setup, posting profiles, or reconciliation mappings are incomplete."], warnings=["Bridge posting may remain approval-gated; no journals are auto-posted by setup."], recommended_action="Review mapping audit, bridge readiness, bridge reconciliation, and approval-gated posting workflows.", target_route="/admin/accounting/bridges", why_this_matters="Financial correctness depends on explicit posting profiles and reconciliation evidence. Bridge readiness is read-only and must not auto-post journals.", category=FINANCE_ACCOUNTING_REQUIRED, repairable=True, metadata={"posting_profiles": posting_profiles_count, "tax_profile_configured": bool(active_tax_profile), "bridge_reconciliation_route": "/admin/accounting/bridge-reconciliation"}),
+        _section(key="branch_cash_counter", title="Branch & Counter / Cash Desk", status="READY" if primary_branch_exists and active_counters.exists() else "BLOCKED", blockers=[] if primary_branch_exists and active_counters.exists() else ["Primary active branch or active cash counter is missing."], recommended_action="Create/activate the primary branch and at least one cash/UPI/bank counter before cashier operations.", target_route="/admin/settings/business-setup/branches-desks", why_this_matters="Daily collection, cashier assignment, receipt source, and day-close need branch/counter context.", category=CORE_REQUIRED, repairable=True, metadata={"active_branches": active_branches.count(), "primary_branch_exists": primary_branch_exists, "active_counters": active_counters.count()}),
+        _section(key="finance_accounts", title="Cash / Bank / UPI Finance Accounts", status="READY" if ready_collection_account_exists and active_finance_blockers == 0 else ("REQUIRED_PENDING" if ready_collection_account_exists else "BLOCKED"), blockers=[] if ready_collection_account_exists else ["No collection-ready cash/bank/UPI finance account is mapped to a posting-enabled leaf ASSET account."], warnings=finance_warnings, recommended_action="Map each active real cash, bank, and UPI account to a posting-enabled leaf ASSET chart account. At least one active collection account is enough to start controlled collection.", target_route="/admin/accounting/finance-accounts", why_this_matters="Cashier/admin collection selectors must show only accounts that can safely post, reconcile, and day-close.", category=CORE_REQUIRED, repairable=True, metadata=finance_counts),
+        _section(key="chart_of_accounts", title="Chart of Accounts", status="READY" if not required_coa_missing else "BLOCKED", blockers=[] if not required_coa_missing else [f"Missing required COA account(s): {', '.join(required_coa_missing)}"], recommended_action="Seed default accounting setup and review account names before live posting.", target_route="/admin/accounting/chart-of-accounts", why_this_matters="Payment collection, receipts, invoices, reversals, settlements, deposits, and reconciliation require stable posting accounts.", category=FINANCE_ACCOUNTING_REQUIRED, repairable=True, metadata={"active_accounts": active_chart_accounts.count(), "missing_required_codes": required_coa_missing}),
+        _section(key="finance_account_coa_mapping", title="FinanceAccount to COA Mapping", status="READY" if not required_mappings_missing and collection_mappings.exists() else "BLOCKED", blockers=[] if not required_mappings_missing and collection_mappings.exists() else ["FinanceAccount to COA collection mappings are incomplete."], recommended_action="Complete cash/bank/UPI collection mappings and system posting profiles before controlled posting.", target_route="/admin/accounting/setup", why_this_matters="Collection accounts must map to real posting-enabled ASSET accounts; setup must not auto-post journals.", category=FINANCE_ACCOUNTING_REQUIRED, repairable=True, metadata={"missing_mapping_purposes": required_mappings_missing, "collection_mappings": collection_mappings.count()}),
+        _section(key="accounting_bridge", title="Accounting Bridge Readiness", status="READY" if not required_coa_missing and not required_mappings_missing and posting_profiles_count else "BLOCKED", blockers=[] if not required_coa_missing and not required_mappings_missing and posting_profiles_count else ["Accounting setup, posting profiles, or reconciliation mappings are incomplete."], warnings=["Bridge posting may remain approval-gated; no journals are auto-posted by setup."], recommended_action="Review mapping audit, bridge readiness, bridge reconciliation, and approval-gated posting workflows.", target_route="/admin/accounting/setup", why_this_matters="Financial correctness depends on explicit posting profiles and reconciliation evidence. Bridge readiness is read-only and must not auto-post journals.", category=FINANCE_ACCOUNTING_REQUIRED, repairable=True, metadata={"posting_profiles": posting_profiles_count, "tax_profile_configured": bool(active_tax_profile), "bridge_reconciliation_route": "/admin/accounting/bridge-reconciliation"}),
         _accounting_period_section(),
         _opening_balance_integrity_section(),
-        _legacy_receivable_section(),
+        _legacy_receivable_section(is_legacy_migration=is_legacy_migration),
         _numbering_continuity_section(),
-        _opening_stock_valuation_section(),
+        _opening_stock_valuation_section(is_legacy_migration=is_legacy_migration),
         _go_live_backup_section(),
         _rent_lease_section(),
-        _section(key="direct_sale_setup", title="Direct Sale Setup", status="READY" if direct_sale_ready else ("REQUIRED_PENDING" if active_products.exists() else "BLOCKED"), blockers=[] if active_products.exists() else ["No active products configured for direct sale."], warnings=[] if direct_sale_ready or not active_products.exists() else ["Direct-sale numbering or document readiness is not yet configured."], recommended_action="Create active products, verify direct-sale route, numbering, invoice/receipt readiness, and bridge readiness.", target_route="/admin/billing/direct-sale", why_this_matters="Direct sale is a live selling path and must use real product, invoice, receipt, and bridge readiness without changing financial semantics.", category=DIRECT_SALE_REQUIRED, repairable=True, metadata={"active_products": active_products.count(), "document_numbering_ready": numbering_ready, "route": "/admin/billing/direct-sale"}),
+        _section(key="direct_sale_setup", title="Direct Sale Setup", status="READY" if direct_sale_ready else ("REQUIRED_PENDING" if active_products.exists() else "BLOCKED"), blockers=[] if active_products.exists() else ["No active products configured for direct sale."], warnings=[] if direct_sale_ready or not active_products.exists() else ["Direct-sale numbering or document readiness is not yet configured."], recommended_action="Create active products, verify direct-sale route, numbering, invoice/receipt readiness, and bridge readiness.", target_route="/admin/products", why_this_matters="Direct sale is a live selling path and must use real product, invoice, receipt, and bridge readiness without changing financial semantics.", category=DIRECT_SALE_REQUIRED, repairable=True, metadata={"active_products": active_products.count(), "document_numbering_ready": numbering_ready, "route": "/admin/billing/direct-sale"}),
         _section(key="subscription_emi_setup", title="Subscription EMI / Lucky Plan Setup", status="READY" if subscription_ready else "REQUIRED_PENDING", warnings=[] if subscription_ready else ["Active products, batch/lucky IDs, or receipt/document readiness is incomplete."], recommended_action="Create active products, prepare Lucky Plan batches/Lucky IDs, verify EMI collection and receipt readiness, and keep bridge posting controlled.", target_route="/admin/subscriptions", why_this_matters="Lucky Plan EMI requires controlled product pricing, batch/Lucky ID readiness, receipts, waiver audit, and bridge readiness.", category=SUBSCRIPTION_EMI_REQUIRED, repairable=True, metadata={"active_products": active_products.count(), "batches": batches.count(), "lucky_ids": lucky_ids.count(), "document_numbering_ready": numbering_ready}),
         _section(key="inventory_accounting", title="Inventory Accounting Setup", status="READY" if inventory_account_ready else "BLOCKED", blockers=[] if inventory_account_ready else ["Inventory asset / purchase / COGS accounting setup is incomplete."], recommended_action="Open accounting setup and mapping audit. Inventory stock quantities must still be entered through manual opening stock or CSV confirmation workflows.", target_route="/admin/accounting/setup", why_this_matters="Inventory is required as an admin workflow. Accounting accounts can be ready while stock quantity remains onboarding-pending.", category=INVENTORY_REQUIRED, repairable=True, metadata={"inventory_asset_ready": _active_system_account_exists("INVENTORY_ASSET"), "purchase_expense_ready": _active_system_account_exists("PURCHASE_EXPENSE")} ),
         _inventory_onboarding_section(active_products),
@@ -625,8 +667,15 @@ def get_setup_readiness() -> dict[str, Any]:
         {"key": "can_reconcile", "label": "Can review bridge readiness", "ready": not required_coa_missing and not required_mappings_missing and bool(posting_profiles_count), "source_section": "accounting_bridge", "category": FINANCE_ACCOUNTING_REQUIRED},
         {"key": "can_day_close", "label": "Can day-close after collections", "ready": ready_collection_account_exists and active_counters.exists(), "source_section": "branch_cash_counter", "category": CORE_REQUIRED},
     ]
+    def calculate_score(cat: str) -> int:
+        cat_stats = category_summary.get(cat)
+        if not cat_stats or cat_stats["total"] == 0:
+            return 100
+        return int((cat_stats["ready"] / cat_stats["total"]) * 100)
+
     overall_status = "BLOCKED" if blocker_count else "READY"
     return {
+        "allow_business_reset": getattr(settings, "ALLOW_BUSINESS_RESET", True),
         "summary": {"overall_status": overall_status, "ready_count": ready_count, "warning_count": warning_count, "blocker_count": blocker_count, "next_recommended_action": first_not_ready["recommended_action"] if first_not_ready else "Setup is ready for controlled live operations.", "next_target_route": first_not_ready["target_route"] if first_not_ready else "/admin", "category_summary": category_summary, "core_operational_ready": blocker_count == 0},
         "sections": sections,
         "finance_accounts": finance_rows,
@@ -638,6 +687,10 @@ def get_setup_readiness() -> dict[str, Any]:
             "ready_sections": ready_count,
             "blocked_sections": blocker_count,
             "warning_sections": warning_count,
+            "core_kpi_score": calculate_score(CORE_REQUIRED),
+            "accounting_kpi_score": calculate_score(FINANCE_ACCOUNTING_REQUIRED),
+            "inventory_kpi_score": calculate_score(INVENTORY_REQUIRED),
+            "crm_kpi_score": calculate_score(CRM_REQUIRED),
             "admin_count": admin_users.count(),
             "cashier_count": cashier_users.count(),
             "branch_count": active_branches.count(),

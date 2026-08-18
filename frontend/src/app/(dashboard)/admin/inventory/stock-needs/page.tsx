@@ -9,12 +9,10 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { StockNeedsOperationalWorkspace } from "@/components/workspace/StockNeedsOperationalWorkspace";
 import { ROUTES } from "@/lib/routes";
-import { listStockNeeds } from "@/services/inventory-ops";
-
-type Row = Record<string, unknown>;
+import { listStockNeeds, type StockNeedRow } from "@/services/inventory-ops";
 
 export default function StockNeedsPage() {
-  const [rows, setRows] = useState<Row[]>([]);
+  const [rows, setRows] = useState<StockNeedRow[]>([]);
   const [count, setCount] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -23,9 +21,8 @@ export default function StockNeedsPage() {
     setLoading(true);
     try {
       const payload = await listStockNeeds({ limit: "100" });
-      const p = payload as { results?: Row[]; count?: number };
-      setRows(p.results ?? []);
-      setCount(typeof p.count === "number" ? p.count : (p.results ?? []).length);
+      setRows(payload.results ?? []);
+      setCount(typeof payload.count === "number" ? payload.count : (payload.results ?? []).length);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load stock needs.");

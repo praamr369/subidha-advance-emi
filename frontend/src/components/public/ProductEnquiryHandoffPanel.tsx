@@ -20,6 +20,58 @@ type ProductEnquiryHandoffPanelProps = {
   dict: any;
 };
 
+function PriceDisplay({ product }: { product: PublicProduct }) {
+  const price = Number(product.base_price ?? 0);
+  const hasVariants = (product.pim_variants?.length ?? 0) > 0;
+  const range = product.price_range;
+
+  // Blueprint product: base_price=0, pricing on variant SKUs
+  if (price === 0 && hasVariants) {
+    if (range) {
+      const minFmt = formatCurrency(range.min);
+      const maxFmt = formatCurrency(range.max);
+      const isSingle = range.min === range.max;
+      return (
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            {isSingle ? "Price" : "Starting from"}
+          </div>
+          <div className="mt-2 text-4xl font-semibold tracking-tight text-foreground">
+            {isSingle ? minFmt : minFmt}
+          </div>
+          {!isSingle && (
+            <div className="mt-1 text-sm text-muted-foreground">
+              up to {maxFmt} · {range.count} variant{range.count !== 1 ? "s" : ""}
+            </div>
+          )}
+          <p className="mt-2 text-xs text-amber-700 dark:text-amber-400 font-medium">
+            Select options above to see the exact price for your chosen variant.
+          </p>
+        </div>
+      );
+    }
+    return (
+      <div>
+        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Price</div>
+        <div className="mt-2 text-2xl font-semibold tracking-tight text-muted-foreground">Price on enquiry</div>
+        <p className="mt-2 text-xs text-muted-foreground">Select a variant above or contact branch for pricing.</p>
+      </div>
+    );
+  }
+
+  // Normal product or matched variant — show exact price
+  return (
+    <div>
+      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+        {hasVariants ? "Selected variant price" : "Catalogue base price"}
+      </div>
+      <div className="mt-2 text-4xl font-semibold tracking-tight text-foreground">
+        {formatCurrency(product.base_price)}
+      </div>
+    </div>
+  );
+}
+
 export default function ProductEnquiryHandoffPanel({ product, dict }: ProductEnquiryHandoffPanelProps) {
 
   const planOptions: Array<{
@@ -57,12 +109,7 @@ export default function ProductEnquiryHandoffPanel({ product, dict }: ProductEnq
   return (
     <aside className="grid gap-5">
       <section className="public-card p-6 shadow-[0_26px_62px_-40px_rgba(15,23,42,0.22)] dark:shadow-none">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          Catalogue base price
-        </div>
-        <div className="mt-2 text-4xl font-semibold tracking-tight text-foreground">
-          {formatCurrency(product.base_price)}
-        </div>
+        <PriceDisplay product={product} />
         <p className="mt-3 text-sm leading-6 text-muted-foreground">
           This price comes from live public product records. Final stock, discount, invoice, EMI, rent, lease, taxes, and delivery terms are confirmed only through branch workflow.
         </p>

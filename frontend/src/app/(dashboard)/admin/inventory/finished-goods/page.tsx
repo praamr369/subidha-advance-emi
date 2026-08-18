@@ -126,6 +126,14 @@ export default function FinishedGoodsPage() {
                     </div>
                     <div className="mt-1 text-xs text-muted-foreground">
                       SKU: {row.sku ?? "—"} · UoM: {row.unit_of_measure} · Cost: ₹{row.standard_unit_cost}
+                      {" · "}
+                      <span className={(() => {
+                        const qty = parseFloat(row.physical_qty ?? "0");
+                        const reorder = parseFloat(row.reorder_level_qty ?? "0");
+                        return qty <= 0 ? "font-semibold text-red-600 dark:text-red-400" : qty <= reorder ? "font-semibold text-amber-600 dark:text-amber-400" : "font-semibold text-green-600 dark:text-green-400";
+                      })()}>
+                        Stock: {parseFloat(row.physical_qty ?? "0").toFixed(2)}
+                      </span>
                     </div>
                     {row.category ? (
                       <div className="mt-0.5 text-xs text-muted-foreground">

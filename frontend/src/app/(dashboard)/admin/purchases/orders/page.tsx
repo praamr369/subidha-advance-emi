@@ -1,4 +1,3 @@
-// @ts-nocheck
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
@@ -78,7 +77,7 @@ function CreatePOForm({ vendors, items, onSaved, onCancel }: CreatePOFormProps) 
     if (!poDate) errs.po_date = "Date is required.";
     const validLines = lines.filter((l) => l.inventory_item);
     if (!validLines.length) errs.lines = "At least one line item is required.";
-    validLines.forEach((l: any, i: any) => {
+    validLines.forEach((l: PurchaseOrderLine, i: number) => {
       if (parseFloat(l.quantity) <= 0) errs[`qty_${i}`] = "Quantity must be > 0.";
       if (parseFloat(l.unit_cost) < 0) errs[`cost_${i}`] = "Unit cost cannot be negative.";
     });
@@ -221,7 +220,7 @@ function PODetailDrawer({ po, onCancelled, onClose }: DetailDrawerProps) {
   }
 
   const canCancel = po.status === "DRAFT";
-  const lineTotal = po.lines.reduce((sum: any, l: any) => sum + parseFloat(l.unit_cost) * parseFloat(l.quantity), 0);
+  const lineTotal = po.lines.reduce((sum: number, l: PurchaseOrderLine) => sum + parseFloat(l.unit_cost) * parseFloat(l.quantity), 0);
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end">
@@ -254,7 +253,7 @@ function PODetailDrawer({ po, onCancelled, onClose }: DetailDrawerProps) {
                   <tr><th className="py-1 pr-3">Item</th><th className="py-1 pr-3">Qty</th><th className="py-1 pr-3">Unit Cost</th><th className="py-1">Tax</th></tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {po.lines.map((l: any, i: any) => (
+                  {po.lines.map((l: PurchaseOrderLine, i: number) => (
                     <tr key={l.id ?? i}>
                       <td className="py-1.5 pr-3">{l.inventory_item_product_name ?? `Item #${l.inventory_item}`}</td>
                       <td className="py-1.5 pr-3">{l.quantity}</td>

@@ -57,5 +57,27 @@ class PIMSyncService:
             except Exception:
                 pass
 
+        # Sync PIM attributes into the core product's base_specs JSON dictionary
+        base_specs = {}
+        
+        # 1. Base product attributes
+        for p_attr in pim_product.attributes.select_related('attribute').all():
+            base_specs[p_attr.attribute.slug] = p_attr.display_value
+            
+        # 2. Variant-specific attribute overrides
+        for v_attr in variant.attribute_values.select_related('attribute').all():
+            dtype = v_attr.attribute.data_type
+            if dtype in ('TEXT', 'CHOICE', 'MULTI_CHOICE'):
+                val = v_attr.value_text
+            elif dtype in ('NUMBER', 'DECIMAL'):
+                val = float(v_attr.value_number) if v_attr.value_number is not None else None
+            elif dtype == 'BOOLEAN':
+                val = v_attr.value_boolean
+            else:
+                val = v_attr.value_text
+            base_specs[v_attr.attribute.slug] = val
+            
+        core_product.base_specs = base_specs
+
         core_product.save()
         return core_product

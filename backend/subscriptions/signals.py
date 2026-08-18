@@ -16,6 +16,22 @@ from subscriptions.services.cache_service import (
     invalidate_all_dashboards,
 )
 
+
+# =====================================================
+# 0️⃣ BUSINESS PROFILE → REFRESH POLICY PLACEHOLDER CACHE
+# =====================================================
+
+@receiver(post_save, sender='business_setup.BusinessProfile')
+def refresh_policy_placeholder_cache_on_profile_save(sender, instance, **kwargs):
+    """
+    When the business profile is updated (name, phone, email, address, etc.),
+    invalidate the render_policy_content context cache so all policy API
+    responses automatically reflect the new business data on the next request.
+    No policy content in the DB is mutated — resolution is always at serve time.
+    """
+    from django.core.cache import cache
+    cache.delete("policy_placeholder_context")
+
 # =====================================================
 # 1️⃣ BATCH → CREATE LUCKY IDS (SAFE INITIALIZATION)
 # =====================================================

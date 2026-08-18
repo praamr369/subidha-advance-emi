@@ -341,6 +341,10 @@ export default function PrintBrandingSettingsPage() {
                     <input type="checkbox" checked={settings.show_watermark !== false} onChange={(e) => updateField("show_watermark", e.target.checked)} />
                     Show unsafe-status watermark
                   </label>
+                  <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <input type="checkbox" checked={settings.show_upi_qr !== false} onChange={(e) => updateField("show_upi_qr", e.target.checked)} />
+                    Show UPI QR Code (if UPI ID is set)
+                  </label>
                 </div>
               </div>
             </section>

@@ -42,19 +42,19 @@ export async function listHrStaffAdvances() {
 }
 
 export async function createHrStaffAdvance(payload: { employee: number; request_date: string; amount: string; reason: string; notes?: string }) {
-  return apiFetch<HrStaffAdvance>("/admin/hr/staff-advances/", { method: "POST", body: JSON.stringify(payload) });
+  return apiFetch<HrStaffAdvance>("/admin/hr/staff-advances/", { method: "POST", body: payload });
 }
 
 export async function approveHrStaffAdvance(id: number) {
-  return apiFetch<HrStaffAdvance>(`/admin/hr/staff-advances/${id}/approve/`, { method: "POST", body: JSON.stringify({}) });
+  return apiFetch<HrStaffAdvance>(`/admin/hr/staff-advances/${id}/approve/`, { method: "POST", body: {} });
 }
 
 export async function disburseHrStaffAdvance(id: number, payload: { finance_account: number; disbursement_date: string; reference_no?: string }) {
-  return apiFetch<HrStaffAdvance>(`/admin/hr/staff-advances/${id}/disburse/`, { method: "POST", body: JSON.stringify(payload) });
+  return apiFetch<HrStaffAdvance>(`/admin/hr/staff-advances/${id}/disburse/`, { method: "POST", body: payload });
 }
 
 export async function recoverHrStaffAdvance(id: number, payload: { finance_account: number; recovery_date: string; amount: string; reference_no?: string }) {
-  return apiFetch<HrStaffAdvance>(`/admin/hr/staff-advances/${id}/recover/`, { method: "POST", body: JSON.stringify(payload) });
+  return apiFetch<HrStaffAdvance>(`/admin/hr/staff-advances/${id}/recover/`, { method: "POST", body: payload });
 }
 
 export type HrStaffOptions = {
@@ -191,11 +191,28 @@ export type HrExpenseClaim = {
   notes: string;
 };
 
+export type HrSalarySheetLine = {
+  id: number;
+  component_name: string;
+  component_type: "EARNING" | "DEDUCTION";
+  source_type: string;
+  source_reference: string;
+  quantity: string;
+  rate: string;
+  amount: string;
+  notes: string;
+  sort_order: number;
+};
+
 export type HrPayrollSheet = {
   id: number;
   employee: number;
   employee_name: string;
   employee_code: string;
+  employee_phone?: string;
+  employee_designation?: string;
+  employee_department?: string;
+  payroll_period?: number;
   payroll_period_code?: string;
   payroll_period_status?: string;
   year: number;
@@ -206,7 +223,9 @@ export type HrPayrollSheet = {
   status: string;
   payment_total?: string;
   outstanding_amount?: string;
+  lines?: HrSalarySheetLine[];
   created_at?: string;
+  updated_at?: string;
 };
 
 export type HrSalaryPayment = {
@@ -347,11 +366,11 @@ export type HrStaffCreatePayload = {
 };
 
 export async function createHrStaff(payload: HrStaffCreatePayload) {
-  return apiFetch<{ employee: HrStaff; workflow_status?: string; user_id?: number | null; staff_identity_id?: number | null; temporary_password?: string | null }>("/admin/hr/staff/", { method: "POST", body: JSON.stringify(payload) });
+  return apiFetch<{ employee: HrStaff; workflow_status?: string; user_id?: number | null; staff_identity_id?: number | null; temporary_password?: string | null }>("/admin/hr/staff/", { method: "POST", body: payload });
 }
 
 export async function patchHrStaff(staffId: number, payload: Record<string, unknown>) {
-  return apiFetch(`/admin/hr/staff/${staffId}/`, { method: "PATCH", body: JSON.stringify(payload) });
+  return apiFetch(`/admin/hr/staff/${staffId}/`, { method: "PATCH", body: payload });
 }
 
 export async function listHrAttendance(params = "") {
@@ -359,7 +378,7 @@ export async function listHrAttendance(params = "") {
 }
 
 export async function markHrAttendance(payload: { employee: number; attendance_date?: string; status: string; notes?: string; worked_hours?: string | null; overtime_hours?: string | null }) {
-  return apiFetch("/admin/hr/attendance/", { method: "POST", body: JSON.stringify(payload) });
+  return apiFetch("/admin/hr/attendance/", { method: "POST", body: payload });
 }
 
 export async function listHrLeaveRequests(params: Record<string, string | number | undefined | null> = {}) {
@@ -367,11 +386,11 @@ export async function listHrLeaveRequests(params: Record<string, string | number
 }
 
 export async function patchHrLeaveRequest(leaveRequestId: number, payload: { action: "APPROVE" | "REJECT"; reason?: string }) {
-  return apiFetch(`/admin/hr/leave-requests/${leaveRequestId}/`, { method: "PATCH", body: JSON.stringify(payload) });
+  return apiFetch(`/admin/hr/leave-requests/${leaveRequestId}/`, { method: "PATCH", body: payload });
 }
 
 export async function createHrLeaveRequest(payload: { employee: number; leave_type: number; start_date: string; end_date?: string; reason?: string; notes?: string }) {
-  return apiFetch<HrLeaveRequest>("/admin/hr/leave-requests/", { method: "POST", body: JSON.stringify(payload) });
+  return apiFetch<HrLeaveRequest>("/admin/hr/leave-requests/", { method: "POST", body: payload });
 }
 
 export type HrLeaveType = { id: number; code: string; name: string; is_paid: boolean; annual_allowance_days: string | null; is_active: boolean };
@@ -402,11 +421,22 @@ export async function listHrExpenseClaims(params: Record<string, string | number
 }
 
 export async function patchHrExpenseClaim(expenseClaimId: number, payload: { action: "APPROVE" | "REJECT"; reason?: string }) {
-  return apiFetch(`/admin/hr/expense-claims/${expenseClaimId}/`, { method: "PATCH", body: JSON.stringify(payload) });
+  return apiFetch(`/admin/hr/expense-claims/${expenseClaimId}/`, { method: "PATCH", body: payload });
 }
 
 export async function getHrPayroll(params: Record<string, string | number | undefined | null> = {}) {
   return apiFetch<{ current_period: { id: number; code: string; status: string } | null; salary_sheets: HrPayrollSheet[] }>(`/admin/hr/payroll/${queryString(params)}`);
+}
+
+export async function createSalarySheet(payload: {
+  employee: number;
+  year: number;
+  month: number;
+  auto_generate?: boolean;
+  gross_amount?: string;
+  deductions_amount?: string;
+}) {
+  return apiFetch<HrPayrollSheet>("/admin/hr/payroll/", { method: "POST", body: { auto_generate: true, ...payload } });
 }
 
 export async function listHrSalaryPayments(params: Record<string, string | number | undefined | null> = {}) {
@@ -426,7 +456,7 @@ export async function recordSalaryPayment(payload: { salary_sheet: number; payme
 }
 
 export async function setHrStaffStatus(staffId: number, action: "DEACTIVATE" | "REACTIVATE", reason?: string) {
-  return apiFetch<HrStaff>(`/admin/hr/staff/${staffId}/status/`, { method: "POST", body: JSON.stringify({ action, reason }) });
+  return apiFetch<HrStaff>(`/admin/hr/staff/${staffId}/status/`, { method: "POST", body: { action, reason } });
 }
 
 export async function listHrStaffDocuments(params: number | Record<string, string | number | undefined | null> = {}) {
@@ -439,7 +469,7 @@ export async function createHrStaffDocument(payload: FormData) {
 }
 
 export async function patchHrStaffDocument(documentId: number, payload: Record<string, unknown>) {
-  return apiFetch<HrStaffDocument>(`/admin/hr/staff-documents/${documentId}/`, { method: "PATCH", body: JSON.stringify(payload) });
+  return apiFetch<HrStaffDocument>(`/admin/hr/staff-documents/${documentId}/`, { method: "PATCH", body: payload });
 }
 
 export async function reviewHrStaffDocument(
@@ -449,7 +479,7 @@ export async function reviewHrStaffDocument(
 ) {
   return apiFetch<HrStaffDocument>(`/admin/hr/staff-documents/${documentId}/review/`, {
     method: "POST",
-    body: JSON.stringify({ action, notes: notes ?? "" }),
+    body: { action, notes: notes ?? "" },
   });
 }
 

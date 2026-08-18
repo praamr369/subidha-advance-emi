@@ -56,6 +56,10 @@ class PolicyPageAdminSerializer(serializers.ModelSerializer):
     archive_reason = serializers.SerializerMethodField()
     source_template_key = serializers.SerializerMethodField()
 
+    raw_content = serializers.CharField(source="content", read_only=True)
+    raw_summary = serializers.CharField(source="summary", read_only=True)
+    raw_title = serializers.CharField(source="title", read_only=True)
+
     public_visible = serializers.SerializerMethodField()
     internal_only = serializers.SerializerMethodField()
     public_ready = serializers.SerializerMethodField()
@@ -99,8 +103,11 @@ class PolicyPageAdminSerializer(serializers.ModelSerializer):
             "internal_ready",
             "lifecycle_actions",
             "title",
+            "raw_title",
             "summary",
+            "raw_summary",
             "content",
+            "raw_content",
             "status",
             "effective_date",
             "last_reviewed_at",
@@ -118,6 +125,9 @@ class PolicyPageAdminSerializer(serializers.ModelSerializer):
         read_only_fields = (
             "id",
             "version",
+            "raw_title",
+            "raw_summary",
+            "raw_content",
             "published_at",
             "last_published_at",
             "published_by",
@@ -236,6 +246,13 @@ class PolicyPageAdminSerializer(serializers.ModelSerializer):
 
     def get_lifecycle_actions(self, obj: PolicyPage) -> dict[str, bool]:
         return lifecycle_actions_for_policy(obj)
+
+    def to_representation(self, instance: PolicyPage):
+        data = super().to_representation(instance)
+        data["content"] = render_policy_content(instance.content or "")
+        data["summary"] = render_policy_content(instance.summary or "")
+        data["title"] = render_policy_content(instance.title or "")
+        return data
 
     def validate_status(self, value: str) -> str:
         if value in {POLICY_STATUS_PUBLISHED, POLICY_STATUS_APPROVED}:
