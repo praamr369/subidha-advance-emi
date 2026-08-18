@@ -92,8 +92,12 @@ export default function AdminPaymentCollectPage({
   async function handleSearch(query: string, autoSelectContext?: string) {
     const trimmed = query.trim();
     setSearchError(null);
-    setSuccessResponse(null);
-    
+    // Do NOT clear successResponse here: handleSuccess() re-invokes handleSearch
+    // to refresh the row list, and clearing here races the banner off-screen
+    // within one render tick. The banner is dismissed explicitly by the
+    // "Collect Another Payment" button or by successResponse being replaced
+    // by a subsequent collection.
+
     if (!trimmed) {
       setSearchResults([]);
       return;
