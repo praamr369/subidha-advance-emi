@@ -10,8 +10,9 @@ from inventory.services.local_inventory_vendor_seed_service import (
     VENDOR_CODE_PREFIX,
     seed_inventory_vendor_sandbox,
 )
+from accounting.services.accounting_setup_service import AccountingSetupService
 from subscriptions.models import Product
-from tests.helpers import create_admin_user
+from tests.helpers import create_admin_user, ensure_test_accounting_posting_prerequisites
 
 
 @override_settings(DEBUG=True)
@@ -19,6 +20,11 @@ class InventoryVendorSandboxSeedTests(TestCase):
     def setUp(self):
         super().setUp()
         self.admin = create_admin_user(username="inventory_seed_admin")
+        # Seeding posts opening stock to the ledger, which needs both the standard
+        # chart of accounts (INVENTORY_ASSET etc.) and an open financial year with
+        # journal numbering profile for today's posting date.
+        AccountingSetupService.bootstrap(actor=self.admin, dry_run=False)
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
 
     def test_seed_creates_records_and_is_idempotent(self):
         first = seed_inventory_vendor_sandbox(performed_by=self.admin, item_count=60, vendor_count=6)

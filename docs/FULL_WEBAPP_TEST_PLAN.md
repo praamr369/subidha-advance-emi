@@ -22,6 +22,37 @@ Run every step against a **restored clone of the production DB**, never the live
 - [ ] Regenerate inventories so they match this build (Developer Guide §8) — routes/pages/modules.
 - [ ] Have one login per role ready: **admin, cashier, partner, vendor, staff, customer**.
 
+> **Run log — 2026-08-18 (full production-readiness sweep after inventory enterprise refactor):**
+> All gates green after fixing 1 latent 500 + 5 pre-existing test failures.
+>
+> **Frontend gates:** `typecheck` ✅ (exit 0), `check:routes` ✅ (599 pages / 421 constants / 225 admin registry links / 0 warnings), `lint` ✅ (0 errors, 423 pre-existing warnings — unused vars / any / unused params, no bugs), `build:smoke` ✅ (full Next.js production build, all routes compiled).
+>
+> **Backend gates:** `manage.py check` ✅ (0 issues), `makemigrations --check --dry-run` ✅ (no drift).
+>
+> **Layer-A verification suite (53 tests, walks all ~1,529 /api/v1 endpoints as multiple roles):** first run caught **1 real 500 crash** — `AdminOwnerLoanScheduleView.get()` on `/api/v1/admin/finance/owner-funds/schedule-preview/` raised `TypeError: missing pk` (view bound to two URLs, POST-only preview vs GET-with-pk schedule). Fixed by making `pk` optional and returning 405 on the preview route's GET. Added regression test `tests.accounting.test_owner_funds_api`. Re-run: 53/53 ✅ OK.
+>
+> **Scoped inventory/manufacturing/accounting bridge tests (62 tests):** first run had 4 errors + 1 fail — all confirmed **pre-existing on clean HEAD** (reproduced with uncommitted work stashed), unrelated to the session's inventory refactor. Root causes + fixes (all committed):
+> 1. `tests.manufacturing.test_production_workflow` × 2 — ERROR `No active financial year configured`. Test setUp never seeded accounting posting prereqs; sibling `test_manufacturing_endpoints.py` does. **Fix:** added `ensure_test_accounting_posting_prerequisites(reference_date=date(2026, 4, 20))` to setUp.
+> 2. `tests.inventory.test_inventory_valuation` — FAIL `'0.00' != '1800.00'`. `_calculate_on_hand_qty_bulk` in `inventory/services/valuation_service.py` summed only StockLedger, ignoring both `opening_stock_qty` and the `SOFT_HOLD_MOVEMENT_TYPES` exclusion — a real valuation understatement bug for opening-balance-only items. **Fix:** rewrote to match the canonical stock formula from `stock_service.py:87` (`opening + Σin − Σout`, excluding soft-holds), pass `item` through to avoid an extra query. Financial-integrity impact: valuation reports were undercounting opening-balance inventory.
+> 3. `tests.inventory.test_demand_planning_module.test_demand_planning_result_contains_expected_inputs` — ERROR `ValidationError: Batch is LOCKED — new subscriptions cannot be enrolled (CTRL-LP-5)`. Test created a LOCKED batch then tried to enroll into it; the guard now (correctly) rejects. **Fix:** enroll while OPEN, then lock via `.update(status="LOCKED")` (fixture-only bypass, business rule preserved).
+> 4. `tests.inventory.test_inventory_vendor_sandbox_seed.test_seed_creates_records_and_is_idempotent` — ERROR `Missing active INVENTORY_ASSET chart account` → `No JOURNAL_ENTRY numbering profile for FY2026-27`. **Fix:** setUp now calls `AccountingSetupService.bootstrap()` + `ensure_test_accounting_posting_prerequisites()` before seeding.
+>
+> Result after fixes: **62/62 ✅ OK** across the scoped suite, **53/53 ✅ OK** on full Layer-A verification.
+>
+> **UAT smoke:** frontend + backend booted; `/login` and `/products` render with 0 console errors; endpoint smoke coverage (all 1,529 endpoints × multiple roles) already provided by Layer-A gate. Interactive admin click-through deferred (no local admin creds).
+>
+> **Files changed this run:**
+> - `backend/api/v1/views/admin_owner_funds.py` — `pk` optional guard for shared view
+> - `backend/inventory/services/valuation_service.py` — canonical on-hand formula (soft-hold exclusion + opening_stock_qty)
+> - `backend/tests/manufacturing/test_production_workflow.py` — accounting prereqs in setUp
+> - `backend/tests/inventory/test_demand_planning_module.py` — enroll-then-lock ordering
+> - `backend/tests/inventory/test_inventory_vendor_sandbox_seed.py` — bootstrap chart + numbering
+> - `backend/tests/accounting/test_owner_funds_api.py` — new regression suite (4 tests)
+>
+> No production API/schema changes. Migrations unchanged. Financial-integrity impact: **valuation service now reports correct totals for items with opening_stock_qty > 0** — recompute any stored InventoryValuation snapshots after deploy if historical totals matter for audit.
+>
+> ---
+>
 > **Run log — 2026-08-06 (Stage 1 executed):**
 > Backend all green — `check` 0 issues; `check --deploy` under production settings has **no** security warnings (HSTS/SSL-redirect/secure-cookies/DEBUG all correct); no migration drift; `migrate` no-op; `spectacular` exit 0. Only cosmetic drf_spectacular W001/W002 doc hints remain (non-blocking).
 > Frontend — `typecheck` ✅ clean; `build` ✅ (498 static pages, exit 0); `check:routes` was ❌ **74 pre-existing committed route-drift errors** → **now ✅ PASSES (0 errors)**; `lint` ❌ 330 problems (133 errors: ~280 hygiene [no-unused-vars/no-explicit-any/unescaped-entities] — deferred; **32 react-hooks warnings** reviewed = idiomatic timers/mount-fetch, no bugs, left as-is).

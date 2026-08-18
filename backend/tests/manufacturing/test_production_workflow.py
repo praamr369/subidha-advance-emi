@@ -19,13 +19,22 @@ from manufacturing.services.production_service import (
     upsert_production_job_draft,
 )
 from subscriptions.models import AuditLog
-from tests.helpers import create_admin_user, create_product
+from tests.helpers import (
+    create_admin_user,
+    create_product,
+    ensure_test_accounting_posting_prerequisites,
+)
 
 
 class ManufacturingWorkflowTests(TestCase):
     def setUp(self):
         super().setUp()
         self.admin = create_admin_user(username="mfg_admin", phone="9387700101")
+        # Posting production materials/output drives the accounting bridge, which
+        # requires an open financial year + period covering the job dates below.
+        ensure_test_accounting_posting_prerequisites(
+            reference_date=date(2026, 4, 20), performed_by=self.admin
+        )
         self.location = StockLocation.objects.create(code="MFG-FLR", name="Manufacturing Floor")
         self.raw_product = create_product(
             name="Wood Panel",

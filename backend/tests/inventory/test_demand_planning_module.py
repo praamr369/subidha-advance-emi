@@ -86,13 +86,15 @@ class DemandPlanningModuleTests(TestCase):
         self.assertEqual(availability["reserved"], "1.000")
 
     def test_demand_planning_result_contains_expected_inputs(self):
+        # Enroll while the batch is OPEN: CTRL-LP-5 blocks new subscriptions once a
+        # batch is LOCKED (eligible-pool snapshot frozen). Demand planning still
+        # counts these as locked-batch commitments, so we lock AFTER enrolling.
         batch = create_batch(
             batch_code="INVPLANLOCK",
             duration_months=10,
             total_slots=100,
             draw_day=5,
             start_date=date(2026, 1, 1),
-            status="LOCKED",
         )
         create_subscription(
             customer=self.customer,
@@ -103,6 +105,8 @@ class DemandPlanningModuleTests(TestCase):
             monthly_amount=Decimal("1000.00"),
             tenure_months=10,
         )
+        # Lock via update() to bypass the enrollment-time guard (fixture-only).
+        type(batch).objects.filter(pk=batch.pk).update(status="LOCKED")
         payload = calculate_product_demand(product_id=self.product.id)
         self.assertIn("active_subscriptions", payload)
         self.assertIn("locked_batch_demand", payload)

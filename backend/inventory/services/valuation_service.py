@@ -39,22 +39,34 @@ def _latest_weighted_cost(item: InventoryItem) -> Decimal:
     return weighted_average_unit_cost(item)
 
 
-def _calculate_on_hand_qty_bulk(inventory_item_id: int, stock_location_id: int | None = None) -> Decimal:
-    """Calculate on-hand quantity using bulk aggregation for a single item."""
-    from django.db.models import Q as DjangoQ
+def _calculate_on_hand_qty_bulk(item: InventoryItem, stock_location_id: int | None = None) -> Decimal:
+    """On-hand quantity for a single item, matching the canonical stock formula.
 
-    ledger_filter = DjangoQ(inventory_item_id=inventory_item_id)
+    Canonical (see inventory.services.stock_service): on-hand =
+    opening_stock_qty + Sum(quantity_in) - Sum(quantity_out), aggregated over
+    StockLedger while EXCLUDING soft-hold movements (reservations etc.). Omitting
+    either piece understated inventory valuation for opening-balance-only items.
+    """
+    from django.db.models import Q as DjangoQ
+    from inventory.models import SOFT_HOLD_MOVEMENT_TYPES
+
+    ledger_filter = DjangoQ(inventory_item_id=item.id)
     if stock_location_id:
         ledger_filter &= DjangoQ(stock_location_id=stock_location_id)
 
-    result = StockLedger.objects.filter(ledger_filter).aggregate(
-        total_in=Sum('quantity_in', output_field=DecimalField()),
-        total_out=Sum('quantity_out', output_field=DecimalField())
+    result = (
+        StockLedger.objects.filter(ledger_filter)
+        .exclude(movement_type__in=list(SOFT_HOLD_MOVEMENT_TYPES))
+        .aggregate(
+            total_in=Sum('quantity_in', output_field=DecimalField()),
+            total_out=Sum('quantity_out', output_field=DecimalField()),
+        )
     )
 
     total_in = result['total_in'] or Decimal("0.000")
     total_out = result['total_out'] or Decimal("0.000")
-    return total_in - total_out
+    opening = Decimal(str(item.opening_stock_qty or "0.000"))
+    return total_in - total_out + opening
 
 
 def build_inventory_valuation(
@@ -95,7 +107,7 @@ def build_inventory_valuation(
     temp_rows = []
 
     for item in all_items:
-        on_hand = _calculate_on_hand_qty_bulk(item.id, stock_location_id)
+        on_hand = _calculate_on_hand_qty_bulk(item, stock_location_id)
         if exclude_zero and on_hand <= Decimal("0.000"):
             continue
         unit_cost = _latest_weighted_cost(item)
@@ -181,7 +193,7 @@ def build_inventory_valuation_csv(
 
     # Write data rows
     for item in queryset:
-        on_hand = _calculate_on_hand_qty_bulk(item.id, stock_location_id)
+        on_hand = _calculate_on_hand_qty_bulk(item, stock_location_id)
         if exclude_zero and on_hand <= Decimal("0.000"):
             continue
         unit_cost = _latest_weighted_cost(item)
