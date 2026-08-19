@@ -35,7 +35,9 @@ from tests.helpers import (
     create_customer_profile,
     create_customer_user,
     create_finance_account,
+    create_payment_collection_finance_account,
     create_product,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 
@@ -185,7 +187,12 @@ class RentLeaseProductionWorkflowTests(TestCase):
 class LuckyDrawWinnerProductionWorkflowTests(TestCase):
     def test_winner_waives_only_future_unpaid_emis_and_does_not_create_cash_for_waiver(self):
         admin = _admin()
-        finance_account = create_finance_account(
+        # Winner-payment collection posts through the accounting bridge —
+        # needs an open FY + numbering profiles.
+        ensure_test_accounting_posting_prerequisites(performed_by=admin)
+        # Winner-payment collection needs a finance account with an active
+        # collection-purpose COA mapping (record_emi_payment guard).
+        finance_account = create_payment_collection_finance_account(
             code=f"WF-DRAW-CASH-{_token().upper()}",
             name=f"Workflow Draw Cash {_token()}",
             kind="CASH",

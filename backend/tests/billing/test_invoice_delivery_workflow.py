@@ -332,8 +332,10 @@ class InvoiceDeliveryServiceTests(TestCase):
         # Fail-closed: if contract readiness cannot be evaluated, delivery must be
         # BLOCKED (never optimistically allowed) so the asset cannot leave the shop.
         subscription, invoice = self._make_subscription_invoice()
+        # The readiness service was moved from subscriptions.services →
+        # contracts.services during the app-split refactor; patch the new path.
         with mock.patch(
-            "subscriptions.services.contract_activation_readiness_service."
+            "contracts.services.contract_activation_readiness_service."
             "evaluate_contract_activation_readiness",
             side_effect=RuntimeError("readiness backend exploded"),
         ):

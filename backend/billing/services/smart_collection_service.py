@@ -9,7 +9,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 from billing.models import DirectSale, SmartCollectionRun
-from subscriptions.models import CustomerAdvance, Emi, Customer, Payment
+from subscriptions.models import CustomerAdvance, Emi, EmiStatus, Customer, Payment
 from payments.services.payment_service import record_emi_payment
 from billing.services.direct_sale_collection_service import collect_direct_sale_payment
 from payments.services.payment_allocation_service import PaymentAllocationService, _emi_outstanding_amount
@@ -50,10 +50,13 @@ def plan_smart_collection(
     allocations = []
     skipped = []
     
-    # Get all unpaid EMIs
+    # Get all unpaid EMIs. Emi.is_paid was removed during the payments model
+    # refactor; the canonical unpaid check is now status not in {PAID, WAIVED,
+    # CANCELLED} — i.e. PENDING or OVERDUE. Waived EMIs must NOT enter smart
+    # collection planning (already settled by draw outcome).
     unpaid_emis = list(Emi.objects.filter(
         subscription__customer_id=customer_id,
-        is_paid=False
+        status__in=[EmiStatus.PENDING, EmiStatus.OVERDUE],
     ).order_by('due_date', 'month_no', 'subscription_id'))
     
     opening_emi_outstanding = sum([_emi_outstanding_amount(e) for e in unpaid_emis])
@@ -141,7 +144,9 @@ def plan_smart_collection(
     return {
         "customer": {
             "id": customer.id,
-            "name": customer.full_name,
+            # Customer.full_name was removed during the CRM refactor —
+            # the canonical display field is `.name`.
+            "name": customer.name,
             "phone": customer.phone
         },
         "input": {
@@ -205,7 +210,10 @@ def execute_smart_collection(
         # Actually, let's lock them in advance if we can, or just let the services do it.
         # But we need an accurate plan before calling services.
         # Lock EMIs and Sales
-        list(Emi.objects.select_for_update().filter(subscription__customer_id=customer_id, is_paid=False))
+        list(Emi.objects.select_for_update().filter(
+            subscription__customer_id=customer_id,
+            status__in=[EmiStatus.PENDING, EmiStatus.OVERDUE],
+        ))
         list(DirectSale.objects.select_for_update().filter(customer_id=customer_id, status="INVOICED", balance_total__gt=0))
         CustomerAdvance.objects.select_for_update().filter(customer_id=customer_id)
         
@@ -239,45 +247,57 @@ def execute_smart_collection(
             elif step == "CASH_TO_EMI":
                 emi_id = allocation["emi_id"]
                 emi_key = f"{idempotency_key}:emi:{emi_id}"
-                payment = record_emi_payment(
+                # record_emi_payment accepts `method` (not `payment_method`) and
+                # `note` (not `notes`) — canonical kwargs per the service
+                # signature in payments.services.payment_service.
+                # record_emi_payment returns a dict:
+                # {payment, emi, subscription, ...} — not a Payment instance.
+                payment_result = record_emi_payment(
                     emi_id=emi_id,
                     amount=alloc_amount,
-                    payment_method=payment_method,
+                    method=payment_method,
                     collected_by=collected_by,
                     idempotency_key=emi_key,
                     finance_account_id=finance_account_id,
                     branch_id=branch_id,
                     cash_counter_id=cash_counter_id,
                     reference_no=reference_no,
-                    notes=notes
+                    note=notes,
                 )
-                payment_ids.append(payment.id)
+                payment_ids.append(payment_result["payment"].id)
                 
             elif step == "CASH_TO_DIRECT_SALE":
                 sale_id = allocation["direct_sale_id"]
                 ds_key = f"{idempotency_key}:ds:{sale_id}"
-                receipt = collect_direct_sale_payment(
+                # collect_direct_sale_payment takes `notes` (correct) but does
+                # NOT accept `payment_method` — the method is derived from the
+                # linked finance account's kind. Returns a dict:
+                # {created, direct_sale, invoice, receipt, ...}.
+                ds_result = collect_direct_sale_payment(
                     direct_sale_id=sale_id,
                     amount=alloc_amount,
-                    payment_method=payment_method,
                     collected_by=collected_by,
                     finance_account_id=finance_account_id,
                     branch_id=branch_id,
                     cash_counter_id=cash_counter_id,
                     reference_no=reference_no or ds_key,
-                    notes=notes
+                    notes=notes,
                 )
-                receipt_ids.append(receipt.id)
+                receipt_ids.append(ds_result["receipt"].id)
                 
             elif step == "CASH_TO_ADVANCE":
+                # CustomerAdvanceService.collect_unapplied_advance takes
+                # `method` / `note` (not payment_method/notes) and REQUIRES
+                # payment_date.
                 advance = CustomerAdvanceService.collect_unapplied_advance(
                     customer_id=customer_id,
                     amount=alloc_amount,
-                    payment_method=payment_method,
+                    method=payment_method,
                     finance_account_id=finance_account_id,
                     collected_by=collected_by,
                     reference_no=reference_no,
-                    notes=notes
+                    note=notes,
+                    payment_date=timezone.localdate(),
                 )
                 advance_id = advance.id
                 

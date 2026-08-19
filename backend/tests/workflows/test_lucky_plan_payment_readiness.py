@@ -25,7 +25,9 @@ from tests.helpers import (
     create_customer_profile,
     create_customer_user,
     create_finance_account,
+    create_payment_collection_finance_account,
     create_product,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 
@@ -142,13 +144,20 @@ class LuckyPlanSubscriptionWorkflowTests(TestCase):
 class EmiPaymentWorkflowTests(TestCase):
     def setUp(self):
         self.admin = _admin()
+        # Collection posts through the accounting bridge — needs an open FY
+        # + period + numbering profiles for today (else post_journal_entry
+        # raises "No active financial year is configured for accounting posting").
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         self.subscription = _subscription(lucky_number=3, performed_by=self.admin)
-        self.cash_account = create_finance_account(
+        # record_emi_payment / collection services require the finance
+        # account to carry an active collection-purpose COA mapping; the
+        # base create_finance_account helper omits that wiring.
+        self.cash_account = create_payment_collection_finance_account(
             code=f"WF-CASH-{_token().upper()}",
             name=f"Workflow Cash {_token()}",
             kind="CASH",
         )
-        self.upi_account = create_finance_account(
+        self.upi_account = create_payment_collection_finance_account(
             code=f"WF-UPI-{_token().upper()}",
             name=f"Workflow UPI {_token()}",
             kind="UPI",

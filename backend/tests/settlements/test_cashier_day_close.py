@@ -50,6 +50,7 @@ from tests.helpers import (
     create_lucky_id,
     create_product,
     create_subscription,
+    ensure_test_collection_purpose_mapping,
 )
 
 User = get_user_model()
@@ -107,6 +108,11 @@ class CashierDayCloseServiceTest(TestCase):
             is_real_settlement_account=True,
             is_active=True,
         )
+        # Wire the collection-purpose COA mapping so downstream
+        # record_emi_payment / process_unified_collection don't raise
+        # FinanceAccountPostingReadinessError inside these day-close tests.
+        ensure_test_collection_purpose_mapping(finance_account=self.finance_account)
+        ensure_test_collection_purpose_mapping(finance_account=self.finance_account2)
 
         # Create cash counter (requires finance_account)
         self.cash_counter = CashCounter.objects.create(
@@ -524,6 +530,9 @@ class CashierDayCloseAPITest(APITestCase):
             is_real_settlement_account=True,
             is_active=True,
         )
+        # Wire the collection-purpose COA mapping — see the top-of-file
+        # setUp for the same rationale.
+        ensure_test_collection_purpose_mapping(finance_account=self.finance_account)
 
         self.cash_counter = CashCounter.objects.create(
             branch=self.branch,

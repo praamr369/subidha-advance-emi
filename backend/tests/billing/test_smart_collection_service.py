@@ -15,12 +15,17 @@ from tests.helpers import (
     create_subscription,
     create_emi,
     create_finance_account,
+    create_payment_collection_finance_account,
     create_batch,
     create_lucky_id,
     ensure_test_accounting_posting_prerequisites,
 )
 from accounting.models import DocumentSequence
-from accounting.services.document_sequence_service import DocumentType
+from accounting.services.document_sequence_service import (
+    DocumentType,
+    get_or_create_sequence_for_document_type,
+    validate_document_numbering_ready,
+)
 
 
 class SmartCollectionServiceTests(TestCase):
@@ -28,7 +33,15 @@ class SmartCollectionServiceTests(TestCase):
         self.admin = create_admin_user()
         prereqs = ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         fy = prereqs["financial_year"]
-        doc_series = DocumentSequence.objects.get(document_type=DocumentType.DIRECT_SALE, financial_year=fy)
+        # ensure_test_accounting_posting_prerequisites upserts numbering
+        # PROFILES (spec metadata) but the concrete DocumentSequence row
+        # is created lazily by get_or_create_sequence_for_document_type
+        # (validate_document_numbering_ready only READS an existing one).
+        # Force sequence creation so the setUp can attach it to the seed
+        # DirectSale below without a DoesNotExist trap.
+        doc_series = get_or_create_sequence_for_document_type(
+            DocumentType.DIRECT_SALE, timezone.localdate()
+        )
         
         self.customer = create_customer_profile(name="Amrita", phone="7407533262")
         self.product = create_product(base_price=Decimal("15000.00"))
@@ -59,7 +72,13 @@ class SmartCollectionServiceTests(TestCase):
             status="INVOICED"
         )
         
-        self.finance_account = create_finance_account(code="SC-TEST-01", name="SC Test Bank")
+        # Collection tests need a finance account WITH the collection-purpose
+        # COA mapping wired up, or record_emi_payment /
+        # execute_smart_collection 400s with
+        # FinanceAccountPostingReadinessError.
+        self.finance_account = create_payment_collection_finance_account(
+            code="SC-TEST-01", name="SC Test Bank"
+        )
         
     def test_exact_match(self):
         # 3 EMIs (4500) + 1 Sale (3500) = 8000

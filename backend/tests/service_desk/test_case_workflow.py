@@ -28,6 +28,8 @@ from tests.helpers import (
     create_lucky_id,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
+    ensure_test_collection_purpose_mapping,
 )
 
 
@@ -35,6 +37,12 @@ class ServiceDeskCaseWorkflowTests(TestCase):
     def setUp(self):
         super().setUp()
         self.admin = create_admin_user(username="service_desk_admin", phone="9387700001")
+        # create_direct_sale / posting flows need an open FY + numbering
+        # profiles + credit-note sequence for the seed date; without them
+        # the sale creation errors out before the sales-return assertion runs.
+        ensure_test_accounting_posting_prerequisites(
+            reference_date=date(2026, 4, 16), performed_by=self.admin
+        )
         self.customer = create_customer_profile(name="Service Desk Customer", phone="7387700001")
         self.product = create_product(
             name="Service Desk Sofa",
@@ -60,6 +68,7 @@ class ServiceDeskCaseWorkflowTests(TestCase):
             chart_account=cash_chart,
             opening_balance=Decimal("0.00"),
         )
+        ensure_test_collection_purpose_mapping(finance_account=self.cash_account)
 
     def _create_posted_direct_sale_invoice(self):
         sale = create_direct_sale(

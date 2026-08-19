@@ -24,6 +24,7 @@ from tests.helpers import (
     create_lucky_id,
     create_product,
     create_subscription,
+    ensure_test_collection_purpose_mapping,
 )
 
 
@@ -65,6 +66,11 @@ class CashierDayCloseLifecycleValidityTest(TestCase):
             is_real_settlement_account=True,
             is_active=True,
         )
+        # Wire the collection-purpose COA mapping so downstream
+        # record_emi_payment / cash-desk day-close flows don't raise
+        # FinanceAccountPostingReadinessError.
+        ensure_test_collection_purpose_mapping(finance_account=self.finance_account)
+        ensure_test_collection_purpose_mapping(finance_account=self.finance_account2)
 
         self.cash_counter = CashCounter.objects.create(
             branch=self.branch,
