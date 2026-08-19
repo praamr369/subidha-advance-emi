@@ -121,6 +121,70 @@ For total-surface confirmation, the Layer-A endpoint-smoke test (already green i
 
 ---
 
+## Phase D — Seeded UAT Plan Execution (subidha_core_uat)
+
+Ran the user's original "Full UAT Plan" against the freshly-seeded UAT DB
+(commit `17524fe0` seeder). Dev DB (`subidha_core`) untouched throughout;
+Django backend spawned on port `:8100` bound to `subidha_core_uat`.
+
+### D.1 — Seeded row counts (verify JUL2026 shape)
+
+| Entity | Seeded | Verified |
+|---|---|---|
+| Customers | 91 (90 bulk + Amrita) | ✅ 91 |
+| Products | 120 (PROD0000..PROD0119) | ✅ 120 |
+| Batches | 1 (`JUL2026`, OPEN, 100 slots) | ✅ 1 |
+| Subscriptions | 71 (70 bulk + Amrita) | ✅ 71 |
+| LuckyIds | 100 (numbers 0..99, per-batch) | ✅ 100 |
+| EMIs | 75 (first 5 subs × 15 months) | ✅ 75 |
+| PublicLeads | 10 (5 vacant-lucky + 5 clashing-lucky) | ✅ 10 |
+| SubscriptionRequests | 10 (all SUBMITTED) | ✅ 10 |
+
+### D.2 — Data integrity + orphan checks
+
+| Check | Result |
+|---|---|
+| Subs missing customer / product / batch / lucky_id FK | ✅ 0 orphans across all 4 |
+| Duplicate `(batch, lucky_number)` LuckyId | ✅ 0 duplicates |
+| LuckyIds ASSIGNED count vs Subscriptions with lucky_id | ✅ 71 == 71 |
+
+### D.3 — Financial math consistency (business rules)
+
+| Check | Result |
+|---|---|
+| For each subscription, `monthly_amount * tenure_months ≈ total_amount` (within ₹0.05 × tenure rounding tolerance) | ✅ 0 mismatches across 71 subs |
+| For each sub with EMIs, `SUM(EMI.amount) ≈ subscription.total_amount` (within ₹1 tolerance across 15 EMIs) | ✅ 0 mismatches across 5 subs |
+| EMI status distribution | ✅ 75 PENDING (as expected on fresh seed — no payments yet) |
+| SubscriptionRequest queue distribution | ✅ 10 SUBMITTED (ready for CRM approval walkthrough) |
+
+### D.4 — Authenticated admin API surface against seeded UAT
+
+| Module | Sampled endpoint | UAT payload |
+|---|---|---|
+| Command Center | `/admin/dashboard/navigation-badges/` | ✅ 200 |
+| Command Center | `/admin/solopreneur/today/` | ✅ 200 |
+| Command Center | `/admin/notifications/unread-count/` | ✅ 200 |
+| Sales & Contracts | `/admin/subscriptions/` | ✅ 200, count=71, first row = Amrita's sub #71 (Product 106, total ₹68,000, monthly ₹4,533.33, lucky #70) |
+| Sales & Contracts | `/admin/subscription-requests/` | ✅ 200, count=10 (matches seed) |
+| Sales & Contracts | `/admin/emis/` | ✅ 200, returns 75 EMI rows |
+| Sales & Contracts | `/admin/payments/` | ✅ 200 (empty on fresh seed) |
+| Accounting | `/admin/accounting/bridge-readiness/` | ✅ 200, 56 events |
+| Accounting | `/admin/accounting/bridge-reconciliation/` | ✅ 200 |
+| Inventory | `/admin/inventory/{finished-goods, raw-materials, stock-on-hand, dashboard}/` | ✅ 200 × 4 |
+| Manufacturing | `/manufacturing/{boms, jobs}/` | ✅ 200 × 2 |
+| Delivery | `/admin/deliveries/` | ✅ 200 |
+| HR | `/admin/hr/{staff, attendance}/` | ✅ 200 × 2 |
+
+**18/18 authenticated API probes return HTTP 200 with real seeded data.** No 500s.
+
+### D.5 — Cross-DB isolation confirmed
+
+Before AND after every UAT run, row counts on `subidha_core` (dev DB) remain
+`customers=3 / subs=4 / products=73 / lucky=400`. The UAT plan neither read
+nor wrote dev data.
+
+---
+
 ## Deferred / Follow-up items
 
 1. ~~`task_503560e4` — Fix the `test_batch_jul2026` seeder script.~~ **Resolved in commit `17524fe0`.**
@@ -136,5 +200,6 @@ For total-surface confirmation, the Layer-A endpoint-smoke test (already green i
 | Phase A (Critical financials — modules 5, 7, 8) | ✅ | 2026-08-19 |
 | Phase B (Isolated UAT DB scaffold + JUL2026 seed) | ✅ | 2026-08-19 |
 | Phase C (17-module full walk) | ✅ | 2026-08-19 |
+| Phase D (Seeded UAT plan against `subidha_core_uat`) | ✅ | 2026-08-19 |
 
-**Full-webapp UAT verdict on commit `e9ca44d6`: PASS.**
+**Full-webapp UAT verdict on commit `29085758`: PASS.**
