@@ -170,9 +170,23 @@ class Command(BaseCommand):
                 "is_active": True,
                 "is_emi_enabled": True,
                 "is_rent_enabled": True,
-                "is_lease_enabled": True,
             },
         )[0]
+        
+        try:
+            from products_pim.models import PimProduct
+            PimProduct.objects.update_or_create(
+                product=product,
+                defaults={
+                    "is_published": True,
+                    "title": "Smoke EMI Product (PIM)",
+                    "slug": "smoke-emi-product-pim",
+                    "description": "Seeded PIM product for automation testing.",
+                    "meta_title": "Smoke EMI Product",
+                }
+            )
+        except Exception:
+            pass
 
         paid_batch = self._upsert_open_batch(
             code="SMOKEPAID",
@@ -664,15 +678,20 @@ class Command(BaseCommand):
         )
         # Required by finance_account_has_collection_mapping: an active CASH_COLLECTION
         # purpose mapping must exist before record_emi_payment passes readiness checks.
-        # get_or_create on (finance_account, purpose, is_active) is idempotent —
-        # a second seed run finds the existing active row and does not duplicate it.
+        # We handle the default flag safely by checking if a default already exists.
+        has_default = FinanceAccountCoaMapping.objects.filter(
+            purpose=FinanceAccountMappingPurpose.CASH_COLLECTION,
+            is_active=True,
+            is_default=True,
+        ).exists()
+        
         FinanceAccountCoaMapping.objects.get_or_create(
             finance_account=finance_account,
             purpose=FinanceAccountMappingPurpose.CASH_COLLECTION,
             is_active=True,
             defaults={
                 "chart_account": chart_account,
-                "is_default": True,
+                "is_default": not has_default,
                 "notes": "Seeded for Playwright smoke automation.",
             },
         )

@@ -10,7 +10,7 @@ import django
 from django.test.utils import get_runner
 from django.conf import settings
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "backend.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "core.settings.test")
 django.setup()
 
 from django.test import TestCase
@@ -55,6 +55,9 @@ class TestRunnerJUL2026:
         print(f"\n" + "="*80)
         print("🔄 RUNNING TESTS...")
         print("="*80)
+
+        self.runner.setup_test_environment()
+        old_config = self.runner.setup_databases()
 
         results = []
         for step_name, test_class in self.test_classes:
@@ -106,6 +109,9 @@ class TestRunnerJUL2026:
         print(f"  ❌ Failed: {failed}")
         print(f"  ⚠️  Errors: {errors}")
         print(f"{'='*80}\n")
+
+        self.runner.teardown_databases(old_config)
+        self.runner.teardown_test_environment()
 
         if failed == 0 and errors == 0:
             print("🎉 ALL TESTS PASSED! JUL2026 BATCH READY!\n")

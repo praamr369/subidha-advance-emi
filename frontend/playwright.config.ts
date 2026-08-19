@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import os from "node:os";
 
 import { defineConfig, devices } from "@playwright/test";
 
@@ -12,13 +13,13 @@ const apiBaseUrl =
   process.env.PLAYWRIGHT_API_URL || `${backendRootUrl}/api/v1`;
 const smokeMetaPath =
   process.env.PLAYWRIGHT_SMOKE_META_PATH ||
-  `/tmp/subidha-playwright-smoke-meta-${randomUUID()}.json`;
+  path.join(os.tmpdir(), `subidha-playwright-smoke-meta.json`);
 const smokeDbPath =
   process.env.PLAYWRIGHT_DB_PATH ||
-  `/tmp/subidha-playwright-smoke-${randomUUID()}.sqlite3`;
+  path.join(os.tmpdir(), `subidha-playwright-smoke.sqlite3`);
 const smokeManifestPath =
   process.env.PLAYWRIGHT_SMOKE_MANIFEST_PATH ||
-  `/tmp/subidha-playwright-smoke-manifest-${randomUUID()}.json`;
+  path.join(os.tmpdir(), `subidha-playwright-smoke-manifest.json`);
 
 // Setup tests invoke Django commands directly. Keep them on the same isolated
 // SQLite database and generated artifacts as the backend webServer bootstrap.
@@ -69,7 +70,7 @@ export default defineConfig({
       name: "setup",
       testMatch: /.*\.setup\.ts/,
       use: {
-        ...devices["Desktop Chrome"],
+        channel: "chrome", ...devices["Desktop Chrome"],
       },
     },
     {
@@ -81,7 +82,7 @@ export default defineConfig({
         /.*route_load_smoke\.spec\.ts/,
       ],
       use: {
-        ...devices["Desktop Chrome"],
+        channel: "chrome", ...devices["Desktop Chrome"],
       },
     },
     {
@@ -92,7 +93,7 @@ export default defineConfig({
       dependencies: ["setup"],
       testMatch: /.*route_load_smoke\.spec\.ts/,
       use: {
-        ...devices["Desktop Chrome"],
+        channel: "chrome", ...devices["Desktop Chrome"],
       },
     },
     {
@@ -100,24 +101,24 @@ export default defineConfig({
       dependencies: ["setup"],
       testMatch: /.*release-smoke\.spec\.ts/,
       use: {
-        ...devices["Desktop Chrome"],
+        channel: "chrome", ...devices["Desktop Chrome"],
       },
     },
     {
       name: "chromium-auth-smoke",
       testMatch: /.*real-login-smoke\.spec\.ts/,
       use: {
-        ...devices["Desktop Chrome"],
+        channel: "chrome", ...devices["Desktop Chrome"],
       },
     },
   ],
   webServer: [
     {
-      command: "bash ../backend/scripts/start_playwright_backend.sh",
+      command: ".\\..\\backend\\scripts\\start_playwright_backend.bat",
       url: `${backendRootUrl}/healthz/`,
       reuseExistingServer: !process.env.CI,
       // Backend bootstrap may create/install a dedicated playwright venv on first run.
-      timeout: 420_000,
+      timeout: 900_000,
       cwd: ".",
       // Surface backend stdout/stderr to the CI log so migration or startup
       // failures are visible when the health check times out. Default is

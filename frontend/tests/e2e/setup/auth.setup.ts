@@ -32,6 +32,7 @@ const PYTHON_EXECUTABLE = resolvePythonExecutable();
 test("seed deterministic smoke data and capture role sessions", async ({
   browser,
 }) => {
+  test.setTimeout(120_000);
   ensureSmokeDirectories();
 
   execFileSync(
