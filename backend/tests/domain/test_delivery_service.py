@@ -74,6 +74,8 @@ class DeliveryServiceTests(TestCase):
             status=DeliveryStatus.SCHEDULED,
             scheduled_date=date(2026, 3, 15),
             notes="Ready for dispatch",
+            admin_override=True,
+            admin_override_reason="test fixture",
         )
 
         self.subscription.refresh_from_db()
@@ -101,6 +103,8 @@ class DeliveryServiceTests(TestCase):
             performed_by=self.admin,
             status=DeliveryStatus.SCHEDULED,
             scheduled_date=date(2026, 3, 18),
+            admin_override=True,
+            admin_override_reason="test fixture",
         )
 
         delivery = transition_subscription_delivery_status(
@@ -227,6 +231,8 @@ class DeliveryServiceTests(TestCase):
         delivery = create_subscription_delivery(
             subscription=self.subscription,
             performed_by=self.admin,
+            admin_override=True,
+            admin_override_reason="test fixture",
         )
 
         updated = update_subscription_delivery_metadata(
