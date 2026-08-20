@@ -1816,7 +1816,20 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                                         </span>
                                         <span className="block text-xs text-muted-foreground">
                                           Base {accountingMoney(product.base_price)} | Stock {product.current_stock_qty || product.inventory_status.available}
+                                          {product.brand ? ` | ${product.brand}` : ""}
+                                          {product.hsn_sac_code ? ` | HSN: ${product.hsn_sac_code}` : ""}
+                                          {product.unit_of_measure ? ` | ${product.unit_of_measure}` : ""}
                                         </span>
+                                        {product.base_specs && Object.keys(product.base_specs).length > 0 && (
+                                          <span className="block text-[10px] text-muted-foreground/70 mt-0.5">
+                                            {Object.entries(product.base_specs).slice(0, 5).map(([k, v]) => `${k}: ${v}`).join(" | ")}
+                                          </span>
+                                        )}
+                                        {product.accessories && product.accessories.length > 0 && (
+                                          <span className="block text-[10px] text-muted-foreground/70 mt-0.5">
+                                            Accessories: {product.accessories.map((a) => a.name).join(", ")}
+                                          </span>
+                                        )}
                                       </button>
                                     ))
                                   ) : (
@@ -1827,6 +1840,7 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                               {line.selected_product ? (
                                 <div className="mt-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
                                   {line.selected_product.product_code || line.selected_product.sku || `P-${line.selected_product.id}`} | Base {accountingMoney(line.selected_product.base_price)} | Stock {line.selected_product.current_stock_qty || line.selected_product.inventory_status.available} | Inventory {line.selected_product.inventory_ready ? "ready" : "not ready"} {!line.selected_product.inventory_status.is_in_stock ? " | OUT OF STOCK" : ""}
+                                  {line.selected_product.brand ? ` | ${line.selected_product.brand}` : ""}{line.selected_product.hsn_sac_code ? ` | HSN: ${line.selected_product.hsn_sac_code}` : ""}{line.selected_product.unit_of_measure ? ` | ${line.selected_product.unit_of_measure}` : ""}
                                 </div>
                               ) : null}
                             </div>

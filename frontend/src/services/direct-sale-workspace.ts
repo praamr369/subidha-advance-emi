@@ -31,6 +31,19 @@ export type BillingProductSearchRow = {
   };
   last_sale_price?: string | null;
   stock_item_type?: "FINISHED_GOOD" | "ACCESSORY" | "RAW_MATERIAL" | null;
+  brand?: string;
+  hsn_sac_code?: string;
+  unit_of_measure?: string;
+  base_specs?: Record<string, string>;
+  description?: string;
+  accessories?: Array<{
+    id: number;
+    name: string;
+    product_code?: string | null;
+    sku?: string | null;
+    quantity: string;
+    included_in_price: boolean;
+  }>;
 };
 
 export type BillingProductSearchResponse = {

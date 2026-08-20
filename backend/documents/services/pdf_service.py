@@ -56,9 +56,32 @@ def generate_invoice_pdf(invoice_data: dict) -> bytes:
     items = invoice_data.get("items", [])
     table_data = [["#", "Description", "Qty", "Rate", "Amount"]]
     for i, item in enumerate(items, 1):
+        desc_parts = [item.get("description", "")]
+        if item.get("product_code"):
+            desc_parts.append(f"Code: {item['product_code']}")
+        if item.get("sku"):
+            desc_parts.append(f"SKU: {item['sku']}")
+        if item.get("hsn_sac_code"):
+            desc_parts.append(f"HSN: {item['hsn_sac_code']}")
+        desc_line = desc_parts[0]
+        if len(desc_parts) > 1:
+            desc_line += "\n" + " | ".join(desc_parts[1:])
+        specs = item.get("base_specs") or {}
+        if specs:
+            spec_str = ", ".join(f"{k}: {v}" for k, v in list(specs.items())[:6])
+            desc_line += f"\n{spec_str}"
+        accessories = item.get("accessories") or []
+        if accessories:
+            acc_lines = []
+            for acc in accessories:
+                acc_parts = [acc.get("name", "")]
+                if acc.get("product_code"):
+                    acc_parts.append(acc["product_code"])
+                acc_lines.append(" | ".join(acc_parts))
+            desc_line += "\nAccessories: " + "; ".join(acc_lines)
         table_data.append([
             str(i),
-            item.get("description", ""),
+            Paragraph(desc_line.replace("\n", "<br/>"), ParagraphStyle("item", fontSize=8, leading=10)),
             str(item.get("qty", 1)),
             f"₹{item.get('rate', 0):.2f}",
             f"₹{item.get('amount', 0):.2f}",

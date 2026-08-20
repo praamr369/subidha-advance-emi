@@ -10,9 +10,14 @@ export type ProductOption = {
   id: number;
   name: string;
   product_code?: string;
+  sku?: string;
   base_price?: string;
   category?: string;
   subcategory?: string;
+  brand?: string;
+  hsn_sac_code?: string;
+  unit_of_measure?: string;
+  base_specs?: Record<string, string>;
   is_emi_enabled?: boolean;
   is_rent_enabled?: boolean;
   is_lease_enabled?: boolean;
@@ -52,9 +57,16 @@ export function normalizeProduct(raw: Record<string, unknown>): ProductOption {
     id: toNumber(raw.id),
     name: String(raw.name ?? ""),
     product_code: toOptionalString(raw.product_code),
+    sku: toOptionalString(raw.sku),
     base_price: toMoneyString(raw.base_price),
     category: toOptionalString(raw.category),
     subcategory: toOptionalString(raw.subcategory),
+    brand: toOptionalString(raw.brand),
+    hsn_sac_code: toOptionalString(raw.hsn_sac_code),
+    unit_of_measure: toOptionalString(raw.unit_of_measure),
+    base_specs: (raw.base_specs && typeof raw.base_specs === "object" && !Array.isArray(raw.base_specs))
+      ? raw.base_specs as Record<string, string>
+      : undefined,
     is_emi_enabled: typeof raw.is_emi_enabled === "boolean" ? raw.is_emi_enabled : undefined,
     is_rent_enabled: typeof raw.is_rent_enabled === "boolean" ? raw.is_rent_enabled : undefined,
     is_lease_enabled: typeof raw.is_lease_enabled === "boolean" ? raw.is_lease_enabled : undefined,
@@ -95,16 +107,33 @@ function ProductResultCard({
                 {product.product_code}
               </span>
             )}
+            {product.sku && (
+              <span>SKU: {product.sku}</span>
+            )}
             {product.category && (
               <span className="flex items-center gap-1">
                 <Package className="h-3 w-3" />
-                {product.category}
+                {product.category}{product.subcategory ? ` / ${product.subcategory}` : ""}
               </span>
             )}
+            {product.brand && <span>{product.brand}</span>}
+            {product.hsn_sac_code && <span>HSN: {product.hsn_sac_code}</span>}
             <span className="font-medium text-foreground">
               ₹{product.base_price}
             </span>
           </div>
+          {product.base_specs && Object.keys(product.base_specs).length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {Object.entries(product.base_specs).slice(0, 5).map(([k, v]) => (
+                <span
+                  key={k}
+                  className="inline-flex rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                >
+                  {k}: {v}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
         <div className="shrink-0">
           <span className="rounded-lg bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">

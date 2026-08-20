@@ -103,6 +103,7 @@ class CustomerInvoicePdfView(APIView):
             return _customer_missing_response()
         invoice = (
             BillingInvoice.objects.select_related("customer", "direct_sale")
+            .prefetch_related("lines__product", "lines__inventory_item")
             .filter(pk=pk, customer=customer)
             .first()
         )

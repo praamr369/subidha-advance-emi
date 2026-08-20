@@ -479,7 +479,12 @@ class AdminInvoicePdfView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def get(self, request, pk: int):
-        invoice = BillingInvoice.objects.select_related("customer", "direct_sale").filter(pk=pk).first()
+        invoice = (
+            BillingInvoice.objects.select_related("customer", "direct_sale")
+            .prefetch_related("lines__product", "lines__inventory_item")
+            .filter(pk=pk)
+            .first()
+        )
         if invoice is None:
             return Response({"detail": "Invoice not found."}, status=status.HTTP_404_NOT_FOUND)
         pdf_bytes = render_invoice_pdf(invoice=invoice)

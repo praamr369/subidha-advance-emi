@@ -72,6 +72,8 @@ def _render_contract_pdf(*, subscription, profile, contract_kind: str) -> bytes:
         c.line(mx, cy, width - mx, cy)
         cy -= 10
 
+    from products_core.models import ProductRelationship
+
     customer = getattr(subscription, "customer", None)
     product = getattr(subscription, "product", None)
     monthly_label = "Rent" if contract_kind.upper() == "RENT" else "Lease"
@@ -87,7 +89,43 @@ def _render_contract_pdf(*, subscription, profile, contract_kind: str) -> bytes:
     line(f"Customer: {getattr(customer, 'name', 'Customer')}", size=10)
     line(f"Phone (masked): {_mask_phone(getattr(customer, 'phone', ''))}", size=10)
     line(f"Customer Address: {getattr(customer, 'address', '') or 'N/A'}", size=10)
-    line(f"Product Summary: {getattr(product, 'name', 'Product')}", size=10)
+    rule()
+
+    line("PRODUCT DETAILS", size=11, lead=15)
+    line(f"Product: {getattr(product, 'name', 'Product')}", size=10)
+    if product:
+        if product.product_code:
+            line(f"Product Code: {product.product_code}", size=10)
+        if product.sku:
+            line(f"SKU: {product.sku}", size=10)
+        if product.brand:
+            line(f"Brand: {product.brand}", size=10)
+        if product.category:
+            cat_str = product.category
+            if product.subcategory:
+                cat_str += f" / {product.subcategory}"
+            line(f"Category: {cat_str}", size=10)
+        if product.hsn_sac_code:
+            line(f"HSN/SAC: {product.hsn_sac_code}", size=10)
+        specs = getattr(product, "base_specs", None) or {}
+        if specs:
+            line("Specifications:", size=10)
+            for k, v in list(specs.items())[:10]:
+                line(f"  • {k}: {v}", size=9, lead=12)
+        accessories = ProductRelationship.objects.filter(
+            product_id=product.id, relationship_type="ACCESSORY",
+        ).select_related("related_product").order_by("id")
+        if accessories.exists():
+            line("Included Accessories:", size=10)
+            for acc in accessories:
+                rp = acc.related_product
+                parts = [rp.name]
+                if rp.product_code:
+                    parts.append(f"Code: {rp.product_code}")
+                if rp.sku:
+                    parts.append(f"SKU: {rp.sku}")
+                parts.append(f"Qty: {acc.quantity:.0f}")
+                line(f"  • {' | '.join(parts)}", size=9, lead=12)
     line(f"Reference No: {contract_no}", size=10)
     rule()
     line(f"Tenure: {subscription.tenure_months} months", size=10)
@@ -112,7 +150,9 @@ def _render_contract_pdf(*, subscription, profile, contract_kind: str) -> bytes:
 def render_invoice_pdf(*, invoice) -> bytes:
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import mm
+    from reportlab.lib import colors
     from reportlab.pdfgen import canvas
+    from products_core.models import ProductRelationship
 
     buf = BytesIO()
     c = canvas.Canvas(buf, pagesize=A4, pageCompression=0)
@@ -143,6 +183,12 @@ def render_invoice_pdf(*, invoice) -> bytes:
         c.line(mx, cy, width - mx, cy)
         cy -= 10
 
+    def check_page_break(needed: float = 80):
+        nonlocal cy
+        if cy < needed:
+            c.showPage()
+            cy = height - (20 * mm)
+
     customer_name = invoice.customer_name_snapshot or getattr(invoice.customer, "name", "Customer")
     customer_phone = invoice.customer_phone_snapshot or getattr(getattr(invoice, "customer", None), "phone", "")
     sale_no = getattr(getattr(invoice, "direct_sale", None), "sale_no", None) or "N/A"
@@ -162,9 +208,96 @@ def render_invoice_pdf(*, invoice) -> bytes:
     line(f"Direct Sale Number: {sale_no}", size=10)
     line(f"Delivery Status: {delivery_status}", size=10)
     rule()
-    line(f"Total Amount: INR {invoice.grand_total:.2f}", size=10)
+
+    invoice_lines = list(
+        invoice.lines.select_related("product", "inventory_item").order_by("id")
+    )
+
+    if invoice_lines:
+        line("LINE ITEMS", size=11, lead=15)
+
+        for idx, inv_line in enumerate(invoice_lines, 1):
+            check_page_break(120)
+            product = inv_line.product
+
+            c.setFont("Helvetica-Bold", 10)
+            c.drawString(mx, cy, f"{idx}. {inv_line.description}")
+            cy -= 13
+
+            if product:
+                details = []
+                if product.product_code:
+                    details.append(f"Code: {product.product_code}")
+                if product.sku:
+                    details.append(f"SKU: {product.sku}")
+                if product.brand:
+                    details.append(f"Brand: {product.brand}")
+                if product.hsn_sac_code:
+                    details.append(f"HSN: {product.hsn_sac_code}")
+                if product.category:
+                    cat_str = product.category
+                    if product.subcategory:
+                        cat_str += f" / {product.subcategory}"
+                    details.append(f"Category: {cat_str}")
+                if product.unit_of_measure:
+                    details.append(f"UOM: {product.unit_of_measure}")
+                if details:
+                    line(f"   {' | '.join(details)}", size=8, lead=11)
+
+                specs = getattr(product, "base_specs", None) or {}
+                if specs:
+                    spec_parts = [f"{k}: {v}" for k, v in list(specs.items())[:8]]
+                    line(f"   Attributes: {', '.join(spec_parts)}", size=8, lead=11)
+            elif inv_line.hsn_sac_code:
+                line(f"   HSN: {inv_line.hsn_sac_code}", size=8, lead=11)
+
+            qty_str = f"{inv_line.quantity:.3f}".rstrip("0").rstrip(".")
+            line(
+                f"   Qty: {qty_str}  |  Unit Price: INR {inv_line.unit_price:.2f}  |  "
+                f"Line Total: INR {inv_line.line_total:.2f}",
+                size=9,
+                lead=12,
+            )
+            if inv_line.gst_rate:
+                line(
+                    f"   GST: {inv_line.gst_rate}%  |  CGST: {inv_line.cgst_amount:.2f}  |  "
+                    f"SGST: {inv_line.sgst_amount:.2f}  |  IGST: {inv_line.igst_amount:.2f}",
+                    size=8,
+                    lead=11,
+                )
+
+            if product:
+                accessories = ProductRelationship.objects.filter(
+                    product_id=product.id, relationship_type="ACCESSORY",
+                ).select_related("related_product").order_by("id")
+                if accessories.exists():
+                    line("   Accessories:", size=8, lead=11)
+                    for acc in accessories:
+                        rp = acc.related_product
+                        acc_parts = [rp.name]
+                        if rp.product_code:
+                            acc_parts.append(f"Code: {rp.product_code}")
+                        if rp.sku:
+                            acc_parts.append(f"SKU: {rp.sku}")
+                        acc_parts.append(f"Qty: {acc.quantity:.0f}")
+                        incl = "Included" if acc.is_price_included_in_parent else "Add-on"
+                        acc_parts.append(incl)
+                        line(f"     • {' | '.join(acc_parts)}", size=8, lead=10)
+
+            cy -= 4
+
+        rule()
+
+    line(f"Subtotal: INR {invoice.subtotal:.2f}", size=10)
+    if invoice.discount_total:
+        line(f"Discount: INR {invoice.discount_total:.2f}", size=10)
+    line(f"Tax: INR {invoice.tax_total:.2f}", size=10)
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(mx, cy, f"Grand Total: INR {invoice.grand_total:.2f}")
+    cy -= 15
+    rule()
     line(f"Paid Amount: INR {invoice.received_total:.2f}", size=10)
-    line(f"Outstanding Amount: INR {invoice.balance_total:.2f}", size=10)
+    line(f"Outstanding: INR {invoice.balance_total:.2f}", size=10)
 
     c.showPage()
     c.save()

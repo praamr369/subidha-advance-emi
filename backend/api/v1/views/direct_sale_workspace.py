@@ -82,6 +82,8 @@ def _last_sale_price(product_id: int) -> str | None:
 
 
 def _serialize_product_row(product: Product, *, include_extended: bool) -> dict:
+    from products_core.models import ProductRelationship
+
     inventory = _inventory_payload(product)
     payload = {
         "id": product.id,
@@ -97,9 +99,28 @@ def _serialize_product_row(product: Product, *, include_extended: bool) -> dict:
         "is_direct_sale_enabled": bool(getattr(product, "is_direct_sale_enabled", False)),
         "inventory_status": inventory,
         "last_sale_price": _last_sale_price(product.id),
+        "brand": getattr(product, "brand", "") or "",
+        "hsn_sac_code": getattr(product, "hsn_sac_code", "") or "",
+        "unit_of_measure": getattr(product, "unit_of_measure", "PCS") or "PCS",
+        "base_specs": getattr(product, "base_specs", None) or {},
+        "description": getattr(product, "description", "") or "",
     }
     if include_extended:
         payload["lifecycle_status"] = getattr(product, "lifecycle_status", None)
+        accessories = ProductRelationship.objects.filter(
+            product_id=product.id, relationship_type="ACCESSORY",
+        ).select_related("related_product").order_by("id")
+        payload["accessories"] = [
+            {
+                "id": rel.related_product_id,
+                "name": rel.related_product.name,
+                "product_code": rel.related_product.product_code,
+                "sku": rel.related_product.sku,
+                "quantity": str(rel.quantity),
+                "included_in_price": rel.is_price_included_in_parent,
+            }
+            for rel in accessories
+        ]
     return payload
 
 
