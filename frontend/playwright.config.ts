@@ -114,7 +114,9 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: ".\\..\\backend\\scripts\\start_playwright_backend.bat",
+      command: process.platform === "win32"
+        ? ".\\..\\backend\\scripts\\start_playwright_backend.bat"
+        : "../backend/scripts/start_playwright_backend.sh",
       url: `${backendRootUrl}/healthz/`,
       reuseExistingServer: !process.env.CI,
       // Backend bootstrap may create/install a dedicated playwright venv on first run.
