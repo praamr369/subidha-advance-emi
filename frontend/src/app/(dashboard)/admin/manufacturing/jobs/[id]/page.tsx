@@ -18,9 +18,11 @@ import {
   getProductionJob,
   postProductionMaterials,
   postProductionOutput,
+  postProductionLabor,
   releaseProductionJob,
   type ProductionJob,
 } from "@/services/manufacturing";
+import { listHrStaff, type HrStaff } from "@/services/admin-hr";
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) return error.message;
@@ -63,6 +65,14 @@ export default function AdminManufacturingJobDetailPage() {
     scrap_reason: "",
     notes: "",
   });
+  const [employees, setEmployees] = useState<HrStaff[]>([]);
+  const [laborForm, setLaborForm] = useState({
+    employee: "",
+    activity_name: "",
+    hours_worked: "",
+    piece_count: "",
+    wage_amount: "",
+  });
 
   const loadPage = useCallback(async () => {
     if (!jobId) {
@@ -73,8 +83,12 @@ export default function AdminManufacturingJobDetailPage() {
 
     try {
       setLoading(true);
-      const next = await getProductionJob(jobId);
+      const [next, staffRes] = await Promise.all([
+        getProductionJob(jobId),
+        listHrStaff(),
+      ]);
       setJob(next);
+      setEmployees(staffRes.results);
       setError(null);
     } catch (err) {
       setJob(null);
@@ -204,6 +218,44 @@ export default function AdminManufacturingJobDetailPage() {
         scrap_reason: "",
         notes: "",
       });
+    } catch (err) {
+      setError(toErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handlePostLabor() {
+    if (!job) return;
+    const isFormEmpty = !laborForm.employee.trim() && !laborForm.wage_amount.trim();
+    try {
+      setSaving(true);
+      setNotice(null);
+      
+      const payload = isFormEmpty ? undefined : {
+        labor_lines: [
+          {
+            employee: Number(laborForm.employee),
+            activity_name: laborForm.activity_name || "General Labor",
+            hours_worked: laborForm.hours_worked || "0.00",
+            piece_count: laborForm.piece_count || "0.00",
+            wage_amount: laborForm.wage_amount,
+          }
+        ]
+      };
+      
+      const response = await postProductionLabor(job.id, payload);
+      setJob(response.job);
+      setNotice("Production labor posted successfully.");
+      if (!isFormEmpty) {
+        setLaborForm({
+          employee: "",
+          activity_name: "",
+          hours_worked: "",
+          piece_count: "",
+          wage_amount: "",
+        });
+      }
     } catch (err) {
       setError(toErrorMessage(err));
     } finally {
@@ -632,6 +684,121 @@ export default function AdminManufacturingJobDetailPage() {
                         </div>
                       </div>
                     ))
+                  )}
+                </div>
+              </ERPSectionShell>
+            </div>
+            
+            <div className="grid gap-6 mt-6">
+              <ERPSectionShell
+                title="Labor & Staff"
+                description="Manufacturing labor costs assigned to this job that will capitalize to finished goods."
+              >
+                <div className="space-y-4">
+                  {job.status === "IN_PROGRESS" || job.status === "RELEASED" ? (
+                    <div className="rounded-xl border border-border bg-background p-4 space-y-4">
+                      <div className="font-medium text-foreground">Log Labor Activity</div>
+                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                        <div className="space-y-1.5 lg:col-span-1">
+                          <label className="text-xs font-medium text-muted-foreground">Employee</label>
+                          <select
+                            value={laborForm.employee}
+                            onChange={(e) => setLaborForm((prev) => ({ ...prev, employee: e.target.value }))}
+                            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                          >
+                            <option value="">Select staff</option>
+                            {employees.map((emp) => (
+                              <option key={emp.id} value={emp.id}>
+                                {emp.name} {emp.employee_code ? `(${emp.employee_code})` : ""}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="space-y-1.5 lg:col-span-1">
+                          <label className="text-xs font-medium text-muted-foreground">Activity</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Polishing"
+                            value={laborForm.activity_name}
+                            onChange={(e) => setLaborForm((prev) => ({ ...prev, activity_name: e.target.value }))}
+                            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                          />
+                        </div>
+                        <div className="space-y-1.5 lg:col-span-1">
+                          <label className="text-xs font-medium text-muted-foreground">Hours</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.5"
+                            placeholder="Hours worked"
+                            value={laborForm.hours_worked}
+                            onChange={(e) => setLaborForm((prev) => ({ ...prev, hours_worked: e.target.value }))}
+                            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                          />
+                        </div>
+                        <div className="space-y-1.5 lg:col-span-1">
+                          <label className="text-xs font-medium text-muted-foreground">Pieces</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            placeholder="Piece count"
+                            value={laborForm.piece_count}
+                            onChange={(e) => setLaborForm((prev) => ({ ...prev, piece_count: e.target.value }))}
+                            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                          />
+                        </div>
+                        <div className="space-y-1.5 lg:col-span-1">
+                          <label className="text-xs font-medium text-muted-foreground">Wage Amount</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            placeholder="₹"
+                            value={laborForm.wage_amount}
+                            onChange={(e) => setLaborForm((prev) => ({ ...prev, wage_amount: e.target.value }))}
+                            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => void handlePostLabor()}
+                          disabled={saving || !laborForm.employee.trim() || !laborForm.wage_amount.trim()}
+                          className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
+                        >
+                          Absorb Labor
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {job.labor_lines.length === 0 ? (
+                    <ERPEmptyState title="No labor lines" description="Record labor against this job." />
+                  ) : (
+                    job.labor_lines.map((line) => (
+                      <div key={line.id} className="rounded-xl border border-border bg-background/70 p-3 text-sm">
+                        <div className="font-medium text-foreground">
+                          {line.employee_name || line.employee_code || `Staff ${line.employee}`} · {line.activity_name}
+                        </div>
+                        <div className="text-muted-foreground">
+                          {line.hours_worked}h · {line.piece_count}pcs · Wage {formatRupee(line.wage_amount)} · {line.is_posted ? "Posted" : "Draft"}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                  {job.labor_lines.some((l) => !l.is_posted) && (
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={() => void handlePostLabor()}
+                        disabled={saving}
+                        className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
+                      >
+                        Post Pending Labor
+                      </button>
+                    </div>
                   )}
                 </div>
               </ERPSectionShell>

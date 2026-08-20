@@ -111,6 +111,8 @@ class ProductionJobViewSet(AdminManufacturingModelViewSet):
         "scrap_lines",
         "scrap_lines__inventory_item",
         "scrap_lines__inventory_item__product",
+        "labor_lines",
+        "labor_lines__employee",
     ).all()
     serializer_class = ProductionJobSerializer
     search_fields = ["job_no", "finished_good_inventory_item__sku", "finished_good_inventory_item__product__name"]
@@ -143,6 +145,9 @@ class ProductionJobViewSet(AdminManufacturingModelViewSet):
             return ProductionMaterialPostSerializer
         if self.action == "post_output":
             return ProductionOutputPostSerializer
+        if self.action == "post_labor":
+            from api.v1.serializers.manufacturing import ManufacturingEmptyActionSerializer
+            return ManufacturingEmptyActionSerializer
         if self.action == "cancel_job":
             return ProductionCancelSerializer
         return super().get_serializer_class()
@@ -181,6 +186,23 @@ class ProductionJobViewSet(AdminManufacturingModelViewSet):
             raise ValidationError({"detail": str(exc)}) from exc
         payload = ProductionJobSerializer(updated_job, context=self.get_serializer_context())
         return Response({"updated": True, "job": payload.data}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="post-labor")
+    def post_labor(self, request, pk=None):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            from manufacturing.services.production_service import post_production_labor
+            labor_lines = request.data.get("labor_lines")
+            updated_job, updated = post_production_labor(
+                job_id=self.get_object().id,
+                labor_lines=labor_lines,
+                performed_by=request.user,
+            )
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        payload = ProductionJobSerializer(updated_job, context=self.get_serializer_context())
+        return Response({"updated": updated, "job": payload.data}, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["post"], url_path="complete")
     def complete(self, request, pk=None):

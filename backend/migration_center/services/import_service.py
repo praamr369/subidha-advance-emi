@@ -102,6 +102,8 @@ def _import_customer(row: MigrationStagingRow, data: dict[str, Any], actor) -> t
         from accounting.models import CustomerOpeningOutstanding
 
         outstanding = CustomerOpeningOutstanding.objects.create(
+            customer=customer,
+            migration_row=row,
             customer_name=customer.name, phone=customer.phone,
             outstanding_amount=opening, entry_date=timezone.now().date(),
             notes=f"Migrated opening balance ({row.batch.batch_number})", created_by=actor,
@@ -294,6 +296,7 @@ def _import_customer_outstanding(row: MigrationStagingRow, data: dict[str, Any],
 
     outstanding = CustomerOpeningOutstanding.objects.create(
         customer=customer,
+        migration_row=row,
         customer_name=customer_name,
         phone=phone,
         outstanding_amount=amount,

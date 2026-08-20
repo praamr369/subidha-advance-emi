@@ -10,6 +10,7 @@ from manufacturing.models import (
     ProductionMaterialIssueLine,
     ProductionReceiptLine,
     ProductionScrapLine,
+    ProductionLaborLine,
 )
 from manufacturing.services.production_service import (
     activate_manufacturing_bom,
@@ -216,6 +217,41 @@ class ProductionScrapLineSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class ProductionLaborLineSerializer(serializers.ModelSerializer):
+    employee_name = serializers.CharField(source="employee.name", read_only=True)
+    employee_code = serializers.CharField(source="employee.employee_code", read_only=True)
+    posted_by_username = serializers.CharField(source="posted_by.username", read_only=True)
+
+    class Meta:
+        model = ProductionLaborLine
+        fields = [
+            "id",
+            "production_job",
+            "employee",
+            "employee_name",
+            "employee_code",
+            "activity_name",
+            "hours_worked",
+            "piece_count",
+            "wage_amount",
+            "is_posted",
+            "posted_at",
+            "posted_by",
+            "posted_by_username",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "is_posted",
+            "posted_at",
+            "posted_by",
+            "posted_by_username",
+            "created_at",
+            "updated_at",
+        ]
+
+
 class ProductionJobSerializer(serializers.ModelSerializer):
     finished_good_sku = serializers.CharField(source="finished_good_inventory_item.sku", read_only=True)
     finished_good_product_name = serializers.CharField(
@@ -232,6 +268,7 @@ class ProductionJobSerializer(serializers.ModelSerializer):
     material_issue_lines = ProductionMaterialIssueLineSerializer(many=True, required=False)
     receipt_lines = ProductionReceiptLineSerializer(many=True, read_only=True)
     scrap_lines = ProductionScrapLineSerializer(many=True, read_only=True)
+    labor_lines = ProductionLaborLineSerializer(many=True, required=False)
 
     class Meta:
         model = ProductionJob

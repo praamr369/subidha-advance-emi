@@ -24,6 +24,7 @@ INVENTORY_MANUFACTURING_EVENT_KEYS = {
     "manufacturing_output",
     "manufacturing_wastage",
     "manufacturing_scrap_recovery",
+    "manufacturing_labor_accrual",
 }
 
 INVENTORY_MANUFACTURING_SUPPLEMENTAL_EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
@@ -104,6 +105,19 @@ INVENTORY_MANUFACTURING_SUPPLEMENTAL_EVENT_REGISTRY: tuple[BridgeEventSpec, ...]
         debit_mapping_purposes=(FinanceAccountMappingPurpose.INVENTORY_ASSET,),
         credit_coa_system_codes=("WORK_IN_PROGRESS_INVENTORY",),
         operator_action="Validate finished-goods output mapping only. Readiness does not receive finished stock or post WIP closeout.",
+    ),
+    BridgeEventSpec(
+        event_key="manufacturing_labor_accrual",
+        label="Manufacturing labor accrual",
+        source_module="manufacturing",
+        source_app="manufacturing",
+        source_model="ProductionJob",
+        event_group="Manufacturing",
+        debit_requirements=("WORK_IN_PROGRESS_INVENTORY",),
+        credit_requirements=("SALARY_PAYABLE liability",),
+        debit_coa_system_codes=("WORK_IN_PROGRESS_INVENTORY",),
+        credit_coa_system_codes=("SALARY_PAYABLE",),
+        operator_action="Validate labor accrual mapping only. Readiness does not post journals.",
     ),
     BridgeEventSpec(
         event_key="manufacturing_scrap_recovery",

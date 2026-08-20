@@ -381,6 +381,13 @@ class ProductionJob(ManufacturingTimeStampedModel):
         self.full_clean()
         super().save(*args, **kwargs)
 
+    def update_labor_cost(self):
+        from django.db.models import Sum
+        total_labor = self.labor_lines.aggregate(total=Sum("wage_amount"))["total"] or MONEY_ZERO
+        if self.labor_cost != total_labor:
+            self.labor_cost = total_labor
+            self.save(update_fields=["labor_cost"])
+
     def __str__(self):
         return self.job_no
 
@@ -623,3 +630,64 @@ class ProductionScrapLine(ManufacturingTimeStampedModel):
         self.notes = (self.notes or "").strip()
         self.full_clean()
         super().save(*args, **kwargs)
+
+
+class ProductionLaborLine(ManufacturingTimeStampedModel):
+    production_job = models.ForeignKey(
+        ProductionJob,
+        on_delete=models.CASCADE,
+        related_name="labor_lines",
+    )
+    employee = models.ForeignKey(
+        "accounting.EmployeeProfile",
+        on_delete=models.PROTECT,
+        related_name="production_labor_lines",
+    )
+    activity_name = models.CharField(max_length=120)
+    hours_worked = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
+    piece_count = models.PositiveIntegerField(null=True, blank=True)
+    wage_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=MONEY_ZERO,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    is_posted = models.BooleanField(default=False, db_index=True)
+    posted_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    posted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="posted_production_labor_lines",
+    )
+
+    class Meta:
+        db_table = "manufacturing_production_labor_lines"
+        ordering = ["id"]
+        indexes = [
+            models.Index(fields=["production_job", "is_posted"]),
+        ]
+
+    def clean(self):
+        errors = {}
+        if (self.wage_amount or MONEY_ZERO) <= MONEY_ZERO:
+            errors["wage_amount"] = "Wage amount must be greater than zero."
+        if not (self.activity_name or "").strip():
+            errors["activity_name"] = "Activity name is required."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        _guard_posted_line(self)
+        self.activity_name = (self.activity_name or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+        if getattr(self.production_job, "update_labor_cost", None):
+            self.production_job.update_labor_cost()

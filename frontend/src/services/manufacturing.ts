@@ -99,6 +99,20 @@ export type ProductionScrapLine = {
   posted_journal_entry?: number | null;
 };
 
+export type ProductionLaborLine = {
+  id: number;
+  employee: number;
+  employee_name?: string | null;
+  employee_code?: string | null;
+  activity_name: string;
+  hours_worked: string;
+  piece_count: string;
+  wage_amount: string;
+  is_posted: boolean;
+  posted_at?: string | null;
+  posted_by_username?: string | null;
+};
+
 export type ProductionJob = {
   id: number;
   job_no: string;
@@ -134,6 +148,7 @@ export type ProductionJob = {
   material_issue_lines: ProductionMaterialIssueLine[];
   receipt_lines: ProductionReceiptLine[];
   scrap_lines: ProductionScrapLine[];
+  labor_lines: ProductionLaborLine[];
 };
 
 export type ManufacturingOverview = {
@@ -340,5 +355,23 @@ export function cancelProductionJob(id: number | string, reason: string) {
   return apiFetch<{ updated: boolean; job: ProductionJob }>(`/manufacturing/jobs/${id}/cancel/`, {
     method: "POST",
     body: JSON.stringify({ reason }),
+  });
+}
+
+export function postProductionLabor(
+  id: number | string,
+  payload: {
+    labor_lines?: Array<{
+      employee: number;
+      activity_name: string;
+      hours_worked: string;
+      piece_count: string;
+      wage_amount: string;
+    }>;
+  } = {}
+) {
+  return apiFetch<{ updated: boolean; job: ProductionJob }>(`/manufacturing/jobs/${id}/post-labor/`, {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 }

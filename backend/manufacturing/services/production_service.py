@@ -161,7 +161,12 @@ def _refresh_job_rollups(job: ProductionJob) -> ProductionJob:
     received_cost = sum((_money(line.line_total_cost) for line in receipt_lines if line.is_posted), MONEY_ZERO)
     scrap_cost = sum((_money(line.line_total_cost) for line in scrap_lines if line.is_posted), MONEY_ZERO)
     completed_output_qty = sum((_quantity(line.quantity) for line in receipt_lines if line.is_posted), QUANTITY_ZERO)
-    wip_cost = _money(issued_cost - received_cost - scrap_cost)
+    
+    # Refresh labor_cost if method exists (from earlier update)
+    if hasattr(job, "update_labor_cost"):
+        job.update_labor_cost()
+        
+    wip_cost = _money(issued_cost + _money(job.labor_cost) - received_cost - scrap_cost)
 
     posted_material = [line for line in material_lines if line.is_posted]
     posted_receipts = [line for line in receipt_lines if line.is_posted]
@@ -524,6 +529,7 @@ def deactivate_manufacturing_bom(*, bom_id: int, performed_by=None):
 def upsert_production_job_draft(*, payload: dict, job_id: int | None = None, performed_by=None) -> ProductionJob:
     payload = dict(payload)
     material_issue_lines = payload.pop("material_issue_lines", None)
+    labor_lines_payload = payload.pop("labor_lines", None)
     finished_good_inventory_item = payload.get("finished_good_inventory_item")
     bom = payload.get("bom")
     if finished_good_inventory_item is None and job_id is None:
@@ -544,6 +550,13 @@ def upsert_production_job_draft(*, payload: dict, job_id: int | None = None, per
             )
         elif job.bom_id:
             _seed_material_lines_from_bom(job)
+            
+        if labor_lines_payload is not None:
+            from manufacturing.models import ProductionLaborLine
+            ProductionLaborLine.objects.bulk_create(
+                [ProductionLaborLine(production_job=job, **line) for line in labor_lines_payload]
+            )
+            
         job = _refresh_job_rollups(job)
         log_manufacturing_event(
             action_type=AuditLog.ActionType.PRODUCTION_JOB_CREATED,
@@ -563,13 +576,13 @@ def upsert_production_job_draft(*, payload: dict, job_id: int | None = None, per
     job = (
         ProductionJob.objects.select_for_update()
         .select_related("bom", "finished_good_inventory_item", "stock_location")
-        .prefetch_related("material_issue_lines", "receipt_lines", "scrap_lines")
+        .prefetch_related("material_issue_lines", "receipt_lines", "scrap_lines", "labor_lines")
         .get(pk=job_id)
     )
     if job.status not in {ProductionJobStatus.DRAFT, ProductionJobStatus.RELEASED}:
         raise ValueError("Only draft or released production jobs can be edited.")
-    if any(line.is_posted for line in [*job.material_issue_lines.all(), *job.receipt_lines.all(), *job.scrap_lines.all()]):
-        raise ValueError("Production jobs cannot be edited after material or output posting has started.")
+    if any(line.is_posted for line in [*job.material_issue_lines.all(), *job.receipt_lines.all(), *job.scrap_lines.all(), *job.labor_lines.all()]):
+        raise ValueError("Production jobs cannot be edited after material, labor, or output posting has started.")
 
     for field_name, value in payload.items():
         setattr(job, field_name, value)
@@ -584,6 +597,14 @@ def upsert_production_job_draft(*, payload: dict, job_id: int | None = None, per
         )
     elif job.bom_id and not job.material_issue_lines.exists():
         _seed_material_lines_from_bom(job)
+        
+    if labor_lines_payload is not None:
+        job.labor_lines.all().delete()
+        from manufacturing.models import ProductionLaborLine
+        ProductionLaborLine.objects.bulk_create(
+            [ProductionLaborLine(production_job=job, **line) for line in labor_lines_payload]
+        )
+        
     job = _refresh_job_rollups(job)
     log_manufacturing_event(
         action_type=AuditLog.ActionType.PRODUCTION_JOB_UPDATED,
@@ -775,7 +796,7 @@ def post_production_output(*, job_id: int, output_date=None, receipt_lines: list
         raise ValueError("Material issue must be posted before finished-goods output can be recorded.")
 
     posting_date = output_date or timezone.localdate()
-    current_wip_pool = _money(job.total_issued_cost - job.total_received_cost - job.total_scrap_cost)
+    current_wip_pool = _money(job.total_issued_cost + _money(job.labor_cost) - job.total_received_cost - job.total_scrap_cost)
 
     normalized_scrap = _prepare_scrap_batch_lines(lines=scrap_lines or [], job=job)
     scrap_cost_total = sum((_money(line["line_total_cost"]) for line in normalized_scrap), MONEY_ZERO)
@@ -906,14 +927,14 @@ def post_production_output(*, job_id: int, output_date=None, receipt_lines: list
 def complete_production_job(*, job_id: int, performed_by=None):
     job = (
         ProductionJob.objects.select_for_update()
-        .prefetch_related("material_issue_lines", "receipt_lines", "scrap_lines")
+        .prefetch_related("material_issue_lines", "receipt_lines", "scrap_lines", "labor_lines")
         .get(pk=job_id)
     )
     if job.status == ProductionJobStatus.COMPLETED:
         return job, False
     if job.status not in {ProductionJobStatus.RELEASED, ProductionJobStatus.IN_PROGRESS}:
         raise ValueError("Only released or in-progress production jobs can be completed.")
-    if any(not line.is_posted for line in [*job.material_issue_lines.all(), *job.receipt_lines.all(), *job.scrap_lines.all()]):
+    if any(not line.is_posted for line in [*job.material_issue_lines.all(), *job.receipt_lines.all(), *job.scrap_lines.all(), *job.labor_lines.all()]):
         raise ValueError("All draft manufacturing lines must be posted before the job can be completed.")
 
     job = _refresh_job_rollups(job)
@@ -1022,3 +1043,115 @@ def build_manufacturing_overview():
             for bom in recent_boms
         ],
     }
+
+
+def _build_bridge_lines_for_labor(line) -> list[dict] | None:
+    from accounting.models import FinanceAccountMappingPurpose
+    from accounting.services.bridge_posting_service import resolve_finance_account_mapping
+    
+    if line.wage_amount <= MONEY_ZERO:
+        return None
+        
+    try:
+        wip_account_id = resolve_finance_account_mapping(
+            finance_account_id=None,
+            purpose=FinanceAccountMappingPurpose.INVENTORY_ASSET,
+            system_code="WORK_IN_PROGRESS_INVENTORY",
+        )
+    except Exception:
+        return None
+        
+    try:
+        salary_expense_account_id = resolve_finance_account_mapping(
+            finance_account_id=None,
+            purpose=FinanceAccountMappingPurpose.SALARY_EXPENSE,
+            system_code=None,
+        )
+    except Exception:
+        return None
+
+    return [
+        {
+            "chart_account_id": wip_account_id,
+            "debit_amount": line.wage_amount,
+            "credit_amount": MONEY_ZERO,
+            "notes": f"Labor accrual {line.activity_name}",
+            "is_system_generated": True,
+        },
+        {
+            "chart_account_id": salary_expense_account_id,
+            "debit_amount": MONEY_ZERO,
+            "credit_amount": line.wage_amount,
+            "notes": f"Labor absorption {line.employee.name}",
+            "is_system_generated": True,
+        },
+    ]
+
+@transaction.atomic
+def post_production_labor(*, job_id: int, labor_lines: list[dict] | None = None, performed_by=None):
+    job = (
+        ProductionJob.objects.select_for_update()
+        .prefetch_related("labor_lines")
+        .get(pk=job_id)
+    )
+    if job.status not in {ProductionJobStatus.RELEASED, ProductionJobStatus.IN_PROGRESS}:
+        raise ValueError("Only released or in-progress production jobs can post labor.")
+        
+    posting_date = timezone.localdate()
+    posted_count = 0
+    deferred_count = 0
+    
+    if labor_lines is not None:
+        from manufacturing.models import ProductionLaborLine
+        ProductionLaborLine.objects.bulk_create(
+            [ProductionLaborLine(production_job=job, **line) for line in labor_lines]
+        )
+    
+    for line in job.labor_lines.filter(is_posted=False):
+        bridge_lines = _build_bridge_lines_for_labor(line)
+        journal_entry = None
+        if bridge_lines is not None:
+            journal_entry, _ = post_bridge_entry(
+                source_instance=line,
+                purpose="PRODUCTION_LABOR",
+                entry_date=posting_date,
+                memo=f"Production labor {job.job_no}",
+                lines=bridge_lines,
+                voucher_type="PRODUCTION_LABOR",
+                source_type="PRODUCTION_JOB",
+                source_reference=job.job_no,
+                source_document_no=job.job_no,
+                source_event_date=posting_date,
+                trace_metadata={
+                    "production_job_id": job.id,
+                    "job_no": job.job_no,
+                    "labor_line_id": line.id,
+                    "employee_id": line.employee_id,
+                },
+                posted_by=performed_by,
+            )
+        else:
+            deferred_count += 1
+            
+        line.is_posted = True
+        line.posted_at = timezone.now()
+        line.posted_by = performed_by
+        line.posted_journal_entry = journal_entry
+        line.save(update_fields=["is_posted", "posted_at", "posted_by", "posted_journal_entry", "updated_at"])
+        posted_count += 1
+
+    job = _refresh_job_rollups(job)
+    log_manufacturing_event(
+        action_type=AuditLog.ActionType.PRODUCTION_MATERIAL_MOVEMENT_POSTED,
+        instance=job,
+        performed_by=performed_by,
+        event="PRODUCTION_LABOR_POSTED",
+        metadata={
+            "production_job_id": job.id,
+            "job_no": job.job_no,
+            "posted_count": posted_count,
+            "deferred_accounting_count": deferred_count,
+            "movement_date": posting_date.isoformat(),
+        },
+    )
+    return job, True

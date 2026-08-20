@@ -538,3 +538,18 @@ Merge is additive: consolidate access, preserve every workflow.
 - any dev-data writes made and how (which flow)
 - residual risks
 - Assume the admin is trusted to control all operational fields single-handedly. Optimize the Admin UI for speed, comprehensive visibility, and unified operations.
+
+
+### 4e. Financial Reporting & KPI Rules (verified 2026-08-20)
+- **Dynamic Ledger Mapping**: The KPI aggregation in the frontend/backend must dynamically lookup `FinanceAccountCoaMapping` rather than assuming a single `chart_account` attached to a `FinanceAccount`. Payments made to mapped accounts (like `UPI_COLLECTION`) must accurately roll up into the "Balance held" and "Total Liquid Balance" for their parent settlement accounts.
+- **Cosmetic Data**: No cosmetic test data is allowed in the development database. It breaks the dashboard and KPI reporting. Operations must only use valid real-world records.
+
+### 4f. Manufacturing Labor & Payroll Rules (verified 2026-08-20)
+- **Manufacturing Labor**: Manufacturing labor costs must be aggregated using `ProductionLaborLine` and must trigger `manufacturing_labor_accrual` to bridge into the accounting ledger (credit `Salary Payable`, debit `WIP`). 
+- Labor must be fully posted before a production job can be completed.
+- Unposted `ProductionLaborLine` records for an employee must be pulled during their monthly salary sheet generation.
+
+### 4g. Data Migration & Legacy Receivables (verified 2026-08-20)
+- `CustomerOpeningOutstanding` records (Legacy Receivables) imported from batches must be strictly linked to their `MigrationStagingRow` via `migration_row` ForeignKey.
+- Admin UI and Customer Profiles must expose the `migration_batch_number` so operators can trace legacy receivables back to the exact migration batch that generated them.
+

@@ -49,12 +49,12 @@ def _next_draw_date_for_batch(today: date, draw_day: int) -> date:
     return date(today.year, today.month + 1, draw_day)
 
 
-def _chart_balance(system_code: str) -> str:
+def _chart_balance(*system_codes: str) -> str:
     from django.db.models import Sum
     from accounting.models import JournalEntryLine, JournalEntryStatus
 
     row = JournalEntryLine.objects.filter(
-        chart_account__system_code=system_code,
+        chart_account__system_code__in=system_codes,
         journal_entry__status=JournalEntryStatus.POSTED,
     ).aggregate(debit=Sum("debit_amount"), credit=Sum("credit_amount"))
     return _money((row["debit"] or 0) - (row["credit"] or 0))
@@ -135,10 +135,21 @@ def _build_module_kpis(today: date) -> dict:
         status__in=[RentLeaseDemandStatus.PENDING, RentLeaseDemandStatus.PARTIAL, RentLeaseDemandStatus.OVERDUE],
     ).aggregate(total=Sum("amount"), n=Count("id"))
 
+    from accounting.models import FinanceAccountCoaMapping
+    cash_coas = list(FinanceAccountCoaMapping.objects.filter(
+        finance_account__kind='CASH', 
+        purpose='CASH_COLLECTION'
+    ).values_list('chart_account__system_code', flat=True)) or ["CASH_COLLECTION"]
+    
+    bank_coas = list(FinanceAccountCoaMapping.objects.filter(
+        finance_account__kind='BANK', 
+        purpose__in=['BANK_COLLECTION', 'UPI_COLLECTION', 'PAYMENT_GATEWAY_COLLECTION']
+    ).values_list('chart_account__system_code', flat=True)) or ["BANK_COLLECTION", "UPI_COLLECTION"]
+
     return {
         "treasury": {
-            "cash_in_hand": _chart_balance("CASH_COLLECTION"),
-            "bank_balance": _chart_balance("BANK_COLLECTION"),
+            "cash_in_hand": _chart_balance(*cash_coas),
+            "bank_balance": _chart_balance(*bank_coas),
         },
         "sales": {
             "today_count": int(today_sales["n"] or 0),

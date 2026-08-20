@@ -585,6 +585,31 @@ def _build_generated_salary_lines(*, employee: EmployeeProfile, payroll_period: 
                 }
             )
 
+    try:
+        from manufacturing.models import ProductionLaborLine
+        labor_lines = ProductionLaborLine.objects.filter(
+            employee=employee,
+            is_posted=True,
+            posted_at__date__range=(payroll_period.start_date, payroll_period.end_date),
+        )
+        labor_amount = sum((_money(line.wage_amount) for line in labor_lines), Decimal("0.00"))
+        if labor_amount > MONEY_ZERO:
+            lines.append(
+                {
+                    "component_name": "Production Wages",
+                    "component_type": CompensationComponentType.EARNING,
+                    "source_type": SalaryLineSourceType.PRODUCTION_WAGE,
+                    "source_reference": payroll_period.code,
+                    "quantity": Decimal("1.00"),
+                    "rate": labor_amount,
+                    "amount": labor_amount,
+                    "sort_order": len(lines) + 1,
+                    "notes": f"Derived from {labor_lines.count()} posted manufacturing labor records in {payroll_period.code}",
+                }
+            )
+    except LookupError:
+        pass
+
     from accounting.services.staff_advance_service import total_outstanding_staff_advance
 
     outstanding_advance = total_outstanding_staff_advance(employee_id=employee.id)

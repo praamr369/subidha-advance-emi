@@ -245,7 +245,7 @@ export const ROUTES = {
     luckyDraws: "/admin/lucky-draws",
 
     luckyPlanControl: "/admin/lucky-plan",
-    luckyPlanBatches: "/admin/lucky-ids", // repointed: no batches page; lucky-ids is the closest register. TODO: confirm
+    luckyPlanBatches: "/admin/batches",
     luckyPlanLuckyIds: "/admin/lucky-ids", // repointed: canonical page is /admin/lucky-ids
     luckyPlanDraws: "/admin/lucky-draws", // repointed: canonical page is /admin/lucky-draws
     luckyPlanWinners: "/admin/lucky-plan/winners",

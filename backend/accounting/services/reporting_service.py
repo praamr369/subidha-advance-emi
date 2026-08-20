@@ -376,6 +376,7 @@ def build_cashbook(
 # new rail still shows up (just less pretty) rather than being hidden.
 MONEY_SOURCE_LABELS: dict[str, str] = {
     "PAYMENT": "EMI collections",
+    "SUBSCRIPTION_PAYMENT": "EMI collections",
     "DIRECT_SALE": "Direct sales",
     "RENT_LEASE": "Rent & lease",
     "RENT": "Rent",
@@ -390,6 +391,7 @@ MONEY_SOURCE_LABELS: dict[str, str] = {
     "SALARY_PAYMENT": "Salary payouts",
     "EXPENSE": "Expenses",
     "COMMISSION_PAYOUT": "Commission payouts",
+    "OWNER_FUND_INJECTION": "Owner fund injection",
 }
 
 
@@ -508,10 +510,21 @@ def build_finance_book(
     )
     if branch_id is not None:
         finance_accounts = [account for account in finance_accounts if account.branch_id == int(branch_id)]
-    chart_account_ids = [account.chart_account_id for account in finance_accounts]
+    finance_account_ids = [account.id for account in finance_accounts]
+    chart_account_ids = set([account.chart_account_id for account in finance_accounts if account.chart_account_id])
     finance_account_by_chart_account_id = {
-        account.chart_account_id: account for account in finance_accounts
+        account.chart_account_id: account for account in finance_accounts if account.chart_account_id
     }
+    finance_account_by_id = {account.id: account for account in finance_accounts}
+
+    from accounting.models import FinanceAccountCoaMapping
+    mappings = FinanceAccountCoaMapping.objects.filter(finance_account_id__in=finance_account_ids)
+    for mapping in mappings:
+        if mapping.chart_account_id:
+            chart_account_ids.add(mapping.chart_account_id)
+            finance_account_by_chart_account_id[mapping.chart_account_id] = finance_account_by_id[mapping.finance_account_id]
+            
+    chart_account_ids = list(chart_account_ids)
     rows = []
     total_debit = MONEY_ZERO
     total_credit = MONEY_ZERO
