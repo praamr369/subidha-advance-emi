@@ -1,6 +1,9 @@
 // @ts-nocheck
 "use client";
 
+import { Printer, Maximize2 } from "lucide-react";
+import ModalShell from "@/components/ui/ModalShell";
+
 import Link from "next/link";
 import QRCode from "react-qr-code";
 import {
@@ -422,6 +425,85 @@ function AttentionRow({
         {value}
       </span>
     </Link>
+  );
+}
+
+function StorefrontQRWidget() {
+  const [open, setOpen] = useState(false);
+  const qrValue = typeof window !== "undefined" ? window.location.origin : "https://example.com";
+
+  return (
+    <>
+      <button 
+        type="button" 
+        onClick={() => setOpen(true)}
+        className="group flex shrink-0 items-center justify-center gap-3 rounded-[1.5rem] border border-border bg-card p-4 shadow-sm transition hover:border-ring hover:shadow-md sm:min-w-[200px] text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <div className="relative rounded-xl bg-white p-2 shadow-sm transition-transform group-hover:scale-105">
+          <QRCode value={qrValue} size={64} />
+          <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/5 opacity-0 transition-opacity group-hover:opacity-100">
+            <Maximize2 className="h-5 w-5 text-black/70 drop-shadow-sm" />
+          </div>
+        </div>
+        <div className="text-sm">
+          <p className="font-semibold text-foreground group-hover:text-primary transition-colors">Storefront QR</p>
+          <p className="text-xs text-muted-foreground">Click to expand & print</p>
+        </div>
+      </button>
+
+      <ModalShell
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Storefront QR"
+        panelClassName="max-w-sm"
+      >
+        <div className="p-6 text-center">
+          <div className="mx-auto inline-block rounded-2xl bg-white p-6 shadow-sm ring-1 ring-black/5 print:shadow-none print:ring-0">
+            <QRCode value={qrValue} size={200} />
+          </div>
+          <h2 className="mt-6 text-lg font-bold text-foreground">Scan to visit</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{qrValue}</p>
+          
+          <div className="mt-8 flex items-center justify-center gap-3 print:hidden">
+            <ActionButton variant="secondary" onClick={() => setOpen(false)}>
+              Close
+            </ActionButton>
+            <ActionButton
+              variant="primary"
+              leftIcon={<Printer className="h-4 w-4" />}
+              onClick={() => window.print()}
+            >
+              Print QR Code
+            </ActionButton>
+          </div>
+        </div>
+        
+        {/* Print specific styles for this modal */}
+        <style dangerouslySetInnerHTML={{__html: `
+          @media print {
+            body * {
+              visibility: hidden;
+            }
+            .workflow-modal-panel, .workflow-modal-panel * {
+              visibility: visible;
+            }
+            .workflow-modal-panel {
+              position: absolute;
+              left: 0;
+              top: 0;
+              width: 100%;
+              box-shadow: none !important;
+              background: transparent !important;
+            }
+            .dashboard-app {
+              position: absolute;
+              left: 0;
+              top: 0;
+            }
+          }
+        `}} />
+      </ModalShell>
+    </>
   );
 }
 
@@ -947,15 +1029,7 @@ export default function AdminDashboardPage() {
           </ActionButton>
           </div>
           
-          <div className="flex shrink-0 items-center justify-center gap-3 rounded-[1.5rem] border border-border bg-card p-4 shadow-sm sm:min-w-[200px]">
-            <div className="rounded-xl bg-white p-2 shadow-sm">
-              <QRCode value={typeof window !== "undefined" ? window.location.origin : "https://example.com"} size={64} />
-            </div>
-            <div className="text-sm">
-              <p className="font-semibold text-foreground">Storefront QR</p>
-              <p className="text-xs text-muted-foreground">Scan to visit</p>
-            </div>
-          </div>
+          <StorefrontQRWidget />
         </div>
 
         <DashboardTimeWindowSelector
