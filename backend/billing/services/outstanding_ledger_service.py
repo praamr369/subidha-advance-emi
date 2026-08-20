@@ -382,7 +382,7 @@ def _collect_standalone_invoice_rows(*, today: date) -> list[dict[str, Any]]:
 def _collect_opening_outstanding_rows(*, today: date) -> list[dict[str, Any]]:
     from accounting.models import CustomerOpeningOutstanding
     rows: list[dict[str, Any]] = []
-    outstandings = CustomerOpeningOutstanding.objects.filter(is_settled=False).order_by("entry_date", "id")
+    outstandings = CustomerOpeningOutstanding.objects.select_related("customer").filter(is_settled=False).order_by("entry_date", "id")
     for out in outstandings:
         original = _money(out.outstanding_amount)
         collected = _money(out.collected_amount or MONEY_ZERO)
@@ -397,7 +397,7 @@ def _collect_opening_outstanding_rows(*, today: date) -> list[dict[str, Any]]:
                 "operation_type": OP_LEGACY_RECEIVABLE,
                 "source_type": "LEGACY_RECEIVABLE",
                 "source_id": out.id,
-                "customer_id": None,
+                "customer_id": out.customer_id,
                 "customer_name": out.customer_name or "",
                 "customer_phone": out.phone or "",
                 "contract_reference": "Legacy Balance",
@@ -414,8 +414,9 @@ def _collect_opening_outstanding_rows(*, today: date) -> list[dict[str, Any]]:
                 "age_bucket": _age_bucket_from_days(overdue_days),
                 "status": "OVERDUE" if overdue_days > 0 else "DUE",
                 "collection_allowed": True,
+                "admin_verified": out.admin_verified,
                 "detail_url": "",
-                "customer_url": "",
+                "customer_url": f"/admin/customers/{out.customer_id}" if out.customer_id else "",
                 "payment_url": f"/admin/finance/collect?workflow=legacy-receivable&outstanding={out.id}",
                 "risk_flags": ["OVERDUE_30_PLUS"] if overdue_days >= 30 else [],
                 "_due_date_obj": due_date,

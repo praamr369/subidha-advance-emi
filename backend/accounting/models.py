@@ -4863,8 +4863,23 @@ class CustomerOpeningOutstanding(AccountingTimeStampedModel):
     notes = models.TextField(blank=True, default="")
     is_settled = models.BooleanField(default=False, db_index=True)
     settled_at = models.DateTimeField(null=True, blank=True)
+    admin_verified = models.BooleanField(default=False, db_index=True)
+    admin_verified_at = models.DateTimeField(null=True, blank=True)
+    admin_verified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name="verified_opening_outstandings",
+    )
+    admin_verification_notes = models.TextField(blank=True, default="")
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name="customer_opening_outstandings",
+    )
+    migration_row = models.ForeignKey(
+        "migration_center.MigrationStagingRow",
         null=True, blank=True,
         on_delete=models.SET_NULL,
         related_name="customer_opening_outstandings",

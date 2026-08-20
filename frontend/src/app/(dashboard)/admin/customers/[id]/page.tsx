@@ -13,6 +13,8 @@ import {
   Check,
   Search,
   X,
+  ChevronRight,
+  Database,
   RefreshCw,
 } from "lucide-react";
 
@@ -202,6 +204,40 @@ type PartnerLinkageRow = {
   subscription_count: number;
 };
 
+type LegacyReceivableRow = {
+  id: number;
+  customer_name: string;
+  phone?: string;
+  outstanding_amount: string;
+  collected_amount: string;
+  balance_remaining: string;
+  entry_date: string | null;
+  notes?: string;
+  is_settled: boolean;
+  settled_at?: string | null;
+  admin_verified: boolean;
+  admin_verified_at?: string | null;
+  admin_verification_notes?: string;
+  migration_batch_id?: number | null;
+  migration_batch_number?: string | null;
+};
+
+type LegacyCollectionRow = {
+  id: number;
+  collection_no: string;
+  receivable_id: number;
+  customer_name: string;
+  amount: string;
+  payment_method: string;
+  finance_account_name?: string | null;
+  receipt_date: string | null;
+  reference_no?: string;
+  notes?: string;
+  journal_entry_no?: string | null;
+  collected_by_username?: string | null;
+  created_at: string;
+};
+
 type CustomerOperationalProfile = {
   overview: {
     legacy_outstanding_amount?: string;
@@ -298,6 +334,20 @@ type CustomerOperationalProfile = {
   partner_linkages: {
     count: number;
     rows: PartnerLinkageRow[];
+  };
+  legacy_receivables?: {
+    summary: {
+      total_count: number;
+      unsettled_count: number;
+      settled_count: number;
+      verified_count: number;
+      unverified_count: number;
+      total_outstanding: string;
+      total_collected: string;
+      balance_remaining: string;
+    };
+    rows: LegacyReceivableRow[];
+    collections: LegacyCollectionRow[];
   };
 };
 
@@ -2548,6 +2598,140 @@ export default function AdminCustomerDetailPage() {
                 </SectionCard>
 
                 <SectionCard
+                  title="Legacy Receivables"
+                  description="Legacy opening balances linked to this customer."
+                  actionHref="/admin/opening-balances/customers"
+                  actionLabel="Opening Balances"
+                >
+                  {!operationalProfile.legacy_receivables?.rows || operationalProfile.legacy_receivables.rows.length === 0 ? (
+                    <EmptyState
+                      title="No legacy receivables"
+                      description="No legacy opening balance records were found for this customer."
+                    />
+                  ) : (
+                    <div className="space-y-3">
+                      {operationalProfile.legacy_receivables.rows.map((row) => (
+                        <div
+                          key={row.id}
+                          className="rounded-xl border border-border bg-background p-4 shadow-sm"
+                        >
+                          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                            <div>
+                              <div className="text-sm font-semibold text-foreground">
+                                Legacy Receivable #{row.id}
+                              </div>
+                              <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                                <div>{formatDate(row.entry_date)}</div>
+                                <div>·</div>
+                                <StatusBadge
+                                  status={row.is_settled ? "SETTLED" : "UNSETTLED"}
+                                  tone={row.is_settled ? "success" : "warning"}
+                                />
+                                {row.admin_verified ? (
+                                  <StatusBadge status="VERIFIED" tone="info" />
+                                ) : (
+                                  <StatusBadge status="UNVERIFIED" tone="danger" />
+                                )}
+                                {row.migration_batch_number && (
+                                  <>
+                                    <div>·</div>
+                                    <Link 
+                                      href={`/admin/migration-center/batches/${row.migration_batch_id}`}
+                                      className="inline-flex items-center gap-1 font-medium text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-0.5 rounded"
+                                      title="View Migration Batch"
+                                    >
+                                      <Database className="w-3 h-3" />
+                                      {row.migration_batch_number}
+                                    </Link>
+                                  </>
+                                )}
+                              </div>
+                              {row.notes && (
+                                <div className="mt-2 text-xs text-muted-foreground max-w-lg">
+                                  {row.notes}
+                                </div>
+                              )}
+                            </div>
+                            <div className="grid gap-2 sm:grid-cols-3">
+                              <div className="rounded-xl border border-border bg-muted/50 px-3 py-2">
+                                <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Original</div>
+                                <div className="mt-1 text-sm font-semibold text-foreground">{formatRupee(row.outstanding_amount)}</div>
+                              </div>
+                              <div className="rounded-xl border border-border bg-muted/50 px-3 py-2">
+                                <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Collected</div>
+                                <div className="mt-1 text-sm font-semibold text-foreground">{formatRupee(row.collected_amount)}</div>
+                              </div>
+                              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
+                                <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">Remaining</div>
+                                <div className="mt-1 text-sm font-semibold text-amber-900">
+                                  {formatRupee(row.balance_remaining)}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          {!row.is_settled && Number(row.balance_remaining || 0) > 0 && (
+                            <div className="mt-4 flex flex-wrap gap-2">
+                              <Link
+                                href={`/admin/finance/collect?workflow=legacy-receivable&outstanding=${row.id}`}
+                                className="inline-flex items-center rounded-md border border-amber-900 bg-amber-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-amber-800"
+                              >
+                                Collect Legacy Balance
+                              </Link>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </SectionCard>
+
+                <SectionCard
+                  title="Legacy Collection History"
+                  description="Collections posted against legacy receivables."
+                >
+                  {!operationalProfile.legacy_receivables?.collections || operationalProfile.legacy_receivables.collections.length === 0 ? (
+                    <EmptyState
+                      title="No legacy collections"
+                      description="No collections have been recorded against legacy receivables."
+                    />
+                  ) : (
+                    <div className="overflow-x-auto rounded-xl border border-border bg-background shadow-sm">
+                      <table className="w-full text-left text-sm">
+                        <thead className="bg-muted/50 text-xs font-medium uppercase text-muted-foreground">
+                          <tr>
+                            <th className="px-4 py-3">Collection No.</th>
+                            <th className="px-4 py-3">Date</th>
+                            <th className="px-4 py-3">Receivable ID</th>
+                            <th className="px-4 py-3">Method & Account</th>
+                            <th className="px-4 py-3">Amount</th>
+                            <th className="px-4 py-3">Journal Entry</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {operationalProfile.legacy_receivables.collections.map((row: LegacyCollectionRow) => (
+                            <tr key={row.id} className="transition hover:bg-muted/50">
+                              <td className="px-4 py-3 font-medium">{row.collection_no || `COL-${row.id}`}</td>
+                              <td className="px-4 py-3 text-muted-foreground">{formatDate(row.receipt_date)}</td>
+                              <td className="px-4 py-3 text-muted-foreground">LEGACY-{row.receivable_id}</td>
+                              <td className="px-4 py-3">
+                                <div className="flex flex-col gap-0.5">
+                                  <span className="font-medium text-foreground">{row.payment_method || "N/A"}</span>
+                                  {row.finance_account_name && (
+                                    <span className="text-xs text-muted-foreground">{row.finance_account_name}</span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 font-semibold text-foreground">{formatRupee(row.amount)}</td>
+                              <td className="px-4 py-3 text-muted-foreground">{row.journal_entry_no || "—"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </SectionCard>
+
+                <SectionCard
                   title="Lead / Quotation History"
                   description="Walk-in, online, quotation, and estimate lead records linked to this customer identity."
                   actionHref={ROUTES.admin.leads}
@@ -2778,6 +2962,7 @@ export default function AdminCustomerDetailPage() {
                     </div>
                   </div>
                 </SectionCard>
+
               </>
             ) : null}
           </>

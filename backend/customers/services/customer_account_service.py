@@ -135,15 +135,60 @@ def get_customer_historical_subscription_contract_value(customer: Customer) -> D
 
 
 def build_customer_operational_profile(customer: Customer) -> dict[str, object]:
-    from accounting.models import CustomerOpeningOutstanding
+    from accounting.models import CustomerOpeningOutstanding, LegacyReceivableCollection
 
-    opening_outstanding_qs = CustomerOpeningOutstanding.objects.filter(customer=customer)
-    opening_outstanding_totals = opening_outstanding_qs.aggregate(
+    opening_outstanding_qs = CustomerOpeningOutstanding.objects.select_related("migration_row", "migration_row__batch").filter(customer=customer)
+    unsettled_qs = opening_outstanding_qs.filter(is_settled=False)
+    opening_outstanding_totals = unsettled_qs.aggregate(
         total_count=Count("id"),
-        outstanding_total=Sum("outstanding_amount"),
+        remaining_total=Sum("outstanding_amount") - Sum("collected_amount"),
     )
-    legacy_outstanding_amount = opening_outstanding_totals["outstanding_total"] or Decimal("0.00")
+    raw_remaining = opening_outstanding_totals["remaining_total"]
+    legacy_outstanding_amount = raw_remaining if raw_remaining and raw_remaining > Decimal("0.00") else Decimal("0.00")
     legacy_outstanding_count = opening_outstanding_totals["total_count"] or 0
+
+    legacy_receivable_rows = [
+        {
+            "id": obj.id,
+            "customer_name": obj.customer_name,
+            "phone": obj.phone,
+            "outstanding_amount": _money(obj.outstanding_amount),
+            "collected_amount": _money(obj.collected_amount),
+            "balance_remaining": _money(obj.balance_remaining),
+            "entry_date": obj.entry_date,
+            "notes": obj.notes,
+            "is_settled": obj.is_settled,
+            "settled_at": obj.settled_at,
+            "admin_verified": obj.admin_verified,
+            "admin_verified_at": obj.admin_verified_at,
+            "admin_verification_notes": obj.admin_verification_notes,
+            "migration_row_id": obj.migration_row_id,
+            "migration_batch_id": obj.migration_row.batch_id if obj.migration_row else None,
+            "migration_batch_number": obj.migration_row.batch.batch_number if obj.migration_row else None,
+        }
+        for obj in opening_outstanding_qs.order_by("-entry_date", "-id")[:20]
+    ]
+
+    legacy_collection_rows = [
+        {
+            "id": col.id,
+            "collection_no": col.collection_no,
+            "receivable_id": col.receivable_id,
+            "customer_name": col.receivable.customer_name,
+            "amount": _money(col.amount),
+            "payment_method": col.payment_method,
+            "finance_account_name": getattr(col.finance_account, "name", None),
+            "receipt_date": col.receipt_date,
+            "reference_no": col.reference_no,
+            "notes": col.notes,
+            "journal_entry_no": getattr(col.posted_journal_entry, "entry_no", None),
+            "collected_by_username": getattr(col.collected_by, "username", None),
+            "created_at": col.created_at,
+        }
+        for col in LegacyReceivableCollection.objects.select_related(
+            "receivable", "finance_account", "posted_journal_entry", "collected_by"
+        ).filter(receivable__customer=customer).order_by("-created_at", "-id")[:20]
+    ]
 
     subscriptions = list(
         get_subscription_detail_queryset()
@@ -588,6 +633,12 @@ def build_customer_operational_profile(customer: Customer) -> dict[str, object]:
             "summary": build_customer_profile_summary(customer),
             "rows": recent_subscriptions,
         },
+        "legacy_receivables": {
+            "rows": legacy_receivable_rows,
+        },
+        "legacy_collections": {
+            "rows": legacy_collection_rows,
+        },
         "contract_references": {
             "summary": {
                 "total_count": len(contract_reference_payload),
@@ -675,6 +726,20 @@ def build_customer_operational_profile(customer: Customer) -> dict[str, object]:
         "partner_linkages": {
             "count": len(partner_rows),
             "rows": list(partner_rows.values()),
+        },
+        "legacy_receivables": {
+            "summary": {
+                "total_count": opening_outstanding_qs.count(),
+                "unsettled_count": legacy_outstanding_count,
+                "settled_count": opening_outstanding_qs.filter(is_settled=True).count(),
+                "verified_count": opening_outstanding_qs.filter(admin_verified=True).count(),
+                "unverified_count": opening_outstanding_qs.filter(admin_verified=False).count(),
+                "total_outstanding": _money(opening_outstanding_qs.aggregate(t=Sum("outstanding_amount"))["t"]),
+                "total_collected": _money(opening_outstanding_qs.aggregate(t=Sum("collected_amount"))["t"]),
+                "balance_remaining": _money(legacy_outstanding_amount),
+            },
+            "rows": legacy_receivable_rows,
+            "collections": legacy_collection_rows,
         },
     }
 

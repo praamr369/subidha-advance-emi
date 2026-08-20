@@ -38,6 +38,7 @@ from api.v1.views.vendor_ops import AdminFinanceOpeningBalanceView
 from api.v1.views.vendor_ops import AdminVendorAccountLinkView
 from api.v1.views.vendor_ops import AdminVendorCategoryListCreateView
 from api.v1.views.vendor_ops import AdminVendorLedgerView
+from api.v1.views.vendor_ops import AdminCustomerOutstandingSyncView
 from api.v1.views.vendor_ops import AdminVendorOpeningBalanceListView
 from api.v1.views.vendor_ops import AdminVendorOpeningBalanceView
 from api.v1.views.vendor_ops import AdminVendorOutstandingView
@@ -90,6 +91,7 @@ urlpatterns = [
     path("vendors/<int:pk>/outstanding/", AdminVendorOutstandingView.as_view()),
     path("opening-balances/customers/", AdminCustomerOpeningOutstandingView.as_view()),
     path("opening-balances/customers/<int:pk>/", AdminCustomerOpeningOutstandingDetailView.as_view()),
+    path("opening-balances/customers/sync/", AdminCustomerOutstandingSyncView.as_view()),
     path("opening-balances/finance-accounts/<int:pk>/", AdminFinanceOpeningBalanceView.as_view()),
     path("opening-balances/vendors/", AdminVendorOpeningBalanceListView.as_view()),
     path("opening-balances/vendors/<int:pk>/", AdminVendorOpeningBalanceView.as_view()),

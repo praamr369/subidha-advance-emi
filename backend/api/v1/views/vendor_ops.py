@@ -630,7 +630,7 @@ class AdminCustomerOpeningOutstandingView(APIView):
 
     def get(self, request):
         from decimal import Decimal
-        qs = CustomerOpeningOutstanding.objects.all().order_by("-entry_date", "customer_name")
+        qs = CustomerOpeningOutstanding.objects.select_related("migration_row", "migration_row__batch").all().order_by("-entry_date", "customer_name")
         settled = request.query_params.get("settled")
         if settled == "true":
             qs = qs.filter(is_settled=True)
@@ -644,6 +644,8 @@ class AdminCustomerOpeningOutstandingView(APIView):
                 total += remaining
             rows.append({
                 "id": obj.id,
+                "customer_id": obj.customer_id,
+                "customer_url": f"/admin/customers/{obj.customer_id}" if obj.customer_id else None,
                 "customer_name": obj.customer_name,
                 "phone": obj.phone,
                 "outstanding_amount": str(obj.outstanding_amount),
@@ -653,7 +655,13 @@ class AdminCustomerOpeningOutstandingView(APIView):
                 "notes": obj.notes,
                 "is_settled": obj.is_settled,
                 "settled_at": obj.settled_at,
+                "admin_verified": obj.admin_verified,
+                "admin_verified_at": obj.admin_verified_at,
+                "admin_verification_notes": obj.admin_verification_notes,
                 "created_at": obj.created_at,
+                "migration_row_id": obj.migration_row_id,
+                "migration_batch_id": obj.migration_row.batch_id if obj.migration_row else None,
+                "migration_batch_number": obj.migration_row.batch.batch_number if obj.migration_row else None,
             })
         return Response({"count": len(rows), "total_outstanding": str(total), "results": rows})
 
@@ -713,8 +721,28 @@ class AdminCustomerOpeningOutstandingDetailView(APIView):
             )
         if "notes" in request.data:
             obj.notes = (request.data["notes"] or "").strip()
+        if "admin_verified" in request.data:
+            from django.utils import timezone as tz
+            is_verified = bool(request.data["admin_verified"])
+            if obj.admin_verified != is_verified:
+                obj.admin_verified = is_verified
+                obj.admin_verified_at = tz.now() if is_verified else None
+                obj.admin_verified_by = request.user if is_verified else None
+        if "admin_verification_notes" in request.data:
+            obj.admin_verification_notes = (request.data["admin_verification_notes"] or "").strip()
         obj.save()
-        return Response({"id": obj.id, "customer_name": obj.customer_name, "is_settled": obj.is_settled, "settled_at": obj.settled_at and obj.settled_at.isoformat()})
+        
+        return Response({
+            "id": obj.id,
+            "customer_id": obj.customer_id,
+            "customer_url": f"/admin/customers/{obj.customer_id}" if obj.customer_id else None,
+            "customer_name": obj.customer_name,
+            "is_settled": obj.is_settled, 
+            "settled_at": obj.settled_at and obj.settled_at.isoformat(),
+            "admin_verified": obj.admin_verified,
+            "admin_verified_at": obj.admin_verified_at,
+            "admin_verification_notes": obj.admin_verification_notes,
+        })
 
     def delete(self, request, pk: int):
         get_object_or_404(CustomerOpeningOutstanding, pk=pk)
@@ -722,6 +750,16 @@ class AdminCustomerOpeningOutstandingDetailView(APIView):
             {"detail": "Posted opening balances cannot be deleted. Create an audited correction/reversal instead."},
             status=status.HTTP_409_CONFLICT,
         )
+
+
+class AdminCustomerOutstandingSyncView(APIView):
+    """POST /admin/opening-balances/customers/sync/ — re-link orphaned outstanding records to CRM customers."""
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request):
+        from accounting.services.opening_balance_migration_service import sync_outstanding_customer_links
+        result = sync_outstanding_customer_links()
+        return Response(result)
 
 
 class AdminVendorOpeningBalanceListView(APIView):

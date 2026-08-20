@@ -140,8 +140,18 @@ def set_vendor_opening_balance(*, vendor: Vendor, amount, entry_date: date, note
 
 @transaction.atomic
 def create_customer_opening_outstanding(*, customer_name: str, phone: str, amount, entry_date: date, notes: str, actor) -> CustomerOpeningOutstanding:
+    from customers.models import Customer
     value = _amount(amount, allow_zero=False)
+    
+    # Try to find a matching customer
+    customer = None
+    if phone:
+        customer = Customer.objects.filter(phone=phone).first()
+    if not customer and customer_name:
+        customer = Customer.objects.filter(name__iexact=customer_name).first()
+        
     row = CustomerOpeningOutstanding.objects.create(
+        customer=customer,
         customer_name=customer_name,
         phone=phone,
         outstanding_amount=value,
@@ -162,3 +172,52 @@ def create_customer_opening_outstanding(*, customer_name: str, phone: str, amoun
     )
     row._journal_entry = journal
     return row
+
+
+def sync_outstanding_customer_links() -> dict:
+    """Re-link orphaned CustomerOpeningOutstanding records to Customer by phone or name.
+
+    Returns a summary of how many were linked, already linked, or unresolvable.
+    """
+    from customers.models import Customer
+
+    orphans = CustomerOpeningOutstanding.objects.filter(customer__isnull=True)
+    linked = 0
+    skipped = 0
+    already_linked = 0
+    details: list[dict] = []
+
+    for row in orphans:
+        match = None
+        match_method = None
+        if row.phone:
+            match = Customer.objects.filter(phone=row.phone).first()
+            if match:
+                match_method = "phone"
+        if not match and row.customer_name:
+            match = Customer.objects.filter(name__iexact=row.customer_name).first()
+            if match:
+                match_method = "name"
+
+        if match:
+            row.customer = match
+            row.save(update_fields=["customer", "updated_at"])
+            linked += 1
+            details.append({
+                "outstanding_id": row.id,
+                "customer_id": match.id,
+                "customer_name": match.name,
+                "matched_by": match_method,
+            })
+        else:
+            skipped += 1
+
+    already_linked = CustomerOpeningOutstanding.objects.filter(customer__isnull=False).count()
+
+    return {
+        "newly_linked": linked,
+        "already_linked": already_linked,
+        "unresolvable": skipped,
+        "total": CustomerOpeningOutstanding.objects.count(),
+        "details": details,
+    }
