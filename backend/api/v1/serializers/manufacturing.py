@@ -311,6 +311,7 @@ class ProductionJobSerializer(serializers.ModelSerializer):
             "material_issue_lines",
             "receipt_lines",
             "scrap_lines",
+            "labor_lines",
             "created_at",
             "updated_at",
         ]
