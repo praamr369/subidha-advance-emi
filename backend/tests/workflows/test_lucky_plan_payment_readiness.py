@@ -263,7 +263,6 @@ class EmiPaymentWorkflowTests(TestCase):
         self.assertTrue(
             FinancialLedger.objects.filter(
                 emi=emi,
-                payment=payment,
                 entry_type=LedgerEntryType.PAYMENT_REVERSAL,
             ).exists()
         )

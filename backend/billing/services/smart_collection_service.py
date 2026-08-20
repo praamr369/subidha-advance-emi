@@ -43,9 +43,9 @@ def plan_smart_collection(
     advance = CustomerAdvance.objects.filter(customer_id=customer_id).first()
     
     if advance:
-        opening_advance = advance.unapplied_balance
+        opening_advance = advance.unapplied_amount
         if use_existing_advance:
-            pool_advance = advance.unapplied_balance
+            pool_advance = advance.unapplied_amount
             
     allocations = []
     skipped = []

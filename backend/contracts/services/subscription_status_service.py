@@ -43,10 +43,10 @@ def resolve_expected_subscription_status(
     if not normalized_emi_statuses:
         return current_status or active_status
 
-    if normalized_emi_statuses.issubset(SETTLED_EMI_STATUSES):
-        return completed_status
-
     if is_winner:
         return won_status
+
+    if normalized_emi_statuses.issubset(SETTLED_EMI_STATUSES):
+        return completed_status
 
     return active_status

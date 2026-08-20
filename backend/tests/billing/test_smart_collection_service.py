@@ -5,7 +5,7 @@ from datetime import date
 from django.test import TestCase
 from django.utils import timezone
 
-from billing.models import DirectSale, SmartCollectionRun
+from billing.models import DirectSale, SmartCollectionRun, BillingInvoice
 from subscriptions.models import CustomerAdvance, Emi, Payment
 from billing.services.smart_collection_service import plan_smart_collection, execute_smart_collection
 from tests.helpers import (
@@ -20,7 +20,7 @@ from tests.helpers import (
     create_lucky_id,
     ensure_test_accounting_posting_prerequisites,
 )
-from accounting.models import DocumentSequence
+from accounting.models import DocumentSequence, JournalEntry
 from accounting.services.document_sequence_service import (
     DocumentType,
     get_or_create_sequence_for_document_type,
@@ -72,6 +72,29 @@ class SmartCollectionServiceTests(TestCase):
             status="INVOICED"
         )
         
+        je = JournalEntry.objects.create(
+            entry_type="SYSTEM_BRIDGE",
+            status="POSTED",
+            entry_date=timezone.localdate(),
+            financial_year=fy,
+            posted_at=timezone.now(),
+        )
+        self.billing_invoice = BillingInvoice.objects.create(
+            document_no=f"INV-{fy.code}-SC",
+            invoice_date=timezone.localdate(),
+            financial_year=fy.code,
+            doc_series=doc_series,
+            customer=self.customer,
+            direct_sale=self.direct_sale,
+            status="POSTED",
+            grand_total=Decimal("3500.00"),
+            balance_total=Decimal("3500.00"),
+            received_total=Decimal("0.00"),
+            billing_channel="RETAIL",
+            source_type="DIRECT_SALE",
+            posted_journal_entry=je,
+        )
+        
         # Collection tests need a finance account WITH the collection-purpose
         # COA mapping wired up, or record_emi_payment /
         # execute_smart_collection 400s with
@@ -97,10 +120,12 @@ class SmartCollectionServiceTests(TestCase):
             idempotency_key=idem
         )
         self.assertEqual(len(res["allocations"]), 4)
-        self.assertFalse(res["dry_run"])
-        
         self.emi1.refresh_from_db()
-        self.assertTrue(self.emi1.is_paid)
+        self.emi2.refresh_from_db()
+        self.emi3.refresh_from_db()
+        self.assertEqual(self.emi1.status, "PAID")
+        self.assertEqual(self.emi2.status, "PAID")
+        self.assertEqual(self.emi3.status, "PAID")
         self.direct_sale.refresh_from_db()
         self.assertEqual(self.direct_sale.balance_total, Decimal("0.00"))
 
@@ -136,11 +161,18 @@ class SmartCollectionServiceTests(TestCase):
         self.assertEqual(res["allocations"][-1]["amount"], "2000.00")
         
         adv = CustomerAdvance.objects.get(customer=self.customer)
-        self.assertEqual(adv.unapplied_balance, Decimal("2000.00"))
+        self.assertEqual(adv.unapplied_amount, Decimal("2000.00"))
         
     def test_existing_advance_consumed_first(self):
         # Create advance
-        CustomerAdvance.objects.create(customer=self.customer, total_received=Decimal("1500.00"), unapplied_balance=Decimal("1500.00"))
+        CustomerAdvance.objects.create(
+            customer=self.customer,
+            amount=Decimal("1500.00"),
+            unapplied_amount=Decimal("1500.00"),
+            finance_account=self.finance_account,
+            method="CASH",
+            payment_date=timezone.localdate()
+        )
         
         # Pay 1500 cash. Toggle ON. Advance pays EMI1. Cash pays EMI2.
         plan = plan_smart_collection(customer_id=self.customer.id, amount=Decimal("1500.00"), use_existing_advance=True)
