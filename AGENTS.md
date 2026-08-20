@@ -453,6 +453,32 @@ backend/.venv/Scripts/python.exe backend/manage.py test <app.tests.Target>   # s
 Note: the full backend test suite has ~20 known pre-existing failures and is NOT
 the gate — run the tests scoped to what you changed.
 
+### 4d. Payment/collection service call rules (verified 2026-08-20)
+
+These rules were discovered when the `smart_collection_service` was found
+completely broken due to post-refactor field/signature drift:
+
+- `record_emi_payment()` uses `method=` (not `payment_method=`), `note=` (not
+  `notes=`), and returns a **dict** `{payment, emi, subscription, ...}` — not a
+  Payment model instance.
+- `collect_direct_sale_payment()` does NOT accept `payment_method` — the method
+  is derived from the finance account kind. It requires a linked `BillingInvoice`.
+- `CustomerAdvanceService.collect_unapplied_advance()` uses `method=`, `note=`,
+  and REQUIRES `payment_date`.
+- `CustomerAdvance` model fields are `amount` and `unapplied_amount` (not
+  `total_received` / `unapplied_balance`).
+- `Emi.is_paid` was removed; use `status__in=[EmiStatus.PENDING, EmiStatus.OVERDUE]`
+  for unpaid EMIs, or `status == EmiStatus.PAID` for paid.
+- `Customer.full_name` was removed; use `.name`.
+- `FinancialLedger.payment` is a **OneToOneField** — reversal entries use
+  `payment=None` and store the reversed payment ID in `allocation_context`.
+- Winner subscription status is `WON`, not `COMPLETED` — `is_winner` takes
+  priority over `SETTLED_EMI_STATUSES` in `resolve_expected_subscription_status`.
+- Test fixtures must call `ensure_test_collection_purpose_mapping(finance_account=...)`
+  or use `create_payment_collection_finance_account()` — inline
+  `FinanceAccount.objects.create()` won't have COA mappings and will raise
+  `FinanceAccountPostingReadinessError`.
+
 **End-to-end (behavioral) verification — required for anything the browser can
 render:** boot the servers via `.claude/launch.json`, drive the actual flow in the
 in-app browser, and read console/network/server logs to confirm no errors. Share a

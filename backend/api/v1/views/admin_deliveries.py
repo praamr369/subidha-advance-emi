@@ -43,6 +43,7 @@ from contracts.services.document_pdf_service import render_delivery_handover_pdf
 from deliveries.services.delivery_service import (
     build_delivery_report_summary,
     cancel_subscription_delivery,
+    check_delivery_eligibility,
     create_subscription_delivery,
     get_delivery_queryset,
     mark_subscription_delivery_delivered,
@@ -294,6 +295,8 @@ class AdminDeliveryListCreateView(APIView):
                     "",
                 ),
                 notes=validated.get("notes", ""),
+                admin_override=validated.get("admin_override", False),
+                admin_override_reason=validated.get("admin_override_reason", ""),
             )
         except ValueError as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
@@ -831,3 +834,26 @@ class AdminDirectSaleDeliveryMetadataView(APIView):
         except ValueError as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
         return Response({"updated": True, "delivery": serialize_direct_sale_delivery_case(case)})
+
+
+class AdminDeliveryEligibilityCheckView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request, subscription_id):
+        subscription = get_object_or_404(
+            Subscription.objects.select_related("customer", "product", "batch"),
+            pk=subscription_id,
+        )
+        eligibility = check_delivery_eligibility(subscription)
+        return Response({
+            "eligible": eligibility.eligible,
+            "reason": eligibility.reason,
+            "paid_emi_count": eligibility.paid_emi_count,
+            "total_emi_count": eligibility.total_emi_count,
+            "paid_ratio": str(eligibility.paid_ratio),
+            "is_winner": eligibility.is_winner,
+            "is_completed": eligibility.is_completed,
+            "subscription_id": subscription.id,
+            "customer_name": subscription.customer.name,
+            "product_name": subscription.product.name,
+        })

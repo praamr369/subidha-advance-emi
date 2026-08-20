@@ -22,6 +22,7 @@ from api.v1.views.admin_deliveries import AdminDirectSaleDeliveryMarkDeliveredVi
 from api.v1.views.admin_deliveries import AdminDirectSaleDeliveryMetadataView
 from api.v1.views.admin_deliveries import AdminDirectSaleDeliveryNoteView
 from api.v1.views.admin_deliveries import AdminDirectSaleDeliveryScheduleView
+from api.v1.views.admin_deliveries import AdminDeliveryEligibilityCheckView
 from api.v1.views.admin_navigation import AdminNavigationBadgesView
 
 urlpatterns = [
@@ -30,6 +31,10 @@ urlpatterns = [
     path("dashboard/navigation-badges/", AdminNavigationBadgesView.as_view()),
     path("deliveries/", AdminDeliveryListCreateView.as_view()),
     path("deliveries/summary/", AdminDeliverySummaryView.as_view()),
+    path(
+        "deliveries/eligibility/<int:subscription_id>/",
+        AdminDeliveryEligibilityCheckView.as_view(),
+    ),
     path("deliveries/sources/subscriptions/", AdminDeliverySourceSubscriptionsView.as_view()),
     path(
         "deliveries/sources/subscriptions/<int:subscription_id>/prefill/",

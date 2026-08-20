@@ -23,8 +23,82 @@ from subscriptions.services.business_event_service import append_business_event
 from subscriptions.services.audit_service import log_audit
 
 
+from subscriptions.models import EmiStatus, SubscriptionStatus
+
 ACTIVE_DELIVERY_STATUSES = tuple(SubscriptionDelivery.ACTIVE_STATUSES)
 TERMINAL_DELIVERY_STATUSES = tuple(SubscriptionDelivery.TERMINAL_STATUSES)
+
+DELIVERY_ELIGIBILITY_THRESHOLD = Decimal("0.70")
+
+
+@dataclass
+class DeliveryEligibility:
+    eligible: bool
+    reason: str
+    paid_emi_count: int = 0
+    total_emi_count: int = 0
+    paid_ratio: Decimal = Decimal("0")
+    is_winner: bool = False
+    is_completed: bool = False
+
+
+def check_delivery_eligibility(subscription: Subscription) -> DeliveryEligibility:
+    """Check if a subscription meets delivery window eligibility criteria."""
+    from payments.models import Emi
+
+    is_winner = subscription.status == SubscriptionStatus.WON
+    is_completed = subscription.status == SubscriptionStatus.COMPLETED
+
+    total_emi_count = Emi.objects.filter(subscription=subscription).count()
+    paid_emi_count = Emi.objects.filter(
+        subscription=subscription,
+        status__in=[EmiStatus.PAID, EmiStatus.WAIVED],
+    ).count()
+
+    paid_ratio = (
+        Decimal(paid_emi_count) / Decimal(total_emi_count)
+        if total_emi_count > 0
+        else Decimal("0")
+    )
+
+    if is_winner:
+        return DeliveryEligibility(
+            eligible=True,
+            reason="Draw winner — delivery eligible immediately.",
+            paid_emi_count=paid_emi_count,
+            total_emi_count=total_emi_count,
+            paid_ratio=paid_ratio,
+            is_winner=True,
+        )
+
+    if is_completed:
+        return DeliveryEligibility(
+            eligible=True,
+            reason="All EMIs completed — delivery eligible.",
+            paid_emi_count=paid_emi_count,
+            total_emi_count=total_emi_count,
+            paid_ratio=paid_ratio,
+            is_completed=True,
+        )
+
+    if paid_ratio >= DELIVERY_ELIGIBILITY_THRESHOLD:
+        pct = int(paid_ratio * 100)
+        return DeliveryEligibility(
+            eligible=True,
+            reason=f"{pct}% EMIs paid ({paid_emi_count}/{total_emi_count}) — advance-paid threshold met.",
+            paid_emi_count=paid_emi_count,
+            total_emi_count=total_emi_count,
+            paid_ratio=paid_ratio,
+        )
+
+    pct = int(paid_ratio * 100) if total_emi_count > 0 else 0
+    return DeliveryEligibility(
+        eligible=False,
+        reason=f"Only {pct}% EMIs paid ({paid_emi_count}/{total_emi_count}). Need 70%+ or draw win.",
+        paid_emi_count=paid_emi_count,
+        total_emi_count=total_emi_count,
+        paid_ratio=paid_ratio,
+    )
 
 
 def _enforce_delivery_kyc_gate(
@@ -108,6 +182,7 @@ def get_delivery_queryset():
         "subscription__lucky_id",
         "created_by",
         "updated_by",
+        "admin_override_by",
     ).order_by("-created_at", "-id")
 
 
@@ -346,6 +421,8 @@ def create_subscription_delivery(
     receiver_phone: str = "",
     delivery_address_snapshot: str = "",
     notes: str = "",
+    admin_override: bool = False,
+    admin_override_reason: str = "",
 ):
     if _active_delivery_for_subscription(subscription) is not None:
         raise ValueError("An active delivery already exists for this subscription.")
@@ -362,9 +439,26 @@ def create_subscription_delivery(
         subscription, delivery_address_snapshot=delivery_address_snapshot
     )
 
+    eligibility = check_delivery_eligibility(subscription)
+    if not eligibility.eligible and not admin_override:
+        raise ValueError(
+            f"Delivery not eligible: {eligibility.reason} "
+            f"Admin can force-release with override."
+        )
+
+    if admin_override and not eligibility.eligible:
+        if not admin_override_reason.strip():
+            raise ValueError("Admin override reason is required when force-releasing delivery.")
+
     normalized_status = (status or DeliveryStatus.PENDING).strip().upper()
     if normalized_status not in {DeliveryStatus.PENDING, DeliveryStatus.SCHEDULED}:
         raise ValueError("New deliveries can start only in PENDING or SCHEDULED status.")
+
+    override_at = None
+    override_by = None
+    if admin_override and not eligibility.eligible:
+        override_at = timezone.now()
+        override_by = performed_by
 
     delivery = SubscriptionDelivery.objects.create(
         subscription=subscription,
@@ -375,6 +469,10 @@ def create_subscription_delivery(
         receiver_phone=receiver_phone or subscription.customer.phone,
         delivery_address_snapshot=delivery_address_snapshot or subscription.customer.address,
         notes=notes or "",
+        admin_override=bool(admin_override and not eligibility.eligible),
+        admin_override_reason=admin_override_reason.strip() if (admin_override and not eligibility.eligible) else "",
+        admin_override_by=override_by,
+        admin_override_at=override_at,
         created_by=performed_by,
         updated_by=performed_by,
     )

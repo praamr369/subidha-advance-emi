@@ -17,6 +17,7 @@ import {
 } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import {
+  checkDeliveryEligibility,
   createAdminDelivery,
   getAdminDeliverySourceDirectSalePrefill,
   getAdminDeliverySourceSubscriptionPrefill,
@@ -157,6 +158,18 @@ export default function AdminDeliveriesPage() {
   const [createAddress, setCreateAddress] = useState("");
   const [createNotes, setCreateNotes] = useState("");
   const [creating, setCreating] = useState(false);
+  const [adminOverride, setAdminOverride] = useState(false);
+  const [adminOverrideReason, setAdminOverrideReason] = useState("");
+  const [eligibility, setEligibility] = useState<{
+    eligible: boolean;
+    reason: string;
+    paid_emi_count: number;
+    total_emi_count: number;
+    paid_ratio: string;
+    is_winner: boolean;
+    is_completed: boolean;
+  } | null>(null);
+  const [eligibilityLoading, setEligibilityLoading] = useState(false);
   const [actingCaseId, setActingCaseId] = useState<number | null>(null);
   const [sourceQuery, setSourceQuery] = useState("");
   const [sourceLoading, setSourceLoading] = useState(false);
@@ -274,8 +287,21 @@ export default function AdminDeliveriesPage() {
       setCreateReceiverPhone(payload.defaults.receiver_phone || "");
       setCreateAddress(payload.defaults.delivery_address_snapshot || "");
       setCreateNotes(payload.defaults.notes || "");
+      setEligibility(null);
+      setAdminOverride(false);
+      setAdminOverrideReason("");
+      try {
+        setEligibilityLoading(true);
+        const elig = await checkDeliveryEligibility(Number(payload.source.id));
+        setEligibility(elig);
+      } catch {
+        setEligibility(null);
+      } finally {
+        setEligibilityLoading(false);
+      }
     } catch (err) {
       setSelectedSource(null);
+      setEligibility(null);
       setSourceError(toErrorMessage(err, "Unable to load subscription delivery prefill."));
     } finally {
       setSourcePrefillLoading(false);
@@ -443,6 +469,8 @@ export default function AdminDeliveriesPage() {
         receiver_phone: createReceiverPhone.trim() || undefined,
         delivery_address_snapshot: createAddress.trim() || undefined,
         notes: createNotes.trim() || undefined,
+        admin_override: adminOverride || undefined,
+        admin_override_reason: adminOverrideReason.trim() || undefined,
       });
 
       setMessage(`Delivery ${created.delivery_reference} created successfully.`);
@@ -1044,19 +1072,85 @@ export default function AdminDeliveriesPage() {
                         placeholder="Operational notes"
                         className="min-h-[96px] rounded-xl border border-border bg-background px-3 py-2 text-sm"
                       />
+                      {eligibilityLoading && (
+                        <div className="rounded-xl border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+                          Checking delivery eligibility...
+                        </div>
+                      )}
+                      {eligibility && (
+                        <div
+                          className={`rounded-xl border p-3 text-sm ${
+                            eligibility.eligible
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                              : "border-amber-300 bg-amber-50 text-amber-900"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-bold ${
+                              eligibility.eligible
+                                ? "bg-emerald-100 text-emerald-700"
+                                : "bg-amber-200 text-amber-800"
+                            }`}>
+                              {eligibility.eligible ? "Eligible" : "Not Eligible"}
+                            </span>
+                            <span className="text-xs">
+                              {eligibility.paid_emi_count}/{eligibility.total_emi_count} EMIs paid
+                              ({Math.round(Number(eligibility.paid_ratio) * 100)}%)
+                            </span>
+                            {eligibility.is_winner && (
+                              <span className="inline-flex rounded-full bg-yellow-100 border border-yellow-300 px-2 py-0.5 text-xs font-bold text-yellow-800">
+                                Draw Winner
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-1.5 text-xs">{eligibility.reason}</p>
+                          {!eligibility.eligible && (
+                            <div className="mt-3 space-y-2 border-t border-amber-200 pt-3">
+                              <label className="flex items-center gap-2 text-xs font-medium">
+                                <input
+                                  type="checkbox"
+                                  checked={adminOverride}
+                                  onChange={(e) => setAdminOverride(e.target.checked)}
+                                  className="rounded border-amber-400"
+                                />
+                                Admin Override — force-release delivery
+                              </label>
+                              {adminOverride && (
+                                <textarea
+                                  value={adminOverrideReason}
+                                  onChange={(e) => setAdminOverrideReason(e.target.value)}
+                                  placeholder="Override reason (required)"
+                                  className="w-full min-h-[64px] rounded-lg border border-red-300 bg-white px-3 py-2 text-xs text-red-900 placeholder:text-red-400"
+                                />
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
                       <div className="flex flex-wrap gap-2">
                         <button
                           type="submit"
-                          disabled={creating || Boolean(activeSelectedDelivery)}
+                          disabled={
+                            creating ||
+                            Boolean(activeSelectedDelivery) ||
+                            (eligibility !== null && !eligibility.eligible && !adminOverride)
+                          }
                           className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          {creating ? "Creating..." : "Create delivery"}
+                          {creating
+                            ? "Creating..."
+                            : adminOverride
+                            ? "Force-release delivery (Admin Override)"
+                            : "Create delivery"}
                         </button>
                         <button
                           type="button"
                           onClick={() => {
                             setSelectedSource(null);
                             setCreateSubscriptionId("");
+                            setEligibility(null);
+                            setAdminOverride(false);
+                            setAdminOverrideReason("");
                           }}
                           className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
                         >
@@ -1166,6 +1260,11 @@ export default function AdminDeliveriesPage() {
                         >
                           {row.status}
                         </span>
+                        {row.admin_override && (
+                          <span className="ml-1.5 inline-flex rounded-full border border-red-400 bg-red-100 px-2 py-0.5 text-[11px] font-bold text-red-800">
+                            Admin Override
+                          </span>
+                        )}
                         {row.source_reversed ? (
                           <div className="mt-2 flex flex-wrap gap-2">
                             <span className="inline-flex rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-medium text-violet-800">

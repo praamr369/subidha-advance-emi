@@ -62,6 +62,12 @@ class AdminSubscriptionDeliveryReadSerializer(_BaseSubscriptionDeliveryReadSeria
     created_by_username = serializers.CharField(source="created_by.username", read_only=True)
     updated_by_id = serializers.IntegerField(source="updated_by.id", read_only=True)
     updated_by_username = serializers.CharField(source="updated_by.username", read_only=True)
+    admin_override = serializers.BooleanField(read_only=True)
+    admin_override_reason = serializers.CharField(read_only=True)
+    admin_override_by_username = serializers.CharField(
+        source="admin_override_by.username", read_only=True, default=None,
+    )
+    admin_override_at = serializers.DateTimeField(read_only=True)
 
     class Meta:
         model = SubscriptionDelivery
@@ -97,6 +103,10 @@ class AdminSubscriptionDeliveryReadSerializer(_BaseSubscriptionDeliveryReadSeria
             "delivery_address_snapshot",
             "notes",
             "failure_reason",
+            "admin_override",
+            "admin_override_reason",
+            "admin_override_by_username",
+            "admin_override_at",
             "created_by_id",
             "created_by_username",
             "updated_by_id",
@@ -190,6 +200,8 @@ class AdminSubscriptionDeliveryCreateSerializer(serializers.Serializer):
     receiver_phone = serializers.CharField(required=False, allow_blank=True, max_length=20)
     delivery_address_snapshot = serializers.CharField(required=False, allow_blank=True)
     notes = serializers.CharField(required=False, allow_blank=True)
+    admin_override = serializers.BooleanField(required=False, default=False)
+    admin_override_reason = serializers.CharField(required=False, allow_blank=True, default="")
 
     def validate(self, attrs):
         subscription = attrs.get("subscription")

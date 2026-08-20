@@ -44,6 +44,20 @@ class SubscriptionDelivery(TimeStampedModel):
     failure_reason = models.TextField(blank=True, default="")
     # Phase 2: reason set when delivery is moved to BLOCKED_STOCK_UNAVAILABLE
     stock_blocked_reason = models.TextField(blank=True, default="")
+    admin_override = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="True when admin force-released delivery bypassing eligibility gate.",
+    )
+    admin_override_reason = models.TextField(blank=True, default="")
+    admin_override_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="overridden_deliveries",
+    )
+    admin_override_at = models.DateTimeField(null=True, blank=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,

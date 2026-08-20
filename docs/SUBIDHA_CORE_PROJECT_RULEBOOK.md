@@ -74,6 +74,12 @@ The system must remain suitable for today’s Lucky Plan EMI, Rent, Lease, and D
 | Payment, EMI, waiver, commission, payout, reconciliation, accounting, and audit records must remain traceable. | Confirmed by model/service structure and project rule. |
 | Admin and cashier are internal roles. | Project rule / instruction. |
 | Customer and partner public registration must follow approved workflow. | Project rule / instruction. |
+| Winner subscription status is WON, not COMPLETED. | Confirmed from `subscription_status_service.resolve_expected_subscription_status`: `is_winner` check takes priority over `SETTLED_EMI_STATUSES`. A winner stays WON even when all EMIs are settled (PAID+WAIVED). |
+| Payment reversal ledger entry uses `payment=None`. | Confirmed from `payment_service.reverse_payment_for_admin`: `FinancialLedger.payment` is a OneToOneField (already occupied by the original EMI_PAYMENT entry), so the PAYMENT_REVERSAL entry stores `payment=None` and records the reversed payment ID in `allocation_context`. |
+| `collect_direct_sale_payment` requires a linked BillingInvoice. | Confirmed from `direct_sale_collection_service`: raises ValueError if no BillingInvoice is linked to the DirectSale. |
+| `record_emi_payment` returns a dict, not a Payment model. | Confirmed from `payment_service.record_emi_payment`: returns `{payment, emi, subscription, ...}`. Access payment via `result["payment"]`. |
+| CustomerAdvance fields are `amount` and `unapplied_amount`. | Confirmed from `payments.models.CustomerAdvance`. Old names `total_received`/`unapplied_balance` were removed in payments refactor. |
+| Smart collection must exclude waived EMIs from planning. | Confirmed: waived EMIs (from draw outcome) must NOT enter smart collection planning. Filter uses `status__in=[EmiStatus.PENDING, EmiStatus.OVERDUE]`. |
 
 ## 6. Domain model map
 
@@ -400,9 +406,28 @@ Rules:
 
 - Delivery does not imply full payment unless explicitly coded.
 - Stock and delivery state are separate from payment state.
-- Exceptional delivery release must be admin-approved where implemented.
 - Return pickup and return condition must be auditable.
 - Print output must use persisted delivery data.
+
+### Delivery window eligibility (Lucky Plan EMI subscriptions)
+
+A customer's delivery window opens ONLY when one of these conditions is met:
+
+1. **Draw winner** — subscription status is `WON`. Delivery eligible immediately after draw result.
+2. **EMI completed** — all EMIs paid, subscription status is `COMPLETED`.
+3. **Advance-paid threshold (70-80%)** — customer has paid 70-80% of total EMI months (e.g., 10+ months out of 15-month tenure). Covers customers who pay multiple EMIs in advance.
+
+Customers who have NOT met any of these three conditions are **not eligible for delivery**.
+
+Eligibility is **payment-milestone-based**, not time-based. Backend check: `is_winner OR is_completed OR (paid_emi_count / total_emi_count >= 0.70)`.
+
+### Admin override delivery (force-release)
+
+- Admin may override and force-approve delivery for a subscription that does NOT meet the eligibility criteria above.
+- When admin force-releases delivery, the subscription/delivery MUST be marked with a visible **"Admin Override"** badge in both backend records and frontend UI.
+- The override must be audit-logged: who approved, when, and reason.
+- Admin-override deliveries are tracked separately for reconciliation — they represent elevated business risk (product released before sufficient payment coverage).
+- The badge must persist and be visible on all delivery lists, detail pages, and print documents.
 
 ## 22. Inventory and stock rules
 

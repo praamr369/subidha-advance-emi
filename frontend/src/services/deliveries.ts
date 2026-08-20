@@ -52,6 +52,10 @@ export type DeliveryRecord = {
   failure_reason?: string | null;
   // Phase 2: reason populated when status = BLOCKED_STOCK_UNAVAILABLE
   stock_blocked_reason?: string | null;
+  admin_override?: boolean;
+  admin_override_reason?: string | null;
+  admin_override_by_username?: string | null;
+  admin_override_at?: string | null;
   created_by_id?: number | null;
   created_by_username?: string | null;
   updated_by_id?: number | null;
@@ -608,6 +612,23 @@ export async function getAdminDirectSaleDeliveryCase(caseId: number | string): P
   return normalizeDeliveryRecord(payload);
 }
 
+export type DeliveryEligibility = {
+  eligible: boolean;
+  reason: string;
+  paid_emi_count: number;
+  total_emi_count: number;
+  paid_ratio: string;
+  is_winner: boolean;
+  is_completed: boolean;
+  subscription_id: number;
+  customer_name: string;
+  product_name: string;
+};
+
+export async function checkDeliveryEligibility(subscriptionId: number): Promise<DeliveryEligibility> {
+  return apiFetch<DeliveryEligibility>(`/admin/deliveries/eligibility/${subscriptionId}/`);
+}
+
 export async function createAdminDelivery(
   payload:
     | {
@@ -619,6 +640,8 @@ export async function createAdminDelivery(
         receiver_phone?: string;
         delivery_address_snapshot?: string;
         notes?: string;
+        admin_override?: boolean;
+        admin_override_reason?: string;
       }
     | { direct_sale: number }
 ): Promise<DeliveryRecord> {

@@ -448,6 +448,27 @@ export default function AdminDeliveryDetailPage() {
                     <p className="mt-1 text-xs text-amber-800">{delivery.stock_blocked_reason}</p>
                   </div>
                 )}
+                {delivery.admin_override && (
+                  <div className="col-span-full rounded-md border border-red-300 bg-red-50 p-3 text-red-900">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex rounded-full border border-red-400 bg-red-100 px-2.5 py-0.5 text-xs font-bold text-red-800">
+                        Admin Override
+                      </span>
+                      <span className="text-xs text-red-700">
+                        Delivery force-released bypassing eligibility gate
+                      </span>
+                    </div>
+                    {delivery.admin_override_reason && (
+                      <p className="mt-1.5 text-xs text-red-800">
+                        <span className="font-medium">Reason:</span> {delivery.admin_override_reason}
+                      </p>
+                    )}
+                    <p className="mt-1 text-xs text-red-600">
+                      By {delivery.admin_override_by_username || "—"} on{" "}
+                      {formatDateTime(delivery.admin_override_at)}
+                    </p>
+                  </div>
+                )}
                 <DetailValue
                   label="Return Requested"
                   value={formatDateTime(delivery.return_requested_at)}
