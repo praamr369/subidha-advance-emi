@@ -140,6 +140,18 @@ DEFAULT_MAPPINGS: list[tuple[str, str, str, bool]] = [
         FinanceAccountMappingPurpose.SALARY_EXPENSE,
         True,
     ),
+    (
+        LEDGER_POSTING_PROFILES_FINANCE_ACCOUNT_NAME,
+        "Advance Forfeiture Income",
+        FinanceAccountMappingPurpose.ADVANCE_FORFEITURE_INCOME,
+        True,
+    ),
+    (
+        LEDGER_POSTING_PROFILES_FINANCE_ACCOUNT_NAME,
+        "Bad Debt Written Off",
+        FinanceAccountMappingPurpose.BAD_DEBT_EXPENSE,
+        True,
+    ),
 ]
 
 REQUIRED_MAPPING_PURPOSES: tuple[str, ...] = tuple(sorted({row[2] for row in DEFAULT_MAPPINGS}))
@@ -164,6 +176,8 @@ PURPOSE_EXPECTED_ACCOUNT_TYPES: dict[str, tuple[str, ...]] = {
     FinanceAccountMappingPurpose.DELIVERY_EXPENSE: (ChartOfAccountType.EXPENSE,),
     FinanceAccountMappingPurpose.SALARY_EXPENSE: (ChartOfAccountType.EXPENSE,),
     FinanceAccountMappingPurpose.INVENTORY_ASSET: (ChartOfAccountType.ASSET,),
+    FinanceAccountMappingPurpose.ADVANCE_FORFEITURE_INCOME: (ChartOfAccountType.INCOME,),
+    FinanceAccountMappingPurpose.BAD_DEBT_EXPENSE: (ChartOfAccountType.EXPENSE,),
 }
 
 

@@ -217,6 +217,8 @@ class FinanceAccountMappingPurpose(models.TextChoices):
     DELIVERY_EXPENSE = "DELIVERY_EXPENSE", "Delivery Expense"
     SALARY_EXPENSE = "SALARY_EXPENSE", "Salary Expense"
     INVENTORY_ASSET = "INVENTORY_ASSET", "Inventory Asset"
+    ADVANCE_FORFEITURE_INCOME = "ADVANCE_FORFEITURE_INCOME", "Advance Forfeiture Income"
+    BAD_DEBT_EXPENSE = "BAD_DEBT_EXPENSE", "Bad Debt Written Off"
 
 
 class JournalEntryType(models.TextChoices):
@@ -335,6 +337,7 @@ class SalaryLineSourceType(models.TextChoices):
     OVERTIME = "OVERTIME", "Overtime"
     LEAVE_DEDUCTION = "LEAVE_DEDUCTION", "Leave Deduction"
     STAFF_ADVANCE_DEDUCTION = "STAFF_ADVANCE_DEDUCTION", "Staff Advance Deduction"
+    PRODUCTION_WAGE = "PRODUCTION_WAGE", "Production Wage"
     MANUAL = "MANUAL", "Manual"
 
 

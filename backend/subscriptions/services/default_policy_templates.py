@@ -138,6 +138,8 @@ Errors, omissions, or outdated information provided by the customer may result i
 
 Product images, catalogue entries, brochure content, and website listings are provided for general information only. Final product specifications, pricing (inclusive of GST), discounts, delivery charges, warranty terms, and contract conditions are confirmed exclusively through approved quotation, invoice, or contract documents issued by Subidha Furniture.
 
+**EMI Pricing (Advance Purchase):** The base price displayed includes all applicable taxes. The monthly EMI amount is calculated as base price divided by tenure months — no additional tax, interest, processing fee, or surcharge is added. The total of all EMI payments equals the base price exactly. This is an advance purchase scheme (not a loan or hire-purchase); each EMI is an advance installment toward future product delivery.
+
 
 
 

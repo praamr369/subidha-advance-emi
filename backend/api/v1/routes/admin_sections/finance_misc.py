@@ -1,5 +1,18 @@
 from django.urls import include, path
 from api.v1.routes import crm_analytics as crm_analytics_routes
+from api.v1.views.admin_advance_forfeiture import AdminAdvanceForfeitureCandidatesView
+from api.v1.views.admin_advance_forfeiture import AdminAdvanceForfeitureContactAttemptView
+from api.v1.views.admin_advance_forfeiture import AdminAdvanceForfeitureExecuteView
+from api.v1.views.admin_advance_forfeiture import AdminAdvanceForfeitureReverseView
+from api.v1.views.admin_bad_debt import AdminBadDebtAgingReportView
+from api.v1.views.admin_bad_debt import AdminBadDebtClassifyNpaView
+from api.v1.views.admin_bad_debt import AdminBadDebtListView
+from api.v1.views.admin_bad_debt import AdminBadDebtRecordNoticeView
+from api.v1.views.admin_bad_debt import AdminBadDebtWriteOffView
+from api.v1.views.admin_erasure import AdminErasureExecuteView
+from api.v1.views.admin_erasure import AdminErasurePreviewView
+from api.v1.views.admin_erasure import AdminErasureRejectView
+from api.v1.views.admin_erasure import AdminErasureRequestListView
 from api.v1.views.admin_aml import AdminAMLScreeningListView
 from api.v1.views.admin_aml import AdminCustomerAMLScreeningView
 from api.v1.views.admin_aml import AdminCustomerPEPFlagView
@@ -212,4 +225,23 @@ urlpatterns = [
     path("finance/owner-funds/<int:pk>/", AdminOwnerFundDetailView.as_view()),
     path("finance/owner-funds/<int:pk>/repay/", AdminOwnerLoanRepayView.as_view()),
     path("finance/owner-funds/<int:pk>/schedule/", AdminOwnerLoanScheduleView.as_view()),
+
+    # ── Advance forfeiture (Limitation Act 1963 s.3) ─────────────────────────
+    path("finance/advance-forfeitures/", AdminAdvanceForfeitureCandidatesView.as_view()),
+    path("finance/advance-forfeitures/<int:advance_id>/contact-attempt/", AdminAdvanceForfeitureContactAttemptView.as_view()),
+    path("finance/advance-forfeitures/<int:advance_id>/forfeit/", AdminAdvanceForfeitureExecuteView.as_view()),
+    path("finance/advance-forfeitures/<int:pk>/reverse/", AdminAdvanceForfeitureReverseView.as_view()),
+
+    # ── Bad debt provisioning & write-off (IT Act s.36(1)(vii)) ──────────────
+    path("finance/bad-debt/", AdminBadDebtListView.as_view()),
+    path("finance/bad-debt/aging-report/", AdminBadDebtAgingReportView.as_view()),
+    path("finance/bad-debt/<int:pk>/classify-npa/", AdminBadDebtClassifyNpaView.as_view()),
+    path("finance/bad-debt/<int:pk>/legal-notice/", AdminBadDebtRecordNoticeView.as_view()),
+    path("finance/bad-debt/<int:pk>/write-off/", AdminBadDebtWriteOffView.as_view()),
+
+    # ── DPDP erasure requests (DPDP 2023 s.12) ──────────────────────────────
+    path("privacy/erasure-requests/", AdminErasureRequestListView.as_view()),
+    path("privacy/erasure-requests/<int:pk>/preview/", AdminErasurePreviewView.as_view()),
+    path("privacy/erasure-requests/<int:pk>/execute/", AdminErasureExecuteView.as_view()),
+    path("privacy/erasure-requests/<int:pk>/reject/", AdminErasureRejectView.as_view()),
 ]

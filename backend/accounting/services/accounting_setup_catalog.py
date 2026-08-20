@@ -98,6 +98,8 @@ SYSTEM_POSTING_PROFILE_ACCOUNTS: tuple[CanonicalChartAccountSpec, ...] = (
     CanonicalChartAccountSpec(key="ACCUMULATED_DEPRECIATION", code="DEP-1250", name="Accumulated Depreciation", account_type=ChartOfAccountType.ASSET),
     CanonicalChartAccountSpec(key="OWNER_CAPITAL", code="EQ-3000", name="Owner Capital", account_type=ChartOfAccountType.EQUITY),
     CanonicalChartAccountSpec(key="RETAINED_EARNINGS", code="EQ-3100", name="Retained Earnings / Opening Balance Adjustment", account_type=ChartOfAccountType.EQUITY),
+    CanonicalChartAccountSpec(key="ADVANCE_FORFEITURE_INCOME", code="FORF-4100", name="Advance Forfeiture Income", account_type=ChartOfAccountType.INCOME),
+    CanonicalChartAccountSpec(key="BAD_DEBT_EXPENSE", code="BD-5500", name="Bad Debt Written Off", account_type=ChartOfAccountType.EXPENSE),
 )
 
 

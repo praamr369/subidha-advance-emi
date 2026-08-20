@@ -1352,6 +1352,21 @@ class RecoveryCase(TimeStampedModel):
     updated_at = models.DateTimeField(auto_now=True, db_index=True)
     last_contact_at = models.DateTimeField(null=True, blank=True)
 
+    # Bad-debt provisioning and write-off (IT Act s.36(1)(vii))
+    npa_classified_at = models.DateTimeField(null=True, blank=True, help_text="When classified as NPA (>90 days overdue)")
+    provisioning_percent = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"), help_text="10% sub-standard / 50% doubtful / 100% loss")
+    written_off_amount = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    written_off_at = models.DateTimeField(null=True, blank=True)
+    written_off_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="written_off_recovery_cases",
+    )
+    write_off_legal_notice_date = models.DateField(null=True, blank=True, help_text="Date legal demand notice issued under CPC s.80")
+    write_off_legal_notice_ref = models.CharField(max_length=100, blank=True, default="", help_text="Legal notice reference number")
+
     class Meta:
         db_table = "subscriptions_recovery_cases"
         ordering = ["-first_overdue_date", "-id"]
@@ -2042,4 +2057,69 @@ class RentLeaseCollection(TimeStampedModel):
 
     def __str__(self):
         return self.collection_number
+
+
+# ---------------------------------------------------------------------------
+# AdvanceForfeiture — Limitation Act 1963 s.3 dormant advance forfeiture
+# ---------------------------------------------------------------------------
+
+class AdvanceForfeitureStatus(models.TextChoices):
+    PENDING_REVIEW = "PENDING_REVIEW", "Pending Review"
+    CONTACT_ATTEMPTED = "CONTACT_ATTEMPTED", "Contact Attempted"
+    FORFEITED = "FORFEITED", "Forfeited"
+    REVERSED = "REVERSED", "Reversed"
+
+
+class AdvanceForfeiture(TimeStampedModel):
+    advance = models.OneToOneField(
+        CustomerAdvance,
+        on_delete=models.PROTECT,
+        related_name="forfeiture",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=AdvanceForfeitureStatus.choices,
+        default=AdvanceForfeitureStatus.PENDING_REVIEW,
+        db_index=True,
+    )
+    forfeited_amount = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    dormant_since = models.DateField(
+        help_text="Date of last customer activity related to this advance.",
+    )
+    contact_attempts = models.JSONField(
+        default=list,
+        help_text="[{date, method, outcome, recorded_by}] — documented contact attempts.",
+    )
+    forfeiture_date = models.DateField(null=True, blank=True)
+    legal_basis = models.CharField(
+        max_length=200,
+        default="Limitation Act 1963 s.3 — 3-year dormancy",
+    )
+    income_recognition_note = models.TextField(
+        default="IT Act s.41(1) cessation of liability",
+    )
+    forfeited_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="forfeited_advances",
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+    reversed_at = models.DateTimeField(null=True, blank=True)
+    reversal_reason = models.TextField(blank=True, default="")
+    reversed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reversed_advance_forfeitures",
+    )
+
+    class Meta:
+        db_table = "customer_advance_forfeitures"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Forfeiture CA#{self.advance_id} [{self.status}] ₹{self.forfeited_amount}"
 
