@@ -90,7 +90,7 @@ export default function PrivacyCompliancePage() {
               { label: "Legal Controls", href: "/admin/settings/legal-controls", icon: "🔒" },
               { label: "Roles & Access", href: "/admin/settings/roles-permissions", icon: "👥" },
               { label: "KYC Review", href: "/admin/compliance/kyc", icon: "🪪" },
-              { label: "Policy Editor", href: "/admin/settings/policies", icon: "📄" },
+              { label: "Policy Editor", href: "/admin/settings/compliance-policies", icon: "📄" },
             ].map((link) => (
               <Link key={link.href} href={link.href}
                 className="flex items-center gap-2 p-3 border rounded-lg hover:shadow-sm">

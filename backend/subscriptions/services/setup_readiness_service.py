@@ -193,7 +193,7 @@ def _policy_governance_section() -> dict[str, Any]:
         warnings.append(f"{internal_missing} internal governance policy template(s) are missing.")
     if internal_draft:
         warnings.append(f"{internal_draft} internal governance policy template(s) are still draft.")
-    return _section(key="policy_governance", title="Policy Governance", status=_status_from(blockers, warnings), blockers=blockers, warnings=warnings, recommended_action="Seed missing templates, review policy text, publish required public policies, and approve/internalize governance policies before launch.", target_route="/admin/settings/policies", why_this_matters="Public launch must not expose draft/internal policies. Customer-facing policies require publication, while internal governance policies support audit and controls.", category=OPTIONAL_OR_FUTURE, optional_for_initial_start=True, metadata={"coverage_summary": coverage["summary"], "public_missing_count": public_missing, "public_not_published_count": public_not_published, "internal_missing_count": internal_missing, "internal_draft_count": internal_draft})
+    return _section(key="policy_governance", title="Policy Governance", status=_status_from(blockers, warnings), blockers=blockers, warnings=warnings, recommended_action="Seed missing templates, review policy text, publish required public policies, and approve/internalize governance policies before launch.", target_route="/admin/settings/compliance-policies", why_this_matters="Public launch must not expose draft/internal policies. Customer-facing policies require publication, while internal governance policies support audit and controls.", category=OPTIONAL_OR_FUTURE, optional_for_initial_start=True, metadata={"coverage_summary": coverage["summary"], "public_missing_count": public_missing, "public_not_published_count": public_not_published, "internal_missing_count": internal_missing, "internal_draft_count": internal_draft})
 
 
 def _business_compliance_section() -> dict[str, Any]:
@@ -384,12 +384,31 @@ def _go_live_backup_section() -> dict[str, Any]:
     )
 
 
-def _numbering_continuity_section() -> dict[str, Any]:
+def _numbering_continuity_section(is_legacy_migration: bool) -> dict[str, Any]:
     from contracts.services.document_numbering_service import get_document_numbering_state
 
     state = get_document_numbering_state()
     required_keys = set(required_numbering_keys_for_checklist())
     rows = [row for row in state["sequences"] if row["key"] in required_keys]
+    
+    if not is_legacy_migration:
+        return _section(
+            key="numbering_continuity",
+            title="Document Numbering Continuity (Legacy Carry-Over)",
+            status="NOT_APPLICABLE",
+            warnings=["This is a new business. Legacy document continuity is not applicable."],
+            recommended_action="No action required for new businesses.",
+            target_route="/admin/settings/business-setup/document-numbering",
+            why_this_matters="Only required when migrating from a previous system to avoid duplicate invoice/receipt numbers.",
+            category=CORE_REQUIRED,
+            repairable=False,
+            optional_for_initial_start=True,
+            metadata={
+                "financial_year": state.get("financial_year"),
+                "is_legacy_migration": False,
+            },
+        )
+
     still_at_one = [row["key"] for row in rows if row.get("configured") and int(row.get("next_number") or 1) <= 1]
     no_duplicates = bool(state["checks"].get("no_duplicate_issued_numbers"))
     warnings: list[str] = []
@@ -403,7 +422,7 @@ def _numbering_continuity_section() -> dict[str, Any]:
     return _section(
         key="numbering_continuity",
         title="Document Numbering Continuity (Legacy Carry-Over)",
-        status=_status_from(blockers, warnings),
+        status=_status_from(blockers, warnings, pending_status="INFO"),
         blockers=blockers,
         warnings=warnings,
         recommended_action="On the document-numbering page, set each sequence's next number to start after your last legacy document number, then verify no duplicate issued numbers.",
@@ -619,7 +638,7 @@ def get_setup_readiness() -> dict[str, Any]:
         _accounting_period_section(),
         _opening_balance_integrity_section(),
         _legacy_receivable_section(is_legacy_migration=is_legacy_migration),
-        _numbering_continuity_section(),
+        _numbering_continuity_section(is_legacy_migration=is_legacy_migration),
         _opening_stock_valuation_section(is_legacy_migration=is_legacy_migration),
         _go_live_backup_section(),
         _rent_lease_section(),
