@@ -486,6 +486,7 @@ TEMPLATES = [
 DATABASES = {"default": _get_database_config()}
 DATABASES["default"]["ATOMIC_REQUESTS"] = True
 DATABASES["default"]["CONN_MAX_AGE"] = _get_conn_max_age()
+DATABASES["default"]["CONN_HEALTH_CHECKS"] = True
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},

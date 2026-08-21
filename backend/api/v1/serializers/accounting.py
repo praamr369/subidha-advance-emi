@@ -193,10 +193,12 @@ class ChartOfAccountDetailSerializer(ChartOfAccountSerializer):
         ]
 
     def get_child_count(self, obj):
-        return obj.children.count()
+        cached = getattr(obj, "_child_count", None)
+        return cached if cached is not None else obj.children.count()
 
     def get_finance_account_count(self, obj):
-        return obj.finance_accounts.count()
+        cached = getattr(obj, "_finance_account_count", None)
+        return cached if cached is not None else obj.finance_accounts.count()
 
     def get_editability(self, obj):
         return get_chart_account_editability(obj)

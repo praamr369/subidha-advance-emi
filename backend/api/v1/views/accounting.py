@@ -129,7 +129,12 @@ class ChartOfAccountViewSet(AdminAccountingModelViewSet):
         return Response(output.data, status=status.HTTP_201_CREATED, headers=headers)
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        from django.db.models import Count
+
+        queryset = super().get_queryset().annotate(
+            _child_count=Count("children", distinct=True),
+            _finance_account_count=Count("finance_accounts", distinct=True),
+        )
         account_type = (self.request.query_params.get("account_type") or "").strip().upper()
         is_active = self.request.query_params.get("is_active")
         if account_type:
