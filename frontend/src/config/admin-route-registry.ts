@@ -1,4 +1,4 @@
-import { ROUTES } from "@/lib/routes";
+﻿import { ROUTES } from "@/lib/routes";
 
 export type AdminRouteRegistryItem = {
   label: string;
@@ -30,7 +30,7 @@ function item(
   };
 }
 
-// ── Navigation v2 — 14 canonical modules ─────────────────────────────────────
+// â”€â”€ Navigation v2 â€” 14 canonical modules â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 //
 // Group order here matches the canonical business module taxonomy:
 //   docs/architecture/admin-module-taxonomy.md
@@ -45,7 +45,7 @@ function item(
 //    to merge or expand it is made.
 
 export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
-  // ── 1. Command Center ────────────────────────────────────────────────────────
+  // â”€â”€ 1. Command Center â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   item("Command Center", "Admin Dashboard", ROUTES.admin.dashboard, "Daily overview, critical KPIs, urgent queues, and quick actions."),
   item(
     "Command Center",
@@ -59,9 +59,14 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Command Center", "Notifications", ROUTES.admin.notifications, "In-app system alerts, job outcomes, and operational signals.", { badgeSource: "unread_count" }),
   item("Command Center", "AI Assistant", ROUTES.admin.aiAssistant, "Read-only internal knowledge assistant with source citations."),
   item("Command Center", "AI Readiness", ROUTES.admin.aiReadiness, "AI feature flags, retrieval posture, and safety readiness checks."),
+  item("Command Center", "AI Query Log", ROUTES.admin.aiQueryLog, "AI assistant query history and response audit trail."),
+  item("Command Center", "AI Sources", ROUTES.admin.aiSources, "AI knowledge source configuration and ingestion status."),
   item("Command Center", "ERP Home", ROUTES.admin.erp, "Unified ERP command center."),
+  item("Command Center", "Operations Hub", ROUTES.admin.operations, "Operations landing page."),
+  item("Command Center", "Documents", ROUTES.admin.documents, "Document repository and management."),
+  item("Command Center", "Close Cockpit", ROUTES.admin.closeCockpit, "End-of-day close cockpit for all operational modules."),
 
-  // ── 2. Profiles & Parties ─────────────────────────────────────────────────
+  // â”€â”€ 2. Profiles & Parties â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Phase 2: canonical /admin/profiles/* routes are now live as redirect aliases.
   item("Profiles & Parties", "Profiles Hub", ROUTES.admin.profiles, "Master identity landing page for all profile sub-modules."),
   item("Profiles & Parties", "Partners", ROUTES.admin.profilesPartners, "Partner register and identity cockpit.", {
@@ -74,8 +79,12 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Profiles & Parties", "Vendors", ROUTES.admin.profilesVendors, "Vendor identity register. Procurement operations remain under Purchases & Vendors."),
   item("Profiles & Parties", "Staff Profiles", ROUTES.admin.profilesStaff, "Staff identity and HR context. Payroll operations remain under HR & Staff."),
   item("Profiles & Parties", "Branches", ROUTES.admin.profilesBranches, "Branch identity and operational status."),
+  item("Profiles & Parties", "Branch Reporting", ROUTES.admin.branchReporting, "Branch-level performance and operational reporting."),
+  item("Profiles & Parties", "Partners Workspace", ROUTES.admin.partnersWorkspace, "Partner operations workspace."),
+  item("Profiles & Parties", "Partner Commissions", ROUTES.admin.partnersCommissions, "Partner commission ledger and earnings."),
+  item("Profiles & Parties", "Partner Payment Requests", "/admin/partner-payment-requests", "Partner payment request queue."),
 
-  // ── 3. CRM & Customers ────────────────────────────────────────────────────
+  // â”€â”€ 3. CRM & Customers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Phase 6: CRM & Customers owns customer lifecycle, demands, follow-up, KYC, 
   // public enquiries, support intake, and subscription request approval.
   item("CRM & Customers", "CRM Workspace", ROUTES.admin.crmWorkspace, "Operational CRM hub with customer profiles, lead management, follow-ups, and KYC queue."),
@@ -96,22 +105,27 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
       item("CRM & Customers", "Lead Registration", "/admin/crm/leads/register", "Track registered customers and their conversions across all subscription types (EMI, RENT, LEASE) and direct sales."),
     ]
   }),
+  item("CRM & Customers", "CRM Dashboard", ROUTES.admin.crmDashboard, "CRM operational dashboard with key metrics."),
+  item("CRM & Customers", "CRM Leaderboard", ROUTES.admin.crmLeaderboard, "Sales and partner performance leaderboard."),
   item("CRM & Customers", "CRM Analytics", "/admin/crm/analytics", "Unified analytics: current metrics, conversion funnel, product performance, and historical trends with customizable date ranges."),
-  item("CRM & Customers", "Requests Hub", ROUTES.admin.requestsHub, "Unified request intake hub. Request intake only — no financial posting from this page.", {
+  item("CRM & Customers", "Customers Create", ROUTES.admin.customersCreate, "Create a new customer record."),
+  item("CRM & Customers", "Defaulters", ROUTES.admin.defaulters, "Defaulter watchlist and escalation queue."),
+  item("CRM & Customers", "Online Requests", ROUTES.admin.requestsOnlineRequests, "Online enquiry and request queue from public-facing channels."),
+  item("CRM & Customers", "Requests Hub", ROUTES.admin.requestsHub, "Unified request intake hub. Request intake only â€” no financial posting from this page.", {
     children: [
-      item("CRM & Customers", "Support", ROUTES.admin.requestsSupport, "Customer support intake. Request intake — service execution remains in Service Desk.", { badgeSource: "open_support_ticket_count" }),
+      item("CRM & Customers", "Support", ROUTES.admin.requestsSupport, "Customer support intake. Request intake â€” service execution remains in Service Desk.", { badgeSource: "open_support_ticket_count" }),
       item("CRM & Customers", "Subscription Requests", ROUTES.admin.requestsSubscriptions, "Controlled approval queue for subscription requests. No silent contract/payment creation.", { badgeSource: "queue.subscription_requests_pending" }),
       item("CRM & Customers", "Product Requests", ROUTES.admin.subscriptionRequests, "Controlled approval queue for product requests (e.g. direct sale requests).", { badgeSource: "queue.product_requests_pending" }),
     ]
   }),
 
-  // ── 4. Sales & Contracts ──────────────────────────────────────────────────
+  // â”€â”€ 4. Sales & Contracts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Rent/lease contract items are included here (canonical route family:
   // /admin/subscriptions, /admin/rent-lease). Collection/delivery sub-tasks
   // for rent/lease live under Collections & Cashier and Delivery & Service.
   item("Sales & Contracts", "Sales Workspace", ROUTES.admin.salesWorkspace, "Sales pipeline and fulfillment handoff."),
   item("Sales & Contracts", "Advance EMI / Subscriptions", `${ROUTES.admin.subscriptions}?plan_type=EMI`, "Advance EMI subscription register.", { badgeSource: "queue.contract_approvals_pending" }),
-  item("Sales & Contracts", "Prepayment & Advance Delivery", ROUTES.admin.subscriptions, "Advance EMI prepayment unlock — customers pay 60-70% of remaining EMIs to get product delivered immediately (no lucky draw).", { badgeSource: "queue.contract_activation_pending" }),
+  item("Sales & Contracts", "Prepayment & Advance Delivery", ROUTES.admin.subscriptions, "Advance EMI prepayment unlock â€” customers pay 60-70% of remaining EMIs to get product delivered immediately (no lucky draw).", { badgeSource: "queue.contract_activation_pending" }),
   item("Sales & Contracts", "Create Advance EMI Contract", ROUTES.admin.subscriptionsAdvanceEmiCreate, "Create an Advance EMI contract."),
   item("Sales & Contracts", "Direct Sale", ROUTES.admin.billingDirectSaleWorkspace, "Direct-sale billing workspace and register."),
   item("Sales & Contracts", "Create Direct Sale Invoice", ROUTES.admin.billingDirectSaleCreate, "Open full-page direct-sale invoice creation."),
@@ -124,11 +138,20 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
       item("Sales & Contracts", "Debit Notes", ROUTES.admin.billingDebitNotes, "Debit note register."),
     ],
   }),
+  item("Sales & Contracts", "Billing Cashbook", ROUTES.admin.billingCashBook, "Billing cashbook register."),
+  item("Sales & Contracts", "Billing Dailybook", ROUTES.admin.billingDailyBook, "Billing daily register."),
+  item("Sales & Contracts", "Billing Contracts", ROUTES.admin.billingContracts, "Contract billing register."),
+  item("Sales & Contracts", "Billing Reversals", ROUTES.admin.billingReversals, "Billing reversal register."),
+  item("Sales & Contracts", "Billing Reversal Workbench", ROUTES.admin.billingReversalWorkbench, "Reversal workbench for billing documents."),
+  item("Sales & Contracts", "EMIs Pending", ROUTES.admin.emisPending, "Pending EMI installment queue."),
   item("Sales & Contracts", "Contract Amendments", ROUTES.admin.contractAmendments, "Admin decision register for amendment requests.", {
     children: [
       item("Sales & Contracts", "Product Recontract Report", ROUTES.admin.contractAmendmentsRecontractReport, "Read-only evidence report for recontract previews and addendum eligibility."),
+      item("Sales & Contracts", "New Amendment", ROUTES.admin.contractAmendmentsNew, "Create a new contract amendment request."),
     ],
   }),
+  item("Sales & Contracts", "Schemes", ROUTES.admin.schemes, "Scheme configuration and management."),
+  item("Sales & Contracts", "Reviews", ROUTES.admin.reviews, "Customer review and feedback register."),
 
   // Rent / lease contract sub-section
   item("Sales & Contracts", "Rent/Lease Cockpit", ROUTES.admin.rentLease, "Rent and lease cockpit."),
@@ -138,33 +161,50 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Sales & Contracts", "Create Lease", ROUTES.admin.subscriptionsLeaseCreate, "Create a lease contract."),
   item("Sales & Contracts", "Monthly Demands", `${ROUTES.admin.emis}?plan_type=RENT_LEASE`, "Rent and lease monthly demand visibility."),
 
-  // ── 5. Lucky Plan Control ─────────────────────────────────────────────────
+  // â”€â”€ 5. Lucky Plan Control â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Phase 3: canonical /admin/lucky-plan/* routes are now live as redirect aliases.
   // Legacy paths remain active:
-  //   /admin/batches      → /admin/lucky-plan/batches  (migrate_then_alias)
-  //   /admin/lucky-ids    → /admin/lucky-plan/lucky-ids (migrate_then_alias)
-  //   /admin/lucky-draws  → /admin/lucky-plan/draws    (migrate_then_alias)
+  //   /admin/batches      â†’ /admin/lucky-plan/batches  (migrate_then_alias)
+  //   /admin/lucky-ids    â†’ /admin/lucky-plan/lucky-ids (migrate_then_alias)
+  //   /admin/lucky-draws  â†’ /admin/lucky-plan/draws    (migrate_then_alias)
   // Winners route is implemented as a read-only register page.
   item("Lucky Plan Control", "Lucky Plan Control", ROUTES.admin.luckyPlanControl, "Lucky Plan hub: batches, Lucky IDs, draws, and winner audit evidence.", { badgeSource: "pending_draw_count" }),
   item("Lucky Plan Control", "Batches", ROUTES.admin.luckyPlanBatches, "Batch lifecycle and draw scope.", { badgeSource: "pending_draw_count" }),
-  item("Lucky Plan Control", "Lucky IDs", ROUTES.admin.luckyPlanLuckyIds, "Lucky ID register and 00–99 allocation grid."),
+  item("Lucky Plan Control", "Lucky IDs", ROUTES.admin.luckyPlanLuckyIds, "Lucky ID register and 00â€“99 allocation grid."),
   item("Lucky Plan Control", "Lucky Draws", ROUTES.admin.luckyPlanDraws, "Draw schedule and execution: commit, reveal, winner evidence.", { badgeSource: "pending_draw_count" }),
   item("Lucky Plan Control", "Winners", ROUTES.admin.luckyPlanWinners, "Winner visibility and EMI waiver audit trail."),
   item("Lucky Plan Control", "Analytics", ROUTES.admin.luckyPlanAnalytics, "Draw performance metrics: winners, waiver totals, success rate."),
+  item("Lucky Plan Control", "Draw Audit", ROUTES.admin.luckyPlanDrawAudit, "Cryptographic draw audit trail and evidence."),
+  item("Lucky Plan Control", "Draw Authorisations", ROUTES.admin.luckyPlanDrawAuthorisations, "Draw authorisation queue and approval workflow."),
+  item("Lucky Plan Control", "Waiver Settlements", ROUTES.admin.luckyPlanWaiverSettlements, "Winner waiver settlement processing and tracking."),
+  item("Lucky Plan Control", "Create Draw", ROUTES.admin.luckyDrawsCreate, "Create a new lucky draw."),
+  item("Lucky Plan Control", "Create Batch", ROUTES.admin.batchesCreate, "Create a new lucky plan batch."),
 
-  // ── 6. Collections & Cashier ──────────────────────────────────────────────
+  // â”€â”€ 6. Collections & Cashier â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   item("Collections & Cashier", "Collection", ROUTES.admin.financeCollect, "Unified collection workspace.", { badgeSource: "overdue_count" }),
   item("Collections & Cashier", "Payments", ROUTES.admin.payments, "Payment register."),
   item("Collections & Cashier", "Settlements", ROUTES.admin.settlements, "Bank statement and UPI settlement evidence imports with manual allocations."),
   item("Collections & Cashier", "Day Closes", ROUTES.admin.settlementsDayCloses, "Cashier day close."),
   item("Collections & Cashier", "Cashier Variance Monitor", ROUTES.admin.settlementsCashierVariance, "List day-close cash variance breaches and dispatch escalation emails to management."),
+  item("Collections & Cashier", "Collections Hub", ROUTES.admin.collections, "Collection operations landing page."),
+  item("Collections & Cashier", "Collection Control Center", ROUTES.admin.collectionsControlCenter, "Collection control center with queue management."),
+  item("Collections & Cashier", "Bank Imports", ROUTES.admin.settlementsBankImports, "Bank statement import and matching."),
+  item("Collections & Cashier", "UPI Imports", ROUTES.admin.settlementsUpiImports, "UPI settlement import and matching."),
+  item("Collections & Cashier", "Cashier Close", ROUTES.admin.paymentsCashierClose, "Cashier close and cash handover."),
+  item("Collections & Cashier", "Payment Reversals", ROUTES.admin.paymentsReversals, "Payment reversal register."),
+  item("Collections & Cashier", "Reminders", ROUTES.admin.reminders, "Payment reminder configuration and queue.", {
+    children: [
+      item("Collections & Cashier", "Payment Reminders", ROUTES.admin.remindersPaymentReminders, "Automated payment reminder dispatch."),
+      item("Collections & Cashier", "Reminder Templates", ROUTES.admin.remindersTemplates, "Reminder message templates."),
+    ],
+  }),
 
-  // ── 7. Finance Operations ─────────────────────────────────────────────────
+  // â”€â”€ 7. Finance Operations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Finance Operations = source-of-money workflow records.
   // Answers: who owes money, who gets money, what came in/out, what is pending.
   // Does NOT include COA, journals, accounting periods, trial balance, P&L,
-  // or balance sheet — those are Accounting & Reconciliation.
+  // or balance sheet â€” those are Accounting & Reconciliation.
   item("Finance Operations", "Finance Control Center", "/admin/finance-control", "Unified solopreneur finance control center.", { badgeSource: "outstanding_count" }),
   item("Finance Operations", "Owner Fund Injections", ROUTES.admin.financeOwnerFunds, "Record capital injections or owner loans into the business. Every entry posts a real double-entry journal."),
   item("Finance Operations", "Finance Workspace", ROUTES.admin.finance, "Finance source workflow workspace: receivables, payables, deposits, commissions, payouts, and reversals.", { badgeSource: "today_work_count" }),
@@ -180,8 +220,20 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Finance Operations", "Payout Batches", ROUTES.admin.financePayoutBatches, "Partner payout batches: source payout obligations before accounting bridge."),
   item("Finance Operations", "Reversal Control", ROUTES.admin.financeReversalControl, "Audited admin pipeline for cancellation, reversal, returns, refunds, and customer-credit decisions.", { badgeSource: "pending_reversal_count" }),
   item("Finance Operations", "Reversal Reconciliation", ROUTES.admin.financeReversalReconciliation, "Queue for unresolved reversal, refund, stock return, and delivery return links.", { badgeSource: "pending_reversal_count" }),
+  item("Finance Operations", "Settled Commissions", ROUTES.admin.financeSettledCommissions, "Settled commission history and payout evidence."),
+  item("Finance Operations", "Customer Advances", "/admin/customer-advances", "Customer advance liability register."),
+  item("Finance Operations", "Advance Forfeitures", ROUTES.admin.financeAdvanceForfeitures, "Customer advance forfeiture processing per legal policy."),
+  item("Finance Operations", "Bad Debt Write-off", ROUTES.admin.financeBadDebt, "Bad debt identification and write-off workflow."),
+  item("Finance Operations", "Forfeiture Invoices", ROUTES.admin.financeForfeitureInvoices, "Forfeiture invoice register for advance forfeitures."),
+  item("Finance Operations", "Reconciliation Signoffs", ROUTES.admin.financeReconciliationSignoffs, "Reconciliation evidence and signoff queue."),
+  item("Finance Operations", "Revenue Workbench", ROUTES.admin.revenueWorkbench, "Revenue recognition and finance analysis workbench."),
+  item("Finance Operations", "Opening Balances â€” Customers", ROUTES.admin.openingBalancesCustomers, "Set customer opening balances for migration."),
+  item("Finance Operations", "Recovery Settlement", ROUTES.admin.recoveryCasesSettlement, "Recovery case settlement processing."),
+  item("Finance Operations", "Refund Inspection", ROUTES.admin.refundsInspection, "Refund inspection and verification queue."),
+  item("Finance Operations", "Refund Processing", ROUTES.admin.refundsProcess, "Refund processing and disbursement."),
+  item("Finance Operations", "Repossessions", ROUTES.admin.repossessions, "Asset repossession cases and workflow."),
 
-  // ── 8. Accounting & Reconciliation ────────────────────────────────────────
+  // â”€â”€ 8. Accounting & Reconciliation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   item("Accounting & Reconciliation", "Reconciliation", ROUTES.admin.financeCanonicalReconciliation, "Reconciliation queue.", {
     badgeSource: "queue.reconciliation_pending",
   }),
@@ -210,19 +262,29 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Accounting & Reconciliation", "Trial Balance Check", ROUTES.admin.accountingTrialBalanceCheck, "Read-only debit/credit automation checks over posted journals."),
   item("Accounting & Reconciliation", "Liability Reconciliation", ROUTES.admin.accountingLiabilityReconciliation, "Read-only customer advance and security deposit liability diagnostics."),
   item("Accounting & Reconciliation", "Accounting Exports", ROUTES.admin.accountingExports, "Read-only JSON and CSV accounting reports from the P4E export endpoints."),
-  item("Accounting & Reconciliation", "TDS Deductions", ROUTES.admin.accountingTds, "Tax Deducted at Source on vendor payments — record, track, and mark deposited."),
-  item("Accounting & Reconciliation", "TCS Collections", ROUTES.admin.accountingTcs, "Tax Collected at Source on customer transactions — record, track, and mark deposited."),
+  item("Accounting & Reconciliation", "TDS Deductions", ROUTES.admin.accountingTds, "Tax Deducted at Source on vendor payments â€” record, track, and mark deposited."),
+  item("Accounting & Reconciliation", "TCS Collections", ROUTES.admin.accountingTcs, "Tax Collected at Source on customer transactions â€” record, track, and mark deposited."),
+  item("Accounting & Reconciliation", "Assets", ROUTES.admin.accountingAssets, "Fixed asset register and tracking."),
+  item("Accounting & Reconciliation", "Depreciation", ROUTES.admin.accountingDepreciation, "Asset depreciation schedules and posting."),
+  item("Accounting & Reconciliation", "Expenses", ROUTES.admin.accountingExpenses, "Accounting expense register."),
+  item("Accounting & Reconciliation", "Purchase Bills (Accounting)", ROUTES.admin.accountingPurchaseBills, "Purchase bill accounting entries."),
+  item("Accounting & Reconciliation", "Salary Accounting", "/admin/accounting/salary", "Salary accounting entries and payroll journals."),
+  item("Accounting & Reconciliation", "Setup Mapping Audit", ROUTES.admin.accountingSetupMappingAudit, "Finance-to-COA mapping audit and diagnostics."),
+  item("Accounting & Reconciliation", "Staff Ledger", ROUTES.admin.accountingStaffLedger, "Staff financial ledger entries."),
+  item("Accounting & Reconciliation", "Vendor Accounting", ROUTES.admin.accountingVendors, "Vendor accounting entries and payable ledger."),
+  item("Accounting & Reconciliation", "ITR Pack", ROUTES.admin.accountingItrPack, "Income tax return data pack export."),
+  item("Accounting & Reconciliation", "Export Reports", ROUTES.admin.accountingExportReports, "Accounting export reports (JSON/CSV)."),
   item("Accounting & Reconciliation", "Core Finance Complete", ROUTES.admin.accountingFinanceComplete, "IFRS-16 lease accounting (ROU asset & liability), asset depreciation, cost centre P&L, cash flow, fund flow, financial ratios, deferred tax."),
   item("Accounting & Reconciliation", "Trial Balance", ROUTES.admin.accountingTrialBalance, "Trial balance report."),
   item("Accounting & Reconciliation", "Profit & Loss", ROUTES.admin.accountingProfitLoss, "Profit and loss report."),
   item("Accounting & Reconciliation", "Balance Sheet", ROUTES.admin.accountingBalanceSheet, "Balance sheet report."),
 
-  // ── 10. Inventory & Stock ──────────────────────────────────────────────────
+  // â”€â”€ 10. Inventory & Stock â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   item("Inventory & Stock", "Inventory Dashboard", ROUTES.admin.inventory, "Inventory operations workspace."),
   item("Inventory & Stock", "Products", ROUTES.admin.products, "Product catalog used by contract and sale workflows."),
   item("Inventory & Stock", "Product Workspace", ROUTES.admin.productsWorkspace, "Product operations workspace."),
   item("Inventory & Stock", "Product Masters", ROUTES.admin.productsMasters, "Product category, subcategory, and UOM setup."),
-  item("Inventory & Stock", "PIM Products", ROUTES.admin.pimProducts, "Enterprise PIM — category-specific attributes and SKU variants."),
+  item("Inventory & Stock", "PIM Products", ROUTES.admin.pimProducts, "Enterprise PIM â€” category-specific attributes and SKU variants."),
   item("Inventory & Stock", "PIM Categories", ROUTES.admin.pimCategories, "PIM category tree with attribute templates."),
   item("Inventory & Stock", "PIM Manage Categories", ROUTES.admin.pimCategoriesManage, "Create and edit PIM categories, subcategories and attribute types."),
   item("Inventory & Stock", "Product Brochures", ROUTES.admin.brochures, "Read-only customer catalog PDF generation and sharing. No stock reservation, billing, contract, payment, or accounting posting."),
@@ -244,13 +306,22 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Inventory & Stock", "Profiles", ROUTES.admin.inventoryProfiles, "Inventory profiles."),
   item("Inventory & Stock", "Reservations", ROUTES.admin.inventoryReservations, "Active stock reservations by item and purpose. Read-only; release via source workflow."),
   item("Inventory & Stock", "Service Profile", ROUTES.admin.inventoryServiceCatalog, "Admin-managed catalog of services (installation, warranty, maintenance, AMC, etc.)."),
+  item("Inventory & Stock", "Finished Goods", ROUTES.admin.inventoryFinishedGoods, "Finished goods inventory with barcode and QR tracking."),
+  item("Inventory & Stock", "Raw Materials", ROUTES.admin.inventoryRawMaterials, "Raw material inventory register."),
+  item("Inventory & Stock", "Accessories", ROUTES.admin.inventoryAccessories, "Accessory inventory register."),
+  item("Inventory & Stock", "Accessory Variant Groups", ROUTES.admin.inventoryAccessoryVariantGroups, "Accessory variant group configuration."),
+  item("Inventory & Stock", "Stock Needs", ROUTES.admin.inventoryStockNeeds, "Stock replenishment needs analysis."),
+  item("Inventory & Stock", "Inventory Workspace", ROUTES.admin.inventoryWorkspace, "Inventory operations workspace with quick actions."),
+  item("Inventory & Stock", "Create Product", ROUTES.admin.productsCreate, "Create a new product."),
+  item("Inventory & Stock", "Import Products", ROUTES.admin.productsImport, "Bulk product import."),
+  item("Inventory & Stock", "Create PIM Product", ROUTES.admin.pimProductsCreate, "Create a PIM product with variants."),
 
-  // ── 10. Purchases & Vendors ───────────────────────────────────────────────
-  // Purchase source workflow: vendor profile → request → order → receipt → stock increase
-  //   → purchase bill → vendor payable → vendor payment → accounting bridge → reconciliation.
+  // â”€â”€ 10. Purchases & Vendors â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Purchase source workflow: vendor profile â†’ request â†’ order â†’ receipt â†’ stock increase
+  //   â†’ purchase bill â†’ vendor payable â†’ vendor payment â†’ accounting bridge â†’ reconciliation.
   // Vendor identity/profile remains under Profiles & Parties (/admin/profiles/vendors).
   // /admin/vendors is the procurement operations register (keep_temporarily per migration map).
-  item("Purchases & Vendors", "Purchases Hub", ROUTES.admin.purchases, "Purchase source workflow: request → order → receipt → bill → payable → payment. Vendor procurement chain."),
+  item("Purchases & Vendors", "Purchases Hub", ROUTES.admin.purchases, "Purchase source workflow: request â†’ order â†’ receipt â†’ bill â†’ payable â†’ payment. Vendor procurement chain."),
   item("Purchases & Vendors", "Purchase Requests", ROUTES.admin.purchaseRequests, "Purchase request register. First step in the purchase source workflow."),
   item("Purchases & Vendors", "Purchase Orders", ROUTES.admin.purchaseOrders, "Purchase order register. Authorised procurement commitments."),
   item("Purchases & Vendors", "Purchase Receipts", ROUTES.admin.purchaseReceipts, "Purchase receipt register. Goods receipt creates stock ledger IN entries."),
@@ -263,19 +334,22 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Purchases & Vendors", "Vendor Ledger", ROUTES.admin.vendorsLedger, "Vendor payable ledger entries."),
   item("Purchases & Vendors", "Vendor Outstanding", ROUTES.admin.vendorsOutstanding, "Vendor payable outstanding summary."),
   item("Purchases & Vendors", "Vendor Settlements", ROUTES.admin.accountingVendorSettlements, "Vendor settlement workflow."),
+  item("Purchases & Vendors", "Vendor Agreements", ROUTES.admin.purchaseVendorAgreements, "Vendor agreement and contract register."),
+  item("Purchases & Vendors", "Vendor Categories", ROUTES.admin.vendorsCategories, "Vendor category configuration."),
+  item("Purchases & Vendors", "Vendor Settlements (Payments)", ROUTES.admin.vendorsSettlements, "Vendor settlement register."),
   item("Purchases & Vendors", "Quotes / Sourcing", ROUTES.admin.vendorsQuotes, "Vendor quote requests and sourcing.", {
     children: [
       item("Purchases & Vendors", "Vendor Sourcing", ROUTES.admin.vendorsSourcing, "Read-only sourcing suggestions based on location and score."),
     ],
   }),
 
-  // ── 11. Manufacturing ─────────────────────────────────────────────────────
+  // â”€â”€ 11. Manufacturing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Not in canonical 14; kept until a module decision is made.
   item("Manufacturing", "Manufacturing Dashboard", ROUTES.admin.manufacturing, "Manufacturing operations."),
   item("Manufacturing", "BOMs", ROUTES.admin.manufacturingBoms, "Bill of materials."),
   item("Manufacturing", "Production Jobs", ROUTES.admin.manufacturingJobs, "Production jobs."),
 
-  // ── 12. Delivery & Service ────────────────────────────────────────────────
+  // â”€â”€ 12. Delivery & Service â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Includes rent/lease possession, handover, and return inspection routes.
   item("Delivery & Service", "Deliveries", ROUTES.admin.deliveries, "Delivery register for subscription and direct-sale handoffs.", { badgeSource: "pending_delivery_count" }),
   item("Delivery & Service", "Logistics Cockpit", ROUTES.admin.logisticsCockpit, "Central command for all pending deliveries, dispatch operations, and logistics alerts.", { badgeSource: "queue.delivery_blocked" }),
@@ -285,32 +359,35 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Delivery & Service", "Delivery Returns", ROUTES.admin.deliveryReturns, "Delivery return workflow."),
   item("Delivery & Service", "Possession / Handover", `${ROUTES.admin.deliveries}?plan_type=RENT_LEASE`, "Rent and lease possession and handover queue."),
   item("Delivery & Service", "Return Inspections", `${ROUTES.admin.serviceDeskReturns}?plan_type=RENT_LEASE`, "Rent and lease return inspection queue.", { badgeSource: "queue.return_inspections_pending" }),
-  item("Delivery & Service", "Service Control Center", ROUTES.admin.serviceDesk, "Unified control center — find any customer product issue (service, warranty, return, exchange, void, cancel) by customer name/phone, sales ID, service ID, return ID, or contract ID."),
+  item("Delivery & Service", "Service Control Center", ROUTES.admin.serviceDesk, "Unified control center â€” find any customer product issue (service, warranty, return, exchange, void, cancel) by customer name/phone, sales ID, service ID, return ID, or contract ID."),
   item("Delivery & Service", "Cases", ROUTES.admin.serviceDeskCases, "Service desk cases.", { badgeSource: "open_support_ticket_count" }),
   item("Delivery & Service", "Complaints", ROUTES.admin.serviceDeskComplaints, "Complaint register."),
   item("Delivery & Service", "Returns", ROUTES.admin.serviceDeskReturns, "Return queue."),
   item("Delivery & Service", "Tickets", ROUTES.admin.serviceDeskTickets, "Service ticket register.", { badgeSource: "open_support_ticket_count" }),
-  item("Delivery & Service", "Warranty Claims", ROUTES.admin.warrantyClaims, "Warranty claim register — filing, review, and approval."),
+  item("Delivery & Service", "Warranty Claims", ROUTES.admin.warrantyClaims, "Warranty claim register â€” filing, review, and approval."),
   item("Delivery & Service", "Service Schedule", ROUTES.admin.warrantyServiceSchedule, "Schedule technicians and dates for approved warranty service jobs."),
+  item("Delivery & Service", "Consumer Defect Claims", ROUTES.admin.consumerDefectClaims, "Consumer defect claim register and processing."),
+  item("Delivery & Service", "Consumer Return Requests", ROUTES.admin.consumerReturnRequests, "Consumer return request register."),
 
-  // ── 13. HR & Staff ────────────────────────────────────────────────────────
+  // â”€â”€ 13. HR & Staff â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Phase 7: HR & Staff owns people operations only.
   // Answers: who works for the business? Is the staff profile complete?
   //          Is onboarding complete? Is attendance configured? Is payroll setup complete?
   //          Which salary sheet/payment workflow applies? Which documents/KYC are attached?
   // Does NOT own: payroll journal auto-posting, accounting bridge reconciliation,
-  //               reconciliation evidence — those belong to Accounting & Reconciliation.
+  //               reconciliation evidence â€” those belong to Accounting & Reconciliation.
   item("HR & Staff", "HR Dashboard", ROUTES.admin.hr, "Staff HR workspace: daily command center for staff profiles, onboarding workflow, attendance, payroll setup, and salary payment source. No payroll accounting posting from this group."),
   item("HR & Staff", "Staff", ROUTES.admin.hrStaff, "Staff profile source: recruit, onboard, and manage staff records. Payroll setup and salary payment remain separate controlled workflows. No payroll/accounting posting from staff creation."),
   item("HR & Staff", "Attendance", ROUTES.admin.hrAttendance, "Attendance source workflow: mark and review attendance records. Attendance does not auto-generate payroll sheets or salary payments."),
   item("HR & Staff", "Payroll", ROUTES.admin.hrPayroll, "Payroll setup: configure staff pay basis, salary effective dates, and payroll periods. Salary sheets and salary payments are separate steps. No payroll journal posting from this page."),
   item("HR & Staff", "Salary Payments", ROUTES.admin.hrSalaryPayments, "Salary payment source: record and view salary payments against existing salary sheets. Payroll accounting bridge status and reconciliation evidence are in Accounting & Reconciliation."),
   item("HR & Staff", "Staff Advances", ROUTES.admin.hrStaffAdvances, "Create, approve, disburse, and recover staff advances with explicit settlement accounts and balanced journals."),
-  item("HR & Staff", "Leave", ROUTES.admin.hrLeave, "Onboarding workflow — leave: approve or reject staff leave requests through the existing leave workflow."),
+  item("HR & Staff", "Leave", ROUTES.admin.hrLeave, "Onboarding workflow â€” leave: approve or reject staff leave requests through the existing leave workflow."),
   item("HR & Staff", "Expenses", ROUTES.admin.hrExpenses, "Employee expense claims: approve or reject claims through the existing expense workflow. No journal posting from this page."),
   item("HR & Staff", "Staff Documents", ROUTES.admin.hrStaffDocuments, "Staff documents and KYC: upload, maintain, toggle active/inactive status, and use the review endpoint for verify/reject decisions."),
+  item("HR & Staff", "Create Staff", ROUTES.admin.hrStaffCreate, "Create a new staff member."),
 
-  // ── 14. BI & Reports ──────────────────────────────────────────────────────
+  // â”€â”€ 14. BI & Reports â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Phase 8: BI & Reports is read-only decision-support only.
   // These pages answer: which products sell, which customers are risky, which batches
   // perform well, which stock is stuck, which money is unreconciled, what trend needs action.
@@ -322,17 +399,17 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   //   - Change contract, request, delivery, or payroll state.
   //
   // Drill-down targets (links go TO source modules, no mutation from here):
-  //   customer risk  → Profiles / Customers or CRM KYC
-  //   overdue        → Finance Operations / Outstandings
-  //   collections    → Collections & Cashier
-  //   bridge blocker → Accounting & Reconciliation
-  //   stock risk     → Inventory & Stock
-  //   purchase risk  → Purchases & Vendors
-  //   HR risk        → HR & Staff
-  //   batch risk     → Lucky Plan Control
+  //   customer risk  â†’ Profiles / Customers or CRM KYC
+  //   overdue        â†’ Finance Operations / Outstandings
+  //   collections    â†’ Collections & Cashier
+  //   bridge blocker â†’ Accounting & Reconciliation
+  //   stock risk     â†’ Inventory & Stock
+  //   purchase risk  â†’ Purchases & Vendors
+  //   HR risk        â†’ HR & Staff
+  //   batch risk     â†’ Lucky Plan Control
   //
   // Trial Balance, P&L, Balance Sheet remain under Accounting & Reconciliation (not here).
-  item("BI & Reports", "BI Dashboards", ROUTES.admin.bi, "Read-only BI control center. Decision support only — no posting from this page."),
+  item("BI & Reports", "BI Dashboards", ROUTES.admin.bi, "Read-only BI control center. Decision support only â€” no posting from this page."),
   item("BI & Reports", "Reports & Governance", "/admin/reports-governance", "Dedicated control room for analytical reporting, audit logs, and privacy compliance."),
   item("BI & Reports", "Profitability View", ROUTES.admin.biProfitability, "Read-only income, waiver, deposit liability, and monthly operating summary. Source-linked report. No posting from this page."),
   item("BI & Reports", "Customer Insights", ROUTES.admin.biCustomers, "Read-only customer activity, overdue, repeat, and churn-risk posture. Drill down to Profiles / Customers or CRM KYC for action."),
@@ -346,25 +423,36 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("BI & Reports", "Collections Report", ROUTES.admin.reportsCollections, "Source-linked collection analytics posture. Decision support only. Drill down to Finance Operations / Outstandings for action."),
   item("BI & Reports", "Overdue EMI Report", ROUTES.admin.reportsOverdue, "Source-linked overdue EMI exposure with row-level drill-down. Decision support only. Drill down to Finance Operations / Outstandings for action."),
   item("BI & Reports", "Customer Analytics", ROUTES.admin.reportsCustomerAnalytics, "Read-only customer cohort and lifecycle analytics. Decision support only. Drill down to Profiles / Customers for action."),
-  item("BI & Reports", "Batch Performance Report", ROUTES.admin.reportsBatchPerformance, "Source-linked Lucky Plan batch performance — draw, enrollment, Lucky ID progression. Decision support only. Drill down to Lucky Plan Control for action."),
-  item("BI & Reports", "Partner Reports", ROUTES.admin.reportsPartners, "Source-linked partner performance — customers, contracts, collections, commission posture. Decision support only. Drill down to Profiles / Partners for action."),
+  item("BI & Reports", "Batch Performance Report", ROUTES.admin.reportsBatchPerformance, "Source-linked Lucky Plan batch performance â€” draw, enrollment, Lucky ID progression. Decision support only. Drill down to Lucky Plan Control for action."),
+  item("BI & Reports", "Partner Reports", ROUTES.admin.reportsPartners, "Source-linked partner performance â€” customers, contracts, collections, commission posture. Decision support only. Drill down to Profiles / Partners for action."),
   item("BI & Reports", "Waiver Loss Report", ROUTES.admin.reportsWaiverLoss, "Source-linked waiver and loss analytics with auditable source references. Decision support only. Drill down to Lucky Plan Control for action."),
-  item("BI & Reports", "Analytics Workspace", ROUTES.admin.analytics, "Read-only analytics workspace — redirects to Reports & analysis live posture view. Decision support only. No posting from this page."),
+  item("BI & Reports", "Analytics Workspace", ROUTES.admin.analytics, "Read-only analytics workspace â€” redirects to Reports & analysis live posture view. Decision support only. No posting from this page."),
   item("BI & Reports", "Risk Monitor", ROUTES.admin.analyticsRiskMonitor, "Read-only overdue EMI risk watchlist for collection escalation. Source-linked report. Drill down to Finance Operations / Outstandings for action."),
   item("BI & Reports", "Churn Analysis", ROUTES.admin.analyticsChurnAnalysis, "Read-only churn-risk and defaulted subscription watchlist. Source-linked report. Drill down to Profiles / Customers for action."),
-  item("BI & Reports", "Partial Payment Tool", ROUTES.admin.partialPaymentTool, "Waterfall allocation calculator — preview how a partial payment distributes across pending EMIs. Preview only; no records modified."),
+  item("BI & Reports", "Partial Payment Tool", ROUTES.admin.partialPaymentTool, "Waterfall allocation calculator â€” preview how a partial payment distributes across pending EMIs. Preview only; no records modified."),
   item("BI & Reports", "Scheduled Report Export", ROUTES.admin.scheduledReportExport, "Generate and email CSV exports for outstanding EMIs, overdue, TDS, batch fill rates, or KYC expiry."),
   item("BI & Reports", "Batch Alerts", ROUTES.admin.batchAlerts, "Run threshold-based batch performance health checks and dispatch alert emails."),
+  item("BI & Reports", "Advance EMI Report", ROUTES.admin.reportsAdvanceEmi, "Advance EMI analytics and performance."),
+  item("BI & Reports", "Contracts Report", ROUTES.admin.reportsContracts, "Contract lifecycle and status analytics."),
+  item("BI & Reports", "CRM Report", ROUTES.admin.reportsCrm, "CRM pipeline and conversion analytics."),
+  item("BI & Reports", "Delivery Report", ROUTES.admin.reportsDelivery, "Delivery performance and logistics analytics."),
+  item("BI & Reports", "Direct Sales Report", ROUTES.admin.reportsDirectSales, "Direct sale analytics and trends."),
+  item("BI & Reports", "Finance Report", ROUTES.admin.reportsFinance, "Financial analytics and cash position."),
+  item("BI & Reports", "GSTR Report", ROUTES.admin.reportsGstr, "GST return data and filing readiness."),
+  item("BI & Reports", "Inventory Report", ROUTES.admin.reportsInventory, "Inventory analytics and stock health."),
+  item("BI & Reports", "Money In/Out Report", ROUTES.admin.reportsMoneyInOut, "Money inflow and outflow analytics."),
+  item("BI & Reports", "Reconciliation Report", ROUTES.admin.reportsReconciliation, "Reconciliation analytics and status."),
+  item("BI & Reports", "Rent/Lease Report", ROUTES.admin.reportsRentLease, "Rent and lease analytics."),
 
-  // ── 17. Growth & Offers ───────────────────────────────────────────────────────
+  // â”€â”€ 17. Growth & Offers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   item("Growth & Offers", "Growth Hub", ROUTES.admin.growth, "Growth configuration hub: plan templates, offer packages, growth requests, partner performance, and retention intelligence."),
-  item("Growth & Offers", "Plan Templates", ROUTES.admin.growthPlanTemplates, "Reusable EMI, RENT, and LEASE plan configuration blueprints. Admin config only — no subscription created automatically."),
-  item("Growth & Offers", "Offer Packages", ROUTES.admin.growthOfferPackages, "Time-bounded offers built on plan templates. Preview/config only — no subscription, EMI, or payment created."),
-  item("Growth & Offers", "Growth Requests", ROUTES.admin.growthRequests, "Customer renewal, upgrade, exchange, and plan conversion requests. Request workflow only — no subscription mutated automatically."),
+  item("Growth & Offers", "Plan Templates", ROUTES.admin.growthPlanTemplates, "Reusable EMI, RENT, and LEASE plan configuration blueprints. Admin config only â€” no subscription created automatically."),
+  item("Growth & Offers", "Offer Packages", ROUTES.admin.growthOfferPackages, "Time-bounded offers built on plan templates. Preview/config only â€” no subscription, EMI, or payment created."),
+  item("Growth & Offers", "Growth Requests", ROUTES.admin.growthRequests, "Customer renewal, upgrade, exchange, and plan conversion requests. Request workflow only â€” no subscription mutated automatically."),
   item("Growth & Offers", "Partner Performance", ROUTES.admin.growthPartnerPerformance, "Read-only partner activity: referrals, collections, overdue, commissions, and risk flags. No payout or commission mutation."),
-  item("Growth & Offers", "Retention Intelligence", ROUTES.admin.growthRetention, "Customer retention signals and suggested follow-up actions. Read-only advisory — no payments, penalties, or messages sent."),
+  item("Growth & Offers", "Retention Intelligence", ROUTES.admin.growthRetention, "Customer retention signals and suggested follow-up actions. Read-only advisory â€” no payments, penalties, or messages sent."),
 
-  // ── 16. Enterprise Control ───────────────────────────────────────────────────
+  // â”€â”€ 16. Enterprise Control â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   item("Enterprise Control", "Control Desk", ROUTES.admin.controlRoot, "Enterprise control hub: approvals, policies, exceptions, cash sessions, close controls, and data quality."),
   item("Enterprise Control", "Approval Queue", ROUTES.admin.controlApprovals, "Maker-checker approvals pending a decision. Approve or reject controlled actions."),
   item("Enterprise Control", "Business Policies", ROUTES.admin.controlPolicies, "Toggle enterprise control policies (e.g. cash variance approval requirement)."),
@@ -374,7 +462,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Enterprise Control", "Month-End Close", ROUTES.admin.controlMonthEndClose, "Month-end close readiness, dry-run, and execute controls. No financial records are mutated."),
   item("Enterprise Control", "Data Quality Center", ROUTES.admin.dataQuality, "11 read-only integrity checks across customers, contracts, payments, and accounting."),
 
-  // ── 15. Settings & Governance ─────────────────────────────────────────────
+  // â”€â”€ 15. Settings & Governance â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   item("Settings & Governance", "Settings", ROUTES.admin.settings, "Settings cockpit."),
   item("Settings & Governance", "Sidebar & Navigation Customizer", ROUTES.admin.settingsNavigation, "Interactive desktop layout builder to reorder parent modules, rearrange pages, and toggle sidebar visibility."),
   item("Settings & Governance", "Staff Users", ROUTES.admin.settingsUsers, "Internal staff users."),
@@ -392,15 +480,53 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Settings & Governance", "Brand & Business Data Center", ROUTES.admin.brandData, "Public business profile, social links, and media reference center."),
   item("Settings & Governance", "Imports / Backups", ROUTES.admin.settingsImports, "Import, export, and readiness tools."),
 
-  // Audit logs were missing from navigation — added here (gap filled)
+  // Audit logs were missing from navigation â€” added here (gap filled)
   item("Settings & Governance", "Audit Logs", ROUTES.admin.auditLogs, "System-wide audit trail."),
   item("Settings & Governance", "Audit Events", ROUTES.admin.auditEvents, "Granular audit event log."),
+  item("Settings & Governance", "Backup & Restore", ROUTES.admin.settingsBackupRestore, "Data backup and restore operations."),
+  item("Settings & Governance", "Business Settings", ROUTES.admin.settingsBusiness, "Core business settings and configuration."),
+  item("Settings & Governance", "Business Compliance", ROUTES.admin.settingsBusinessCompliance, "Business compliance configuration and evidence."),
+  item("Settings & Governance", "Branches & Desks Setup", ROUTES.admin.settingsBusinessSetupBranchesDesks, "Branch and counter/desk configuration."),
+  item("Settings & Governance", "Data Migration", ROUTES.admin.settingsBusinessSetupDataMigration, "Legacy data migration tools and import center."),
+  item("Settings & Governance", "Dry Runs", ROUTES.admin.settingsBusinessSetupDryRuns, "Dry run execution and validation."),
+  item("Settings & Governance", "Email & SMTP Setup", ROUTES.admin.settingsBusinessSetupEmailSmtp, "Email configuration and SMTP settings."),
+  item("Settings & Governance", "Finance Accounts Setup", "/admin/settings/business-setup/finance-accounts", "Finance account onboarding setup."),
+  item("Settings & Governance", "MSME / Udyam", ROUTES.admin.settingsBusinessSetupMsme, "MSME/Udyam registration and configuration."),
+  item("Settings & Governance", "Print & Branding", ROUTES.admin.settingsBusinessSetupPrintBranding, "Print templates and branding configuration."),
+  item("Settings & Governance", "Factory Reset", ROUTES.admin.settingsBusinessSetupReset, "Factory reset and data wipe controls."),
+  item("Settings & Governance", "Staff Setup", ROUTES.admin.settingsBusinessSetupStaff, "Staff onboarding setup."),
+  item("Settings & Governance", "Local Sandbox", ROUTES.admin.settingsLocalSandbox, "Local development sandbox and testing tools."),
+  item("Settings & Governance", "Masters Config", ROUTES.admin.settingsMasters, "Master data configuration (categories, UOM, etc)."),
+  item("Settings & Governance", "Create User", ROUTES.admin.settingsUsersCreate, "Create a new staff user account."),
+  item("Settings & Governance", "Compliance Tax Profile", ROUTES.admin.complianceTaxProfile, "Business tax profile and GSTIN configuration."),
+  item("Settings & Governance", "Tax Readiness", ROUTES.admin.complianceTaxReadiness, "Tax compliance readiness checks."),
+  item("Settings & Governance", "Party Tax Profiles", ROUTES.admin.compliancePartyTaxProfiles, "Party (customer/vendor) tax profile register."),
+  item("Settings & Governance", "Product Tax Profiles", ROUTES.admin.complianceProductTaxProfiles, "Product HSN/SAC and tax rate configuration."),
+  item("Settings & Governance", "Receipt Samples", ROUTES.admin.receiptsSample, "Sample receipt templates for preview and testing.", {
+    children: [
+      item("Settings & Governance", "Acknowledgement Sample", ROUTES.admin.receiptsSampleAcknowledgement, "Sample acknowledgement receipt."),
+      item("Settings & Governance", "Invoice Sample", ROUTES.admin.receiptsSampleInvoice, "Sample invoice receipt."),
+      item("Settings & Governance", "Payment Sample", ROUTES.admin.receiptsSamplePayment, "Sample payment receipt."),
+      item("Settings & Governance", "Subscription Sample", ROUTES.admin.receiptsSampleSubscription, "Sample subscription receipt."),
+      item("Settings & Governance", "Waiver Sample", ROUTES.admin.receiptsSampleWaiver, "Sample waiver receipt."),
+    ],
+  }),
+  item("Settings & Governance", "Privacy & DPDP", ROUTES.admin.privacyCompliance, "Privacy compliance dashboard and DPDP Act controls.", {
+    children: [
+      item("Settings & Governance", "Breaches", ROUTES.admin.privacyBreaches, "Data breach register."),
+      item("Settings & Governance", "Breach Notifications", ROUTES.admin.privacyBreachNotifications, "Breach notification dispatch and tracking."),
+      item("Settings & Governance", "Data Retention", ROUTES.admin.privacyDataRetention, "Data retention policy configuration."),
+      item("Settings & Governance", "Erasure Requests", ROUTES.admin.privacyErasureRequests, "Data erasure (right to be forgotten) request queue."),
+      item("Settings & Governance", "Grievances", ROUTES.admin.privacyGrievances, "Privacy grievance register."),
+      item("Settings & Governance", "Retention Schedule", ROUTES.admin.privacyRetentionSchedule, "Data retention schedule and automation."),
+    ],
+  }),
 ];
 
 export const ADMIN_ROUTE_ALIASES: Record<string, string> = {
-  // ── All handled by permanent HTTP redirects in next.config.ts ─────────────
+  // â”€â”€ All handled by permanent HTTP redirects in next.config.ts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Kept here for programmatic use (breadcrumb builders, link validators, tests).
-  // Source → canonical destination.
+  // Source â†’ canonical destination.
   "/admin/setup/readiness": ROUTES.admin.settingsBusinessSetup,
   "/admin/workspace": ROUTES.admin.erp,
   "/admin/staff": ROUTES.admin.hrStaff,
@@ -423,7 +549,7 @@ export const ADMIN_ROUTE_ALIASES: Record<string, string> = {
   "/admin/finance/customer-advances": ROUTES.admin.financeCustomerAdvances,
   "/admin/billing/direct-sales": ROUTES.admin.billingDirectSaleWorkspace,
   "/admin/sales": ROUTES.admin.billingDirectSaleWorkspace,
-  // ── requests/ is now canonical — old top-level paths are legacy aliases ───
+  // â”€â”€ requests/ is now canonical â€” old top-level paths are legacy aliases â”€â”€â”€
   // Online Enquiries removed: unified into CRM Leads + Online Requests workflow
   "/admin/support-requests": ROUTES.admin.requestsSupport,
   "/admin/subscription-requests": ROUTES.admin.requestsSubscriptions,

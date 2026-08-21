@@ -1,4 +1,4 @@
-export const ROUTES = {
+﻿export const ROUTES = {
   public: {
     home: "/",
     products: "/products",
@@ -53,28 +53,28 @@ export const ROUTES = {
     dashboard: "/admin",
     today: "/admin/today",
 
-    // ── Compatibility-alias topology (Phase 9A audit) ─────────────────────────
+    // â”€â”€ Compatibility-alias topology (Phase 9A audit) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Most canonical "new" routes are thin page-level redirect aliases that
     // point BACK to the legacy route that still hosts the real page. The legacy
     // path is the content owner (classification: keep_temporarily); the canonical
     // path is the alias (classification: alias). These are intentionally preserved
     // and must NOT be deleted in Phase 9A. Request hub routes are the exception:
     // the /admin/requests/* paths are now the real pages, and the legacy request
-    // routes redirect forward to them. Direction (canonical → target):
-    //   /admin/profiles/customers        → /admin/customers
-    //   /admin/profiles/partners         → /admin/partners
-    //   /admin/profiles/vendors          → /admin/vendors
-    //   /admin/profiles/branches         → /admin/branches
-    //   /admin/profiles/staff            → /admin/hr/staff
-    //   /admin/profiles/parties          → /admin/crm/parties
-    //   /admin/lucky-plan/batches        → /admin/batches
-    //   /admin/lucky-plan/lucky-ids      → /admin/lucky-ids
-    //   /admin/lucky-plan/draws          → /admin/lucky-draws
-    //   /admin/finance/outstandings      → /admin/outstandings
-    //   /admin/finance/customer-advances → /admin/customer-advances
-    //   /admin/online-enquiries          → /admin/requests/online-enquiries
-    //   /admin/support-requests          → /admin/requests/support
-    //   /admin/subscription-requests     → /admin/requests/subscriptions
+    // routes redirect forward to them. Direction (canonical â†’ target):
+    //   /admin/profiles/customers        â†’ /admin/customers
+    //   /admin/profiles/partners         â†’ /admin/partners
+    //   /admin/profiles/vendors          â†’ /admin/vendors
+    //   /admin/profiles/branches         â†’ /admin/branches
+    //   /admin/profiles/staff            â†’ /admin/hr/staff
+    //   /admin/profiles/parties          â†’ /admin/crm/parties
+    //   /admin/lucky-plan/batches        â†’ /admin/batches
+    //   /admin/lucky-plan/lucky-ids      â†’ /admin/lucky-ids
+    //   /admin/lucky-plan/draws          â†’ /admin/lucky-draws
+    //   /admin/finance/outstandings      â†’ /admin/outstandings
+    //   /admin/finance/customer-advances â†’ /admin/customer-advances
+    //   /admin/online-enquiries          â†’ /admin/requests/online-enquiries
+    //   /admin/support-requests          â†’ /admin/requests/support
+    //   /admin/subscription-requests     â†’ /admin/requests/subscriptions
     // Phase 9B (deferred): move more page content into the canonical path, then
     // flip each redirect so the legacy path becomes the alias (migrate_then_alias).
     profiles: "/admin/profiles",
@@ -102,9 +102,9 @@ export const ROUTES = {
     biHr: "/admin/bi/hr",
     crmWorkspace: "/admin/crm",
     crmAnalytics: "/admin/crm/analytics",
-    salesWorkspace: "/admin/billing/direct-sale", // was /admin/sales — now redirected
-    serviceWorkspace: "/admin/service-desk", // was /admin/service — now redirected
-    workspace: "/admin/erp", // was /admin/workspace — now redirected
+    salesWorkspace: "/admin/billing/direct-sale", // was /admin/sales â€” now redirected
+    serviceWorkspace: "/admin/service-desk", // was /admin/service â€” now redirected
+    workspace: "/admin/erp", // was /admin/workspace â€” now redirected
     hr: "/admin/hr",
     hrStaff: "/admin/hr/staff",
     hrStaffProfile: "/admin/hr/staff",
@@ -182,7 +182,7 @@ export const ROUTES = {
     settlementsUpiImports: "/admin/settlements/upi-imports",
     settlementsBankImports: "/admin/settlements/bank-imports",
     reconciliation: "/admin/accounting/bridge-reconciliation",
-    reportsCenter: "/admin/reports", // was /admin/reports-center — now redirected
+    reportsCenter: "/admin/reports", // was /admin/reports-center â€” now redirected
     reports: "/admin/reports",
     reportsRevenue: "/admin/reports/revenue",
     reportsCollections: "/admin/reports/collections",
@@ -192,8 +192,8 @@ export const ROUTES = {
     reportsPartners: "/admin/reports/partners",
     reportsWaiverLoss: "/admin/reports/waiver-loss",
     reportsMoneyInOut: "/admin/reports/money-in-out",
-    leads: "/admin/crm/leads", // was /admin/leads — now redirected
-    supportRequests: "/admin/requests/support", // was /admin/support-requests — now canonical is requests/support
+    leads: "/admin/crm/leads", // was /admin/leads â€” now redirected
+    supportRequests: "/admin/requests/support", // was /admin/support-requests â€” now canonical is requests/support
     customers: "/admin/customers",
     deliveries: "/admin/deliveries",
     delivery: "/admin/deliveries", // repointed: no /admin/delivery page; canonical is /admin/deliveries
@@ -212,7 +212,7 @@ export const ROUTES = {
     contractAmendments: "/admin/contract-amendments",
     contractAmendmentsNew: "/admin/contract-amendments/new",
     contractAmendmentsRecontractReport: "/admin/contract-amendments/recontract-report",
-    subscriptionRequests: "/admin/requests/product-requests", // was /admin/subscription-requests — now canonical is requests/subscriptions
+    subscriptionRequests: "/admin/requests/product-requests", // was /admin/subscription-requests â€” now canonical is requests/subscriptions
     payments: "/admin/payments",
     paymentsCreate: "/admin/payments/create",
     paymentsHistory: "/admin/payments/history",
@@ -289,7 +289,7 @@ export const ROUTES = {
     dataQuality: "/admin/data-quality",
 
     billing: "/admin/billing",
-    billingDirectSales: "/admin/billing/direct-sale", // was /admin/billing/direct-sales — duplicate
+    billingDirectSales: "/admin/billing/direct-sale", // was /admin/billing/direct-sales â€” duplicate
     billingDirectSaleWorkspace: "/admin/billing/direct-sale",
     billingDirectSaleCreate: "/admin/billing/direct-sale/create",
     salesDirectSaleCreate: "/admin/billing/direct-sale/create",
@@ -332,7 +332,7 @@ export const ROUTES = {
     vendorsCategories: "/admin/vendors/categories",
     vendorsQuotes: "/admin/vendors/quotes",
     vendorsSourcing: "/admin/vendors/sourcing",
-    onlineEnquiries: "/admin/requests/online-requests", // was /admin/online-enquiries — now canonical is requests/online-requests
+    onlineEnquiries: "/admin/requests/online-requests", // was /admin/online-enquiries â€” now canonical is requests/online-requests
     vendorsLedger: "/admin/vendors/ledger",
     vendorsOutstanding: "/admin/vendors/outstanding",
     vendorsPurchases: "/admin/vendors/purchases",
@@ -406,6 +406,130 @@ export const ROUTES = {
     accountingLeave: "/admin/hr/leave", // Redirects to HR (backward compat)
     accountingSalary: "/admin/hr/payroll", // Redirects to HR (backward compat)
     closeCockpit: "/admin/close-cockpit",
+
+    // Accounting extras
+    accountingSetupMappingAudit: "/admin/accounting/setup/mapping-audit",
+
+    // AI extras
+
+    // Billing extras
+
+    // Collections
+    collectionsControlCenter: "/admin/collections/control-center",
+
+    // Compliance extras
+    compliancePartyTaxProfiles: "/admin/compliance/party-tax-profiles",
+    complianceProductTaxProfiles: "/admin/compliance/product-tax-profiles",
+    complianceTaxProfile: "/admin/compliance/tax-profile",
+    complianceTaxReadiness: "/admin/compliance/tax-readiness",
+
+    // Consumer
+    consumerDefectClaims: "/admin/consumer/defect-claims",
+    consumerReturnRequests: "/admin/consumer/return-requests",
+
+    // CRM extras
+    crmDashboard: "/admin/crm/dashboard",
+
+    // Customers extras
+    customersCreate: "/admin/customers/create",
+
+    // Defaulters
+
+    // Documents
+    documents: "/admin/documents",
+
+    // Finance extras
+    financeAdvanceForfeitures: "/admin/finance/advance-forfeitures",
+    financeBadDebt: "/admin/finance/bad-debt",
+    financeForfeitureInvoices: "/admin/finance/forfeiture-invoices",
+    financeReconciliationSignoffs: "/admin/finance/reconciliation-signoffs",
+
+    // HR extras
+    hrStaffCreate: "/admin/hr/staff/create",
+
+    // Inventory extras
+
+    // Lucky draws/plan extras
+    luckyDrawsCreate: "/admin/lucky-draws/create",
+    luckyPlanDrawAudit: "/admin/lucky-plan/draw-audit",
+    luckyPlanDrawAuthorisations: "/admin/lucky-plan/draw-authorisations",
+    luckyPlanWaiverSettlements: "/admin/lucky-plan/waiver-settlements",
+
+    // Opening balances
+    openingBalancesCustomers: "/admin/opening-balances/customers",
+
+    // Operations
+
+    // Partners extras
+    partnersCommissions: "/admin/partners/commissions",
+
+    // Payments extras
+    paymentsCashierClose: "/admin/payments/cashier-close",
+    paymentsReversals: "/admin/payments/reversals",
+
+    // PIM extras
+
+    // Privacy
+    privacyBreaches: "/admin/privacy/breaches",
+    privacyBreachNotifications: "/admin/privacy/breach-notifications",
+    privacyCompliance: "/admin/privacy/compliance",
+    privacyDataRetention: "/admin/privacy/data-retention",
+    privacyErasureRequests: "/admin/privacy/erasure-requests",
+    privacyGrievances: "/admin/privacy/grievances",
+    privacyRetentionSchedule: "/admin/privacy/retention-schedule",
+
+    // Products extras
+
+    // Purchases extras
+
+    // Receipts sample
+    receiptsSample: "/admin/receipts/sample",
+    receiptsSampleAcknowledgement: "/admin/receipts/sample/acknowledgement",
+    receiptsSampleInvoice: "/admin/receipts/sample/invoice",
+    receiptsSamplePayment: "/admin/receipts/sample/payment",
+    receiptsSampleSubscription: "/admin/receipts/sample/subscription",
+    receiptsSampleWaiver: "/admin/receipts/sample/waiver",
+
+    // Recovery / Refunds
+    recoveryCasesSettlement: "/admin/recovery-cases/settlement",
+    refundsInspection: "/admin/refunds/inspection",
+    refundsProcess: "/admin/refunds/process",
+
+    // Reminders
+    remindersTemplates: "/admin/reminders/templates",
+
+    // Reports extras
+    reportsAdvanceEmi: "/admin/reports/advance-emi",
+    reportsContracts: "/admin/reports/contracts",
+    reportsCrm: "/admin/reports/crm",
+    reportsDelivery: "/admin/reports/delivery",
+    reportsDirectSales: "/admin/reports/direct-sales",
+    reportsFinance: "/admin/reports/finance",
+    reportsGstr: "/admin/reports/gstr",
+    reportsInventory: "/admin/reports/inventory",
+    reportsReconciliation: "/admin/reports/reconciliation",
+    reportsRentLease: "/admin/reports/rent-lease",
+
+    // Repossessions
+    repossessions: "/admin/repossessions",
+
+    // Requests extras
+
+    // Revenue workbench
+
+    // Reviews / Schemes
+
+    // Settings extras
+    settingsBackupRestore: "/admin/settings/backup-restore",
+    settingsBusiness: "/admin/settings/business",
+    settingsBusinessCompliance: "/admin/settings/business-compliance",
+    settingsBusinessSetupMsme: "/admin/settings/business-setup/msme",
+    settingsLocalSandbox: "/admin/settings/local-sandbox",
+    settingsUsersCreate: "/admin/settings/users/create",
+
+    // Settlements extras
+
+    // Vendors extras
 
     // P5: Growth & Offers
     growth: "/admin/growth",

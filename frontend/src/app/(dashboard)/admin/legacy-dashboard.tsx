@@ -458,50 +458,44 @@ function StorefrontQRWidget() {
         panelClassName="max-w-sm"
       >
         <div className="p-6 text-center">
-          <div className="mx-auto inline-block rounded-2xl bg-white p-6 shadow-sm ring-1 ring-black/5 print:shadow-none print:ring-0">
+          <div className="storefront-qr-print-target mx-auto inline-block rounded-2xl bg-white p-6 shadow-sm ring-1 ring-black/5">
             <QRCode value={qrValue} size={200} />
           </div>
           <h2 className="mt-6 text-lg font-bold text-foreground">Scan to visit</h2>
           <p className="mt-1 text-sm text-muted-foreground">{qrValue}</p>
           
-          <div className="mt-8 flex items-center justify-center gap-3 print:hidden">
+          <div className="mt-8 flex items-center justify-center gap-3">
             <ActionButton variant="secondary" onClick={() => setOpen(false)}>
               Close
             </ActionButton>
             <ActionButton
               variant="primary"
               leftIcon={<Printer className="h-4 w-4" />}
-              onClick={() => window.print()}
+              onClick={() => {
+                const svgEl = document.querySelector('.storefront-qr-print-target svg');
+                if (!svgEl) return;
+                const win = window.open("", "_blank", "width=450,height=550");
+                if (!win) return;
+                win.document.write(`<!DOCTYPE html><html><head><title>Storefront QR</title><style>
+                  @page { size: auto; margin: 15mm; }
+                  * { margin: 0; padding: 0; box-sizing: border-box; }
+                  body { font-family: Arial, sans-serif; background: #fff; color: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; text-align: center; }
+                  .qr-wrap { background: #fff; padding: 24px; border-radius: 16px; }
+                  h2 { margin-top: 20px; font-size: 18px; }
+                  p { margin-top: 6px; font-size: 13px; color: #555; }
+                </style></head><body>
+                  <div class="qr-wrap">${svgEl.outerHTML}</div>
+                  <h2>Scan to visit</h2>
+                  <p>${qrValue}</p>
+                  <script>window.onload=function(){window.print();window.close();}<\/script>
+                </body></html>`);
+                win.document.close();
+              }}
             >
               Print QR Code
             </ActionButton>
           </div>
         </div>
-        
-        {/* Print specific styles for this modal */}
-        <style dangerouslySetInnerHTML={{__html: `
-          @media print {
-            body * {
-              visibility: hidden;
-            }
-            .workflow-modal-panel, .workflow-modal-panel * {
-              visibility: visible;
-            }
-            .workflow-modal-panel {
-              position: absolute;
-              left: 0;
-              top: 0;
-              width: 100%;
-              box-shadow: none !important;
-              background: transparent !important;
-            }
-            .dashboard-app {
-              position: absolute;
-              left: 0;
-              top: 0;
-            }
-          }
-        `}} />
       </ModalShell>
     </>
   );
