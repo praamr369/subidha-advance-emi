@@ -4,7 +4,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("subscriptions", "0147_move_aml_dryrun_state"),
+        ("audit", "0002_alter_auditlog_metadata"),
     ]
 
     operations = [
