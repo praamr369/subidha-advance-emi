@@ -6,9 +6,9 @@ verification with a browser, the API docs, and a terminal.
 
 The heavy row-by-row lists live in the auto-generated inventories — tick the
 boxes there as you go:
-- [`inventory/routes.md`](inventory/routes.md) — **2,543** API endpoints (all routes, all methods).
-- [`inventory/pages.md`](inventory/pages.md) — **651** frontend pages/routes.
-- [`inventory/modules.md`](inventory/modules.md) — **32** backend modules (models / services / commands).
+- [`inventory/routes.md`](inventory/routes.md) — **2,627** API endpoints (all routes, all methods).
+- [`inventory/pages.md`](inventory/pages.md) — **602** frontend pages/routes.
+- [`inventory/modules.md`](inventory/modules.md) — **33** backend modules (models / services / commands).
 
 Regenerate the inventories first (see the Developer Guide §8) so they match the
 build you are shipping.

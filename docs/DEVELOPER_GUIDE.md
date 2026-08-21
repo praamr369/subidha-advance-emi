@@ -19,9 +19,9 @@ reconciliation, direct sales & billing, inventory & purchasing, accounting
 (double-entry with a "bridge" from operations to journals), CRM, service desk,
 commissions, a cryptographic "lucky plan" draw, and a public storefront.
 
-**Scale (auto-measured):** ~32 Django apps, ~338 models, **2,543 API endpoints**,
-**651 frontend pages**, ~388 backend service files, ~169 management commands,
-~394 migrations. It is large; treat every change as touching a live business.
+**Scale (auto-measured):** ~33 Django apps, ~351 models, **2,627 API endpoints**,
+**602 frontend pages**, ~369 backend service files, ~57 management commands,
+~366 migrations. It is large; treat every change as touching a live business.
 
 ## 2. Stack & layout
 
