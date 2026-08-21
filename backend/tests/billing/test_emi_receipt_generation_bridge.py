@@ -89,32 +89,13 @@ class EmiReceiptGenerationBridgeTests(TestCase):
         )
         self.assertTrue(created)
         self.assertEqual(receipt.receipt_type, ReceiptType.EMI_PAYMENT_RECEIPT)
-        # When the payment already has a PAYMENT_COLLECTION bridge (from
-        # record_emi_payment → FinancePostingService), the receipt is created
-        # as a document-only record — no separate receipt journal — to avoid
-        # double-debiting the cash account.
-        payment_collection_exists = AccountingBridgePosting.objects.filter(
-            source_model="Payment",
-            source_id=str(self.payment.id),
-            purpose="PAYMENT_COLLECTION",
-        ).exists()
-        if payment_collection_exists:
-            self.assertIsNone(receipt.posted_journal_entry_id)
-            self.assertFalse(
-                AccountingBridgePosting.objects.filter(
-                    source_model="ReceiptDocument",
-                    source_id=str(receipt.id),
-                    purpose=ReceiptType.EMI_PAYMENT_RECEIPT,
-                ).exists()
-            )
-        else:
-            self.assertTrue(
-                AccountingBridgePosting.objects.filter(
-                    source_model="ReceiptDocument",
-                    source_id=str(receipt.id),
-                    purpose=ReceiptType.EMI_PAYMENT_RECEIPT,
-                ).exists()
-            )
+        self.assertTrue(
+            AccountingBridgePosting.objects.filter(
+                source_model="ReceiptDocument",
+                source_id=str(receipt.id),
+                purpose=ReceiptType.EMI_PAYMENT_RECEIPT,
+            ).exists()
+        )
 
         second_receipt, created_again = generate_emi_payment_receipt(
             payment_id=self.payment.id,

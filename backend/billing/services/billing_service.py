@@ -1192,32 +1192,19 @@ def create_manual_receipt(
         ),
         notes=notes,
     )
-    payment_already_bridged = False
-    if receipt_type == ReceiptType.EMI_PAYMENT_RECEIPT and payment is not None:
-        from accounting.models import AccountingBridgePosting
-        payment_already_bridged = AccountingBridgePosting.objects.filter(
-            source_model="Payment",
-            source_id=str(payment.id),
-            purpose="PAYMENT_COLLECTION",
-        ).exists()
-
-    if payment_already_bridged:
-        receipt.status = BillingDocumentStatus.POSTED
-        receipt.save(update_fields=["status", "updated_at"])
-    else:
-        offset_account = (
-            accounts["EMI_COLLECTION_CLEARING"]
-            if receipt_type == ReceiptType.EMI_PAYMENT_RECEIPT
-            else accounts["ACCOUNTS_RECEIVABLE"]
-        )
-        posted_journal, _ = _create_receipt_journal(
-            receipt=receipt,
-            offset_account=offset_account,
-            posted_by=created_by,
-        )
-        receipt.posted_journal_entry = posted_journal
-        receipt.status = BillingDocumentStatus.POSTED
-        receipt.save(update_fields=["posted_journal_entry", "status", "updated_at"])
+    offset_account = (
+        accounts["EMI_COLLECTION_CLEARING"]
+        if receipt_type == ReceiptType.EMI_PAYMENT_RECEIPT
+        else accounts["ACCOUNTS_RECEIVABLE"]
+    )
+    posted_journal, _ = _create_receipt_journal(
+        receipt=receipt,
+        offset_account=offset_account,
+        posted_by=created_by,
+    )
+    receipt.posted_journal_entry = posted_journal
+    receipt.status = BillingDocumentStatus.POSTED
+    receipt.save(update_fields=["posted_journal_entry", "status", "updated_at"])
     _log_accounting_event(
         event="BILLING_RECEIPT_POSTED",
         instance=receipt,
