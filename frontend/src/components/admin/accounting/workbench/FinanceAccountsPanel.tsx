@@ -93,7 +93,7 @@ export function FinanceAccountsPanel() {
         {booksReadiness?.warnings?.length ? <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><div className="font-semibold">Finance account warnings</div><ul className="mt-2 list-disc space-y-1 pl-5">{booksReadiness.warnings.map((item) => <li key={item}>{item}</li>)}</ul></div> : null}
         <div className="mt-4 flex flex-wrap gap-2">
           <Link className="rounded-xl bg-primary px-3 py-2 text-sm font-medium text-primary-foreground" href="/admin/accounting/setup">Open Finance Setup</Link>
-          <Link className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground" href="/admin/settings/business-setup/chart-accounts">Categories Checklist</Link>
+          <Link className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground" href="/admin/accounting/chart-of-accounts">Categories Checklist</Link>
           <Link className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground" href="/admin/accounting/books">Open Ledger</Link>
           <button type="button" className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground disabled:opacity-60" disabled={repairing} onClick={async () => { setRepairing(true); try { await repairSuggestedMappings(false); await loadPage(); } catch (err) { setError(err instanceof Error ? err.message : "Failed to repair suggested mappings."); } finally { setRepairing(false); } }}>{repairing ? "Repairing..." : "Repair suggested mappings"}</button>
         </div>
