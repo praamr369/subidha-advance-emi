@@ -1435,6 +1435,22 @@ export default function AdminDashboardPage() {
                     className="rounded-2xl p-4"
                   />
                 </div>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <StatCard
+                    label="FG Outward"
+                    value={formatQuantity(stockSummary?.summary?.total_fg_out_qty)}
+                    subtext="Finished goods shipped/sold"
+                    tone="info"
+                    className="rounded-2xl p-4"
+                  />
+                  <StatCard
+                    label="FG Inward"
+                    value={formatQuantity(stockSummary?.summary?.total_fg_in_qty)}
+                    subtext="Finished goods received/produced"
+                    tone="success"
+                    className="rounded-2xl p-4"
+                  />
+                </div>
                 {lowStockRows.length > 0 ? (
                   <div className="mt-4 space-y-2">
                     {lowStockRows.slice(0, 4).map((row: StockSummaryRow) => (

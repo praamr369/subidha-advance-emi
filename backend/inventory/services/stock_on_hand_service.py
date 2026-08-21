@@ -11,30 +11,41 @@ Key field corrections vs. old service:
 
 from decimal import Decimal
 
-from django.db.models import DecimalField, F, Q, Sum
+from django.db.models import DecimalField, ExpressionWrapper, F, Q, Sum, Value
 from django.db.models.functions import Coalesce
 
-from inventory.models import InventoryItem, InventoryLot
+from inventory.models import InventoryItem, SOFT_HOLD_MOVEMENT_TYPES
 
+MONEY_ZERO = Decimal("0.00")
+QUANTITY_ZERO = Decimal("0.000")
+_SOFT_HOLDS = list(SOFT_HOLD_MOVEMENT_TYPES)
+
+def _annotate_stock_qty(qs):
+    return qs.annotate(
+        _ledger_in=Coalesce(
+            Sum("stock_ledger__quantity_in", filter=~Q(stock_ledger__movement_type__in=_SOFT_HOLDS)),
+            Value(QUANTITY_ZERO), output_field=DecimalField(),
+        ),
+        _ledger_out=Coalesce(
+            Sum("stock_ledger__quantity_out", filter=~Q(stock_ledger__movement_type__in=_SOFT_HOLDS)),
+            Value(QUANTITY_ZERO), output_field=DecimalField(),
+        ),
+    ).annotate(
+        physical_qty=ExpressionWrapper(
+            Coalesce(F("opening_stock_qty"), Value(QUANTITY_ZERO), output_field=DecimalField()) + F("_ledger_in") - F("_ledger_out"),
+            output_field=DecimalField(),
+        )
+    )
 
 def _critical_qs():
     """
-    InventoryItems whose total quantity_on_hand across active lots ≤ reorder_level_qty.
+    InventoryItems whose total physical quantity ≤ reorder_level_qty.
     Returns an annotated queryset ordered worst-first.
     """
+    qs = InventoryItem.objects.filter(is_active=True)
+    qs = _annotate_stock_qty(qs)
     return (
-        InventoryItem.objects.filter(is_active=True)
-        .annotate(
-            physical_qty=Coalesce(
-                Sum(
-                    "lots__quantity_on_hand",
-                    filter=Q(lots__status="ACTIVE"),
-                ),
-                Decimal("0"),
-                output_field=DecimalField(),
-            ),
-        )
-        .filter(physical_qty__lte=F("reorder_level_qty"))
+        qs.filter(physical_qty__lte=F("reorder_level_qty"))
         .select_related("product")
         .order_by(F("reorder_level_qty") - F("physical_qty"))  # worst shortage first
     )
@@ -44,34 +55,26 @@ def build_stock_on_hand_summary():
     """
     KPI summary + full critical-shortage list for the warehouse command room.
     """
-    # Total physical stock across all active lots
-    total_physical = (
-        InventoryLot.objects.filter(status="ACTIVE")
-        .aggregate(
-            total=Coalesce(
-                Sum("quantity_on_hand"),
-                Decimal("0"),
-                output_field=DecimalField(),
-            )
-        )["total"]
-    )
+    # Total physical stock across all active items
+    qs = InventoryItem.objects.filter(is_active=True)
+    qs = _annotate_stock_qty(qs)
+
+    value_qs = qs.values("standard_unit_cost", "physical_qty")
+    
+    total_physical = Decimal("0")
+    total_value = Decimal("0")
+    
+    for row in value_qs:
+        qty = row["physical_qty"] or Decimal("0")
+        total_physical += qty
+        
+        if qty > 0:
+            cost = row["standard_unit_cost"] or Decimal("0")
+            total_value += cost * qty
 
     # StockReservation integration is a future phase; treat reserved as 0 for now
     total_reserved = Decimal("0")
     total_available = total_physical - total_reserved
-
-    # Total inventory value: standard_unit_cost × active quantity per item
-    value_qs = (
-        InventoryLot.objects.filter(status="ACTIVE")
-        .select_related("inventory_item")
-        .values("inventory_item__standard_unit_cost")
-        .annotate(qty=Sum("quantity_on_hand"))
-    )
-    total_value = Decimal("0")
-    for row in value_qs:
-        cost = row["inventory_item__standard_unit_cost"] or Decimal("0")
-        qty = row["qty"] or Decimal("0")
-        total_value += cost * qty
 
     # Critical shortages list
     critical_shortages = []

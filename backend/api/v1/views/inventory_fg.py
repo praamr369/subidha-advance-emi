@@ -171,8 +171,9 @@ def _active_bom_dict(fg: InventoryItem) -> dict | None:
 
 
 def _get_fg(pk: int) -> InventoryItem:
+    qs = _annotate_stock_qty(InventoryItem.objects.select_related("product"))
     return get_object_or_404(
-        InventoryItem.objects.select_related("product"),
+        qs,
         pk=pk,
         stock_item_type=InventoryItemType.FINISHED_GOOD,
     )

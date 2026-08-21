@@ -975,6 +975,15 @@ def build_stock_summary(
     low_stock_count = sum(1 for r in rows if Decimal(r["on_hand_qty"]) > 0 and r["is_below_reorder"])
     out_of_stock_count = sum(1 for r in rows if Decimal(r["on_hand_qty"]) <= 0)
 
+    total_fg_in = sum(
+        (Decimal(str(phys_map.get(item.id, {}).get("total_in") or ZERO)) + Decimal(str(item.opening_stock_qty or ZERO)))
+        for item in items if item.stock_item_type == "FINISHED_GOOD"
+    )
+    total_fg_out = sum(
+        Decimal(str(phys_map.get(item.id, {}).get("total_out") or ZERO))
+        for item in items if item.stock_item_type == "FINISHED_GOOD"
+    )
+
     return {
         "count": len(rows),
         "summary": {
@@ -985,6 +994,8 @@ def build_stock_summary(
             "in_stock_count": in_stock_count,
             "low_stock_count": low_stock_count,
             "out_of_stock_count": out_of_stock_count,
+            "total_fg_in_qty": f"{total_fg_in:.3f}",
+            "total_fg_out_qty": f"{total_fg_out:.3f}",
         },
         "results": rows,
     }

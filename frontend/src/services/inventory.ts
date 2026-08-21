@@ -460,6 +460,17 @@ export type StockSummaryRow = {
 
 export type StockSummaryResponse = {
   results: StockSummaryRow[];
+  summary?: {
+    total_on_hand_qty: string;
+    total_reserved_qty: string;
+    total_available_qty: string;
+    total_valuation_amount: string;
+    in_stock_count: number;
+    low_stock_count: number;
+    out_of_stock_count: number;
+    total_fg_in_qty?: string;
+    total_fg_out_qty?: string;
+  };
   count: number;
 };
 

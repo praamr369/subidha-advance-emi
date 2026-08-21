@@ -229,8 +229,13 @@ class BulkDemandPlanningView(APIView):
         # Step 3: Get inventory items for products that have them (optional enhancement)
         inventory_items_map = {}
         if product_ids:
-            inventory_items = InventoryItem.objects.filter(product_id__in=product_ids).values(
-                "product_id", "sku", "current_stock_qty", "stock_tracking_enabled"
+            from inventory.services.stock_on_hand_service import _annotate_stock_qty
+            
+            qs = InventoryItem.objects.filter(product_id__in=product_ids)
+            qs = _annotate_stock_qty(qs)
+            
+            inventory_items = qs.values(
+                "product_id", "sku", "physical_qty", "stock_tracking_enabled"
             )
             for item in inventory_items:
                 inventory_items_map[item["product_id"]] = item
@@ -243,9 +248,9 @@ class BulkDemandPlanningView(APIView):
         for product in all_products:
             demand = demand_map.get(product.id, {})
 
-            # Skip products with zero demand
+            # Skip products with zero demand, unless the user explicitly searched for them
             total_required = float(demand.get("total_required", "0"))
-            if total_required == 0 and not demand:
+            if total_required == 0 and not demand and not search:
                 continue
 
             # Get on-hand quantity (if inventory item exists)
@@ -254,7 +259,7 @@ class BulkDemandPlanningView(APIView):
             inventory_item = inventory_items_map.get(product.id)
             if inventory_item:
                 try:
-                    on_hand = float(inventory_item.get("current_stock_qty") or 0)
+                    on_hand = float(inventory_item.get("physical_qty") or 0)
                 except (ValueError, TypeError):
                     on_hand = 0.0
                 sku = inventory_item.get("sku") or ""
