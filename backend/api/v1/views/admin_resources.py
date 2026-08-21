@@ -277,6 +277,11 @@ class BatchAdminViewSet(AdminOnlyModelViewSet):
                     filter=Q(lucky_ids__status=LuckyIdStatus.WON),
                     distinct=True,
                 ),
+                _available_slots=Count(
+                    "lucky_ids",
+                    filter=Q(lucky_ids__status=LuckyIdStatus.AVAILABLE),
+                    distinct=True,
+                ),
             )
         )
 

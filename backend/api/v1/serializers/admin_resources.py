@@ -115,7 +115,8 @@ class BatchAdminSerializer(serializers.ModelSerializer):
         ]
 
     def get_available_slots(self, obj):
-        return obj.lucky_ids.filter(status=LuckyIdStatus.AVAILABLE).count()
+        cached = getattr(obj, "_available_slots", None)
+        return cached if cached is not None else obj.lucky_ids.filter(status=LuckyIdStatus.AVAILABLE).count()
 
     def validate(self, attrs):
         instance = getattr(self, "instance", None)
