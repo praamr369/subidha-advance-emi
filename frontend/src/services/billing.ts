@@ -697,6 +697,75 @@ export function postBillingCreditNote(id: number) {
   );
 }
 
+export type CreditNoteApplicationResult = {
+  message: string;
+  application: {
+    id: number;
+    credit_note_id: number;
+    credit_note_no: string | null;
+    invoice_id: number;
+    invoice_no: string | null;
+    amount: string;
+    applied_date: string;
+    journal_entry_id: number | null;
+  };
+};
+
+export type CreditNoteAvailableBalance = {
+  credit_note_id: number;
+  available_balance: string;
+  applications: Array<{
+    id: number;
+    invoice_id: number;
+    invoice_no: string | null;
+    amount: string;
+    applied_date: string;
+    applied_by: string | null;
+  }>;
+};
+
+export type ApplicableCreditNote = {
+  id: number;
+  note_no: string | null;
+  note_date: string;
+  total_adjustment: string;
+  available_balance: string;
+  original_invoice_no: string | null;
+};
+
+export type InvoiceApplicableCreditNotes = {
+  invoice_id: number;
+  outstanding: string;
+  credit_notes: ApplicableCreditNote[];
+};
+
+export function applyCreditNoteToInvoice(payload: {
+  credit_note_id: number;
+  invoice_id: number;
+  amount: string | number;
+  notes?: string;
+}) {
+  return apiFetch<CreditNoteApplicationResult>(
+    `/billing/credit-note-applications/apply/`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export function getCreditNoteAvailableBalance(id: number) {
+  return apiFetch<CreditNoteAvailableBalance>(
+    `/billing/credit-notes/${id}/available-balance/`
+  );
+}
+
+export function getInvoiceApplicableCreditNotes(invoiceId: number) {
+  return apiFetch<InvoiceApplicableCreditNotes>(
+    `/billing/invoices/${invoiceId}/applicable-credit-notes/`
+  );
+}
+
 export function listBillingDebitNotes(params: Record<string, QueryValue> = {}) {
   return apiFetch<PaginatedResponse<BillingDebitNote>>(
     `/billing/debit-notes/${buildQuery(params)}`

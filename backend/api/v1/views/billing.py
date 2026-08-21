@@ -914,3 +914,159 @@ class AdminDirectSaleFinalizeInvoiceView(APIView):
         except ValueError as exc:
             _raise_direct_sale_finalize_blocked(str(exc))
         return Response(build_finalize_invoice_api_response(sale=sale, updated=updated, request=request))
+
+
+class CreditNoteApplyView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request):
+        credit_note_id = request.data.get("credit_note_id")
+        invoice_id = request.data.get("invoice_id")
+        amount = request.data.get("amount")
+        notes = request.data.get("notes", "")
+
+        if not credit_note_id or not invoice_id or not amount:
+            return Response(
+                {"detail": "credit_note_id, invoice_id, and amount are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            amount = Decimal(str(amount))
+        except Exception:
+            return Response(
+                {"detail": "Invalid amount."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from billing.services.credit_note_application_service import apply_credit_note_to_invoice
+
+        try:
+            result = apply_credit_note_to_invoice(
+                credit_note_id=int(credit_note_id),
+                invoice_id=int(invoice_id),
+                amount=amount,
+                applied_by=request.user,
+                notes=notes,
+            )
+        except (BillingCreditNote.DoesNotExist, BillingInvoice.DoesNotExist):
+            return Response(
+                {"detail": "Credit note or invoice not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except ValueError as exc:
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        app = result["application"]
+        return Response(
+            {
+                "message": "Credit note applied to invoice successfully.",
+                "application": {
+                    "id": app.id,
+                    "credit_note_id": app.credit_note_id,
+                    "credit_note_no": result["credit_note"].note_no,
+                    "invoice_id": app.invoice_id,
+                    "invoice_no": result["invoice"].document_no,
+                    "amount": str(app.amount),
+                    "applied_date": app.applied_date.isoformat(),
+                    "journal_entry_id": app.posted_journal_entry_id,
+                },
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class CreditNoteAvailableBalanceView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request, pk: int):
+        from billing.services.credit_note_application_service import (
+            get_credit_note_available_balance,
+            list_credit_note_applications,
+        )
+
+        try:
+            balance = get_credit_note_available_balance(pk)
+        except BillingCreditNote.DoesNotExist:
+            return Response(
+                {"detail": "Credit note not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        applications = list_credit_note_applications(credit_note_id=pk)
+        return Response(
+            {
+                "credit_note_id": pk,
+                "available_balance": str(balance),
+                "applications": [
+                    {
+                        "id": a.id,
+                        "invoice_id": a.invoice_id,
+                        "invoice_no": getattr(a.invoice, "document_no", None),
+                        "amount": str(a.amount),
+                        "applied_date": a.applied_date.isoformat(),
+                        "applied_by": getattr(a.applied_by, "username", None),
+                    }
+                    for a in applications
+                ],
+            }
+        )
+
+
+class InvoiceApplicableCreditNotesView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request, pk: int):
+        from billing.services.credit_note_application_service import (
+            get_credit_note_available_balance,
+            get_invoice_outstanding,
+        )
+
+        try:
+            invoice = BillingInvoice.objects.get(pk=pk)
+        except BillingInvoice.DoesNotExist:
+            return Response(
+                {"detail": "Invoice not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        outstanding = get_invoice_outstanding(pk)
+        if not invoice.customer_id:
+            return Response(
+                {
+                    "invoice_id": pk,
+                    "outstanding": str(outstanding),
+                    "credit_notes": [],
+                }
+            )
+
+        posted_notes = BillingCreditNote.objects.filter(
+            status="POSTED",
+            original_invoice__customer_id=invoice.customer_id,
+        ).select_related("original_invoice")
+
+        results = []
+        for cn in posted_notes:
+            avail = get_credit_note_available_balance(cn.id)
+            if avail > Decimal("0.00"):
+                results.append(
+                    {
+                        "id": cn.id,
+                        "note_no": cn.note_no,
+                        "note_date": cn.note_date.isoformat(),
+                        "total_adjustment": str(cn.total_adjustment),
+                        "available_balance": str(avail),
+                        "original_invoice_no": getattr(cn.original_invoice, "document_no", None),
+                    }
+                )
+
+        return Response(
+            {
+                "invoice_id": pk,
+                "outstanding": str(outstanding),
+                "credit_notes": results,
+            }
+        )

@@ -12,6 +12,7 @@ from api.v1.views.admin_payout_batches import AdminPayoutBatchDetailView
 from api.v1.views.admin_payout_batches import AdminPayoutBatchExportView
 from api.v1.views.admin_payout_batches import AdminPayoutBatchFinalizeView
 from api.v1.views.admin_payout_batches import AdminPayoutBatchListView
+from api.v1.views.admin_payout_batches import AdminPayoutBatchMarkPaidView
 from api.v1.views.admin_payout_batches import AdminPayoutBatchPreviewView
 from api.v1.views.admin_reconciliation import PaymentReconciliationDetailView
 from api.v1.views.admin_reconciliation import PaymentReconciliationFlagView
@@ -66,6 +67,7 @@ urlpatterns = [
     path("commission-payout-batches/<int:pk>/export/", AdminPayoutBatchExportView.as_view()),
     path("commission-payout-batches/<int:pk>/finalize/", AdminPayoutBatchFinalizeView.as_view()),
     path("commission-payout-batches/<int:pk>/cancel/", AdminPayoutBatchCancelView.as_view()),
+    path("commission-payout-batches/<int:pk>/mark-paid/", AdminPayoutBatchMarkPaidView.as_view()),
     path("reconciliations/", PaymentReconciliationListView.as_view()),
     path("reconciliations/<int:pk>/", PaymentReconciliationDetailView.as_view()),
     path("reconciliations/<int:pk>/flag/", PaymentReconciliationFlagView.as_view()),

@@ -91,6 +91,38 @@ export async function finalizePayoutBatch(
   );
 }
 
+export type MarkPaidPayoutBatchPayload = {
+  reference_no?: string;
+};
+
+export type MarkPaidPayoutBatchResponse = {
+  message: string;
+  updated: boolean;
+  batch: {
+    id: number;
+    batch_code: string;
+    status: PayoutBatchStatus;
+    total_amount: string;
+    reference_no: string;
+    payout_date: string | null;
+    updated_at: string | null;
+  };
+};
+
+export async function markPayoutBatchPaid(
+  id: number | string,
+  payload: MarkPaidPayoutBatchPayload = {}
+): Promise<MarkPaidPayoutBatchResponse> {
+  return request<MarkPaidPayoutBatchResponse>(
+    `/admin/commission-payout-batches/${id}/mark-paid/`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+      retryCount: 0,
+    }
+  );
+}
+
 export async function cancelPayoutBatch(
   id: number | string,
   payload: CancelPayoutBatchPayload

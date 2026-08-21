@@ -11,8 +11,11 @@ from api.v1.views.billing import (
     BillingPaymentSyncView,
     BillingProfileViewSet,
     BillingSyncEventViewSet,
+    CreditNoteApplyView,
+    CreditNoteAvailableBalanceView,
     DirectSaleViewSet,
     EmiPaymentReceiptGenerateView,
+    InvoiceApplicableCreditNotesView,
     ReceiptDocumentViewSet,
 )
 
@@ -31,5 +34,8 @@ urlpatterns = [
     path("cashbook/", BillingCashBookView.as_view()),
     path("receipts/emi-payment/<int:payment_id>/generate/", EmiPaymentReceiptGenerateView.as_view()),
     path("payments/<int:payment_id>/sync/", BillingPaymentSyncView.as_view()),
+    path("credit-note-applications/apply/", CreditNoteApplyView.as_view()),
+    path("credit-notes/<int:pk>/available-balance/", CreditNoteAvailableBalanceView.as_view()),
+    path("invoices/<int:pk>/applicable-credit-notes/", InvoiceApplicableCreditNotesView.as_view()),
     path("", include(router.urls)),
 ]

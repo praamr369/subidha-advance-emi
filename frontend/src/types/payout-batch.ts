@@ -1,4 +1,4 @@
-export type PayoutBatchStatus = "DRAFT" | "FINALIZED" | "CANCELLED";
+export type PayoutBatchStatus = "DRAFT" | "FINALIZED" | "PAID" | "CANCELLED";
 
 export interface PayoutBatchLine {
   id: number;

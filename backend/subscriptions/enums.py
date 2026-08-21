@@ -486,6 +486,14 @@ class ActionType(models.TextChoices):
             "COMMISSION_PAYOUT_BATCH_CANCELLED",
             "Commission Payout Batch Cancelled",
         )
+        COMMISSION_PAYOUT_BATCH_PAID = (
+            "COMMISSION_PAYOUT_BATCH_PAID",
+            "Commission Payout Batch Paid",
+        )
+        CREDIT_NOTE_APPLIED = (
+            "CREDIT_NOTE_APPLIED",
+            "Credit Note Applied to Invoice",
+        )
         PAYMENT_RECONCILED = "PAYMENT_RECONCILED", "Payment Reconciled"
         PAYMENT_FLAGGED = "PAYMENT_FLAGGED", "Payment Flagged"
         PRODUCT_INVENTORY_PROFILE_PREPARED = (

@@ -19,6 +19,7 @@ from commissions.services.commission_payout_service import (
     cancel_commission_payout_batch,
     create_commission_payout_batch,
     finalize_commission_payout_batch,
+    mark_commission_payout_batch_paid,
     preview_commission_payout_candidates,
 )
 
@@ -309,6 +310,52 @@ class AdminPayoutBatchCancelView(APIView):
                     "status": batch.status,
                     "notes": batch.notes,
                     "total_amount": str(batch.total_amount),
+                    "payout_date": batch.payout_date.isoformat() if batch.payout_date else None,
+                    "updated_at": batch.updated_at.isoformat() if batch.updated_at else None,
+                },
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class AdminPayoutBatchMarkPaidView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, pk: int):
+        serializer = PayoutBatchActionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            result = mark_commission_payout_batch_paid(
+                batch_id=pk,
+                processed_by=request.user,
+                reference_no=serializer.validated_data.get("reference_no"),
+            )
+        except CommissionPayoutBatch.DoesNotExist:
+            return Response(
+                {"detail": "Batch not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except ValueError as exc:
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        batch = result["batch"]
+        return Response(
+            {
+                "message": (
+                    "Payout batch marked as paid."
+                    if result["updated"]
+                    else "Payout batch was already marked as paid."
+                ),
+                "updated": result["updated"],
+                "batch": {
+                    "id": batch.id,
+                    "batch_code": batch.batch_code,
+                    "status": batch.status,
+                    "total_amount": str(batch.total_amount),
+                    "reference_no": batch.reference_no,
                     "payout_date": batch.payout_date.isoformat() if batch.payout_date else None,
                     "updated_at": batch.updated_at.isoformat() if batch.updated_at else None,
                 },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
@@ -12,19 +12,193 @@ import BillingPrintDocument from "@/components/print/BillingPrintDocument";
 import PrintActionBanner from "@/components/print/PrintActionBanner";
 import { ROUTES } from "@/lib/routes";
 import { accountingDate, accountingErrorMessage, accountingMoney } from "@/components/accounting/shared";
-import type { BillingCreditNote } from "@/services/billing";
+import type { BillingCreditNote, CreditNoteAvailableBalance } from "@/services/billing";
 import {
   approveBillingCreditNote,
+  applyCreditNoteToInvoice,
+  getCreditNoteAvailableBalance,
   listBillingCreditNotes,
   postBillingCreditNote,
 } from "@/services/billing";
+import { apiFetch } from "@/lib/api";
+
+type InvoiceOption = {
+  id: number;
+  document_no: string | null;
+  balance_total: string;
+  customer_name_snapshot?: string;
+};
+
+function ApplyCreditNoteDialog({
+  creditNote,
+  onClose,
+  onSuccess,
+}: {
+  creditNote: BillingCreditNote;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [balance, setBalance] = useState<CreditNoteAvailableBalance | null>(null);
+  const [invoices, setInvoices] = useState<InvoiceOption[]>([]);
+  const [selectedInvoice, setSelectedInvoice] = useState("");
+  const [amount, setAmount] = useState("");
+  const [notes, setNotes] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [dialogError, setDialogError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const bal = await getCreditNoteAvailableBalance(creditNote.id);
+        setBalance(bal);
+        const origInv = await apiFetch<{ customer?: number }>(`/billing/invoices/${creditNote.original_invoice}/`).catch(() => null);
+        const customerId = origInv?.customer;
+        if (customerId) {
+          const invResp = await apiFetch<{ results: InvoiceOption[] }>(
+            `/billing/invoices/?customer=${customerId}&page_size=200`
+          ).catch(() => ({ results: [] as InvoiceOption[] }));
+          setInvoices((invResp.results || []).filter((i) => Number(i.balance_total || 0) > 0));
+        }
+      } catch {
+        setDialogError("Failed to load credit note details.");
+      }
+    }
+    void load();
+  }, [creditNote.id, creditNote.original_invoice]);
+
+  async function handleApply() {
+    if (!selectedInvoice || !amount) return;
+    setSubmitting(true);
+    setDialogError(null);
+    try {
+      const result = await applyCreditNoteToInvoice({
+        credit_note_id: creditNote.id,
+        invoice_id: Number(selectedInvoice),
+        amount,
+        notes,
+      });
+      setSuccess(result.message);
+      setTimeout(() => {
+        onSuccess();
+        onClose();
+      }, 1200);
+    } catch (err) {
+      setDialogError(err instanceof Error ? err.message : "Failed to apply credit note.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-xl">
+        <h3 className="text-lg font-semibold text-foreground">
+          Apply Credit Note {creditNote.note_no || `#${creditNote.id}`}
+        </h3>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Total: {accountingMoney(creditNote.total_adjustment)} | Available:{" "}
+          {balance ? accountingMoney(balance.available_balance) : "Loading..."}
+        </p>
+
+        {balance && balance.applications.length > 0 ? (
+          <div className="mt-3 rounded-xl border border-border bg-muted/50 p-3">
+            <div className="text-xs font-semibold uppercase text-muted-foreground">Previous Applications</div>
+            {balance.applications.map((a) => (
+              <div key={a.id} className="mt-1 text-sm text-foreground">
+                INV {a.invoice_no || a.invoice_id} — {accountingMoney(a.amount)} on {a.applied_date}
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        {dialogError ? (
+          <div className="mt-3 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-2 text-sm text-destructive">
+            {dialogError}
+          </div>
+        ) : null}
+
+        {success ? (
+          <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-800">
+            {success}
+          </div>
+        ) : null}
+
+        {!success ? (
+          <div className="mt-4 space-y-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-foreground">Invoice</label>
+              <select
+                value={selectedInvoice}
+                onChange={(e) => setSelectedInvoice(e.target.value)}
+                className="h-10 w-full rounded-xl border border-border bg-card px-3 text-sm text-foreground outline-none focus:border-sky-400"
+                disabled={submitting}
+              >
+                <option value="">Select invoice...</option>
+                {invoices.map((inv) => (
+                  <option key={inv.id} value={inv.id}>
+                    {inv.document_no || `INV #${inv.id}`} — Balance: {accountingMoney(inv.balance_total)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-foreground">Amount</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                max={balance?.available_balance || undefined}
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="Amount to apply"
+                className="h-10 w-full rounded-xl border border-border bg-card px-3 text-sm text-foreground outline-none focus:border-sky-400"
+                disabled={submitting}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-foreground">Notes (optional)</label>
+              <input
+                type="text"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Application notes"
+                className="h-10 w-full rounded-xl border border-border bg-card px-3 text-sm text-foreground outline-none focus:border-sky-400"
+                disabled={submitting}
+              />
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={handleApply}
+                disabled={submitting || !selectedInvoice || !amount}
+                className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {submitting ? "Applying..." : "Apply Credit"}
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={submitting}
+                className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-card px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-60"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
 
 export default function BillingCreditNotesPage() {
   const [rows, setRows] = useState<BillingCreditNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [applyingNote, setApplyingNote] = useState<BillingCreditNote | null>(null);
 
-  async function loadPage() {
+  const loadPage = useCallback(async () => {
     try {
       const payload = await listBillingCreditNotes();
       setRows(payload.results);
@@ -35,11 +209,11 @@ export default function BillingCreditNotesPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     void loadPage();
-  }, []);
+  }, [loadPage]);
 
   const columns: EnterpriseColumnDef<BillingCreditNote>[] = [
     { key: "note_date", header: "Date", render: (row) => accountingDate(row.note_date) },
@@ -76,6 +250,15 @@ export default function BillingCreditNotesPage() {
               }}
               variant="primary"
             />
+          ) : null}
+          {row.status === "POSTED" ? (
+            <button
+              type="button"
+              onClick={() => setApplyingNote(row)}
+              className="inline-flex h-8 items-center justify-center rounded-lg border border-border bg-card px-3 text-xs font-medium text-foreground transition hover:border-ring hover:bg-muted"
+            >
+              Apply to Invoice
+            </button>
           ) : null}
         </div>
       ),
@@ -188,6 +371,13 @@ export default function BillingCreditNotesPage() {
           note: line.inventory_item_sku || undefined,
         }))}
       />
+      {applyingNote ? (
+        <ApplyCreditNoteDialog
+          creditNote={applyingNote}
+          onClose={() => setApplyingNote(null)}
+          onSuccess={() => void loadPage()}
+        />
+      ) : null}
     </ERPPageShell>
   );
 }

@@ -1349,3 +1349,45 @@ class SmartCollectionRun(BillingTimeStampedModel):
 
     class Meta:
         db_table = "billing_smart_collection_run"
+
+
+class CreditNoteApplication(BillingTimeStampedModel):
+    credit_note = models.ForeignKey(
+        BillingCreditNote,
+        on_delete=models.PROTECT,
+        related_name="applications",
+    )
+    invoice = models.ForeignKey(
+        BillingInvoice,
+        on_delete=models.PROTECT,
+        related_name="credit_note_applications",
+    )
+    amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01"))],
+    )
+    applied_date = models.DateField(default=timezone.localdate, db_index=True)
+    applied_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="applied_credit_notes",
+    )
+    notes = models.TextField(blank=True, default="")
+    posted_journal_entry = models.OneToOneField(
+        JournalEntry,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="credit_note_application",
+    )
+
+    class Meta:
+        db_table = "billing_credit_note_application"
+        ordering = ["-applied_date", "-id"]
+        indexes = [
+            models.Index(fields=["credit_note", "invoice"]),
+        ]
+
+    def __str__(self):
+        return f"CN {self.credit_note_id} → INV {self.invoice_id}: {self.amount}"

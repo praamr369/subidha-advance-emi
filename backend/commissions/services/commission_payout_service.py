@@ -459,3 +459,48 @@ def cancel_commission_payout_batch(*, batch_id: int, processed_by, reason: str |
         "batch": payout_batch,
         "updated": True,
     }
+
+
+@transaction.atomic
+def mark_commission_payout_batch_paid(
+    *,
+    batch_id: int,
+    processed_by,
+    reference_no: str | None = None,
+):
+    if not batch_id:
+        raise ValueError("batch_id is required.")
+    if not processed_by:
+        raise ValueError("processed_by is required.")
+
+    payout_batch = (
+        CommissionPayoutBatch.objects.select_for_update().get(id=batch_id)
+    )
+
+    if payout_batch.status == CommissionPayoutBatch.Status.PAID:
+        return {"batch": payout_batch, "updated": False}
+
+    if payout_batch.status != CommissionPayoutBatch.Status.FINALIZED:
+        raise ValueError(
+            f"Only finalized batches can be marked as paid (current: {payout_batch.status})."
+        )
+
+    if reference_no is not None:
+        payout_batch.reference_no = (reference_no or "").strip()
+
+    payout_batch.status = CommissionPayoutBatch.Status.PAID
+    payout_batch.save(update_fields=["status", "reference_no", "updated_at"])
+
+    _create_payout_batch_audit_log(
+        action_type=AuditLog.ActionType.COMMISSION_PAYOUT_BATCH_PAID,
+        actor=processed_by,
+        payout_batch=payout_batch,
+        metadata={
+            "batch_code": payout_batch.batch_code,
+            "status": payout_batch.status,
+            "reference_no": payout_batch.reference_no,
+            "total_amount": str(payout_batch.total_amount),
+        },
+    )
+
+    return {"batch": payout_batch, "updated": True}

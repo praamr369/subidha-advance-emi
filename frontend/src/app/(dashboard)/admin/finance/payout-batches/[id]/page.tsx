@@ -19,7 +19,7 @@ import { apiFetch, toArray } from "@/lib/api";
 import { downloadCsv } from "@/lib/export/csv";
 import { listFinanceAccounts } from "@/services/accounting";
 
-type BatchStatus = "DRAFT" | "FINALIZED" | "CANCELLED";
+type BatchStatus = "DRAFT" | "FINALIZED" | "PAID" | "CANCELLED";
 
 type PayoutBatchMeta = {
   id: number;
@@ -105,6 +105,7 @@ function toObject(value: unknown): Record<string, unknown> | null {
 function normalizeStatus(raw: unknown): BatchStatus {
   const status = String(raw ?? "DRAFT").toUpperCase();
   if (status === "FINALIZED") return "FINALIZED";
+  if (status === "PAID") return "PAID";
   if (status === "CANCELLED") return "CANCELLED";
   return "DRAFT";
 }
@@ -331,10 +332,10 @@ export default function AdminPayoutBatchDetailPage() {
     };
   }, []);
 
-  async function runAction(action: "finalize" | "cancel") {
+  async function runAction(action: "finalize" | "cancel" | "mark-paid") {
     if (!batchId || !batch) return;
 
-    const verb = action === "finalize" ? "finalize" : "cancel";
+    const verb = action === "mark-paid" ? "mark as paid" : action === "finalize" ? "finalize" : "cancel";
     const confirmed = window.confirm(
       `Are you sure you want to ${verb} payout batch #${batchId}?`
     );
@@ -350,6 +351,10 @@ export default function AdminPayoutBatchDetailPage() {
           ? {
               ...(actionNote.trim().length > 0 ? { note: actionNote.trim(), reason: actionNote.trim() } : {}),
               ...(selectedFinanceAccount ? { finance_account: Number(selectedFinanceAccount) } : {}),
+              ...(referenceNo.trim().length > 0 ? { reference_no: referenceNo.trim() } : {}),
+            }
+          : action === "mark-paid"
+          ? {
               ...(referenceNo.trim().length > 0 ? { reference_no: referenceNo.trim() } : {}),
             }
           : actionNote.trim().length > 0
@@ -383,7 +388,7 @@ export default function AdminPayoutBatchDetailPage() {
 
   function handleActionSubmit(
     event: FormEvent<HTMLFormElement>,
-    action: "finalize" | "cancel"
+    action: "finalize" | "cancel" | "mark-paid"
   ) {
     event.preventDefault();
     void runAction(action);
@@ -414,6 +419,7 @@ export default function AdminPayoutBatchDetailPage() {
 
   const isDraft = batch?.status === "DRAFT";
   const isFinalized = batch?.status === "FINALIZED";
+  const isPaid = batch?.status === "PAID";
   const isCancelled = batch?.status === "CANCELLED";
 
   return (
@@ -471,8 +477,10 @@ export default function AdminPayoutBatchDetailPage() {
         tone:
           batch?.status === "DRAFT"
             ? "warning"
-            : batch?.status === "FINALIZED"
+            : batch?.status === "PAID"
             ? "success"
+            : batch?.status === "FINALIZED"
+            ? "info"
             : batch?.status === "CANCELLED"
             ? "danger"
             : "info",
@@ -706,8 +714,40 @@ export default function AdminPayoutBatchDetailPage() {
                     </div>
                   </div>
                 ) : isFinalized ? (
+                  <div className="space-y-4">
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                      This batch is finalized. After confirming actual bank transfer, mark it as paid.
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="batch-paid-reference"
+                        className="mb-2 block text-sm font-medium text-foreground"
+                      >
+                        Payment reference (bank transfer / UTR)
+                      </label>
+                      <input
+                        id="batch-paid-reference"
+                        type="text"
+                        value={referenceNo}
+                        onChange={(event) => setReferenceNo(event.target.value)}
+                        placeholder="UTR / bank transfer reference"
+                        className="h-10 w-full rounded-xl border border-border bg-card px-4 text-sm text-foreground outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                        disabled={acting}
+                      />
+                    </div>
+                    <form onSubmit={(event) => handleActionSubmit(event, "mark-paid")}>
+                      <button
+                        type="submit"
+                        disabled={acting}
+                        className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {acting ? "Processing..." : "Mark as Paid"}
+                      </button>
+                    </form>
+                  </div>
+                ) : isPaid ? (
                   <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                    This batch is finalized and should now be treated as read-only.
+                    This batch has been paid out. No further actions available.
                   </div>
                 ) : isCancelled ? (
                   <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
