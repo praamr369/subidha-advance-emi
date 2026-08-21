@@ -2,44 +2,61 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { apiFetch } from "@/lib/api";
+
+const publicLeadSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  phone: z.string().regex(/^[0-9]{10}$/, "Enter a valid 10-digit phone number"),
+  email: z.string().email("Enter a valid email address"),
+  city: z.string().min(1, "City is required"),
+  interested_product: z.string().optional().default(""),
+  preferred_emi_amount: z.string().optional().default(""),
+  notes: z.string().optional().default(""),
+});
+
+type PublicLeadFormValues = z.infer<typeof publicLeadSchema>;
 
 export default function PublicLeadFormPage() {
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [submittedPhone, setSubmittedPhone] = useState("");
 
-  const [formData, setFormData] = useState({
-    name: "",
-    phone: "",
-    email: "",
-    city: "",
-    interested_product: "",
-    preferred_emi_amount: "",
-    notes: "",
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+  } = useForm<PublicLeadFormValues>({
+    resolver: zodResolver(publicLeadSchema),
+    mode: "onBlur",
+    defaultValues: {
+      name: "",
+      phone: "",
+      email: "",
+      city: "",
+      interested_product: "",
+      preferred_emi_amount: "",
+      notes: "",
+    },
   });
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function onSubmit(data: PublicLeadFormValues) {
     setLoading(true);
     setError(null);
 
     try {
       await apiFetch("/api/v1/crm-pipeline/leads/public/", {
         method: "POST",
-        body: formData,
+        body: data,
       });
 
+      setSubmittedPhone(data.phone);
       setSubmitted(true);
-      setFormData({
-        name: "",
-        phone: "",
-        email: "",
-        city: "",
-        interested_product: "",
-        preferred_emi_amount: "",
-        notes: "",
-      });
+      reset();
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
@@ -55,7 +72,7 @@ export default function PublicLeadFormPage() {
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Thank you!</h1>
           <p className="text-gray-600 mb-6">
             Your enquiry has been received. Our team will contact you soon at{" "}
-            <strong>{formData.phone}</strong>.
+            <strong>{submittedPhone}</strong>.
           </p>
           <p className="text-sm text-gray-500 mb-6">
             Expected response time: 24-48 hours
@@ -83,136 +100,132 @@ export default function PublicLeadFormPage() {
           </p>
 
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800">
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800" role="alert" aria-live="polite">
               {error}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" aria-label="Product enquiry form">
             {/* Name */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="lead-name" className="block text-sm font-medium text-gray-700 mb-2">
                 Full Name *
               </label>
               <input
+                id="lead-name"
                 type="text"
-                required
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
+                {...register("name")}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Your name"
               />
+              {errors.name && (
+                <p className="mt-1 text-xs text-red-600">{errors.name?.message}</p>
+              )}
             </div>
 
             {/* Phone */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="lead-phone" className="block text-sm font-medium text-gray-700 mb-2">
                 Phone Number * (10 digits)
               </label>
               <input
+                id="lead-phone"
                 type="tel"
-                required
-                pattern="[0-9]{10}"
-                value={formData.phone}
-                onChange={(e) =>
-                  setFormData({ ...formData, phone: e.target.value })
-                }
+                {...register("phone")}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="9876543210"
               />
+              {errors.phone && (
+                <p className="mt-1 text-xs text-red-600">{errors.phone?.message}</p>
+              )}
             </div>
 
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="lead-email" className="block text-sm font-medium text-gray-700 mb-2">
                 Email Address *
               </label>
               <input
+                id="lead-email"
                 type="email"
-                required
-                value={formData.email}
-                onChange={(e) =>
-                  setFormData({ ...formData, email: e.target.value })
-                }
+                {...register("email")}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="your@email.com"
               />
+              {errors.email && (
+                <p className="mt-1 text-xs text-red-600">{errors.email?.message}</p>
+              )}
             </div>
 
             {/* City */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="lead-city" className="block text-sm font-medium text-gray-700 mb-2">
                 City *
               </label>
               <input
+                id="lead-city"
                 type="text"
-                required
-                value={formData.city}
-                onChange={(e) =>
-                  setFormData({ ...formData, city: e.target.value })
-                }
+                {...register("city")}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Your city"
               />
+              {errors.city && (
+                <p className="mt-1 text-xs text-red-600">{errors.city?.message}</p>
+              )}
             </div>
 
             {/* Product Interest */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="lead-product" className="block text-sm font-medium text-gray-700 mb-2">
                 Product/Service Interest
               </label>
               <input
+                id="lead-product"
                 type="text"
-                value={formData.interested_product}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    interested_product: e.target.value,
-                  })
-                }
+                {...register("interested_product")}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="E.g., Laptop, Phone, Electronics"
               />
+              {errors.interested_product && (
+                <p className="mt-1 text-xs text-red-600">{errors.interested_product?.message}</p>
+              )}
             </div>
 
             {/* EMI Amount */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="lead-emi" className="block text-sm font-medium text-gray-700 mb-2">
                 Preferred Monthly EMI (Optional)
               </label>
               <div className="relative">
-                <span className="absolute left-4 top-3 text-gray-500">₹</span>
+                <span className="absolute left-4 top-3 text-gray-500" aria-hidden="true">₹</span>
                 <input
+                  id="lead-emi"
                   type="number"
-                  value={formData.preferred_emi_amount}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      preferred_emi_amount: e.target.value,
-                    })
-                  }
+                  {...register("preferred_emi_amount")}
                   className="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="5000"
                 />
               </div>
+              {errors.preferred_emi_amount && (
+                <p className="mt-1 text-xs text-red-600">{errors.preferred_emi_amount?.message}</p>
+              )}
             </div>
 
             {/* Notes */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="lead-notes" className="block text-sm font-medium text-gray-700 mb-2">
                 Additional Comments
               </label>
               <textarea
-                value={formData.notes}
-                onChange={(e) =>
-                  setFormData({ ...formData, notes: e.target.value })
-                }
+                id="lead-notes"
+                {...register("notes")}
                 rows={4}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Tell us more about your requirements..."
               />
+              {errors.notes && (
+                <p className="mt-1 text-xs text-red-600">{errors.notes?.message}</p>
+              )}
             </div>
 
             {/* Submit Button */}

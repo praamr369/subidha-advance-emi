@@ -108,8 +108,10 @@ export default function BillingOverviewPage() {
         { label: "Receipts", value: showMetrics ? String(receiptCount) : "—", tone: showMetrics ? "success" : "default" },
       ]}
     >
-      {loading ? <ERPLoadingState label="Loading billing operations..." /> : null}
-      {!loading && error ? <ERPErrorState title="Billing load failed" description={error} /> : null}
+      <div aria-live="polite">
+        {loading ? <ERPLoadingState label="Loading billing operations..." /> : null}
+        {!loading && error ? <ERPErrorState title="Billing load failed" description={error} /> : null}
+      </div>
 
       {!loading && !error ? (
         <>

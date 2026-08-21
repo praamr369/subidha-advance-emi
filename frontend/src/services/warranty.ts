@@ -61,6 +61,64 @@ class WarrantyService {
       body: JSON.stringify({ product_id: productId, plan_type: planType }),
     })
   }
+
+  async getExtendedPlans(productId: number | string): Promise<unknown[]> {
+    const d = await apiFetch(`/api/v1/warranty/extended-plans/${productId}/`)
+    if (Array.isArray(d)) return d
+    return (d as { plans?: unknown[] })?.plans ?? []
+  }
+
+  async enrollExtendedBySubscription(subscriptionId: string, months: number): Promise<unknown> {
+    return apiFetch('/api/v1/warranty/enroll-extended/', {
+      method: 'POST',
+      body: JSON.stringify({ subscription_id: subscriptionId, months }),
+    })
+  }
+
+  async fileClaimForm(data: {
+    subscription_id: string
+    product_id?: number
+    defect_type: string
+    description: string
+    preferred_service_date?: string | null
+  }): Promise<unknown> {
+    return apiFetch('/api/v1/warranty/claim/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  // --- Admin methods ---
+
+  async adminGetClaims(queryString = ''): Promise<unknown[]> {
+    const d = await apiFetch(`/api/v1/warranty/admin-claims/?${queryString}`)
+    if (Array.isArray(d)) return d
+    return (d as { results?: unknown[] })?.results ?? []
+  }
+
+  async adminApproveClaim(claimId: number): Promise<unknown> {
+    return apiFetch(`/api/v1/warranty/claim/${claimId}/approve/`, { method: 'POST' })
+  }
+
+  async adminScheduleClaim(
+    claimId: number,
+    data: { scheduled_date: string; technician_name: string }
+  ): Promise<unknown> {
+    return apiFetch(`/api/v1/warranty/claim/${claimId}/schedule/`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async adminGetServiceSchedule(): Promise<unknown[]> {
+    const d = await apiFetch('/api/v1/warranty/service-schedule/')
+    if (Array.isArray(d)) return d
+    return (d as { results?: unknown[] })?.results ?? []
+  }
+
+  async adminCompleteServiceCall(jobId: number): Promise<unknown> {
+    return apiFetch(`/api/v1/warranty/service-call/${jobId}/complete/`, { method: 'POST' })
+  }
 }
 
 export const warrantyService = new WarrantyService()

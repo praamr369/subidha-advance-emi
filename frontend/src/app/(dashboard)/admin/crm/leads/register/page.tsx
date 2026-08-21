@@ -109,10 +109,12 @@ export default function LeadRegisterPage() {
       <ERPSectionShell title="Search by Customer" description="Enter customer ID to view their lead registration and all conversions">
         <div className="flex gap-3 mb-6">
           <input
+            id="lead-customer-id"
             type="number"
             value={customerId}
             onChange={(e) => setCustomerId(e.target.value)}
             placeholder="Enter customer ID"
+            aria-label="Customer ID"
             className="flex-1 px-4 py-2 border border-border rounded-lg bg-background"
           />
           <button
@@ -125,7 +127,7 @@ export default function LeadRegisterPage() {
         </div>
 
         {error && (
-          <div className="p-4 bg-destructive/10 border border-destructive/50 rounded-lg text-destructive text-sm">
+          <div className="p-4 bg-destructive/10 border border-destructive/50 rounded-lg text-destructive text-sm" role="alert" aria-live="polite">
             {error}
           </div>
         )}

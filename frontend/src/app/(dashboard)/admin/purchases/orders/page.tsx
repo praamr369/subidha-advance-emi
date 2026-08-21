@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
@@ -47,6 +50,14 @@ function EmptyLine(): PurchaseOrderLine {
   return { inventory_item: 0, quantity: "1", unit_cost: "0.00", tax_amount: "0.00" };
 }
 
+const purchaseOrderSchema = z.object({
+  vendorId: z.string().min(1, "Vendor is required."),
+  poDate: z.string().min(1, "Date is required."),
+  expectedDate: z.string().optional().default(""),
+  notes: z.string().optional().default(""),
+});
+type PurchaseOrderFormValues = z.infer<typeof purchaseOrderSchema>;
+
 // ── Create PO form ────────────────────────────────────────────────────────────
 interface CreatePOFormProps {
   vendors: VendorLite[];
@@ -56,10 +67,16 @@ interface CreatePOFormProps {
 }
 function CreatePOForm({ vendors, items, onSaved, onCancel }: CreatePOFormProps) {
   const today = new Date().toISOString().slice(0, 10);
-  const [vendorId, setVendorId] = useState("");
-  const [poDate, setPoDate] = useState(today);
-  const [expectedDate, setExpectedDate] = useState("");
-  const [notes, setNotes] = useState("");
+  const {
+    register,
+    handleSubmit: rhfHandleSubmit,
+    getValues,
+    formState: { errors: formErrors },
+  } = useForm<PurchaseOrderFormValues>({
+    resolver: zodResolver(purchaseOrderSchema),
+    mode: "onBlur",
+    defaultValues: { vendorId: "", poDate: today, expectedDate: "", notes: "" },
+  });
   const [lines, setLines] = useState<PurchaseOrderLine[]>([EmptyLine()]);
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -70,11 +87,8 @@ function CreatePOForm({ vendors, items, onSaved, onCancel }: CreatePOFormProps) 
   function addLine() { setLines((prev) => [...prev, EmptyLine()]); }
   function removeLine(i: number) { setLines((prev) => prev.filter((_, idx) => idx !== i)); }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function onSubmit(values: PurchaseOrderFormValues) {
     const errs: Record<string, string> = {};
-    if (!vendorId) errs.vendor = "Vendor is required.";
-    if (!poDate) errs.po_date = "Date is required.";
     const validLines = lines.filter((l) => l.inventory_item);
     if (!validLines.length) errs.lines = "At least one line item is required.";
     validLines.forEach((l: PurchaseOrderLine, i: number) => {
@@ -86,10 +100,10 @@ function CreatePOForm({ vendors, items, onSaved, onCancel }: CreatePOFormProps) 
     setBusy(true);
     try {
       const po = await createPurchaseOrder({
-        vendor: Number(vendorId),
-        po_date: poDate,
-        expected_date: expectedDate || null,
-        notes,
+        vendor: Number(values.vendorId),
+        po_date: values.poDate,
+        expected_date: values.expectedDate || null,
+        notes: values.notes ?? "",
         lines: validLines.map((l) => ({
           inventory_item: Number(l.inventory_item),
           description: l.description ?? "",
@@ -110,30 +124,30 @@ function CreatePOForm({ vendors, items, onSaved, onCancel }: CreatePOFormProps) 
   const inputCls = "h-9 w-full rounded-xl border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
 
   return (
-    <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
+    <form onSubmit={(e) => void rhfHandleSubmit(onSubmit)(e)} className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="mb-1 block text-xs font-medium text-muted-foreground">Vendor *</label>
-          <select value={vendorId} onChange={(e) => setVendorId(e.target.value)} className={inputCls}>
+          <select {...register("vendorId")} className={inputCls}>
             <option value="">— Select vendor —</option>
             {vendors.filter((v) => v.is_active).map((v) => (
               <option key={v.id} value={v.id}>{v.name}</option>
             ))}
           </select>
-          {errors.vendor ? <p className="mt-0.5 text-[10px] text-red-600">{errors.vendor}</p> : null}
+          {formErrors.vendorId ? <p className="mt-0.5 text-[10px] text-red-600">{formErrors.vendorId.message}</p> : null}
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-muted-foreground">PO Date *</label>
-          <input type="date" value={poDate} onChange={(e) => setPoDate(e.target.value)} className={inputCls} />
-          {errors.po_date ? <p className="mt-0.5 text-[10px] text-red-600">{errors.po_date}</p> : null}
+          <input type="date" {...register("poDate")} className={inputCls} />
+          {formErrors.poDate ? <p className="mt-0.5 text-[10px] text-red-600">{formErrors.poDate.message}</p> : null}
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-muted-foreground">Expected Delivery</label>
-          <input type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} className={inputCls} />
+          <input type="date" {...register("expectedDate")} className={inputCls} />
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-muted-foreground">Notes</label>
-          <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} placeholder="Optional" />
+          <input type="text" {...register("notes")} className={inputCls} placeholder="Optional" />
         </div>
       </div>
 

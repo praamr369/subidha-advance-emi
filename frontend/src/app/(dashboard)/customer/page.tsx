@@ -422,6 +422,7 @@ export default function CustomerDashboardPage() {
               <ActionButton
                 variant="outline"
                 onClick={refreshDashboard}
+                aria-label={refreshing ? "Refreshing dashboard" : "Refresh dashboard"}
                 leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
               >
                 {refreshing ? "Refreshing..." : "Refresh"}
@@ -522,15 +523,17 @@ export default function CustomerDashboardPage() {
       }
       records={
         <>
-      {loading ? <ERPLoadingState label="Loading customer workspace..." /> : null}
+      <div aria-live="polite">
+        {loading ? <ERPLoadingState label="Loading customer workspace..." /> : null}
 
-      {!loading && error ? (
-        <ERPErrorState
-          title="Unable to load customer workspace"
-          description={error}
-          onRetry={() => void coreQuery.refetch()}
-        />
-      ) : null}
+        {!loading && error ? (
+          <ERPErrorState
+            title="Unable to load customer workspace"
+            description={error}
+            onRetry={() => void coreQuery.refetch()}
+          />
+        ) : null}
+      </div>
 
       {!loading && !error && legacy && summary ? (
         <>

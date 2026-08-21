@@ -75,10 +75,12 @@ export default function FinishedGoodsPage() {
       <ERPSectionShell title="Search">
         <form onSubmit={handleSearch} className="flex gap-2">
           <input
+            id="fg-search"
             type="text"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Name, code, SKU…"
+            aria-label="Search finished goods"
             className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           />
           <button
@@ -91,6 +93,7 @@ export default function FinishedGoodsPage() {
             <button
               type="button"
               onClick={() => { setQ(""); setSearch(""); setPage(1); }}
+              aria-label="Clear search"
               className="rounded-lg border border-border px-3 py-2 text-xs hover:bg-muted/50"
             >
               Clear
@@ -101,8 +104,10 @@ export default function FinishedGoodsPage() {
 
       {/* List */}
       <ERPSectionShell title="Finished Goods Register" description="Click any row to open the full profile with accessories, services, and BOM.">
-        {loading ? <ERPLoadingState label="Loading finished goods…" /> : null}
-        {!loading && error ? <ERPErrorState title="Unable to load" description={error} /> : null}
+        <div aria-live="polite">
+          {loading ? <ERPLoadingState label="Loading finished goods…" /> : null}
+          {!loading && error ? <ERPErrorState title="Unable to load" description={error} /> : null}
+        </div>
         {!loading && !error && rows.length === 0 ? (
           <ERPEmptyState
             title="No finished goods found"
@@ -173,6 +178,7 @@ export default function FinishedGoodsPage() {
               <button
                 disabled={page <= 1}
                 onClick={() => setPage((p) => p - 1)}
+                aria-label="Previous page"
                 className="rounded border border-border px-3 py-1.5 disabled:opacity-40 hover:bg-muted/50"
               >
                 Prev
@@ -180,6 +186,7 @@ export default function FinishedGoodsPage() {
               <button
                 disabled={page >= numPages}
                 onClick={() => setPage((p) => p + 1)}
+                aria-label="Next page"
                 className="rounded border border-border px-3 py-1.5 disabled:opacity-40 hover:bg-muted/50"
               >
                 Next
