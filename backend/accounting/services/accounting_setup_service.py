@@ -236,6 +236,8 @@ class AccountingSetupService:
         FinanceAccountMappingPurpose.DELIVERY_EXPENSE: "DELIVERY_EXPENSE",
         FinanceAccountMappingPurpose.SALARY_EXPENSE: "SALARY_EXPENSE",
         FinanceAccountMappingPurpose.INVENTORY_ASSET: "INVENTORY_ASSET",
+        FinanceAccountMappingPurpose.ADVANCE_FORFEITURE_INCOME: "ADVANCE_FORFEITURE_INCOME",
+        FinanceAccountMappingPurpose.BAD_DEBT_EXPENSE: "BAD_DEBT_EXPENSE",
     }
 
     @staticmethod
