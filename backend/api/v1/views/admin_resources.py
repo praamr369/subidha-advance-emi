@@ -2250,42 +2250,19 @@ class PaymentAdminViewSet(AdminOnlyModelViewSet):
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
-        count = queryset.count()
-        # Summary is always computed over the FULL filtered set so callers that
-        # rely on it (e.g. collections desk net-collected/today counts) stay
-        # correct regardless of paging.
         summary = self._payment_summary(queryset)
 
-        # Opt-in pagination: only page the rows when the client asks via
-        # ?page / ?page_size. Without them, return the full filtered set
-        # (backward compatible with existing unpaginated callers).
-        wants_page = (
-            request.query_params.get("page") is not None
-            or request.query_params.get("page_size") is not None
-        )
-        if wants_page:
-            page, page_size = get_page_params(request, default_page_size=25)
-            start = (page - 1) * page_size
-            rows = list(queryset[start : start + page_size]) if start < count else []
-            serializer = self.get_serializer(rows, many=True)
-            num_pages = (count + page_size - 1) // page_size if count else 0
-            return Response(
-                {
-                    "count": count,
-                    "results": serializer.data,
-                    "summary": summary,
-                    "page": page,
-                    "page_size": page_size,
-                    "num_pages": num_pages,
-                    "has_next": page < num_pages,
-                    "has_previous": page > 1 and num_pages > 0,
-                }
-            )
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            resp = self.get_paginated_response(serializer.data)
+            resp.data["summary"] = summary
+            return resp
 
         serializer = self.get_serializer(queryset, many=True)
         return Response(
             {
-                "count": count,
+                "count": len(serializer.data),
                 "results": serializer.data,
                 "summary": summary,
             }
@@ -2791,42 +2768,40 @@ class PartnerAdminListViewSet(viewsets.ReadOnlyModelViewSet):
 
         return queryset
 
+    def _serialize_partner(self, partner):
+        return {
+            "id": partner.id,
+            "username": partner.username,
+            "email": getattr(partner, "email", "") or "",
+            "phone": getattr(partner, "phone", "") or "",
+            "is_active": partner.is_active,
+            "referred_customers": int(
+                getattr(partner, "referred_customers_count", 0) or 0
+            ),
+            "active_subscriptions": int(
+                getattr(partner, "active_subscriptions_count", 0) or 0
+            ),
+            "total_monthly_book": str(
+                getattr(partner, "total_monthly_book_value", None) or MONEY_ZERO
+            ),
+            "total_contract_value": str(
+                getattr(partner, "total_contract_value_amount", None) or MONEY_ZERO
+            ),
+            "total_commission": str(
+                getattr(partner, "total_commission_amount", None) or MONEY_ZERO
+            ),
+        }
+
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
 
-        results = []
-        for partner in queryset:
-            results.append(
-                {
-                    "id": partner.id,
-                    "username": partner.username,
-                    "email": getattr(partner, "email", "") or "",
-                    "phone": getattr(partner, "phone", "") or "",
-                    "is_active": partner.is_active,
-                    "referred_customers": int(
-                        getattr(partner, "referred_customers_count", 0) or 0
-                    ),
-                    "active_subscriptions": int(
-                        getattr(partner, "active_subscriptions_count", 0) or 0
-                    ),
-                    "total_monthly_book": str(
-                        getattr(partner, "total_monthly_book_value", None) or MONEY_ZERO
-                    ),
-                    "total_contract_value": str(
-                        getattr(partner, "total_contract_value_amount", None) or MONEY_ZERO
-                    ),
-                    "total_commission": str(
-                        getattr(partner, "total_commission_amount", None) or MONEY_ZERO
-                    ),
-                }
-            )
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            results = [self._serialize_partner(p) for p in page]
+            return self.get_paginated_response(results)
 
-        return Response(
-            {
-                "count": queryset.count(),
-                "results": results,
-            }
-        )
+        results = [self._serialize_partner(p) for p in queryset]
+        return Response({"count": len(results), "results": results})
 
 
 # =====================================================
@@ -4136,10 +4111,12 @@ class RentalAssetAdminViewSet(viewsets.ReadOnlyModelViewSet):
         return qs
 
     def list(self, request, *args, **kwargs):
-        qs = self.get_queryset()
-        data = []
-        for asset in qs:
-            data.append(self._serialize_asset(asset))
+        qs = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            data = [self._serialize_asset(asset) for asset in page]
+            return self.get_paginated_response(data)
+        data = [self._serialize_asset(asset) for asset in qs]
         return Response({"count": len(data), "results": data})
 
     def retrieve(self, request, pk=None):

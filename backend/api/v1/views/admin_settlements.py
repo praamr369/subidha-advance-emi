@@ -720,43 +720,26 @@ class CashierDayCloseListView(generics.ListAPIView):
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
-        count = queryset.count()
-        
+
         pending_review = queryset.filter(status="PENDING_REVIEW").count()
         with_variance = queryset.exclude(variance=0).count()
 
         summary = {
-            "total_count": count,
+            "total_count": queryset.count(),
             "pending_review": pending_review,
             "with_variance": with_variance,
         }
 
-        wants_page = (
-            request.query_params.get("page") is not None
-            or request.query_params.get("page_size") is not None
-        )
-        if wants_page:
-            page, page_size = get_page_params(request, default_page_size=25)
-            start = (page - 1) * page_size
-            rows = list(queryset[start : start + page_size]) if start < count else []
-            serializer = self.get_serializer(rows, many=True)
-            num_pages = (count + page_size - 1) // page_size if count else 0
-            return Response(
-                {
-                    "count": count,
-                    "results": serializer.data,
-                    "summary": summary,
-                    "page": page,
-                    "page_size": page_size,
-                    "num_pages": num_pages,
-                    "has_next": page < num_pages,
-                    "has_previous": page > 1 and num_pages > 0,
-                }
-            )
-            
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            resp = self.get_paginated_response(serializer.data)
+            resp.data["summary"] = summary
+            return resp
+
         serializer = self.get_serializer(queryset, many=True)
         return Response({
-            "count": count,
+            "count": len(serializer.data),
             "results": serializer.data,
             "summary": summary,
         })

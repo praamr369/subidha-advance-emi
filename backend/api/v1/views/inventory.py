@@ -471,19 +471,20 @@ class VendorViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = VendorLiteSerializer
 
     def list(self, request, *args, **kwargs):
-        rows = list(
-            Vendor.objects.order_by("name", "id").values(
-                "id",
-                "name",
-                "phone",
-                "email",
-                "gstin",
-                "state_code",
-                "state_name",
-                "is_active",
-            )
+        queryset = Vendor.objects.order_by("name", "id").values(
+            "id",
+            "name",
+            "phone",
+            "email",
+            "gstin",
+            "state_code",
+            "state_name",
+            "is_active",
         )
-        return Response({"count": len(rows), "results": rows})
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            return self.get_paginated_response(list(page))
+        return Response({"count": queryset.count(), "results": list(queryset)})
 
 
 class PurchaseOrderViewSet(AdminInventoryModelViewSet):
