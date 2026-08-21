@@ -16,6 +16,8 @@ import {
   accountingMoney,
   AccountingPeriodFilters,
 } from "@/components/accounting/shared";
+import { getAccessToken } from "@/lib/auth/tokens";
+import { getStoredSession } from "@/lib/auth/session";
 import type { InventoryValuationReport, InventoryValuationRow, StockLocation } from "@/services/inventory";
 import { getInventoryValuation, listStockLocations, listInventoryCategories } from "@/services/inventory";
 
@@ -133,9 +135,15 @@ export default function InventoryValuationPage() {
   const handleExportCsv = async () => {
     setExportingCsv(true);
     try {
+      // Raw fetch is intentional here: apiFetch parses JSON, but this endpoint
+      // returns a CSV blob that must be handled with response.blob().
+      const accessToken = getAccessToken() ?? getStoredSession()?.accessToken ?? null;
       const response = await fetch(
-        `/inventory/valuation/?export=csv&as_of_date=${encodeURIComponent(asOfDate)}&search=${encodeURIComponent(debouncedSearch)}&category=${encodeURIComponent(debouncedCategory)}&exclude_zero=${excludeZero ? "true" : "false"}${locationId ? `&stock_location_id=${locationId}` : ""}`,
-        { credentials: "include" }
+        `/api/v1/admin/inventory/valuation/?export=csv&as_of_date=${encodeURIComponent(asOfDate)}&search=${encodeURIComponent(debouncedSearch)}&category=${encodeURIComponent(debouncedCategory)}&exclude_zero=${excludeZero ? "true" : "false"}${locationId ? `&stock_location_id=${locationId}` : ""}`,
+        {
+          credentials: "include",
+          headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+        }
       );
       if (!response.ok) throw new Error("Export failed");
 

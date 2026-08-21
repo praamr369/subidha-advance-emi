@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { apiFetch } from "@/lib/api";
 
 export default function PublicLeadFormPage() {
   const [loading, setLoading] = useState(false);
@@ -24,15 +25,10 @@ export default function PublicLeadFormPage() {
     setError(null);
 
     try {
-      const response = await fetch("/api/v1/crm-pipeline/leads/public/", {
+      await apiFetch("/api/v1/crm-pipeline/leads/public/", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: formData,
       });
-
-      if (!response.ok) {
-        throw new Error("Failed to submit form");
-      }
 
       setSubmitted(true);
       setFormData({

@@ -66,7 +66,7 @@ export default function KYCPage() {
       const formData = new FormData();
       formData.append("document_type", docType);
       formData.append("file", file);
-      await fetch("/api/v1/customers/kyc-upload/", { method: "POST", body: formData, credentials: "include" });
+      await apiFetch("/api/v1/customers/kyc-upload/", { method: "POST", body: formData });
       setUploaded(true);
       setTimeout(() => setUploaded(false), 3000);
     } catch {

@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-import { API_BASE_URL } from "@/lib/constants";
+import { apiFetch, ApiError } from "@/lib/api";
 import ActionButton from "@/components/ui/ActionButton";
 import AuthBrand from "@/components/auth/AuthBrand";
 import { useI18n } from "@/components/i18n/I18nProvider";
@@ -236,37 +236,18 @@ export default function RegisterPage() {
       setError(null);
       setSuccessMessage(null);
 
-      const response = await fetch(
-        `${API_BASE_URL.replace(/\/api\/v1\/?$/, "")}/api/v1/auth/register/`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            username: trimmedUsername,
-            password,
-            role: "CUSTOMER",
-            phone: trimmedPhone,
-            email: trimmedEmail,
-            first_name: trimmedFirstName,
-            last_name: trimmedLastName,
-          }),
-        }
-      );
-
-      const contentType = response.headers.get("content-type") || "";
-      const payload: RegisterResponse | string = contentType.includes(
-        "application/json"
-      )
-        ? await response.json()
-        : await response.text();
-
-      if (!response.ok) {
-        throw new Error(
-          typeof payload === "string" ? payload : JSON.stringify(payload)
-        );
-      }
+      await apiFetch("/api/v1/auth/register/", {
+        method: "POST",
+        body: {
+          username: trimmedUsername,
+          password,
+          role: "CUSTOMER",
+          phone: trimmedPhone,
+          email: trimmedEmail,
+          first_name: trimmedFirstName,
+          last_name: trimmedLastName,
+        },
+      });
 
       setSuccessMessage(
         "Customer account created successfully. Redirecting to sign in..."

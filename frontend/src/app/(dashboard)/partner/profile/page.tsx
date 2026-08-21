@@ -26,7 +26,7 @@ import KycDocumentPanel from "@/components/kyc/KycDocumentPanel";
 import { changePartnerPassword, changePartnerUsername } from "@/services/partner";
 import { useLogout } from "@/hooks/useLogout";
 
-const API_BASE = "/api/v1";
+import { apiFetch } from "@/lib/api";
 
 type PartnerProfileInfo = {
   name?: string;
@@ -64,9 +64,11 @@ function fmtMoney(v?: string | number | null) {
 }
 
 async function fetchPartnerProfileInfo(): Promise<PartnerProfileInfo> {
-  const res = await fetch(`${API_BASE}/partner/profile-info/`, { credentials: "include" });
-  if (!res.ok) return {};
-  return res.json() as Promise<PartnerProfileInfo>;
+  try {
+    return await apiFetch<PartnerProfileInfo>("/api/v1/partner/profile-info/");
+  } catch {
+    return {};
+  }
 }
 
 function ReadonlyField({ label, value, icon: Icon }: { label: string; value?: string | null; icon?: React.ComponentType<{ className?: string }> }) {

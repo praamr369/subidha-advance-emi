@@ -40,11 +40,10 @@ class WarrantyService {
     formData.append('defect_description', defectDescription)
     formData.append('defect_type', defectType)
     photos.forEach((photo) => formData.append('photos', photo))
-    return fetch('/api/v1/warranty/claim/', {
+    return apiFetch('/api/v1/warranty/claim/', {
       method: 'POST',
       body: formData,
-      credentials: 'include',
-    }).then((r) => r.json())
+    })
   }
 
   async getClaimStatus(claimId: string): Promise<WarrantyClaim> {

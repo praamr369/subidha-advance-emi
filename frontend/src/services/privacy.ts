@@ -69,11 +69,10 @@ class PrivacyService {
     if (evidence) {
       evidence.forEach((file) => formData.append('evidence', file))
     }
-    return fetch('/api/v1/privacy/grievance/', {
+    return apiFetch('/api/v1/privacy/grievance/', {
       method: 'POST',
       body: formData,
-      credentials: 'include',
-    }).then((r) => r.json())
+    })
   }
 
   async getGrievances(limit = 20, offset = 0): Promise<{ count: number; results: Grievance[] }> {

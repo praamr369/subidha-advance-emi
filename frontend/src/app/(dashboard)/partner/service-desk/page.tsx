@@ -14,8 +14,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import Link from "next/link";
-
-const API_BASE = "/api/v1";
+import { apiFetch } from "@/lib/api";
 
 type TicketStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
 
@@ -90,9 +89,7 @@ function Notice({ tone, children }: { tone: NoticeTone; children: React.ReactNod
 }
 
 async function fetchTickets(): Promise<Ticket[]> {
-  const res = await fetch(`${API_BASE}/partner/support/tickets/`, { credentials: "include" });
-  if (!res.ok) throw new Error("Could not load your tickets.");
-  const data = (await res.json()) as { results?: unknown[]; data?: unknown[] } | unknown[];
+  const data = await apiFetch<{ results?: unknown[]; data?: unknown[] } | unknown[]>("/api/v1/partner/support/tickets/");
   const list = Array.isArray(data)
     ? data
     : (Array.isArray((data as { results?: unknown[] }).results)
@@ -107,17 +104,10 @@ async function submitTicket(payload: {
   priority: string;
   description: string;
 }) {
-  const res = await fetch(`${API_BASE}/partner/support/tickets/`, {
+  return apiFetch("/api/v1/partner/support/tickets/", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-    body: JSON.stringify(payload),
+    body: payload,
   });
-  if (!res.ok) {
-    const err = (await res.json().catch(() => ({}))) as { detail?: string };
-    throw new Error(err.detail ?? "Could not submit ticket. Please try again.");
-  }
-  return res.json();
 }
 
 const CATEGORIES = [
