@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
-import { apiFetch } from "@/lib/api";
+import { fetchCustomerDocumentConsents } from "@/services/customer-portal";
 
 type DocConsent = {
   id: number;
@@ -20,7 +20,7 @@ export default function DocumentConsentHistoryPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiFetch("/api/v1/customers/document-consents/")
+    fetchCustomerDocumentConsents()
       .then((d) => setDocs(Array.isArray(d) ? d as DocConsent[] : ((d as { results?: DocConsent[] })?.results ?? [])))
       .catch(() => {})
       .finally(() => setLoading(false));

@@ -18,6 +18,7 @@ import CustomerPageShell, {
 } from "@/components/layout/CustomerPageShell";
 import { listCustomerSubscriptionsRegister } from "@/services/customer/paginated-subscriptions";
 import type { CustomerSubscription } from "@/services/customer";
+import { customerRentContractPdfUrl, customerLeaseContractPdfUrl } from "@/services/customer-portal";
 
 const PAGE_SIZE = 50;
 
@@ -125,7 +126,7 @@ function ContractCard({ sub }: { sub: CustomerSubscription }) {
         </Link>
         {pt === "RENT" ? (
           <a
-            href={`/api/v1/customer/rent-contracts/${sub.id}/pdf/`}
+            href={customerRentContractPdfUrl(sub.id)}
             target="_blank"
             rel="noreferrer"
             onClick={(e) => e.stopPropagation()}
@@ -136,7 +137,7 @@ function ContractCard({ sub }: { sub: CustomerSubscription }) {
         ) : null}
         {pt === "LEASE" ? (
           <a
-            href={`/api/v1/customer/lease-contracts/${sub.id}/pdf/`}
+            href={customerLeaseContractPdfUrl(sub.id)}
             target="_blank"
             rel="noreferrer"
             onClick={(e) => e.stopPropagation()}

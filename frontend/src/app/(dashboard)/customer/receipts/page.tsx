@@ -8,9 +8,10 @@ import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import Link from "next/link";
 import { listCustomerReceipts, type FinanceReceiptRow } from "@/services/phase4-finance";
+import { customerReceiptPdfUrl } from "@/services/customer-portal";
 
 function downloadHref(id: number | string) {
-  return `/api/v1/customer/receipts/${id}/pdf/`;
+  return customerReceiptPdfUrl(id);
 }
 
 function formatDate(value?: string | null): string {

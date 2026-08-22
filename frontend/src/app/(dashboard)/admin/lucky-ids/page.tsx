@@ -20,6 +20,7 @@ import {
   QuickActionGrid,
 } from "@/components/ui/operations";
 import { apiFetch, toArray } from "@/lib/api";
+import { luckyPlanService } from "@/services/lucky-plan";
 
 type LuckyIdStatus =
   | "AVAILABLE"
@@ -287,8 +288,8 @@ export default function AdminLuckyIdsPage() {
       const [luckyRows, batchRows] = await Promise.all([
         // Request a large page so the full (per-grid, client-filtered) set loads
         // in one round-trip; fetchAllPagedRows still follows next as a safety net.
-        fetchAllPagedRows("/admin/lucky-ids/?page_size=200"),
-        fetchAllPagedRows("/admin/batches/"),
+        fetchAllPagedRows(luckyPlanService.adminLuckyIdsPath(200)),
+        fetchAllPagedRows(luckyPlanService.adminBatchesPath()),
       ]);
 
       setAllRows(

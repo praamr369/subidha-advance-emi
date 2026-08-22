@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { createVendor } from "@/services/data-migration";
 
 function toErr(e: unknown): string {
   if (e instanceof Error) return e.message;
@@ -29,10 +29,7 @@ export default function VendorMasterQuickEntry() {
     setNotice(null);
 
     try {
-      await apiFetch("/api/v1/admin/vendors/", {
-        method: "POST",
-        body: JSON.stringify(form),
-      });
+      await createVendor(form);
       setNotice(`Vendor "${form.name}" created successfully.`);
       setForm({ name: "", phone: "", email: "", gst_number: "", address: "" });
     } catch (err) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { z } from "zod";
 import CustomerPageShell, { CPageCard, CPageSection } from "@/components/layout/CustomerPageShell";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import { apiFetch } from "@/lib/api";
@@ -57,9 +58,32 @@ export default function KYCPage() {
 
   useEffect(() => { void load(); }, [uploaded]);
 
+  const kycUploadSchema = z.object({
+    docType: z.enum(["AADHAAR", "PAN", "PASSPORT", "VOTER_ID", "DRIVING_LICENSE"], {
+      required_error: "Document type is required.",
+    }),
+    fileName: z.string().min(1, "Please select a file."),
+    fileSize: z.number().max(5 * 1024 * 1024, "File must be 5 MB or smaller."),
+    fileType: z.string().refine(
+      (t) => ["application/pdf", "image/jpeg", "image/png"].includes(t),
+      "Only PDF, JPG, or PNG files are accepted."
+    ),
+  });
+
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const validation = kycUploadSchema.safeParse({
+      docType,
+      fileName: file.name,
+      fileSize: file.size,
+      fileType: file.type,
+    });
+    if (!validation.success) {
+      setError(validation.error.issues[0].message);
+      e.target.value = "";
+      return;
+    }
     setUploading(true);
     setError(null);
     try {

@@ -3,20 +3,7 @@
 import { useEffect, useState } from "react";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
-import { apiFetch } from "@/lib/api";
-
-type DrawAudit = {
-  id: number;
-  batch_number: string;
-  draw_date: string;
-  commit_hash: string;
-  reveal_seed: string | null;
-  winner_lucky_id: string | null;
-  winner_customer: string | null;
-  waiver_amount: number;
-  verified: boolean;
-  total_eligible: number;
-};
+import { luckyPlanService, type DrawAudit } from "@/services/lucky-plan";
 
 export default function DrawAuditPage() {
   const [draws, setDraws] = useState<DrawAudit[]>([]);
@@ -25,8 +12,9 @@ export default function DrawAuditPage() {
   const [verifyResult, setVerifyResult] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
-    apiFetch("/api/v1/lucky-plan/draw-audit/")
-      .then((d) => setDraws(Array.isArray(d) ? d as DrawAudit[] : ((d as { results?: DrawAudit[] })?.results ?? [])))
+    luckyPlanService
+      .getDrawAudit()
+      .then((d) => setDraws(d))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -35,11 +23,12 @@ export default function DrawAuditPage() {
     if (!draw.reveal_seed) return;
     setVerifying(draw.id);
     try {
-      const res = await apiFetch("/api/v1/public/lucky-plan/verify-seed/", {
-        method: "POST",
-        body: JSON.stringify({ commit_hash: draw.commit_hash, reveal_seed: draw.reveal_seed, batch_id: draw.id }),
+      const res = await luckyPlanService.verifyDrawAuditSeed({
+        commit_hash: draw.commit_hash,
+        reveal_seed: draw.reveal_seed,
+        batch_id: draw.id,
       });
-      setVerifyResult((prev) => ({ ...prev, [draw.id]: (res as { valid?: boolean }).valid === true }));
+      setVerifyResult((prev) => ({ ...prev, [draw.id]: res.valid === true }));
     } catch {
       setVerifyResult((prev) => ({ ...prev, [draw.id]: false }));
     } finally {

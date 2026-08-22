@@ -6,7 +6,7 @@ import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import StatusBadge from "@/components/ui/status-badge";
 import { ROUTES } from "@/lib/routes";
-import { apiFetch } from "@/lib/api";
+import { getLeadCustomerSubscriptions } from "@/services/crm";
 
 interface SubscriptionData {
   customer: {
@@ -74,9 +74,7 @@ export default function LeadRegisterPage() {
     setLoading(true);
     setError(null);
     try {
-      const result = await apiFetch<{ status: string; data: SubscriptionData }>(
-        `/api/v1/admin/lead-tracker/customer/${customerId}/subscriptions/`
-      );
+      const result = await getLeadCustomerSubscriptions(customerId);
       if (result.data) {
         setData(result.data);
       }

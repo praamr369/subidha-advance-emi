@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { z } from "zod";
 
 import { accountingErrorMessage } from "@/components/accounting/shared";
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
@@ -54,6 +55,14 @@ interface CreateBillFormProps {
   onCancel: () => void;
 }
 
+const vendorBillSchema = z.object({
+  vendorId: z.string().min(1, "Vendor is required."),
+  billDate: z.string().min(1, "Date is required."),
+  billNo: z.string().optional().default(""),
+  grId: z.string().optional().default(""),
+  notes: z.string().optional().default(""),
+});
+
 function EmptyLine(): VendorBillLine {
   return { inventory_item: 0, quantity: "1", unit_cost: "0" };
 }
@@ -82,8 +91,14 @@ function CreateBillForm({ vendors, receipts, items, onSaved, onCancel }: CreateB
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const errs: Record<string, string> = {};
-    if (!vendorId) errs.vendor = "Vendor is required.";
-    if (!billDate) errs.bill_date = "Date is required.";
+    const result = vendorBillSchema.safeParse({ vendorId, billDate, billNo, grId, notes });
+    if (!result.success) {
+      for (const issue of result.error.issues) {
+        const key = issue.path[0] as string;
+        const fieldMap: Record<string, string> = { vendorId: "vendor", billDate: "bill_date" };
+        errs[fieldMap[key] ?? key] = issue.message;
+      }
+    }
     const validLines = lines.filter((l) => l.inventory_item && parseFloat(l.quantity) > 0);
     if (!validLines.length) errs.lines = "At least one line with item and quantity > 0 is required.";
     if (Object.keys(errs).length) { setErrors(errs); return; }

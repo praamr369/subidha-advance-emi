@@ -11,7 +11,6 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { ROUTES } from "@/lib/routes";
 import { formatRupee } from "@/lib/utils/currency";
-import { apiFetch } from "@/lib/api";
 import KanbanBoard, { type KanbanLead } from "@/components/crm/KanbanBoard";
 import {
   getFunnelAnalytics,
@@ -23,6 +22,7 @@ import {
   TimelineAnalytics,
   RequestTypeAnalytics,
 } from "@/services/crm-analytics";
+import { getCrmAnalyticsDashboard, listCrmPipelineLeads, updateCrmPipelineStage } from "@/services/crm";
 
 // Current metrics interface
 interface DashboardMetrics {
@@ -113,7 +113,7 @@ export default function CRMAnalyticsPage() {
     setError(null);
     try {
       const [metrics, funnel, products, timeline, byType] = await Promise.all([
-        apiFetch<DashboardMetrics>("/api/v1/admin/crm/analytics/dashboard/"),
+        getCrmAnalyticsDashboard(),
         getFunnelAnalytics(days),
         getProductPerformance(days),
         getTimelineAnalytics(days),
@@ -139,7 +139,7 @@ export default function CRMAnalyticsPage() {
       void loadAnalytics();
     } else if (activeTab === "pipeline" && pipelineLeads.length === 0) {
       setPipelineLoading(true);
-      apiFetch('/api/v1/crm-pipeline/pipeline/')
+      listCrmPipelineLeads()
         .then((data: any) => setPipelineLeads(Array.isArray(data) ? data : (data.results || [])))
         .catch(console.error)
         .finally(() => setPipelineLoading(false));
@@ -148,10 +148,7 @@ export default function CRMAnalyticsPage() {
 
   const handleStageChange = async (leadId: number, newStage: string) => {
     try {
-      await apiFetch(`/api/v1/crm-pipeline/pipeline/${leadId}/stage/`, {
-        method: 'PATCH',
-        body: JSON.stringify({ stage: newStage }),
-      });
+      await updateCrmPipelineStage(leadId, newStage);
       setPipelineLeads(pipelineLeads.map(l =>
         l.id === leadId ? { ...l, current_stage: newStage } : l
       ));

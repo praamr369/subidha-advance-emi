@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { z } from "zod";
 import {
   CheckCircle2,
   Eye,
@@ -375,37 +376,32 @@ export default function AdminCustomerCreatePage({
     setSuccess(null);
   }
 
+  const customerCreateSchema = z.object({
+    name: z.string().min(1, "Full name is required."),
+    phone: z.string().min(1, "Phone number is required."),
+    username: z.string().min(1, "Username is required."),
+    password: z.string().min(1, "Password is required.").min(8, "Password must be at least 8 characters."),
+    email: z.string().min(1, "Email is required for customer access and password reset.").email("Enter a valid email address."),
+    kyc_status: z.string().min(1, "KYC status is required."),
+  });
+
   function validate(): ValidationErrors {
+    const result = customerCreateSchema.safeParse({
+      name: trimmedName,
+      phone: trimmedPhone,
+      username: trimmedUsername,
+      password: password.trim(),
+      email: trimmedEmail,
+      kyc_status: kycStatus,
+    });
+
+    if (result.success) return {};
+
     const next: ValidationErrors = {};
-
-    if (!trimmedName) {
-      next.name = "Full name is required.";
+    for (const issue of result.error.issues) {
+      const key = issue.path[0] as keyof ValidationErrors;
+      if (!next[key]) next[key] = issue.message;
     }
-
-    if (!trimmedPhone) {
-      next.phone = "Phone number is required.";
-    }
-
-    if (!trimmedUsername) {
-      next.username = "Username is required.";
-    }
-
-    if (!password.trim()) {
-      next.password = "Password is required.";
-    } else if (password.trim().length < 8) {
-      next.password = "Password must be at least 8 characters.";
-    }
-
-    if (!trimmedEmail) {
-      next.email = "Email is required for customer access and password reset.";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-      next.email = "Enter a valid email address.";
-    }
-
-    if (!kycStatus) {
-      next.kyc_status = "KYC status is required.";
-    }
-
     return next;
   }
 

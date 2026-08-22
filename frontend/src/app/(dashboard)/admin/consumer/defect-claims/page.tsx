@@ -3,23 +3,11 @@
 import { useEffect, useState } from "react";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
-import { apiFetch } from "@/lib/api";
-
-type DefectClaim = {
-  id: number;
-  subscription: number;
-  subscription_number?: string;
-  customer_name?: string;
-  severity: "MINOR" | "MAJOR" | "DANGEROUS";
-  status: "FILED" | "UNDER_REVIEW" | "ACCEPTED" | "REJECTED" | "RESOLVED";
-  defect_description: string;
-  product_name?: string;
-  filed_at: string;
-  reviewed_at: string | null;
-  resolution_notes: string;
-  replacement_dispatched: boolean;
-  refund_issued: boolean;
-};
+import {
+  advanceDefectClaim,
+  listDefectClaims,
+  type DefectClaim,
+} from "@/services/consumer";
 
 const SEVERITY_COLOR: Record<string, string> = {
   MINOR: "bg-yellow-100 text-yellow-700",
@@ -41,8 +29,8 @@ export default function DefectClaimsPage() {
 
   const reload = () => {
     setLoading(true);
-    apiFetch("/api/v1/admin/consumer/defect-claims/")
-      .then((d) => setItems(Array.isArray(d) ? d as DefectClaim[] : ((d as { results?: DefectClaim[] })?.results ?? [])))
+    listDefectClaims()
+      .then((d) => setItems(d))
       .catch(() => {})
       .finally(() => setLoading(false));
   };
@@ -57,7 +45,7 @@ export default function DefectClaimsPage() {
   ];
 
   const advance = async (id: number, action: string) => {
-    await apiFetch(`/api/v1/admin/consumer/defect-claims/${id}/${action}/`, { method: "POST" });
+    await advanceDefectClaim(id, action);
     reload();
   };
 

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
-import { apiFetch } from "@/lib/api";
+import { fetchCustomerCommsPreferences, saveCustomerCommsPreferences } from "@/services/customer-portal";
 
 type CommsPrefs = {
   sms_enabled: boolean;
@@ -41,7 +41,7 @@ export default function CommsPreferencesPage() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    apiFetch("/api/v1/privacy/communication-preferences/")
+    fetchCustomerCommsPreferences()
       .then((d) => { if (d) setPrefs(d as CommsPrefs); })
       .catch(() => {});
   }, []);
@@ -51,10 +51,7 @@ export default function CommsPreferencesPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await apiFetch("/api/v1/privacy/communication-preferences/", {
-        method: "POST",
-        body: JSON.stringify(prefs),
-      });
+      await saveCustomerCommsPreferences(prefs);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch {

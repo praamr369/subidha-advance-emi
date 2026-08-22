@@ -3,21 +3,12 @@
 import { useEffect, useState } from "react";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
-import { apiFetch } from "@/lib/api";
-
-type ReturnRequest = {
-  id: number;
-  subscription: number;
-  subscription_number?: string;
-  customer_name?: string;
-  status: "FILED" | "WITHIN_WINDOW" | "OUTSIDE_WINDOW" | "CPA_OVERRIDE" | "APPROVED" | "REJECTED" | "REFUNDED";
-  reason: string;
-  defect_claim?: number | null;
-  filed_at: string;
-  refund_deadline: string | null;
-  cpa_override_authorised_by?: string | null;
-  created_at: string;
-};
+import {
+  actOnReturnRequest,
+  cpaOverrideReturnRequest,
+  listReturnRequests,
+  type ReturnRequest,
+} from "@/services/consumer";
 
 const STATUS_COLOR: Record<string, string> = {
   FILED: "bg-blue-100 text-blue-700",
@@ -35,8 +26,8 @@ export default function ReturnRequestsPage() {
 
   const reload = () => {
     setLoading(true);
-    apiFetch("/api/v1/admin/consumer/return-requests/")
-      .then((d) => setItems(Array.isArray(d) ? d as ReturnRequest[] : ((d as { results?: ReturnRequest[] })?.results ?? [])))
+    listReturnRequests()
+      .then((d) => setItems(d))
       .catch(() => {})
       .finally(() => setLoading(false));
   };
@@ -51,17 +42,14 @@ export default function ReturnRequestsPage() {
   ];
 
   const act = async (id: number, action: string) => {
-    await apiFetch(`/api/v1/admin/consumer/return-requests/${id}/${action}/`, { method: "POST" });
+    await actOnReturnRequest(id, action);
     reload();
   };
 
   const overrideWithCPA = async (id: number) => {
     const reason = prompt("CPA override reason (authorised by?):");
     if (!reason) return;
-    await apiFetch(`/api/v1/admin/consumer/return-requests/${id}/cpa-override/`, {
-      method: "POST",
-      body: JSON.stringify({ reason }),
-    });
+    await cpaOverrideReturnRequest(id, reason);
     reload();
   };
 

@@ -317,7 +317,7 @@ function HorizontalBar({
         <span className="font-semibold text-foreground">{label}</span>
         <span className="text-xs font-semibold text-muted-foreground">{meta}</span>
       </div>
-      <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-muted/50">
+      <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-muted/50" role="progressbar" aria-valuenow={value} aria-valuemin={0} aria-valuemax={total} aria-label={label}>
         <div
           className={`h-full rounded-full ${fillClass}`}
           style={{ width: `${asPercent(value, total)}%` }}
@@ -339,7 +339,7 @@ function PaymentModeSplit({
   const total = cash + bank + upi;
   return (
     <div>
-      <div className="flex h-3 overflow-hidden rounded-full bg-muted/50">
+      <div className="flex h-3 overflow-hidden rounded-full bg-muted/50" role="img" aria-label={`Payment mode split: Cash ${money(cash)}, Bank ${money(bank)}, UPI ${money(upi)}`}>
         <div className="bg-emerald-500" style={{ width: `${asPercent(cash, total)}%` }} />
         <div className="bg-primary" style={{ width: `${asPercent(bank, total)}%` }} />
         <div className="bg-amber-500" style={{ width: `${asPercent(upi, total)}%` }} />
@@ -434,9 +434,10 @@ function StorefrontQRWidget() {
 
   return (
     <>
-      <button 
-        type="button" 
+      <button
+        type="button"
         onClick={() => setOpen(true)}
+        aria-label="Expand storefront QR code"
         className="group flex shrink-0 items-center justify-center gap-3 rounded-[1.5rem] border border-border bg-card p-4 shadow-sm transition hover:border-ring hover:shadow-md sm:min-w-[200px] text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <div className="relative rounded-xl bg-white p-2 shadow-sm transition-transform group-hover:scale-105">
@@ -989,11 +990,12 @@ export default function AdminDashboardPage() {
       <div className="space-y-6">
         <div className="flex flex-col gap-6 md:flex-row">
           <div className="flex-1 surface-panel-elevated flex flex-wrap items-end justify-between gap-3 rounded-[1.5rem] border border-border bg-card p-4 shadow-sm">
-          <label className="min-w-[240px] flex-1 text-sm text-muted-foreground md:max-w-sm">
+          <label htmlFor="dashboard-branch-scope" className="min-w-[240px] flex-1 text-sm text-muted-foreground md:max-w-sm">
             <span className="enterprise-eyebrow mb-2 block">
               Branch scope
             </span>
             <select
+              id="dashboard-branch-scope"
               value={selectedBranchId}
               onChange={(event) => setSelectedBranchId(event.target.value)}
               disabled={loading || refreshing}
@@ -1036,6 +1038,7 @@ export default function AdminDashboardPage() {
           onEndDateChange={setEndDate}
         />
 
+        <div aria-live="polite">
         {loading ? <LoadingBlock label="Loading admin dashboard..." /> : null}
 
         {!loading && error ? (
@@ -1045,6 +1048,7 @@ export default function AdminDashboardPage() {
             onRetry={() => void retryDashboard()}
           />
         ) : null}
+        </div>
 
         {!loading && !error && legacy && summary ? (
           <>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { createEmployee } from "@/services/data-migration";
 
 function toErr(e: unknown): string {
   if (e instanceof Error) return e.message;
@@ -29,10 +29,7 @@ export default function EmployeeQuickEntry() {
     setNotice(null);
 
     try {
-      await apiFetch("/api/v1/admin/hr/staff/", {
-        method: "POST",
-        body: JSON.stringify(form),
-      });
+      await createEmployee(form);
       setNotice(`Employee "${form.first_name} ${form.last_name}" created successfully.`);
       setForm({ first_name: "", last_name: "", email: "", phone: "", role: "STORE_STAFF" });
     } catch (err) {

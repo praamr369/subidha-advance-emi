@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { z } from "zod";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { apiFetch } from "@/lib/api";
@@ -29,6 +30,17 @@ export default function MSMEPage() {
   const [form, setForm] = useState<Partial<MSMEInfo>>({});
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const msmeSchema = z.object({
+    udyam_number: z.string().optional().nullable().refine(
+      (v) => !v || /^UDYAM-[A-Z]{2}-\d{2}-\d{7}$/.test(v),
+      "Udyam number must follow the format UDYAM-XX-00-0000000."
+    ),
+    enterprise_type: z.enum(["MICRO", "SMALL", "MEDIUM"]).nullable().optional(),
+    enterprise_name: z.string().optional().default(""),
+    nic_code: z.string().optional().nullable(),
+  });
 
   useEffect(() => {
     apiFetch("/api/v1/business/msme/")
@@ -38,6 +50,17 @@ export default function MSMEPage() {
   }, [saving]);
 
   const handleSave = async () => {
+    const result = msmeSchema.safeParse(form);
+    if (!result.success) {
+      const errs: Record<string, string> = {};
+      for (const issue of result.error.issues) {
+        const key = String(issue.path[0] ?? "form");
+        if (!errs[key]) errs[key] = issue.message;
+      }
+      setErrors(errs);
+      return;
+    }
+    setErrors({});
     setSaving(true);
     try {
       await apiFetch("/api/v1/business/msme/", {
@@ -133,6 +156,7 @@ export default function MSMEPage() {
                     value={form.udyam_number || ""}
                     onChange={(e) => setForm({ ...form, udyam_number: e.target.value })}
                     placeholder="UDYAM-XX-00-0000000" />
+                  {errors.udyam_number ? <p className="text-sm text-destructive mt-1">{errors.udyam_number}</p> : null}
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Enterprise Type</label>

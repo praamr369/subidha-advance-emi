@@ -7,7 +7,7 @@ import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import StatusBadge from "@/components/ui/status-badge";
 import { ROUTES } from "@/lib/routes";
-import { apiFetch } from "@/lib/api";
+import { getLeadConversionJourney } from "@/services/crm";
 
 interface LeadDetail {
   id: number;
@@ -51,9 +51,7 @@ export default function LeadDetailPage() {
     setLoading(true);
     try {
       // Try to fetch from our workbench API first
-      const result = await apiFetch<{ data: LeadDetail }>(
-        `/api/v1/admin/lead-workflow/journey/?phone=${leadId}`
-      );
+      const result = await getLeadConversionJourney(leadId);
       if (result.data) {
         setLead(result.data as any);
       } else {

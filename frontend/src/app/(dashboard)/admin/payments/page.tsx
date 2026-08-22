@@ -138,6 +138,7 @@ function PaymentsTable({ rows }: { rows: PaymentRegisterRow[] }) {
             <input
               type="text"
               placeholder="Quick table search (screen only)"
+              aria-label="Quick table search (screen only)"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="h-10 w-full rounded-xl border border-border bg-background pl-9 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
@@ -150,6 +151,7 @@ function PaymentsTable({ rows }: { rows: PaymentRegisterRow[] }) {
         {searchTerm && (
           <button
             onClick={() => setSearchTerm("")}
+            aria-label="Clear quick table search"
             className="inline-flex items-center gap-1 pt-2 text-sm text-muted-foreground hover:text-foreground"
           >
             <X className="h-4 w-4" />
@@ -799,6 +801,7 @@ export default function AdminPaymentsPage() {
         }
         register={
           <>
+        <div aria-live="polite">
         {loading ? <ERPLoadingState label="Loading payment register..." /> : null}
 
         {!loading && error ? (
@@ -808,6 +811,7 @@ export default function AdminPaymentsPage() {
             onRetry={() => void loadPayments("initial")}
           />
         ) : null}
+        </div>
 
         {!loading && !error && (
           <ERPSectionShell

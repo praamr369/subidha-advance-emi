@@ -6,7 +6,7 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { ROUTES } from "@/lib/routes";
 import { formatRupee } from "@/lib/utils/currency";
-import { apiFetch } from "@/lib/api";
+import { getCrmAnalyticsDashboard } from "@/services/crm";
 
 interface DashboardMetrics {
   leads: { stage: string; count: number };
@@ -33,7 +33,7 @@ export default function CrmDashboardPage() {
     setLoading(true);
     setError(null);
     try {
-      const data: DashboardMetrics = await apiFetch("/api/v1/admin/crm/analytics/dashboard/");
+      const data = await getCrmAnalyticsDashboard();
       setMetrics(data);
       setError(null);
     } catch (err) {

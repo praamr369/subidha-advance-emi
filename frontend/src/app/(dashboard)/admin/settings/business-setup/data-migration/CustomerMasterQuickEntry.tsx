@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { createCustomer } from "@/services/data-migration";
 
 function toErr(e: unknown): string {
   if (e instanceof Error) return e.message;
@@ -28,10 +28,7 @@ export default function CustomerMasterQuickEntry() {
     setNotice(null);
 
     try {
-      await apiFetch("/api/v1/admin/customers/", {
-        method: "POST",
-        body: JSON.stringify(form),
-      });
+      await createCustomer(form);
       setNotice(`Customer "${form.name}" created successfully.`);
       setForm({ name: "", phone: "", email: "", address: "" });
     } catch (err) {

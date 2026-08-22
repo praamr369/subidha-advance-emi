@@ -3,23 +3,7 @@
 import { useEffect, useState } from "react";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
-import { apiFetch } from "@/lib/api";
-
-type WaiverSettlement = {
-  id: number;
-  subscription: number;
-  subscription_number?: string;
-  customer_name?: string;
-  batch: number;
-  batch_code?: string;
-  draw_month: number;
-  waiver_amount: string;
-  remaining_emi_count: number;
-  settlement_status: "PENDING" | "APPROVED" | "PAID" | "CANCELLED";
-  settlement_date: string | null;
-  payment_reference: string;
-  created_at: string;
-};
+import { luckyPlanService, type WaiverSettlement } from "@/services/lucky-plan";
 
 const STATUS_COLOR: Record<string, string> = {
   PENDING: "bg-yellow-100 text-yellow-700",
@@ -34,8 +18,9 @@ export default function WaiverSettlementsPage() {
 
   const reload = () => {
     setLoading(true);
-    apiFetch("/api/v1/admin/lucky-plan/waiver-settlements/")
-      .then((d) => setItems(Array.isArray(d) ? d as WaiverSettlement[] : ((d as { results?: WaiverSettlement[] })?.results ?? [])))
+    luckyPlanService
+      .getWaiverSettlements()
+      .then((d) => setItems(d))
       .catch(() => {})
       .finally(() => setLoading(false));
   };
@@ -54,7 +39,7 @@ export default function WaiverSettlementsPage() {
     .reduce((s, i) => s + Number(i.waiver_amount), 0);
 
   const approve = async (id: number) => {
-    await apiFetch(`/api/v1/admin/lucky-plan/waiver-settlements/${id}/approve/`, { method: "POST" });
+    await luckyPlanService.approveWaiverSettlement(id);
     reload();
   };
 

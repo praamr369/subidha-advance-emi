@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
-import { apiFetch } from "@/lib/api";
+import { fetchRefundHistory } from "@/services/customer-portal";
 
 type RefundRow = {
   id: number;
@@ -29,7 +29,7 @@ export default function RefundHistoryPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiFetch("/api/v1/refunds/history/")
+    fetchRefundHistory()
       .then((d) => setRows(Array.isArray(d) ? d as RefundRow[] : ((d as { results?: RefundRow[] })?.results ?? [])))
       .catch(() => {})
       .finally(() => setLoading(false));

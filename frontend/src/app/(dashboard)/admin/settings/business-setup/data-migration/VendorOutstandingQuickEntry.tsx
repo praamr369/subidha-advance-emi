@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { listVendorOpeningBalances, saveVendorOpeningBalance } from "@/services/data-migration";
 import Link from "next/link";
 import { ROUTES } from "@/lib/routes";
 
@@ -32,9 +32,9 @@ export default function VendorOutstandingQuickEntry() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiFetch("/api/v1/admin/opening-balances/vendors/")
-      .then((res: any) => {
-        setVendors(res.results || []);
+    listVendorOpeningBalances()
+      .then((res) => {
+        setVendors(res);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -45,10 +45,7 @@ export default function VendorOutstandingQuickEntry() {
     setError(null);
     setNotice(null);
     try {
-      await apiFetch(`/api/v1/admin/opening-balances/vendors/${vendor.id}/`, {
-        method: "POST",
-        body: JSON.stringify({ amount, entry_date: entryDate, notes: "Quick entry" }),
-      });
+      await saveVendorOpeningBalance(vendor.id, { amount, entry_date: entryDate, notes: "Quick entry" });
       setVendors((prev) => prev.map((v) => v.id === vendor.id ? { ...v, opening_balance: amount } : v));
       setNotice(`${vendor.name} opening balance saved.`);
       setEditing((prev) => { const n = { ...prev }; delete n[vendor.id]; return n; });

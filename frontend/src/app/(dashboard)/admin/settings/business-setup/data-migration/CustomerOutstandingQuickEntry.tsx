@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { createCustomerOpeningOutstanding } from "@/services/data-migration";
 
 function toErr(e: unknown): string {
   if (e instanceof Error) return e.message;
@@ -33,10 +33,7 @@ export default function CustomerOutstandingQuickEntry() {
     setNotice(null);
 
     try {
-      await apiFetch("/api/v1/admin/opening-balances/customers/", {
-        method: "POST",
-        body: JSON.stringify(form),
-      });
+      await createCustomerOpeningOutstanding(form);
       setNotice(`Outstanding balance of ₹${form.outstanding_amount} for "${form.customer_name}" saved successfully.`);
       setForm({ ...form, customer_name: "", phone: "", outstanding_amount: "", notes: "" });
     } catch (err) {

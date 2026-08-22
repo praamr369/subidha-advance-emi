@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
-import { apiFetch } from "@/lib/api";
+import { fetchCustomerHandoverReceipts } from "@/services/customer-portal";
 
 type Handover = {
   id: number;
@@ -22,7 +22,7 @@ export default function HandoverReceiptPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiFetch("/api/v1/deliveries/handover-receipts/")
+    fetchCustomerHandoverReceipts()
       .then((d) => setHandovers(Array.isArray(d) ? d as Handover[] : ((d as { results?: Handover[] })?.results ?? [])))
       .catch(() => {})
       .finally(() => setLoading(false));

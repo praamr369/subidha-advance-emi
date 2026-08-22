@@ -838,9 +838,11 @@ export default function AdminCustomersPage() {
               onSubmit={handleApplyFilters}
               className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_180px_auto]"
             >
-              <label className="relative block">
+              <label htmlFor="customer-search" className="relative block">
+                <span className="sr-only">Search by name, phone, username</span>
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <input
+                  id="customer-search"
                   type="text"
                   value={queryInput}
                   onChange={(event) => setQueryInput(event.target.value)}
@@ -849,7 +851,9 @@ export default function AdminCustomersPage() {
                 />
               </label>
 
+              <label htmlFor="customer-kyc-filter" className="sr-only">KYC status filter</label>
               <select
+                id="customer-kyc-filter"
                 value={kycInput}
                 onChange={(event) => setKycInput(event.target.value as "" | KycStatus)}
                 className="h-10 rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
@@ -862,7 +866,9 @@ export default function AdminCustomersPage() {
                 <option value="REJECTED">Rejected</option>
               </select>
 
+              <label htmlFor="customer-status-filter" className="sr-only">Account status filter</label>
               <select
+                id="customer-status-filter"
                 value={statusInput}
                 onChange={(event) =>
                   setStatusInput(event.target.value as "" | CustomerStatus)
@@ -895,6 +901,7 @@ export default function AdminCustomersPage() {
         }
         register={
           <>
+        <div aria-live="polite">
         {loading ? <ERPLoadingState label="Loading customer register..." /> : null}
 
         {!loading && error ? (
@@ -904,6 +911,7 @@ export default function AdminCustomersPage() {
             onRetry={() => void loadPage("initial")}
           />
         ) : null}
+        </div>
 
         {!loading && !error ? (
           <>

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
-import { apiFetch } from "@/lib/api";
+import { fetchDamageAssessment, submitDamageAssessment } from "@/services/customer-portal";
 
 type Assessment = {
   id: number;
@@ -25,7 +25,7 @@ export default function DamageAssessmentPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    apiFetch(`/api/v1/refunds/assess-damage/?refund_request=${id}`)
+    fetchDamageAssessment(id)
       .then((d) => {
         const row = Array.isArray(d) ? (d as Assessment[])[0] : ((d as { results?: Assessment[] })?.results?.[0]);
         if (row) setAssessment(row);
@@ -47,10 +47,7 @@ export default function DamageAssessmentPage() {
     setSubmitting(true);
     setError(null);
     try {
-      await apiFetch("/api/v1/refunds/assess-damage/", {
-        method: "POST",
-        body: JSON.stringify({ refund_request: id, condition: form.condition, notes: form.notes }),
-      });
+      await submitDamageAssessment({ refund_request: id, condition: form.condition, notes: form.notes });
       router.push(`/customer/refunds/status/${id}`);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Submission failed.");

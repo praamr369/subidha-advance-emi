@@ -3,21 +3,7 @@
 import { useEffect, useState } from "react";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
-import { apiFetch } from "@/lib/api";
-
-type DrawAuth = {
-  id: number;
-  batch: number;
-  batch_code?: string;
-  draw_month: number;
-  status: "PENDING" | "AUTHORISED" | "REJECTED" | "REVOKED";
-  requested_by_name?: string;
-  authorised_by_name?: string;
-  authorised_at: string | null;
-  rejection_reason: string;
-  snapshot: Record<string, unknown>;
-  created_at: string;
-};
+import { luckyPlanService, type DrawAuthorisation as DrawAuth } from "@/services/lucky-plan";
 
 const STATUS_COLOR: Record<string, string> = {
   PENDING: "bg-yellow-100 text-yellow-700",
@@ -33,8 +19,9 @@ export default function DrawAuthorisationsPage() {
 
   const reload = () => {
     setLoading(true);
-    apiFetch("/api/v1/admin/lucky-plan/draw-authorisations/")
-      .then((d) => setItems(Array.isArray(d) ? d as DrawAuth[] : ((d as { results?: DrawAuth[] })?.results ?? [])))
+    luckyPlanService
+      .getDrawAuthorisations()
+      .then((d) => setItems(d))
       .catch(() => {})
       .finally(() => setLoading(false));
   };
@@ -44,10 +31,7 @@ export default function DrawAuthorisationsPage() {
   const act = async (id: number, action: "authorise" | "reject", reason?: string) => {
     setActing(id);
     try {
-      await apiFetch(`/api/v1/admin/lucky-plan/draw-authorisations/${id}/${action}/`, {
-        method: "POST",
-        body: JSON.stringify({ reason: reason ?? "" }),
-      });
+      await luckyPlanService.actOnDrawAuthorisation(id, action, reason);
       reload();
     } catch {
     } finally {

@@ -1157,6 +1157,7 @@ export default function AdminSubscriptionsPage() {
           </DetailPanel>
         ) : null}
 
+        <div aria-live="polite">
         {loading ? <ERPLoadingState label="Loading subscription register..." /> : null}
 
         {!loading && error ? (
@@ -1166,6 +1167,7 @@ export default function AdminSubscriptionsPage() {
             onRetry={() => void loadPage("initial")}
           />
         ) : null}
+        </div>
 
         {!loading && !error ? (
           <>
@@ -1314,7 +1316,7 @@ export default function AdminSubscriptionsPage() {
                           </div>
                           {row.plan_type === "EMI" && Number(row.emi_count) > 0 && (
                             <div className="mt-1 space-y-1.5 px-1">
-                              <div className="flex w-full h-1.5 rounded-full overflow-hidden bg-muted/60">
+                              <div className="flex w-full h-1.5 rounded-full overflow-hidden bg-muted/60" role="progressbar" aria-valuenow={Number(row.paid_emi_count || 0)} aria-valuemin={0} aria-valuemax={Number(row.emi_count)} aria-label={`EMI progress: ${row.paid_emi_count || 0} of ${row.emi_count} paid`}>
                                 <div style={{ width: `${(Number(row.paid_emi_count || 0) / Number(row.emi_count)) * 100}%` }} className="bg-emerald-500 transition-all duration-500" />
                                 <div style={{ width: `${(Number(row.overdue_emi_count || 0) / Number(row.emi_count)) * 100}%` }} className="bg-destructive transition-all duration-500" />
                               </div>

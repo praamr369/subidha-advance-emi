@@ -460,9 +460,11 @@ export default function AdminAccountingPage() {
     >
       <div className="space-y-6">
         {/* Tab switcher */}
-        <div className="flex flex-wrap gap-1 p-1 rounded-xl bg-muted/60 w-fit">
+        <div className="flex flex-wrap gap-1 p-1 rounded-xl bg-muted/60 w-fit" role="tablist" aria-label="Accounting sections">
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === "readiness"}
             onClick={() => setActiveTab("readiness")}
             className={`px-4 py-2.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${activeTab === "readiness" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
           >
@@ -470,6 +472,8 @@ export default function AdminAccountingPage() {
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === "books"}
             onClick={() => setActiveTab("books")}
             className={`px-4 py-2.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${activeTab === "books" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
           >
@@ -477,6 +481,8 @@ export default function AdminAccountingPage() {
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === "tax"}
             onClick={() => setActiveTab("tax")}
             className={`px-4 py-2.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${activeTab === "tax" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
           >
@@ -484,6 +490,8 @@ export default function AdminAccountingPage() {
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === "reconciliation"}
             onClick={() => setActiveTab("reconciliation")}
             className={`px-4 py-2.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${activeTab === "reconciliation" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
           >
@@ -491,6 +499,8 @@ export default function AdminAccountingPage() {
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === "close"}
             onClick={() => setActiveTab("close")}
             className={`px-4 py-2.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${activeTab === "close" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
           >
@@ -498,11 +508,13 @@ export default function AdminAccountingPage() {
           </button>
         </div>
 
+        <div aria-live="polite">
         {loading ? <ERPLoadingState label="Loading accounting and finance cockpit..." /> : null}
         {!loading && error ? <ERPErrorState title="Unable to load accounting cockpit" description={error} onRetry={() => void loadPage("initial")} /> : null}
+        </div>
         
         {/* Tab content wrapper */}
-        <div className="bg-background rounded-2xl border border-border p-6 shadow-sm">
+        <div className="bg-background rounded-2xl border border-border p-6 shadow-sm" role="tabpanel" aria-label={activeTab}>
           {!loading && !error && data ? (
             <>
               {activeTab === "readiness" && (
@@ -511,7 +523,7 @@ export default function AdminAccountingPage() {
                     title="Accounting Control Center"
                     description="Active blockers, primary actions, and daily finance workflows."
                     actions={
-                      <button type="button" onClick={() => void loadPage("refresh")} disabled={refreshing}
+                      <button type="button" onClick={() => void loadPage("refresh")} disabled={refreshing} aria-label={refreshing ? "Refreshing accounting data" : "Refresh accounting data"}
                         className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60">
                         <RefreshCw className={cn("h-3.5 w-3.5", refreshing ? "animate-spin" : "")} aria-hidden />
                         {refreshing ? "Refreshing…" : "Refresh"}

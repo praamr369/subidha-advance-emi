@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { z } from "zod";
 import Link from "next/link";
 import {
   Eye,
@@ -171,6 +172,24 @@ export default function RegisterPage() {
   const [submitting, setSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const registerSchema = z.object({
+    username: z.string().min(1, "Username is required."),
+    phone: z.string().min(1, "Phone is required."),
+    email: z.string().min(1, "Email is required for customer access and password reset.").email("Enter a valid email address."),
+    password: z.string()
+      .min(1, "Password is required.")
+      .min(8, "Password must be at least 8 characters.")
+      .regex(/[A-Za-z]/, "Password should include at least one letter.")
+      .regex(/\d/, "Password should include at least one number."),
+    confirmPassword: z.string().min(1, "Please confirm your password."),
+    firstName: z.string().optional(),
+    lastName: z.string().optional(),
+  }).refine((data) => data.password === data.confirmPassword, {
+    message: "Password and confirm password must match.",
+    path: ["confirmPassword"],
+  });
 
   useEffect(() => {
     document.title = "Register | SUBIDHA CORE";
@@ -196,40 +215,28 @@ export default function RegisterPage() {
     const trimmedFirstName = firstName.trim();
     const trimmedLastName = lastName.trim();
 
-    if (!trimmedUsername) {
-      setError("Username is required.");
-      return;
-    }
+    const result = registerSchema.safeParse({
+      username: trimmedUsername,
+      phone: trimmedPhone,
+      email: trimmedEmail,
+      password,
+      confirmPassword,
+      firstName: trimmedFirstName,
+      lastName: trimmedLastName,
+    });
 
-    if (!trimmedPhone) {
-      setError("Phone is required.");
+    if (!result.success) {
+      const errs: Record<string, string> = {};
+      for (const issue of result.error.issues) {
+        const key = String(issue.path[0] ?? "form");
+        if (!errs[key]) errs[key] = issue.message;
+      }
+      setFieldErrors(errs);
+      // Show first error in the banner for backward compat
+      setError(result.error.issues[0].message);
       return;
     }
-
-    if (!trimmedEmail) {
-      setError("Email is required for customer access and password reset.");
-      return;
-    }
-
-    if (!password) {
-      setError("Password is required.");
-      return;
-    }
-
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
-      return;
-    }
-
-    if (!/[A-Za-z]/.test(password) || !/\d/.test(password)) {
-      setError("Password should include at least one letter and one number.");
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setError("Password and confirm password must match.");
-      return;
-    }
+    setFieldErrors({});
 
     try {
       setSubmitting(true);
@@ -414,6 +421,7 @@ export default function RegisterPage() {
                         disabled={submitting}
                       />
                     </div>
+                    {fieldErrors.username ? <p className="text-sm text-destructive">{fieldErrors.username}</p> : null}
                   </div>
 
                 <div className="space-y-2">
@@ -437,6 +445,7 @@ export default function RegisterPage() {
                       disabled={submitting}
                     />
                   </div>
+                  {fieldErrors.phone ? <p className="text-sm text-destructive">{fieldErrors.phone}</p> : null}
                 </div>
 
                 <div className="space-y-2">
@@ -461,6 +470,7 @@ export default function RegisterPage() {
                       disabled={submitting}
                     />
                   </div>
+                  {fieldErrors.email ? <p className="text-sm text-destructive">{fieldErrors.email}</p> : null}
                 </div>
 
                 <div className="space-y-2">
@@ -558,6 +568,7 @@ export default function RegisterPage() {
                     </button>
                   </div>
 
+                  {fieldErrors.password ? <p className="text-sm text-destructive">{fieldErrors.password}</p> : null}
                   <div className="workspace-filter-bar space-y-2 p-3">
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-muted-foreground">
@@ -620,6 +631,7 @@ export default function RegisterPage() {
                     </button>
                   </div>
 
+                  {fieldErrors.confirmPassword ? <p className="text-sm text-destructive">{fieldErrors.confirmPassword}</p> : null}
                   <div className="workspace-filter-bar p-3">
                     <div className="text-xs text-muted-foreground">
                       {t("auth.register.accountTypeLabel")}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { createOpeningStockDraft, postOpeningStockDraft } from "@/services/data-migration";
 
 function toErr(e: unknown): string {
   if (e instanceof Error) return e.message;
@@ -35,23 +35,17 @@ export default function OpeningStockQuickEntry() {
 
     try {
       // 1. Create the opening stock draft
-      const draftRes: any = await apiFetch("/api/v1/admin/inventory/opening-stock/", {
-        method: "POST",
-        body: JSON.stringify({
-          inventory_item: { pk: parseInt(form.inventory_item) },
-          stock_location: { pk: parseInt(form.stock_location) },
-          quantity: parseInt(form.quantity),
-          unit_cost_snapshot: form.unit_cost_snapshot || null,
-          effective_date: form.effective_date,
-          note: form.note,
-        }),
+      const draftRes = await createOpeningStockDraft({
+        inventory_item: { pk: parseInt(form.inventory_item) },
+        stock_location: { pk: parseInt(form.stock_location) },
+        quantity: parseInt(form.quantity),
+        unit_cost_snapshot: form.unit_cost_snapshot || null,
+        effective_date: form.effective_date,
+        note: form.note,
       });
 
       // 2. Post the entry to make it active
-      await apiFetch(`/api/v1/admin/inventory/opening-stock/${draftRes.id}/post/`, {
-        method: "POST",
-        body: JSON.stringify({}),
-      });
+      await postOpeningStockDraft(draftRes.id);
 
       setNotice(`Opening stock of ${form.quantity} added successfully.`);
       setForm({ ...form, inventory_item: "", quantity: "", unit_cost_snapshot: "" }); // keep location and date

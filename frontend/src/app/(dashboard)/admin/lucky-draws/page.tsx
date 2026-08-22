@@ -11,6 +11,7 @@ import StatusBadge from "@/components/ui/status-badge";
 import { DataTableShell, MobileSafeTable } from "@/components/ui/operations";
 import TableToolbar from "@/components/ui/TableToolbar";
 import { apiFetch, toArray } from "@/lib/api";
+import { luckyPlanService } from "@/services/lucky-plan";
 
 type BatchOption = {
   id: number;
@@ -354,8 +355,8 @@ export default function AdminLuckyDrawsPage() {
 
     try {
       const [drawRows, batchRows] = await Promise.all([
-        fetchAllPagedRows("/admin/lucky-draws/"),
-        fetchAllPagedRows("/admin/batches/"),
+        fetchAllPagedRows(luckyPlanService.adminLuckyDrawsPath()),
+        fetchAllPagedRows(luckyPlanService.adminBatchesPath()),
       ]);
 
       setAllRows(

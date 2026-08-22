@@ -6,44 +6,9 @@ import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import StatusBadge from "@/components/ui/status-badge";
 import { ROUTES } from "@/lib/routes";
-import { apiFetch } from "@/lib/api";
+import { getLeadConversionJourney, processLeadOnlineEnquiry, processLeadDirectSale, LeadConversionJourney } from "@/services/crm";
 
-interface ConversionJourney {
-  id: number;
-  name: string;
-  phone: string;
-  email: string;
-  status: string;
-  stage: string;
-  source: string;
-  customer?: {
-    id: number;
-    name: string;
-    phone: string;
-    email: string;
-    kyc_status: string;
-  };
-  online_request?: {
-    id: number;
-    request_number: string;
-    status: string;
-  };
-  product_request?: {
-    id: number;
-    type: string;
-    status: string;
-  };
-  subscription?: {
-    id: number;
-    plan_type: string;
-    status: string;
-  };
-  direct_sale?: {
-    id: number;
-    amount: string;
-    status: string;
-  };
-}
+
 
 export default function LeadConversionPage() {
   const [formData, setFormData] = useState({
@@ -54,7 +19,7 @@ export default function LeadConversionPage() {
     amount: "50000",
   });
 
-  const [journey, setJourney] = useState<ConversionJourney | null>(null);
+  const [journey, setJourney] = useState<LeadConversionJourney | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -69,9 +34,7 @@ export default function LeadConversionPage() {
     setError(null);
     setSuccess(null);
     try {
-      const result = await apiFetch<{ status: string; data: ConversionJourney | null }>(
-        `/api/v1/admin/lead-workflow/journey/?phone=${formData.phone}`
-      );
+      const result = await getLeadConversionJourney(formData.phone);
       if (result.data) {
         setJourney(result.data);
         setActiveTab("result");
@@ -90,16 +53,13 @@ export default function LeadConversionPage() {
     setError(null);
     setSuccess(null);
     try {
-      const result = await apiFetch<any>(`/api/v1/admin/lead-workflow/online-enquiry/`, {
-        method: "POST",
-        body: {
-          phone: formData.phone,
-          name: formData.name,
-          email: formData.email,
-          product_name: formData.product_name,
-          amount: formData.amount,
-          request_number: `ONL-${Date.now()}`,
-        },
+      const result = await processLeadOnlineEnquiry({
+        phone: formData.phone,
+        name: formData.name,
+        email: formData.email,
+        product_name: formData.product_name,
+        amount: formData.amount,
+        request_number: `ONL-${Date.now()}`,
       });
 
       if (result.status === "success") {
@@ -119,15 +79,12 @@ export default function LeadConversionPage() {
     setError(null);
     setSuccess(null);
     try {
-      const result = await apiFetch<any>(`/api/v1/admin/lead-workflow/direct-sale/`, {
-        method: "POST",
-        body: {
-          phone: formData.phone,
-          name: formData.name,
-          email: formData.email,
-          product_name: formData.product_name,
-          amount: formData.amount,
-        },
+      const result = await processLeadDirectSale({
+        phone: formData.phone,
+        name: formData.name,
+        email: formData.email,
+        product_name: formData.product_name,
+        amount: formData.amount,
       });
 
       if (result.status === "success") {

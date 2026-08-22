@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
-import { apiFetch } from "@/lib/api";
+import { fetchCustomerDeposits } from "@/services/customer-portal";
 
 type Deposit = {
   id: number;
@@ -30,7 +30,7 @@ export default function DepositStatusPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiFetch("/api/v1/subscriptions/deposits/")
+    fetchCustomerDeposits()
       .then((d) => setDeposits(Array.isArray(d) ? d as Deposit[] : ((d as { results?: Deposit[] })?.results ?? [])))
       .catch(() => {})
       .finally(() => setLoading(false));

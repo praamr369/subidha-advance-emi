@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
-import { apiFetch } from "@/lib/api";
+import { fetchCustomerReturns, submitCustomerReturn } from "@/services/customer-portal";
 
 type ReturnRequest = {
   id: number;
@@ -46,7 +46,7 @@ export default function CustomerReturnsPage() {
 
   const reload = () => {
     setLoading(true);
-    apiFetch("/api/v1/customer/returns/")
+    fetchCustomerReturns()
       .then((d) => setItems(Array.isArray(d) ? d as ReturnRequest[] : ((d as { results?: ReturnRequest[] })?.results ?? [])))
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -63,10 +63,7 @@ export default function CustomerReturnsPage() {
     setSubmitting(true);
     setError("");
     try {
-      await apiFetch("/api/v1/customer/returns/", {
-        method: "POST",
-        body: JSON.stringify({ subscription: Number(subscriptionId), reason }),
-      });
+      await submitCustomerReturn({ subscription: Number(subscriptionId), reason });
       setShowForm(false);
       setSubscriptionId("");
       setReason("");

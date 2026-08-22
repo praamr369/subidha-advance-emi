@@ -19,6 +19,7 @@ import CustomerPageShell, {
 import { formatPlanTypeLabel } from "@/lib/plan-labels";
 import { listCustomerPayments, type CustomerPayment } from "@/services/customer";
 import { listCustomerReceipts, type FinanceReceiptRow } from "@/services/phase4-finance";
+import { customerReceiptPdfUrl } from "@/services/customer-portal";
 
 function formatDate(value: string | null | undefined): string {
   if (!value) return "—";
@@ -32,7 +33,7 @@ function formatDate(value: string | null | undefined): string {
 }
 
 function downloadReceiptHref(receiptId: number | string) {
-  return `/api/v1/customer/receipts/${receiptId}/pdf/`;
+  return customerReceiptPdfUrl(receiptId);
 }
 
 function splitReceipts(receipts: FinanceReceiptRow[]) {

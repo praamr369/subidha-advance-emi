@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
-import { apiFetch } from "@/lib/api";
+import { fetchRefundStatus } from "@/services/customer-portal";
 
 type RefundStatus = {
   id: number;
@@ -37,7 +37,7 @@ export default function RefundStatusPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    apiFetch(`/api/v1/refunds/status/${id}/`)
+    fetchRefundStatus(id)
       .then((d) => setData(d as RefundStatus))
       .catch(() => setError("Could not load refund status."))
       .finally(() => setLoading(false));

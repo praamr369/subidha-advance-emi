@@ -3,22 +3,11 @@
 import { useEffect, useState } from "react";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
-import { apiFetch } from "@/lib/api";
-
-type Repossession = {
-  id: number;
-  subscription: number;
-  subscription_number?: string;
-  customer_name?: string;
-  status: "NOTICE_ISSUED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
-  notice_issued_at: string;
-  notice_reference: string;
-  response_deadline: string;
-  initiated_at: string | null;
-  completed_at: string | null;
-  outstanding_balance_at_repossession: string | null;
-  asset_condition_on_return: string;
-};
+import {
+  advanceRepossession,
+  listRepossessions,
+  type Repossession,
+} from "@/services/consumer";
 
 const STATUS_COLOR: Record<string, string> = {
   NOTICE_ISSUED: "bg-yellow-100 text-yellow-700",
@@ -33,8 +22,8 @@ export default function RepossessionsPage() {
 
   const reload = () => {
     setLoading(true);
-    apiFetch("/api/v1/admin/repossessions/")
-      .then((d) => setItems(Array.isArray(d) ? d as Repossession[] : ((d as { results?: Repossession[] })?.results ?? [])))
+    listRepossessions()
+      .then((d) => setItems(d))
       .catch(() => {})
       .finally(() => setLoading(false));
   };
@@ -49,7 +38,7 @@ export default function RepossessionsPage() {
   ];
 
   const advanceStatus = async (id: number, action: string) => {
-    await apiFetch(`/api/v1/admin/repossessions/${id}/${action}/`, { method: "POST" });
+    await advanceRepossession(id, action);
     reload();
   };
 

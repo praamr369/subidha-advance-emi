@@ -258,3 +258,187 @@ export function updatePartyInteractionStatus(
     }
   );
 }
+
+export type LeadCustomerSubscriptionsResponse = {
+  status: string;
+  data: {
+    customer: {
+      id: number;
+      name: string;
+      phone: string;
+      email: string;
+      kyc_status: string;
+    };
+    leads: Array<{
+      id: number;
+      status: string;
+      source: string;
+      created_at: string;
+    }>;
+    subscriptions: {
+      emi: Array<{
+        id: number;
+        subscription_number?: string;
+        amount: string;
+        status: string;
+        created_at: string;
+        plan_type: string;
+      }>;
+      rent: Array<{
+        id: number;
+        subscription_number?: string;
+        amount: string;
+        status: string;
+        created_at: string;
+        plan_type: string;
+      }>;
+      lease: Array<{
+        id: number;
+        subscription_number?: string;
+        amount: string;
+        status: string;
+        created_at: string;
+        plan_type: string;
+      }>;
+    };
+    direct_sales: Array<{
+      id: number;
+      amount: string;
+      status: string;
+      created_at: string;
+    }>;
+    summary: {
+      total_emi_active: number;
+      total_rent_active: number;
+      total_lease_active: number;
+      total_direct_sales: number;
+      total_revenue: string;
+    };
+  };
+};
+
+export function getLeadCustomerSubscriptions(customerId: number | string) {
+  return apiFetch<LeadCustomerSubscriptionsResponse>(
+    `/admin/lead-tracker/customer/${customerId}/subscriptions/`
+  );
+}
+
+export type LeadConversionJourney = {
+  id: number;
+  name: string;
+  phone: string;
+  email: string;
+  status: string;
+  stage: string;
+  source: string;
+  city?: string;
+  interested_product?: string;
+  notes?: string;
+  created_at?: string;
+  assigned_to?: string | null;
+  customer?: {
+    id: number;
+    name: string;
+    phone: string;
+    email: string;
+    kyc_status: string;
+    city?: string;
+    created_at?: string;
+  } | null;
+  online_request?: {
+    id: number;
+    request_number: string;
+    status: string;
+  };
+  product_request?: {
+    id: number;
+    type: string;
+    status: string;
+  };
+  subscription?: {
+    id: number;
+    plan_type: string;
+    status: string;
+  };
+  direct_sale?: {
+    id: number;
+    amount: string;
+    status: string;
+  };
+  journey?: {
+    online_request: boolean;
+    product_request: boolean;
+    subscription: boolean;
+    direct_sale: boolean;
+  };
+};
+
+export function getLeadConversionJourney(phone: string) {
+  return apiFetch<{ status: string; data: LeadConversionJourney | null }>(
+    `/admin/lead-workflow/journey/${buildQuery({ phone })}`
+  );
+}
+
+export function processLeadOnlineEnquiry(payload: {
+  phone: string;
+  name: string;
+  email: string;
+  product_name: string;
+  amount: string;
+  request_number: string;
+}) {
+  return apiFetch<{ status: string; [key: string]: unknown }>(
+    `/admin/lead-workflow/online-enquiry/`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export function processLeadDirectSale(payload: {
+  phone: string;
+  name: string;
+  email: string;
+  product_name: string;
+  amount: string;
+}) {
+  return apiFetch<{ status: string; [key: string]: unknown }>(
+    `/admin/lead-workflow/direct-sale/`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export type CrmDashboardMetrics = {
+  leads: { stage: string; count: number };
+  onlineRequests: { stage: string; count: number };
+  productRequests: { stage: string; count: number };
+  subscriptionRequests: { stage: string; count: number };
+  subscriptions: { stage: string; count: number; revenue: number };
+  directSales: { stage: string; count: number; revenue: number };
+  roi: {
+    totalLeads: number;
+    totalConversions: number;
+    conversionRate: number;
+    totalRevenue: number;
+    avgRevenuePerLead: number;
+  };
+};
+
+export function getCrmAnalyticsDashboard() {
+  return apiFetch<CrmDashboardMetrics>(`/admin/crm/analytics/dashboard/`);
+}
+
+export function listCrmPipelineLeads() {
+  return apiFetch<unknown>(`/crm-pipeline/pipeline/`);
+}
+
+export function updateCrmPipelineStage(leadId: number | string, stage: string) {
+  return apiFetch<unknown>(`/crm-pipeline/pipeline/${leadId}/stage/`, {
+    method: "PATCH",
+    body: JSON.stringify({ stage }),
+  });
+}
