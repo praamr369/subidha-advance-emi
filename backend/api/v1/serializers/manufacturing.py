@@ -5,8 +5,10 @@ from rest_framework import serializers
 from manufacturing.models import (
     ManufacturingBom,
     ManufacturingBomLine,
+    ManufacturingBomServiceLine,
     ManufacturingBomStatus,
     ProductionJob,
+    ProductionJobStatus,
     ProductionMaterialIssueLine,
     ProductionReceiptLine,
     ProductionScrapLine,
@@ -50,6 +52,31 @@ class ManufacturingBomLineSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "updated_at"]
 
 
+class ManufacturingBomServiceLineSerializer(serializers.ModelSerializer):
+    service_code = serializers.CharField(source="service.code", read_only=True)
+    service_name = serializers.CharField(source="service.name", read_only=True)
+    default_employee_name = serializers.CharField(source="default_employee.name", read_only=True)
+    default_employee_code = serializers.CharField(source="default_employee.employee_code", read_only=True)
+
+    class Meta:
+        model = ManufacturingBomServiceLine
+        fields = [
+            "id",
+            "service",
+            "service_code",
+            "service_name",
+            "default_employee",
+            "default_employee_name",
+            "default_employee_code",
+            "quantity",
+            "sort_order",
+            "notes",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+
 class ManufacturingBomSerializer(serializers.ModelSerializer):
     finished_good_sku = serializers.CharField(source="finished_good_inventory_item.sku", read_only=True)
     finished_good_product_name = serializers.CharField(
@@ -58,6 +85,7 @@ class ManufacturingBomSerializer(serializers.ModelSerializer):
     )
     activated_by_username = serializers.CharField(source="activated_by.username", read_only=True)
     lines = ManufacturingBomLineSerializer(many=True, required=False)
+    service_lines = ManufacturingBomServiceLineSerializer(many=True, required=False)
 
     class Meta:
         model = ManufacturingBom
@@ -77,6 +105,7 @@ class ManufacturingBomSerializer(serializers.ModelSerializer):
             "activated_by",
             "activated_by_username",
             "lines",
+            "service_lines",
             "created_at",
             "updated_at",
         ]
@@ -102,16 +131,20 @@ class ManufacturingBomSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         lines = validated_data.pop("lines", [])
+        service_lines = validated_data.pop("service_lines", [])
         return upsert_manufacturing_bom_draft(
-            payload={**validated_data, "lines": lines},
+            payload={**validated_data, "lines": lines, "service_lines": service_lines},
             performed_by=getattr(self.context.get("request"), "user", None),
         )
 
     def update(self, instance, validated_data):
         lines = validated_data.pop("lines", None)
+        service_lines = validated_data.pop("service_lines", None)
         payload = dict(validated_data)
         if lines is not None:
             payload["lines"] = lines
+        if service_lines is not None:
+            payload["service_lines"] = service_lines
         return upsert_manufacturing_bom_draft(
             payload=payload,
             bom_id=instance.id,
@@ -220,6 +253,8 @@ class ProductionScrapLineSerializer(serializers.ModelSerializer):
 class ProductionLaborLineSerializer(serializers.ModelSerializer):
     employee_name = serializers.CharField(source="employee.name", read_only=True)
     employee_code = serializers.CharField(source="employee.employee_code", read_only=True)
+    service_name = serializers.CharField(source="service.name", read_only=True)
+    service_code = serializers.CharField(source="service.code", read_only=True)
     posted_by_username = serializers.CharField(source="posted_by.username", read_only=True)
 
     class Meta:
@@ -230,6 +265,9 @@ class ProductionLaborLineSerializer(serializers.ModelSerializer):
             "employee",
             "employee_name",
             "employee_code",
+            "service",
+            "service_name",
+            "service_code",
             "activity_name",
             "hours_worked",
             "piece_count",

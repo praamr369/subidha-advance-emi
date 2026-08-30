@@ -79,3 +79,64 @@ export function listPimCategoryOptions() {
     "/pim/categories/"
   ).then((payload) => (Array.isArray(payload) ? payload : payload.results ?? []));
 }
+
+export type PimProductAccessory = {
+  id: number;
+  product: number;
+  related_product: number;
+  related_pim_product_id: number;
+  related_pim_product_name: string;
+  related_pim_product_code: string;
+};
+
+export function listPimProductAccessories(productId: number | string) {
+  return apiFetch<PimProductAccessory[]>(`${BASE}/${productId}/accessories/`);
+}
+
+export function addPimProductAccessory(productId: number | string, relatedPimId: number) {
+  return apiFetch<PimProductAccessory>(`${BASE}/${productId}/accessories/`, {
+    method: "POST",
+    body: JSON.stringify({ related_pim_id: relatedPimId }),
+  });
+}
+
+export function removePimProductAccessory(productId: number | string, accessoryId: number) {
+  return apiFetch(`${BASE}/${productId}/accessories/${accessoryId}/`, {
+    method: "DELETE",
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Variant publish control
+// ---------------------------------------------------------------------------
+
+export type PimVariantPublishRow = {
+  id: number;
+  code: string;
+  name: string;
+  sku: string;
+  is_published: boolean;
+  is_active: boolean;
+  price: string | null;
+};
+
+export type PimVariantPublishControl = {
+  base: { id: number; code: string; name: string; is_published: boolean };
+  variants: PimVariantPublishRow[];
+};
+
+export function getVariantPublishControl(productId: number | string) {
+  return apiFetch<PimVariantPublishControl>(`${BASE}/${productId}/variants/publish-control/`);
+}
+
+export function patchVariantPublishControl(
+  productId: number | string,
+  body:
+    | { all: boolean }
+    | { base_published?: boolean; variants?: Array<{ id: number; is_published: boolean }> }
+) {
+  return apiFetch<PimVariantPublishControl>(`${BASE}/${productId}/variants/publish-control/`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}

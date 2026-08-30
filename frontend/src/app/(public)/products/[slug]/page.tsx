@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { Suspense } from "react";
 
 import ProductDetailWorkflowBoundary from "@/components/public/ProductDetailWorkflowBoundary";
+import ProductReviews from "@/components/public/ProductReviews";
 import ProductEnquiryHandoffPanel from "@/components/public/ProductEnquiryHandoffPanel";
 import { buildProductEnquiryHref } from "@/components/public/product-enquiry-utils";
 import PublicPageShell from "@/components/public/PublicPageShell";
@@ -17,31 +18,32 @@ import { buildProductJsonLd, buildPublicMetadata } from "@/lib/public-seo";
 import { ROUTES } from "@/lib/routes";
 
 type ProductDetailPageProps = {
-  params: Promise<{ id: string }>;
+  params: Promise<{ slug: string }>;
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
 export async function generateMetadata({
   params,
 }: ProductDetailPageProps): Promise<Metadata> {
-  const { id } = await params;
+  const { slug } = await params;
 
   try {
-    const product = await getPublicProductDetail(id);
+    const product = await getPublicProductDetail(slug);
 
     if (!product) {
       return buildPublicMetadata({
         title: "Product Not Found",
         description: "The requested public product could not be found.",
-        path: `/products/${id}`,
+        path: `/products/${slug}`,
         noIndex: true,
       });
     }
 
     // For variant pages, build a richer title from the defining attributes
-    let title = product.name;
+    // Prefer backend-computed seo_name, fall back to manual attribute assembly
+    let title = product.seo_name || product.name;
     let description = product.description ?? "";
-    if (product.is_variant_page && product.selected_attributes) {
+    if (product.is_variant_page && product.selected_attributes && !product.seo_name) {
       const attrParts = Object.entries(product.selected_attributes)
         .filter(([k]) => ["Size", "Color", "Bed Type", "Type", "Variant"].includes(k))
         .map(([, v]) => v);
@@ -54,21 +56,21 @@ export async function generateMetadata({
     return buildPublicMetadata({
       title,
       description,
-      path: `/products/${id}`,
+      path: `/products/${slug}`,
       imagePath: product.image || undefined,
     });
   } catch {
     return buildPublicMetadata({
       title: "Product Detail",
       description: "Live public product detail and enquiry handoff.",
-      path: `/products/${id}`,
+      path: `/products/${slug}`,
     });
   }
 }
 
 export default async function ProductDetailPage({ params, searchParams }: ProductDetailPageProps) {
-  const { id } = await params;
-  const product = await getPublicProductDetail(id);
+  const { slug } = await params;
+  const product = await getPublicProductDetail(slug);
 
   if (!product) {
     notFound();
@@ -94,7 +96,7 @@ export default async function ProductDetailPage({ params, searchParams }: Produc
 
   const productJsonLd = buildProductJsonLd({
     name: product.name,
-    path: `/products/${product.id}`,
+    path: `/products/${product.product_code}`,
     description: product.description,
     image: product.image,
     category: product.category,
@@ -106,7 +108,7 @@ export default async function ProductDetailPage({ params, searchParams }: Produc
     <>
     <PublicSeoJsonLd payload={productJsonLd} />
     <PublicPageShell
-      title={product.name}
+      title={product.seo_name || product.name}
       subtitle={
         product.description?.trim() ||
         "This product is published in the live Subidha Furniture catalogue and can be carried into a branch-reviewed enquiry workflow."
@@ -136,6 +138,14 @@ export default async function ProductDetailPage({ params, searchParams }: Produc
       />
 
       <ProductDetailWorkflowBoundary />
+
+      {/* Reviews section */}
+      <div className="mt-10">
+        <ProductReviews
+          productId={product.id}
+          productName={product.name}
+        />
+      </div>
     </PublicPageShell>
     </>
   );

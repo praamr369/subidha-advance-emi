@@ -151,3 +151,99 @@ export function formatStars(rating: number): string {
   const full = Math.max(0, Math.min(5, Math.round(rating)));
   return "★".repeat(full) + "☆".repeat(5 - full);
 }
+
+// ── Product-level review system (PIM reviews on public product pages) ─────────
+
+export interface ReviewPhoto {
+  id: number;
+  file: string;
+  file_url: string | null;
+}
+
+export interface ProductReview {
+  id: number;
+  reviewer_name: string;
+  rating: number;
+  title: string;
+  body: string;
+  is_verified_purchase: boolean;
+  photos: ReviewPhoto[];
+  created_at: string;
+}
+
+export interface ReviewStats {
+  count: number;
+  page: number;
+  page_size: number;
+  average_rating: number;
+  total_reviews: number;
+  results: ProductReview[];
+}
+
+export interface SubmitReviewPayload {
+  product_id: number;
+  reviewer_name: string;
+  reviewer_email?: string;
+  rating: number;
+  title?: string;
+  body?: string;
+}
+
+export interface AdminReview extends ProductReview {
+  product: number;
+  product_name: string;
+  product_code: string;
+  customer: number | null;
+  reviewer_email: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  synced_google: boolean;
+  synced_facebook: boolean;
+  synced_whatsapp: boolean;
+  synced_instagram: boolean;
+  admin_note: string;
+  moderated_at: string | null;
+}
+
+export async function listReviews(productId: number, page = 1): Promise<ReviewStats> {
+  return apiFetch<ReviewStats>(`/api/v1/reviews/?product=${productId}&page=${page}`);
+}
+
+export async function submitReview(payload: SubmitReviewPayload): Promise<{ detail: string; id: number }> {
+  return apiFetch<{ detail: string; id: number }>("/api/v1/reviews/submit/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function adminListReviews(params: { status?: string; product?: number; page?: number } = {}): Promise<ReviewStats & { results: AdminReview[] }> {
+  const q = new URLSearchParams();
+  if (params.status) q.set("status", params.status);
+  if (params.product) q.set("product", String(params.product));
+  if (params.page) q.set("page", String(params.page));
+  return apiFetch<ReviewStats & { results: AdminReview[] }>(`/api/v1/reviews/admin/?${q}`);
+}
+
+export async function adminApproveReview(id: number): Promise<AdminReview> {
+  return apiFetch<AdminReview>(`/api/v1/reviews/admin/${id}/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "approve" }),
+  });
+}
+
+export async function adminRejectReview(id: number, note = ""): Promise<AdminReview> {
+  return apiFetch<AdminReview>(`/api/v1/reviews/admin/${id}/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "reject", note }),
+  });
+}
+
+export async function adminSyncReview(id: number, whatsappPhone?: string): Promise<AdminReview> {
+  return apiFetch<AdminReview>(`/api/v1/reviews/admin/${id}/sync/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ whatsapp_phone: whatsappPhone }),
+  });
+}

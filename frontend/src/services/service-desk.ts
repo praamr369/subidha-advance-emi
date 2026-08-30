@@ -332,6 +332,31 @@ export function linkServiceDeskReplacementSale(id: number | string, replacementD
   );
 }
 
+export type CustomerLookupResult = {
+  found: boolean;
+  customer: {
+    id: number;
+    name: string;
+    phone: string;
+    email: string;
+    address: string;
+    city: string;
+    gstin: string;
+    kyc_status: string;
+    customer_code: string;
+  } | null;
+  direct_sales: { id: number; sale_no: string; sale_date: string; grand_total: string; balance_total: string; status: string }[];
+  subscriptions: { id: number; subscription_no: string; status: string; plan_name: string }[];
+  deliveries: { id: number; delivery_reference: string; scheduled_date: string; status: string }[];
+  warranty_claims: { id: number; case_no: string; product_name: string; claim_status: string; warranty_end_date: string }[];
+  production_jobs: { id: number; job_no: string; job_date: string; status: string; bom_no: string }[];
+  service_cases: { id: number; case_no: string; issue_summary: string; status: string; case_type: string; created_at: string }[];
+};
+
+export function serviceDeskCustomerLookup(phone: string) {
+  return apiFetch<CustomerLookupResult>(`/service-desk/customer-lookup/${buildQuery({ phone })}`);
+}
+
 export function listServiceDeskComplaints(params: Record<string, QueryValue> = {}) {
   return apiFetch<ServiceDeskComplaintListResponse>(
     `/service-desk/complaints/${buildQuery(params)}`

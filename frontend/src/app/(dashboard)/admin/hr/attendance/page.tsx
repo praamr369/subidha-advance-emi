@@ -18,27 +18,32 @@ export default function AdminHrAttendancePage() {
 
   const [rows, setRows] = useState<Array<Record<string, unknown>>>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const canMark = useMemo(() => Boolean(staffId) && Boolean(statusValue), [staffId, statusValue]);
 
-  async function load() {
+  async function load(isInitial = false) {
     try {
-      setLoading(true);
-      const [staffPayload, attendancePayload] = await Promise.all([listHrStaff(), listHrAttendance()]);
+      if (isInitial) setLoading(true); else setRefreshing(true);
+      const [staffPayload, attendancePayload] = await Promise.all([
+        listHrStaff({ employment_type: "PERMANENT_MONTHLY" }),
+        listHrAttendance(),
+      ]);
       setStaff(staffPayload.results);
       setRows(attendancePayload.results as Array<Record<string, unknown>>);
       setError(null);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Unable to load attendance.");
-      setRows([]);
+      if (isInitial) setRows([]);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }
 
   useEffect(() => {
-    void load();
+    void load(true);
   }, []);
 
   async function handleMark() {
@@ -118,6 +123,12 @@ export default function AdminHrAttendancePage() {
         </div>
       </ERPSectionShell>
 
+      {refreshing && (
+        <div className="h-0.5 w-full overflow-hidden rounded-full bg-muted">
+          <div className="h-full w-1/3 bg-primary" style={{ animation: "slide 1.2s ease-in-out infinite" }} />
+          <style>{`@keyframes slide { 0% { transform:translateX(-100%) } 100% { transform:translateX(400%) } }`}</style>
+        </div>
+      )}
       {loading ? <ERPLoadingState label="Loading attendance..." /> : null}
       {!loading && error ? <ERPErrorState title="Attendance unavailable" description={error} onRetry={() => void load()} /> : null}
       {!loading && !error && rows.length === 0 ? (

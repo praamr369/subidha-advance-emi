@@ -1,8 +1,9 @@
-﻿"use client";
+"use client";
 
-import { useEffect, useState } from "react";
 import ERPPageShell from "@/components/erp/ERPPageShell";
+import RefreshBar from "@/components/feedback/RefreshBar";
 import { WorkspaceSection } from "@/components/ui/workspace";
+import { useRefreshableList } from "@/hooks/useRefreshableList";
 import {
   advanceDefectClaim,
   listDefectClaims,
@@ -23,19 +24,16 @@ const STATUS_COLOR: Record<string, string> = {
   RESOLVED: "bg-emerald-100 text-emerald-700",
 };
 
+const ACTION_NEXT: Record<string, string> = {
+  review: "UNDER_REVIEW",
+  accept: "ACCEPTED",
+  reject: "REJECTED",
+  resolve: "RESOLVED",
+};
+
 export default function DefectClaimsPage() {
-  const [items, setItems] = useState<DefectClaim[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const reload = () => {
-    setLoading(true);
-    listDefectClaims()
-      .then((d) => setItems(d))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(reload, []);
+  const { items, setItems, initialLoading, refreshing, reload } =
+    useRefreshableList<DefectClaim>(listDefectClaims);
 
   const kpis = [
     { label: "Total", value: items.length },
@@ -45,6 +43,9 @@ export default function DefectClaimsPage() {
   ];
 
   const advance = async (id: number, action: string) => {
+    // Optimistic update — row changes instantly, no scroll reset.
+    const next = ACTION_NEXT[action];
+    if (next) setItems((prev) => prev.map((c) => (c.id === id ? { ...c, status: next as DefectClaim["status"] } : c)));
     await advanceDefectClaim(id, action);
     reload();
   };
@@ -52,12 +53,13 @@ export default function DefectClaimsPage() {
   return (
     <ERPPageShell
       title="Defect Claims"
-      subtitle="CTRL-CONS-1 â€” CPA 2019 s.2(47) product defect classification and resolution"
+      subtitle="CTRL-CONS-1 — CPA 2019 s.2(47) product defect classification and resolution"
       stats={kpis}
     >
       <WorkspaceSection title="Product defect claims">
-        {loading ? (
-          <p className="text-sm text-muted-foreground py-8 text-center">Loadingâ€¦</p>
+        <RefreshBar active={refreshing} />
+        {initialLoading ? (
+          <p className="text-sm text-muted-foreground py-8 text-center">Loading…</p>
         ) : items.length === 0 ? (
           <p className="text-sm text-muted-foreground py-8 text-center">No defect claims on file.</p>
         ) : (
@@ -79,7 +81,7 @@ export default function DefectClaimsPage() {
                 {items.map((c) => (
                   <tr key={c.id} className="border-b hover:bg-muted/30">
                     <td className="py-2 px-3 font-mono text-xs">DC-{c.id}</td>
-                    <td className="py-2 px-3">{c.customer_name ?? "â€”"}</td>
+                    <td className="py-2 px-3">{c.customer_name ?? "—"}</td>
                     <td className="py-2 px-3 text-xs">{c.product_name ?? `Sub #${c.subscription}`}</td>
                     <td className="py-2 px-3">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${SEVERITY_COLOR[c.severity] ?? ""}`}>
@@ -131,4 +133,3 @@ export default function DefectClaimsPage() {
     </ERPPageShell>
   );
 }
-

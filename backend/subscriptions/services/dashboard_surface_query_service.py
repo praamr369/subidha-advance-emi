@@ -13,7 +13,12 @@ from subscriptions.services.dashboard_canonical_financial_summary_service import
     _cashier_visible_payments_queryset,
     _payment_queryset,
     resolve_dashboard_window,
+    _money,
+    _days_overdue,
 )
+from billing.models import DirectSale
+from accounting.models import CustomerOpeningOutstanding
+
 from subscriptions.services.dashboard_scopes import (
     CashierScope,
     CustomerScope,
@@ -209,7 +214,110 @@ def _scoped_payment_queryset(scope: DashboardScope, actor_user):
     return _payment_queryset().order_by("-payment_date", "-id")
 
 
+
+
+def _build_due_direct_sale_rows(
+    *,
+    window_params: DashboardWindowParams,
+    only_state: str | None = None,
+) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    reference_date = window_params.reference_date
+
+    cancelled_sale_statuses = [
+        "CANCELLED",
+        "CANCELLED_PRE_INVOICE",
+        "CANCELLED_AFTER_DELIVERY",
+        "REVERSED_POST_INVOICE",
+        "RETURNED",
+        "ARCHIVED",
+        "EXCHANGED_CLOSED",
+    ]
+    qs = DirectSale.objects.exclude(status__in=cancelled_sale_statuses).filter(balance_total__gt=0)
+    
+    for sale in qs:
+        if window_params.start_date and sale.sale_date < window_params.start_date:
+            continue
+        if window_params.end_date and sale.sale_date > window_params.end_date:
+            continue
+        
+        is_overdue = sale.sale_date < reference_date
+        
+        if only_state == "OVERDUE" and not is_overdue:
+            continue
+        if only_state == "UPCOMING" and is_overdue:
+            continue
+            
+        rows.append({
+            "id": f"ds-{sale.id}",
+            "subscription_id": None,
+            "direct_sale_id": sale.id,
+            "subscription_number": sale.sale_no,
+            "source_type": "DIRECT_SALE",
+            "customer_id": sale.customer_id,
+            "customer_name": sale.customer.name if sale.customer_id else "",
+            "customer_phone": sale.customer.phone if sale.customer_id else "",
+            "product_name": "Direct Sale", 
+            "batch_code": None,
+            "lucky_number": None,
+            "due_date": sale.sale_date.isoformat() if sale.sale_date else None,
+            "monthly_amount": _money(sale.grand_total),
+            "pending_amount": _money(sale.balance_total),
+            "overdue_days": _days_overdue(sale.sale_date.isoformat(), reference_date=reference_date) if is_overdue else 0,
+            "is_overdue": is_overdue,
+            "emi_id": None,
+            "month_no": None,
+        })
+    return rows
+
+
+def _build_due_legacy_rows(
+    *,
+    window_params: DashboardWindowParams,
+    only_state: str | None = None,
+) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    reference_date = window_params.reference_date
+
+    qs = CustomerOpeningOutstanding.objects.filter(is_settled=False)
+
+    for legacy in qs:
+        if window_params.start_date and legacy.entry_date < window_params.start_date:
+            continue
+        if window_params.end_date and legacy.entry_date > window_params.end_date:
+            continue
+        
+        is_overdue = legacy.entry_date < reference_date
+        
+        if only_state == "OVERDUE" and not is_overdue:
+            continue
+        if only_state == "UPCOMING" and is_overdue:
+            continue
+            
+        rows.append({
+            "id": f"legacy-{legacy.id}",
+            "subscription_id": None,
+            "legacy_id": legacy.id,
+            "subscription_number": f"LEG-{legacy.id}",
+            "source_type": "LEGACY_OUTSTANDING",
+            "customer_id": legacy.customer_id,
+            "customer_name": legacy.customer_name,
+            "customer_phone": legacy.phone,
+            "product_name": "Legacy Outstanding", 
+            "batch_code": None,
+            "lucky_number": None,
+            "due_date": legacy.entry_date.isoformat() if legacy.entry_date else None,
+            "monthly_amount": _money(legacy.outstanding_amount),
+            "pending_amount": _money(legacy.balance_remaining),
+            "overdue_days": _days_overdue(legacy.entry_date.isoformat(), reference_date=reference_date) if is_overdue else 0,
+            "is_overdue": is_overdue,
+            "emi_id": None,
+            "month_no": None,
+        })
+    return rows
+
 def list_upcoming_items(
+
     *,
     scope: DashboardScope,
     actor_user,
@@ -240,11 +348,19 @@ def list_overdue_items(
     effective_window = window_params or resolve_dashboard_window()
     subscriptions = list(scope.get_subscription_queryset(actor_user).order_by("-created_at", "-id"))
     build_customer_dashboard_summary(subscriptions)
-    rows = _build_due_subscription_rows(
+    
+    emi_rows = _build_due_subscription_rows(
         subscriptions,
         window_params=effective_window,
         only_state="OVERDUE",
     )
+    for r in emi_rows:
+        r["source_type"] = "SUBSCRIPTION_EMI"
+        
+    ds_rows = _build_due_direct_sale_rows(window_params=effective_window, only_state="OVERDUE")
+    legacy_rows = _build_due_legacy_rows(window_params=effective_window, only_state="OVERDUE")
+    
+    rows = emi_rows + ds_rows + legacy_rows
     rows = _apply_row_ordering(rows, surface_code=SURFACE_OVERDUE, ordering=ordering)
     return rows if limit is None else rows[:limit]
 

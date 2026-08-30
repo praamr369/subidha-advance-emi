@@ -504,26 +504,27 @@ export function getStockSummary(
  * POST /api/v1/admin/products/
  */
 export function quickCreateAccessory(payload: QuickCreatePayload): Promise<QuickCreateResult> {
-  return apiFetch<QuickCreateResult>("/admin/products/", {
+  return apiFetch<QuickCreateResult>("/admin/inventory/quick-create/accessory/", {
     method: "POST",
-    body: JSON.stringify({
-      ...payload,
-      product_type: "ACCESSORY",
-    }),
+    body: JSON.stringify(payload),
   });
 }
 
 /**
  * Quick create a raw material
- * POST /api/v1/admin/products/
+ * POST /api/v1/admin/inventory/quick-create/raw-material/
  */
 export function quickCreateRawMaterial(payload: QuickCreatePayload): Promise<QuickCreateResult> {
-  return apiFetch<QuickCreateResult>("/admin/products/", {
+  return apiFetch<QuickCreateResult>("/admin/inventory/quick-create/raw-material/", {
     method: "POST",
-    body: JSON.stringify({
-      ...payload,
-      product_type: "RAW_MATERIAL",
-    }),
+    body: JSON.stringify(payload),
+  });
+}
+
+export function quickCreateService(payload: QuickCreatePayload): Promise<QuickCreateResult> {
+  return apiFetch<QuickCreateResult>("/admin/inventory/quick-create/service/", {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 }
 

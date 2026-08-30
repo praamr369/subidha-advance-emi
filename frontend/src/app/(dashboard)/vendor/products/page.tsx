@@ -16,6 +16,7 @@ import { createVendorProduct, listVendorProducts } from "@/services/vendor-ops";
 export default function VendorProductsPage() {
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [name, setName] = useState("");
@@ -24,8 +25,8 @@ export default function VendorProductsPage() {
   const [price, setPrice] = useState("");
   const [leadDays, setLeadDays] = useState("");
 
-  function reload() {
-    setLoading(true);
+  function reload(isInitial = false) {
+    if (isInitial) setLoading(true); else setRefreshing(true);
     void listVendorProducts()
       .then((p) => {
         const parsed = p as { results?: Record<string, unknown>[] };
@@ -33,11 +34,11 @@ export default function VendorProductsPage() {
         setError(null);
       })
       .catch((err) => setError(accountingErrorMessage(err, "Could not load products.")))
-      .finally(() => setLoading(false));
+      .finally(() => { setLoading(false); setRefreshing(false); });
   }
 
   useEffect(() => {
-    reload();
+    reload(true);
   }, []);
 
   async function onSubmit(ev: React.FormEvent) {
@@ -130,6 +131,12 @@ export default function VendorProductsPage() {
       </ERPSectionShell>
 
       <ERPSectionShell title="Catalog register" description="Your published vendor catalog lines.">
+        {refreshing && (
+          <div className="h-0.5 w-full overflow-hidden rounded-full bg-muted mb-2">
+            <div className="h-full w-1/3 bg-primary" style={{ animation: "slide 1.2s ease-in-out infinite" }} />
+            <style>{`@keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(400%)}}`}</style>
+          </div>
+        )}
         {loading ? <ERPLoadingState label="Loading catalog..." /> : null}
 
         {!loading && rows.length === 0 ? (

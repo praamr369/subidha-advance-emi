@@ -1,3 +1,4 @@
+from api.v1.views.dashboard_calendar import DashboardCalendarEventsView, DashboardMemoView
 from django.urls import path, include
 
 from brochures.urls import admin_urlpatterns as brochure_admin_urlpatterns
@@ -73,11 +74,13 @@ from api.v1.views.admin_inventory_quick_create import (
     AdminInventoryItemVariantGroupView,
     AdminQuickCreateAccessoryView,
     AdminQuickCreateRawMaterialView,
+    AdminQuickCreateServiceView,
 )
 from api.v1.views.admin_product_register import AdminProductRegisterView, AdminProductCreateView
 from api.v1.views import (
     admin_solopreneur_today,
 )
+from api.v1.views.solopreneur import SolopreneurUniversalDashboardView
 from smart_fields.views import (
     SmartConfirmView,
     SmartHsnSuggestView,
@@ -93,6 +96,7 @@ urlpatterns = [
     path("auth/", include("api.v1.routes.auth")),
     path("admin/payments/collect/", IdempotentAdminPaymentCollectView.as_view()),
     path("admin/solopreneur/today/", admin_solopreneur_today.AdminSolopreneurTodayView.as_view()),
+    path("admin/solopreneur-dashboard/", SolopreneurUniversalDashboardView.as_view()),
     path("admin/products/", AdminProductCreateView.as_view()),
     path("admin/products/register/", AdminProductRegisterView.as_view()),
     path("admin/catalog/", include("api.v1.routes.catalog")),
@@ -131,6 +135,7 @@ urlpatterns = [
     # Quick create
     path("admin/inventory/quick-create/accessory/", AdminQuickCreateAccessoryView.as_view()),
     path("admin/inventory/quick-create/raw-material/", AdminQuickCreateRawMaterialView.as_view()),
+    path("admin/inventory/quick-create/service/", AdminQuickCreateServiceView.as_view()),
     # Billing accessory options (used at billing/contract time)
     path("admin/inventory/finished-goods/<int:product_id>/billing-accessories/", AdminBillingAccessoryOptionsView.as_view()),
     path("admin/brochures/", include(brochure_admin_urlpatterns)),
@@ -208,6 +213,8 @@ urlpatterns = [
     path("service-desk/", include("api.v1.routes.service_desk")),
     path("reminders/", include("api.v1.routes.reminders")),
     path("dashboards/", include("api.v1.routes.dashboard_surfaces")),
+    path("dashboard/calendar-events", DashboardCalendarEventsView.as_view()),
+    path("dashboard/calendar-memos", DashboardMemoView.as_view()),
     path("partner/", include("api.v1.routes.contract_amendments_partner")),
     path("partner/", include("api.v1.routes.partner")),
     path("vendor/", include("api.v1.routes.vendor")),
@@ -225,6 +232,7 @@ urlpatterns = [
     path("executive/", include("api.v1.routes.executive")),
     path("winner/", include("api.v1.route_modules.winner_urls")),
     path("pim/", include("products_pim.urls")),
+    path("reviews/", include("product_reviews.urls")),
 ]
 
 urlpatterns += workbench_urlpatterns

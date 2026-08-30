@@ -17,6 +17,7 @@ from branch_control.services.context_service import (
     resolve_support_request_branch,
     serialize_branch,
 )
+from accounting.models import CustomerOpeningOutstanding
 from billing.models import BillingInvoice, DirectSale, ReceiptDocument
 from crm.models import PartyInteraction, PartyLink, PartyLinkRole, PartyMaster
 from reminders.models import PaymentReminder
@@ -204,6 +205,11 @@ def build_party_detail_payload(party: PartyMaster) -> dict[str, Any]:
         party.interactions.select_related("created_by", "reminder").order_by("-happened_at", "-created_at", "-id")
     )
 
+    legacy_outstandings = list(
+        CustomerOpeningOutstanding.objects.filter(customer_id__in=customer_ids)
+        .order_by("-entry_date", "-id")
+    ) if customer_ids else []
+
     timeline: list[dict[str, Any]] = []
     for interaction in interactions:
         timeline.append(
@@ -345,6 +351,18 @@ def build_party_detail_payload(party: PartyMaster) -> dict[str, Any]:
                 link={"reminder_id": reminder.id},
             )
         )
+    for lo in legacy_outstandings:
+        timeline.append(
+            _timeline_item(
+                event_at=lo.entry_date,
+                event_type="LEGACY_OUTSTANDING",
+                label=f"Opening Balance — {lo.customer_name}",
+                status="SETTLED" if lo.is_settled else "DUE",
+                reference=f"Legacy #{lo.id}",
+                detail=f"₹{lo.outstanding_amount} (paid ₹{lo.collected_amount}, remaining ₹{lo.balance_remaining})",
+                link={"legacy_outstanding_id": lo.id},
+            )
+        )
     timeline.sort(key=lambda item: item["event_at"], reverse=True)
 
     open_follow_ups = sorted(
@@ -379,6 +397,11 @@ def build_party_detail_payload(party: PartyMaster) -> dict[str, Any]:
     outstanding = total_invoiced - total_received
     if outstanding < 0:
         outstanding = Decimal("0")
+    legacy_outstanding_total = sum(
+        (o.balance_remaining for o in legacy_outstandings if not o.is_settled),
+        Decimal("0"),
+    )
+    outstanding += legacy_outstanding_total
     total_direct_sales = sum(
         (_dec(sale.grand_total) for sale in direct_sales if sale.status not in _void_sale),
         Decimal("0"),
@@ -401,12 +424,22 @@ def build_party_detail_payload(party: PartyMaster) -> dict[str, Any]:
     pending_kyc_customers = [c for c in customers if getattr(c, "kyc_status", "") == "PENDING"]
 
     alerts: list[dict[str, Any]] = []
+    if legacy_outstanding_total > 0:
+        unsettled = [o for o in legacy_outstandings if not o.is_settled]
+        alerts.append({
+            "level": "high",
+            "module": "LEGACY",
+            "label": "Legacy outstanding (old books)",
+            "detail": f"₹{legacy_outstanding_total} from {len(unsettled)} migrated opening balance(s)",
+            "count": len(unsettled),
+            "amount": str(legacy_outstanding_total),
+        })
     if outstanding > 0:
         alerts.append({
             "level": "high",
             "module": "BILLING",
             "label": "Outstanding balance",
-            "detail": f"₹{outstanding} unpaid across {len(billable_invoices)} invoice(s)",
+            "detail": f"₹{outstanding} unpaid (includes legacy + invoices)",
             "count": None,
             "amount": str(outstanding),
         })
@@ -530,11 +563,14 @@ def build_party_detail_payload(party: PartyMaster) -> dict[str, Any]:
             "open_support_count": len(open_support),
             "due_reminder_count": len(due_reminders),
             "pending_kyc_count": len(pending_kyc_customers),
+            "legacy_outstanding_count": len(legacy_outstandings),
+            "unsettled_legacy_count": len([o for o in legacy_outstandings if not o.is_settled]),
         },
         "financials": {
             "total_invoiced": str(total_invoiced),
             "total_received": str(total_received),
             "outstanding": str(outstanding),
+            "legacy_outstanding": str(legacy_outstanding_total),
             "total_direct_sales": str(total_direct_sales),
         },
         "alerts": alerts,
@@ -774,6 +810,21 @@ def build_party_detail_payload(party: PartyMaster) -> dict[str, Any]:
                     "reminder_id": interaction.reminder_id,
                 }
                 for interaction in interactions[:50]
+            ],
+            "legacy_outstandings": [
+                {
+                    "id": lo.id,
+                    "customer_name": lo.customer_name,
+                    "phone": lo.phone,
+                    "outstanding_amount": str(lo.outstanding_amount),
+                    "collected_amount": str(lo.collected_amount),
+                    "balance_remaining": str(lo.balance_remaining),
+                    "entry_date": str(lo.entry_date),
+                    "is_settled": lo.is_settled,
+                    "admin_verified": lo.admin_verified,
+                    "notes": lo.notes,
+                }
+                for lo in legacy_outstandings
             ],
         },
         "timeline": timeline[:100],

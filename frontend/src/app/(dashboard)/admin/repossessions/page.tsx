@@ -1,8 +1,9 @@
 ﻿"use client";
 
-import { useEffect, useState } from "react";
 import ERPPageShell from "@/components/erp/ERPPageShell";
+import RefreshBar from "@/components/feedback/RefreshBar";
 import { WorkspaceSection } from "@/components/ui/workspace";
+import { useRefreshableList } from "@/hooks/useRefreshableList";
 import {
   advanceRepossession,
   listRepossessions,
@@ -17,18 +18,8 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export default function RepossessionsPage() {
-  const [items, setItems] = useState<Repossession[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const reload = () => {
-    setLoading(true);
-    listRepossessions()
-      .then((d) => setItems(d))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(reload, []);
+  const { items, setItems, initialLoading, refreshing, reload } =
+    useRefreshableList<Repossession>(listRepossessions);
 
   const kpis = [
     { label: "Total", value: items.length },
@@ -38,6 +29,11 @@ export default function RepossessionsPage() {
   ];
 
   const advanceStatus = async (id: number, action: string) => {
+    // Optimistic: update status locally so the row changes instantly without a scroll reset.
+    const nextStatus = action === "initiate" ? "IN_PROGRESS" : "COMPLETED";
+    setItems((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, status: nextStatus } : r))
+    );
     await advanceRepossession(id, action);
     reload();
   };
@@ -49,8 +45,9 @@ export default function RepossessionsPage() {
       stats={kpis}
     >
       <WorkspaceSection title="Active repossession cases">
-        {loading ? (
-          <p className="text-sm text-muted-foreground py-8 text-center">Loadingâ€¦</p>
+        <RefreshBar active={refreshing} />
+        {initialLoading ? (
+          <p className="text-sm text-muted-foreground py-8 text-center">Loading…</p>
         ) : items.length === 0 ? (
           <p className="text-sm text-muted-foreground py-8 text-center">No repossession cases on record.</p>
         ) : (

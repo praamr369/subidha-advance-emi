@@ -9,6 +9,8 @@ from api.v1.views.admin_brand_data import AdminBrandDataYoutubePreviewView
 from api.v1.views.admin_brand_data import AdminBrandDirectProfileView
 from api.v1.views.admin_outstandings import AdminOutstandingsExportCsvView
 from api.v1.views.admin_outstandings import AdminOutstandingsView
+from api.v1.views.notifications import AdminNotificationArchiveView
+from api.v1.views.notifications import AdminNotificationDismissAllView
 from api.v1.views.notifications import AdminNotificationListView
 from api.v1.views.notifications import AdminNotificationMarkReadView
 from api.v1.views.notifications import AdminUnreadNotificationCountView
@@ -17,6 +19,8 @@ urlpatterns = [
     path("notifications/", AdminNotificationListView.as_view()),
     path("notifications/unread-count/", AdminUnreadNotificationCountView.as_view()),
     path("notifications/<int:pk>/read/", AdminNotificationMarkReadView.as_view()),
+    path("notifications/<int:pk>/archive/", AdminNotificationArchiveView.as_view()),
+    path("notifications/dismiss-all/", AdminNotificationDismissAllView.as_view()),
     path("outstandings/", AdminOutstandingsView.as_view()),
     path("outstandings/export.csv", AdminOutstandingsExportCsvView.as_view()),
     path("brand-data/sources/", AdminBrandDataSourcesView.as_view()),

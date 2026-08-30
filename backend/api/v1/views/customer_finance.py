@@ -213,7 +213,10 @@ class CustomerReceiptPdfView(APIView):
         if customer is None:
             return _customer_missing_response()
         receipt = (
-            ReceiptDocument.objects.select_related("customer", "finance_account", "payment")
+            ReceiptDocument.objects.select_related(
+                "customer", "finance_account", "payment", "payment__collected_by",
+                "subscription", "subscription__product", "direct_sale",
+            )
             .filter(pk=pk, customer=customer)
             .first()
         )

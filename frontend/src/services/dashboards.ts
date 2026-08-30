@@ -180,6 +180,7 @@ function normalizeDueSubscription(item: unknown): DashboardDueSubscription {
         : toMoneyString(row.pending_amount),
     overdue_days: toNumber(row.overdue_days, 0),
     is_overdue: toBoolean(row.is_overdue, false),
+    source_type: typeof row.source_type === "string" ? row.source_type : undefined,
     emi_id:
       row.emi_id === null || row.emi_id === undefined ? null : toNumber(row.emi_id),
     month_no:

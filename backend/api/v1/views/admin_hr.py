@@ -668,7 +668,9 @@ class HrAttendanceCreateSerializer(serializers.Serializer):
 
 class AdminHrAttendanceListCreateView(_AdminBase):
     def get(self, request):
-        qs = EmployeeAttendance.objects.select_related("employee").all().order_by("-attendance_date", "-id")
+        qs = EmployeeAttendance.objects.select_related("employee").filter(
+            employee__employment_type=EmploymentType.PERMANENT_MONTHLY
+        ).order_by("-attendance_date", "-id")
         from_date = request.query_params.get("from")
         to_date = request.query_params.get("to")
         employee_id = request.query_params.get("employee")

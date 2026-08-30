@@ -105,6 +105,7 @@ const CHAPTERS: Chapter[] = [
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -131,10 +132,8 @@ const CHAPTERS: Chapter[] = [
               return (
                 <article
                   key={chapter.title}
-                  className="imx-layer absolute inset-0 flex flex-col justify-center gap-4"
+                  className="absolute inset-0 flex flex-col justify-center gap-4 will-change-transform [backface-visibility:hidden]"
                   style={{
-                    ["--imx-depth" as string]: -10,
-                    ["--imx-tilt" as string]: 1.5,
                     opacity: isActive ? 1 : 0,
                     transform: isActive ? "translate3d(0,0,0)" : "translate3d(0,26px,0)",
                     transition: "opacity 560ms cubic-bezier(0.22,1,0.36,1), transform 560ms cubic-bezier(0.22,1,0.36,1)",
@@ -167,10 +166,8 @@ const CHAPTERS: Chapter[] = [
               return (
                 <div
                   key={chapter.title}
-                  className="imx-layer absolute inset-0"
+                  className="absolute inset-0 will-change-transform [backface-visibility:hidden]"
                   style={{
-                    ["--imx-depth" as string]: 12,
-                    ["--imx-tilt" as string]: 8,
                     opacity: isActive ? 1 : 0,
                     transform: isActive
                       ? "translate3d(0,0,0) scale(1) rotateY(0deg)"

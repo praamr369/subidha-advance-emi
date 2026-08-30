@@ -1,5 +1,6 @@
 "use client";
 import { formatRupee } from "@/lib/utils/currency";
+import { downloadAuthenticatedFile } from "@/lib/export/auth-download";
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
@@ -105,14 +106,15 @@ export default function CustomerDirectSalesPage() {
                             View
                           </Link>
                           {row.invoice_pdf_url ? (
-                            <a
-                              href={row.invoice_pdf_url}
-                              target="_blank"
-                              rel="noreferrer"
+                            <button
+                              onClick={() => {
+                                const url = new URL(row.invoice_pdf_url!, window.location.origin);
+                                void downloadAuthenticatedFile(url.pathname, `invoice-${row.id}.pdf`);
+                              }}
                               className="inline-flex h-8 items-center rounded-lg border border-border px-3 text-xs font-medium hover:bg-muted"
                             >
                               Download Invoice
-                            </a>
+                            </button>
                           ) : null}
                         </div>
                       </td>

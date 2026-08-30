@@ -76,6 +76,7 @@ class Notification(models.Model):
     payload = models.JSONField(default=dict, blank=True)
     dedupe_key = models.CharField(max_length=220, null=True, blank=True, unique=True, db_index=True)
     read_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    archived_at = models.DateTimeField(null=True, blank=True, db_index=True)
     source_job = models.ForeignKey(
         SystemJobLog,
         on_delete=models.SET_NULL,
@@ -108,6 +109,19 @@ class Notification(models.Model):
             self.save(update_fields=["read_at"])
         self._invalidate_badge_cache()
 
+    def archive(self):
+        now = timezone.now()
+        updates = []
+        if self.read_at is None:
+            self.read_at = now
+            updates.append("read_at")
+        if self.archived_at is None:
+            self.archived_at = now
+            updates.append("archived_at")
+        if updates:
+            self.save(update_fields=updates)
+        self._invalidate_badge_cache()
+
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
         self._invalidate_badge_cache()
@@ -138,3 +152,28 @@ class NotificationPreference(models.Model):
         db_table = "system_notification_preferences"
         unique_together = (("user", "module"),)
         ordering = ["user_id", "module"]
+
+class DashboardMemo(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="dashboard_memos",
+    )
+    date = models.DateField(db_index=True)
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True, default="")
+    color_code = models.CharField(max_length=20, blank=True, default="slate")
+    is_completed = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "system_dashboard_memos"
+        ordering = ["date", "-created_at"]
+        indexes = [
+            models.Index(fields=["user", "date"]),
+        ]
+
+    def __str__(self):
+        return f"{self.date} - {self.title}"
+

@@ -1,9 +1,10 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useState } from "react";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import RefreshBar from "@/components/feedback/RefreshBar";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import {
@@ -22,10 +23,11 @@ const STATUS_COLOR: Record<string, string> = {
 export default function ReconciliationSignOffsPage() {
   const [items, setItems] = useState<ReconciliationSignOff[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const reload = useCallback(async () => {
-    setLoading(true);
+  const reload = useCallback(async (isInitial = false) => {
+    if (isInitial) setLoading(true); else setRefreshing(true);
     setError(null);
     try {
       setItems(await listReconciliationSignOffs());
@@ -33,11 +35,12 @@ export default function ReconciliationSignOffsPage() {
       setError(err instanceof Error ? err.message : "Failed to load sign-off records.");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
-    void reload();
+    void reload(true);
   }, [reload]);
 
   const kpis = [
@@ -74,6 +77,7 @@ export default function ReconciliationSignOffsPage() {
       stats={kpis}
     >
       <WorkspaceSection title="Sign-off records">
+        <RefreshBar active={refreshing} />
         {loading ? (
           <LoadingBlock label="Loading sign-off records…" />
         ) : error ? (
@@ -143,4 +147,3 @@ export default function ReconciliationSignOffsPage() {
     </ERPPageShell>
   );
 }
-

@@ -14,6 +14,7 @@ from accounting.models import (
     EmployeeAttendance,
     EmployeeExpenseClaim,
     EmployeeProfile,
+    EmploymentType,
     ExpenseClaimStatus,
     LeaveRequest,
     LeaveRequestStatus,
@@ -64,7 +65,8 @@ def _write_audit(*, actor, action_type: str, model_name: str, object_id: int, me
 def get_hr_summary() -> dict:
     today = timezone.localdate()
     active_staff = EmployeeProfile.objects.filter(is_active=True)
-    attendance_today = EmployeeAttendance.objects.filter(attendance_date=today)
+    permanent_staff = active_staff.filter(employment_type=EmploymentType.PERMANENT_MONTHLY)
+    attendance_today = EmployeeAttendance.objects.filter(attendance_date=today, employee__employment_type=EmploymentType.PERMANENT_MONTHLY)
 
     today_present = attendance_today.filter(status=AttendanceStatus.PRESENT).count()
     today_absent = attendance_today.filter(status=AttendanceStatus.ABSENT).count()
@@ -92,7 +94,7 @@ def get_hr_summary() -> dict:
 
     return {
         "as_of": timezone.now().isoformat(),
-        "total_active_staff": active_staff.count(),
+        "total_active_staff": permanent_staff.count(),
         "today_present": today_present,
         "today_absent": today_absent,
         "pending_leave_requests": pending_leave,
@@ -199,6 +201,9 @@ def mark_attendance(
     worked_hours: Decimal | None = None,
     overtime_hours: Decimal | None = None,
 ):
+    if employee.employment_type != EmploymentType.PERMANENT_MONTHLY:
+        raise ValueError("Attendance marking is only applicable for permanent staff.")
+
     attendance, created = upsert_employee_attendance(
         employee=employee,
         attendance_date=attendance_date,

@@ -1,8 +1,9 @@
-﻿"use client";
+"use client";
 
-import { useEffect, useState } from "react";
 import ERPPageShell from "@/components/erp/ERPPageShell";
+import RefreshBar from "@/components/feedback/RefreshBar";
 import { WorkspaceSection } from "@/components/ui/workspace";
+import { useRefreshableList } from "@/hooks/useRefreshableList";
 import { luckyPlanService, type WaiverSettlement } from "@/services/lucky-plan";
 
 const STATUS_COLOR: Record<string, string> = {
@@ -13,19 +14,8 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export default function WaiverSettlementsPage() {
-  const [items, setItems] = useState<WaiverSettlement[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const reload = () => {
-    setLoading(true);
-    luckyPlanService
-      .getWaiverSettlements()
-      .then((d) => setItems(d))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(reload, []);
+  const { items, setItems, initialLoading, refreshing, reload } =
+    useRefreshableList<WaiverSettlement>(() => luckyPlanService.getWaiverSettlements());
 
   const kpis = [
     { label: "Total", value: items.length },
@@ -39,6 +29,7 @@ export default function WaiverSettlementsPage() {
     .reduce((s, i) => s + Number(i.waiver_amount), 0);
 
   const approve = async (id: number) => {
+    setItems((prev) => prev.map((s) => (s.id === id ? { ...s, settlement_status: "APPROVED" } : s)));
     await luckyPlanService.approveWaiverSettlement(id);
     reload();
   };
@@ -46,17 +37,18 @@ export default function WaiverSettlementsPage() {
   return (
     <ERPPageShell
       title="EMI Waiver Settlements"
-      subtitle="CTRL-LP-3 â€” Waiver settlement records for lucky-plan draw winners"
+      subtitle="CTRL-LP-3 — Waiver settlement records for lucky-plan draw winners"
       stats={kpis}
     >
       {totalWaived > 0 && (
         <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
-          Total waived amount paid out: <strong>â‚¹{totalWaived.toLocaleString("en-IN")}</strong>
+          Total waived amount paid out: <strong>₹{totalWaived.toLocaleString("en-IN")}</strong>
         </div>
       )}
       <WorkspaceSection title="Settlement records">
-        {loading ? (
-          <p className="text-sm text-muted-foreground py-8 text-center">Loadingâ€¦</p>
+        <RefreshBar active={refreshing} />
+        {initialLoading ? (
+          <p className="text-sm text-muted-foreground py-8 text-center">Loading…</p>
         ) : items.length === 0 ? (
           <p className="text-sm text-muted-foreground py-8 text-center">No waiver settlement records.</p>
         ) : (
@@ -78,16 +70,16 @@ export default function WaiverSettlementsPage() {
                 {items.map((s) => (
                   <tr key={s.id} className="border-b hover:bg-muted/30">
                     <td className="py-2 px-3 font-mono text-xs">{s.subscription_number ?? `#${s.subscription}`}</td>
-                    <td className="py-2 px-3">{s.customer_name ?? "â€”"}</td>
+                    <td className="py-2 px-3">{s.customer_name ?? "—"}</td>
                     <td className="py-2 px-3 text-xs">{s.batch_code ?? `#${s.batch}`} / M{s.draw_month}</td>
-                    <td className="py-2 px-3 font-mono font-medium">â‚¹{Number(s.waiver_amount).toLocaleString("en-IN")}</td>
+                    <td className="py-2 px-3 font-mono font-medium">₹{Number(s.waiver_amount).toLocaleString("en-IN")}</td>
                     <td className="py-2 px-3 text-center">{s.remaining_emi_count}</td>
                     <td className="py-2 px-3">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLOR[s.settlement_status] ?? ""}`}>
                         {s.settlement_status}
                       </span>
                     </td>
-                    <td className="py-2 px-3 text-xs text-muted-foreground">{s.settlement_date ?? "â€”"}</td>
+                    <td className="py-2 px-3 text-xs text-muted-foreground">{s.settlement_date ?? "—"}</td>
                     <td className="py-2 px-3">
                       {s.settlement_status === "PENDING" && (
                         <button onClick={() => approve(s.id)}
@@ -106,4 +98,3 @@ export default function WaiverSettlementsPage() {
     </ERPPageShell>
   );
 }
-

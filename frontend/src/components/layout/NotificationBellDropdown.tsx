@@ -26,6 +26,9 @@ import {
   listCustomerNotifications,
   listPartnerNotifications,
   listVendorNotifications,
+  archiveAdminNotification,
+  archiveNotification,
+  dismissAllAdminNotifications,
   markAdminNotificationRead,
   markAllNotificationsRead,
   markCashierNotificationRead,
@@ -249,11 +252,57 @@ export default function NotificationBellDropdown({ role }: { role: NavigationRol
     }
   }
 
+  async function onArchive(id: number) {
+    const previousList = queryClient.getQueryData<NotificationBellSnapshot>(listQueryKey);
+    const previousUnread = queryClient.getQueryData<number>(unreadQueryKey);
+    if (previousList) {
+      const target = previousList.items.find((n) => n.id === id);
+      const decrement = target && !target.is_read ? 1 : 0;
+      const nextUnread = Math.max(0, (previousUnread ?? previousList.unread) - decrement);
+      queryClient.setQueryData<number>(unreadQueryKey, nextUnread);
+      queryClient.setQueryData<NotificationBellSnapshot>(listQueryKey, {
+        unread: nextUnread,
+        items: previousList.items.filter((n) => n.id !== id),
+      });
+    }
+    try {
+      if (role === "ADMIN") {
+        await archiveAdminNotification(id);
+      } else {
+        await archiveNotification(id);
+      }
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("subidha:badges-refresh"));
+      }
+    } catch {
+      if (previousList) queryClient.setQueryData(listQueryKey, previousList);
+      if (previousUnread !== undefined) queryClient.setQueryData(unreadQueryKey, previousUnread);
+    }
+  }
+
+  async function onDismissAllRead() {
+    if (role !== "ADMIN") return;
+    const previousList = queryClient.getQueryData<NotificationBellSnapshot>(listQueryKey);
+    if (previousList) {
+      queryClient.setQueryData<NotificationBellSnapshot>(listQueryKey, {
+        unread: previousList.unread,
+        items: previousList.items.filter((n) => !n.is_read),
+      });
+    }
+    try {
+      await dismissAllAdminNotifications();
+      void queryClient.invalidateQueries({ queryKey });
+    } catch {
+      if (previousList) queryClient.setQueryData(listQueryKey, previousList);
+    }
+  }
+
   const href = centerHref(role);
   const badge =
     unreadCount === null ? null : unreadCount > 99 ? "99+" : String(Math.max(0, unreadCount));
 
   const showMarkAll = (role === "CUSTOMER" || role === "PARTNER" || role === "VENDOR") && items.some((n) => !n.is_read);
+  const showDismissAll = role === "ADMIN" && items.some((n) => n.is_read);
 
   return (
     <div className="relative shrink-0" ref={rootRef}>
@@ -307,6 +356,15 @@ export default function NotificationBellDropdown({ role }: { role: NavigationRol
                     Mark all read
                   </button>
                 ) : null}
+                {showDismissAll ? (
+                  <button
+                    type="button"
+                    className="text-xs font-medium text-destructive hover:underline"
+                    onClick={() => void onDismissAllRead()}
+                  >
+                    Dismiss all read
+                  </button>
+                ) : null}
                 <Link href={href} className="text-xs font-medium text-primary hover:underline" onClick={() => setOpen(false)}>
                   Open center
                 </Link>
@@ -356,6 +414,14 @@ export default function NotificationBellDropdown({ role }: { role: NavigationRol
                                 Mark read
                               </button>
                             ) : null}
+                            <button
+                              type="button"
+                              className="text-xs font-medium text-muted-foreground hover:text-destructive hover:underline"
+                              aria-label={`Dismiss notification ${n.title}`}
+                              onClick={() => void onArchive(n.id)}
+                            >
+                              Dismiss
+                            </button>
                           </div>
                         </div>
                       </li>
@@ -381,6 +447,15 @@ export default function NotificationBellDropdown({ role }: { role: NavigationRol
                   onClick={() => void onMarkAllRead()}
                 >
                   Mark all read
+                </button>
+              ) : null}
+              {showDismissAll ? (
+                <button
+                  type="button"
+                  className="text-xs font-medium text-destructive hover:underline"
+                  onClick={() => void onDismissAllRead()}
+                >
+                  Dismiss all read
                 </button>
               ) : null}
               <Link

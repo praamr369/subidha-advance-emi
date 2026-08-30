@@ -1,5 +1,6 @@
 // @ts-nocheck
 "use client";
+import { OperationalCalendar } from "@/components/dashboard/calendar/OperationalCalendar";
 
 import { Printer, Maximize2 } from "lucide-react";
 import ModalShell from "@/components/ui/ModalShell";
@@ -45,7 +46,7 @@ import ActionButton from "@/components/ui/ActionButton";
 import StatCard from "@/components/ui/StatCard";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
-import { ADMIN_ENTERPRISE_MODULES } from "@/config/admin-enterprise";
+
 import {
   buildSettlementPosture,
   buildWinnerPosture,
@@ -59,6 +60,7 @@ import {
   buildAdminReconciliationRoute,
   buildAdminSubscriptionRequestsRoute,
   buildAdminSubscriptionRoute,
+  buildAdminCustomerRoute,
 } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -236,54 +238,95 @@ function DashboardKpiCard({
   );
 }
 
-function ModuleSummaryCard({
+function MiniBar({ value, max, color }: { value: number; max: number; color: string }) {
+  const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
+  return (
+    <div className="h-1.5 w-full rounded-full bg-slate-200/80 dark:bg-slate-700/60 overflow-hidden">
+      <div className={`h-full rounded-full transition-all duration-500 ${color}`} style={{ width: `${pct}%` }} />
+    </div>
+  );
+}
+
+function KpiPill({ value, label, tone = "neutral" }: { value: string | number; label: string; tone?: "neutral" | "warning" | "success" | "danger" }) {
+  const bg = tone === "warning" ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+    : tone === "danger" ? "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
+    : tone === "success" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+    : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
+  return (
+    <div className={`flex flex-col items-center rounded-xl px-3 py-2 ${bg}`}>
+      <span className="text-base font-bold leading-none">{value}</span>
+      <span className="mt-1 text-[10px] font-medium leading-none opacity-80">{label}</span>
+    </div>
+  );
+}
+
+function ModuleOperationalCard({
   title,
   href,
   icon,
-  rows,
+  iconBg,
+  kpis,
+  bar,
+  actions,
   alert = false,
 }: {
   title: string;
   href: string;
   icon: ReactNode;
-  rows: Array<{ label: string; value: string; emphasize?: boolean }>;
+  iconBg: string;
+  kpis: Array<{ value: string | number; label: string; tone?: "neutral" | "warning" | "success" | "danger" }>;
+  bar?: { value: number; max: number; color: string; label: string };
+  actions?: Array<{ label: string; href: string }>;
   alert?: boolean;
 }) {
   return (
-    <Link
-      href={href}
-      className={`group flex flex-col rounded-[1.4rem] border p-4 shadow-[0_14px_36px_-30px_rgba(15,23,42,0.5)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_45px_-32px_rgba(15,23,42,0.6)] ${
+    <div
+      className={`group flex flex-col rounded-[1.4rem] border p-4 shadow-[0_8px_24px_-12px_rgba(15,23,42,0.12)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_36px_-16px_rgba(15,23,42,0.18)] ${
         alert
-          ? "border-amber-300/70 bg-amber-50/60 dark:bg-amber-500/10"
+          ? "border-amber-300/70 bg-gradient-to-br from-amber-50/80 to-amber-100/40 dark:from-amber-950/20 dark:to-amber-900/10 dark:border-amber-700/40"
           : "border-border bg-card"
       }`}
     >
-      <div className="flex items-center justify-between gap-2">
+      <Link href={href} className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2.5">
-          <div className="rounded-lg border border-border bg-card p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]">
+          <div className={`rounded-xl p-2 ${iconBg}`}>
             {icon}
           </div>
           <div className="text-sm font-semibold text-foreground">{title}</div>
         </div>
-        <ArrowRight className="h-4 w-4 opacity-40 transition group-hover:translate-x-0.5 group-hover:opacity-80" />
-      </div>
-      <dl className="mt-3 space-y-1.5">
-        {rows.map((row) => (
-          <div key={row.label} className="flex items-baseline justify-between gap-3 text-sm">
-            <dt className="text-muted-foreground">{row.label}</dt>
-            <dd
-              className={
-                row.emphasize
-                  ? "font-semibold text-amber-700 dark:text-amber-400"
-                  : "font-semibold text-foreground"
-              }
-            >
-              {row.value}
-            </dd>
-          </div>
+        <ArrowRight className="h-4 w-4 opacity-30 transition group-hover:translate-x-0.5 group-hover:opacity-70" />
+      </Link>
+
+      <div className="mt-3 grid grid-cols-3 gap-1.5">
+        {kpis.map((k) => (
+          <KpiPill key={k.label} value={k.value} label={k.label} tone={k.tone} />
         ))}
-      </dl>
-    </Link>
+      </div>
+
+      {bar ? (
+        <div className="mt-3">
+          <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
+            <span>{bar.label}</span>
+            <span className="font-semibold">{bar.max > 0 ? Math.round((bar.value / bar.max) * 100) : 0}%</span>
+          </div>
+          <MiniBar value={bar.value} max={bar.max} color={bar.color} />
+        </div>
+      ) : null}
+
+      {actions && actions.length > 0 ? (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {actions.map((a) => (
+            <Link
+              key={a.href}
+              href={a.href}
+              className="inline-flex items-center rounded-lg border border-border bg-background px-2.5 py-1 text-[11px] font-medium text-foreground shadow-sm transition hover:bg-muted/60"
+            >
+              {a.label}
+            </Link>
+          ))}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -922,6 +965,16 @@ export default function AdminDashboardPage() {
     1
   );
 
+  const getDueRowHref = (row: any) => {
+    if (row.source_type === "LEGACY_OUTSTANDING" && row.customer_id) {
+      return buildAdminCustomerRoute(row.customer_id);
+    }
+    if (row.source_type === "DIRECT_SALE") {
+      return ROUTES.admin.billingDirectSales;
+    }
+    return buildAdminSubscriptionRoute(row.subscription_id ?? row.id);
+  };
+
   return (
     <ERPPageShell
       title="Admin Dashboard"
@@ -987,7 +1040,8 @@ export default function AdminDashboardPage() {
         tone: summary?.has_payment_adjustments ? "warning" : "info",
       }}
     >
-      <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="lg:col-span-3 space-y-6">
         <div className="flex flex-col gap-6 md:flex-row">
           <div className="flex-1 surface-panel-elevated flex flex-wrap items-end justify-between gap-3 rounded-[1.5rem] border border-border bg-card p-4 shadow-sm">
           <label htmlFor="dashboard-branch-scope" className="min-w-[240px] flex-1 text-sm text-muted-foreground md:max-w-sm">
@@ -1091,139 +1145,269 @@ export default function AdminDashboardPage() {
 
             {legacy.modules ? (
               <WorkspaceSection
-                title="All modules at a glance"
-                description="Live counters from every business module. Click any card to open that module's workspace."
+                title="Operations Command Center"
+                description="Live operational KPIs from every module. Take action directly or drill into any workspace."
               >
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  <ModuleSummaryCard
+                  <ModuleOperationalCard
                     title="Lucky Plan / EMI"
                     href={ROUTES.admin.subscriptions}
-                    icon={<BadgeCheck className="h-4 w-4 text-sky-700" />}
+                    icon={<BadgeCheck className="h-4 w-4 text-white" />}
+                    iconBg="bg-sky-600 dark:bg-sky-700"
                     alert={legacy.emi.overdue > 0}
-                    rows={[
-                      { label: "Active subscriptions", value: String(legacy.subscriptions.active) },
-                      { label: "Pending EMIs", value: String(legacy.emi.pending) },
-                      { label: "Overdue EMIs", value: String(legacy.emi.overdue), emphasize: legacy.emi.overdue > 0 },
+                    kpis={[
+                      { value: legacy.subscriptions.active, label: "Active", tone: "success" },
+                      { value: legacy.emi.pending, label: "Pending", tone: legacy.emi.pending > 0 ? "warning" : "neutral" },
+                      { value: legacy.emi.overdue, label: "Overdue", tone: legacy.emi.overdue > 0 ? "danger" : "success" },
+                    ]}
+                    bar={legacy.subscriptions.active > 0 ? {
+                      value: legacy.subscriptions.active - legacy.emi.overdue,
+                      max: legacy.subscriptions.active,
+                      color: "bg-sky-500",
+                      label: "Collection health",
+                    } : undefined}
+                    actions={[
+                      { label: "Collect EMI", href: ROUTES.admin.payments },
+                      { label: "View overdue", href: ROUTES.admin.subscriptions },
                     ]}
                   />
-                  <ModuleSummaryCard
+                  <ModuleOperationalCard
                     title="Rent & Lease"
                     href={ROUTES.admin.rentLease}
-                    icon={<Building2 className="h-4 w-4 text-violet-700" />}
+                    icon={<Building2 className="h-4 w-4 text-white" />}
+                    iconBg="bg-violet-600 dark:bg-violet-700"
                     alert={legacy.modules.rent_lease.open_demand_count > 0}
-                    rows={[
-                      {
-                        label: "Active contracts",
-                        value: `${legacy.modules.rent_lease.active_rent} rent · ${legacy.modules.rent_lease.active_lease} lease`,
-                      },
-                      { label: "Deposits held", value: money(legacy.modules.rent_lease.deposits_held) },
-                      {
-                        label: "Open demands",
-                        value: `${legacy.modules.rent_lease.open_demand_count} (${money(legacy.modules.rent_lease.open_demand_amount)})`,
-                        emphasize: legacy.modules.rent_lease.open_demand_count > 0,
-                      },
+                    kpis={[
+                      { value: legacy.modules.rent_lease.active_rent, label: "Rent", tone: "neutral" },
+                      { value: legacy.modules.rent_lease.active_lease, label: "Lease", tone: "neutral" },
+                      { value: legacy.modules.rent_lease.open_demand_count, label: "Open", tone: legacy.modules.rent_lease.open_demand_count > 0 ? "warning" : "success" },
+                    ]}
+                    bar={(() => {
+                      const total = legacy.modules.rent_lease.active_rent + legacy.modules.rent_lease.active_lease;
+                      return total > 0 ? {
+                        value: total - legacy.modules.rent_lease.open_demand_count,
+                        max: total,
+                        color: "bg-violet-500",
+                        label: "Demand cleared",
+                      } : undefined;
+                    })()}
+                    actions={[
+                      { label: "Deposits", href: ROUTES.admin.rentLease },
                     ]}
                   />
-                  <ModuleSummaryCard
+                  <ModuleOperationalCard
                     title="Inventory & Purchasing"
                     href={ROUTES.admin.inventory}
-                    icon={<PackageSearch className="h-4 w-4 text-slate-700" />}
+                    icon={<PackageSearch className="h-4 w-4 text-white" />}
+                    iconBg="bg-slate-600 dark:bg-slate-700"
                     alert={
                       legacy.modules.purchasing.draft_goods_receipts +
                         legacy.modules.purchasing.draft_vendor_bills >
                       0
                     }
-                    rows={[
-                      { label: "Open purchase orders", value: String(legacy.modules.purchasing.open_purchase_orders) },
-                      { label: "Draft goods receipts", value: String(legacy.modules.purchasing.draft_goods_receipts) },
-                      { label: "Draft vendor bills", value: String(legacy.modules.purchasing.draft_vendor_bills) },
+                    kpis={[
+                      { value: legacy.modules.purchasing.open_purchase_orders, label: "POs open", tone: "neutral" },
+                      { value: legacy.modules.purchasing.draft_goods_receipts, label: "GRN draft", tone: legacy.modules.purchasing.draft_goods_receipts > 0 ? "warning" : "neutral" },
+                      { value: legacy.modules.purchasing.draft_vendor_bills, label: "Bills draft", tone: legacy.modules.purchasing.draft_vendor_bills > 0 ? "warning" : "neutral" },
+                    ]}
+                    actions={[
+                      { label: "New PO", href: ROUTES.admin.purchaseOrders },
+                      { label: "Stock on hand", href: ROUTES.admin.inventoryStockOnHand },
                     ]}
                   />
-                  <ModuleSummaryCard
+                  <ModuleOperationalCard
                     title="HR & Payroll"
                     href={ROUTES.admin.hrStaff}
-                    icon={<Users className="h-4 w-4 text-emerald-700" />}
+                    icon={<Users className="h-4 w-4 text-white" />}
+                    iconBg="bg-emerald-600 dark:bg-emerald-700"
                     alert={
                       legacy.modules.hr.pending_leave_requests + legacy.modules.hr.unpaid_salary_sheets > 0
                     }
-                    rows={[
-                      { label: "Active staff", value: String(legacy.modules.hr.active_staff) },
-                      {
-                        label: "Pending leave / claims",
-                        value: `${legacy.modules.hr.pending_leave_requests} / ${legacy.modules.hr.open_expense_claims}`,
-                        emphasize: legacy.modules.hr.pending_leave_requests > 0,
-                      },
-                      {
-                        label: "Unpaid salaries / advances",
-                        value: `${legacy.modules.hr.unpaid_salary_sheets} / ${legacy.modules.hr.outstanding_staff_advances}`,
-                        emphasize: legacy.modules.hr.unpaid_salary_sheets > 0,
-                      },
+                    kpis={[
+                      { value: legacy.modules.hr.active_staff, label: "Staff", tone: "neutral" },
+                      { value: legacy.modules.hr.pending_leave_requests, label: "Leave req", tone: legacy.modules.hr.pending_leave_requests > 0 ? "warning" : "success" },
+                      { value: legacy.modules.hr.unpaid_salary_sheets, label: "Unpaid sal", tone: legacy.modules.hr.unpaid_salary_sheets > 0 ? "danger" : "success" },
+                    ]}
+                    actions={[
+                      { label: "Run payroll", href: ROUTES.admin.hrPayroll },
+                      { label: "Leave requests", href: ROUTES.admin.hrLeave },
                     ]}
                   />
-                  <ModuleSummaryCard
+                  <ModuleOperationalCard
                     title="CRM Pipeline"
                     href={ROUTES.admin.crm}
-                    icon={<BarChart3 className="h-4 w-4 text-indigo-700" />}
+                    icon={<BarChart3 className="h-4 w-4 text-white" />}
+                    iconBg="bg-indigo-600 dark:bg-indigo-700"
                     alert={legacy.modules.crm_modules.follow_ups_due > 0}
-                    rows={[
-                      { label: "Open leads", value: String(legacy.modules.crm_modules.open_leads) },
-                      { label: "Open opportunities", value: String(legacy.modules.crm_modules.open_opportunities) },
-                      {
-                        label: "Follow-ups due",
-                        value: String(legacy.modules.crm_modules.follow_ups_due),
-                        emphasize: legacy.modules.crm_modules.follow_ups_due > 0,
-                      },
+                    kpis={[
+                      { value: legacy.modules.crm_modules.open_leads, label: "Leads", tone: "neutral" },
+                      { value: legacy.modules.crm_modules.open_opportunities, label: "Opptys", tone: "neutral" },
+                      { value: legacy.modules.crm_modules.follow_ups_due, label: "Follow-ups", tone: legacy.modules.crm_modules.follow_ups_due > 0 ? "danger" : "success" },
+                    ]}
+                    bar={(() => {
+                      const total = legacy.modules.crm_modules.open_leads + legacy.modules.crm_modules.open_opportunities;
+                      return total > 0 ? {
+                        value: legacy.modules.crm_modules.open_opportunities,
+                        max: total,
+                        color: "bg-indigo-500",
+                        label: "Lead → Opportunity",
+                      } : undefined;
+                    })()}
+                    actions={[
+                      { label: "New lead", href: buildAdminLeadsRoute() },
+                      { label: "Follow-ups", href: ROUTES.admin.crm },
                     ]}
                   />
-                  <ModuleSummaryCard
+                  <ModuleOperationalCard
                     title="Support & Service"
                     href={ROUTES.admin.serviceDeskTickets}
-                    icon={<ShieldAlert className="h-4 w-4 text-rose-700" />}
+                    icon={<ShieldAlert className="h-4 w-4 text-white" />}
+                    iconBg="bg-rose-600 dark:bg-rose-700"
                     alert={legacy.modules.support.open_tickets > 0}
-                    rows={[
-                      {
-                        label: "Open support tickets",
-                        value: String(legacy.modules.support.open_tickets),
-                        emphasize: legacy.modules.support.open_tickets > 0,
-                      },
-                      { label: "Delivery cases in progress", value: String(legacy.modules.support.open_delivery_cases) },
+                    kpis={[
+                      { value: legacy.modules.support.open_tickets, label: "Tickets", tone: legacy.modules.support.open_tickets > 0 ? "danger" : "success" },
+                      { value: legacy.modules.support.open_delivery_cases, label: "Delivery", tone: legacy.modules.support.open_delivery_cases > 0 ? "warning" : "neutral" },
+                      { value: 0, label: "Resolved", tone: "success" },
+                    ]}
+                    actions={[
+                      { label: "New ticket", href: ROUTES.admin.serviceDeskTickets },
                     ]}
                   />
-                  <ModuleSummaryCard
+                  <ModuleOperationalCard
                     title="Batches & Draws"
                     href={ROUTES.admin.batches}
-                    icon={<CalendarClock className="h-4 w-4 text-amber-700" />}
-                    rows={[
-                      { label: "Live batches", value: String(legacy.batches.live_batches ?? legacy.batches.total_batches) },
-                      { label: "Draws completed", value: String(legacy.batches.total_draws) },
+                    icon={<CalendarClock className="h-4 w-4 text-white" />}
+                    iconBg="bg-amber-600 dark:bg-amber-700"
+                    kpis={[
+                      { value: legacy.batches.live_batches ?? legacy.batches.total_batches, label: "Live", tone: "neutral" },
+                      { value: legacy.batches.total_draws, label: "Draws", tone: "success" },
                       {
-                        label: "Next draw",
-                        value: legacy.batches.next_draw_batch
-                          ? legacy.batches.next_draw_batch.days_until_draw != null
-                            ? `${legacy.batches.next_draw_batch.batch_code} · in ${legacy.batches.next_draw_batch.days_until_draw}d`
-                            : legacy.batches.next_draw_batch.batch_code
+                        value: legacy.batches.next_draw_batch?.days_until_draw != null
+                          ? `${legacy.batches.next_draw_batch.days_until_draw}d`
                           : "—",
+                        label: "Next draw",
+                        tone: legacy.batches.next_draw_batch?.days_until_draw != null && legacy.batches.next_draw_batch.days_until_draw <= 3 ? "warning" : "neutral",
                       },
                     ]}
+                    actions={[
+                      { label: "Run draw", href: ROUTES.admin.batches },
+                    ]}
                   />
-                  <ModuleSummaryCard
+                  <ModuleOperationalCard
                     title="Commissions"
                     href={ROUTES.admin.financeCommissions}
-                    icon={<Percent className="h-4 w-4 text-teal-700" />}
+                    icon={<Percent className="h-4 w-4 text-white" />}
+                    iconBg="bg-teal-600 dark:bg-teal-700"
                     alert={(legacy.commission_summary?.pending_count ?? 0) > 0}
-                    rows={[
+                    kpis={[
                       {
-                        label: "Pending payout",
                         value: money(legacy.commission_summary?.pending_commission ?? "0.00"),
-                        emphasize: (legacy.commission_summary?.pending_count ?? 0) > 0,
+                        label: "Pending",
+                        tone: (legacy.commission_summary?.pending_count ?? 0) > 0 ? "warning" : "success",
                       },
-                      { label: "Settled", value: money(legacy.commission_summary?.settled_commission ?? "0.00") },
-                      { label: "Entries", value: String(legacy.commission_summary?.total_count ?? 0) },
+                      { value: money(legacy.commission_summary?.settled_commission ?? "0.00"), label: "Settled", tone: "success" },
+                      { value: legacy.commission_summary?.total_count ?? 0, label: "Entries", tone: "neutral" },
+                    ]}
+                    actions={[
+                      { label: "Process payout", href: ROUTES.admin.financeCommissions },
                     ]}
                   />
                 </div>
               </WorkspaceSection>
             ) : null}
+
+            {/* Attendance Block */}
+            {legacy.attendance ? (
+              <WorkspaceSection
+                title="Today's Attendance"
+                description="Staff presence snapshot for today."
+              >
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                  <div className="rounded-xl border border-border bg-card p-4 text-center">
+                    <div className="text-2xl font-bold text-foreground">{legacy.attendance.total_staff}</div>
+                    <div className="mt-1 text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Total Staff</div>
+                  </div>
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 dark:bg-emerald-900/20 dark:border-emerald-800/40 p-4 text-center">
+                    <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{legacy.attendance.present}</div>
+                    <div className="mt-1 text-[11px] font-medium text-emerald-600/80 dark:text-emerald-400/80 uppercase tracking-wide">Present</div>
+                  </div>
+                  <div className="rounded-xl border border-amber-200 bg-amber-50/60 dark:bg-amber-900/20 dark:border-amber-800/40 p-4 text-center">
+                    <div className="text-2xl font-bold text-amber-700 dark:text-amber-400">{legacy.attendance.half_day}</div>
+                    <div className="mt-1 text-[11px] font-medium text-amber-600/80 dark:text-amber-400/80 uppercase tracking-wide">Half Day</div>
+                  </div>
+                  <div className="rounded-xl border border-red-200 bg-red-50/60 dark:bg-red-900/20 dark:border-red-800/40 p-4 text-center">
+                    <div className="text-2xl font-bold text-red-700 dark:text-red-400">{legacy.attendance.absent}</div>
+                    <div className="mt-1 text-[11px] font-medium text-red-600/80 dark:text-red-400/80 uppercase tracking-wide">Absent</div>
+                  </div>
+                  <div className="rounded-xl border border-sky-200 bg-sky-50/60 dark:bg-sky-900/20 dark:border-sky-800/40 p-4 text-center">
+                    <div className="text-2xl font-bold text-sky-700 dark:text-sky-400">{legacy.attendance.on_leave}</div>
+                    <div className="mt-1 text-[11px] font-medium text-sky-600/80 dark:text-sky-400/80 uppercase tracking-wide">On Leave</div>
+                  </div>
+                </div>
+                {legacy.attendance.total_staff > 0 ? (
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
+                      <span>Attendance Rate</span>
+                      <span className="font-bold text-foreground">{legacy.attendance.attendance_rate}%</span>
+                    </div>
+                    <div className="h-2.5 w-full rounded-full bg-slate-200/80 dark:bg-slate-700/60 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-emerald-500 transition-all duration-700"
+                        style={{ width: `${legacy.attendance.attendance_rate}%` }}
+                      />
+                    </div>
+                    {legacy.attendance.not_marked > 0 ? (
+                      <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+                        {legacy.attendance.not_marked} staff not yet marked today
+                      </p>
+                    ) : null}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <ActionButton href={ROUTES.admin.hrAttendance} variant="secondary" className="h-8 px-3 text-xs">
+                        Mark Attendance
+                      </ActionButton>
+                      <ActionButton href={ROUTES.admin.hrStaff} variant="secondary" className="h-8 px-3 text-xs">
+                        View Staff
+                      </ActionButton>
+                      <ActionButton href={ROUTES.admin.hrPayroll} variant="secondary" className="h-8 px-3 text-xs">
+                        Run Payroll
+                      </ActionButton>
+                    </div>
+                  </div>
+                ) : null}
+              </WorkspaceSection>
+            ) : null}
+
+            {/* Quick Actions Grid */}
+            <WorkspaceSection
+              title="Quick Actions"
+              description="Jump to frequently-used operations across all modules."
+            >
+              <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-4">
+                {[
+                  { label: "Collect EMI", href: ROUTES.admin.payments, icon: "💰", bg: "bg-sky-50 dark:bg-sky-900/20 border-sky-200 dark:border-sky-800/40" },
+                  { label: "New Subscription", href: ROUTES.admin.subscriptions, icon: "📋", bg: "bg-violet-50 dark:bg-violet-900/20 border-violet-200 dark:border-violet-800/40" },
+                  { label: "Run Lucky Draw", href: ROUTES.admin.batches, icon: "🎲", bg: "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/40" },
+                  { label: "New Direct Sale", href: ROUTES.admin.billing, icon: "🧾", bg: "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/40" },
+                  { label: "Create Purchase Order", href: ROUTES.admin.purchaseOrders, icon: "📦", bg: "bg-slate-50 dark:bg-slate-900/20 border-slate-200 dark:border-slate-800/40" },
+                  { label: "Schedule Delivery", href: ROUTES.admin.deliveries, icon: "🚚", bg: "bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800/40" },
+                  { label: "New Lead", href: buildAdminLeadsRoute(), icon: "👤", bg: "bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800/40" },
+                  { label: "Process Commission", href: ROUTES.admin.financeCommissions, icon: "📊", bg: "bg-teal-50 dark:bg-teal-900/20 border-teal-200 dark:border-teal-800/40" },
+                  { label: "Accounting", href: ROUTES.admin.accounting, icon: "📒", bg: "bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800/40" },
+                  { label: "Service Desk", href: ROUTES.admin.serviceDeskTickets, icon: "🔧", bg: "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/40" },
+                  { label: "Rent & Lease", href: ROUTES.admin.rentLease, icon: "🏠", bg: "bg-violet-50 dark:bg-violet-900/20 border-violet-200 dark:border-violet-800/40" },
+                  { label: "Manufacturing", href: ROUTES.admin.manufacturing, icon: "🏭", bg: "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800/40" },
+                ].map((action) => (
+                  <Link
+                    key={action.href + action.label}
+                    href={action.href}
+                    className={`flex items-center gap-3 rounded-xl border p-3 transition hover:-translate-y-0.5 hover:shadow-sm ${action.bg}`}
+                  >
+                    <span className="text-xl">{action.icon}</span>
+                    <span className="text-sm font-semibold text-foreground">{action.label}</span>
+                  </Link>
+                ))}
+              </div>
+            </WorkspaceSection>
 
             <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
               <CockpitPanel
@@ -1970,9 +2154,7 @@ export default function AdminDashboardPage() {
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <Link
-                              href={buildAdminSubscriptionRoute(
-                                row.subscription_id ?? row.id
-                              )}
+                              href={getDueRowHref(row)}
                               className="text-sm font-semibold text-slate-950 transition hover:text-sky-700"
                             >
                               {row.subscription_number ||
@@ -2021,7 +2203,7 @@ export default function AdminDashboardPage() {
 
                         <div className="flex items-center md:justify-end">
                           <Link
-                            href={buildAdminSubscriptionRoute(row.subscription_id ?? row.id)}
+                            href={getDueRowHref(row)}
                             className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3.5 py-2 text-sm font-semibold text-foreground transition hover:-translate-y-0.5 hover:border-ring hover:bg-muted/50"
                           >
                             Open
@@ -2224,69 +2406,12 @@ export default function AdminDashboardPage() {
               </WorkspaceSection>
             </div>
 
-            <WorkspaceSection
-              title="Enterprise module map"
-              description="The sidebar now exposes the ERP-ready admin information architecture only through canonical routes. Legacy paths remain compatibility-only while shared master data stays centered on product, inventory, billing mirror, and accounting boundaries."
-              contentClassName="grid gap-4 xl:grid-cols-2"
-            >
-              {ADMIN_ENTERPRISE_MODULES.map((item) => (
-                <article
-                  key={item.key}
-                  className="rounded-xl border border-border bg-card px-5 py-5 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.42)]"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <Link
-                        href={item.href}
-                        className="text-base font-semibold text-slate-950 transition hover:text-sky-700"
-                      >
-                        {item.title}
-                      </Link>
-                      <p className="mt-2 text-sm leading-6 text-slate-700">
-                        {item.description}
-                      </p>
-                    </div>
-                    <span className="inline-flex rounded-full border border-border bg-muted/50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                      Canonical
-                    </span>
-                  </div>
-
-                  <div className="mt-4 grid gap-3 md:grid-cols-2">
-                    <div className="rounded-xl border border-border bg-card px-4 py-3">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                        Operational focus
-                      </div>
-                      <div className="mt-2 text-sm leading-6 text-slate-700">
-                        {item.operationalFocus}
-                      </div>
-                    </div>
-                    <div className="rounded-xl border border-border bg-card px-4 py-3">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                        Master-data direction
-                      </div>
-                      <div className="mt-2 text-sm leading-6 text-slate-700">
-                        {item.masterDataDirection}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {item.routes.map((route) => (
-                      <ActionButton
-                        key={`${item.key}-${route.href}`}
-                        href={route.href}
-                        variant="secondary"
-                        className="h-8 px-3 text-xs"
-                      >
-                        {route.label}
-                      </ActionButton>
-                    ))}
-                  </div>
-                </article>
-              ))}
-            </WorkspaceSection>
           </>
         ) : null}
+        </div>
+        <div className="lg:col-span-1 space-y-6">
+          <OperationalCalendar />
+        </div>
       </div>
     </ERPPageShell>
   );

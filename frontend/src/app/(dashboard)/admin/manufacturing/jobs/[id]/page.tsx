@@ -67,6 +67,7 @@ export default function AdminManufacturingJobDetailPage() {
   });
   const [employees, setEmployees] = useState<HrStaff[]>([]);
   const [laborForm, setLaborForm] = useState({
+    id: undefined as number | undefined,
     employee: "",
     activity_name: "",
     hours_worked: "",
@@ -235,13 +236,14 @@ export default function AdminManufacturingJobDetailPage() {
       const payload = isFormEmpty ? undefined : {
         labor_lines: [
           {
+            ...(laborForm.id ? { id: laborForm.id } : {}),
             employee: Number(laborForm.employee),
             activity_name: laborForm.activity_name || "General Labor",
-            hours_worked: laborForm.hours_worked || "0.00",
-            piece_count: laborForm.piece_count || "0.00",
+            hours_worked: laborForm.hours_worked || null,
+            piece_count: laborForm.piece_count || null,
             wage_amount: laborForm.wage_amount,
-          }
-        ]
+          },
+        ],
       };
       
       const response = await postProductionLabor(job.id, payload);
@@ -249,6 +251,7 @@ export default function AdminManufacturingJobDetailPage() {
       setNotice("Production labor posted successfully.");
       if (!isFormEmpty) {
         setLaborForm({
+          id: undefined,
           employee: "",
           activity_name: "",
           hours_worked: "",
@@ -697,7 +700,18 @@ export default function AdminManufacturingJobDetailPage() {
                 <div className="space-y-4">
                   {job.status === "IN_PROGRESS" || job.status === "RELEASED" ? (
                     <div className="rounded-xl border border-border bg-background p-4 space-y-4">
-                      <div className="font-medium text-foreground">Log Labor Activity</div>
+                      <div className="font-medium text-foreground">
+                        {laborForm.id ? "Update Pending Labor" : "Log Labor Activity"}
+                        {laborForm.id && (
+                          <button
+                            type="button"
+                            onClick={() => setLaborForm({ id: undefined, employee: "", activity_name: "", hours_worked: "", piece_count: "", wage_amount: "" })}
+                            className="ml-3 text-xs text-muted-foreground hover:text-foreground underline"
+                          >
+                            Cancel Edit
+                          </button>
+                        )}
+                      </div>
                       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
                         <div className="space-y-1.5 lg:col-span-1">
                           <label className="text-xs font-medium text-muted-foreground">Employee</label>
@@ -768,7 +782,7 @@ export default function AdminManufacturingJobDetailPage() {
                           disabled={saving || !laborForm.employee.trim() || !laborForm.wage_amount.trim()}
                           className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
                         >
-                          Absorb Labor
+                          {laborForm.id ? "Update Line" : "Absorb Labor"}
                         </button>
                       </div>
                     </div>
@@ -778,12 +792,28 @@ export default function AdminManufacturingJobDetailPage() {
                     <ERPEmptyState title="No labor lines" description="Record labor against this job." />
                   ) : (
                     job.labor_lines.map((line) => (
-                      <div key={line.id} className="rounded-xl border border-border bg-background/70 p-3 text-sm">
-                        <div className="font-medium text-foreground">
-                          {line.employee_name || line.employee_code || `Staff ${line.employee}`} · {line.activity_name}
+                      <div 
+                        key={line.id} 
+                        className={`rounded-xl border border-border p-3 text-sm ${!line.is_posted ? 'bg-amber-50/50 dark:bg-amber-900/10 cursor-pointer hover:border-primary/50 transition-colors' : 'bg-background/70'}`}
+                        onClick={() => {
+                          if (!line.is_posted) {
+                            setLaborForm({
+                              id: line.id,
+                              employee: line.employee ? String(line.employee) : "",
+                              activity_name: line.activity_name,
+                              hours_worked: line.hours_worked || "",
+                              piece_count: line.piece_count || "",
+                              wage_amount: line.wage_amount || "",
+                            });
+                          }
+                        }}
+                      >
+                        <div className="font-medium text-foreground flex justify-between items-center">
+                          <span>{line.employee_name || line.employee_code || (line.employee ? `Staff ${line.employee}` : "Unassigned Staff")} · {line.activity_name}</span>
+                          {!line.is_posted && <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full dark:bg-amber-900/30 dark:text-amber-300 font-semibold uppercase tracking-wider">Pending</span>}
                         </div>
-                        <div className="text-muted-foreground">
-                          {line.hours_worked}h · {line.piece_count}pcs · Wage {formatRupee(line.wage_amount)} · {line.is_posted ? "Posted" : "Draft"}
+                        <div className="text-muted-foreground mt-1">
+                          {line.hours_worked || 0}h · {line.piece_count || 0}pcs · Wage {formatRupee(line.wage_amount || "0")} {line.is_posted ? "· Posted" : "· Click to update & post"}
                         </div>
                       </div>
                     ))

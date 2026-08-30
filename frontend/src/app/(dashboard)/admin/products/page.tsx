@@ -252,7 +252,7 @@ function PimProductRow({
       {/* Status — variant SKUs inherit their blueprint's publish status */}
       <td className="px-4 py-2.5 text-center">
         {(() => {
-          const effectivePublished = isChild ? p.parent_is_published : p.is_published;
+          const effectivePublished = p.is_published;
           if (effectivePublished) {
             return (
               <span className="text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5">
@@ -277,6 +277,14 @@ function PimProductRow({
           >
             PIM Editor <ExternalLink className="h-3 w-3" />
           </Link>
+          {!isChild && (
+            <Link
+              href={`/admin/pim/products/${p.id}/variants/publish-control`}
+              className="inline-flex items-center gap-1 text-violet-600 text-xs hover:underline font-medium"
+            >
+              Publish control <Layers className="h-3 w-3" />
+            </Link>
+          )}
           {p.code && (
             <Link
               href={`/admin/products?q=${encodeURIComponent(p.code)}`}

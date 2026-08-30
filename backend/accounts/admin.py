@@ -1,10 +1,11 @@
+from unfold.admin import ModelAdmin as UnfoldModelAdmin, TabularInline as UnfoldTabularInline, StackedInline as UnfoldStackedInline
 from django.contrib import admin
 
 from accounts.models import Capability, RoleCapability, StaffIdentity, UserCapabilityOverride
 
 
 @admin.register(StaffIdentity)
-class StaffIdentityAdmin(admin.ModelAdmin):
+class StaffIdentityAdmin(UnfoldModelAdmin):
     list_display = ("id", "user", "employee", "login_enabled", "created_at")
     list_filter = ("login_enabled",)
     search_fields = ("user__username", "employee__id")
@@ -12,7 +13,7 @@ class StaffIdentityAdmin(admin.ModelAdmin):
 
 
 @admin.register(Capability)
-class CapabilityAdmin(admin.ModelAdmin):
+class CapabilityAdmin(UnfoldModelAdmin):
     list_display = ("code", "label", "is_active", "created_at")
     list_filter = ("is_active",)
     search_fields = ("code", "label")
@@ -21,7 +22,7 @@ class CapabilityAdmin(admin.ModelAdmin):
 
 
 @admin.register(RoleCapability)
-class RoleCapabilityAdmin(admin.ModelAdmin):
+class RoleCapabilityAdmin(UnfoldModelAdmin):
     list_display = ("role", "capability", "is_allowed", "created_at")
     list_filter = ("role", "is_allowed")
     search_fields = ("capability__code",)
@@ -29,7 +30,7 @@ class RoleCapabilityAdmin(admin.ModelAdmin):
 
 
 @admin.register(UserCapabilityOverride)
-class UserCapabilityOverrideAdmin(admin.ModelAdmin):
+class UserCapabilityOverrideAdmin(UnfoldModelAdmin):
     list_display = ("user", "capability", "is_allowed", "note", "created_at")
     list_filter = ("is_allowed",)
     search_fields = ("user__username", "capability__code")

@@ -312,12 +312,12 @@ export default function ProductGrid({
               <ProductCard3D
                 key={product.id}
                 id={String(product.id)}
-                title={product.name}
+                title={product.seo_name || product.name}
                 category={product.category || "Uncategorized"}
                 price={price}
                 emiAmount={emiAmount}
                 imageUrl={product.image || ""}
-                href={`/products/${product.id}`}
+                href={`/products/${product.product_code}`}
               />
             );
           })}

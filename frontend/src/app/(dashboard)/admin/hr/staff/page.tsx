@@ -51,7 +51,7 @@ import {
 type Tab = "dashboard" | "register" | "leave" | "attendance" | "advances";
 type EmploymentTypeValue = "PERMANENT_MONTHLY" | "TEMPORARY" | "DAILY_WAGE" | "HOURLY" | "PIECE_RATE" | "MANUFACTURING" | "SERVICE";
 type EmploymentStatusValue = "DRAFT" | "ONBOARDING" | "ACTIVE";
-type PaymentModeValue = "CASH" | "BANK" | "UPI";
+type PaymentModeValue = "" | "CASH" | "BANK" | "UPI";
 type KycStatusValue = "PENDING" | "VERIFIED" | "REJECTED";
 
 type StaffFormState = {
@@ -105,7 +105,7 @@ const emptyForm: StaffFormState = {
   reporting_manager: "", work_location: "", probation_end_date: "",
   attendance_policy: "", shift_name: "", weekly_off: "", payroll_eligible: false,
   salary_effective_from: "", base_salary: "", daily_wage_rate: "", hourly_wage_rate: "",
-  piece_rate_amount: "", piece_rate_unit_label: "", cost_center_code: "", payment_mode: "CASH",
+  piece_rate_amount: "", piece_rate_unit_label: "", cost_center_code: "", payment_mode: "",
   bank_account_name: "", bank_account_number: "", bank_ifsc: "", upi_id: "",
   kyc_status: "PENDING", kyc_id_type: "", kyc_id_number: "", address: "",
   emergency_contact_name: "", emergency_contact_relation: "", emergency_contact_phone: "",
@@ -143,7 +143,7 @@ function formFromStaff(s: HrStaff): StaffFormState {
     salary_effective_from: s.salary_effective_from || "", base_salary: s.base_salary || "",
     daily_wage_rate: s.daily_wage_rate || "", hourly_wage_rate: s.hourly_wage_rate || "",
     piece_rate_amount: s.piece_rate_amount || "", piece_rate_unit_label: s.piece_rate_unit_label || "",
-    cost_center_code: s.cost_center_code || "", payment_mode: (s.payment_mode as PaymentModeValue) || "CASH",
+    cost_center_code: s.cost_center_code || "", payment_mode: (s.payment_mode as PaymentModeValue) || "",
     bank_account_name: s.bank_account_name || "", bank_account_number: s.bank_account_number || "",
     bank_ifsc: s.bank_ifsc || "", upi_id: s.upi_id || "",
     kyc_status: s.kyc_verified ? "VERIFIED" : "PENDING", kyc_id_type: s.kyc_id_type || "",
@@ -172,7 +172,7 @@ function compactPayload(form: StaffFormState, targetStatus: EmploymentStatusValu
     piece_rate_amount: form.employment_type === "PIECE_RATE" ? form.piece_rate_amount.trim() || null : null,
     piece_rate_unit_label: form.employment_type === "PIECE_RATE" ? form.piece_rate_unit_label.trim() : "",
     cost_center_code: form.cost_center_code.trim(), cost_center: form.cost_center_code.trim(),
-    payment_mode: form.payment_mode, bank_account_name: form.bank_account_name.trim(),
+    payment_mode: form.payment_mode || undefined, bank_account_name: form.bank_account_name.trim(),
     bank_account_number: form.bank_account_number.trim(), bank_ifsc: form.bank_ifsc.trim(),
     upi_id: form.upi_id.trim(), kyc_status: form.kyc_status,
     kyc_verified: form.kyc_status === "VERIFIED", kyc_id_type: form.kyc_id_type.trim(),
@@ -414,7 +414,7 @@ function Wizard({ form, options, branches, editing, saving, fieldErrors, onChang
           <div className="grid gap-3 md:grid-cols-3">
             <Field label="Salary effective date"><TI type="date" value={form.salary_effective_from} onChange={(v) => up("salary_effective_from", v)} /></Field>
             <Field label="Cost center"><SI value={form.cost_center_code} onChange={(v) => up("cost_center_code", v)}>{optItems(options.cost_centers, "Select cost center")}</SI></Field>
-            <Field label="Payment mode"><SI value={form.payment_mode} onChange={(v) => up("payment_mode", v as PaymentModeValue)}>{options.payment_modes.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}</SI></Field>
+            <Field label="Payment mode (optional)"><SI value={form.payment_mode} onChange={(v) => up("payment_mode", v as PaymentModeValue)}><option value="">— Set later in Payroll —</option>{options.payment_modes.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}</SI></Field>
             {["PERMANENT_MONTHLY", "TEMPORARY", "MANUFACTURING", "SERVICE"].includes(form.employment_type) && (
               <Field label={form.employment_type === "TEMPORARY" ? "Contract payout" : "Base salary"}><TI value={form.base_salary} onChange={(v) => up("base_salary", v)} /></Field>
             )}
@@ -589,6 +589,7 @@ export default function AdminHrStaffPage() {
 
   // UI state
   const [loading,  setLoading]  = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [saving,   setSaving]   = useState(false);
   const [error,    setError]    = useState<string | null>(null);
   const [notice,   setNotice]   = useState<string | null>(null);
@@ -627,9 +628,10 @@ export default function AdminHrStaffPage() {
 
   // ── Load ────────────────────────────────────────────────────────────────────
 
-  const load = useCallback(async (overrideFilters = filters) => {
+  const load = useCallback(async (overrideFilters = filters, isInitial = false) => {
     try {
-      setLoading(true); setError(null);
+      if (isInitial) { setLoading(true); } else { setRefreshing(true); }
+      setError(null);
       const [staffRes, branchRes, idRes, optRes, sumRes, leaveRes, leaveTypeRes, advRes] = await Promise.all([
         listHrStaff({
           q: overrideFilters.q, branch: overrideFilters.branch, department: overrideFilters.department,
@@ -656,10 +658,11 @@ export default function AdminHrStaffPage() {
       setError(err instanceof Error ? err.message : "Unable to load HR cockpit.");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [filters]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(filters, true); }, [load]);
 
   // Debounced search
   function handleSearch(q: string) {
@@ -779,9 +782,9 @@ export default function AdminHrStaffPage() {
             )}
           </button>
         ))}
-        <button type="button" onClick={() => void load()} disabled={loading}
+        <button type="button" onClick={() => void load()} disabled={loading || refreshing}
           className="ml-auto shrink-0 flex items-center gap-1.5 px-3 py-2 text-xs text-muted-foreground hover:text-foreground transition disabled:opacity-50">
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+          <RefreshCw className={`h-3.5 w-3.5 ${(loading || refreshing) ? "animate-spin" : ""}`} /> Refresh
         </button>
       </div>
 
@@ -796,6 +799,13 @@ export default function AdminHrStaffPage() {
         <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
           <AlertTriangle className="h-4 w-4 shrink-0" /> {error}
           <button type="button" onClick={() => setError(null)} className="ml-auto"><X className="h-3.5 w-3.5" /></button>
+        </div>
+      )}
+
+      {refreshing && (
+        <div className="h-0.5 w-full overflow-hidden rounded-full bg-muted">
+          <div className="h-full w-1/3 bg-primary" style={{ animation: "slide 1.2s ease-in-out infinite" }} />
+          <style>{`@keyframes slide { 0% { transform:translateX(-100%) } 100% { transform:translateX(400%) } }`}</style>
         </div>
       )}
 

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import RefreshBar from "@/components/feedback/RefreshBar";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import {
@@ -29,10 +30,11 @@ export default function BadDebtPage() {
   const [cases, setCases] = useState<BadDebtCase[]>([]);
   const [aging, setAging] = useState<AgingReport | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const reload = useCallback(async () => {
-    setLoading(true);
+  const reload = useCallback(async (isInitial = false) => {
+    if (isInitial) setLoading(true); else setRefreshing(true);
     setError(null);
     try {
       const [c, a] = await Promise.all([listBadDebtCases(true), getAgingReport()]);
@@ -42,10 +44,11 @@ export default function BadDebtPage() {
       setError(err instanceof Error ? err.message : "Failed to load.");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
-  useEffect(() => { void reload(); }, [reload]);
+  useEffect(() => { void reload(true); }, [reload]);
 
   const kpis = [
     { label: "Recovery cases", value: cases.length },
@@ -91,6 +94,7 @@ export default function BadDebtPage() {
       subtitle="IT Act s.36(1)(vii) — NPA classification, aging buckets, legal notice, write-off"
       stats={kpis}
     >
+      <RefreshBar active={refreshing} />
       {loading ? (
         <LoadingBlock label="Loading bad debt data…" />
       ) : error ? (

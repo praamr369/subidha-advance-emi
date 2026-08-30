@@ -339,6 +339,8 @@ class FinanceAccountSerializer(serializers.ModelSerializer):
             "collection_blocker_reason",
             "recommended_action",
             "opening_balance",
+            "opening_balance_locked",
+            "opening_balance_set_at",
             "is_real_settlement_account",
             "is_active",
             "bank_last4",
@@ -347,7 +349,7 @@ class FinanceAccountSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = ["id", "opening_balance_locked", "opening_balance_set_at", "created_at", "updated_at"]
 
 
 class FinanceAccountDetailSerializer(FinanceAccountSerializer):

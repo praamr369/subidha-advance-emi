@@ -1,3 +1,4 @@
+from unfold.admin import ModelAdmin as UnfoldModelAdmin, TabularInline as UnfoldTabularInline, StackedInline as UnfoldStackedInline
 from django.contrib import admin
 
 from inventory.models import (
@@ -14,52 +15,52 @@ from inventory.models import (
 
 
 @admin.register(InventoryItem)
-class InventoryItemAdmin(admin.ModelAdmin):
+class InventoryItemAdmin(UnfoldModelAdmin):
     list_display = ("product", "sku", "stock_item_type", "stock_tracking_enabled", "delivery_stock_bridge_enabled", "is_active")
     list_filter = ("stock_item_type", "stock_tracking_enabled", "delivery_stock_bridge_enabled", "is_active", "valuation_method")
     search_fields = ("product__name", "product__product_code", "sku")
 
 
 @admin.register(StockLocation)
-class StockLocationAdmin(admin.ModelAdmin):
+class StockLocationAdmin(UnfoldModelAdmin):
     list_display = ("code", "name", "location_type", "is_active")
     list_filter = ("location_type", "is_active")
     search_fields = ("code", "name")
 
 
-class StockAdjustmentLineInline(admin.TabularInline):
+class StockAdjustmentLineInline(UnfoldTabularInline):
     model = StockAdjustmentLine
     extra = 0
 
 
 @admin.register(OpeningStockBatch)
-class OpeningStockBatchAdmin(admin.ModelAdmin):
+class OpeningStockBatchAdmin(UnfoldModelAdmin):
     list_display = ("batch_key", "original_filename", "created_at", "created_by")
     search_fields = ("batch_key", "original_filename")
 
 
 @admin.register(OpeningStockEntry)
-class OpeningStockEntryAdmin(admin.ModelAdmin):
+class OpeningStockEntryAdmin(UnfoldModelAdmin):
     list_display = ("id", "inventory_item", "stock_location", "effective_date", "quantity", "status", "source")
     list_filter = ("status", "source")
     search_fields = ("inventory_item__sku", "inventory_item__product__product_code")
 
 
 @admin.register(StockAdjustment)
-class StockAdjustmentAdmin(admin.ModelAdmin):
+class StockAdjustmentAdmin(UnfoldModelAdmin):
     list_display = ("adjustment_no", "adjustment_date", "status", "created_by")
     list_filter = ("status", "adjustment_date")
     search_fields = ("adjustment_no", "reason")
     inlines = [StockAdjustmentLineInline]
 
 
-class PurchaseBillLineInline(admin.TabularInline):
+class PurchaseBillLineInline(UnfoldTabularInline):
     model = PurchaseBillLine
     extra = 0
 
 
 @admin.register(PurchaseBill)
-class PurchaseBillAdmin(admin.ModelAdmin):
+class PurchaseBillAdmin(UnfoldModelAdmin):
     list_display = ("bill_no", "bill_date", "status", "vendor", "grand_total")
     list_filter = ("status", "tax_mode", "bill_date")
     search_fields = ("bill_no", "vendor__name")
@@ -67,7 +68,7 @@ class PurchaseBillAdmin(admin.ModelAdmin):
 
 
 @admin.register(StockLedger)
-class StockLedgerAdmin(admin.ModelAdmin):
+class StockLedgerAdmin(UnfoldModelAdmin):
     list_display = (
         "inventory_item",
         "movement_type",

@@ -1,3 +1,4 @@
+from unfold.admin import ModelAdmin as UnfoldModelAdmin, TabularInline as UnfoldTabularInline, StackedInline as UnfoldStackedInline
 from django.contrib import admin
 
 from accounting.models import (
@@ -38,26 +39,26 @@ from accounting.models import (
 
 
 @admin.register(ChartOfAccount)
-class ChartOfAccountAdmin(admin.ModelAdmin):
+class ChartOfAccountAdmin(UnfoldModelAdmin):
     list_display = ("code", "name", "account_type", "system_code", "is_active")
     search_fields = ("code", "name", "system_code")
     list_filter = ("account_type", "is_active")
 
 
 @admin.register(FinanceAccount)
-class FinanceAccountAdmin(admin.ModelAdmin):
+class FinanceAccountAdmin(UnfoldModelAdmin):
     list_display = ("name", "kind", "chart_account", "opening_balance", "is_active")
     search_fields = ("name", "upi_handle", "bank_last4")
     list_filter = ("kind", "is_active")
 
 
-class JournalEntryLineInline(admin.TabularInline):
+class JournalEntryLineInline(UnfoldTabularInline):
     model = JournalEntryLine
     extra = 0
 
 
 @admin.register(JournalEntry)
-class JournalEntryAdmin(admin.ModelAdmin):
+class JournalEntryAdmin(UnfoldModelAdmin):
     list_display = ("entry_no", "entry_date", "entry_type", "status", "posted_by")
     search_fields = ("entry_no", "memo", "source_model", "source_id")
     list_filter = ("entry_type", "status")
@@ -65,68 +66,68 @@ class JournalEntryAdmin(admin.ModelAdmin):
 
 
 @admin.register(Vendor)
-class VendorAdmin(admin.ModelAdmin):
+class VendorAdmin(UnfoldModelAdmin):
     list_display = ("name", "gstin", "phone", "email", "is_active")
     search_fields = ("name", "gstin", "phone", "email")
     list_filter = ("is_active",)
 
 
 @admin.register(ExpenseVoucher)
-class ExpenseVoucherAdmin(admin.ModelAdmin):
+class ExpenseVoucherAdmin(UnfoldModelAdmin):
     list_display = ("voucher_no", "expense_date", "vendor", "net_amount", "status")
     search_fields = ("voucher_no", "bill_no", "vendor__name")
     list_filter = ("status", "payment_mode")
 
 
 @admin.register(EmployeeProfile)
-class EmployeeProfileAdmin(admin.ModelAdmin):
+class EmployeeProfileAdmin(UnfoldModelAdmin):
     list_display = ("employee_code", "name", "joining_date", "is_active")
     search_fields = ("employee_code", "name")
     list_filter = ("is_active",)
 
 
 @admin.register(EmployeeCompensationComponent)
-class EmployeeCompensationComponentAdmin(admin.ModelAdmin):
+class EmployeeCompensationComponentAdmin(UnfoldModelAdmin):
     list_display = ("employee", "component_name", "component_type", "amount", "is_active")
     search_fields = ("employee__employee_code", "employee__name", "component_name")
     list_filter = ("component_type", "is_active")
 
 
 @admin.register(EmployeeAttendance)
-class EmployeeAttendanceAdmin(admin.ModelAdmin):
+class EmployeeAttendanceAdmin(UnfoldModelAdmin):
     list_display = ("employee", "attendance_date", "status", "worked_hours", "overtime_hours")
     search_fields = ("employee__employee_code", "employee__name", "notes")
     list_filter = ("status", "attendance_date")
 
 
 @admin.register(LeaveType)
-class LeaveTypeAdmin(admin.ModelAdmin):
+class LeaveTypeAdmin(UnfoldModelAdmin):
     list_display = ("code", "name", "is_paid", "is_active")
     search_fields = ("code", "name")
     list_filter = ("is_paid", "is_active")
 
 
 @admin.register(LeaveRequest)
-class LeaveRequestAdmin(admin.ModelAdmin):
+class LeaveRequestAdmin(UnfoldModelAdmin):
     list_display = ("request_no", "employee", "leave_type", "start_date", "end_date", "day_count", "status")
     search_fields = ("request_no", "employee__employee_code", "employee__name", "reason")
     list_filter = ("status", "leave_type")
 
 
 @admin.register(PayrollPeriod)
-class PayrollPeriodAdmin(admin.ModelAdmin):
+class PayrollPeriodAdmin(UnfoldModelAdmin):
     list_display = ("code", "year", "month", "start_date", "end_date", "status")
     search_fields = ("code",)
     list_filter = ("status", "year")
 
 
-class SalarySheetLineInline(admin.TabularInline):
+class SalarySheetLineInline(UnfoldTabularInline):
     model = SalarySheetLine
     extra = 0
 
 
 @admin.register(SalarySheet)
-class SalarySheetAdmin(admin.ModelAdmin):
+class SalarySheetAdmin(UnfoldModelAdmin):
     list_display = ("employee", "year", "month", "net_amount", "status")
     search_fields = ("employee__employee_code", "employee__name")
     list_filter = ("status", "year", "month")
@@ -134,86 +135,86 @@ class SalarySheetAdmin(admin.ModelAdmin):
 
 
 @admin.register(SalaryPayment)
-class SalaryPaymentAdmin(admin.ModelAdmin):
+class SalaryPaymentAdmin(UnfoldModelAdmin):
     list_display = ("salary_sheet", "payment_date", "amount", "finance_account")
     search_fields = ("reference_no", "salary_sheet__employee__name")
 
 
 @admin.register(EmployeeExpenseClaim)
-class EmployeeExpenseClaimAdmin(admin.ModelAdmin):
+class EmployeeExpenseClaimAdmin(UnfoldModelAdmin):
     list_display = ("claim_no", "employee", "expense_date", "approved_amount", "status")
     search_fields = ("claim_no", "employee__employee_code", "employee__name", "bill_no")
     list_filter = ("status",)
 
 
 @admin.register(EmployeeExpenseClaimPayment)
-class EmployeeExpenseClaimPaymentAdmin(admin.ModelAdmin):
+class EmployeeExpenseClaimPaymentAdmin(UnfoldModelAdmin):
     list_display = ("expense_claim", "payment_date", "amount", "finance_account")
     search_fields = ("reference_no", "expense_claim__claim_no", "expense_claim__employee__name")
 
 
 @admin.register(MoneyMovement)
-class MoneyMovementAdmin(admin.ModelAdmin):
+class MoneyMovementAdmin(UnfoldModelAdmin):
     list_display = ("movement_no", "movement_date", "from_finance_account", "to_finance_account", "amount", "status")
     search_fields = ("movement_no", "reference_no", "notes")
     list_filter = ("status",)
 
 
 @admin.register(AccountingBridgePosting)
-class AccountingBridgePostingAdmin(admin.ModelAdmin):
+class AccountingBridgePostingAdmin(UnfoldModelAdmin):
     list_display = ("source_model", "source_id", "purpose", "journal_entry", "created_at")
     search_fields = ("source_model", "source_id", "purpose", "journal_entry__entry_no")
     list_filter = ("purpose",)
 
 
 @admin.register(DocumentSequence)
-class DocumentSequenceAdmin(admin.ModelAdmin):
+class DocumentSequenceAdmin(UnfoldModelAdmin):
     list_display = ("series_code", "financial_year", "prefix", "next_number", "is_active")
     search_fields = ("series_code", "financial_year", "prefix")
     list_filter = ("is_active",)
 
 
 @admin.register(FinancialYear)
-class FinancialYearAdmin(admin.ModelAdmin):
+class FinancialYearAdmin(UnfoldModelAdmin):
     list_display = ("code", "name", "start_date", "end_date", "is_active", "activated_by")
     search_fields = ("code", "name")
     list_filter = ("is_active",)
 
 
 @admin.register(AccountingPeriod)
-class AccountingPeriodAdmin(admin.ModelAdmin):
+class AccountingPeriodAdmin(UnfoldModelAdmin):
     list_display = ("code", "name", "start_date", "end_date", "financial_year", "status", "is_locked", "locked_by")
     search_fields = ("code", "label", "name", "financial_year__code")
     list_filter = ("status", "is_locked", "financial_year")
 
 
 @admin.register(PostingLock)
-class PostingLockAdmin(admin.ModelAdmin):
+class PostingLockAdmin(UnfoldModelAdmin):
     list_display = ("lock_date", "locked_by", "locked_at")
     search_fields = ("reason", "locked_by__username")
 
 
 @admin.register(AssetCategory)
-class AssetCategoryAdmin(admin.ModelAdmin):
+class AssetCategoryAdmin(UnfoldModelAdmin):
     list_display = ("code", "name", "method", "useful_life_months", "is_active")
     search_fields = ("code", "name")
     list_filter = ("method", "is_active")
 
 
 @admin.register(Asset)
-class AssetAdmin(admin.ModelAdmin):
+class AssetAdmin(UnfoldModelAdmin):
     list_display = ("asset_code", "description", "category", "cost_amount", "accumulated_depreciation", "status")
     search_fields = ("asset_code", "description", "vendor__name")
     list_filter = ("status", "category")
 
 
-class DepreciationLineInline(admin.TabularInline):
+class DepreciationLineInline(UnfoldTabularInline):
     model = DepreciationLine
     extra = 0
 
 
 @admin.register(DepreciationRun)
-class DepreciationRunAdmin(admin.ModelAdmin):
+class DepreciationRunAdmin(UnfoldModelAdmin):
     list_display = ("run_code", "period_start", "period_end", "status", "created_by")
     search_fields = ("run_code", "created_by__username")
     list_filter = ("status",)
@@ -221,19 +222,19 @@ class DepreciationRunAdmin(admin.ModelAdmin):
 
 
 @admin.register(VendorSettlement)
-class VendorSettlementAdmin(admin.ModelAdmin):
+class VendorSettlementAdmin(UnfoldModelAdmin):
     list_display = ("settlement_no", "vendor", "settlement_date", "amount", "status")
     search_fields = ("settlement_no", "vendor__name", "reference_no")
     list_filter = ("status",)
 
 
-class TaxInvoiceLineInline(admin.TabularInline):
+class TaxInvoiceLineInline(UnfoldTabularInline):
     model = TaxInvoiceLine
     extra = 0
 
 
 @admin.register(TaxInvoice)
-class TaxInvoiceAdmin(admin.ModelAdmin):
+class TaxInvoiceAdmin(UnfoldModelAdmin):
     list_display = ("invoice_no", "invoice_date", "recipient_name", "total_amount", "status")
     search_fields = ("invoice_no", "recipient_name", "recipient_gstin", "supplier_gstin")
     list_filter = ("status", "supply_kind")
@@ -241,21 +242,21 @@ class TaxInvoiceAdmin(admin.ModelAdmin):
 
 
 @admin.register(CreditNote)
-class CreditNoteAdmin(admin.ModelAdmin):
+class CreditNoteAdmin(UnfoldModelAdmin):
     list_display = ("note_no", "note_date", "original_invoice", "total_adjustment", "status")
     search_fields = ("note_no", "original_invoice__invoice_no", "reason")
     list_filter = ("status",)
 
 
 @admin.register(DebitNote)
-class DebitNoteAdmin(admin.ModelAdmin):
+class DebitNoteAdmin(UnfoldModelAdmin):
     list_display = ("note_no", "note_date", "original_invoice", "total_adjustment", "status")
     search_fields = ("note_no", "original_invoice__invoice_no", "reason")
     list_filter = ("status",)
 
 
 @admin.register(ExportPackJob)
-class ExportPackJobAdmin(admin.ModelAdmin):
+class ExportPackJobAdmin(UnfoldModelAdmin):
     list_display = ("id", "pack_type", "financial_year", "status", "created_by", "created_at")
     search_fields = ("financial_year", "file_path", "created_by__username")
     list_filter = ("pack_type", "status")

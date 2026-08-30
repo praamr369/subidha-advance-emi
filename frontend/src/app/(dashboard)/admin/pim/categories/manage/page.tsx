@@ -152,23 +152,23 @@ function AttributeForm({ categoryId, subcategoryId, initial, onSave, onCancel }:
         await api(`${BASE}/attributes/${initial.id}/`, { method: "PATCH", body: JSON.stringify(body) });
         // delete removed options
         for (const delId of deletedOptionIds) {
-          await api(`${BASE}/attribute-options/${delId}/`, { method: "DELETE" }).catch(() => {});
+          await api(`${BASE}/attribute-options/${delId}/`, { method: "DELETE" });
         }
         // save/update options
         for (let i = 0; i < options.length; i++) {
           const opt = options[i];
           const payload = { value: opt.value, display_name: opt.display_name, display_order: i, attribute: initial.id };
           if (!opt.id) {
-            await api(`${BASE}/attribute-options/`, { method: "POST", body: JSON.stringify(payload) }).catch(() => {});
+            await api(`${BASE}/attribute-options/`, { method: "POST", body: JSON.stringify(payload) });
           } else if (opt.display_name !== initial.options?.find(o => o.id === opt.id)?.display_name || opt.display_order !== i) {
-            await api(`${BASE}/attribute-options/${opt.id}/`, { method: "PATCH", body: JSON.stringify(payload) }).catch(() => {});
+            await api(`${BASE}/attribute-options/${opt.id}/`, { method: "PATCH", body: JSON.stringify(payload) });
           }
         }
       } else {
         const created = await api<{ id: number }>(`${BASE}/attributes/`, { method: "POST", body: JSON.stringify(body) });
         // save options for new attribute
         for (let i = 0; i < options.length; i++) {
-          await api(`${BASE}/attribute-options/`, { method: "POST", body: JSON.stringify({ value: options[i].value, display_name: options[i].display_name, display_order: i, attribute: created.id }) }).catch(() => {});
+          await api(`${BASE}/attribute-options/`, { method: "POST", body: JSON.stringify({ value: options[i].value, display_name: options[i].display_name, display_order: i, attribute: created.id }) });
         }
       }
       await onSave();

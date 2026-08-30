@@ -323,12 +323,18 @@ export const RELATIONSHIP_TYPE_LABELS: Record<ProductRelationshipType, string> =
 export type ProductRelationship = {
   id: number;
   product: number;
+  parent_variant?: number | null;
+  parent_variant_name?: string | null;
+  parent_variant_sku?: string | null;
   related_product: number;
+  related_variant?: number | null;
+  related_variant_name?: string | null;
+  related_variant_sku?: string | null;
   related_product_name: string;
   related_product_code: string;
-  related_product_item_type: string;
+  related_product_item_type: ProductItemType;
   relationship_type: ProductRelationshipType;
-  quantity: string | number;
+  quantity: string;
   is_price_included_in_parent: boolean;
   notes: string;
   created_at: string;
@@ -348,10 +354,38 @@ export async function getProductRelationships(productId: number | string): Promi
   return result.results || [];
 }
 
-export async function addProductRelationship(productId: number | string, relatedProductId: number, relationshipType: ProductRelationshipType, quantity: number = 1, notes: string = "", isPriceIncluded: boolean = true): Promise<ProductRelationship> {
+export type ProductVariantCompact = {
+  id: number;
+  sku: string;
+  variant_label: string;
+};
+
+export async function getProductVariants(productId: number | string): Promise<ProductVariantCompact[]> {
+  const result = await request<{ results: ProductVariantCompact[] }>(`/pim/variants/?product=${productId}`);
+  return result.results || [];
+}
+
+export async function addProductRelationship(
+  productId: number | string, 
+  relatedProductId: number, 
+  relationshipType: ProductRelationshipType, 
+  quantity: number = 1, 
+  notes: string = "", 
+  isPriceIncluded: boolean = false,
+  parentVariantSku?: string | null,
+  relatedVariantSku?: string | null
+): Promise<ProductRelationship> {
   return request<ProductRelationship>(`/admin/products/${productId}/add-related-product/`, {
     method: "POST",
-    body: JSON.stringify({ related_product: relatedProductId, relationship_type: relationshipType, quantity, notes, is_price_included_in_parent: isPriceIncluded }),
+    body: JSON.stringify({ 
+      related_product: relatedProductId, 
+      relationship_type: relationshipType, 
+      quantity, 
+      notes, 
+      is_price_included_in_parent: isPriceIncluded,
+      parent_variant_sku: parentVariantSku,
+      related_variant_sku: relatedVariantSku
+    }),
     retryCount: 0,
   });
 }

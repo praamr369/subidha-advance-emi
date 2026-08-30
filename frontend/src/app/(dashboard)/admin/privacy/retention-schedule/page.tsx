@@ -1,8 +1,9 @@
-﻿"use client";
+"use client";
 
-import { useEffect, useState } from "react";
 import ERPPageShell from "@/components/erp/ERPPageShell";
+import RefreshBar from "@/components/feedback/RefreshBar";
 import { WorkspaceSection } from "@/components/ui/workspace";
+import { useRefreshableList } from "@/hooks/useRefreshableList";
 import { apiFetch } from "@/lib/api";
 
 type RetentionSchedule = {
@@ -28,19 +29,14 @@ const STATUS_COLOR: Record<string, string> = {
   CANCELLED: "bg-gray-100 text-gray-500",
 };
 
+async function fetchSchedule(): Promise<RetentionSchedule[]> {
+  const d = await apiFetch("/api/v1/admin/privacy/retention-schedule/");
+  return Array.isArray(d) ? (d as RetentionSchedule[]) : ((d as { results?: RetentionSchedule[] })?.results ?? []);
+}
+
 export default function RetentionSchedulePage() {
-  const [items, setItems] = useState<RetentionSchedule[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const reload = () => {
-    setLoading(true);
-    apiFetch("/api/v1/admin/privacy/retention-schedule/")
-      .then((d) => setItems(Array.isArray(d) ? d as RetentionSchedule[] : ((d as { results?: RetentionSchedule[] })?.results ?? [])))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(reload, []);
+  const { items, setItems, initialLoading, refreshing, reload } =
+    useRefreshableList<RetentionSchedule>(fetchSchedule);
 
   const kpis = [
     { label: "Total", value: items.length },
@@ -50,6 +46,9 @@ export default function RetentionSchedulePage() {
   ];
 
   const act = async (id: number, action: string) => {
+    const nextMap: Record<string, string> = { approve: "APPROVED", cancel: "CANCELLED", execute: "IN_PROGRESS" };
+    const next = nextMap[action];
+    if (next) setItems((prev) => prev.map((s) => (s.id === id ? { ...s, status: next as RetentionSchedule["status"] } : s)));
     await apiFetch(`/api/v1/admin/privacy/retention-schedule/${id}/${action}/`, { method: "POST" });
     reload();
   };
@@ -57,12 +56,13 @@ export default function RetentionSchedulePage() {
   return (
     <ERPPageShell
       title="Data Retention Schedule"
-      subtitle="CTRL-DPDP-8 â€” Purge job approvals; AWAITING_APPROVAL gate before execution"
+      subtitle="CTRL-DPDP-8 — Purge job approvals; AWAITING_APPROVAL gate before execution"
       stats={kpis}
     >
       <WorkspaceSection title="Scheduled purge jobs">
-        {loading ? (
-          <p className="text-sm text-muted-foreground py-8 text-center">Loadingâ€¦</p>
+        <RefreshBar active={refreshing} />
+        {initialLoading ? (
+          <p className="text-sm text-muted-foreground py-8 text-center">Loading…</p>
         ) : items.length === 0 ? (
           <p className="text-sm text-muted-foreground py-8 text-center">No retention schedule entries.</p>
         ) : (
@@ -99,9 +99,9 @@ export default function RetentionSchedulePage() {
                     <td className="py-2 px-3 text-center text-xs">
                       {s.status === "COMPLETED" ? (
                         <span className="text-green-600 font-medium">{s.records_purged.toLocaleString()}</span>
-                      ) : "â€”"}
+                      ) : "—"}
                     </td>
-                    <td className="py-2 px-3 text-xs">{s.approved_by_name ?? "â€”"}</td>
+                    <td className="py-2 px-3 text-xs">{s.approved_by_name ?? "—"}</td>
                     <td className="py-2 px-3 flex gap-1">
                       {s.status === "AWAITING_APPROVAL" && (
                         <>
@@ -132,4 +132,3 @@ export default function RetentionSchedulePage() {
     </ERPPageShell>
   );
 }
-

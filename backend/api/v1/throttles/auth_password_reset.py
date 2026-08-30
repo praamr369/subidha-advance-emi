@@ -17,6 +17,10 @@ class AuthLoginThrottle(AnonRateThrottle):
     scope = "auth_login"
 
 
+class AuthRegistrationThrottle(AnonRateThrottle):
+    scope = "auth_registration"
+
+
 class PaymentMutationThrottle(UserRateThrottle):
     scope = "payment_mutation"
 

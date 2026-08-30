@@ -123,6 +123,8 @@ export type PublicProduct = {
   id: number;
   product_code: string;
   name: string;
+  /** SEO-enriched name: base name + key variant attributes (Size, Material, etc.). Falls back to name. */
+  seo_name?: string | null;
   base_price: string;
   /** Min/max price across active variant SKUs. Present on blueprint products where base_price=0. */
   price_range?: { min: string; max: string; count: number } | null;
@@ -130,11 +132,14 @@ export type PublicProduct = {
   is_variant_page?: boolean;
   /** ID of the base Product when this is a variant page. */
   parent_product_id?: number | null;
+  /** product_code (URL slug) of the base Product when this is a variant page. */
+  parent_product_code?: string | null;
   /** The attributes that define this specific variant (e.g. {Size: "King (6x7)"}). */
   selected_attributes?: Record<string, string>;
   /** Other variant Products under the same blueprint. */
   sibling_variants?: Array<{
     product_id: number;
+    product_code: string;
     sku: string;
     label: string;
     price: string;
@@ -150,6 +155,8 @@ export type PublicProduct = {
   video?: string | null;
   /** Optional extra gallery URLs when the API provides them (deduped with `image` on the client). */
   gallery_images?: string[] | null;
+  /** PIM gallery video URLs */
+  gallery_videos?: string[] | null;
   description?: string | null;
   pim_description?: string | null;
   stock_status?: "IN_STOCK" | "MAKE_TO_ORDER";
@@ -163,6 +170,7 @@ export type PublicProduct = {
     stock_status?: "IN_STOCK" | "MAKE_TO_ORDER";
     image?: string | null;
     product_id?: number | null;
+    product_code?: string | null;
   }>;
 };
 

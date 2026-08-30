@@ -9,7 +9,9 @@ export type SystemNotification = {
   body: string;
   payload: Record<string, unknown>;
   is_read: boolean;
+  is_archived: boolean;
   read_at: string | null;
+  archived_at: string | null;
   created_at: string;
   source_job_id: number | null;
 };
@@ -59,6 +61,14 @@ export async function markAdminNotificationRead(id: number): Promise<SystemNotif
   return apiFetch(`/admin/notifications/${id}/read/`, { method: "POST" });
 }
 
+export async function archiveAdminNotification(id: number): Promise<SystemNotification> {
+  return apiFetch(`/admin/notifications/${id}/archive/`, { method: "POST" });
+}
+
+export async function dismissAllAdminNotifications(): Promise<{ archived_count: number }> {
+  return apiFetch("/admin/notifications/dismiss-all/", { method: "POST" });
+}
+
 export async function listCashierNotifications(params?: {
   module?: string;
   limit?: number;
@@ -88,6 +98,10 @@ export async function listNotifications(params?: {
 
 export async function markNotificationRead(id: number): Promise<SystemNotification> {
   return apiFetch(`/notifications/${id}/read/`, { method: "POST" });
+}
+
+export async function archiveNotification(id: number): Promise<SystemNotification> {
+  return apiFetch(`/notifications/${id}/archive/`, { method: "POST" });
 }
 
 export async function markAllNotificationsRead(): Promise<{ updated_count: number }> {

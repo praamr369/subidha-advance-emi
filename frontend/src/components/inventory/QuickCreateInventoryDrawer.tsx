@@ -6,9 +6,9 @@
  */
 
 import { useState } from "react";
-import { quickCreateAccessory, quickCreateRawMaterial, type QuickCreateResult } from "@/services/inventory";
+import { quickCreateAccessory, quickCreateRawMaterial, quickCreateService, type QuickCreateResult } from "@/services/inventory";
 
-type ItemType = "ACCESSORY" | "RAW_MATERIAL";
+type ItemType = "ACCESSORY" | "RAW_MATERIAL" | "SERVICE";
 
 type Props = {
   open: boolean;
@@ -20,6 +20,7 @@ type Props = {
 const TITLES: Record<ItemType, string> = {
   ACCESSORY: "Quick Create — Accessory",
   RAW_MATERIAL: "Quick Create — Raw Material",
+  SERVICE: "Quick Create — Service",
 };
 
 const UOM_OPTIONS = ["PCS", "NOS", "SFT", "RFT", "KG", "LTR", "MTR", "BOX", "SET", "PAIR"];
@@ -79,7 +80,9 @@ export default function QuickCreateInventoryDrawer({ open, itemType, onClose, on
       };
       const result = itemType === "ACCESSORY"
         ? await quickCreateAccessory(payload)
-        : await quickCreateRawMaterial(payload);
+        : itemType === "RAW_MATERIAL" 
+          ? await quickCreateRawMaterial(payload)
+          : await quickCreateService(payload);
       reset();
       onCreated?.(result);
       onClose();

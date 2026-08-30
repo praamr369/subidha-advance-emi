@@ -24,7 +24,7 @@ from inventory.models import (
     InventoryValuationMethod,
     StockLocation,
 )
-from subscriptions.models import Product
+from subscriptions.models import Product, PlanType, ProductItemType
 
 MONEY_ZERO = Decimal("0.00")
 QUANTITY_ZERO = Decimal("0.000")
@@ -203,7 +203,8 @@ class AdminQuickCreateAccessoryView(APIView):
             is_emi_enabled=False,
             is_rent_enabled=False,
             is_lease_enabled=False,
-            is_direct_sale_enabled=False,
+            is_direct_sale_enabled=True,
+            item_type=ProductItemType.ACCESSORY,
         )
         product.save()
 
@@ -261,7 +262,8 @@ class AdminQuickCreateRawMaterialView(APIView):
             is_emi_enabled=False,
             is_rent_enabled=False,
             is_lease_enabled=False,
-            is_direct_sale_enabled=False,
+            is_direct_sale_enabled=True,
+            item_type=ProductItemType.RAW_MATERIAL,
         )
         product.save()
 
@@ -284,6 +286,47 @@ class AdminQuickCreateRawMaterialView(APIView):
             "product_name": product.name,
             "inventory_item_id": inv_item.id,
             "stock_item_type": inv_item.stock_item_type,
+        }, status=status.HTTP_201_CREATED)
+
+
+# ---------------------------------------------------------------------------
+# Quick Create — Service
+# ---------------------------------------------------------------------------
+
+class AdminQuickCreateServiceView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    @transaction.atomic
+    def post(self, request):
+        ser = QuickCreateInventoryItemSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        d = ser.validated_data
+
+        if Product.objects.filter(product_code=d["product_code"].strip().upper()).exists():
+            return Response({"detail": f"Product code '{d['product_code']}' already exists."}, status=status.HTTP_409_CONFLICT)
+
+        product = Product(
+            product_code=d["product_code"].strip().upper(),
+            name=d["name"].strip(),
+            base_price=d["base_price"],
+            category=d.get("category", "").strip(),
+            subcategory=d.get("subcategory", "").strip(),
+            description=d.get("description", "").strip(),
+            sku=d.get("sku", "").strip() or None,
+            is_active=True,
+            is_emi_enabled=False,
+            is_rent_enabled=False,
+            is_lease_enabled=False,
+            is_direct_sale_enabled=True,
+            item_type=ProductItemType.SERVICE,
+        )
+        product.save()
+
+        return Response({
+            "product_id": product.id,
+            "product_code": product.product_code,
+            "product_name": product.name,
+            "stock_item_type": None, # Services don't need inventory item
         }, status=status.HTTP_201_CREATED)
 
 

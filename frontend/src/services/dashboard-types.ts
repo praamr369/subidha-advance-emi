@@ -71,7 +71,10 @@ export type DashboardReconciliationSurface = {
 export type DashboardDueSubscription = {
   id: number | string;
   subscription_id?: number | string;
+  direct_sale_id?: number | string;
+  legacy_id?: number | string;
   subscription_number?: string;
+  source_type?: string;
   customer_id?: number | string;
   customer_name?: string;
   customer_phone?: string;

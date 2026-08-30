@@ -59,3 +59,68 @@ def ready():
     Called when the app is ready. We import signals here to ensure they're registered.
     """
     pass
+
+
+from django.db.models.signals import post_delete
+
+@receiver(post_save, sender='products_core.ProductRelationship')
+def sync_product_relationship_to_fg_accessory(sender, instance, created, **kwargs):
+    """
+    Sync PIM ProductRelationships (ACCESSORY) to Inventory FinishedGoodAccessoryLinks.
+    """
+    if instance.relationship_type != "ACCESSORY":
+        return
+        
+    from inventory.models import InventoryItem, FinishedGoodAccessoryLink
+    
+    if not instance.related_product:
+        return
+        
+    acc_item = InventoryItem.objects.filter(product=instance.related_product).first()
+    if not acc_item:
+        return
+        
+    # Determine the target FG inventory items
+    target_fgs = []
+    if instance.parent_variant_sku:
+        fg_item = InventoryItem.objects.filter(sku=instance.parent_variant_sku).first()
+        if fg_item:
+            target_fgs.append(fg_item)
+    else:
+        # Applies to all FG variants for this base product
+        target_fgs = list(InventoryItem.objects.filter(product=instance.product))
+        
+    charge_mode = 'FREE' if instance.is_price_included_in_parent else 'CHARGEABLE'
+    for fg in target_fgs:
+        FinishedGoodAccessoryLink.objects.update_or_create(
+            finished_good=fg,
+            accessory=acc_item,
+            defaults={
+                'charge_mode': charge_mode,
+                'sale_price': 0,
+                'is_default_included': True,
+                'notes': instance.notes
+            }
+        )
+
+@receiver(post_delete, sender='products_core.ProductRelationship')
+def sync_delete_product_relationship_from_fg(sender, instance, **kwargs):
+    if instance.relationship_type != "ACCESSORY":
+        return
+        
+    from inventory.models import InventoryItem, FinishedGoodAccessoryLink
+    if not instance.related_product:
+        return
+        
+    acc_item = InventoryItem.objects.filter(product=instance.related_product).first()
+    if not acc_item:
+        return
+        
+    if instance.parent_variant_sku:
+        fg_item = InventoryItem.objects.filter(sku=instance.parent_variant_sku).first()
+        if fg_item:
+            FinishedGoodAccessoryLink.objects.filter(finished_good=fg_item, accessory=acc_item).delete()
+    else:
+        fg_items = list(InventoryItem.objects.filter(product=instance.product))
+        for fg in fg_items:
+            FinishedGoodAccessoryLink.objects.filter(finished_good=fg, accessory=acc_item).delete()

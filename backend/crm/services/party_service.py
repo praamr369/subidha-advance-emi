@@ -267,7 +267,7 @@ def _sync_party(
 def sync_party_for_lead(lead: PublicLead, *, party: PartyMaster | None = None, performed_by=None) -> PartyMaster:
     return _sync_party(
         role_type=PartyLinkRole.LEAD,
-        app_label="subscriptions",
+        app_label=PublicLead._meta.app_label,
         model="PublicLead",
         source_pk=lead.id,
         display_name=lead.name,
@@ -311,7 +311,7 @@ def sync_party_for_customer(customer: Customer, *, party: PartyMaster | None = N
     user = getattr(customer, "user", None)
     return _sync_party(
         role_type=PartyLinkRole.CUSTOMER,
-        app_label="subscriptions",
+        app_label=Customer._meta.app_label,
         model="Customer",
         source_pk=customer.id,
         display_name=customer.name,
@@ -459,6 +459,8 @@ def seed_missing_party_links(*, performed_by=None) -> dict[str, int]:
         sync_party_for_crm_lead(crm_lead, performed_by=performed_by)
         summary["leads"] += 1
 
+    _link_orphaned_outstandings(performed_by=performed_by)
+
     existing_customer_ids = set(
         PartyLink.objects.filter(
             role_type=PartyLinkRole.CUSTOMER,
@@ -500,6 +502,33 @@ def seed_missing_party_links(*, performed_by=None) -> dict[str, int]:
         summary["staff"] += 1
 
     return summary
+
+
+def _link_orphaned_outstandings(*, performed_by=None) -> int:
+    """Auto-create Customer + Party for outstandings that have a phone but no customer link."""
+    from accounting.models import CustomerOpeningOutstanding
+    from customers.services.customer_service import find_or_create_customer, normalize_phone
+    from subscriptions.models import CustomerSource
+
+    linked = 0
+    orphans = CustomerOpeningOutstanding.objects.filter(
+        customer__isnull=True,
+    ).exclude(phone="")
+    for outstanding in orphans:
+        phone = normalize_phone(outstanding.phone)
+        if not phone:
+            continue
+        customer, _ = find_or_create_customer(
+            name=outstanding.customer_name,
+            phone=phone,
+            source=CustomerSource.IMPORT,
+            created_by=performed_by,
+        )
+        outstanding.customer = customer
+        outstanding.save(update_fields=["customer", "updated_at"])
+        sync_party_for_customer(customer, performed_by=performed_by)
+        linked += 1
+    return linked
 
 
 def summarize_role_types(links: Iterable[PartyLink]) -> list[str]:

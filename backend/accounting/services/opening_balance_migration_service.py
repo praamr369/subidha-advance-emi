@@ -72,13 +72,17 @@ def _post_opening_journal(*, entry_date: date, source_model: str, source_id: str
 @transaction.atomic
 def set_finance_account_opening_balance(*, finance_account: FinanceAccount, amount, entry_date: date, actor) -> dict:
     finance_account = FinanceAccount.objects.select_for_update().select_related("chart_account").get(pk=finance_account.pk)
+
+    # One-time lock: once an opening balance journal has been posted, it cannot be re-posted.
+    # Re-posting would create duplicate debit entries and break double-entry reconciliation.
+    if finance_account.opening_balance_locked:
+        raise ValueError(
+            f"Opening balance for '{finance_account.name}' has already been posted and locked. "
+            "This is a one-time-only entry. Contact your auditor to reverse and re-post if a correction is genuinely required."
+        )
+
     value = _amount(amount)
-    voided = _void_existing(
-        source_model="FinanceAccount",
-        source_id=str(finance_account.id),
-        actor=actor,
-        reason="Opening finance balance corrected during legacy-data migration.",
-    )
+    voided: list[int] = []  # nothing to void — first-time only
     journal = None
     if value > 0:
         journal = _post_opening_journal(
@@ -93,8 +97,17 @@ def set_finance_account_opening_balance(*, finance_account: FinanceAccount, amou
             actor=actor,
         )
     finance_account.opening_balance = value
-    finance_account.save(update_fields=["opening_balance", "updated_at"])
-    return {"finance_account_id": finance_account.id, "opening_balance": str(value), "journal_entry_id": getattr(journal, "id", None), "entry_no": getattr(journal, "entry_no", None), "voided_journal_ids": voided}
+    finance_account.opening_balance_locked = True
+    finance_account.opening_balance_set_at = timezone.now()
+    finance_account.save(update_fields=["opening_balance", "opening_balance_locked", "opening_balance_set_at", "updated_at"])
+    return {
+        "finance_account_id": finance_account.id,
+        "opening_balance": str(value),
+        "journal_entry_id": getattr(journal, "id", None),
+        "entry_no": getattr(journal, "entry_no", None),
+        "voided_journal_ids": voided,
+        "locked": True,
+    }
 
 
 @transaction.atomic

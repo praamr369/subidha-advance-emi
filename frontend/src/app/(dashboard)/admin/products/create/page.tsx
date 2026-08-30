@@ -13,6 +13,7 @@ import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import SmartSuggestField from "@/components/forms/SmartSuggestField";
 import CatalogSpecificationFields from "@/components/admin/products/CatalogSpecificationFields";
+import RelatedProductsSection from "@/components/admin/products/RelatedProductsSection";
 import { apiFetch } from "@/lib/api";
 import {
   getProductCatalogOptions,
@@ -607,6 +608,13 @@ export default function AdminProductCreatePage() {
               </div>
               <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-1 transition-transform" />
             </Link>
+          </div>
+
+          <div className="mt-8">
+            <h3 className="text-lg font-bold mb-4">Attach Accessories & Raw Materials</h3>
+            <div className="rounded-xl border bg-background p-6">
+              <RelatedProductsSection productId={created.id} productName={created.name || trimmedName} saving={false} />
+            </div>
           </div>
         </div>
       </ERPPageShell>

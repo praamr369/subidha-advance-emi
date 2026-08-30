@@ -464,14 +464,17 @@ class PublicProductDetailView(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
 
-    def get(self, request, id):
+    def get(self, request, slug=None, id=None):
         try:
-            product = (
-                Product.objects.filter(id=id, is_active=True, item_type="FINISHED_GOOD", pim__is_published=True)
+            base_qs = (
+                Product.objects.filter(is_active=True, pim__is_published=True)
                 .exclude(inventory_profile__stock_item_type__in=["RAW_MATERIAL", "ACCESSORY"])
                 .prefetch_related("pim", "pim__attributes__attribute", "pim__variants__attribute_values__attribute")
-                .get()
             )
+            if slug is not None:
+                product = base_qs.get(product_code__iexact=slug)
+            else:
+                product = base_qs.get(id=id)
         except Product.DoesNotExist:
             return Response({"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -620,7 +623,8 @@ urlpatterns = [
     path("business-compliance/summary/", PublicBusinessComplianceSummaryView.as_view(), name="public-business-compliance-summary"),
     path("products/", PublicProductsView.as_view(), name="public-products"),
     path("product-categories/", PublicProductCategoriesView.as_view(), name="public-product-categories"),
-    path("products/<int:id>/", PublicProductDetailView.as_view(), name="public-product-detail"),
+    path("products/<str:slug>/", PublicProductDetailView.as_view(), name="public-product-detail"),
+    path("products/by-id/<int:id>/", PublicProductDetailView.as_view(), name="public-product-detail-by-id"),
     path("leads/", PublicLeadView.as_view(), name="public-leads"),
     path("latest-winner/", LatestWinnerView.as_view(), name="latest-winner"),
     path("winners/", PublicWinnersView.as_view(), name="public-winners"),

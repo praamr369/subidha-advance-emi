@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
+import RefreshBar from "@/components/feedback/RefreshBar";
 import { WorkspaceSection } from "@/components/ui/workspace";
+import { useRefreshableList } from "@/hooks/useRefreshableList";
 import { apiFetch } from "@/lib/api";
 
 type SignOff = {
@@ -24,24 +24,18 @@ const STATUS_COLOR: Record<string, string> = {
   REVOKED: "bg-red-100 text-red-700",
 };
 
+async function fetchSignoffs(): Promise<SignOff[]> {
+  const d = await apiFetch("/api/v1/admin/finance/reconciliation-signoffs/");
+  return Array.isArray(d) ? (d as SignOff[]) : ((d as { results?: SignOff[] })?.results ?? []);
+}
+
 /**
  * Officer sign-off gate for reconciliation runs (zero open items required before
  * sign-off). Extracted from /admin/finance/reconciliation-signoffs so it renders
  * both on that route and as a tab in the Reconciliation Center.
  */
 export default function ReconciliationSignoffsPanel() {
-  const [items, setItems] = useState<SignOff[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const reload = () => {
-    setLoading(true);
-    apiFetch("/api/v1/admin/finance/reconciliation-signoffs/")
-      .then((d) => setItems(Array.isArray(d) ? d as SignOff[] : ((d as { results?: SignOff[] })?.results ?? [])))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(reload, []);
+  const { items, initialLoading, refreshing, reload } = useRefreshableList<SignOff>(fetchSignoffs);
 
   const kpis = [
     { label: "Total", value: items.length },
@@ -80,7 +74,8 @@ export default function ReconciliationSignoffsPanel() {
       </div>
 
       <WorkspaceSection title="Sign-off records">
-        {loading ? (
+        <RefreshBar active={refreshing} />
+        {initialLoading ? (
           <p className="text-sm text-muted-foreground py-8 text-center">Loading…</p>
         ) : items.length === 0 ? (
           <p className="text-sm text-muted-foreground py-8 text-center">No sign-off records found.</p>

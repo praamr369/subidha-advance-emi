@@ -14,7 +14,10 @@ class AdminNotificationListView(APIView):
 
     def get(self, request):
         module = (request.query_params.get("module") or "").strip()
+        include_archived = str(request.query_params.get("archived") or "").strip().lower() in {"1", "true"}
         qs = Notification.objects.filter(recipient=request.user).order_by("-created_at", "-id")
+        if not include_archived:
+            qs = qs.filter(archived_at__isnull=True)
         if module:
             qs = qs.filter(module=module)
         unread = qs.filter(read_at__isnull=True).count()
@@ -51,6 +54,31 @@ class AdminNotificationMarkReadView(APIView):
             return Response({"detail": "Forbidden."}, status=status.HTTP_403_FORBIDDEN)
         notif.mark_read()
         return Response(NotificationSerializer(notif).data)
+
+
+class AdminNotificationArchiveView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, pk: int):
+        notif = Notification.objects.filter(pk=pk, recipient=request.user).first()
+        if notif is None:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        notif.archive()
+        return Response(NotificationSerializer(notif).data)
+
+
+class AdminNotificationDismissAllView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request):
+        from django.utils import timezone as tz
+        now = tz.now()
+        updated = Notification.objects.filter(
+            recipient=request.user,
+            archived_at__isnull=True,
+            read_at__isnull=False,
+        ).update(archived_at=now)
+        return Response({"archived_count": updated})
 
 
 class CashierNotificationListView(APIView):
@@ -105,6 +133,17 @@ def _safe_int(value, default: int, *, max_value: int) -> int:
     return min(parsed, max_value)
 
 
+class NotificationArchiveView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk: int):
+        notif = Notification.objects.filter(pk=pk, recipient=request.user).first()
+        if notif is None:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        notif.archive()
+        return Response(NotificationSerializer(notif).data)
+
+
 class NotificationListView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -112,6 +151,7 @@ class NotificationListView(APIView):
         module = (request.query_params.get("module") or "").strip()
         category = (request.query_params.get("category") or "").strip().upper()
         severity = (request.query_params.get("severity") or "").strip().upper()
+        include_archived = str(request.query_params.get("archived") or "").strip().lower() in {"1", "true"}
         unread_only = str(request.query_params.get("unread") or "").strip().lower() in {
             "1",
             "true",
@@ -119,6 +159,8 @@ class NotificationListView(APIView):
         }
 
         qs = Notification.objects.filter(recipient=request.user).order_by("-created_at", "-id")
+        if not include_archived:
+            qs = qs.filter(archived_at__isnull=True)
         if module:
             qs = qs.filter(module=module)
         if unread_only:

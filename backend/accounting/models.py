@@ -919,6 +919,9 @@ class FinanceAccount(AccountingTimeStampedModel):
         default=MONEY_ZERO,
         validators=[MinValueValidator(MONEY_ZERO)],
     )
+    # Locked after the first opening balance journal is posted — prevents duplicate journal injection.
+    opening_balance_locked = models.BooleanField(default=False, db_index=True)
+    opening_balance_set_at = models.DateTimeField(null=True, blank=True)
     # Settlement desks (cash/bank/UPI/gateway) use True; ledger-profile anchor rows use False.
     is_real_settlement_account = models.BooleanField(default=True, db_index=True)
     is_active = models.BooleanField(default=True, db_index=True)

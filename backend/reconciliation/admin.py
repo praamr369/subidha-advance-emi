@@ -1,9 +1,10 @@
+from unfold.admin import ModelAdmin as UnfoldModelAdmin, TabularInline as UnfoldTabularInline, StackedInline as UnfoldStackedInline
 from django.contrib import admin
 
 from reconciliation.models import ReconciliationEvidence, ReconciliationItem, ReconciliationRun
 
 
-class ReconciliationItemInline(admin.TabularInline):
+class ReconciliationItemInline(UnfoldTabularInline):
     model = ReconciliationItem
     extra = 0
     readonly_fields = ("source_type", "source_id", "status", "severity")
@@ -11,7 +12,7 @@ class ReconciliationItemInline(admin.TabularInline):
 
 
 @admin.register(ReconciliationRun)
-class ReconciliationRunAdmin(admin.ModelAdmin):
+class ReconciliationRunAdmin(UnfoldModelAdmin):
     list_display = ("run_no", "module", "scope", "status", "started_at", "finished_at", "total_checked", "total_matched", "total_exceptions")
     list_filter = ("status", "module")
     search_fields = ("run_no", "module", "scope")
@@ -21,7 +22,7 @@ class ReconciliationRunAdmin(admin.ModelAdmin):
 
 
 @admin.register(ReconciliationItem)
-class ReconciliationItemAdmin(admin.ModelAdmin):
+class ReconciliationItemAdmin(UnfoldModelAdmin):
     list_display = ("id", "run", "source_type", "source_id", "status", "severity", "exception_code")
     list_filter = ("status", "severity", "module")
     search_fields = ("source_type", "source_id", "exception_code")
@@ -29,7 +30,7 @@ class ReconciliationItemAdmin(admin.ModelAdmin):
 
 
 @admin.register(ReconciliationEvidence)
-class ReconciliationEvidenceAdmin(admin.ModelAdmin):
+class ReconciliationEvidenceAdmin(UnfoldModelAdmin):
     list_display = ("id", "item", "evidence_type", "label", "created_at")
     list_filter = ("evidence_type",)
     search_fields = ("evidence_type", "label")

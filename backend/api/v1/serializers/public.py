@@ -26,11 +26,17 @@ class PublicProductSerializer(serializers.ModelSerializer):
     pim_attributes = serializers.SerializerMethodField()
     pim_variants = serializers.SerializerMethodField()
     price_range = serializers.SerializerMethodField()
+    # SEO-enriched name: base name + key variant attributes appended
+    seo_name = serializers.SerializerMethodField()
     # Variant-page fields — null on base products
     is_variant_page = serializers.SerializerMethodField()
     parent_product_id = serializers.SerializerMethodField()
+    parent_product_code = serializers.SerializerMethodField()
     selected_attributes = serializers.SerializerMethodField()
     sibling_variants = serializers.SerializerMethodField()
+    # PIM media gallery — images and videos from ProductMediaItem
+    gallery_images = serializers.SerializerMethodField()
+    gallery_videos = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -38,6 +44,7 @@ class PublicProductSerializer(serializers.ModelSerializer):
             "id",
             "product_code",
             "name",
+            "seo_name",
             "base_price",
             "price_range",
             "category",
@@ -45,6 +52,8 @@ class PublicProductSerializer(serializers.ModelSerializer):
             "subcategory",
             "image",
             "video",
+            "gallery_images",
+            "gallery_videos",
             "description",
             "pim_description",
             "pim_attributes",
@@ -52,6 +61,7 @@ class PublicProductSerializer(serializers.ModelSerializer):
             # Variant-page extras
             "is_variant_page",
             "parent_product_id",
+            "parent_product_code",
             "selected_attributes",
             "sibling_variants",
         ]
@@ -68,13 +78,74 @@ class PublicProductSerializer(serializers.ModelSerializer):
     # ── media ─────────────────────────────────────────────────────────────────
 
     def get_image(self, obj):
+        req = self.context.get("request")
         own_v = self._own_variant(obj)
+        # 1. Variant's own image field
         if own_v and own_v.image:
-            return serialize_media_url(self.context.get("request"), own_v.image)
-        return serialize_media_url(self.context.get("request"), obj.image)
+            return serialize_media_url(req, own_v.image)
+        # 2. Product's own image field
+        if obj.image:
+            return serialize_media_url(req, obj.image)
+        # 3. Fall back to hero/first PIM gallery image scoped to this product/variant
+        try:
+            from products_pim.models import ProductMediaItem
+            from django.db.models import Q
+            pim = self._pim(obj)
+            if pim:
+                base_pim = pim.parent if pim.parent_id else pim
+                qs = ProductMediaItem.objects.filter(product=base_pim, kind="IMAGE")
+                if pim.parent_id and own_v:
+                    qs = qs.filter(Q(scope="ALL_VARIANTS") | Q(scope="VARIANT", variant=own_v))
+                else:
+                    qs = qs.filter(scope="ALL_VARIANTS")
+                item = qs.order_by("-is_hero", "display_order", "-created_at").first()
+                if item and item.file:
+                    return serialize_media_url(req, item.file)
+        except Exception:
+            pass
+        return None
 
     def get_video(self, obj):
         return serialize_media_url(self.context.get("request"), getattr(obj, "video", None))
+
+    def _get_pim_media(self, obj):
+        """Return PIM media items scoped to this product/variant.
+
+        Base product page  → ALL_VARIANTS items only.
+        Variant page       → ALL_VARIANTS items + VARIANT items for this specific variant.
+        """
+        try:
+            from products_pim.models import ProductMediaItem
+        except ImportError:
+            return []
+        pim = self._pim(obj)
+        if not pim:
+            return []
+        base_pim = pim.parent if pim.parent_id else pim
+        from django.db.models import Q
+        qs = ProductMediaItem.objects.filter(product=base_pim)
+        if pim.parent_id:
+            own_variant = self._own_variant(obj)
+            if own_variant:
+                qs = qs.filter(Q(scope="ALL_VARIANTS") | Q(scope="VARIANT", variant=own_variant))
+            else:
+                qs = qs.filter(scope="ALL_VARIANTS")
+        else:
+            qs = qs.filter(scope="ALL_VARIANTS")
+        return list(qs.order_by("display_order", "-created_at"))
+
+    def get_gallery_images(self, obj):
+        req = self.context.get("request")
+        items = self._get_pim_media(obj)
+        # Hero image first, then rest
+        images = [i for i in items if i.kind == "IMAGE"]
+        images.sort(key=lambda i: (not i.is_hero, i.display_order))
+        return [serialize_media_url(req, i.file) for i in images if i.file]
+
+    def get_gallery_videos(self, obj):
+        req = self.context.get("request")
+        items = self._get_pim_media(obj)
+        return [serialize_media_url(req, i.file) for i in items if i.kind == "VIDEO" and i.file]
 
     # ── category ─────────────────────────────────────────────────────────────
 
@@ -154,25 +225,109 @@ class PublicProductSerializer(serializers.ModelSerializer):
             # Variant products don't list sub-variants
             return []
 
+        # Pre-load PIM gallery images for all variants in one query
+        try:
+            from products_pim.models import ProductMediaItem
+            from django.db.models import Q
+            gallery_map: dict = {}
+            for item in ProductMediaItem.objects.filter(
+                product=pim, kind="IMAGE"
+            ).order_by("-is_hero", "display_order").select_related("variant"):
+                key = item.variant_id  # None = ALL_VARIANTS
+                if key not in gallery_map:
+                    gallery_map[key] = item
+        except Exception:
+            gallery_map = {}
+
+        req = self.context.get("request")
         variants = []
         for variant in pim.variants.filter(is_active=True):
             op = getattr(variant, "operational_product", None)
+            # Image priority: variant.image → op.image → VARIANT-scoped gallery → ALL_VARIANTS gallery
+            img = None
+            if variant.image:
+                img = serialize_media_url(req, variant.image)
+            elif op and op.image:
+                img = serialize_media_url(req, op.image)
+            else:
+                gallery_item = gallery_map.get(variant.id) or gallery_map.get(None)
+                if gallery_item and gallery_item.file:
+                    img = serialize_media_url(req, gallery_item.file)
             variants.append({
                 "id": variant.id,
                 "sku": variant.sku,
                 "price": str(variant.price),
-                "image": serialize_media_url(self.context.get("request"), variant.image) if variant.image else (
-                    serialize_media_url(self.context.get("request"), op.image) if op and op.image else None
-                ),
+                "image": img,
                 "attributes": _variant_attr_map(variant),
                 "is_low_stock": variant.is_low_stock,
                 "stock_status": "IN_STOCK" if variant.quantity_on_hand > 0 else "MAKE_TO_ORDER",
-                # Deep-link: public page URL for this variant's own Product record
                 "product_id": op.id if op else None,
+                "product_code": op.product_code if op else None,
             })
         return variants
 
     # ── variant-page extras ───────────────────────────────────────────────────
+
+    # ── seo_name ─────────────────────────────────────────────────────────────
+
+    # Attributes whose values are too noisy to add to a product name
+    _SKIP_ATTR_NAMES = frozenset({
+        "storage", "headboard", "is_storage", "has_storage",
+    })
+    # Boolean-like values that add no meaning in a name string
+    _SKIP_VALUES = frozenset({"yes", "no", "true", "false", "1", "0"})
+
+    def get_seo_name(self, obj):
+        """Base name enriched with key variant attributes for SEO and discoverability.
+
+        For a variant product: appends its defining attributes (Size, Material, etc.)
+        For a base product with exactly one variant: same.
+        For a base product with many variants: returns just the base name (variants differ).
+        """
+        base_name = obj.name or ""
+        pim = self._pim(obj)
+        if not pim:
+            return base_name
+
+        attr_map: dict[str, str] = {}
+
+        if pim.parent_id:
+            # Variant product — pull from its own ProductVariant
+            own_v = self._own_variant(obj)
+            if own_v:
+                attr_map = _variant_attr_map(own_v)
+        else:
+            # Base product — pull from the single active variant (if only one)
+            active_variants = list(pim.variants.filter(is_active=True)[:2])
+            if len(active_variants) == 1:
+                attr_map = _variant_attr_map(active_variants[0])
+            # Multiple variants → name stays as-is (variants differ too much)
+
+        if not attr_map:
+            return base_name
+
+        # Filter: skip noisy/boolean attributes, keep meaningful textual values
+        parts = []
+        for name, value in attr_map.items():
+            if name.lower() in self._SKIP_ATTR_NAMES:
+                continue
+            if str(value).lower() in self._SKIP_VALUES:
+                continue
+            # Skip values that are pure numbers (dimensions without context)
+            stripped = str(value).strip()
+            if stripped:
+                parts.append(stripped)
+
+        if not parts:
+            return base_name
+
+        suffix = " ".join(parts)
+        # Avoid duplicating content already in the base name
+        suffix_lower = suffix.lower()
+        if suffix_lower in base_name.lower():
+            return base_name
+
+        return f"{base_name} – {suffix}"
 
     def get_is_variant_page(self, obj):
         pim = self._pim(obj)
@@ -195,6 +350,22 @@ class PublicProductSerializer(serializers.ModelSerializer):
             # fallback: look up Product by product_code == parent_pim.code
             try:
                 return Product.objects.get(product_code=parent_pim.code).id
+            except Product.DoesNotExist:
+                return None
+
+    def get_parent_product_code(self, obj):
+        """product_code of the base Product — used as the public URL slug."""
+        pim = self._pim(obj)
+        if not pim or not pim.parent_id:
+            return None
+        parent_pim = pim.parent
+        if not parent_pim:
+            return None
+        try:
+            return parent_pim.pim_product.product_code
+        except Exception:
+            try:
+                return Product.objects.get(product_code=parent_pim.code).product_code
             except Product.DoesNotExist:
                 return None
 
@@ -230,6 +401,7 @@ class PublicProductSerializer(serializers.ModelSerializer):
             label = " · ".join(label_parts) if label_parts else variant.sku
             siblings.append({
                 "product_id": op.id,
+                "product_code": op.product_code,
                 "sku": variant.sku,
                 "label": label,
                 "price": str(variant.price),

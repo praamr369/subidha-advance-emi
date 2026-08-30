@@ -405,6 +405,7 @@ AI_VECTOR_SEARCH_ENABLED = _parse_bool(
 )
 
 INSTALLED_APPS = [
+    "unfold",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -451,6 +452,7 @@ INSTALLED_APPS = [
     "reviews",
     "django_extensions",
     "products_pim",
+    "product_reviews",
 ]
 
 MIDDLEWARE = [
@@ -542,7 +544,8 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.AnonRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
-        "auth_login": "20/minute",
+        "auth_login": "10/minute",
+        "auth_registration": "10/hour",
         "forgot_password": "10/hour",
         "resend_password_reset_otp": "10/hour",
         "reset_password": "20/hour",
@@ -870,3 +873,43 @@ if crontab is not None:
     }
 else:
     CELERY_BEAT_SCHEDULE = {}
+
+UNFOLD = {
+    "SITE_TITLE": "Subidha Core Admin",
+    "SITE_HEADER": "Subidha Core",
+    "SITE_URL": "/",
+    # Colors that resemble Azure/Cloud
+    "COLORS": {
+        "primary": {
+            "50": "239 246 255",
+            "100": "219 234 254",
+            "200": "191 219 254",
+            "300": "147 197 253",
+            "400": "96 165 250",
+            "500": "59 130 246",
+            "600": "37 99 235",
+            "700": "29 78 216",
+            "800": "30 64 175",
+            "900": "30 58 138",
+            "950": "23 37 84",
+        },
+    },
+    "TABS": [
+        {
+            "models": [
+                "accounts.user",
+                "accounts.group",
+            ],
+            "items": [
+                {
+                    "title": "Users",
+                    "link": "/admin/accounts/user/",
+                },
+                {
+                    "title": "Groups",
+                    "link": "/admin/auth/group/",
+                },
+            ],
+        }
+    ],
+}

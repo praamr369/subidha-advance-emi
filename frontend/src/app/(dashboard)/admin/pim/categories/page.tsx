@@ -6,6 +6,7 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import { pimService, type PimCategory } from "@/services/pim";
+import { request } from "@/services/api";
 
 const DATA_TYPE_LABELS: Record<string, string> = {
   TEXT: "Text",
@@ -151,6 +152,57 @@ export default function PimCategoriesPage() {
       ]}
     >
       {/* Summary */}
+      <div className="flex items-center gap-2 mb-6">
+        <button
+          onClick={() => {
+            request("/api/v1/pim/categories/export_categories/")
+              .then((data) => {
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "pim-categories-schema.json";
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+              })
+              .catch(() => alert("Export failed"));
+          }}
+          className="rounded-lg border bg-background px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
+        >
+          Export Schema
+        </button>
+        <label className="cursor-pointer rounded-lg border bg-background px-4 py-2 text-sm font-medium hover:bg-muted transition-colors">
+          Import Schema
+          <input
+            type="file"
+            accept=".json"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              const reader = new FileReader();
+              reader.onload = async (ev) => {
+                try {
+                  const content = JSON.parse(ev.target?.result as string);
+                  await request("/api/v1/pim/categories/import_categories/", {
+                    method: "POST",
+                    body: JSON.stringify(content),
+                  });
+                  alert("Import successful!");
+                  window.location.reload();
+                } catch (err) {
+                  alert("Import failed: " + (err as Error).message);
+                }
+              };
+              reader.readAsText(file);
+              e.target.value = "";
+            }}
+          />
+        </label>
+      </div>
+
       <div className="grid grid-cols-3 gap-4 mt-2 mb-6">
         {[
           { label: "Categories", value: categories.length, icon: <Tag className="h-4 w-4" /> },

@@ -261,6 +261,12 @@ export function ProfileFinancials({ financials }: { financials?: PartyDetailResp
           <div className="text-xs text-muted-foreground">Direct Sales Value</div>
           <div className="mt-1 text-2xl font-bold">{money(financials.total_direct_sales)}</div>
         </div>
+        {Number(financials.legacy_outstanding || 0) > 0 && (
+          <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700 p-4">
+            <div className="text-xs text-muted-foreground">Legacy Outstanding (Old Books)</div>
+            <div className="mt-1 text-2xl font-bold text-amber-700 dark:text-amber-400">{money(financials.legacy_outstanding)}</div>
+          </div>
+        )}
       </div>
     </WorkspaceSection>
   );
@@ -468,6 +474,35 @@ export function ProfileModuleSections({ payload }: { payload: PartyDetailRespons
               { key: "status", label: "Status" },
               { key: "issue_summary", label: "Issue" },
               { key: "total_amount", label: "Amount", align: "right", render: (row) => money(row.total_amount) },
+            ]}
+          />
+        </WorkspaceSection>
+      ) : null}
+
+      {(r.legacy_outstandings ?? []).length > 0 ? (
+        <WorkspaceSection
+          title={`Legacy Outstandings (${(r.legacy_outstandings ?? []).length})`}
+          description="Opening balances migrated from old books. Collect via Collection Workspace."
+        >
+          <ModuleTable
+            rows={r.legacy_outstandings ?? []}
+            hrefFor={() => ROUTES.admin.outstandings}
+            cols={[
+              { key: "customer_name", label: "Customer" },
+              { key: "phone", label: "Phone" },
+              { key: "outstanding_amount", label: "Original", align: "right", render: (row) => money(row.outstanding_amount) },
+              { key: "collected_amount", label: "Collected", align: "right", render: (row) => money(row.collected_amount) },
+              { key: "balance_remaining", label: "Remaining", align: "right", render: (row) => (
+                <span className={Number(row.balance_remaining) > 0 ? "font-semibold text-red-600" : "text-emerald-600"}>
+                  {money(row.balance_remaining)}
+                </span>
+              ) },
+              { key: "entry_date", label: "Entry Date" },
+              { key: "is_settled", label: "Status", render: (row) => (
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${row.is_settled ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                  {row.is_settled ? "Settled" : "Due"}
+                </span>
+              ) },
             ]}
           />
         </WorkspaceSection>

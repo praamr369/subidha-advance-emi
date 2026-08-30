@@ -8,11 +8,7 @@ import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import Link from "next/link";
 import { listCustomerReceipts, type FinanceReceiptRow } from "@/services/phase4-finance";
-import { customerReceiptPdfUrl } from "@/services/customer-portal";
-
-function downloadHref(id: number | string) {
-  return customerReceiptPdfUrl(id);
-}
+import { downloadAuthenticatedFile } from "@/lib/export/auth-download";
 
 function formatDate(value?: string | null): string {
   if (!value) return "—";
@@ -36,14 +32,15 @@ function ReceiptCard({ row }: { row: FinanceReceiptRow }) {
         </div>
         <div className="flex flex-col items-end gap-2 shrink-0">
           <span className="text-base font-bold text-foreground">{formatRupee(row.amount)}</span>
-          <a
-            href={downloadHref(row.id)}
-            target="_blank"
-            rel="noreferrer"
+          <button
+            onClick={() => void downloadAuthenticatedFile(
+              `/customer/receipts/${row.id}/pdf/`,
+              `receipt-${row.id}.pdf`
+            )}
             className="rounded-xl border border-border bg-background px-3 py-1 text-xs font-medium hover:bg-muted"
           >
             PDF
-          </a>
+          </button>
         </div>
       </div>
     </div>

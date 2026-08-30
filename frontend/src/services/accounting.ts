@@ -47,6 +47,8 @@ export type FinanceAccount = {
   collection_blocker_reason?: string | null;
   recommended_action?: string | null;
   opening_balance: string;
+  opening_balance_locked?: boolean;
+  opening_balance_set_at?: string | null;
   is_active: boolean;
   is_real_settlement_account?: boolean;
   bank_last4?: string;

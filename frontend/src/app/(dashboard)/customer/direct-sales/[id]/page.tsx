@@ -1,5 +1,6 @@
 "use client";
 import { formatRupee } from "@/lib/utils/currency";
+import { downloadAuthenticatedFile } from "@/lib/export/auth-download";
 
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -93,14 +94,15 @@ export default function CustomerDirectSaleDetailPage() {
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
               {row.invoice_pdf_url ? (
-                <a
-                  href={row.invoice_pdf_url}
-                  target="_blank"
-                  rel="noreferrer"
+                <button
+                  onClick={() => {
+                    const url = new URL(row.invoice_pdf_url!, window.location.origin);
+                    void downloadAuthenticatedFile(url.pathname, `invoice-${row.id}.pdf`);
+                  }}
                   className="inline-flex h-9 items-center rounded-lg border border-border px-3 text-sm font-medium hover:bg-muted"
                 >
                   Download Invoice
-                </a>
+                </button>
               ) : null}
             </div>
           </WorkspaceSection>
@@ -209,14 +211,15 @@ export default function CustomerDirectSaleDetailPage() {
                       {receipt.receipt_date || "—"} · {receipt.payment_method || "—"} · {formatRupee(receipt.amount)}
                     </div>
                     {receipt.receipt_pdf_url ? (
-                      <a
-                        href={receipt.receipt_pdf_url}
-                        target="_blank"
-                        rel="noreferrer"
+                      <button
+                        onClick={() => {
+                          const url = new URL(receipt.receipt_pdf_url!, window.location.origin);
+                          void downloadAuthenticatedFile(url.pathname, `receipt-${receipt.id}.pdf`);
+                        }}
                         className="mt-2 inline-flex h-8 items-center rounded-lg border border-border px-3 text-xs font-medium hover:bg-muted"
                       >
                         Download Receipt
-                      </a>
+                      </button>
                     ) : null}
                   </div>
                 ))}

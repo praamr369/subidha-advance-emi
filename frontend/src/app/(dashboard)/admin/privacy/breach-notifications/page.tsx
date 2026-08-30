@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import ERPPageShell from "@/components/erp/ERPPageShell";
+import RefreshBar from "@/components/feedback/RefreshBar";
 import { WorkspaceSection } from "@/components/ui/workspace";
+import { useRefreshableList } from "@/hooks/useRefreshableList";
 import { apiFetch } from "@/lib/api";
 
 type BreachNotification = {
@@ -36,22 +38,24 @@ const STATUS_COLOR: Record<string, string> = {
   CLOSED: "bg-green-100 text-green-700",
 };
 
+const ACTION_NEXT: Record<string, string> = {
+  investigate: "INVESTIGATING",
+  "notify-board": "NOTIFIED_BOARD",
+  "notify-principals": "NOTIFIED_PRINCIPALS",
+  close: "CLOSED",
+};
+
+async function fetchBreaches(): Promise<BreachNotification[]> {
+  const d = await apiFetch("/api/v1/admin/privacy/breach-notifications/");
+  return Array.isArray(d) ? (d as BreachNotification[]) : ((d as { results?: BreachNotification[] })?.results ?? []);
+}
+
 export default function BreachNotificationsPage() {
-  const [items, setItems] = useState<BreachNotification[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { items, setItems, initialLoading, refreshing, reload } =
+    useRefreshableList<BreachNotification>(fetchBreaches);
   const [showForm, setShowForm] = useState(false);
   const [newBreach, setNewBreach] = useState({ description: "", severity: "MEDIUM", data_categories: "" });
   const [submitting, setSubmitting] = useState(false);
-
-  const reload = () => {
-    setLoading(true);
-    apiFetch("/api/v1/admin/privacy/breach-notifications/")
-      .then((d) => setItems(Array.isArray(d) ? d as BreachNotification[] : ((d as { results?: BreachNotification[] })?.results ?? [])))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(reload, []);
 
   const open = items.filter((i) => !["CLOSED"].includes(i.status)).length;
   const critical = items.filter((i) => i.severity === "CRITICAL" && i.status !== "CLOSED").length;
@@ -64,6 +68,8 @@ export default function BreachNotificationsPage() {
   ];
 
   const advance = async (id: number, action: string, body?: object) => {
+    const next = ACTION_NEXT[action];
+    if (next) setItems((prev) => prev.map((b) => (b.id === id ? { ...b, status: next as BreachNotification["status"] } : b)));
     await apiFetch(`/api/v1/admin/privacy/breach-notifications/${id}/${action}/`, {
       method: "POST",
       body: body ? JSON.stringify(body) : undefined,
@@ -149,7 +155,8 @@ export default function BreachNotificationsPage() {
       )}
 
       <WorkspaceSection title="Breach incident register">
-        {loading ? (
+        <RefreshBar active={refreshing} />
+        {initialLoading ? (
           <p className="text-sm text-muted-foreground py-8 text-center">Loading…</p>
         ) : items.length === 0 ? (
           <p className="text-sm text-muted-foreground py-8 text-center">No breach notifications on record.</p>

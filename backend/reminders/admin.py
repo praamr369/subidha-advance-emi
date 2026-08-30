@@ -1,10 +1,11 @@
+from unfold.admin import ModelAdmin as UnfoldModelAdmin, TabularInline as UnfoldTabularInline, StackedInline as UnfoldStackedInline
 from django.contrib import admin
 
 from reminders.models import PaymentReminder, NotificationTemplate
 
 
 @admin.register(PaymentReminder)
-class PaymentReminderAdmin(admin.ModelAdmin):
+class PaymentReminderAdmin(UnfoldModelAdmin):
     list_display = (
         "id",
         "channel",
@@ -19,7 +20,7 @@ class PaymentReminderAdmin(admin.ModelAdmin):
 
 
 @admin.register(NotificationTemplate)
-class NotificationTemplateAdmin(admin.ModelAdmin):
+class NotificationTemplateAdmin(UnfoldModelAdmin):
     list_display = (
         "key",
         "name",

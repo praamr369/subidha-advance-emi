@@ -144,6 +144,16 @@ def create_public_lead(
     )
     sync_party_for_lead(lead)
 
+    try:
+        from subscriptions.services.operational_notification_service import schedule_lead_created_notification
+        schedule_lead_created_notification(
+            lead_id=lead.pk,
+            lead_name=lead.name or "Unknown",
+            source=lead.source or "",
+        )
+    except Exception:
+        pass
+
     if create_procurement_enquiry:
         if resolved_intent not in {
             PublicLeadIntent.QUOTATION,

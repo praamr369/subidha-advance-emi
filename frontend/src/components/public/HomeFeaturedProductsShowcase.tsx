@@ -52,7 +52,7 @@ export default function HomeFeaturedProductsShowcase({
         <p className="text-sm font-semibold">{formatCurrency(product.base_price)}</p>
         <div className="flex flex-wrap gap-2">
           <Link
-            href={`${ROUTES.public.products}/${product.id}`}
+            href={`${ROUTES.public.products}/${product.product_code}`}
             className="public-action-secondary h-10 px-4 text-sm"
           >
             View

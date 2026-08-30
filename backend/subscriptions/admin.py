@@ -1,3 +1,4 @@
+from unfold.admin import ModelAdmin as UnfoldModelAdmin, TabularInline as UnfoldTabularInline, StackedInline as UnfoldStackedInline
 from django.contrib import messages
 from payments.services.reconciliation_service import (
     system_financial_health
@@ -81,7 +82,7 @@ class SubscriptionAdminForm(forms.ModelForm):
 # =====================================================
 
 @admin.register(Customer)
-class CustomerAdmin(admin.ModelAdmin):
+class CustomerAdmin(UnfoldModelAdmin):
     list_display = ("id", "name", "phone", "kyc_status", "created_at")
     search_fields = ("name", "phone")
     list_filter = ("kyc_status",)
@@ -92,7 +93,7 @@ class CustomerAdmin(admin.ModelAdmin):
 # =====================================================
 
 @admin.register(Product)
-class ProductAdmin(admin.ModelAdmin):
+class ProductAdmin(UnfoldModelAdmin):
     list_display = ("id", "name", "base_price", "created_at")
     search_fields = ("name",)
     readonly_fields = ("created_at",)
@@ -103,7 +104,7 @@ class ProductAdmin(admin.ModelAdmin):
 # =====================================================
 
 @admin.register(Batch)
-class BatchAdmin(admin.ModelAdmin):
+class BatchAdmin(UnfoldModelAdmin):
     list_display = ("id", "batch_code", "duration_months", "start_date")
     search_fields = ("batch_code",)
 
@@ -113,7 +114,7 @@ class BatchAdmin(admin.ModelAdmin):
 # =====================================================
 
 @admin.register(LuckyId)
-class LuckyIdAdmin(admin.ModelAdmin):
+class LuckyIdAdmin(UnfoldModelAdmin):
     list_display = (
         "batch",
         "lucky_number",
@@ -165,7 +166,7 @@ from payments.services.ledger_service import (
 
 
 @admin.register(Subscription)
-class SubscriptionAdmin(admin.ModelAdmin):
+class SubscriptionAdmin(UnfoldModelAdmin):
     
 
     list_display = (
@@ -292,7 +293,7 @@ class SubscriptionAdmin(admin.ModelAdmin):
 # =====================================================
 
 @admin.register(Emi)
-class EmiAdmin(admin.ModelAdmin):
+class EmiAdmin(UnfoldModelAdmin):
     list_display = (
         "id",
         "subscription",
@@ -314,7 +315,7 @@ class EmiAdmin(admin.ModelAdmin):
 # =====================================================
 
 @admin.register(Payment)
-class PaymentAdmin(admin.ModelAdmin):
+class PaymentAdmin(UnfoldModelAdmin):
     form = PaymentAdminForm
     list_display = (
         "id",
@@ -376,7 +377,7 @@ class PaymentAdmin(admin.ModelAdmin):
 # =====================================================
 
 @admin.register(LuckyDraw)
-class LuckyDrawAdmin(admin.ModelAdmin):
+class LuckyDrawAdmin(UnfoldModelAdmin):
     form = LuckyDrawAdminForm
 
     list_display = ("id", "batch", "draw_month", "winner_lucky_id", "is_revealed")
@@ -466,7 +467,7 @@ class LuckyDrawAdmin(admin.ModelAdmin):
 # =====================================================
 
 @admin.register(RecoveryCase)
-class RecoveryCaseAdmin(admin.ModelAdmin):
+class RecoveryCaseAdmin(UnfoldModelAdmin):
     list_display = (
         "id",
         "subscription",

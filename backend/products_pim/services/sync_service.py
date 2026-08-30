@@ -80,4 +80,11 @@ class PIMSyncService:
         core_product.base_specs = base_specs
 
         core_product.save()
+
+        try:
+            from inventory.services.inventory_profile_service import prepare_inventory_profile_for_product
+            prepare_inventory_profile_for_product(product_id=core_product.id)
+        except Exception:
+            pass
+
         return core_product

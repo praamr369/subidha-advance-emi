@@ -1,8 +1,9 @@
 ﻿"use client";
 
-import { useEffect, useState } from "react";
 import ERPPageShell from "@/components/erp/ERPPageShell";
+import RefreshBar from "@/components/feedback/RefreshBar";
 import { WorkspaceSection } from "@/components/ui/workspace";
+import { useRefreshableList } from "@/hooks/useRefreshableList";
 import {
   actOnReturnRequest,
   cpaOverrideReturnRequest,
@@ -21,18 +22,8 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export default function ReturnRequestsPage() {
-  const [items, setItems] = useState<ReturnRequest[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const reload = () => {
-    setLoading(true);
-    listReturnRequests()
-      .then((d) => setItems(d))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(reload, []);
+  const { items, initialLoading, refreshing, reload } =
+    useRefreshableList<ReturnRequest>(listReturnRequests);
 
   const kpis = [
     { label: "Total", value: items.length },
@@ -60,8 +51,9 @@ export default function ReturnRequestsPage() {
       stats={kpis}
     >
       <WorkspaceSection title="Customer return requests">
-        {loading ? (
-          <p className="text-sm text-muted-foreground py-8 text-center">Loadingâ€¦</p>
+        <RefreshBar active={refreshing} />
+        {initialLoading ? (
+          <p className="text-sm text-muted-foreground py-8 text-center">Loading…</p>
         ) : items.length === 0 ? (
           <p className="text-sm text-muted-foreground py-8 text-center">No return requests on file.</p>
         ) : (

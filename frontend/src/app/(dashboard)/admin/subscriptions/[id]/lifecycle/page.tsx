@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ActionButton from "@/components/ui/ActionButton";
+import DownloadPdfButton from "@/components/documents/DownloadPdfButton";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { DetailPanel, FormSection } from "@/components/ui/operations";
@@ -341,11 +342,11 @@ export default function ContractLifecyclePage() {
   const canActivate = status === "APPROVED";
   const canCancel = !["CANCELLED", "CLOSED", "COMPLETED"].includes(status);
   const canClose = ["COMPLETED", "RETURNED"].includes(status);
-  const contractPdfHref =
+  const contractPdfPath =
     sub?.plan_type === "RENT"
-      ? `/api/v1/admin/rent-contracts/${subscriptionId}/pdf/`
+      ? `/admin/rent-contracts/${subscriptionId}/pdf/`
       : sub?.plan_type === "LEASE"
-        ? `/api/v1/admin/lease-contracts/${subscriptionId}/pdf/`
+        ? `/admin/lease-contracts/${subscriptionId}/pdf/`
         : null;
 
   return (
@@ -372,27 +373,21 @@ export default function ContractLifecyclePage() {
       statusBadge={{ label: "Contract Lifecycle", tone: "info" }}
     >
       <div className="space-y-6">
-        {(contractPdfHref || inspection?.id) && (
+        {(contractPdfPath || inspection?.id) && (
           <div className="flex flex-wrap gap-2">
-            {contractPdfHref ? (
-              <a
-                href={contractPdfHref}
-                target="_blank"
-                rel="noreferrer"
-                className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
-              >
-                Download Contract PDF
-              </a>
+            {contractPdfPath ? (
+              <DownloadPdfButton
+                path={contractPdfPath}
+                filename={`contract-${subscriptionId}.pdf`}
+                label="Download Contract PDF"
+              />
             ) : null}
             {inspection?.id ? (
-              <a
-                href={`/api/v1/admin/returns/${inspection.id}/inspection-pdf/`}
-                target="_blank"
-                rel="noreferrer"
-                className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
-              >
-                Download Inspection PDF
-              </a>
+              <DownloadPdfButton
+                path={`/admin/returns/${inspection.id}/inspection-pdf/`}
+                filename={`inspection-${inspection.id}.pdf`}
+                label="Download Inspection PDF"
+              />
             ) : null}
           </div>
         )}

@@ -40,6 +40,18 @@ def _date_or_today(value) -> date:
     return timezone.now().date()
 
 
+def _sync_party_safe(entity, kind: str) -> None:
+    """Best-effort CRM party sync — never fails the import if party sync errors."""
+    try:
+        from crm.services.party_service import sync_party_for_customer, sync_party_for_vendor
+        if kind == "customer":
+            sync_party_for_customer(entity)
+        elif kind == "vendor":
+            sync_party_for_vendor(entity)
+    except Exception:
+        pass
+
+
 # ---------------------------------------------------------------------------
 # Per-dataset importers. Each returns (target_model, target_pk, extra_targets,
 # prior_state) for rollback tracking. ``resolution`` handles duplicates.
@@ -68,6 +80,7 @@ def _import_customer(row: MigrationStagingRow, data: dict[str, Any], actor) -> t
             elif resolution == DuplicateResolution.MERGE and value and not getattr(existing, attr):
                 setattr(existing, attr, value)
         existing.save()
+        _sync_party_safe(existing, "customer")
         return "customers.Customer", existing.pk, [], {"action": "updated", **prior}
 
     customer, created = find_or_create_customer(
@@ -95,6 +108,7 @@ def _import_customer(row: MigrationStagingRow, data: dict[str, Any], actor) -> t
     if updates:
         customer.save(update_fields=[*updates, "updated_at"] if hasattr(customer, "updated_at") else updates)
     extra = [{"model": "accounts.User", "pk": customer.user_id}] if created else []
+    _sync_party_safe(customer, "customer")
     # Opening balance context creates an opening receivable, never an invoice.
     opening = _dec(data.get("opening_balance"))
     ob_type = str(data.get("opening_balance_type") or "DR")
@@ -131,7 +145,9 @@ def _import_vendor(row: MigrationStagingRow, data: dict[str, Any], actor) -> tup
                 if value and (resolution == DuplicateResolution.UPDATE or not getattr(existing, attr)):
                     setattr(existing, attr, value)
             existing.save()
+            _sync_party_safe(existing, "vendor")
             return "accounting.Vendor", existing.pk, [], {"action": "updated", **prior}
+        _sync_party_safe(existing, "vendor")
         return "accounting.Vendor", existing.pk, [], {"action": "already_existed"}
     vendor = Vendor.objects.create(
         name=name,
@@ -143,6 +159,7 @@ def _import_vendor(row: MigrationStagingRow, data: dict[str, Any], actor) -> tup
         status="ACTIVE" if str(data.get("status") or "ACTIVE") == "ACTIVE" else "ARCHIVED",
         notes=f"Migrated via {row.batch.batch_number}",
     )
+    _sync_party_safe(vendor, "vendor")
     extra = []
     opening = _dec(data.get("opening_balance") or data.get("outstanding"))
     if opening > 0:
@@ -293,6 +310,7 @@ def _import_customer_outstanding(row: MigrationStagingRow, data: dict[str, Any],
         if created:
             extra.append({"model": "accounts.User", "pk": customer.user_id})
             extra.append({"model": "customers.Customer", "pk": customer.pk})
+        _sync_party_safe(customer, "customer")
 
     outstanding = CustomerOpeningOutstanding.objects.create(
         customer=customer,
@@ -316,6 +334,7 @@ def _import_vendor_outstanding(row: MigrationStagingRow, data: dict[str, Any], a
     if vendor is None:
         vendor = Vendor.objects.create(name=name, notes=f"Auto-created during migration {row.batch.batch_number}")
         extra.append({"model": "accounting.Vendor", "pk": vendor.pk})
+    _sync_party_safe(vendor, "vendor")
     amount = _dec(data.get("outstanding"))
     if amount <= 0:
         raise ValueError("Outstanding amount must be greater than zero.")

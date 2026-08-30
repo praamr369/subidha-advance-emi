@@ -170,23 +170,27 @@ export default function ImmersiveHero({ title, subtitle, companyName, tagline, s
           </div>
 
           <div
-            className="imx-layer imx-float pointer-events-none absolute -left-3 top-8 hidden rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_86%,transparent)] px-4 py-3 shadow-[0_22px_54px_-38px_rgba(15,23,42,0.74)] backdrop-blur md:block"
-            style={{ ["--imx-depth" as string]: 40, ["--imx-tilt" as string]: 10 }}
+            className="imx-layer pointer-events-none absolute -left-3 top-8 hidden md:block"
+            style={{ ["--imx-depth" as string]: 40, ["--imx-tilt" as string]: 10, zIndex: 10 }}
           >
-            <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-              <ShieldCheck className="h-3.5 w-3.5 text-primary" /> Lucky Plan
+            <div className="imx-float rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_86%,transparent)] px-4 py-3 shadow-[0_22px_54px_-38px_rgba(15,23,42,0.74)] backdrop-blur">
+              <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                <ShieldCheck className="h-3.5 w-3.5 text-primary" /> Lucky Plan
+              </div>
+              <div className="mt-1 text-sm font-semibold text-foreground">Future EMI waiver only</div>
             </div>
-            <div className="mt-1 text-sm font-semibold text-foreground">Future EMI waiver only</div>
           </div>
 
           <div
-            className="imx-layer imx-float pointer-events-none absolute -right-2 bottom-8 hidden rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_86%,transparent)] px-4 py-3 shadow-[0_22px_54px_-38px_rgba(15,23,42,0.74)] backdrop-blur md:block"
-            style={{ ["--imx-depth" as string]: 54, ["--imx-tilt" as string]: 12, animationDelay: "1.6s" }}
+            className="imx-layer pointer-events-none absolute -right-2 bottom-8 hidden md:block"
+            style={{ ["--imx-depth" as string]: 54, ["--imx-tilt" as string]: 12, zIndex: 10 }}
           >
-            <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-              <ReceiptText className="h-3.5 w-3.5 text-primary" /> Rent / Lease
+            <div className="imx-float rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_86%,transparent)] px-4 py-3 shadow-[0_22px_54px_-38px_rgba(15,23,42,0.74)] backdrop-blur" style={{ animationDelay: "1.6s" }}>
+              <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                <ReceiptText className="h-3.5 w-3.5 text-primary" /> Rent / Lease
+              </div>
+              <div className="mt-1 text-sm font-semibold text-foreground">Monthly invoice workflow</div>
             </div>
-            <div className="mt-1 text-sm font-semibold text-foreground">Monthly invoice workflow</div>
           </div>
         </div>
       </div>

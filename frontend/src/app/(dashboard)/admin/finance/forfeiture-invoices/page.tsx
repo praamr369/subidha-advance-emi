@@ -1,9 +1,10 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useState } from "react";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import RefreshBar from "@/components/feedback/RefreshBar";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import {
@@ -21,10 +22,11 @@ const STATUS_COLOR: Record<string, string> = {
 export default function ForfeitureInvoicesPage() {
   const [items, setItems] = useState<ForfeitureInvoice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const reload = useCallback(async () => {
-    setLoading(true);
+  const reload = useCallback(async (isInitial = false) => {
+    if (isInitial) setLoading(true); else setRefreshing(true);
     setError(null);
     try {
       setItems(await listForfeitureInvoices());
@@ -32,11 +34,12 @@ export default function ForfeitureInvoicesPage() {
       setError(err instanceof Error ? err.message : "Failed to load forfeiture invoices.");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
-    void reload();
+    void reload(true);
   }, [reload]);
 
   const totalForfeited = items
@@ -69,6 +72,7 @@ export default function ForfeitureInvoicesPage() {
       stats={kpis}
     >
       <WorkspaceSection title="Forfeiture invoice register">
+        <RefreshBar active={refreshing} />
         {loading ? (
           <LoadingBlock label="Loading forfeiture invoices…" />
         ) : error ? (
@@ -131,4 +135,3 @@ export default function ForfeitureInvoicesPage() {
     </ERPPageShell>
   );
 }
-

@@ -1,8 +1,8 @@
 import logging
-
 import re
 
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
@@ -12,6 +12,9 @@ from subscriptions.models import Customer
 
 User = get_user_model()
 security_logger = logging.getLogger("security.events")
+
+LOGIN_MAX_ATTEMPTS = 5
+LOGIN_LOCKOUT_SECONDS = 900  # 15 minutes
 
 
 def staff_identity_payload(user):
@@ -197,6 +200,18 @@ class CustomTokenSerializer(TokenObtainPairSerializer):
         )
         identifier = self._normalize_identifier(str(raw_identifier))
 
+        lockout_key = f"login_attempts:{identifier}" if identifier else None
+        if lockout_key:
+            attempts = cache.get(lockout_key, 0)
+            if attempts >= LOGIN_MAX_ATTEMPTS:
+                security_logger.warning(
+                    "auth.login_locked_out",
+                    extra={"identifier": identifier, "attempts": attempts},
+                )
+                raise AuthenticationFailed(
+                    "Too many failed login attempts. Please try again in 15 minutes."
+                )
+
         resolved_user: User | None = None
         if identifier:
             resolved_user = self._resolve_user_for_identifier(identifier)
@@ -209,6 +224,9 @@ class CustomTokenSerializer(TokenObtainPairSerializer):
         try:
             data = super().validate(attrs)
         except (AuthenticationFailed, serializers.ValidationError):
+            if lockout_key:
+                new_count = cache.get(lockout_key, 0) + 1
+                cache.set(lockout_key, new_count, LOGIN_LOCKOUT_SECONDS)
             security_logger.warning(
                 "auth.login_failed",
                 extra={
@@ -217,6 +235,9 @@ class CustomTokenSerializer(TokenObtainPairSerializer):
                 },
             )
             raise AuthenticationFailed(self.error_messages["invalid_credentials"])
+
+        if lockout_key:
+            cache.delete(lockout_key)
 
         user = self.user
 

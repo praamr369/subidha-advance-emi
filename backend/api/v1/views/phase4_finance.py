@@ -508,7 +508,10 @@ class AdminReceiptPdfView(APIView):
 
     def get(self, request, pk: int):
         receipt = (
-            ReceiptDocument.objects.select_related("customer", "finance_account", "payment")
+            ReceiptDocument.objects.select_related(
+                "customer", "finance_account", "payment", "payment__collected_by",
+                "subscription", "subscription__product", "direct_sale",
+            )
             .filter(pk=pk)
             .first()
         )
@@ -708,7 +711,10 @@ class CustomerReceiptPdfView(APIView):
         if customer is None:
             return Response({"detail": "Customer profile missing."}, status=status.HTTP_404_NOT_FOUND)
         receipt = (
-            ReceiptDocument.objects.select_related("customer", "finance_account", "payment")
+            ReceiptDocument.objects.select_related(
+                "customer", "finance_account", "payment", "payment__collected_by",
+                "subscription", "subscription__product", "direct_sale",
+            )
             .filter(pk=pk, customer=customer)
             .first()
         )

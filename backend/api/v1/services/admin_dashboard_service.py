@@ -204,6 +204,122 @@ def _build_module_kpis(today: date) -> dict:
     }
 
 
+def _build_action_required_counts(today: date) -> dict:
+    from django.db.models import Q as _Q, Sum, Count
+    from accounting.models import CustomerOpeningOutstanding
+    from crm.models import FollowUpTask, FollowUpTaskStatus, Lead, LeadStage
+    from inventory.models import (
+        GoodsReceipt,
+        GoodsReceiptStatus,
+        PurchaseOrder,
+        PurchaseOrderStatus,
+        VendorBill,
+        VendorBillStatus,
+    )
+    from service_desk.models import ServiceDeskCase
+    from subscriptions.models import (
+        Delivery,
+        DeliveryStatus,
+        OnlineRequest,
+        ProductRequest,
+        ProductRequestStatus,
+        SubscriptionRequest,
+        SubscriptionRequestStatus,
+    )
+
+    pending_deliveries = Delivery.objects.filter(
+        status__in=[DeliveryStatus.PENDING, DeliveryStatus.SCHEDULED, DeliveryStatus.DISPATCHED, DeliveryStatus.OUT_FOR_DELIVERY]
+    ).count()
+    failed_deliveries = Delivery.objects.filter(status=DeliveryStatus.FAILED).count()
+    return_requested = Delivery.objects.filter(status=DeliveryStatus.RETURN_REQUESTED).count()
+
+    sub_requests = SubscriptionRequest.objects.filter(status=SubscriptionRequestStatus.SUBMITTED).count()
+    product_requests = ProductRequest.objects.filter(status=ProductRequestStatus.SUBMITTED).count()
+    online_requests = OnlineRequest.objects.filter(status__in=["DRAFT", "QUOTE_SENT", "QUOTE_ACCEPTED"]).count()
+
+    new_leads = Lead.objects.filter(stage=LeadStage.NEW).count()
+    follow_ups_overdue = FollowUpTask.objects.filter(
+        status=FollowUpTaskStatus.OPEN, due_at__lte=timezone.now()
+    ).count()
+
+    vendor_bills_unpaid = VendorBill.objects.filter(
+        status__in=[VendorBillStatus.DRAFT, VendorBillStatus.POSTED]
+    ).aggregate(count=Count("id"), total=Sum("grand_total"))
+    purchase_orders_open = PurchaseOrder.objects.filter(
+        status__in=[PurchaseOrderStatus.DRAFT, PurchaseOrderStatus.SENT, PurchaseOrderStatus.PARTIALLY_RECEIVED]
+    ).count()
+    goods_receipts_pending = GoodsReceipt.objects.filter(status=GoodsReceiptStatus.DRAFT).count()
+
+    legacy_outstanding = CustomerOpeningOutstanding.objects.filter(
+        outstanding_amount__gt=0
+    ).aggregate(count=Count("id"), total=Sum("outstanding_amount"))
+
+    open_service_cases = ServiceDeskCase.objects.filter(
+        status__in=["OPEN", "UNDER_REVIEW", "AUTHORIZED", "IN_SERVICE"]
+    ).count()
+
+    payment_overdue = Emi.objects.filter(
+        status=EmiStatus.OVERDUE
+    ).count()
+
+    return {
+        "leads": {
+            "new_leads": new_leads,
+            "follow_ups_overdue": follow_ups_overdue,
+        },
+        "requests": {
+            "subscription_requests": sub_requests,
+            "product_requests": product_requests,
+            "online_requests": online_requests,
+            "total": sub_requests + product_requests + online_requests,
+        },
+        "payments": {
+            "overdue_emis": payment_overdue,
+        },
+        "delivery": {
+            "pending": pending_deliveries,
+            "failed": failed_deliveries,
+            "return_requested": return_requested,
+        },
+        "inventory": {
+            "purchase_orders_open": purchase_orders_open,
+            "goods_receipts_pending": goods_receipts_pending,
+        },
+        "vendor": {
+            "unpaid_bills_count": vendor_bills_unpaid["count"] or 0,
+            "unpaid_bills_amount": _money(vendor_bills_unpaid["total"]),
+        },
+        "outstanding": {
+            "legacy_count": legacy_outstanding["count"] or 0,
+            "legacy_amount": _money(legacy_outstanding["total"]),
+        },
+        "service_desk": {
+            "open_cases": open_service_cases,
+        },
+    }
+
+
+def _build_attendance_snapshot(today: date) -> dict:
+    from accounting.models import AttendanceStatus, EmployeeAttendance, EmployeeProfile
+    total_staff = EmployeeProfile.objects.filter(is_active=True).count()
+    today_records = EmployeeAttendance.objects.filter(attendance_date=today)
+    present = today_records.filter(status=AttendanceStatus.PRESENT).count()
+    half_day = today_records.filter(status=AttendanceStatus.HALF_DAY).count()
+    absent = today_records.filter(status=AttendanceStatus.ABSENT).count()
+    on_leave = today_records.filter(status=AttendanceStatus.LEAVE).count()
+    marked = present + half_day + absent + on_leave
+    not_marked = max(0, total_staff - marked)
+    return {
+        "total_staff": total_staff,
+        "present": present,
+        "half_day": half_day,
+        "absent": absent,
+        "on_leave": on_leave,
+        "not_marked": not_marked,
+        "attendance_rate": round(((present + half_day * 0.5) / total_staff) * 100, 1) if total_staff > 0 else 0,
+    }
+
+
 def build_admin_dashboard(*, actor_user=None):
 
     # ------------------------------
@@ -493,6 +609,12 @@ def build_admin_dashboard(*, actor_user=None):
         # HR, CRM, support) so the dashboard covers every module from this
         # single cached payload.
         "modules": _build_module_kpis(today),
+
+        # 🔔 Action-required counts per notification category
+        "action_required": _build_action_required_counts(today),
+
+        # 📋 Today's attendance snapshot
+        "attendance": _build_attendance_snapshot(today),
     }
 
     # ------------------------------

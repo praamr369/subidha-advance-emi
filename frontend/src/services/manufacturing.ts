@@ -30,6 +30,19 @@ export type ManufacturingBomLine = {
   notes?: string;
 };
 
+export type ManufacturingBomServiceLine = {
+  id?: number;
+  service: number;
+  service_code?: string | null;
+  service_name?: string | null;
+  default_employee?: number | null;
+  default_employee_name?: string | null;
+  default_employee_code?: string | null;
+  quantity: string;
+  sort_order?: number;
+  notes?: string;
+};
+
 export type ManufacturingBom = {
   id: number;
   bom_no: string;
@@ -45,6 +58,7 @@ export type ManufacturingBom = {
   activated_at?: string | null;
   activated_by_username?: string | null;
   lines: ManufacturingBomLine[];
+  service_lines?: ManufacturingBomServiceLine[];
 };
 
 export type ProductionMaterialIssueLine = {
@@ -101,9 +115,12 @@ export type ProductionScrapLine = {
 
 export type ProductionLaborLine = {
   id: number;
-  employee: number;
+  employee?: number | null;
   employee_name?: string | null;
   employee_code?: string | null;
+  service?: number | null;
+  service_name?: string | null;
+  service_code?: string | null;
   activity_name: string;
   hours_worked: string;
   piece_count: string;
@@ -198,6 +215,12 @@ export type ManufacturingBomPayload = {
     inventory_item: number;
     quantity_per_unit: string;
     wastage_percent?: string;
+    sort_order?: number;
+    notes?: string;
+  }>;
+  service_lines?: Array<{
+    service: number;
+    quantity: string;
     sort_order?: number;
     notes?: string;
   }>;
@@ -362,10 +385,11 @@ export function postProductionLabor(
   id: number | string,
   payload: {
     labor_lines?: Array<{
+      id?: number;
       employee: number;
       activity_name: string;
-      hours_worked: string;
-      piece_count: string;
+      hours_worked: string | null;
+      piece_count: string | null;
       wage_amount: string;
     }>;
   } = {}

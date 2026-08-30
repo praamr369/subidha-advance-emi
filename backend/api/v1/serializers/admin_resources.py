@@ -13,6 +13,7 @@ from api.v1.serializers.delivery import AdminSubscriptionDeliveryReadSerializer
 from api.v1.serializers.media import serialize_media_url
 from crm.services.party_service import sync_party_for_customer
 from inventory.models import StockLocation
+from products_core.models import ProductVariant
 from subscriptions.models import (
     AuditLog,
     Batch,
@@ -2707,12 +2708,37 @@ class ProductRelationshipSerializer(serializers.ModelSerializer):
     related_product_code = serializers.CharField(source="related_product.product_code", read_only=True)
     related_product_item_type = serializers.CharField(source="related_product.item_type", read_only=True)
 
+    parent_variant = serializers.PrimaryKeyRelatedField(
+        queryset=ProductVariant.objects.all(),
+        required=False,
+        allow_null=True,
+        default=None
+    )
+    parent_variant_name = serializers.CharField(source="parent_variant.variant_name", read_only=True)
+    
+    related_variant = serializers.PrimaryKeyRelatedField(
+        queryset=ProductVariant.objects.all(),
+        required=False,
+        allow_null=True,
+        default=None
+    )
+    related_variant_name = serializers.CharField(source="related_variant.variant_name", read_only=True)
+    
+    parent_variant_sku = serializers.CharField(required=False, allow_null=True)
+    related_variant_sku = serializers.CharField(required=False, allow_null=True)
+
     class Meta:
         model = ProductRelationship
         fields = [
             "id",
             "product",
+            "parent_variant",
+            "parent_variant_sku",
+            "parent_variant_name",
             "related_product",
+            "related_variant",
+            "related_variant_sku",
+            "related_variant_name",
             "related_product_name",
             "related_product_code",
             "related_product_item_type",
@@ -2726,7 +2752,7 @@ class ProductRelationshipSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "updated_at"]
 
     def validate(self, data):
-        product = data.get("product") or self.instance.product if self.instance else None
+        product = data.get("product") or (self.instance.product if self.instance else None)
         related_product = data.get("related_product")
 
         if not product or not related_product:
@@ -2734,6 +2760,14 @@ class ProductRelationshipSerializer(serializers.ModelSerializer):
 
         if product.id == related_product.id:
             raise serializers.ValidationError("A product cannot be related to itself.")
+
+        parent_variant = data.get("parent_variant")
+        if parent_variant and parent_variant.product_id != product.id:
+            raise serializers.ValidationError("The selected parent variant does not belong to the base product.")
+
+        related_variant = data.get("related_variant")
+        if related_variant and related_variant.product_id != related_product.id:
+            raise serializers.ValidationError("The selected related variant does not belong to the related product.")
 
         return data
 

@@ -19,7 +19,7 @@ import CustomerPageShell, {
 import { formatPlanTypeLabel } from "@/lib/plan-labels";
 import { listCustomerPayments, type CustomerPayment } from "@/services/customer";
 import { listCustomerReceipts, type FinanceReceiptRow } from "@/services/phase4-finance";
-import { customerReceiptPdfUrl } from "@/services/customer-portal";
+import { downloadAuthenticatedFile } from "@/lib/export/auth-download";
 
 function formatDate(value: string | null | undefined): string {
   if (!value) return "—";
@@ -32,8 +32,8 @@ function formatDate(value: string | null | undefined): string {
   });
 }
 
-function downloadReceiptHref(receiptId: number | string) {
-  return customerReceiptPdfUrl(receiptId);
+function handleDownloadReceipt(receiptId: number | string) {
+  void downloadAuthenticatedFile(`/customer/receipts/${receiptId}/pdf/`, `receipt-${receiptId}.pdf`);
 }
 
 function splitReceipts(receipts: FinanceReceiptRow[]) {
@@ -96,14 +96,12 @@ function ReceiptCard({ receipt }: { receipt: FinanceReceiptRow }) {
         </div>
         <div className="flex flex-col items-end gap-2">
           <span className="text-base font-bold text-foreground">{formatRupee(receipt.amount)}</span>
-          <a
-            href={downloadReceiptHref(receipt.id)}
-            target="_blank"
-            rel="noreferrer"
+          <button
+            onClick={() => handleDownloadReceipt(receipt.id)}
             className="rounded-xl border border-border bg-background px-3 py-1 text-xs font-medium hover:bg-muted"
           >
             PDF
-          </a>
+          </button>
         </div>
       </div>
     </div>

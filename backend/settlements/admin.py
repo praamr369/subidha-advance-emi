@@ -1,3 +1,4 @@
+from unfold.admin import ModelAdmin as UnfoldModelAdmin, TabularInline as UnfoldTabularInline, StackedInline as UnfoldStackedInline
 from django.contrib import admin
 
 from settlements.models import (
@@ -10,7 +11,7 @@ from settlements.models import (
 )
 
 
-class NoBulkActionsAdmin(admin.ModelAdmin):
+class NoBulkActionsAdmin(UnfoldModelAdmin):
     actions = None
 
 

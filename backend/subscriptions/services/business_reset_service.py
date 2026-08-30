@@ -22,6 +22,7 @@ DEFAULT_TARGET_APP_LABELS: set[str] = {
     "reminders",
     "subscriptions",
     "accounts",
+    "system_jobs",
     # Apps the subscriptions monolith was split into — the operational data
     # (customers, contracts, payments, lucky-plan, deliveries, etc.) now lives
     # here, so they must be cleared too or User deletion hits their PROTECT FKs.
@@ -299,6 +300,10 @@ def execute_business_reset(*, options: BusinessResetOptions, confirm: str, dry_r
 
         # Ensure preserved admins remain active and privileged enough to re-enter setup.
         User.objects.filter(id__in=preserved_user_ids).update(is_active=True, is_staff=True)
+
+        # Clear stale notifications — they reference deleted business entities.
+        from system_jobs.models import Notification
+        Notification.objects.all().delete()
 
     return {**build_business_reset_plan(options=options), "mode": "executed"}
 

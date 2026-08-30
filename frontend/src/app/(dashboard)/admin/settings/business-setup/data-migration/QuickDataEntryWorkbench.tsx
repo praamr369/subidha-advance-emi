@@ -10,26 +10,23 @@ import VendorOutstandingQuickEntry from "./VendorOutstandingQuickEntry";
 import OpeningStockQuickEntry from "./OpeningStockQuickEntry";
 
 const SECTIONS = [
-  { key: "cash_opening_balance", label: "Finance Accounts (FA)", component: FinanceOpeningSection },
+  { key: "finance_opening", label: "Finance Accounts (FA)", component: FinanceOpeningSection },
   { key: "customer_master", label: "Customer Master", component: CustomerMasterQuickEntry },
-  { key: "vendor_master", label: "Vendor Master", component: VendorMasterQuickEntry },
-  { key: "employee_master", label: "Employee Master", component: EmployeeQuickEntry },
   { key: "customer_outstanding", label: "Customer Outstanding", component: CustomerOutstandingQuickEntry },
+  { key: "vendor_master", label: "Vendor Master", component: VendorMasterQuickEntry },
   { key: "vendor_outstanding", label: "Vendor Outstanding", component: VendorOutstandingQuickEntry },
+  { key: "employee_master", label: "Employee Master", component: EmployeeQuickEntry },
   { key: "opening_stock", label: "Opening Stock", component: OpeningStockQuickEntry },
 ];
 
 export default function QuickDataEntryWorkbench({ preselectDataset }: { preselectDataset?: string | null }) {
-  // Map shortcut keys to our internal keys where needed
-  const defaultKey = preselectDataset === "bank_opening_balance" || preselectDataset === "upi_opening_balance" 
-    ? "cash_opening_balance" 
-    : (preselectDataset ?? "cash_opening_balance");
+  const defaultKey = preselectDataset ?? "customer_master";
 
   const [activeSection, setActiveSection] = useState(
-    SECTIONS.find(s => s.key === defaultKey)?.key ?? "cash_opening_balance"
+    SECTIONS.find(s => s.key === defaultKey)?.key ?? "customer_master"
   );
 
-  const ActiveComponent = SECTIONS.find((s) => s.key === activeSection)?.component ?? FinanceOpeningSection;
+  const ActiveComponent = SECTIONS.find((s) => s.key === activeSection)?.component ?? CustomerMasterQuickEntry;
 
   return (
     <div className="flex flex-col md:flex-row gap-6">

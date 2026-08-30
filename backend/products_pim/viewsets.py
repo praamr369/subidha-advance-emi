@@ -121,7 +121,8 @@ class PimProductViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["get"])
     def with_attributes(self, request, pk=None):
         product = self.get_object()
-        return Response(PimProductDetailSerializer(product).data)
+        serializer = PimProductDetailSerializer(product, context=self.get_serializer_context())
+        return Response(serializer.data)
 
     @action(detail=True, methods=["post"])
     def publish(self, request, pk=None):
@@ -249,7 +250,7 @@ class PimProductViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["get"])
     def variants(self, request, pk=None):
         product = self.get_object()
-        variants = product.variants.filter(is_active=True).prefetch_related("attribute_values__attribute")
+        variants = product.variants.filter(is_active=True).select_related("product").prefetch_related("attribute_values__attribute")
         return Response(ProductVariantSerializer(variants, many=True).data)
 
     @action(detail=True, methods=["post"])
@@ -635,6 +636,58 @@ class PimProductViewSet(viewsets.ModelViewSet):
         ).select_related("product__category")
         return Response(ProductVariantSerializer(variants, many=True).data)
 
+    @action(detail=True, methods=["get", "post"])
+    def accessories(self, request, pk=None):
+        from .serializers import PimProductRelationshipSerializer
+        from products_core.models import ProductRelationship
+        product = self.get_object()
+
+        if not product.source_product_id:
+            return Response({"error": "PIM product is not published/linked to an operational product yet."}, status=400)
+
+        if request.method == "GET":
+            qs = ProductRelationship.objects.filter(product=product.source_product_id, parent_variant__isnull=True)
+            return Response(PimProductRelationshipSerializer(qs, many=True).data)
+
+        # POST method: adding a new accessory
+        related_pim_id = request.data.get("related_pim_id")
+        if not related_pim_id:
+            return Response({"error": "related_pim_id is required."}, status=400)
+            
+        try:
+            related_pim = PimProduct.objects.get(pk=related_pim_id)
+        except PimProduct.DoesNotExist:
+            return Response({"error": "Related PIM product not found."}, status=404)
+            
+        if not related_pim.source_product_id:
+            return Response({"error": "Related PIM product is not published/linked to an operational product yet."}, status=400)
+
+        rel, created = ProductRelationship.objects.get_or_create(
+            product=product.source_product,
+            related_product=related_pim.source_product,
+            defaults={
+                "parent_variant": None,
+                "related_variant": None,
+                "parent_variant_sku": None,
+                "related_variant_sku": None,
+            }
+        )
+        return Response(PimProductRelationshipSerializer(rel).data, status=201 if created else 200)
+
+    @action(detail=True, methods=["delete"], url_path=r"accessories/(?P<accessory_id>\d+)")
+    def delete_accessory(self, request, pk=None, accessory_id=None):
+        from products_core.models import ProductRelationship
+        product = self.get_object()
+        
+        if not product.source_product_id:
+            return Response({"error": "PIM product not linked."}, status=400)
+            
+        try:
+            rel = ProductRelationship.objects.get(pk=accessory_id, product=product.source_product_id)
+            rel.delete()
+            return Response(status=204)
+        except ProductRelationship.DoesNotExist:
+            return Response({"error": "Accessory relationship not found."}, status=404)
 
 class ProductVariantViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsAdmin]
@@ -718,3 +771,47 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
             "attribute_values__attribute"
         ).get(pk=variant.pk)
         return Response(ProductVariantSerializer(variant).data)
+
+
+class ProductMediaItemViewSet(viewsets.ModelViewSet):
+    """CRUD for product media gallery items (images + videos)."""
+    permission_classes = [IsAuthenticated, IsAdmin]
+    parser_classes_override = None
+
+    def get_parser_classes(self):
+        from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+        return [MultiPartParser, FormParser, JSONParser]
+
+    @property
+    def parser_classes(self):
+        from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+        return [MultiPartParser, FormParser, JSONParser]
+
+    def get_queryset(self):
+        from .models import ProductMediaItem
+        qs = ProductMediaItem.objects.select_related("variant")
+        product_id = self.request.query_params.get("product")
+        variant_id = self.request.query_params.get("variant")
+        kind = self.request.query_params.get("kind")
+        if product_id:
+            qs = qs.filter(product_id=product_id)
+        if variant_id:
+            qs = qs.filter(variant_id=variant_id)
+        if kind:
+            qs = qs.filter(kind=kind)
+        return qs
+
+    def get_serializer_class(self):
+        from .serializers import ProductMediaItemSerializer
+        return ProductMediaItemSerializer
+
+    @action(detail=True, methods=["post"])
+    def set_hero(self, request, pk=None):
+        """Mark this item as the hero image; clears hero on all others for the same product."""
+        from .models import ProductMediaItem
+        item = self.get_object()
+        ProductMediaItem.objects.filter(product=item.product, is_hero=True).update(is_hero=False)
+        item.is_hero = True
+        item.save(update_fields=["is_hero"])
+        from .serializers import ProductMediaItemSerializer
+        return Response(ProductMediaItemSerializer(item, context={"request": request}).data)

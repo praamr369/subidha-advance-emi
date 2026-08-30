@@ -7,9 +7,11 @@ import {
   ChevronDown, ChevronUp, Pencil, RefreshCcw, CheckCircle2, Layers, Lock, QrCode
 } from "lucide-react";
 import { pimService, type PimVariant, type PimCategoryAttribute } from "@/services/pim";
+import { patchVariantPublishControl } from "@/services/product-pim";
 import { type AttributeValues } from "./DynamicAttributeForm";
 import { formatRupee } from "@/lib/utils/currency";
 import QRLabelPrintModal, { type QRLabelItem } from "@/components/inventory/QRLabelPrintModal";
+import RelatedProductsSection from "../products/RelatedProductsSection";
 
 interface Props {
   productId: number;
@@ -131,6 +133,7 @@ function VariantEditPanel({
   allAttributes,
   lockedAttributes,
   parentAttrValues,
+  productId,
   onSave,
   onCancel,
 }: {
@@ -138,6 +141,7 @@ function VariantEditPanel({
   allAttributes: PimCategoryAttribute[];
   lockedAttributes?: Set<number>;
   parentAttrValues?: AttributeValues;
+  productId?: number;
   onSave: (data: VariantEditState) => Promise<void>;
   onCancel: () => void;
 }) {
@@ -319,6 +323,19 @@ function VariantEditPanel({
           </div>
         </div>
       </div>
+
+      {/* Related Products / BOM */}
+      {productId && variant.sku && (
+        <div className="border-t border-border mt-2 pt-4">
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Relations & Add-ons</h4>
+          <RelatedProductsSection
+            productId={productId}
+            productName={variant.variant_label || variant.sku}
+            saving={saving}
+            lockedParentVariantSku={variant.sku}
+          />
+        </div>
+      )}
 
       {/* Actions */}
       <div className="flex items-center gap-3">
@@ -502,6 +519,14 @@ export default function VariantManager({ productId, productCode, productName, ba
     onRefresh();
   };
 
+  const handleTogglePublished = async (v: PimVariant) => {
+    // Use child_pim_id (the child PimProduct ID) — that's what the publish control API expects.
+    // Fall back to variant id; backend also handles ProductVariant IDs via mapping.
+    const targetId = v.child_pim_id ?? v.id;
+    await patchVariantPublishControl(productId, { variants: [{ id: targetId, is_published: !v.is_published }] });
+    onRefresh();
+  };
+
   const handleBulkDelete = async () => {
     if (selected.size === 0) return;
     if (!confirm(`Delete ${selected.size} selected variant(s)?`)) return;
@@ -661,7 +686,7 @@ export default function VariantManager({ productId, productCode, productName, ba
   };
 
   // Column count for the full-width expanded row
-  const colSpan = 8;
+  const colSpan = 9;
 
   return (
     <div className="space-y-4">
@@ -1004,7 +1029,8 @@ export default function VariantManager({ productId, productCode, productName, ba
                     <th className="px-3 py-2.5 text-left font-medium text-muted-foreground">Attributes</th>
                     <th className="px-3 py-2.5 text-right font-medium text-muted-foreground cursor-pointer select-none" onClick={() => toggleSort("price")}>Price{sortIcon("price")}</th>
                     <th className="px-3 py-2.5 text-right font-medium text-muted-foreground cursor-pointer select-none" onClick={() => toggleSort("quantity_on_hand")}>Stock{sortIcon("quantity_on_hand")}</th>
-                    <th className="px-3 py-2.5 text-center font-medium text-muted-foreground w-20">Status</th>
+                    <th className="px-3 py-2.5 text-center font-medium text-muted-foreground w-20">Active</th>
+                    <th className="px-3 py-2.5 text-center font-medium text-muted-foreground w-20">Public</th>
                     <th className="px-3 py-2.5 text-center font-medium text-muted-foreground w-24">Actions</th>
                   </tr>
                 </thead>
@@ -1077,6 +1103,13 @@ export default function VariantManager({ productId, productCode, productName, ba
                           </button>
                         </td>
                         <td className="px-3 py-2 text-center">
+                          <button type="button" title={v.is_published ? "Set to draft (hide from public)" : "Publish (show on public site)"}
+                            onClick={() => void handleTogglePublished(v)}
+                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold transition ${v.is_published ? "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-400 hover:bg-violet-200" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
+                            {v.is_published ? "Live" : "Draft"}
+                          </button>
+                        </td>
+                        <td className="px-3 py-2 text-center">
                           <div className="flex items-center justify-center gap-1">
                             <button type="button"
                               title={expandedId === v.id ? "Close editor" : "Edit attributes & pricing"}
@@ -1105,6 +1138,7 @@ export default function VariantManager({ productId, productCode, productName, ba
                               allAttributes={allAttributes}
                               lockedAttributes={lockedAttributes}
                               parentAttrValues={parentAttrValues}
+                              productId={productId}
                               onSave={(state) => handleSaveVariantEdit(v.id, state)}
                               onCancel={() => setExpandedId(null)}
                             />

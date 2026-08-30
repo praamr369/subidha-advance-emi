@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import RefreshBar from "@/components/feedback/RefreshBar";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import {
@@ -27,11 +28,12 @@ const STATUS_COLOR: Record<string, string> = {
 export default function ErasureRequestsPage() {
   const [requests, setRequests] = useState<ErasureRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<ErasurePreview | null>(null);
 
-  const reload = useCallback(async () => {
-    setLoading(true);
+  const reload = useCallback(async (isInitial = false) => {
+    if (isInitial) setLoading(true); else setRefreshing(true);
     setError(null);
     try {
       setRequests(await listErasureRequests());
@@ -39,10 +41,11 @@ export default function ErasureRequestsPage() {
       setError(err instanceof Error ? err.message : "Failed to load.");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
-  useEffect(() => { void reload(); }, [reload]);
+  useEffect(() => { void reload(true); }, [reload]);
 
   const kpis = [
     { label: "Total requests", value: requests.length },
@@ -99,6 +102,7 @@ export default function ErasureRequestsPage() {
       subtitle="DPDP 2023 s.12 — Right to Erasure with financial record retention"
       stats={kpis}
     >
+      <RefreshBar active={refreshing} />
       {loading ? (
         <LoadingBlock label="Loading erasure requests…" />
       ) : error ? (

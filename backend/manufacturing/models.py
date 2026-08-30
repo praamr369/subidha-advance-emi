@@ -214,6 +214,43 @@ class ManufacturingBomLine(ManufacturingTimeStampedModel):
         super().save(*args, **kwargs)
 
 
+class ManufacturingBomServiceLine(ManufacturingTimeStampedModel):
+    bom = models.ForeignKey(
+        ManufacturingBom,
+        on_delete=models.CASCADE,
+        related_name="service_lines",
+    )
+    service = models.ForeignKey(
+        "inventory.ServiceCatalogItem",
+        on_delete=models.PROTECT,
+        related_name="manufacturing_bom_service_lines",
+    )
+    default_employee = models.ForeignKey(
+        "accounting.EmployeeProfile",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="default_bom_service_lines",
+        help_text="Optional default staff member for this service.",
+    )
+    quantity = models.DecimalField(
+        max_digits=12,
+        decimal_places=3,
+        validators=[MinValueValidator(Decimal("0.001"))],
+        help_text="Standard hours or units for this service."
+    )
+    sort_order = models.PositiveSmallIntegerField(default=1)
+    notes = models.CharField(max_length=255, blank=True, default="")
+
+    class Meta:
+        db_table = "manufacturing_bom_service_lines"
+        ordering = ["sort_order", "id"]
+
+    def save(self, *args, **kwargs):
+        self.notes = (self.notes or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
 class ProductionJob(ManufacturingTimeStampedModel):
     job_no = models.CharField(max_length=40, unique=True, default=generate_production_job_no, db_index=True)
     job_date = models.DateField(default=timezone.localdate, db_index=True)
@@ -641,7 +678,17 @@ class ProductionLaborLine(ManufacturingTimeStampedModel):
     employee = models.ForeignKey(
         "accounting.EmployeeProfile",
         on_delete=models.PROTECT,
+        null=True,
+        blank=True,
         related_name="production_labor_lines",
+    )
+    service = models.ForeignKey(
+        "inventory.ServiceCatalogItem",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="production_labor_lines",
+        help_text="Optional link to the service catalog item.",
     )
     activity_name = models.CharField(max_length=120)
     hours_worked = models.DecimalField(

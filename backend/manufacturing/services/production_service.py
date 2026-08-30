@@ -102,6 +102,47 @@ def _replace_bom_lines(*, bom: ManufacturingBom, lines: list[dict]):
     )
 
 
+def _draft_bom_service_lines_from_payload(*, service_lines: list[dict]) -> list[dict]:
+    if not isinstance(service_lines, list):
+        raise ValueError("BOM service_lines must be a list.")
+    
+    from inventory.models import ServiceCatalogItem
+    from manufacturing.models import ManufacturingBomServiceLine
+
+    normalized = []
+    for index, line in enumerate(service_lines, start=1):
+        if not isinstance(line, dict):
+            raise ValueError("Each BOM service line must be an object.")
+        service_id = line.get("service")
+        if not service_id:
+            raise ValueError("Service ID is required for each service line.")
+        service = ServiceCatalogItem.objects.filter(pk=service_id).first()
+        if not service:
+            raise ValueError(f"Service '{service_id}' does not exist.")
+        
+        quantity = _quantity(line.get("quantity"))
+        if quantity <= QUANTITY_ZERO:
+            raise ValueError("BOM service quantity must be greater than zero.")
+        
+        normalized.append(
+            {
+                "service": service,
+                "quantity": quantity,
+                "sort_order": int(line.get("sort_order") or index),
+                "notes": _string(line.get("notes")),
+            }
+        )
+    return normalized
+
+
+def _replace_bom_service_lines(*, bom: ManufacturingBom, service_lines: list[dict]):
+    from manufacturing.models import ManufacturingBomServiceLine
+    bom.service_lines.all().delete()
+    ManufacturingBomServiceLine.objects.bulk_create(
+        [ManufacturingBomServiceLine(bom=bom, **line) for line in service_lines]
+    )
+
+
 def _resolve_default_bom(*, finished_good_inventory_item: InventoryItem) -> ManufacturingBom | None:
     return (
         ManufacturingBom.objects.filter(
@@ -141,6 +182,28 @@ def _seed_material_lines_from_bom(job: ProductionJob) -> list[ProductionMaterial
                 notes=bom_line.notes,
             )
         )
+    return created_lines
+
+
+def _seed_labor_lines_from_bom(job: ProductionJob) -> list["ProductionLaborLine"]:
+    from manufacturing.models import ProductionLaborLine
+    if job.bom_id is None:
+        return []
+    if job.labor_lines.exists():
+        return list(job.labor_lines.all())
+
+    created_lines: list[ProductionLaborLine] = []
+    for bom_service in job.bom.service_lines.select_related("service", "default_employee").all():
+        created_lines.append(
+            ProductionLaborLine(
+                production_job=job,
+                employee=bom_service.default_employee,
+                service=bom_service.service,
+                activity_name=bom_service.service.name if bom_service.service else "General Labor",
+            )
+        )
+    if created_lines:
+        ProductionLaborLine.objects.bulk_create(created_lines)
     return created_lines
 
 
@@ -436,6 +499,7 @@ def _build_bridge_lines_for_scrap(line: ProductionScrapLine) -> list[dict] | Non
 def upsert_manufacturing_bom_draft(*, payload: dict, bom_id: int | None = None, performed_by=None) -> ManufacturingBom:
     payload = dict(payload)
     lines = payload.pop("lines", None)
+    service_lines = payload.pop("service_lines", None)
     if bom_id is None and not lines:
         raise ValueError("At least one BOM line is required.")
 
@@ -443,6 +507,8 @@ def upsert_manufacturing_bom_draft(*, payload: dict, bom_id: int | None = None, 
         bom = ManufacturingBom.objects.create(**payload)
         if lines:
             _replace_bom_lines(bom=bom, lines=_draft_bom_lines_from_payload(lines=lines))
+        if service_lines:
+            _replace_bom_service_lines(bom=bom, service_lines=_draft_bom_service_lines_from_payload(service_lines=service_lines))
         log_manufacturing_event(
             action_type=AuditLog.ActionType.MANUFACTURING_BOM_CREATED,
             instance=bom,
@@ -454,6 +520,7 @@ def upsert_manufacturing_bom_draft(*, payload: dict, bom_id: int | None = None, 
                 "finished_good_inventory_item_id": bom.finished_good_inventory_item_id,
                 "revision_no": bom.revision_no,
                 "line_count": bom.lines.count(),
+                "service_line_count": bom.service_lines.count(),
             },
         )
         return bom
@@ -466,6 +533,8 @@ def upsert_manufacturing_bom_draft(*, payload: dict, bom_id: int | None = None, 
     bom.save()
     if lines is not None:
         _replace_bom_lines(bom=bom, lines=_draft_bom_lines_from_payload(lines=lines))
+    if service_lines is not None:
+        _replace_bom_service_lines(bom=bom, service_lines=_draft_bom_service_lines_from_payload(service_lines=service_lines))
     log_manufacturing_event(
         action_type=AuditLog.ActionType.MANUFACTURING_BOM_UPDATED,
         instance=bom,
@@ -475,6 +544,7 @@ def upsert_manufacturing_bom_draft(*, payload: dict, bom_id: int | None = None, 
             "bom_id": bom.id,
             "bom_no": bom.bom_no,
             "line_count": bom.lines.count(),
+            "service_line_count": bom.service_lines.count(),
         },
     )
     return bom
@@ -556,6 +626,8 @@ def upsert_production_job_draft(*, payload: dict, job_id: int | None = None, per
             ProductionLaborLine.objects.bulk_create(
                 [ProductionLaborLine(production_job=job, **line) for line in labor_lines_payload]
             )
+        elif job.bom_id:
+            _seed_labor_lines_from_bom(job)
             
         job = _refresh_job_rollups(job)
         log_manufacturing_event(
@@ -1103,9 +1175,22 @@ def post_production_labor(*, job_id: int, labor_lines: list[dict] | None = None,
     
     if labor_lines is not None:
         from manufacturing.models import ProductionLaborLine
-        ProductionLaborLine.objects.bulk_create(
-            [ProductionLaborLine(production_job=job, **line) for line in labor_lines]
-        )
+        new_lines = []
+        for line in labor_lines:
+            line_id = line.get("id")
+            if line_id:
+                existing = job.labor_lines.filter(pk=line_id, is_posted=False).first()
+                if existing:
+                    if "employee" in line: existing.employee_id = line["employee"]
+                    if "activity_name" in line: existing.activity_name = line["activity_name"]
+                    if "hours_worked" in line: existing.hours_worked = line.get("hours_worked")
+                    if "piece_count" in line: existing.piece_count = line.get("piece_count")
+                    if "wage_amount" in line: existing.wage_amount = line["wage_amount"]
+                    existing.save()
+            else:
+                new_lines.append(ProductionLaborLine(production_job=job, **line))
+        if new_lines:
+            ProductionLaborLine.objects.bulk_create(new_lines)
     
     for line in job.labor_lines.filter(is_posted=False):
         bridge_lines = _build_bridge_lines_for_labor(line)

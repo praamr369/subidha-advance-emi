@@ -9,7 +9,9 @@ class NotificationSerializer(serializers.ModelSerializer):
     category = serializers.SerializerMethodField()
     severity = serializers.SerializerMethodField()
     is_read = serializers.SerializerMethodField()
+    is_archived = serializers.SerializerMethodField()
     read_at = serializers.DateTimeField(read_only=True)
+    archived_at = serializers.DateTimeField(read_only=True)
 
     def get_category(self, obj: Notification) -> str:
         category = obj.payload.get("category")
@@ -27,6 +29,9 @@ class NotificationSerializer(serializers.ModelSerializer):
     def get_is_read(self, obj: Notification) -> bool:
         return obj.read_at is not None
 
+    def get_is_archived(self, obj: Notification) -> bool:
+        return obj.archived_at is not None
+
     class Meta:
         model = Notification
         fields = (
@@ -38,7 +43,9 @@ class NotificationSerializer(serializers.ModelSerializer):
             "body",
             "payload",
             "is_read",
+            "is_archived",
             "read_at",
+            "archived_at",
             "created_at",
             "source_job_id",
         )

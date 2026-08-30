@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { EnterpriseColumnDef, GenericRecord } from "@/components/enterprise/columns";
 
 import ERPPageShell from "@/components/erp/ERPPageShell";
+import RefreshBar from "@/components/feedback/RefreshBar";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
 import { toArray } from "@/lib/api";
 import { request } from "@/services/api";
@@ -36,6 +37,7 @@ export default function EnterpriseListPage<T extends GenericRecord>({
 }: Props<T>) {
   const [rows, setRows] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
@@ -51,7 +53,7 @@ export default function EnterpriseListPage<T extends GenericRecord>({
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    if (reloadKey === 0) { setLoading(true); } else { setRefreshing(true); }
     setError(null);
 
     const params = status ? { [statusFilterKey]: status } : undefined;
@@ -71,6 +73,7 @@ export default function EnterpriseListPage<T extends GenericRecord>({
       .finally(() => {
         if (cancelled) return;
         setLoading(false);
+        setRefreshing(false);
       });
 
     return () => {
@@ -261,6 +264,7 @@ export default function EnterpriseListPage<T extends GenericRecord>({
         ) : null}
       </section>
 
+      <RefreshBar active={refreshing} />
       <EnterpriseDataTable<T>
         data={rows}
         columns={columns}

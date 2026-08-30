@@ -1,8 +1,10 @@
-﻿"use client";
+"use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import ERPPageShell from "@/components/erp/ERPPageShell";
+import RefreshBar from "@/components/feedback/RefreshBar";
 import { WorkspaceSection } from "@/components/ui/workspace";
+import { useRefreshableList } from "@/hooks/useRefreshableList";
 import { fetchCustomerReturns, submitCustomerReturn } from "@/services/customer-portal";
 
 type ReturnRequest = {
@@ -35,24 +37,18 @@ const STATUS_COLOR: Record<string, string> = {
   REFUNDED: "bg-emerald-100 text-emerald-700",
 };
 
+async function fetchReturns(): Promise<ReturnRequest[]> {
+  const d = await fetchCustomerReturns();
+  return Array.isArray(d) ? (d as ReturnRequest[]) : ((d as { results?: ReturnRequest[] })?.results ?? []);
+}
+
 export default function CustomerReturnsPage() {
-  const [items, setItems] = useState<ReturnRequest[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { items, initialLoading, refreshing, reload } = useRefreshableList<ReturnRequest>(fetchReturns);
   const [showForm, setShowForm] = useState(false);
   const [subscriptionId, setSubscriptionId] = useState("");
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-
-  const reload = () => {
-    setLoading(true);
-    fetchCustomerReturns()
-      .then((d) => setItems(Array.isArray(d) ? d as ReturnRequest[] : ((d as { results?: ReturnRequest[] })?.results ?? [])))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(reload, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,7 +80,7 @@ export default function CustomerReturnsPage() {
   return (
     <ERPPageShell
       title="My Return Requests"
-      subtitle="Consumer Protection Act 2019 â€” 7-day return window for product defects"
+      subtitle="Consumer Protection Act 2019 — 7-day return window for product defects"
       stats={kpis}
     >
       <div className="mb-4">
@@ -115,7 +111,7 @@ export default function CustomerReturnsPage() {
               <textarea
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                placeholder="Describe the defect or reason for returnâ€¦"
+                placeholder="Describe the defect or reason for return…"
                 rows={4}
                 className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
                 required
@@ -125,7 +121,7 @@ export default function CustomerReturnsPage() {
             <div className="flex gap-3">
               <button type="submit" disabled={submitting}
                 className="text-sm bg-primary text-primary-foreground px-4 py-2 rounded hover:bg-primary/90 disabled:opacity-50">
-                {submitting ? "Submittingâ€¦" : "Submit request"}
+                {submitting ? "Submitting…" : "Submit request"}
               </button>
               <button type="button" onClick={() => setShowForm(false)}
                 className="text-sm border px-4 py-2 rounded hover:bg-muted">
@@ -140,8 +136,9 @@ export default function CustomerReturnsPage() {
       )}
 
       <WorkspaceSection title="Your return history">
-        {loading ? (
-          <p className="text-sm text-muted-foreground py-8 text-center">Loadingâ€¦</p>
+        <RefreshBar active={refreshing} />
+        {initialLoading ? (
+          <p className="text-sm text-muted-foreground py-8 text-center">Loading…</p>
         ) : items.length === 0 ? (
           <p className="text-sm text-muted-foreground py-8 text-center">You have no return requests.</p>
         ) : (
@@ -172,4 +169,3 @@ export default function CustomerReturnsPage() {
     </ERPPageShell>
   );
 }
-

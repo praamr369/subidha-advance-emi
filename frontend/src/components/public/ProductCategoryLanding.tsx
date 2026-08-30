@@ -59,7 +59,7 @@ export default async function ProductCategoryLanding({ category }: { category: P
   const related = PRODUCT_SEO_CATEGORIES.filter((entry) => entry.slug !== category.slug);
   const itemListJsonLd =
     matched.length > 0
-      ? buildItemListJsonLd(matched.slice(0, 24).map((product) => ({ name: product.name, path: `/products/${product.id}` })))
+      ? buildItemListJsonLd(matched.slice(0, 24).map((product) => ({ name: product.name, path: `/products/${product.product_code}` })))
       : null;
 
   return (

@@ -1,15 +1,16 @@
+from unfold.admin import ModelAdmin as UnfoldModelAdmin, TabularInline as UnfoldTabularInline, StackedInline as UnfoldStackedInline
 from django.contrib import admin
 
 from service_desk.models import ServiceDeskCase, ServiceDeskCaseLine
 
 
-class ServiceDeskCaseLineInline(admin.TabularInline):
+class ServiceDeskCaseLineInline(UnfoldTabularInline):
     model = ServiceDeskCaseLine
     extra = 0
 
 
 @admin.register(ServiceDeskCase)
-class ServiceDeskCaseAdmin(admin.ModelAdmin):
+class ServiceDeskCaseAdmin(UnfoldModelAdmin):
     list_display = (
         "case_no",
         "case_type",

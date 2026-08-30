@@ -88,14 +88,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         // Variant pages: slightly lower priority than base, but still indexed
         // so search engines can find size/type-specific pages directly
         variantEntries.push({
-          url: `${siteUrl}/products/${product.id}`,
+          url: `${siteUrl}/products/${product.product_code}`,
           lastModified: now,
           changeFrequency: WEEKLY,
           priority: 0.55,
         });
       } else {
         productEntries.push({
-          url: `${siteUrl}/products/${product.id}`,
+          url: `${siteUrl}/products/${product.product_code}`,
           lastModified: now,
           changeFrequency: WEEKLY,
           priority: 0.7,

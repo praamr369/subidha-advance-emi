@@ -1,3 +1,7 @@
+try:
+    from unfold.admin import ModelAdmin as UnfoldModelAdmin, TabularInline as UnfoldTabularInline, StackedInline as UnfoldStackedInline
+except ImportError:
+    from django.contrib.admin import ModelAdmin as UnfoldModelAdmin, TabularInline as UnfoldTabularInline, StackedInline as UnfoldStackedInline
 from django.contrib import admin
 
 from ai_assistant.models import (
@@ -9,7 +13,7 @@ from ai_assistant.models import (
 )
 
 
-class NoBulkActionsAdmin(admin.ModelAdmin):
+class NoBulkActionsAdmin(UnfoldModelAdmin):
     actions = None
 
 

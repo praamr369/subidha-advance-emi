@@ -76,27 +76,30 @@ export default function EMICalculatorWidget({ className }: EMICalculatorWidgetPr
 
         {/* 3D Flip Card Result */}
         <div className="relative flex items-center justify-center [perspective:1000px]">
-          <motion.div
-            key={emi}
-            initial={{ rotateX: 90, opacity: 0 }}
-            animate={{ rotateX: 0, opacity: 1 }}
-            transition={{ type: "spring", stiffness: 200, damping: 20 }}
-            className="flex w-full max-w-[280px] flex-col items-center justify-center gap-2 rounded-2xl bg-primary p-6 text-primary-foreground shadow-2xl"
-            style={{
-              transformStyle: "preserve-3d",
-              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.4), 0 20px 40px -10px rgba(0,0,0,0.5)"
-            }}
-          >
-            <span className="text-xs font-semibold uppercase tracking-widest text-primary-foreground/80">
-              Monthly Payment
-            </span>
-            <div className="text-4xl font-extrabold tracking-tight">
-              ₹{emi.toLocaleString()}
-            </div>
-            <span className="mt-2 text-[10px] font-medium text-primary-foreground/70">
-              0% Interest Applied
-            </span>
-          </motion.div>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={emi}
+              initial={{ rotateX: 90, opacity: 0 }}
+              animate={{ rotateX: 0, opacity: 1 }}
+              exit={{ rotateX: -90, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 200, damping: 20 }}
+              className="flex w-full max-w-[280px] flex-col items-center justify-center gap-2 rounded-2xl bg-primary p-6 text-primary-foreground shadow-2xl absolute"
+              style={{
+                transformStyle: "preserve-3d",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.4), 0 20px 40px -10px rgba(0,0,0,0.5)"
+              }}
+            >
+              <span className="text-xs font-semibold uppercase tracking-widest text-primary-foreground/80">
+                Monthly Payment
+              </span>
+              <div className="text-4xl font-extrabold tracking-tight">
+                ₹{emi.toLocaleString()}
+              </div>
+              <span className="mt-2 text-[10px] font-medium text-primary-foreground/70">
+                0% Interest Applied
+              </span>
+            </motion.div>
+          </AnimatePresence>
         </div>
       </div>
     </div>

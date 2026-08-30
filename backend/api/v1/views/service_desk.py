@@ -365,3 +365,102 @@ class ServiceDeskCaseViewSet(AdminServiceDeskModelViewSet):
             raise serializers.ValidationError({"replacement_direct_sale": str(exc)}) from exc
         payload = ServiceDeskCaseSerializer(linked_case, context=self.get_serializer_context())
         return Response({"updated": True, "service_case": payload.data})
+
+
+class ServiceDeskCustomerLookupView(APIView):
+    """Phone-based customer lookup returning profile + billing + production history."""
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        phone = (request.query_params.get("phone") or "").strip()
+        if not phone or len(phone) < 4:
+            return Response({"found": False, "customer": None, "direct_sales": [], "subscriptions": [], "deliveries": [], "warranty_claims": [], "production_jobs": [], "service_cases": []})
+
+        from customers.services.customer_service import find_customer_by_phone
+        customer = find_customer_by_phone(phone)
+        if not customer:
+            return Response({"found": False, "customer": None, "direct_sales": [], "subscriptions": [], "deliveries": [], "warranty_claims": [], "production_jobs": [], "service_cases": []})
+
+        cust_data = {
+            "id": customer.id,
+            "name": customer.name,
+            "phone": customer.phone,
+            "email": getattr(customer, "email", "") or "",
+            "address": getattr(customer, "address", "") or "",
+            "city": getattr(customer, "city", "") or "",
+            "gstin": getattr(customer, "gstin", "") or "",
+            "kyc_status": getattr(customer, "kyc_status", "") or "",
+            "customer_code": getattr(customer, "customer_code", "") or "",
+        }
+
+        from billing.models import DirectSale
+        ds_qs = DirectSale.objects.filter(customer=customer).exclude(
+            status__in=["CANCELLED", "ARCHIVED"]
+        ).order_by("-sale_date")[:20]
+        direct_sales = [
+            {"id": s.id, "sale_no": s.sale_no, "sale_date": s.sale_date.isoformat() if s.sale_date else "", "grand_total": str(s.grand_total), "balance_total": str(s.balance_total), "status": s.status}
+            for s in ds_qs
+        ]
+
+        from contracts.models import Subscription
+        sub_qs = Subscription.objects.filter(customer=customer).order_by("-created_at")[:20]
+        subscriptions = [
+            {"id": s.id, "subscription_no": s.subscription_no, "status": s.status, "plan_name": getattr(s, "plan_name", "") or str(s.id)}
+            for s in sub_qs
+        ]
+
+        from deliveries.models import Delivery
+        del_qs = Delivery.objects.filter(subscription__customer=customer).order_by("-scheduled_date")[:20]
+        deliveries = [
+            {"id": d.id, "delivery_reference": getattr(d, "delivery_reference", "") or "", "scheduled_date": d.scheduled_date.isoformat() if d.scheduled_date else "", "status": d.status}
+            for d in del_qs
+        ]
+
+        warranty_claims = []
+        try:
+            from service_desk.models import WarrantyClaim
+            wc_qs = WarrantyClaim.objects.filter(
+                Q(service_case__direct_sale__customer=customer)
+                | Q(service_case__subscription__customer=customer)
+                | Q(subscription__customer=customer)
+            ).select_related("service_case", "product").distinct().order_by("-created_at")[:10]
+            warranty_claims = [
+                {"id": wc.id, "case_no": wc.service_case.case_no if wc.service_case else "", "product_name": wc.product.name if wc.product_id else "", "claim_status": wc.claim_status, "warranty_end_date": wc.warranty_end_date.isoformat() if wc.warranty_end_date else ""}
+                for wc in wc_qs
+            ]
+        except Exception:
+            pass
+
+        production_jobs = []
+        try:
+            from manufacturing.models import ProductionJob
+            pj_qs = ProductionJob.objects.filter(
+                bom__finished_good_inventory_item__product__direct_sale_lines__direct_sale__customer=customer
+            ).distinct().order_by("-job_date")[:10]
+            production_jobs = [
+                {"id": j.id, "job_no": j.job_no, "job_date": j.job_date.isoformat() if j.job_date else "", "status": j.status, "bom_no": j.bom.bom_no if j.bom else ""}
+                for j in pj_qs
+            ]
+        except Exception:
+            pass
+
+        existing_cases = ServiceDeskCase.objects.filter(
+            Q(reporter_phone_snapshot__icontains=phone)
+            | Q(direct_sale__customer=customer)
+            | Q(subscription__customer=customer)
+        ).distinct().order_by("-created_at")[:10]
+        service_cases = [
+            {"id": c.id, "case_no": c.case_no, "issue_summary": c.issue_summary, "status": c.status, "case_type": c.case_type, "created_at": c.created_at.isoformat() if c.created_at else ""}
+            for c in existing_cases
+        ]
+
+        return Response({
+            "found": True,
+            "customer": cust_data,
+            "direct_sales": direct_sales,
+            "subscriptions": subscriptions,
+            "deliveries": deliveries,
+            "warranty_claims": warranty_claims,
+            "production_jobs": production_jobs,
+            "service_cases": service_cases,
+        })

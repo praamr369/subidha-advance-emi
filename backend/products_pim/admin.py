@@ -1,3 +1,4 @@
+from unfold.admin import ModelAdmin as UnfoldModelAdmin, TabularInline as UnfoldTabularInline, StackedInline as UnfoldStackedInline
 from django.contrib import admin, messages
 from .models import (
     ProductCategory,
@@ -13,56 +14,56 @@ from .models import (
 from .services import FlexibleVariantService
 
 
-class ProductSubcategoryInline(admin.TabularInline):
+class ProductSubcategoryInline(UnfoldTabularInline):
     model = ProductSubcategory
     extra = 0
 
 
-class CategoryAttributeInline(admin.TabularInline):
+class CategoryAttributeInline(UnfoldTabularInline):
     model = CategoryAttribute
     extra = 0
     fields = ["name", "slug", "data_type", "is_required", "is_variant_defining", "display_order"]
 
 
 @admin.register(ProductCategory)
-class ProductCategoryAdmin(admin.ModelAdmin):
+class ProductCategoryAdmin(UnfoldModelAdmin):
     list_display = ["name", "slug", "icon", "display_order", "is_active"]
     list_editable = ["display_order", "is_active"]
     prepopulated_fields = {"slug": ("name",)}
     inlines = [ProductSubcategoryInline, CategoryAttributeInline]
 
 
-class AttributeOptionInline(admin.TabularInline):
+class AttributeOptionInline(UnfoldTabularInline):
     model = AttributeOption
     extra = 0
 
 
 @admin.register(CategoryAttribute)
-class CategoryAttributeAdmin(admin.ModelAdmin):
+class CategoryAttributeAdmin(UnfoldModelAdmin):
     list_display = ["name", "category", "subcategory", "data_type", "is_required", "is_variant_defining"]
     list_filter = ["category", "data_type"]
     inlines = [AttributeOptionInline]
 
 
-class ProductAttributeInline(admin.TabularInline):
+class ProductAttributeInline(UnfoldTabularInline):
     model = ProductAttribute
     extra = 0
 
 
-class ProductVariantInline(admin.TabularInline):
+class ProductVariantInline(UnfoldTabularInline):
     model = ProductVariant
     extra = 0
     fields = ["sku", "price", "quantity_on_hand", "reorder_level", "is_active"]
 
 
-class ProductAssetInline(admin.TabularInline):
+class ProductAssetInline(UnfoldTabularInline):
     model = ProductAsset
     extra = 1
     fields = ["image", "is_hero", "mapped_attribute_option", "display_order"]
 
 
 @admin.register(PimProduct)
-class PimProductAdmin(admin.ModelAdmin):
+class PimProductAdmin(UnfoldModelAdmin):
     list_display = ["code", "name", "brand", "category", "subcategory", "base_price", "variant_count", "is_active", "is_published"]
     list_filter = ["category", "subcategory", "is_published", "is_active"]
     search_fields = ["code", "name", "brand"]
@@ -120,13 +121,13 @@ class PimProductAdmin(admin.ModelAdmin):
     regenerate_variants.short_description = "Regenerate variants (⚠ deletes old ones)"
 
 
-class VariantAttributeValueInline(admin.TabularInline):
+class VariantAttributeValueInline(UnfoldTabularInline):
     model = VariantAttributeValue
     extra = 0
 
 
 @admin.register(ProductVariant)
-class ProductVariantAdmin(admin.ModelAdmin):
+class ProductVariantAdmin(UnfoldModelAdmin):
     list_display = ["sku", "product", "operational_product", "price", "quantity_on_hand", "reorder_level", "is_active"]
     list_filter = ["is_active"]
     search_fields = ["sku", "product__name", "product__code"]

@@ -140,12 +140,11 @@ export default function MigrationCenterPage() {
 // ── Overview ─────────────────────────────────────────────────────────────────
 
 const OPENING_BALANCE_SHORTCUTS: Array<{ key: string; label: string; hint: string }> = [
-  { key: "cash_opening_balance", label: "Cash Opening Balance", hint: "Drawers & counters" },
-  { key: "bank_opening_balance", label: "Bank Opening Balance", hint: "Bank accounts" },
-  { key: "upi_opening_balance", label: "UPI Opening Balance", hint: "PhonePe, GPay, Paytm, BHIM…" },
-  { key: "customer_outstanding", label: "Customer Outstanding", hint: "Opening receivables" },
-  { key: "vendor_outstanding", label: "Vendor Outstanding", hint: "Opening payables" },
-  { key: "opening_stock", label: "Opening Stock", hint: "Warehouse quantities" },
+  { key: "customer_master", label: "Customer Master", hint: "Import old customer records" },
+  { key: "customer_outstanding", label: "Customer Outstanding", hint: "Opening receivables from old books" },
+  { key: "vendor_master", label: "Vendor Master", hint: "Import old vendor records" },
+  { key: "vendor_outstanding", label: "Vendor Outstanding", hint: "Opening payables from old books" },
+  { key: "opening_stock", label: "Opening Stock", hint: "Warehouse quantities (already in Inventory)" },
 ];
 
 function OverviewTab({ overview, onStartImport, onOpenWorkbench, onOpenDataset }: { overview: MigrationOverview; onStartImport: () => void; onOpenWorkbench: () => void; onOpenDataset: (datasetKey: string) => void }) {
@@ -174,9 +173,9 @@ function OverviewTab({ overview, onStartImport, onOpenWorkbench, onOpenDataset }
         </div>
       </div>
       <div className="rounded-2xl border border-border bg-card p-5">
-        <div className="mb-1 text-sm font-semibold text-foreground">Opening balances & setup</div>
+        <div className="mb-1 text-sm font-semibold text-foreground">Legacy data migration</div>
         <p className="mb-3 text-xs text-muted-foreground">
-          Enter opening balances manually or in bulk using the Data Workbench — cash, bank, UPI, customer receivables, vendor payables, and stock. All imports are staged, validated against live Finance Accounts and master data, and fully reversible. Click a dataset below to open a blank editable grid.
+          Migrate customers, vendors, and their outstanding balances from your old finance book. Cash / Bank / UPI opening balances are set in <strong>Finance Accounts</strong> (already done). Opening stock is managed in Inventory. Click a shortcut below to enter legacy records directly.
         </p>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {OPENING_BALANCE_SHORTCUTS.map((item) => (

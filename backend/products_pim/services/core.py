@@ -55,6 +55,12 @@ def ensure_pim_product_for_product(product) -> "object | None":
     cat_map = {c.name.lower(): c for c in ProductCategory.objects.all()}
     category = cat_map.get((product.category or "").strip().lower(), unclassified)
 
+    # Determine parent if this is a variant
+    parent_id = None
+    if hasattr(product, 'pim_variant'):
+        # Link to the PimProduct corresponding to the variant's parent Operational Product
+        parent_id = product.pim_variant.product_id
+
     return PimProduct.objects.create(
         code=product.product_code,
         source_product=product,
@@ -64,6 +70,7 @@ def ensure_pim_product_for_product(product) -> "object | None":
         category=category,
         is_active=getattr(product, "is_active", True),
         is_published=False,
+        parent_id=parent_id,
     )
 
 

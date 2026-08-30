@@ -340,12 +340,20 @@ def render_receipt_pdf(*, receipt) -> bytes:
         c.line(mx, cy, width - mx, cy)
         cy -= 10
 
+    from products_core.models import ProductRelationship
+
     payment = getattr(receipt, "payment", None)
     customer_name = receipt.customer_name_snapshot or getattr(getattr(receipt, "customer", None), "name", "Customer")
     customer_phone = receipt.customer_phone_snapshot or getattr(getattr(receipt, "customer", None), "phone", "")
     collected_by = getattr(getattr(payment, "collected_by", None), "username", None) or "N/A"
     finance_account_name = getattr(getattr(receipt, "finance_account", None), "name", None) or "N/A"
     payment_method = getattr(payment, 'method', getattr(receipt, 'payment_method', 'CASH'))
+
+    def check_page_break(needed: float = 80):
+        nonlocal cy
+        if cy < needed:
+            c.showPage()
+            cy = height - (20 * mm)
 
     rule()
     line("PAYMENT RECEIPT", size=13, lead=17)
@@ -363,6 +371,93 @@ def render_receipt_pdf(*, receipt) -> bytes:
     line(f"Payment Method: {payment_method}", size=10)
     line(f"Collected By: {collected_by}", size=10)
     line(f"Total Amount Paid: INR {receipt.amount:,.2f}", size=12)
+    rule()
+
+    subscription = getattr(receipt, "subscription", None)
+    direct_sale = getattr(receipt, "direct_sale", None)
+
+    if subscription:
+        product = getattr(subscription, "product", None)
+        if product:
+            check_page_break(100)
+            line("PRODUCT DETAILS", size=11, lead=15)
+            line(f"Product: {product.name}", size=10)
+            if product.product_code:
+                line(f"Product Code: {product.product_code}", size=9, lead=12)
+            if product.sku:
+                line(f"SKU: {product.sku}", size=9, lead=12)
+            if product.brand:
+                line(f"Brand: {product.brand}", size=9, lead=12)
+            if product.hsn_sac_code:
+                line(f"HSN/SAC: {product.hsn_sac_code}", size=9, lead=12)
+            specs = getattr(product, "base_specs", None) or {}
+            if specs:
+                spec_parts = [f"{k}: {v}" for k, v in list(specs.items())[:8]]
+                line(f"Attributes: {', '.join(spec_parts)}", size=8, lead=11)
+            accessories = ProductRelationship.objects.filter(
+                product_id=product.id, relationship_type="ACCESSORY",
+            ).select_related("related_product").order_by("id")
+            if accessories.exists():
+                line("Accessories:", size=9, lead=12)
+                for acc in accessories:
+                    rp = acc.related_product
+                    parts = [rp.name]
+                    if rp.product_code:
+                        parts.append(f"Code: {rp.product_code}")
+                    parts.append(f"Qty: {acc.quantity:.0f}")
+                    line(f"  • {' | '.join(parts)}", size=8, lead=10)
+
+    if direct_sale:
+        try:
+            sale_lines = list(
+                direct_sale.lines.select_related("product", "inventory_item").order_by("id")
+            )
+        except Exception:
+            sale_lines = []
+        if sale_lines:
+            check_page_break(100)
+            line("ITEMS", size=11, lead=15)
+            for idx, sl in enumerate(sale_lines, 1):
+                check_page_break(80)
+                c.setFont("Helvetica-Bold", 10)
+                c.drawString(mx, cy, f"{idx}. {sl.description}")
+                cy -= 13
+                product = sl.product
+                if product:
+                    details = []
+                    if product.product_code:
+                        details.append(f"Code: {product.product_code}")
+                    if product.sku:
+                        details.append(f"SKU: {product.sku}")
+                    if product.brand:
+                        details.append(f"Brand: {product.brand}")
+                    if product.hsn_sac_code:
+                        details.append(f"HSN: {product.hsn_sac_code}")
+                    if details:
+                        line(f"   {' | '.join(details)}", size=8, lead=11)
+                    specs = getattr(product, "base_specs", None) or {}
+                    if specs:
+                        spec_parts = [f"{k}: {v}" for k, v in list(specs.items())[:8]]
+                        line(f"   Attributes: {', '.join(spec_parts)}", size=8, lead=11)
+                    accessories = ProductRelationship.objects.filter(
+                        product_id=product.id, relationship_type="ACCESSORY",
+                    ).select_related("related_product").order_by("id")
+                    if accessories.exists():
+                        line("   Accessories:", size=8, lead=11)
+                        for acc in accessories:
+                            rp = acc.related_product
+                            parts = [rp.name]
+                            if rp.product_code:
+                                parts.append(f"Code: {rp.product_code}")
+                            parts.append(f"Qty: {acc.quantity:.0f}")
+                            line(f"     • {' | '.join(parts)}", size=8, lead=10)
+                qty_str = f"{sl.quantity:.3f}".rstrip("0").rstrip(".")
+                line(
+                    f"   Qty: {qty_str}  |  Unit Price: INR {sl.unit_price:.2f}  |  "
+                    f"Line Total: INR {sl.line_total:.2f}",
+                    size=9, lead=12,
+                )
+                cy -= 4
 
     c.showPage()
     c.save()

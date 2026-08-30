@@ -14,7 +14,9 @@ interface CategoryPillProps {
 
 export default function CategoryPill({ icon, label, isActive, onClick, className }: CategoryPillProps) {
   return (
-    <button
+    <motion.button
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
       onClick={onClick}
       className={cn(
         "flex flex-col items-center justify-center gap-3 rounded-xl border px-4 py-4 transition-all duration-200",
@@ -24,10 +26,10 @@ export default function CategoryPill({ icon, label, isActive, onClick, className
         className
       )}
     >
-      <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-background shadow-sm border border-border/50">
+      <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-background shadow-sm border border-border/50 transition-colors">
         {icon}
       </div>
       <span className="text-sm font-medium tracking-tight">{label}</span>
-    </button>
+    </motion.button>
   );
 }

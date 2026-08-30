@@ -112,18 +112,8 @@ export default function PublicProductInteractiveDetail({
     : initialProduct;
 
   const factRows = [
-    { label: "Product code", value: displayProduct.product_code || "Unassigned" },
     { label: "Category", value: displayProduct.category || "Not classified" },
     { label: "Subcategory", value: displayProduct.subcategory || "Not classified" },
-    {
-      label: "Media state",
-      value:
-        Boolean(displayProduct.image) ||
-        (displayProduct.gallery_images?.length ?? 0) > 0 ||
-        Boolean(displayProduct.video)
-          ? "Uploaded product media"
-          : "Media pending",
-    },
   ];
 
   const isVariantPage = Boolean(initialProduct.is_variant_page);
@@ -139,7 +129,7 @@ export default function PublicProductInteractiveDetail({
         {isVariantPage && initialProduct.parent_product_id && (
           <div className="mb-6">
             <Link
-              href={`/products/${initialProduct.parent_product_id}`}
+              href={`/products/${initialProduct.parent_product_code || initialProduct.parent_product_id}`}
               className="inline-flex items-center gap-1.5 rounded-xl border border-border/70 bg-background px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
@@ -170,7 +160,7 @@ export default function PublicProductInteractiveDetail({
                 {matchedVariant?.product_id && (
                   <div className="mt-4 pt-4 border-t border-border/50">
                     <Link
-                      href={`/products/${matchedVariant.product_id}`}
+                      href={`/products/${matchedVariant.product_code || matchedVariant.product_id}`}
                       className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
                     >
                       Open dedicated page for this variant
@@ -190,7 +180,7 @@ export default function PublicProductInteractiveDetail({
                   {siblings.map((s) => (
                     <Link
                       key={s.product_id}
-                      href={`/products/${s.product_id}`}
+                      href={`/products/${s.product_code || s.product_id}`}
                       className={`inline-flex flex-col items-start rounded-xl border px-4 py-2.5 text-left transition min-w-[100px] ${
                         s.is_current
                           ? "border-primary bg-[color-mix(in_oklab,var(--primary)_10%,transparent)] ring-1 ring-primary"

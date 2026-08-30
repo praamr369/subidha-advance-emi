@@ -163,6 +163,17 @@ def create_customer_subscription_request(
         **_snapshot_customer_fields(customer),
     )
     _audit_request_created(request_obj, performed_by=requester)
+
+    try:
+        from subscriptions.services.operational_notification_service import schedule_subscription_request_notification
+        schedule_subscription_request_notification(
+            request_id=request_obj.pk,
+            customer_name=customer.name or "Customer",
+            product_name=product.name or "Product",
+        )
+    except Exception:
+        pass
+
     return request_obj
 
 
@@ -219,6 +230,18 @@ def create_partner_subscription_request(
 
     request_obj = SubscriptionRequest.objects.create(**payload)
     _audit_request_created(request_obj, performed_by=partner)
+
+    try:
+        from subscriptions.services.operational_notification_service import schedule_subscription_request_notification
+        cust_name = (customer.name if customer else requested_customer_name) or "Customer"
+        schedule_subscription_request_notification(
+            request_id=request_obj.pk,
+            customer_name=cust_name,
+            product_name=product.name or "Product",
+        )
+    except Exception:
+        pass
+
     return request_obj
 
 

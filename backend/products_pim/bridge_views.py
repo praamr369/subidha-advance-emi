@@ -129,6 +129,189 @@ class ProductPimDetailView(APIView):
         )
 
 
+class ProductPimAccessoriesView(APIView):
+    """GET/POST /pim/by-product/<product_id>/accessories/ — list or add accessories."""
+
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def _pim_or_404(self, product_id):
+        product = _resolve_product(product_id)
+        if product is None:
+            return None, Response({"detail": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
+        pim = ensure_pim_product_for_product(product)
+        if pim is None:
+            return None, Response({"detail": "Product cannot be PIM-linked yet."}, status=status.HTTP_400_BAD_REQUEST)
+        return pim, None
+
+    def get(self, request, product_id):
+        from products_pim.serializers import PimProductRelationshipSerializer
+        from products_core.models import ProductRelationship
+        pim, err = self._pim_or_404(product_id)
+        if err:
+            return err
+        rels = ProductRelationship.objects.filter(product=pim.source_product).select_related("related_product")
+        return Response(PimProductRelationshipSerializer(rels, many=True).data)
+
+    def post(self, request, product_id):
+        from products_pim.serializers import PimProductRelationshipSerializer
+        from products_core.models import ProductRelationship
+        from products_pim.models import PimProduct
+        pim, err = self._pim_or_404(product_id)
+        if err:
+            return err
+        related_pim_id = request.data.get("related_pim_id")
+        if not related_pim_id:
+            return Response({"detail": "related_pim_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+        related_pim = PimProduct.objects.filter(pk=related_pim_id).first()
+        if related_pim is None:
+            return Response({"detail": "Related PIM product not found."}, status=status.HTTP_404_NOT_FOUND)
+        if related_pim.source_product is None:
+            return Response({"detail": "Related PIM product has no linked operational product."}, status=status.HTTP_400_BAD_REQUEST)
+        rel, created = ProductRelationship.objects.get_or_create(
+            product=pim.source_product,
+            related_product=related_pim.source_product,
+            defaults={"relationship_type": "ACCESSORY"},
+        )
+        return Response(PimProductRelationshipSerializer(rel).data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+
+class ProductPimAccessoryDetailView(APIView):
+    """DELETE /pim/by-product/<product_id>/accessories/<accessory_id>/"""
+
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def delete(self, request, product_id, accessory_id):
+        from products_core.models import ProductRelationship
+        product = _resolve_product(product_id)
+        if product is None:
+            return Response({"detail": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
+        deleted, _ = ProductRelationship.objects.filter(pk=accessory_id, product=product).delete()
+        if not deleted:
+            return Response({"detail": "Accessory link not found."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ProductPimVariantPublishControlView(APIView):
+    """GET/PATCH /pim/by-product/<product_id>/variants/publish-control/
+
+    GET  — returns base product + every variant with its individual is_published flag.
+    PATCH — body: {"variants": [{"id": <pim_product_id>, "is_published": bool}]}
+            or {"all": true/false} to flip all at once.
+    """
+
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def _pim_or_404(self, product_id):
+        product = _resolve_product(product_id)
+        if product is None:
+            return None, Response({"detail": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
+        pim = ensure_pim_product_for_product(product)
+        if pim is None:
+            return None, Response({"detail": "Product cannot be PIM-linked yet."}, status=status.HTTP_400_BAD_REQUEST)
+        return pim, None
+
+    def _variant_rows(self, pim):
+        rows = []
+        for child in pim.child_pim_products.prefetch_related("variants").order_by("code"):
+            variant = child.variants.first()
+            rows.append({
+                "id": child.id,
+                "variant_id": variant.id if variant else None,
+                "code": child.code,
+                "name": child.name or child.code,
+                "sku": variant.sku if variant else child.code,
+                "is_published": child.is_published,
+                "is_active": child.is_active,
+                "price": str(variant.price) if variant else None,
+            })
+        return rows
+
+    def _base_response(self, pim, product_id):
+        from subscriptions.models import Product as OperationalProduct
+        op = OperationalProduct.objects.filter(pk=product_id).first()
+        return {
+            "id": pim.id,
+            "code": pim.code,
+            "name": pim.name or (op.name if op else pim.code),
+            "is_published": pim.is_published,
+        }
+
+    def _propagate_base(self, pim):
+        """If any child is published, the base must be published too."""
+        any_published = pim.child_pim_products.filter(is_published=True).exists()
+        if any_published and not pim.is_published:
+            pim.is_published = True
+            pim.save(update_fields=["is_published"])
+
+    def get(self, request, product_id):
+        pim, err = self._pim_or_404(product_id)
+        if err:
+            return err
+        return Response({
+            "base": self._base_response(pim, product_id),
+            "variants": self._variant_rows(pim),
+        })
+
+    def patch(self, request, product_id):
+        pim, err = self._pim_or_404(product_id)
+        if err:
+            return err
+        data = request.data
+
+        # Bulk toggle all
+        if "all" in data:
+            flag = bool(data["all"])
+            pim.is_published = flag
+            pim.save(update_fields=["is_published"])
+            pim.child_pim_products.all().update(is_published=flag)
+            return Response({
+                "base": self._base_response(pim, product_id),
+                "variants": self._variant_rows(pim),
+            })
+
+        # Toggle base
+        if "base_published" in data:
+            pim.is_published = bool(data["base_published"])
+            pim.save(update_fields=["is_published"])
+
+        # Per-variant toggles — accept EITHER child PimProduct IDs OR ProductVariant IDs
+        from products_pim.models import PimProduct, ProductVariant
+        variant_updates = data.get("variants", [])
+        if variant_updates:
+            child_ids = set(pim.child_pim_products.values_list("id", flat=True))
+            # Build ProductVariant.id → child PimProduct.id mapping for fallback
+            variant_to_child = {
+                v_id: pim_id
+                for pim_id, v_id in pim.child_pim_products.values_list("id", "variants__id")
+                if v_id is not None
+            }
+            any_published_now = False
+            for row in variant_updates:
+                vid = row.get("id")
+                flag = bool(row.get("is_published", False))
+                if vid in child_ids:
+                    # Received a child PimProduct ID directly
+                    PimProduct.objects.filter(pk=vid).update(is_published=flag)
+                elif vid in variant_to_child:
+                    # Received a ProductVariant ID — map to its child PimProduct
+                    PimProduct.objects.filter(pk=variant_to_child[vid]).update(is_published=flag)
+                if flag:
+                    any_published_now = True
+
+            # Auto-publish base when any child is published
+            if any_published_now and not pim.is_published:
+                pim.is_published = True
+                pim.save(update_fields=["is_published"])
+            else:
+                # Re-read base state in case it changed
+                pim.refresh_from_db(fields=["is_published"])
+
+        return Response({
+            "base": self._base_response(pim, product_id),
+            "variants": self._variant_rows(pim),
+        })
+
+
 class ProductPimAttributesView(APIView):
     """PUT /admin/products/<product_id>/pim/attributes/ — upsert attribute values.
 

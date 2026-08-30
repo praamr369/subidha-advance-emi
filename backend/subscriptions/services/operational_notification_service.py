@@ -227,3 +227,122 @@ def schedule_direct_sale_delivery_ready_notifications(
             )
 
     transaction.on_commit(_run)
+
+
+def schedule_subscription_request_notification(
+    *,
+    request_id: int,
+    customer_name: str,
+    product_name: str,
+) -> None:
+    """Notify admins when a new subscription request is submitted."""
+
+    def _run() -> None:
+        try:
+            from system_jobs.services.broadcast import notify_all_active_admins
+
+            notify_all_active_admins(
+                module="subscriptions",
+                title="New subscription request",
+                body=f"{customer_name} requested {product_name}. Review and approve.",
+                dedupe_prefix=f"SUBSCRIPTION_REQUEST:{request_id}",
+                payload=_payload(
+                    category="SUBSCRIPTION_REQUEST_SUBMITTED",
+                    severity="INFO",
+                    action_url="/admin/subscription-requests",
+                ),
+            )
+        except Exception:
+            logger.exception("operational_notification.subscription_request_failed id=%s", request_id)
+
+    transaction.on_commit(_run)
+
+
+def schedule_lead_created_notification(
+    *,
+    lead_id: int,
+    lead_name: str,
+    source: str = "",
+) -> None:
+    """Notify admins when a new lead is created."""
+
+    def _run() -> None:
+        try:
+            from system_jobs.services.broadcast import notify_all_active_admins
+
+            body = f"New lead: {lead_name}"
+            if source:
+                body += f" (via {source})"
+            notify_all_active_admins(
+                module="crm",
+                title="New lead received",
+                body=body,
+                dedupe_prefix=f"LEAD_CREATED:{lead_id}",
+                payload=_payload(
+                    category="LEAD_CREATED",
+                    severity="INFO",
+                    action_url="/admin/crm/leads",
+                ),
+            )
+        except Exception:
+            logger.exception("operational_notification.lead_created_failed id=%s", lead_id)
+
+    transaction.on_commit(_run)
+
+
+def schedule_outstanding_alert_notification(
+    *,
+    customer_name: str,
+    outstanding_amount: str,
+    customer_id: int | None = None,
+) -> None:
+    """Notify admins of high outstanding balance."""
+
+    def _run() -> None:
+        try:
+            from system_jobs.services.broadcast import notify_all_active_admins
+
+            notify_all_active_admins(
+                module="finance",
+                title="Outstanding balance alert",
+                body=f"{customer_name}: ₹{outstanding_amount} outstanding.",
+                dedupe_prefix=f"OUTSTANDING_ALERT:{customer_id or customer_name}",
+                payload=_payload(
+                    category="OUTSTANDING_ALERT",
+                    severity="WARNING",
+                    action_url="/admin/outstandings",
+                ),
+            )
+        except Exception:
+            logger.exception("operational_notification.outstanding_alert_failed customer=%s", customer_name)
+
+    transaction.on_commit(_run)
+
+
+def schedule_vendor_bill_notification(
+    *,
+    bill_id: int,
+    vendor_name: str,
+    amount: str,
+) -> None:
+    """Notify admins when a vendor bill needs review."""
+
+    def _run() -> None:
+        try:
+            from system_jobs.services.broadcast import notify_all_active_admins
+
+            notify_all_active_admins(
+                module="purchasing",
+                title="Vendor bill pending",
+                body=f"{vendor_name}: ₹{amount} bill awaiting review.",
+                dedupe_prefix=f"VENDOR_BILL_PENDING:{bill_id}",
+                payload=_payload(
+                    category="VENDOR_BILL_PENDING",
+                    severity="INFO",
+                    action_url="/admin/accounting/purchase-bills",
+                ),
+            )
+        except Exception:
+            logger.exception("operational_notification.vendor_bill_failed id=%s", bill_id)
+
+    transaction.on_commit(_run)

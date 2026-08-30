@@ -288,12 +288,14 @@ class Product(TimeStampedModel):
             ]
         ):
             errors["is_emi_enabled"] = "At least one product mode must be enabled (EMI, Rent, Lease, or Direct Sale)."
-        if self.plan_type_default == PlanType.EMI and not self.is_emi_enabled:
-            errors["plan_type_default"] = "Default plan type EMI requires EMI to be enabled."
-        if self.plan_type_default == PlanType.RENT and not self.is_rent_enabled:
-            errors["plan_type_default"] = "Default plan type RENT requires rent to be enabled."
-        if self.plan_type_default == PlanType.LEASE and not self.is_lease_enabled:
-            errors["plan_type_default"] = "Default plan type LEASE requires lease to be enabled."
+        has_subscription = self.is_emi_enabled or self.is_rent_enabled or self.is_lease_enabled
+        if has_subscription:
+            if self.plan_type_default == PlanType.EMI and not self.is_emi_enabled:
+                errors["plan_type_default"] = "Default plan type EMI requires EMI to be enabled."
+            if self.plan_type_default == PlanType.RENT and not self.is_rent_enabled:
+                errors["plan_type_default"] = "Default plan type RENT requires rent to be enabled."
+            if self.plan_type_default == PlanType.LEASE and not self.is_lease_enabled:
+                errors["plan_type_default"] = "Default plan type LEASE requires lease to be enabled."
 
         valid_lifecycle = {"ACTIVE", "UPCOMING", "DISCONTINUED", "MAINTENANCE"}
         if self.lifecycle_status and self.lifecycle_status not in valid_lifecycle:
@@ -390,7 +392,25 @@ class ProductVariant(TimeStampedModel):
 
 class ProductRelationship(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="related_products")
+    parent_variant = models.ForeignKey(
+        "ProductVariant", 
+        on_delete=models.CASCADE, 
+        null=True, 
+        blank=True, 
+        related_name="variant_related_products",
+        help_text="If set, this relationship only applies to this specific variant of the parent product."
+    )
     related_product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="parent_products")
+    related_variant = models.ForeignKey(
+        "ProductVariant", 
+        on_delete=models.CASCADE, 
+        null=True, 
+        blank=True, 
+        related_name="variant_parent_products",
+        help_text="If set, attaches a specific variant of the related accessory/raw material."
+    )
+    parent_variant_sku = models.CharField(max_length=150, blank=True, null=True, help_text="SKU of the parent PIM variant")
+    related_variant_sku = models.CharField(max_length=150, blank=True, null=True, help_text="SKU of the related PIM variant")
     relationship_type = models.CharField(max_length=20, choices=ProductRelationshipType.choices)
     quantity = models.DecimalField(max_digits=8, decimal_places=2, default=1)
     is_price_included_in_parent = models.BooleanField(
@@ -404,10 +424,11 @@ class ProductRelationship(models.Model):
     class Meta:
         db_table = "subscriptions_productrelationship"
 
-        unique_together = ("product", "related_product", "relationship_type")
+        unique_together = ("product", "related_product", "relationship_type", "parent_variant", "related_variant")
         indexes = [
             models.Index(fields=["product", "relationship_type"]),
             models.Index(fields=["related_product"]),
+            models.Index(fields=["parent_variant"]),
         ]
 
     def __str__(self):

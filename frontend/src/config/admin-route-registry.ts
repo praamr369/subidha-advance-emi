@@ -287,6 +287,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Inventory & Stock", "PIM Products", ROUTES.admin.pimProducts, "Enterprise PIM â€” category-specific attributes and SKU variants."),
   item("Inventory & Stock", "PIM Categories", ROUTES.admin.pimCategories, "PIM category tree with attribute templates."),
   item("Inventory & Stock", "PIM Manage Categories", ROUTES.admin.pimCategoriesManage, "Create and edit PIM categories, subcategories and attribute types."),
+  item("Inventory & Stock", "Product Reviews", ROUTES.admin.reviews, "Moderate customer reviews, approve/reject, and sync approved reviews to Google Business, Facebook, WhatsApp, and Instagram."),
   item("Inventory & Stock", "Product Brochures", ROUTES.admin.brochures, "Read-only customer catalog PDF generation and sharing. No stock reservation, billing, contract, payment, or accounting posting."),
   item("Inventory & Stock", "Brochure Settings", ROUTES.admin.brochureSettings, "Operational publication visibility, brochure pricing, descriptions, featured order, and badges. Settings only; no operational or financial posting."),
   item("Inventory & Stock", "Brochure Enquiries", ROUTES.admin.brochureEnquiries, "Customer interest captured from public brochure links with CRM lead tracking and staff follow-up."),

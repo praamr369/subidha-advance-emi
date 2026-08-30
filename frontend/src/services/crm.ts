@@ -109,12 +109,15 @@ export type PartyDetailResponse = {
     open_support_count?: number;
     due_reminder_count?: number;
     pending_kyc_count?: number;
+    legacy_outstanding_count?: number;
+    unsettled_legacy_count?: number;
   };
   financials?: {
     total_invoiced: string;
     total_received: string;
     outstanding: string;
     total_direct_sales: string;
+    legacy_outstanding?: string;
   };
   alerts?: Array<{
     level: "high" | "medium" | "info";
@@ -142,6 +145,7 @@ export type PartyDetailResponse = {
     complaint_cases: Array<Record<string, unknown>>;
     reminders: Array<Record<string, unknown>>;
     interactions: PartyInteraction[];
+    legacy_outstandings?: Array<Record<string, unknown>>;
   };
   timeline: Array<{
     event_at: string;

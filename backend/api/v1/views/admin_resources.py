@@ -252,6 +252,12 @@ def _build_customer_preview_response(headers, validation_rows):
 class AdminOnlyModelViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
+    def get_object(self):
+        try:
+            return super().get_object()
+        except (ValueError, TypeError):
+            raise Http404("Not found.")
+
 
 class AdminOnlyCatalogMasterViewSet(AdminOnlyModelViewSet):
     http_method_names = ["get", "post", "patch", "head", "options"]
@@ -2824,6 +2830,8 @@ class ProductAdminViewSet(AdminOnlyModelViewSet):
         ).all().order_by("name")
     )
     serializer_class = ProductAdminSerializer
+    # Multipart required for image/video file uploads
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -3216,8 +3224,9 @@ class ProductAdminViewSet(AdminOnlyModelViewSet):
 
     @action(detail=True, methods=["get"], url_path="related-products")
     def related_products(self, request, pk=None):
+        from api.v1.serializers.admin_resources import ProductRelationshipSerializer
         product = self.get_object()
-        relationships = ProductRelationship.objects.filter(product=product).select_related("related_product")
+        relationships = ProductRelationship.objects.filter(product=product).select_related("related_product", "parent_variant", "related_variant")
         serializer = ProductRelationshipSerializer(relationships, many=True)
         return Response({"results": serializer.data, "count": len(serializer.data)})
 
@@ -3230,6 +3239,8 @@ class ProductAdminViewSet(AdminOnlyModelViewSet):
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
+        import logging
+        logging.error(f"Failed to add related product: {serializer.errors} | Data: {data}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=["delete"], url_path="remove-related-product/(?P<related_id>[0-9]+)")

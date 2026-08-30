@@ -29,13 +29,7 @@ export default function ReceiptPage() {
 
   const handleDownload = async () => {
     try {
-      const blob = await paymentService.downloadReceipt(params.id as string)
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `receipt-${params.id}.pdf`
-      a.click()
-      URL.revokeObjectURL(url)
+      await paymentService.downloadReceipt(params.id as string)
     } catch (err) {
       console.error('Download failed:', err)
     }

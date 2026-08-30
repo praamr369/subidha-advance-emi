@@ -16,18 +16,24 @@ export default function PublicProductDetailMedia({
   prevLabel: string;
   nextLabel: string;
 }) {
-  const extras = product.gallery_images ?? [];
-  const imageUrls = [...new Set([product.image, ...extras].filter(Boolean))] as string[];
-  
+  // Build deduped image list: PIM gallery images first (hero is already sorted first by backend),
+  // then product.image as fallback if no gallery images
+  const galleryImages = product.gallery_images ?? [];
+  const galleryVideos = product.gallery_videos ?? [];
+  const allImages = galleryImages.length > 0
+    ? galleryImages
+    : [product.image].filter(Boolean) as string[];
+  const imageUrls = [...new Set(allImages)] as string[];
+
+  // Build media list: PIM gallery videos first, then product.video, then images
   type MediaItem = { type: "video" | "image"; src: string };
   const items: MediaItem[] = [];
-  
-  if (product.video) {
+
+  galleryVideos.forEach((v) => items.push({ type: "video", src: v }));
+  if (product.video && !galleryVideos.includes(product.video)) {
     items.push({ type: "video", src: product.video });
   }
-  imageUrls.forEach((url) => {
-    items.push({ type: "image", src: url });
-  });
+  imageUrls.forEach((url) => items.push({ type: "image", src: url }));
 
   const badge = product.category || "Public catalogue";
 

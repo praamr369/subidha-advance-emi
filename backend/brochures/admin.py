@@ -1,3 +1,4 @@
+from unfold.admin import ModelAdmin as UnfoldModelAdmin, TabularInline as UnfoldTabularInline, StackedInline as UnfoldStackedInline
 from django.contrib import admin
 
 from brochures.models import (
@@ -10,7 +11,7 @@ from brochures.models import (
 
 
 @admin.register(ProductBrochureSettings)
-class ProductBrochureSettingsAdmin(admin.ModelAdmin):
+class ProductBrochureSettingsAdmin(UnfoldModelAdmin):
     list_display = (
         "product",
         "visible_on_public_catalog",
@@ -34,7 +35,7 @@ class ProductBrochureSettingsAdmin(admin.ModelAdmin):
 
 
 @admin.register(BrochureDocument)
-class BrochureDocumentAdmin(admin.ModelAdmin):
+class BrochureDocumentAdmin(UnfoldModelAdmin):
     list_display = (
         "brochure_no",
         "title",
@@ -58,7 +59,7 @@ class BrochureDocumentAdmin(admin.ModelAdmin):
     )
 
 
-class BrochureEnquiryProductInline(admin.TabularInline):
+class BrochureEnquiryProductInline(UnfoldTabularInline):
     model = BrochureEnquiryProduct
     extra = 0
     readonly_fields = (
@@ -72,7 +73,7 @@ class BrochureEnquiryProductInline(admin.TabularInline):
     )
 
 
-class BrochureEnquiryStatusHistoryInline(admin.TabularInline):
+class BrochureEnquiryStatusHistoryInline(UnfoldTabularInline):
     model = BrochureEnquiryStatusHistory
     extra = 0
     readonly_fields = (
@@ -89,7 +90,7 @@ class BrochureEnquiryStatusHistoryInline(admin.TabularInline):
 
 
 @admin.register(BrochureEnquiry)
-class BrochureEnquiryAdmin(admin.ModelAdmin):
+class BrochureEnquiryAdmin(UnfoldModelAdmin):
     list_display = (
         "enquiry_no",
         "customer_name",

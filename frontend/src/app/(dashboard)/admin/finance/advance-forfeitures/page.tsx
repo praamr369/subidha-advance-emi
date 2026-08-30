@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import RefreshBar from "@/components/feedback/RefreshBar";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import {
@@ -26,10 +27,11 @@ export default function AdvanceForfeituresPage() {
   const [candidates, setCandidates] = useState<DormantCandidate[]>([]);
   const [forfeitures, setForfeitures] = useState<AdvanceForfeiture[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const reload = useCallback(async () => {
-    setLoading(true);
+  const reload = useCallback(async (isInitial = false) => {
+    if (isInitial) setLoading(true); else setRefreshing(true);
     setError(null);
     try {
       const data = await listAdvanceForfeitures();
@@ -39,10 +41,11 @@ export default function AdvanceForfeituresPage() {
       setError(err instanceof Error ? err.message : "Failed to load.");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
-  useEffect(() => { void reload(); }, [reload]);
+  useEffect(() => { void reload(true); }, [reload]);
 
   const totalForfeited = forfeitures
     .filter((f) => f.status === "FORFEITED")
@@ -94,6 +97,7 @@ export default function AdvanceForfeituresPage() {
       subtitle="Limitation Act 1963 s.3 — dormant customer advance forfeiture workflow"
       stats={kpis}
     >
+      <RefreshBar active={refreshing} />
       {loading ? (
         <LoadingBlock label="Loading advance forfeitures…" />
       ) : error ? (

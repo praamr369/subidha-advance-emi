@@ -214,11 +214,12 @@ class PaymentService {
     return apiFetch(`/api/v1/payments/receipt/${paymentId}/`) as Promise<Receipt>
   }
 
-  async downloadReceipt(paymentId: string): Promise<Blob> {
-    const response = await fetch(`/api/v1/payments/receipt/${paymentId}/download/`, {
-      credentials: 'include',
-    })
-    return response.blob()
+  async downloadReceipt(paymentId: string): Promise<void> {
+    const { downloadAuthenticatedFile } = await import("@/lib/export/auth-download");
+    await downloadAuthenticatedFile(
+      `/payments/receipt/${paymentId}/download/`,
+      `receipt-${paymentId}.pdf`,
+    );
   }
 
   async getBalance(subscriptionId: string): Promise<{ outstanding: number; due: number; past_due: number }> {

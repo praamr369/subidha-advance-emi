@@ -12,6 +12,7 @@ All domain-split apps should import from here instead of
 subscriptions.models to avoid circular dependencies.
 """
 
+import hashlib
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 from uuid import uuid4

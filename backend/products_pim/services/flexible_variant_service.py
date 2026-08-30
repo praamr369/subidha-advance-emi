@@ -201,6 +201,7 @@ class FlexibleVariantService:
                     variant = ProductVariant.objects.create(
                         product=pim_product,
                         sku=sku,
+                        barcode=sku,
                         price=price,
                         cost_price=pim_product.cost_price,
                         quantity_on_hand=0,

@@ -44,6 +44,8 @@ class ManufacturingBomViewSet(AdminManufacturingModelViewSet):
         "lines",
         "lines__inventory_item",
         "lines__inventory_item__product",
+        "service_lines",
+        "service_lines__service",
     ).all()
     serializer_class = ManufacturingBomSerializer
     search_fields = ["bom_no", "finished_good_inventory_item__sku", "finished_good_inventory_item__product__name"]
