@@ -40,11 +40,18 @@ def resolve_expected_subscription_status(
     if current_status == defaulted_status:
         return defaulted_status
 
+    # Winner check runs before the empty-EMI guard so that a winner with no
+    # recorded EMI rows (e.g. subscription created without explicit EMI rows)
+    # is treated as fully settled and gets COMPLETED rather than falling
+    # through to the "return current_status" default.
+    if is_winner:
+        if normalized_emi_statuses.issubset(SETTLED_EMI_STATUSES):
+            # Empty set is always a subset — no EMIs means fully settled.
+            return completed_status
+        return won_status
+
     if not normalized_emi_statuses:
         return current_status or active_status
-
-    if is_winner:
-        return won_status
 
     if normalized_emi_statuses.issubset(SETTLED_EMI_STATUSES):
         return completed_status

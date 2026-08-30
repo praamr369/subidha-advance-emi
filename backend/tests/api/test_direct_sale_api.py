@@ -201,7 +201,7 @@ class DirectSaleApiTests(APITestCase):
         self.assertEqual(outstanding_list.data["count"], 0)
 
     def test_direct_sale_create_returns_clear_400_when_numbering_missing(self):
-        DocumentSequence.objects.filter(series_code="DIRECT_SALE_INVOICE").delete()
+        DocumentSequence.objects.filter(document_type="DIRECT_SALE").delete()
         response = self.client.post(
             "/api/v1/billing/direct-sales/",
             {

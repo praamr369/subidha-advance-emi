@@ -121,7 +121,7 @@ class AdminProductsApiTests(APITestCase):
                 "is_rent_enabled": False,
                 "is_lease_enabled": False,
             },
-            format="json",
+            format="multipart",
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)

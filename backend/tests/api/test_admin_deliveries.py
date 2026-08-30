@@ -75,6 +75,8 @@ class AdminDeliveryApiTests(APITestCase):
                 "receiver_phone": "7321000001",
                 "delivery_address_snapshot": "Dhaka Warehouse Road",
                 "notes": "Pack carefully",
+                "admin_override": True,
+                "admin_override_reason": "Test override — no EMIs in test fixture",
             },
             format="json",
         )

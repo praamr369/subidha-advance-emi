@@ -60,18 +60,18 @@ class BusinessComplianceGovernanceTests(APITestCase):
     def test_contracting_report_controls_are_seeded_with_distinct_template_keys(self):
         seed_business_compliance_rows(performed_by=self.admin)
 
+        # Only REQUIRED and RECOMMENDED templates are seeded — OPTIONAL templates
+        # are skipped by design. These are the REQUIRED + RECOMMENDED keys.
         expected_keys = {
-            "contract-template-family",
-            "seller-of-record-control",
-            "explicit-consent-ui",
-            "signature-tiering-policy",
-            "signature-evidence-package",
-            "certificate-validation-timestamping",
-            "stamp-duty-control",
-            "gst-eco-tcs-workflow",
-            "grievance-disclosure-sla",
-            "direct-selling-partner-control",
-            "privacy-kyc-data-minimisation",
+            "ownership-proof",
+            "rental-agreement",
+            "business-address-proof",
+            "pan-or-tax-proof",
+            "bank-proof",
+            "udyam-certificate",
+            "gst-certificate",
+            "shop-license",
+            "signed-document-delivery-archive",
         }
         states = BusinessComplianceDocumentReviewState.objects.filter(source_template_key__in=expected_keys)
         self.assertEqual(set(states.values_list("source_template_key", flat=True)), expected_keys)

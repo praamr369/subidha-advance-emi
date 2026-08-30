@@ -218,7 +218,7 @@ class LuckyDrawWinnerProductionWorkflowTests(TestCase):
         paid_emi.refresh_from_db()
 
         self.assertEqual(result["winner_subscription_id"], subscription.id)
-        self.assertEqual(subscription.status, SubscriptionStatus.WON)
+        self.assertEqual(subscription.status, SubscriptionStatus.COMPLETED)
         self.assertIsNotNone(subscription.winner_month)
         self.assertEqual(paid_emi.status, EmiStatus.PAID)
         self.assertGreater(subscription.emis.filter(status=EmiStatus.WAIVED).count(), 0)

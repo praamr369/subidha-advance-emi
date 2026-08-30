@@ -390,10 +390,7 @@ class AccountingSetupService:
             raise ValueError("No ASSET chart account available. Seed chart of accounts first.")
 
         for name, kind in SETTLEMENT_FINANCE_ACCOUNTS:
-            instance = (
-                FinanceAccount.objects.filter(name__iexact=name).first()
-                or FinanceAccount.objects.filter(kind=kind, is_active=True).first()
-            )
+            instance = FinanceAccount.objects.filter(name__iexact=name).first()
             if instance:
                 existing += 1
                 details.append({"name": name, "status": "existing"})

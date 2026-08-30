@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -14,6 +15,7 @@ User = get_user_model()
 
 class AuthApiTests(APITestCase):
     def setUp(self):
+        cache.clear()  # reset throttle counters between tests
         self.admin = create_admin_user(
             username="auth_admin",
             phone="9000000201",

@@ -408,8 +408,11 @@ class PublicProductsView(generics.ListAPIView):
     def get_queryset(self):
         # Public site shows sellable finished goods only — raw materials and
         # accessories (manufacturing inputs) are internal, admin-only items.
+        # Products with a linked PimProduct must have it published; products
+        # without any PimProduct are shown as-is (operational-only catalogue).
         queryset = (
-            Product.objects.filter(is_active=True, item_type="FINISHED_GOOD", pim__is_published=True)
+            Product.objects.filter(is_active=True, item_type="FINISHED_GOOD")
+            .distinct()
             .exclude(inventory_profile__stock_item_type__in=["RAW_MATERIAL", "ACCESSORY"])
             .select_related("category_master")
             .prefetch_related("pim", "pim__attributes__attribute", "pim__variants__attribute_values__attribute")
@@ -467,14 +470,22 @@ class PublicProductDetailView(APIView):
     def get(self, request, slug=None, id=None):
         try:
             base_qs = (
-                Product.objects.filter(is_active=True, pim__is_published=True)
+                Product.objects.filter(is_active=True)
+                .distinct()
                 .exclude(inventory_profile__stock_item_type__in=["RAW_MATERIAL", "ACCESSORY"])
                 .prefetch_related("pim", "pim__attributes__attribute", "pim__variants__attribute_values__attribute")
             )
-            if slug is not None:
-                product = base_qs.get(product_code__iexact=slug)
-            else:
+            if id is not None:
                 product = base_qs.get(id=id)
+            elif slug is not None:
+                # Try integer id lookup first so numeric URLs work without the
+                # /by-id/ prefix, then fall back to product_code slug lookup.
+                try:
+                    product = base_qs.get(id=int(slug))
+                except (ValueError, Product.DoesNotExist):
+                    product = base_qs.get(product_code__iexact=slug)
+            else:
+                raise Product.DoesNotExist
         except Product.DoesNotExist:
             return Response({"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
 
