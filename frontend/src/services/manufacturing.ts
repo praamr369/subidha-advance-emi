@@ -135,6 +135,10 @@ export type ProductionJob = {
   job_no: string;
   job_date: string;
   status: "DRAFT" | "RELEASED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+  job_type: "MANUFACTURING" | "FINISHING";
+  job_type_display?: string;
+  finishing_category?: "POLISH" | "INSTALLATION" | "WOODWORK" | "UPHOLSTERY" | "PAINTING" | "OTHER" | null;
+  finishing_category_display?: string | null;
   bom?: number | null;
   bom_no?: string | null;
   finished_good_inventory_item: number;
@@ -228,6 +232,8 @@ export type ManufacturingBomPayload = {
 
 export type ProductionJobPayload = {
   job_date?: string;
+  job_type?: "MANUFACTURING" | "FINISHING";
+  finishing_category?: string | null;
   bom?: number | null;
   finished_good_inventory_item: number;
   stock_location?: number | null;

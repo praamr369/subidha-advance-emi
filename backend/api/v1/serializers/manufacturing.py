@@ -9,6 +9,8 @@ from manufacturing.models import (
     ManufacturingBomStatus,
     ProductionJob,
     ProductionJobStatus,
+    ProductionJobType,
+    FinishingCategory,
     ProductionMaterialIssueLine,
     ProductionReceiptLine,
     ProductionScrapLine,
@@ -308,6 +310,14 @@ class ProductionJobSerializer(serializers.ModelSerializer):
     scrap_lines = ProductionScrapLineSerializer(many=True, read_only=True)
     labor_lines = ProductionLaborLineSerializer(many=True, required=False)
 
+    job_type_display = serializers.CharField(source="get_job_type_display", read_only=True)
+    finishing_category_display = serializers.SerializerMethodField()
+
+    def get_finishing_category_display(self, obj):
+        if obj.finishing_category:
+            return obj.get_finishing_category_display()
+        return None
+
     class Meta:
         model = ProductionJob
         fields = [
@@ -315,6 +325,10 @@ class ProductionJobSerializer(serializers.ModelSerializer):
             "job_no",
             "job_date",
             "status",
+            "job_type",
+            "job_type_display",
+            "finishing_category",
+            "finishing_category_display",
             "bom",
             "bom_no",
             "finished_good_inventory_item",
@@ -511,3 +525,4 @@ def run_job_release(*, job, request):
 def run_job_complete(*, job, request):
     updated_job, updated = complete_production_job(job_id=job.id, performed_by=request.user)
     return {"job": updated_job, "updated": updated}
+

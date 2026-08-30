@@ -86,6 +86,20 @@ class ManufacturingAccountingStatus(models.TextChoices):
     DEFERRED = "DEFERRED", "Deferred"
 
 
+class ProductionJobType(models.TextChoices):
+    MANUFACTURING = "MANUFACTURING", "Manufacturing"
+    FINISHING = "FINISHING", "Finishing / Post-Production Work"
+
+
+class FinishingCategory(models.TextChoices):
+    POLISH = "POLISH", "Polish / Lacquer"
+    INSTALLATION = "INSTALLATION", "Installation"
+    WOODWORK = "WOODWORK", "Wood Work / Improvement"
+    UPHOLSTERY = "UPHOLSTERY", "Upholstery / Fabric"
+    PAINTING = "PAINTING", "Painting / Coating"
+    OTHER = "OTHER", "Other Finishing"
+
+
 class ProductionMaterialEntryKind(models.TextChoices):
     ISSUE = "ISSUE", "Issue"
     RETURN = "RETURN", "Return"
@@ -305,6 +319,21 @@ class ProductionJob(ManufacturingTimeStampedModel):
         validators=[MinValueValidator(MONEY_ZERO)],
         help_text="Overhead (factory/admin) cost allocated to this job.",
     )
+    job_type = models.CharField(
+        max_length=16,
+        choices=ProductionJobType.choices,
+        default=ProductionJobType.MANUFACTURING,
+        db_index=True,
+        help_text="MANUFACTURING = normal production; FINISHING = post-production finishing work (polish, install, woodwork, etc.)",
+    )
+    finishing_category = models.CharField(
+        max_length=16,
+        choices=FinishingCategory.choices,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Only used when job_type=FINISHING.",
+    )
     costing_status = models.CharField(
         max_length=12,
         choices=ManufacturingCostingStatus.choices,
@@ -394,6 +423,10 @@ class ProductionJob(ManufacturingTimeStampedModel):
                 errors["finished_good_inventory_item"] = "Production jobs cannot target raw-material inventory profiles."
         if self.bom_id and self.bom.finished_good_inventory_item_id != self.finished_good_inventory_item_id:
             errors["bom"] = "Selected BOM must belong to the same finished-good inventory item."
+        if self.job_type == ProductionJobType.FINISHING and not self.finishing_category:
+            errors["finishing_category"] = "Finishing category is required for finishing work jobs."
+        if self.job_type == ProductionJobType.MANUFACTURING and self.finishing_category:
+            self.finishing_category = None
         if self.completed_output_qty > self.planned_output_qty:
             errors["completed_output_qty"] = "Completed output cannot exceed planned output quantity."
         if self.status == ProductionJobStatus.COMPLETED:
@@ -738,3 +771,5 @@ class ProductionLaborLine(ManufacturingTimeStampedModel):
         super().save(*args, **kwargs)
         if getattr(self.production_job, "update_labor_cost", None):
             self.production_job.update_labor_cost()
+
+

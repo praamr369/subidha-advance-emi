@@ -299,9 +299,13 @@ export default function AdminManufacturingJobDetailPage() {
 
   return (
     <ERPPageShell
-      eyebrow="Manufacturing"
+      eyebrow={job?.job_type === "FINISHING" ? "Manufacturing · Finishing Work" : "Manufacturing"}
       title={job?.job_no || "Production Job"}
-      subtitle="This job detail keeps BOM reference, raw issue, WIP, finished-goods receipt, scrap, and costing posture in one operational view while inventory and accounting remain separate posted truths."
+      subtitle={
+        job?.job_type === "FINISHING"
+          ? `Finishing job — ${job.finishing_category_display || job.finishing_category || "Post-production work"}. Material consumption and staff labor here capitalize to finished goods through WIP. No new output is produced; only finishing costs are absorbed.`
+          : "This job detail keeps BOM reference, raw issue, WIP, finished-goods receipt, scrap, and costing posture in one operational view while inventory and accounting remain separate posted truths."
+      }
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Manufacturing", href: ROUTES.admin.manufacturing },
@@ -315,11 +319,11 @@ export default function AdminManufacturingJobDetailPage() {
       ]}
       stats={[
         { label: "Status", value: job?.status || "—", tone: "info" },
-        { label: "Output", value: `${job?.completed_output_qty || "0.000"} / ${job?.planned_output_qty || "0.000"}` },
+        { label: job?.job_type === "FINISHING" ? "Category" : "Output", value: job?.job_type === "FINISHING" ? (job?.finishing_category_display || "—") : `${job?.completed_output_qty || "0.000"} / ${job?.planned_output_qty || "0.000"}` },
         { label: "WIP", value: formatRupee(job?.wip_cost) },
         { label: "Accounting", value: job?.accounting_status || "—" },
       ]}
-      statusBadge={{ label: job?.costing_status || "Job", tone: "info" }}
+      statusBadge={{ label: job?.job_type === "FINISHING" ? `Finishing · ${job?.costing_status || "Job"}` : (job?.costing_status || "Job"), tone: job?.job_type === "FINISHING" ? "warning" : "info" }}
     >
       <div className="space-y-6">
         {loading ? <ERPLoadingState label="Loading production job..." /> : null}
@@ -343,17 +347,56 @@ export default function AdminManufacturingJobDetailPage() {
               </div>
             ) : null}
 
+            {job.job_type === "FINISHING" ? (
+              <div className="rounded-xl border border-amber-500/40 bg-amber-50/60 dark:bg-amber-900/15 px-5 py-4 text-sm">
+                <div className="flex flex-wrap items-center gap-3 mb-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/20 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-amber-800 dark:text-amber-300">
+                    Finishing Job
+                  </span>
+                  {job.finishing_category_display ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/50 px-3 py-1 text-xs font-medium text-amber-700 dark:text-amber-400">
+                      {job.finishing_category_display}
+                    </span>
+                  ) : null}
+                </div>
+                <p className="text-amber-900/80 dark:text-amber-200/80 leading-relaxed">
+                  This is a <strong>post-production finishing job</strong> on a finished good — not a new manufacturing run.
+                  Materials issued here (polish, sandpaper, fabric, fittings) are absorbed as <strong>WIP cost → Finished Goods</strong>.
+                  Staff labor is logged as wage expense and absorbed through the same WIP bridge.
+                  The finished good&apos;s inventory is not increased; the cost is capitalized to its existing valuation.
+                </p>
+                <div className="mt-3 grid grid-cols-1 gap-1.5 text-xs text-amber-800/70 dark:text-amber-300/70 sm:grid-cols-3">
+                  <div className="rounded-lg bg-amber-500/10 px-3 py-2">
+                    <div className="font-semibold mb-0.5">Material issue</div>
+                    <div>Dr WIP Inventory → Cr Inventory Asset</div>
+                  </div>
+                  <div className="rounded-lg bg-amber-500/10 px-3 py-2">
+                    <div className="font-semibold mb-0.5">Staff labor</div>
+                    <div>Dr WIP Inventory → Cr Salary Expense</div>
+                  </div>
+                  <div className="rounded-lg bg-amber-500/10 px-3 py-2">
+                    <div className="font-semibold mb-0.5">Job completion</div>
+                    <div>Dr Finished Goods → Cr WIP Inventory</div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
             <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
               <ERPSectionShell
                 title="Job Summary"
-                description="The production job tracks WIP and operational progress while stock ledger and accounting bridge entries remain the posted system of record."
+                description={
+                  job.job_type === "FINISHING"
+                    ? "Finishing job details — item being finished, work location, and timeline. No BOM is required for finishing work; materials and staff are logged directly against this job."
+                    : "The production job tracks WIP and operational progress while stock ledger and accounting bridge entries remain the posted system of record."
+                }
                 actions={<ERPStatusBadge status={job.status} />}
               >
                 <ERPDetailGrid
                   columns={2}
                   items={[
-                    { label: "Finished good", value: job.finished_good_product_name || job.finished_good_sku || "—" },
-                    { label: "BOM", value: job.bom_no || "Manual" },
+                    { label: job.job_type === "FINISHING" ? "Item being finished" : "Finished good", value: job.finished_good_product_name || job.finished_good_sku || "—" },
+                    { label: "BOM", value: job.bom_no || (job.job_type === "FINISHING" ? "Not applicable" : "Manual") },
                     { label: "Location", value: job.stock_location_name || job.stock_location_code || "—" },
                     { label: "Created by", value: job.created_by_username || "—" },
                     { label: "Released at", value: formatDateTime(job.released_at) },
@@ -437,8 +480,12 @@ export default function AdminManufacturingJobDetailPage() {
 
             <div className="grid gap-6 xl:grid-cols-2">
               <ERPSectionShell
-                title="Material Movement"
-                description="Post the seeded BOM lines as a batch, or post an explicit issue/return correction line when the production floor needs an adjustment."
+                title={job.job_type === "FINISHING" ? "Finishing Material Issue" : "Material Movement"}
+                description={
+                  job.job_type === "FINISHING"
+                    ? "Issue consumables used for this finishing work — polish, lacquer, sandpaper, fabric, fittings, etc. Each issued item reduces inventory stock and adds to WIP cost for this job."
+                    : "Post the seeded BOM lines as a batch, or post an explicit issue/return correction line when the production floor needs an adjustment."
+                }
               >
                 <div className="grid gap-4 md:grid-cols-2">
                   <label className="grid gap-2 text-sm">
@@ -527,8 +574,12 @@ export default function AdminManufacturingJobDetailPage() {
               </ERPSectionShell>
 
               <ERPSectionShell
-                title="Output and Scrap"
-                description="Receive finished goods and record scrap explicitly. The job can only complete after WIP clears."
+                title={job.job_type === "FINISHING" ? "Output and Scrap" : "Output and Scrap"}
+                description={
+                  job.job_type === "FINISHING"
+                    ? "For finishing jobs, output receipt closes WIP to Finished Goods at the absorbed finishing cost. Scrap records wasted consumables. The item count stays at 1 unit (the piece being finished) unless multiple units were processed together."
+                    : "Receive finished goods and record scrap explicitly. The job can only complete after WIP clears."
+                }
               >
                 <div className="grid gap-4 md:grid-cols-2">
                   <label className="grid gap-2 text-sm">
@@ -628,8 +679,12 @@ export default function AdminManufacturingJobDetailPage() {
 
             <div className="grid gap-6 xl:grid-cols-3">
               <ERPSectionShell
-                title="Material Lines"
-                description="Issue and return-correction lines keep raw-material consumption explicit."
+                title={job.job_type === "FINISHING" ? "Consumables Issued" : "Material Lines"}
+                description={
+                  job.job_type === "FINISHING"
+                    ? "Finishing consumables (polish, sandpaper, fabric, fittings) issued against this job. Each line posts Dr WIP / Cr Inventory."
+                    : "Issue and return-correction lines keep raw-material consumption explicit."
+                }
               >
                 <div className="space-y-3">
                   {job.material_issue_lines.length === 0 ? (
@@ -694,8 +749,12 @@ export default function AdminManufacturingJobDetailPage() {
             
             <div className="grid gap-6 mt-6">
               <ERPSectionShell
-                title="Labor & Staff"
-                description="Manufacturing labor costs assigned to this job that will capitalize to finished goods."
+                title={job.job_type === "FINISHING" ? "Staff Expense — Finishing Work" : "Labor & Staff"}
+                description={
+                  job.job_type === "FINISHING"
+                    ? `Staff wages for ${job.finishing_category_display || "finishing"} work assigned to this job. Each wage entry is posted as Dr WIP Inventory / Cr Salary Expense and absorbed into the finished good's cost on completion.`
+                    : "Manufacturing labor costs assigned to this job that will capitalize to finished goods."
+                }
               >
                 <div className="space-y-4">
                   {job.status === "IN_PROGRESS" || job.status === "RELEASED" ? (
@@ -732,7 +791,7 @@ export default function AdminManufacturingJobDetailPage() {
                           <label className="text-xs font-medium text-muted-foreground">Activity</label>
                           <input
                             type="text"
-                            placeholder="e.g. Polishing"
+                            placeholder={job.job_type === "FINISHING" ? `e.g. ${job.finishing_category_display || "Finishing work"}` : "e.g. Assembly"}
                             value={laborForm.activity_name}
                             onChange={(e) => setLaborForm((prev) => ({ ...prev, activity_name: e.target.value }))}
                             className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"

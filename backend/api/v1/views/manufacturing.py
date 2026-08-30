@@ -138,6 +138,12 @@ class ProductionJobViewSet(AdminManufacturingModelViewSet):
             queryset = queryset.filter(accounting_status=accounting_status)
         if costing_status:
             queryset = queryset.filter(costing_status=costing_status)
+        job_type = (self.request.query_params.get("job_type") or "").strip().upper()
+        finishing_category = (self.request.query_params.get("finishing_category") or "").strip().upper()
+        if job_type:
+            queryset = queryset.filter(job_type=job_type)
+        if finishing_category:
+            queryset = queryset.filter(finishing_category=finishing_category)
         return queryset
 
     def get_serializer_class(self):
@@ -228,3 +234,4 @@ class ProductionJobViewSet(AdminManufacturingModelViewSet):
             raise ValidationError({"detail": str(exc)}) from exc
         payload = ProductionJobSerializer(updated_job, context=self.get_serializer_context())
         return Response({"updated": True, "job": payload.data}, status=status.HTTP_200_OK)
+

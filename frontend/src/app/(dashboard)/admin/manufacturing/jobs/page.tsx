@@ -45,6 +45,8 @@ export default function AdminManufacturingJobsPage() {
   }>({ frontend: [], backendMessage: null, backendFieldErrors: {} });
   const [form, setForm] = useState({
     job_date: new Date().toISOString().slice(0, 10),
+    job_type: "MANUFACTURING" as "MANUFACTURING" | "FINISHING",
+    finishing_category: "" as string,
     finished_good_inventory_item: "",
     finished_good_inventory_item_option: null as EntityLookupOption | null,
     bom: "",
@@ -117,6 +119,9 @@ export default function AdminManufacturingJobsPage() {
     if (!form.planned_output_qty.trim() || Number(form.planned_output_qty) <= 0) {
       errors.push("Planned output quantity must be greater than zero.");
     }
+    if (form.job_type === "FINISHING" && !form.finishing_category) {
+      errors.push("Finishing category is required for finishing work jobs.");
+    }
     return errors;
   }
 
@@ -130,6 +135,8 @@ export default function AdminManufacturingJobsPage() {
       setError(null);
       await createProductionJob({
         job_date: form.job_date,
+        job_type: form.job_type,
+        finishing_category: form.job_type === "FINISHING" ? form.finishing_category : null,
         finished_good_inventory_item: Number(form.finished_good_inventory_item),
         bom: form.bom ? Number(form.bom) : null,
         stock_location: form.stock_location ? Number(form.stock_location) : null,
@@ -139,6 +146,8 @@ export default function AdminManufacturingJobsPage() {
       setNotice("Production job created.");
       setForm({
         job_date: new Date().toISOString().slice(0, 10),
+        job_type: "MANUFACTURING",
+        finishing_category: "",
         finished_good_inventory_item: "",
         finished_good_inventory_item_option: null,
         bom: "",
@@ -180,6 +189,21 @@ export default function AdminManufacturingJobsPage() {
         key: "finished_good_product_name",
         title: "Finished Good",
         render: (row: ProductionJob) => row.finished_good_product_name || row.finished_good_sku || "—",
+      },
+      {
+        key: "job_type",
+        title: "Type",
+        render: (row: ProductionJob) =>
+          row.job_type === "FINISHING" ? (
+            <span className="inline-flex flex-col text-xs">
+              <span className="font-medium text-amber-700">Finishing</span>
+              {row.finishing_category_display && (
+                <span className="text-muted-foreground">{row.finishing_category_display}</span>
+              )}
+            </span>
+          ) : (
+            <span className="text-xs text-muted-foreground">Manufacturing</span>
+          ),
       },
       { key: "status", title: "Status" },
       {
@@ -281,6 +305,37 @@ export default function AdminManufacturingJobsPage() {
                   className="rounded-xl border border-border bg-background px-3 py-2"
                 />
               </label>
+              <label className="grid gap-2 text-sm">
+                <span>Job Type</span>
+                <select
+                  value={form.job_type}
+                  onChange={(e) =>
+                    setForm((c) => ({ ...c, job_type: e.target.value as "MANUFACTURING" | "FINISHING", finishing_category: "" }))
+                  }
+                  className="rounded-xl border border-border bg-background px-3 py-2"
+                >
+                  <option value="MANUFACTURING">Manufacturing</option>
+                  <option value="FINISHING">Finishing / Post-Production Work</option>
+                </select>
+              </label>
+              {form.job_type === "FINISHING" && (
+                <label className="grid gap-2 text-sm">
+                  <span>Finishing Category *</span>
+                  <select
+                    value={form.finishing_category}
+                    onChange={(e) => setForm((c) => ({ ...c, finishing_category: e.target.value }))}
+                    className="rounded-xl border border-border bg-background px-3 py-2"
+                  >
+                    <option value="">— Select —</option>
+                    <option value="POLISH">Polish / Lacquer</option>
+                    <option value="INSTALLATION">Installation</option>
+                    <option value="WOODWORK">Wood Work / Improvement</option>
+                    <option value="UPHOLSTERY">Upholstery / Fabric</option>
+                    <option value="PAINTING">Painting / Coating</option>
+                    <option value="OTHER">Other Finishing</option>
+                  </select>
+                </label>
+              )}
               <EntityLookupCombobox
                 label="Finished Good Inventory Item"
                 value={form.finished_good_inventory_item || null}
