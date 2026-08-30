@@ -20,8 +20,10 @@ import {
   deleteManufacturingBom,
   type ManufacturingBom,
   type ManufacturingBomLine,
+  type ManufacturingBomServiceLine,
 } from "@/services/manufacturing";
-import { searchAdminInventoryItems } from "@/services/inventory";
+import { searchAdminInventoryItems, listServiceCatalog } from "@/services/inventory";
+import { listEmployees } from "@/services/admin-hr";
 
 // ─── Tokens ───────────────────────────────────────────────────────────────────
 const INP = "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
@@ -77,21 +79,23 @@ function ItemSearch({ value, onChange, placeholder }: { value: ItemOption | null
       />
       {loading && <span className="absolute right-3 top-2.5 text-[10px] text-muted-foreground">Searching…</span>}
       {open && options.length > 0 && (
-        <div className="absolute z-20 mt-1 w-full rounded-xl border border-border bg-card shadow-lg">
+        <div className="absolute z-20 mt-1 w-full overflow-y-auto rounded-xl border-2 border-slate-300 dark:border-slate-600 shadow-[0_8px_32px_rgba(0,0,0,0.22)]" style={{ maxHeight: "18rem" }}>
+          <div className="rounded-xl overflow-hidden bg-white dark:bg-slate-900 divide-y-2 divide-slate-100 dark:divide-slate-800">
           {options.slice(0, 8).map((o) => (
             <button
               key={o.id}
               type="button"
               onMouseDown={() => { onChange(o); setQuery(o.label); setOpen(false); }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted/60"
+              className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
             >
-              <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${o.type === "RAW_MATERIAL" ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300" : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"}`}>
+              <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-bold ${o.type === "RAW_MATERIAL" ? "border-orange-300 bg-orange-100 text-orange-700 dark:border-orange-700 dark:bg-orange-900/50 dark:text-orange-300" : "border-blue-300 bg-blue-100 text-blue-700 dark:border-blue-700 dark:bg-blue-900/50 dark:text-blue-300"}`}>
                 {o.type === "RAW_MATERIAL" ? "RM" : "ACC"}
               </span>
               <span className="flex-1 font-medium">{o.label}</span>
-              <span className="font-mono text-[10px] text-muted-foreground">{o.code}</span>
+              <span className="font-mono text-[11px] font-semibold text-slate-600 dark:text-slate-400">{o.code}</span>
             </button>
           ))}
+          </div>
         </div>
       )}
     </div>
@@ -134,6 +138,154 @@ function LineRow({ line, index, total, onChange, onRemove }: {
   );
 }
 
+function ServiceSearch({ value, onChange, placeholder }: { value: ItemOption | null; onChange: (v: ItemOption | null) => void; placeholder?: string }) {
+  const [query, setQuery] = useState(value?.label ?? "");
+  const [options, setOptions] = useState<ItemOption[]>([]);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => { setQuery(value?.label ?? ""); }, [value]);
+
+  function handleInput(q: string) {
+    setQuery(q);
+    if (!q.trim()) { onChange(null); setOptions([]); return; }
+    if (debounce.current) clearTimeout(debounce.current);
+    debounce.current = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const res = await listServiceCatalog({ q });
+        setOptions((res.results ?? []).map((r: any) => ({ id: r.id, label: r.name || r.service_name || "", code: r.code || "", type: r.service_type || "" })));
+        setOpen(true);
+      } finally { setLoading(false); }
+    }, 280);
+  }
+
+  return (
+    <div className="relative">
+      <input
+        value={query}
+        onChange={(e) => handleInput(e.target.value)}
+        onFocus={() => options.length && setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 180)}
+        placeholder={placeholder ?? "Search services (e.g., Installation)…"}
+        className={INP}
+      />
+      {loading && <span className="absolute right-3 top-2.5 text-[10px] text-muted-foreground">Searching…</span>}
+      {open && options.length > 0 && (
+        <div className="absolute z-20 mt-1 w-full overflow-y-auto rounded-xl border-2 border-slate-300 dark:border-slate-600 shadow-[0_8px_32px_rgba(0,0,0,0.22)]" style={{ maxHeight: "18rem" }}>
+          <div className="rounded-xl overflow-hidden bg-white dark:bg-slate-900 divide-y-2 divide-slate-100 dark:divide-slate-800">
+          {options.map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              onMouseDown={() => { onChange(o); setQuery(o.label); setOpen(false); }}
+              className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
+            >
+              <span className="shrink-0 rounded border border-purple-300 bg-purple-100 text-purple-700 dark:border-purple-700 dark:bg-purple-900/50 dark:text-purple-300 px-1.5 py-0.5 text-[10px] font-bold">
+                SRV
+              </span>
+              <span className="flex-1 text-[13px] font-semibold text-slate-900 dark:text-slate-100">{o.label}</span>
+              <span className="font-mono text-[11px] font-semibold text-slate-600 dark:text-slate-400">{o.code}</span>
+            </button>
+          ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EmployeeSearch({ value, onChange, placeholder }: { value: ItemOption | null; onChange: (v: ItemOption | null) => void; placeholder?: string }) {
+  const [query, setQuery] = useState(value?.label ?? "");
+  const [options, setOptions] = useState<ItemOption[]>([]);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => { setQuery(value?.label ?? ""); }, [value]);
+
+  function handleInput(q: string) {
+    setQuery(q);
+    if (!q.trim()) { onChange(null); setOptions([]); return; }
+    if (debounce.current) clearTimeout(debounce.current);
+    debounce.current = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const res = await listEmployees({ q });
+        setOptions((res.results ?? []).map((r: any) => ({ id: r.id, label: r.name, code: r.employee_code, type: "Employee" })));
+        setOpen(true);
+      } finally { setLoading(false); }
+    }, 280);
+  }
+
+  return (
+    <div className="relative">
+      <input
+        value={query}
+        onChange={(e) => handleInput(e.target.value)}
+        onFocus={() => options.length && setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 180)}
+        placeholder={placeholder ?? "Search staff..."}
+        className={INP}
+      />
+      {loading && <span className="absolute right-3 top-2.5 text-[10px] text-muted-foreground">Searching?</span>}
+      {open && options.length > 0 && (
+        <div className="absolute z-20 mt-1 w-full overflow-y-auto rounded-xl border-2 border-slate-300 dark:border-slate-600 shadow-[0_8px_32px_rgba(0,0,0,0.22)]" style={{ maxHeight: "18rem" }}>
+          <div className="rounded-xl overflow-hidden bg-white dark:bg-slate-900 divide-y-2 divide-slate-100 dark:divide-slate-800">
+          {options.map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              onMouseDown={() => { onChange(o); setQuery(o.label); setOpen(false); }}
+              className="flex w-full flex-col items-start px-4 py-2.5 text-left hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
+            >
+              <div className="text-[13px] font-semibold text-slate-900 dark:text-slate-100 truncate">{o.label}</div>
+              {o.code && <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 truncate">{o.code}</div>}
+            </button>
+          ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+type ServiceLineDraft = { item: ItemOption | null; employee: ItemOption | null; qty: string; notes: string };
+const blankServiceLine = (): ServiceLineDraft => ({ item: null, employee: null, qty: "1.00", notes: "" });
+
+function ServiceLineRow({ line, index, onChange, onRemove }: {
+  line: ServiceLineDraft; index: number;
+  onChange: (f: Partial<ServiceLineDraft>) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="grid gap-3 rounded-xl border border-border bg-muted/20 p-3 sm:grid-cols-[2fr_1fr_90px_1fr_32px]">
+      <div>
+        {index === 0 && <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Service / Labor *</label>}
+        <ServiceSearch value={line.item} onChange={(v) => onChange({ item: v })} />
+      </div>
+      <div>
+        {index === 0 && <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Staff Profile</label>}
+        <EmployeeSearch value={line.employee} onChange={(v) => onChange({ employee: v })} />
+      </div>
+      <div>
+        {index === 0 && <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Qty</label>}
+        <input type="number" min="0.01" step="0.01" value={line.qty} onChange={(e) => onChange({ qty: e.target.value })} className={INP} />
+      </div>
+      <div>
+        {index === 0 && <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Notes</label>}
+        <input value={line.notes} onChange={(e) => onChange({ notes: e.target.value })} placeholder="Optional" className={INP} />
+      </div>
+      <div className={index === 0 ? "mt-5" : ""}>
+        <button type="button" onClick={onRemove} className="flex h-9 w-8 items-center justify-center rounded-lg border border-destructive/30 text-destructive hover:bg-destructive/10 transition">
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Create form ──────────────────────────────────────────────────────────────
 type FGOption = ItemOption;
 
@@ -146,6 +298,7 @@ function CreateBomForm({ onCreated, onCancel }: { onCreated: () => void; onCance
   const [isDefault, setIsDefault] = useState(true);
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<LineDraft[]>([blankLine()]);
+  const [serviceLines, setServiceLines] = useState<ServiceLineDraft[]>([]);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -164,11 +317,15 @@ function CreateBomForm({ onCreated, onCancel }: { onCreated: () => void; onCance
   function updateLine(i: number, f: Partial<LineDraft>) {
     setLines((ls) => ls.map((l, idx) => idx === i ? { ...l, ...f } : l));
   }
+  function updateServiceLine(i: number, f: Partial<ServiceLineDraft>) {
+    setServiceLines((ls) => ls.map((l, idx) => idx === i ? { ...l, ...f } : l));
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!fg) { setErr("Select a finished good."); return; }
     const validLines = lines.filter((l) => l.item);
+    const validServiceLines = serviceLines.filter((l) => l.item);
     if (!validLines.length) { setErr("Add at least one material line."); return; }
     setSaving(true); setErr(null);
     try {
@@ -181,6 +338,12 @@ function CreateBomForm({ onCreated, onCancel }: { onCreated: () => void; onCance
           inventory_item: l.item!.id,
           quantity_per_unit: l.qty,
           wastage_percent: l.wastage,
+          sort_order: i + 1,
+          notes: l.notes,
+        })),
+        service_lines: validServiceLines.map((l, i) => ({
+          service: l.item!.id,
+          quantity: l.qty,
           sort_order: i + 1,
           notes: l.notes,
         })),
@@ -210,14 +373,16 @@ function CreateBomForm({ onCreated, onCancel }: { onCreated: () => void; onCance
               className={INP}
             />
             {fgOpen && fgOpts.length > 0 && (
-              <div className="absolute z-20 mt-1 w-full rounded-xl border border-border bg-card shadow-lg">
+              <div className="absolute z-20 mt-1 w-full overflow-y-auto rounded-xl border-2 border-slate-300 dark:border-slate-600 shadow-[0_8px_32px_rgba(0,0,0,0.22)]" style={{ maxHeight: "18rem" }}>
+                <div className="rounded-xl overflow-hidden bg-white dark:bg-slate-900 divide-y-2 divide-slate-100 dark:divide-slate-800">
                 {fgOpts.slice(0, 8).map((o) => (
                   <button key={o.id} type="button" onMouseDown={() => { setFg(o); setFgQuery(o.label); setFgOpen(false); }}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted/60">
-                    <span className="flex-1 font-medium">{o.label}</span>
-                    <span className="font-mono text-[10px] text-muted-foreground">{o.code}</span>
+                    className="flex w-full items-center gap-2 px-4 py-2.5 text-left hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors">
+                    <span className="flex-1 text-[13px] font-semibold text-slate-900 dark:text-slate-100">{o.label}</span>
+                    <span className="font-mono text-[11px] font-semibold text-slate-600 dark:text-slate-400">{o.code}</span>
                   </button>
                 ))}
+                </div>
               </div>
             )}
             {fg && (
@@ -253,7 +418,22 @@ function CreateBomForm({ onCreated, onCancel }: { onCreated: () => void; onCance
           ))}
         </div>
         <button type="button" onClick={() => setLines((ls) => [...ls, blankLine()])} className={`mt-3 ${BTN_GHOST}`}>
-          <Plus className="h-3.5 w-3.5" />Add Line
+          <Plus className="h-3.5 w-3.5" />Add Material
+        </button>
+      </div>
+
+      {/* BOM service lines */}
+      <div className="pt-2 border-t border-primary/10">
+        <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Service & Labor Lines</div>
+        <div className="space-y-2">
+          {serviceLines.map((line, i) => (
+            <ServiceLineRow key={i} line={line} index={i}
+              onChange={(f) => updateServiceLine(i, f)}
+              onRemove={() => setServiceLines((ls) => ls.filter((_, idx) => idx !== i))} />
+          ))}
+        </div>
+        <button type="button" onClick={() => setServiceLines((ls) => [...ls, blankServiceLine()])} className={`mt-3 ${BTN_GHOST}`}>
+          <Plus className="h-3.5 w-3.5" />Add Service/Labor
         </button>
       </div>
 
@@ -280,6 +460,14 @@ function EditBomLinesPanel({ bom, onSaved, onClose }: { bom: ManufacturingBom; o
       notes: l.notes ?? "",
     }))
   );
+  const [serviceLines, setServiceLines] = useState<ServiceLineDraft[]>(
+    bom.service_lines?.map((l) => ({
+      item: l.service_name ? { id: l.service, label: l.service_name, code: l.service_code || "", type: "" } : null,
+      employee: l.default_employee ? { id: l.default_employee, label: l.default_employee_name || "", code: l.default_employee_code || "", type: "Employee" } : null,
+      qty: l.quantity,
+      notes: l.notes ?? "",
+    })) || []
+  );
   const [notes, setNotes] = useState(bom.notes ?? "");
   const [isDefault, setIsDefault] = useState(bom.is_default);
   const [saving, setSaving] = useState(false);
@@ -288,9 +476,13 @@ function EditBomLinesPanel({ bom, onSaved, onClose }: { bom: ManufacturingBom; o
   function updateLine(i: number, f: Partial<LineDraft>) {
     setLines((ls) => ls.map((l, idx) => idx === i ? { ...l, ...f } : l));
   }
+  function updateServiceLine(i: number, f: Partial<ServiceLineDraft>) {
+    setServiceLines((ls) => ls.map((l, idx) => idx === i ? { ...l, ...f } : l));
+  }
 
   async function handleSave() {
     const validLines = lines.filter((l) => l.item);
+    const validServiceLines = serviceLines.filter((l) => l.item);
     if (!validLines.length) { setErr("At least one material line required."); return; }
     setSaving(true); setErr(null);
     try {
@@ -301,6 +493,12 @@ function EditBomLinesPanel({ bom, onSaved, onClose }: { bom: ManufacturingBom; o
           inventory_item: l.item!.id,
           quantity_per_unit: l.qty,
           wastage_percent: l.wastage,
+          sort_order: i + 1,
+          notes: l.notes,
+        })),
+        service_lines: validServiceLines.map((l, i) => ({
+          service: l.item!.id,
+          quantity: l.qty,
           sort_order: i + 1,
           notes: l.notes,
         })),
@@ -340,8 +538,22 @@ function EditBomLinesPanel({ bom, onSaved, onClose }: { bom: ManufacturingBom; o
         ))}
       </div>
       <button type="button" onClick={() => setLines((ls) => [...ls, blankLine()])} className={BTN_GHOST}>
-        <Plus className="h-3.5 w-3.5" />Add Line
+        <Plus className="h-3.5 w-3.5" />Add Material
       </button>
+
+      <div className="pt-2 border-t border-border mt-4">
+        <div className="text-xs font-semibold text-primary mb-3">Service & Labor Lines</div>
+        <div className="space-y-2">
+          {serviceLines.map((line, i) => (
+            <ServiceLineRow key={`srv-${i}`} line={line} index={i}
+              onChange={(f) => updateServiceLine(i, f)}
+              onRemove={() => setServiceLines((ls) => ls.filter((_, idx) => idx !== i))} />
+          ))}
+        </div>
+        <button type="button" onClick={() => setServiceLines((ls) => [...ls, blankServiceLine()])} className={`${BTN_GHOST} mt-3`}>
+          <Plus className="h-3.5 w-3.5" />Add Service/Labor
+        </button>
+      </div>
 
       {err && <div className="flex gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{err}</div>}
       <div className="flex gap-2">
@@ -478,6 +690,33 @@ function BomCard({ bom, onRefresh }: { bom: ManufacturingBom; onRefresh: () => v
               </tbody>
             </table>
           </div>
+
+          {bom.service_lines && bom.service_lines.length > 0 && (
+            <div className="overflow-x-auto mt-4 border-t border-border">
+              <div className="bg-muted/10 px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Service & Labor</div>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/30 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <th className="px-4 py-2 text-left">#</th>
+                    <th className="px-4 py-2 text-left">Service</th>
+                    <th className="px-4 py-2 text-right">Qty</th>
+                    <th className="px-4 py-2 text-left">Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bom.service_lines.map((ln, i) => (
+                    <tr key={ln.id ?? i} className="border-b border-border/50 hover:bg-muted/20">
+                      <td className="px-4 py-2 text-muted-foreground">{i + 1}</td>
+                      <td className="px-4 py-2 font-medium">{ln.service_name ?? `Service #${ln.service}`}</td>
+                      <td className="px-4 py-2 text-right font-semibold">{ln.quantity}</td>
+                      <td className="px-4 py-2 text-xs italic text-muted-foreground">{ln.notes || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
           {bom.notes && (
             <div className="border-t border-border/50 px-4 py-2 text-xs text-muted-foreground"><strong>Notes:</strong> {bom.notes}</div>
           )}

@@ -18,10 +18,20 @@ export default function PimEditProductPage() {
   useEffect(() => {
     if (!params?.id) return;
     pimService.getProduct(Number(params.id))
-      .then(setProduct)
+      .then((p) => {
+        setProduct(p);
+        // Redirect to type-specific URL for non-finished-good types
+        const typeSlugMap: Record<string, string> = {
+          ACCESSORY: "accessories",
+        };
+        const slug = typeSlugMap[p.product_type ?? ""];
+        if (slug) {
+          router.replace(`/admin/pim/products/${slug}/${params.id}/edit`);
+        }
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [params?.id]);
+  }, [params?.id, router]);
 
   if (!params?.id) return null;
   if (loading) return <ERPLoadingState label="Loading…" />;

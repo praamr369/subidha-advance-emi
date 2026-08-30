@@ -39,6 +39,7 @@ import {
 } from "@/services/direct-sale-workspace";
 import { recheckStockNeed } from "@/services/inventory-ops";
 import AccessorySelectionPanel, { type AccessorySelectionResult } from "@/components/inventory/AccessorySelectionPanel";
+import SearchCombobox, { SearchComboboxRow, CodeBadge } from "@/components/ui/SearchCombobox";
 import { getAdminDirectSaleReturnEligibility, type DirectSaleReturnEligibility } from "@/services/reversals";
 import {
   buildAdminBillingDocumentRoute,
@@ -366,7 +367,7 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
     tax_mode: "NON_GST",
     tax_calculation_mode: "NON_GST",
     finance_account: "",
-    delivery_required: false,
+    delivery_required: true,
     delivery_snapshot_address_line1: "",
     delivery_snapshot_address_line2: "",
     delivery_snapshot_city: "",
@@ -791,7 +792,7 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
       tax_mode: "NON_GST",
       tax_calculation_mode: "NON_GST",
       finance_account: "",
-      delivery_required: false,
+      delivery_required: true,
       delivery_snapshot_address_line1: "",
       delivery_snapshot_address_line2: "",
       delivery_snapshot_city: "",
@@ -942,6 +943,10 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
 
   function selectProduct(lineId: string, product: BillingProductSearchRow) {
     const basePrice = product.base_price || product.sale_price || "0.00";
+    // Auto-calculate stock requirement: if out-of-stock or insufficient, flag it immediately
+    const available = Number(product.inventory_status?.available ?? product.current_stock_qty ?? 0);
+    const needsRequirement = available <= 0 || product.inventory_status?.requires_purchase;
+    const shortage = needsRequirement ? "1.000" : "0.000";
     updateLine(lineId, {
       product_id: String(product.id),
       inventory_item_id: product.inventory_item_id ? String(product.inventory_item_id) : "",
@@ -951,10 +956,15 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
       product_results: [],
       product_loading: false,
       selected_product: product,
-      requirement_quantity: "1.000",
+      create_requirement: Boolean(needsRequirement),
+      requirement_quantity: needsRequirement ? shortage : "1.000",
+      requirement_note: needsRequirement ? "Auto-flagged: stock insufficient at time of sale" : "",
     });
-    // If this is a finished good with accessories/services, offer the selection panel
-    if (product.stock_item_type === "FINISHED_GOOD") {
+    // Open accessory panel whenever this product has related accessories/services
+    if (product.accessories && product.accessories.length > 0) {
+      setAccessoryPanel({ productId: product.id, lineId });
+    } else if (product.stock_item_type === "FINISHED_GOOD") {
+      // Still open for finished goods even if accessories aren't cached in search results
       setAccessoryPanel({ productId: product.id, lineId });
     }
   }
@@ -1354,86 +1364,53 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                             placeholder="Name, phone, customer code, GSTIN"
                           />
                         </div>
-                        {customerQuery.trim().length >= 2 && !selectedCustomer ? (
-                          <div className="absolute z-[85] mt-1 max-h-64 w-full overflow-auto rounded-lg border border-border bg-card p-1 shadow-2xl">
-                            {customerLoading ? (
-                              <div className="px-3 py-2 text-sm text-muted-foreground">Searching customers...</div>
-                            ) : customerResults.length ? (
-                              customerResults.map((customer) => (
-                                <button
-                                  key={customer.id}
-                                  type="button"
-                                  onClick={() => selectCustomer(customer)}
-                                  className="block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-muted"
-                                >
-                                  <span className="block font-medium">{customer.name}</span>
-                                  <span className="block text-xs text-muted-foreground">
-                                    {customer.phone}
-                                    {customer.customer_code ? ` · ${customer.customer_code}` : ` · #${customer.id}`}
-                                  </span>
-                                </button>
-                              ))
-                            ) : customerPartyResults.length ? (
-                              <div className="space-y-2 px-3 py-2 text-sm">
-                                <p className="text-muted-foreground">
-                                  No registered customer matched. CRM party records were found.
-                                </p>
-                                {customerPartyResults.slice(0, 6).map((party) => (
-                                  <div key={party.id} className="rounded-md border border-border bg-background p-2">
-                                    <p className="text-sm font-medium text-foreground">{party.display_name}</p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {party.primary_phone || "No phone"} · {party.party_no}
-                                    </p>
+                        <SearchCombobox<CustomerRecord | PartyListRow>
+                          show={customerQuery.trim().length >= 2 && !selectedCustomer}
+                          loading={customerLoading}
+                          results={customerResults.length > 0 ? (customerResults as (CustomerRecord | PartyListRow)[]) : (customerPartyResults as (CustomerRecord | PartyListRow)[])}
+                          zIndex="z-[85]"
+                          emptyMessage="No registered customer found."
+                          footer={
+                            <div className="flex flex-wrap gap-2">
+                              <button type="button" onClick={() => applySearchPrefill("NEW")}
+                                className="rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-1.5 text-[12px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700">
+                                + Create New Customer
+                              </button>
+                              <button type="button" onClick={() => applySearchPrefill("WALK_IN")}
+                                className="rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-1.5 text-[12px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700">
+                                Walk-in Snapshot
+                              </button>
+                            </div>
+                          }
+                          renderItem={(item) => {
+                            if ("customer_code" in item) {
+                              const c = item as CustomerRecord;
+                              return (
+                                <SearchComboboxRow onClick={() => selectCustomer(c)}>
+                                  <div className="flex items-center gap-2 mb-0.5">
+                                    <CodeBadge>{c.customer_code || `#${c.id}`}</CodeBadge>
+                                    <span className="flex-1 text-[13px] font-bold text-slate-900 dark:text-slate-100">{c.name}</span>
                                   </div>
-                                ))}
-                                <button
-                                  type="button"
-                                  disabled
-                                  className="rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-muted-foreground"
-                                  title="Backend endpoint for customer creation from CRM party is not available."
-                                >
-                                  Create customer profile from party
-                                </button>
-                                <div className="flex flex-wrap gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => applySearchPrefill("NEW")}
-                                    className="rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-foreground hover:bg-muted"
-                                  >
-                                    Create New Customer
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => applySearchPrefill("WALK_IN")}
-                                    className="rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-foreground hover:bg-muted"
-                                  >
-                                    Use Walk-in Snapshot
-                                  </button>
+                                  <div className="flex gap-3 text-[12px] text-slate-500 dark:text-slate-400">
+                                    <span>{c.phone}</span>
+                                    {c.email && <span>{c.email}</span>}
+                                  </div>
+                                </SearchComboboxRow>
+                              );
+                            }
+                            const p = item as PartyListRow;
+                            return (
+                              <div className="px-4 py-2.5">
+                                <div className="flex items-center gap-2 mb-0.5">
+                                  <CodeBadge>{p.party_no}</CodeBadge>
+                                  <span className="flex-1 text-[13px] font-bold text-slate-900 dark:text-slate-100">{p.display_name}</span>
+                                  <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/50 border border-amber-300 dark:border-amber-700 rounded px-1.5 py-0.5">CRM Party</span>
                                 </div>
+                                <div className="text-[12px] text-slate-500 dark:text-slate-400">{p.primary_phone || "No phone"}</div>
                               </div>
-                            ) : (
-                              <div className="space-y-2 px-3 py-2 text-sm">
-                                <p className="text-muted-foreground">No registered customer found.</p>
-                                <div className="flex flex-wrap gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => applySearchPrefill("NEW")}
-                                    className="rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-foreground hover:bg-muted"
-                                  >
-                                    Create New Customer
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => applySearchPrefill("WALK_IN")}
-                                    className="rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-foreground hover:bg-muted"
-                                  >
-                                    Use Walk-in Snapshot
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ) : null}
+                            );
+                          }}
+                        />
                         {customerSearchError ? (
                           <p className="mt-2 text-xs text-destructive">{customerSearchError}</p>
                         ) : null}
@@ -1798,49 +1775,167 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                                 />
                               </div>
                               {line.product_search.trim().length >= 2 && !line.selected_product ? (
-                                <div className="absolute z-[85] mt-1 max-h-72 w-full overflow-auto rounded-lg border border-border bg-card p-1 shadow-2xl">
+                                <div
+                                  className="absolute z-[85] mt-1 w-full overflow-y-auto rounded-xl border-2 border-slate-300 dark:border-slate-600 shadow-[0_8px_32px_rgba(0,0,0,0.22)]"
+                                  style={{ maxHeight: "22rem", background: "var(--color-white, #fff)", ["--tw-bg-opacity" as string]: "1" }}
+                                >
+                                  <style>{`.ds-drop{background:#fff;}.dark .ds-drop{background:#1e293b;}`}</style>
+                                  <div className="ds-drop rounded-xl overflow-hidden">
                                   {line.product_loading ? (
-                                    <div className="px-3 py-2 text-sm text-muted-foreground">Searching products...</div>
+                                    <div className="flex items-center gap-2.5 px-4 py-4 text-sm font-medium text-slate-500 dark:text-slate-400">
+                                      <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-400 border-t-transparent" />
+                                      Searching products…
+                                    </div>
                                   ) : line.product_error ? (
-                                    <div className="px-3 py-2 text-sm text-destructive">{line.product_error}</div>
+                                    <div className="px-4 py-3 text-sm font-medium text-red-600 dark:text-red-400">{line.product_error}</div>
                                   ) : line.product_results.length ? (
-                                    line.product_results.map((product) => (
-                                      <button
-                                        key={product.id}
-                                        type="button"
-                                        onClick={() => selectProduct(line.id, product)}
-                                        className="block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-muted"
-                                      >
-                                        <span className="block font-medium">
-                                          {product.product_code || product.sku || `P-${product.id}`} - {product.name}
-                                        </span>
-                                        <span className="block text-xs text-muted-foreground">
-                                          Base {accountingMoney(product.base_price)} | Stock {product.current_stock_qty || product.inventory_status.available}
-                                          {product.brand ? ` | ${product.brand}` : ""}
-                                          {product.hsn_sac_code ? ` | HSN: ${product.hsn_sac_code}` : ""}
-                                          {product.unit_of_measure ? ` | ${product.unit_of_measure}` : ""}
-                                        </span>
-                                        {product.base_specs && Object.keys(product.base_specs).length > 0 && (
-                                          <span className="block text-[10px] text-muted-foreground/70 mt-0.5">
-                                            {Object.entries(product.base_specs).slice(0, 5).map(([k, v]) => `${k}: ${v}`).join(" | ")}
-                                          </span>
-                                        )}
-                                        {product.accessories && product.accessories.length > 0 && (
-                                          <span className="block text-[10px] text-muted-foreground/70 mt-0.5">
-                                            Accessories: {product.accessories.map((a) => a.name).join(", ")}
-                                          </span>
-                                        )}
-                                      </button>
-                                    ))
+                                    <ul className="divide-y-2 divide-slate-200 dark:divide-slate-700">
+                                      {line.product_results.map((product) => {
+                                        const code = product.product_code || product.sku || `P-${product.id}`;
+                                        const inStock = product.inventory_status?.is_in_stock;
+                                        const stockQty = product.current_stock_qty ?? product.inventory_status?.available ?? 0;
+                                        const specs = product.base_specs
+                                          ? Object.entries(product.base_specs).filter(([, v]) => v && v !== "null").slice(0, 5)
+                                          : [];
+                                        const accs = product.accessories ?? [];
+                                        const typeLabel =
+                                          product.stock_item_type === "ACCESSORY" ? "Accessory"
+                                          : product.stock_item_type === "RAW_MATERIAL" ? "Raw Material"
+                                          : "Finished Good";
+                                        const typeColor =
+                                          product.stock_item_type === "ACCESSORY" ? "border-purple-300 bg-purple-50 text-purple-700 dark:border-purple-700 dark:bg-purple-900/40 dark:text-purple-300"
+                                          : product.stock_item_type === "RAW_MATERIAL" ? "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                                          : "border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-700 dark:bg-sky-900/40 dark:text-sky-300";
+                                        return (
+                                          <li key={product.id}>
+                                            <button
+                                              type="button"
+                                              onClick={() => selectProduct(line.id, product)}
+                                              className="w-full px-4 py-3 text-left transition-colors hover:bg-blue-50 dark:hover:bg-blue-950/40 focus:bg-blue-50 dark:focus:bg-blue-950/40 focus:outline-none"
+                                            >
+                                              {/* Row 1: type badge + code + name + stock pill */}
+                                              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                                                <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-bold ${typeColor}`}>
+                                                  {typeLabel}
+                                                </span>
+                                                <span className="shrink-0 rounded border border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 font-mono text-[11px] font-bold text-slate-700 dark:text-slate-200">
+                                                  {code}
+                                                </span>
+                                                <span className="flex-1 text-[13px] font-bold text-slate-900 dark:text-slate-100 leading-snug min-w-0">{product.name}</span>
+                                                <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold ${inStock ? "border-green-400 bg-green-100 text-green-800 dark:border-green-600 dark:bg-green-900 dark:text-green-200" : "border-red-400 bg-red-100 text-red-800 dark:border-red-600 dark:bg-red-900 dark:text-red-200"}`}>
+                                                  {inStock ? "✓ In Stock" : "✗ Out of Stock"}
+                                                </span>
+                                              </div>
+
+                                              {/* Row 2: price · stock qty · brand · HSN */}
+                                              <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 pl-0.5 text-[12px]">
+                                                <span className="font-bold text-slate-900 dark:text-white">{accountingMoney(product.base_price)}</span>
+                                                <span className="text-slate-500 dark:text-slate-400">
+                                                  Stock: <strong className="text-slate-800 dark:text-slate-200">{stockQty}</strong> {product.unit_of_measure || "PCS"}
+                                                </span>
+                                                {product.brand && <span className="text-slate-500 dark:text-slate-400">{product.brand}</span>}
+                                                {product.hsn_sac_code && (
+                                                  <span className="font-mono text-slate-500 dark:text-slate-400">HSN {product.hsn_sac_code}</span>
+                                                )}
+                                              </div>
+
+                                              {/* Row 3: specs chips */}
+                                              {specs.length > 0 && (
+                                                <div className="mt-1.5 pl-0.5 flex flex-wrap gap-1">
+                                                  {specs.map(([k, v]) => (
+                                                    <span key={k} className="rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-0.5 text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                                                      <span className="font-normal text-slate-400 dark:text-slate-500">{k}: </span>{String(v)}
+                                                    </span>
+                                                  ))}
+                                                </div>
+                                              )}
+
+                                              {/* Row 4: accessories — full detail table */}
+                                              {accs.length > 0 && (
+                                                <div className="mt-2 rounded-lg border border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-950/60 overflow-hidden">
+                                                  <div className="px-2.5 py-1 bg-blue-100 dark:bg-blue-900 border-b border-blue-200 dark:border-blue-700 flex items-center gap-1.5">
+                                                    <span className="text-[10px] font-bold text-blue-800 dark:text-blue-200 uppercase tracking-wide">
+                                                      📦 {accs.length} Related Accessor{accs.length === 1 ? "y" : "ies"}
+                                                    </span>
+                                                  </div>
+                                                  <div className="divide-y divide-blue-100 dark:divide-blue-800">
+                                                    {accs.map((a) => (
+                                                      <div key={a.id} className="flex items-center gap-2 px-2.5 py-1.5">
+                                                        <span className="font-mono text-[10px] font-bold text-blue-600 dark:text-blue-400 shrink-0">
+                                                          {a.product_code || a.sku || `#${a.id}`}
+                                                        </span>
+                                                        <span className="flex-1 text-[12px] font-semibold text-slate-800 dark:text-slate-200">{a.name}</span>
+                                                        <span className="text-[11px] text-slate-500 dark:text-slate-400 shrink-0">
+                                                          Qty: <strong className="text-slate-700 dark:text-slate-300">{a.quantity}</strong>
+                                                        </span>
+                                                        <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold ${a.included_in_price ? "bg-green-100 text-green-700 dark:bg-green-900/60 dark:text-green-300" : "bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300"}`}>
+                                                          {a.included_in_price ? "Included" : "Add-on cost"}
+                                                        </span>
+                                                      </div>
+                                                    ))}
+                                                  </div>
+                                                </div>
+                                              )}
+                                            </button>
+                                          </li>
+                                        );
+                                      })}
+                                    </ul>
                                   ) : (
-                                    <div className="px-3 py-2 text-sm text-muted-foreground">No products found. Try product name, code, or SKU.</div>
+                                    <div className="px-4 py-4 text-sm text-slate-500 dark:text-slate-400">
+                                      No products found — try a product name, code, or SKU.
+                                    </div>
                                   )}
+                                  </div>
                                 </div>
                               ) : null}
                               {line.selected_product ? (
-                                <div className="mt-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                                  {line.selected_product.product_code || line.selected_product.sku || `P-${line.selected_product.id}`} | Base {accountingMoney(line.selected_product.base_price)} | Stock {line.selected_product.current_stock_qty || line.selected_product.inventory_status.available} | Inventory {line.selected_product.inventory_ready ? "ready" : "not ready"} {!line.selected_product.inventory_status.is_in_stock ? " | OUT OF STOCK" : ""}
-                                  {line.selected_product.brand ? ` | ${line.selected_product.brand}` : ""}{line.selected_product.hsn_sac_code ? ` | HSN: ${line.selected_product.hsn_sac_code}` : ""}{line.selected_product.unit_of_measure ? ` | ${line.selected_product.unit_of_measure}` : ""}
+                                <div className="mt-2 rounded-lg border-2 border-green-400 dark:border-green-600 bg-green-50 dark:bg-green-900 overflow-hidden">
+                                  {/* Selected product header */}
+                                  <div className="px-3 py-2.5">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <span className="rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 font-mono px-1.5 py-0.5 text-[11px] font-bold text-slate-700 dark:text-slate-200">
+                                        {line.selected_product.product_code || line.selected_product.sku || `P-${line.selected_product.id}`}
+                                      </span>
+                                      <span className="text-[12px] font-bold text-slate-900 dark:text-white">{line.selected_product.name}</span>
+                                      <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${line.selected_product.inventory_status.is_in_stock ? "border-green-400 bg-green-100 text-green-800 dark:border-green-600 dark:bg-green-800 dark:text-green-100" : "border-red-400 bg-red-100 text-red-800 dark:border-red-600 dark:bg-red-800 dark:text-red-100"}`}>
+                                        {line.selected_product.inventory_status.is_in_stock ? "✓ In Stock" : "✗ Out of Stock"}
+                                      </span>
+                                    </div>
+                                    <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-[12px] text-slate-600 dark:text-slate-300">
+                                      <span className="font-semibold text-slate-800 dark:text-slate-100">{accountingMoney(line.selected_product.base_price)}</span>
+                                      <span>Stock: <strong>{line.selected_product.current_stock_qty ?? line.selected_product.inventory_status.available}</strong> {line.selected_product.unit_of_measure || "PCS"}</span>
+                                      <span>Inv: {line.selected_product.inventory_ready ? "Ready" : "Not ready"}</span>
+                                      {line.selected_product.brand && <span>{line.selected_product.brand}</span>}
+                                      {line.selected_product.hsn_sac_code && <span>HSN {line.selected_product.hsn_sac_code}</span>}
+                                    </div>
+                                  </div>
+                                  {/* Attached accessories section */}
+                                  {line.selected_product.accessories && line.selected_product.accessories.length > 0 && (
+                                    <div className="border-t-2 border-green-300 dark:border-green-700">
+                                      <div className="flex items-center gap-2 bg-blue-100 dark:bg-blue-900 px-3 py-1.5 border-b border-blue-200 dark:border-blue-700">
+                                        <span className="text-[11px] font-bold text-blue-800 dark:text-blue-200 uppercase tracking-wide">
+                                          📦 Attached Accessories ({line.selected_product.accessories.length}) — verify below lines were added
+                                        </span>
+                                      </div>
+                                      <div className="divide-y divide-blue-100 dark:divide-blue-800 bg-blue-50 dark:bg-blue-950/60">
+                                        {line.selected_product.accessories.map((a) => (
+                                          <div key={a.id} className="flex items-center gap-2 px-3 py-1.5 text-[12px]">
+                                            <span className="font-mono text-[10px] font-bold text-blue-600 dark:text-blue-400 shrink-0 w-24 truncate">
+                                              {a.product_code || a.sku || `#${a.id}`}
+                                            </span>
+                                            <span className="flex-1 font-semibold text-slate-800 dark:text-slate-200 truncate">{a.name}</span>
+                                            <span className="shrink-0 text-slate-500 dark:text-slate-400">
+                                              Qty: <strong className="text-slate-700 dark:text-slate-200">{a.quantity}</strong>
+                                            </span>
+                                            <span className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-bold ${a.included_in_price ? "bg-green-200 text-green-800 dark:bg-green-800 dark:text-green-100" : "bg-amber-200 text-amber-800 dark:bg-amber-800 dark:text-amber-100"}`}>
+                                              {a.included_in_price ? "Included in price" : "Separate charge"}
+                                            </span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                               ) : null}
                             </div>
@@ -1864,7 +1959,20 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                                 min="0.001"
                                 step="0.001"
                                 value={line.quantity}
-                                onChange={(event) => updateLine(line.id, { quantity: event.target.value })}
+                                onChange={(event) => {
+                                  const newQty = Number(event.target.value) || 0;
+                                  const available = Number(
+                                    line.selected_product?.inventory_status?.available ??
+                                    line.selected_product?.current_stock_qty ?? 0
+                                  );
+                                  const shortage = Math.max(0, newQty - available);
+                                  const needsReq = shortage > 0;
+                                  updateLine(line.id, {
+                                    quantity: event.target.value,
+                                    create_requirement: needsReq,
+                                    ...(needsReq ? { requirement_quantity: shortage.toFixed(3) } : {}),
+                                  });
+                                }}
                                 disabled={submitting}
                                 className={FIELD_CLASS}
                               />
@@ -1915,8 +2023,20 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                             </div>
                           </div>
 
-                          <div className="mt-4 rounded-lg border border-dashed border-border bg-muted/30 p-3">
-                            <label className="flex items-center gap-3 text-sm text-foreground">
+                          <div className={`mt-4 rounded-lg border p-3 ${line.create_requirement && line.selected_product && !line.selected_product.inventory_status.is_in_stock ? "border-red-300 bg-red-50 dark:border-red-700 dark:bg-red-950/40" : "border-dashed border-border bg-muted/30"}`}>
+                            {/* Auto stock-shortage alert */}
+                            {line.create_requirement && line.selected_product && !line.selected_product.inventory_status.is_in_stock && (
+                              <div className="mb-3 flex items-start gap-2 rounded-lg border border-red-300 bg-red-100 dark:border-red-700 dark:bg-red-900/60 px-3 py-2">
+                                <span className="mt-0.5 shrink-0 text-red-600 dark:text-red-300 font-bold text-sm">⚠</span>
+                                <div className="text-[12px] text-red-800 dark:text-red-200">
+                                  <span className="font-bold">Stock insufficient</span>
+                                  {" — "}Available: <strong>{line.selected_product.inventory_status.available} {line.selected_product.unit_of_measure || "PCS"}</strong>,
+                                  {" "}Ordered: <strong>{line.quantity} {line.selected_product.unit_of_measure || "PCS"}</strong>.
+                                  {" "}A purchase/stock requirement will be raised for <strong>{line.requirement_quantity} {line.selected_product.unit_of_measure || "PCS"}</strong> — purchasing team will be notified.
+                                </div>
+                              </div>
+                            )}
+                            <label className="flex items-center gap-3 text-sm text-foreground font-medium">
                               <input
                                 type="checkbox"
                                 checked={line.create_requirement}
@@ -1933,7 +2053,7 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                                 }}
                                 disabled={submitting}
                               />
-                              Create purchase/stock requirement
+                              Raise purchase / stock requirement
                             </label>
                             {line.create_requirement ? (
                               <div className="mt-3 grid gap-3 md:grid-cols-[180px_1fr]">

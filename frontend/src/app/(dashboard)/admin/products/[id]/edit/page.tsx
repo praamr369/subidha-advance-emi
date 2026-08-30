@@ -2,13 +2,10 @@
 import { formatRupee } from "@/lib/utils/currency";
 
 import Link from "next/link";
-import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
-import { UploadCloud, Trash2, ImagePlus, Video } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import ProductQuickActions from "@/components/admin/products/ProductQuickActions";
-import RelatedProductsSection from "@/components/admin/products/RelatedProductsSection";
 import InventoryProfileCostEditor from "@/components/admin/inventory/InventoryProfileCostEditor";
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
@@ -19,9 +16,7 @@ import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import SmartSuggestField from "@/components/forms/SmartSuggestField";
 import PimSyncSection, { type PimSyncSectionHandle } from "@/components/admin/pim/PimSyncSection";
 import { pimService, type PimProduct } from "@/services/pim";
-import { shouldBypassNextImageOptimization } from "@/lib/media";
 import { getProduct, getProductCatalogOptions, updateProduct, type ProductCatalogOptions, type ProductRecord } from "@/services/products";
-import ImageCropperModal from "@/components/admin/products/ImageCropperModal";
 
 function fieldClass() {
   return "mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none transition focus:border-ring";
@@ -53,7 +48,7 @@ function PimStatusMini({ productCode }: { productCode: string }) {
   if (!pimProduct) return (
     <div className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm dark:border-amber-900 dark:bg-amber-950/30">
       <span>PIM</span>
-      <Link href={`/admin/pim/products`} className="text-xs text-amber-600 hover:underline">Not synced</Link>
+      <Link href="/admin/pim/products" className="text-xs text-amber-600 hover:underline">Not synced</Link>
     </div>
   );
   return (
@@ -68,8 +63,16 @@ function check(label: string, ok: boolean) {
   return <div className="flex items-center justify-between rounded-xl border border-border bg-background px-3 py-2 text-sm"><span>{label}</span><ERPStatusBadge status={ok ? "AVAILABLE" : "PENDING"} label={ok ? "Ready" : "Missing"} /></div>;
 }
 
+/** Per item-type: which sections to show */
+function itemTypeConfig(itemType: string) {
+  const isFinished = itemType === "FINISHED_GOOD";
+  const isConsumable = isFinished || itemType === "ADD_ON" || itemType === "ACCESSORY";
+  return { showCapabilities: isConsumable, showEmi: isFinished, showWarranty: isFinished };
+}
+
 export default function AdminProductEditPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const productId = params?.id;
   const [product, setProduct] = useState<ProductRecord | null>(null);
   const [catalogOptions, setCatalogOptions] = useState<ProductCatalogOptions>({ categories: [], subcategories: [], unit_of_measure_masters: [], unit_of_measure_options: ["PCS"], item_type_choices: [], stock_type_choices: [] });
@@ -89,7 +92,7 @@ export default function AdminProductEditPage() {
   const [description, setDescription] = useState("");
   const [hsnSacCode, setHsnSacCode] = useState("");
   const [gstRate, setGstRate] = useState("");
-  const [basePrice, setBasePrice] = useState("");
+  const [basePrice, setBasePrice] = useState("0.00");
   const [active, setActive] = useState(true);
   const [planType, setPlanType] = useState<"EMI" | "RENT" | "LEASE">("EMI");
   const [emi, setEmi] = useState(true);
@@ -103,14 +106,6 @@ export default function AdminProductEditPage() {
   const [warrantyStructural, setWarrantyStructural] = useState("36");
   const [warrantyExtendedMax, setWarrantyExtendedMax] = useState("12");
   const [extendedWarrantyCostPct, setExtendedWarrantyCostPct] = useState("7.50");
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [clearImage, setClearImage] = useState(false);
-  const [showCropper, setShowCropper] = useState(false);
-  const [tempImageSrc, setTempImageSrc] = useState<string | null>(null);
-  const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [videoPreview, setVideoPreview] = useState<string | null>(null);
-  const [clearVideo, setClearVideo] = useState(false);
 
   function hydrate(next: ProductRecord) {
     setProduct(next);
@@ -137,12 +132,6 @@ export default function AdminProductEditPage() {
     setWarrantyStructural(String(next.warranty_months_structural ?? 36));
     setWarrantyExtendedMax(String(next.warranty_months_extended_max ?? 12));
     setExtendedWarrantyCostPct(next.extended_warranty_cost_percentage != null ? String(next.extended_warranty_cost_percentage) : "7.50");
-    setImageFile(null);
-    setImagePreview(null);
-    setClearImage(false);
-    setVideoFile(null);
-    setVideoPreview(null);
-    setClearVideo(false);
   }
 
   const loadPage = useCallback(async () => {
@@ -151,8 +140,19 @@ export default function AdminProductEditPage() {
     try {
       const [productPayload, optionsPayload] = await Promise.allSettled([getProduct(productId), getProductCatalogOptions()]);
       if (productPayload.status !== "fulfilled") throw productPayload.reason;
-      
-      hydrate(productPayload.value);
+      const prod = productPayload.value;
+      // Redirect non-finished-good types to their type-specific edit pages
+      const typeSlugMap: Record<string, string> = {
+        RAW_MATERIAL: "raw-materials",
+        ACCESSORY: "accessories",
+        SERVICE: "services",
+      };
+      const typeSlug = typeSlugMap[prod.item_type ?? ""];
+      if (typeSlug) {
+        router.replace(`/admin/products/${typeSlug}/${productId}/edit`);
+        return;
+      }
+      hydrate(prod);
       if (optionsPayload.status === "fulfilled") setCatalogOptions(optionsPayload.value);
       setError(null);
     } catch (err) {
@@ -161,63 +161,11 @@ export default function AdminProductEditPage() {
     } finally {
       setLoading(false);
     }
-  }, [productId]);
+  }, [productId, router]);
 
   useEffect(() => {
     void loadPage();
   }, [loadPage]);
-
-  function onImageChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0] ?? null;
-    if (file) {
-      const url = URL.createObjectURL(file);
-      setTempImageSrc(url);
-      setShowCropper(true);
-    }
-    // Clear input so the same file can be selected again if canceled
-    event.target.value = '';
-  }
-
-  function handleCropComplete(croppedBlob: Blob) {
-    const file = new File([croppedBlob], "cropped.jpg", { type: "image/jpeg" });
-    setImageFile(file);
-    setClearImage(false);
-    if (imagePreview) URL.revokeObjectURL(imagePreview);
-    setImagePreview(URL.createObjectURL(file));
-    setShowCropper(false);
-    if (tempImageSrc) URL.revokeObjectURL(tempImageSrc);
-    setTempImageSrc(null);
-  }
-
-  function handleCropCancel() {
-    setShowCropper(false);
-    if (tempImageSrc) URL.revokeObjectURL(tempImageSrc);
-    setTempImageSrc(null);
-  }
-
-  function handleClearImage() {
-    setClearImage(true);
-    setImageFile(null);
-    setImagePreview(null);
-  }
-
-  function handleClearVideo() {
-    setClearVideo(true);
-    setVideoFile(null);
-    setVideoPreview(null);
-  }
-
-  function onVideoChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0] ?? null;
-    if (file && file.size > 10 * 1024 * 1024) {
-      alert("Video file size must be less than 10MB");
-      return;
-    }
-    setVideoFile(file);
-    setClearVideo(false);
-    if (videoPreview) URL.revokeObjectURL(videoPreview);
-    setVideoPreview(file ? URL.createObjectURL(file) : null);
-  }
 
   function effectiveDefault(): "EMI" | "RENT" | "LEASE" {
     if (planType === "RENT" && rent) return "RENT";
@@ -234,8 +182,7 @@ export default function AdminProductEditPage() {
     setError(null);
     setMessage(null);
     try {
-      const hasImage = Boolean(imageFile || clearImage || videoFile || clearVideo);
-      const payload = hasImage ? new FormData() : {
+      const payload = {
         name,
         product_code: productCode,
         sku: sku || null,
@@ -248,47 +195,18 @@ export default function AdminProductEditPage() {
         base_price: basePrice,
         is_active: active,
         plan_type_default: effectiveDefault(),
-        is_emi_enabled: emi,
-        is_rent_enabled: rent,
-        is_lease_enabled: lease,
-        is_direct_sale_enabled: directSale,
+        is_emi_enabled: itemType === "FINISHED_GOOD" ? emi : false,
+        is_rent_enabled: itemType === "FINISHED_GOOD" ? rent : false,
+        is_lease_enabled: itemType === "FINISHED_GOOD" ? lease : false,
+        is_direct_sale_enabled: (itemType === "FINISHED_GOOD" || itemType === "ADD_ON" || itemType === "ACCESSORY") ? directSale : false,
         item_type: itemType,
         stock_type: stockType,
-        warranty_enabled: warrantyEnabled,
+        warranty_enabled: itemType === "FINISHED_GOOD" ? warrantyEnabled : false,
         warranty_months_manufacturing: Number(warrantyManufacturing) || 12,
         warranty_months_structural: Number(warrantyStructural) || 36,
         warranty_months_extended_max: Number(warrantyExtendedMax) || 12,
         extended_warranty_cost_percentage: extendedWarrantyCostPct.trim() || "7.50",
       };
-      if (payload instanceof FormData) {
-        payload.set("name", name);
-        payload.set("product_code", productCode);
-        if (sku) payload.set("sku", sku); else payload.set("sku", "");
-        payload.set("unit_of_measure", unit || "PCS");
-        payload.set("category", category);
-        payload.set("subcategory", subcategory);
-        payload.set("description", description);
-        payload.set("hsn_sac_code", hsnSacCode.trim().toUpperCase());
-        if (gstRate.trim()) payload.set("gst_rate", gstRate.trim());
-        payload.set("base_price", basePrice);
-        payload.set("is_active", String(active));
-        payload.set("plan_type_default", effectiveDefault());
-        payload.set("is_emi_enabled", String(itemType === "FINISHED_GOOD" ? emi : false));
-        payload.set("is_rent_enabled", String(itemType === "FINISHED_GOOD" ? rent : false));
-        payload.set("is_lease_enabled", String(itemType === "FINISHED_GOOD" ? lease : false));
-        payload.set("is_direct_sale_enabled", String(itemType === "FINISHED_GOOD" || itemType === "ADD_ON" || itemType === "ACCESSORY" ? directSale : false));
-        payload.set("item_type", itemType);
-        payload.set("stock_type", stockType);
-        payload.set("warranty_enabled", String(itemType === "FINISHED_GOOD" ? warrantyEnabled : false));
-        payload.set("warranty_months_manufacturing", String(Number(warrantyManufacturing) || 12));
-        payload.set("warranty_months_structural", String(Number(warrantyStructural) || 36));
-        payload.set("warranty_months_extended_max", String(Number(warrantyExtendedMax) || 12));
-        payload.set("extended_warranty_cost_percentage", extendedWarrantyCostPct.trim() || "7.50");
-        if (imageFile) payload.set("image", imageFile);
-        if (clearImage) payload.set("clear_image", "true");
-        if (videoFile) payload.set("video", videoFile);
-        if (clearVideo) payload.set("clear_video", "true");
-      }
       const updated = await updateProduct(productId, payload);
       hydrate(updated);
       await pimSyncRef.current?.save();
@@ -300,22 +218,24 @@ export default function AdminProductEditPage() {
     }
   }
 
+  const { showCapabilities, showEmi, showWarranty } = itemTypeConfig(itemType);
+
   const readiness = useMemo(() => ({
     inventory: Boolean(product?.inventory_ready),
-    image: Boolean(product?.image || imagePreview),
+    image: Boolean(product?.image),
     sku: Boolean(sku || productCode),
     catalog: Boolean(category || subcategory),
     subscription: active && emi && Number(basePrice || 0) > 0,
     directSale: active && directSale,
     rentLease: active && (rent || lease),
     warranty: warrantyEnabled && Number(warrantyManufacturing) > 0,
-  }), [active, basePrice, category, directSale, emi, imagePreview, lease, product?.image, product?.inventory_ready, productCode, rent, sku, subcategory, warrantyEnabled, warrantyManufacturing]);
+  }), [active, basePrice, category, directSale, emi, lease, product?.image, product?.inventory_ready, productCode, rent, sku, subcategory, warrantyEnabled, warrantyManufacturing]);
 
   return (
     <ERPPageShell
       eyebrow="Inventory"
       title={product ? `Edit ${product.name}` : `Edit Product #${productId ?? "—"}`}
-      subtitle="Safe product master editing for future catalog, subscription, rent/lease, direct-sale, and inventory onboarding."
+      subtitle="Edit operational fields: classification, catalog data, and sales capabilities. Manage pricing, media, and related products in PIM."
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Products", href: "/admin/products" }, { label: product?.name || `#${productId}`, href: productId ? `/admin/products/${productId}` : "/admin/products" }, { label: "Edit" }]}
       actions={[{ href: productId ? `/admin/products/${productId}` : "/admin/products", label: "Cancel", variant: "secondary" }, { href: "/admin/products/masters", label: "Manage Masters", variant: "secondary" }]}
       statusBadge={{ label: "Safe Master Edit", tone: "info" }}
@@ -337,21 +257,54 @@ export default function AdminProductEditPage() {
               </div>
               <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">Changes affect future onboarding and billing only. Existing contracts, invoices, receipts, payments, and subscription pricing snapshots are not mutated.</div>
 
+              {/* Classification first — drives what sections appear below */}
+              <FormCard title="Classification" description="Product type determines which operational fields and capabilities apply.">
+                <label className="text-sm text-muted-foreground">
+                  Item Type
+                  <select className={fieldClass()} value={itemType} onChange={(event) => setItemType(event.target.value)}>
+                    <option value="FINISHED_GOOD">Finished Good</option>
+                    <option value="RAW_MATERIAL">Raw Material</option>
+                    <option value="ACCESSORY">Accessory</option>
+                    <option value="SERVICE">Service</option>
+                    <option value="ADD_ON">Add-on</option>
+                  </select>
+                </label>
+                <label className="text-sm text-muted-foreground">
+                  Stock Type
+                  <select className={fieldClass()} value={stockType} onChange={(event) => setStockType(event.target.value)}>
+                    <option value="STOCK_ITEM">Stock Item</option>
+                    <option value="MADE_TO_ORDER">Made to Order</option>
+                    <option value="NON_STOCK">Non-Stock</option>
+                  </select>
+                </label>
+                {/* Contextual hint per item type */}
+                {itemType === "RAW_MATERIAL" && (
+                  <p className="md:col-span-2 text-xs text-muted-foreground rounded-xl border border-border bg-muted/30 px-3 py-2">
+                    Raw materials are tracked in inventory and used in Bills of Material. They do not have subscription, rent/lease, or warranty capabilities.
+                  </p>
+                )}
+                {itemType === "SERVICE" && (
+                  <p className="md:col-span-2 text-xs text-muted-foreground rounded-xl border border-border bg-muted/30 px-3 py-2">
+                    Services are non-stock items billed as direct charges. No inventory tracking, EMI, or warranty.
+                  </p>
+                )}
+                {itemType === "ACCESSORY" && (
+                  <p className="md:col-span-2 text-xs text-muted-foreground rounded-xl border border-border bg-muted/30 px-3 py-2">
+                    Accessories are sold as direct-sale add-ons. No EMI, rent/lease, or warranty capabilities.
+                  </p>
+                )}
+                {itemType === "ADD_ON" && (
+                  <p className="md:col-span-2 text-xs text-muted-foreground rounded-xl border border-border bg-muted/30 px-3 py-2">
+                    Add-ons supplement a primary product sale. Direct-sale enabled; no EMI, rent/lease, or warranty.
+                  </p>
+                )}
+              </FormCard>
+
               <FormCard title="Identity" description="Core product identity used by staff search and document references.">
                 <label className="text-sm text-muted-foreground">Name<input className={fieldClass()} value={name} onChange={(event) => setName(event.target.value)} required /></label>
                 <label className="text-sm text-muted-foreground">Product code<input className={fieldClass()} value={productCode} onChange={(event) => setProductCode(event.target.value)} required /></label>
                 <label className="text-sm text-muted-foreground">SKU<input className={fieldClass()} value={sku} onChange={(event) => setSku(event.target.value)} /></label>
                 <label className="text-sm text-muted-foreground">Unit<input className={fieldClass()} value={unit} onChange={(event) => setUnit(event.target.value)} list="unit-options" /><datalist id="unit-options">{catalogOptions.unit_of_measure_options.map((item) => <option key={item} value={item} />)}</datalist></label>
-              </FormCard>
-
-              <FormCard title="Classification" description="Product type and stock management mode.">
-                <label className="text-sm text-muted-foreground">Item Type<select className={fieldClass()} value={itemType} onChange={(event) => setItemType(event.target.value)}><option value="FINISHED_GOOD">Finished Good</option><option value="RAW_MATERIAL">Raw Material</option><option value="ACCESSORY">Accessory</option><option value="SERVICE">Service</option><option value="ADD_ON">Add-on</option></select></label>
-                <label className="text-sm text-muted-foreground">Stock Type<select className={fieldClass()} value={stockType} onChange={(event) => setStockType(event.target.value)}><option value="STOCK_ITEM">Stock Item</option><option value="MADE_TO_ORDER">Made to Order</option><option value="NON_STOCK">Non-Stock</option></select></label>
-              </FormCard>
-
-              <FormCard title="Pricing" description="Product base price is the future contract total. Historical snapshots are preserved.">
-                <label className="text-sm text-muted-foreground">Base price<input className={fieldClass()} type="number" min="0" step="0.01" value={basePrice} onChange={(event) => setBasePrice(event.target.value)} required /></label>
-                <div className="rounded-xl border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">Current display: {formatRupee(basePrice)}</div>
               </FormCard>
 
               <FormCard title="Category / Master data" description="Catalog fields improve shop search, public display, and future purchase planning.">
@@ -376,66 +329,52 @@ export default function AdminProductEditPage() {
                 <label className="text-sm text-muted-foreground">GST Rate (%)<input className={fieldClass()} type="number" min="0" step="0.01" value={gstRate} onChange={(event) => setGstRate(event.target.value)} /></label>
               </FormCard>
 
-              {(itemType === "FINISHED_GOOD" || itemType === "ADD_ON" || itemType === "ACCESSORY") && (
-                <>
-                  <FormCard title="Capabilities" description="Controls future use in EMI, rent, lease, and direct-sale workflows.">
-                    <label className="text-sm text-muted-foreground">Default plan<select className={fieldClass()} value={planType} onChange={(event) => setPlanType(event.target.value as "EMI" | "RENT" | "LEASE")}><option value="EMI">EMI</option><option value="RENT">Rent</option><option value="LEASE">Lease</option></select></label>
-                    <label className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm">Active<input type="checkbox" checked={active} onChange={(event) => setActive(event.target.checked)} /></label>
-                    {itemType === "FINISHED_GOOD" && (
-                      <>
-                        <label className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm">EMI<input type="checkbox" checked={emi} onChange={(event) => setEmi(event.target.checked)} /></label>
-                        <label className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm">Rent<input type="checkbox" checked={rent} onChange={(event) => setRent(event.target.checked)} /></label>
-                        <label className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm">Lease<input type="checkbox" checked={lease} onChange={(event) => setLease(event.target.checked)} /></label>
-                      </>
-                    )}
-                    <label className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm">Direct Sale<input type="checkbox" checked={directSale} onChange={(event) => setDirectSale(event.target.checked)} /></label>
-                  </FormCard>
-
-                  {itemType === "FINISHED_GOOD" && (
-                    <ERPSectionShell title="Warranty Coverage" description="Configure warranty periods and extended warranty pricing. Applies to future deliveries only.">
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <label className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm md:col-span-2">
-                          Warranty Enabled
-                          <input type="checkbox" checked={warrantyEnabled} onChange={(e) => setWarrantyEnabled(e.target.checked)} />
-                        </label>
-                        {warrantyEnabled ? (
-                          <>
-                            <label className="text-sm text-muted-foreground">
-                              Manufacturing Warranty (months)
-                              <input className={fieldClass()} type="number" min="0" max="120" value={warrantyManufacturing} onChange={(e) => setWarrantyManufacturing(e.target.value)} />
-                            </label>
-                            <label className="text-sm text-muted-foreground">
-                              Structural Warranty (months)
-                              <input className={fieldClass()} type="number" min="0" max="120" value={warrantyStructural} onChange={(e) => setWarrantyStructural(e.target.value)} />
-                            </label>
-                            <label className="text-sm text-muted-foreground">
-                              Max Extended Warranty (months)
-                              <input className={fieldClass()} type="number" min="0" max="60" value={warrantyExtendedMax} onChange={(e) => setWarrantyExtendedMax(e.target.value)} />
-                            </label>
-                            <label className="text-sm text-muted-foreground">
-                              Extended Warranty Cost (% of price)
-                              <input className={fieldClass()} type="number" min="0" max="100" step="0.01" value={extendedWarrantyCostPct} onChange={(e) => setExtendedWarrantyCostPct(e.target.value)} />
-                            </label>
-                            <div className="md:col-span-2 rounded-xl border border-border bg-muted/30 px-4 py-3 text-xs text-muted-foreground space-y-1">
-                              <div>Manufacturing warranty covers defects in materials and workmanship for <strong>{warrantyManufacturing} months</strong> from delivery.</div>
-                              <div>Structural warranty covers frame and core structure for <strong>{warrantyStructural} months</strong> from delivery.</div>
-                              {Number(warrantyExtendedMax) > 0 ? (
-                                <div>Extended warranty available up to <strong>{warrantyExtendedMax} months</strong> at <strong>{extendedWarrantyCostPct}%</strong> of product price ({formatRupee(Number(basePrice || 0) * Number(extendedWarrantyCostPct || 0) / 100)} per month).</div>
-                              ) : null}
-                            </div>
-                          </>
-                        ) : (
-                          <div className="md:col-span-2 rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
-                            Warranty is disabled for this product. No warranty tracking or claims will be available for future deliveries.
-                          </div>
-                        )}
-                      </div>
-                    </ERPSectionShell>
+              {/* Capabilities — only for Finished Good / Add-on / Accessory */}
+              {showCapabilities && (
+                <FormCard title="Capabilities" description="Controls future use in EMI, rent, lease, and direct-sale workflows.">
+                  <label className="text-sm text-muted-foreground">Default plan<select className={fieldClass()} value={planType} onChange={(event) => setPlanType(event.target.value as "EMI" | "RENT" | "LEASE")}><option value="EMI">EMI</option><option value="RENT">Rent</option><option value="LEASE">Lease</option></select></label>
+                  <label className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm">Active<input type="checkbox" checked={active} onChange={(event) => setActive(event.target.checked)} /></label>
+                  {showEmi && (
+                    <>
+                      <label className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm">EMI<input type="checkbox" checked={emi} onChange={(event) => setEmi(event.target.checked)} /></label>
+                      <label className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm">Rent<input type="checkbox" checked={rent} onChange={(event) => setRent(event.target.checked)} /></label>
+                      <label className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm">Lease<input type="checkbox" checked={lease} onChange={(event) => setLease(event.target.checked)} /></label>
+                    </>
                   )}
-                </>
+                  <label className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm">Direct Sale<input type="checkbox" checked={directSale} onChange={(event) => setDirectSale(event.target.checked)} /></label>
+                </FormCard>
               )}
 
-              {/* PIM Sync — auto-matches category/subcategory, inline spec editing */}
+              {/* Warranty — Finished Good only */}
+              {showWarranty && (
+                <ERPSectionShell title="Warranty Coverage" description="Configure warranty periods and extended warranty pricing. Applies to future deliveries only.">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <label className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm md:col-span-2">
+                      Warranty Enabled
+                      <input type="checkbox" checked={warrantyEnabled} onChange={(e) => setWarrantyEnabled(e.target.checked)} />
+                    </label>
+                    {warrantyEnabled ? (
+                      <>
+                        <label className="text-sm text-muted-foreground">Manufacturing Warranty (months)<input className={fieldClass()} type="number" min="0" max="120" value={warrantyManufacturing} onChange={(e) => setWarrantyManufacturing(e.target.value)} /></label>
+                        <label className="text-sm text-muted-foreground">Structural Warranty (months)<input className={fieldClass()} type="number" min="0" max="120" value={warrantyStructural} onChange={(e) => setWarrantyStructural(e.target.value)} /></label>
+                        <label className="text-sm text-muted-foreground">Max Extended Warranty (months)<input className={fieldClass()} type="number" min="0" max="60" value={warrantyExtendedMax} onChange={(e) => setWarrantyExtendedMax(e.target.value)} /></label>
+                        <label className="text-sm text-muted-foreground">Extended Warranty Cost (% of price)<input className={fieldClass()} type="number" min="0" max="100" step="0.01" value={extendedWarrantyCostPct} onChange={(e) => setExtendedWarrantyCostPct(e.target.value)} /></label>
+                        <div className="md:col-span-2 rounded-xl border border-border bg-muted/30 px-4 py-3 text-xs text-muted-foreground space-y-1">
+                          <div>Manufacturing: <strong>{warrantyManufacturing} months</strong> from delivery.</div>
+                          <div>Structural: <strong>{warrantyStructural} months</strong> from delivery.</div>
+                          {Number(warrantyExtendedMax) > 0 ? <div>Extended: up to <strong>{warrantyExtendedMax} months</strong> at <strong>{extendedWarrantyCostPct}%</strong> ({formatRupee(Number(basePrice || 0) * Number(extendedWarrantyCostPct || 0) / 100)}/month).</div> : null}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="md:col-span-2 rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+                        Warranty is disabled. No warranty tracking or claims for future deliveries.
+                      </div>
+                    )}
+                  </div>
+                </ERPSectionShell>
+              )}
+
+              {/* PIM Sync — auto-matches category/subcategory */}
               <PimSyncSection
                 ref={pimSyncRef}
                 productCode={productCode}
@@ -444,95 +383,29 @@ export default function AdminProductEditPage() {
                 subcategoryText={subcategory}
                 basePrice={basePrice}
               />
-
-              <ERPSectionShell title="Related Products" description="Attach accessories, raw materials, services, and add-ons to this product.">
-                <RelatedProductsSection productId={productId ? Number(productId) : 0} productName={name} saving={saving} />
-              </ERPSectionShell>
-
-              <ERPSectionShell title="Image & Video" description="Single image used for catalog completeness and a short video." id="image">
-                <div className="grid gap-6 md:grid-cols-2">
-                  
-                  {/* Image Upload Card */}
-                  <div className="flex flex-col gap-3">
-                    <label className="text-sm font-semibold text-foreground">Product Image</label>
-                    <div className="group relative overflow-hidden rounded-2xl border-2 border-dashed border-border bg-muted/20 transition-all hover:bg-muted/40">
-                      {imagePreview || (product.image && !clearImage) ? (
-                        <div className="relative aspect-square w-full sm:aspect-[4/3] bg-muted/10">
-                          <Image 
-                            src={imagePreview || product.image || ""} 
-                            fill 
-                            className="object-cover" 
-                            alt={name} 
-                            unoptimized={Boolean(imagePreview) || shouldBypassNextImageOptimization(product.image)} 
-                          />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 transition-opacity group-hover:opacity-100 flex items-center justify-center gap-4">
-                            <label className="cursor-pointer rounded-full bg-white/20 p-3 text-white backdrop-blur-md hover:bg-white/30 transition shadow-sm" title="Replace & Crop">
-                              <UploadCloud className="h-5 w-5" />
-                              <input type="file" accept="image/*" className="hidden" onChange={onImageChange} />
-                            </label>
-                            <button type="button" onClick={handleClearImage} className="rounded-full bg-red-500/80 p-3 text-white backdrop-blur-md hover:bg-red-500 transition shadow-sm" title="Delete image">
-                              <Trash2 className="h-5 w-5" />
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <label className="flex aspect-square w-full sm:aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-3 p-6 text-muted-foreground transition hover:text-foreground">
-                          <div className="rounded-full bg-background p-4 shadow-sm ring-1 ring-border">
-                            <ImagePlus className="h-6 w-6 text-primary" />
-                          </div>
-                          <span className="text-sm font-medium">Click to select image</span>
-                          <span className="text-xs">PNG, JPG, WEBP (Square or 4:3)</span>
-                          <input type="file" accept="image/*" className="hidden" onChange={onImageChange} />
-                        </label>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Video Upload Card */}
-                  <div className="flex flex-col gap-3">
-                    <label className="text-sm font-semibold text-foreground">Product Video</label>
-                    <div className="group relative overflow-hidden rounded-2xl border-2 border-dashed border-border bg-muted/20 transition-all hover:bg-muted/40">
-                      {videoPreview || (product.video && !clearVideo) ? (
-                        <div className="relative aspect-square w-full sm:aspect-[4/3] bg-black">
-                          <video 
-                            src={videoPreview || product.video || ""} 
-                            controls 
-                            className="h-full w-full object-contain" 
-                          />
-                          <div className="absolute top-3 right-3 flex items-center gap-2 z-10 opacity-0 transition-opacity group-hover:opacity-100">
-                            <label className="cursor-pointer rounded-full bg-black/60 p-2 text-white backdrop-blur-md hover:bg-black/80 transition shadow-sm" title="Replace video">
-                              <UploadCloud className="h-4 w-4" />
-                              <input type="file" accept="video/mp4,video/quicktime,video/webm" className="hidden" onChange={onVideoChange} />
-                            </label>
-                            <button type="button" onClick={handleClearVideo} className="rounded-full bg-red-500/80 p-2 text-white backdrop-blur-md hover:bg-red-500 transition shadow-sm" title="Delete video">
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <label className="flex aspect-square w-full sm:aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-3 p-6 text-muted-foreground transition hover:text-foreground">
-                          <div className="rounded-full bg-background p-4 shadow-sm ring-1 ring-border">
-                            <Video className="h-6 w-6 text-primary" />
-                          </div>
-                          <span className="text-sm font-medium">Click to select video</span>
-                          <span className="text-xs">MP4, WebM, MOV (Max 10MB)</span>
-                          <input type="file" accept="video/mp4,video/quicktime,video/webm" className="hidden" onChange={onVideoChange} />
-                        </label>
-                      )}
-                    </div>
-                  </div>
-
-                </div>
-              </ERPSectionShell>
             </div>
 
             <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start">
               <ERPSectionShell title="Readiness panel" description="Fast checks before using this product operationally.">
-                <div className="space-y-2">{check("Inventory ready", readiness.inventory)}{check("Image attached", readiness.image)}{check("SKU/code ready", readiness.sku)}{check("Cataloged", readiness.catalog)}{check("Subscription-ready", readiness.subscription)}{check("Direct sale-ready", readiness.directSale)}{check("Rent/lease-ready", readiness.rentLease)}{check("Warranty configured", readiness.warranty)}</div>
+                <div className="space-y-2">
+                  {check("Inventory ready", readiness.inventory)}
+                  {check("Image attached", readiness.image)}
+                  {check("SKU/code ready", readiness.sku)}
+                  {check("Cataloged", readiness.catalog)}
+                  {showEmi && check("Subscription-ready", readiness.subscription)}
+                  {showCapabilities && check("Direct sale-ready", readiness.directSale)}
+                  {showEmi && check("Rent/lease-ready", readiness.rentLease)}
+                  {showWarranty && check("Warranty configured", readiness.warranty)}
+                </div>
               </ERPSectionShell>
+
               <ERPSectionShell title="Inventory readiness" description="Prepare/recheck profile from this edit page without posting stock movements.">
-                <div className="space-y-3"><div className="text-sm text-muted-foreground">Profile: {product.inventory_profile_id ? `#${product.inventory_profile_id}` : "Pending"}</div><ProductQuickActions product={{ ...product, name, product_code: productCode, sku, unit_of_measure: unit, category, subcategory, base_price: basePrice, is_active: active, is_emi_enabled: emi, is_rent_enabled: rent, is_lease_enabled: lease, is_direct_sale_enabled: directSale }} mode="detail" onChanged={() => loadPage()} /></div>
+                <div className="space-y-3">
+                  <div className="text-sm text-muted-foreground">Profile: {product.inventory_profile_id ? `#${product.inventory_profile_id}` : "Pending"}</div>
+                  <ProductQuickActions product={{ ...product, name, product_code: productCode, sku, unit_of_measure: unit, category, subcategory, base_price: basePrice, is_active: active, is_emi_enabled: emi, is_rent_enabled: rent, is_lease_enabled: lease, is_direct_sale_enabled: directSale }} mode="detail" onChanged={() => loadPage()} />
+                </div>
               </ERPSectionShell>
+
               <ERPSectionShell title="Module Links" description="This product across all 3 modules.">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between rounded-xl border px-3 py-2 text-sm">
@@ -552,20 +425,28 @@ export default function AdminProductEditPage() {
                   </Link>
                 </div>
               </ERPSectionShell>
+
+              {/* PIM managed fields reminder */}
+              <ERPSectionShell title="Managed in PIM" description="These fields are authoritative in the PIM module.">
+                <ul className="space-y-2 text-sm text-muted-foreground">
+                  <li className="flex items-center justify-between"><span>Pricing</span><Link href="/admin/pim/products" className="text-xs text-primary hover:underline">Open PIM →</Link></li>
+                  <li className="flex items-center justify-between"><span>Media (images / video)</span><Link href="/admin/pim/products" className="text-xs text-primary hover:underline">Open PIM →</Link></li>
+                  <li className="flex items-center justify-between"><span>Related / accessories</span><Link href="/admin/pim/products" className="text-xs text-primary hover:underline">Open PIM →</Link></li>
+                  <li className="flex items-center justify-between"><span>Variant attributes</span><Link href="/admin/pim/products" className="text-xs text-primary hover:underline">Open PIM →</Link></li>
+                </ul>
+              </ERPSectionShell>
+
               <ERPSectionShell title="Safe edit boundary" description="What this page does not do.">
-                <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground"><li>Does not recalculate EMI.</li><li>Does not mutate active contracts.</li><li>Does not change invoices, receipts, payments, or delivery records.</li><li>Does not post stock ledger opening quantity.</li></ul>
+                <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
+                  <li>Does not recalculate EMI.</li>
+                  <li>Does not mutate active contracts.</li>
+                  <li>Does not change invoices, receipts, payments, or delivery records.</li>
+                  <li>Does not post stock ledger opening quantity.</li>
+                </ul>
               </ERPSectionShell>
             </aside>
           </form>
         ) : null}
-
-        {showCropper && tempImageSrc && (
-          <ImageCropperModal
-            imageSrc={tempImageSrc}
-            onCropComplete={handleCropComplete}
-            onCancel={handleCropCancel}
-          />
-        )}
 
         {showCostEditor && product && (
           <InventoryProfileCostEditor

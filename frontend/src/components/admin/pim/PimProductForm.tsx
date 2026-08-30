@@ -5,6 +5,9 @@ import { Save, ArrowLeft, Layers, Box, Send, CheckCircle2, X, Plus, Search, Tras
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import DynamicAttributeForm, { type AttributeValues } from "./DynamicAttributeForm";
 import VariantManager from "./VariantManager";
+import RelatedProductsSection from "../products/RelatedProductsSection";
+import PimProductAccessoriesPanel from "./PimProductAccessoriesPanel";
+import ProductMediaGallery from "./ProductMediaGallery";
 import {
   pimService,
   type PimCategory,
@@ -16,6 +19,7 @@ import {
 
 interface Props {
   productId?: number;
+  defaultProductType?: "FINISHED_GOOD" | "ACCESSORY" | "SERVICE";
 }
 
 interface AttrPayloadItem {
@@ -229,9 +233,117 @@ function BomVariantRow({ variant, productId }: { variant: PimVariant; productId:
               </div>
             </div>
           )}
+
+          {/* Related Products / Explicit BOM / Services */}
+          <div className="pt-4 border-t mt-4">
+            <RelatedProductsSection
+              productId={productId}
+              productName={variant.variant_label || variant.sku}
+              saving={generating}
+              lockedParentVariantSku={variant.sku}
+            />
+          </div>
         </div>
       )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Inventory Management panel (shown on base product PIM edit page)
+// ---------------------------------------------------------------------------
+
+function PimInventoryPanel({ variants }: { variants: PimVariant[] }) {
+  const [collapsed, setCollapsed] = useState(false);
+
+  return (
+    <section className="rounded-lg border p-5 space-y-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h3 className="font-semibold flex items-center gap-2">
+            <Box className="h-4 w-4 text-primary" />
+            Inventory Management
+          </h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Prepare stock profiles and view current on-hand quantities for each variant SKU.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setCollapsed((v) => !v)}
+          className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground"
+        >
+          {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+          {collapsed ? "Show" : "Hide"}
+        </button>
+      </div>
+
+      {!collapsed && (
+        <div className="divide-y divide-border rounded-xl border overflow-hidden">
+          {/* Header row */}
+          <div className="grid grid-cols-[1fr_80px_1fr] gap-3 px-4 py-2 bg-muted/30 text-xs font-semibold text-muted-foreground">
+            <span>SKU / Variant</span>
+            <span className="text-right">On Hand</span>
+            <span className="text-right">Actions</span>
+          </div>
+          {variants.map((v) => (
+            <div key={v.id} className="grid grid-cols-[1fr_80px_1fr] gap-3 px-4 py-3 items-center hover:bg-muted/20 transition-colors">
+              <div>
+                <span className="font-mono text-sm font-semibold">{v.sku}</span>
+                {v.variant_label && v.variant_label !== v.sku && (
+                  <span className="ml-2 text-xs text-muted-foreground">{v.variant_label}</span>
+                )}
+                <div className="flex gap-1 mt-0.5 flex-wrap">
+                  {v.is_published ? (
+                    <span className="text-[10px] bg-green-100 text-green-700 border border-green-200 rounded-full px-1.5 py-0.5">Published</span>
+                  ) : (
+                    <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-1.5 py-0.5">Draft</span>
+                  )}
+                  {v.is_low_stock && (
+                    <span className="text-[10px] bg-red-50 text-red-700 border border-red-200 rounded-full px-1.5 py-0.5">Low Stock</span>
+                  )}
+                </div>
+              </div>
+              <div className="text-right">
+                <span className={`text-sm font-semibold tabular-nums ${v.quantity_on_hand === 0 ? "text-amber-600" : "text-foreground"}`}>
+                  {v.quantity_on_hand}
+                </span>
+                <div className="text-[10px] text-muted-foreground">units</div>
+              </div>
+              <div className="flex justify-end gap-2 flex-wrap">
+                {v.operational_product_id ? (
+                  <>
+                    <a
+                      href={`/admin/products/${v.operational_product_id}/edit`}
+                      className="inline-flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/5 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
+                    >
+                      <Wrench className="h-3 w-3" />
+                      Prepare Inventory
+                    </a>
+                    <a
+                      href={`/admin/inventory/items?search=${encodeURIComponent(v.sku)}`}
+                      className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+                    >
+                      <Box className="h-3 w-3" />
+                      Open Stock
+                    </a>
+                  </>
+                ) : (
+                  <span className="text-xs text-muted-foreground italic">Not linked to register</span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!collapsed && (
+        <div className="text-xs text-muted-foreground bg-muted/30 rounded-xl border px-4 py-3 space-y-1">
+          <div><strong>Prepare Inventory</strong> — opens the product register edit page where you can set up the inventory profile (cost price, reorder levels, bin location).</div>
+          <div><strong>Open Stock</strong> — opens the stock ledger filtered to this SKU to view movements and post opening stock entries.</div>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -276,7 +388,7 @@ function BomManufacturingPanel({ productId, variants }: { productId: number; var
   );
 }
 
-export default function PimProductForm({ productId }: Props) {
+export default function PimProductForm({ productId, defaultProductType = "FINISHED_GOOD" }: Props) {
   const router = useRouter();
   const isEdit = Boolean(productId);
   const pendingFetchRef = useRef<{ id: number; promise: Promise<PimProduct> } | null>(null);
@@ -504,13 +616,17 @@ export default function PimProductForm({ productId }: Props) {
         locked_attributes: Array.from(lockedAttributes),
         attributes: buildAttrPayload(attributes, attrValues),
         ...(removedAttrIds.size > 0 ? { remove_attributes: Array.from(removedAttrIds) } : {}),
+        ...(!isEdit ? { product_type: defaultProductType } : {}),
       };
       if (isEdit && productId) {
         await pimService.updateProduct(productId, payload);
         setRemovedAttrIds(new Set());
       } else {
         const created = await pimService.createProduct(payload);
-        router.push(`/admin/pim/products/${created.id}/edit`);
+        const typeSlug = defaultProductType === "ACCESSORY" ? "accessories"
+          : defaultProductType === "SERVICE" ? "services"
+          : "finished-goods";
+        router.push(`/admin/pim/products/${typeSlug}/${created.id}/edit`);
         return;
       }
       router.push("/admin/pim/products");
@@ -1123,6 +1239,23 @@ export default function PimProductForm({ productId }: Props) {
         </section>
       )}
 
+      {/* Global Related Products (Base Product Level) */}
+      {isEdit && productId && (
+        <section className="rounded-lg border p-5 space-y-4">
+          <div>
+            <h3 className="font-semibold text-sm">Base Product Links (Accessories & Services)</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Add accessories, raw materials, or extra services that apply globally to all variants of this product.
+            </p>
+          </div>
+          <div className="pt-2">
+            <PimProductAccessoriesPanel
+              productId={productId}
+            />
+          </div>
+        </section>
+      )}
+
       {/* Variants (edit mode only) */}
       {isEdit && productId && (
         <section className="rounded-lg border p-5 space-y-4">
@@ -1172,6 +1305,16 @@ export default function PimProductForm({ productId }: Props) {
       {/* BOM & Manufacturing (edit mode, variant SKUs only) */}
       {isEdit && productId && variants.length > 0 && (
         <BomManufacturingPanel productId={productId} variants={variants} />
+      )}
+
+      {/* Inventory Management (base products with variants) */}
+      {isEdit && productId && variants.length > 0 && (
+        <PimInventoryPanel variants={variants} />
+      )}
+
+      {/* Media Gallery */}
+      {isEdit && productId && (
+        <ProductMediaGallery productId={productId} variants={variants} />
       )}
 
       {/* Publish */}

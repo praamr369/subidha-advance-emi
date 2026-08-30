@@ -72,6 +72,9 @@ export interface PimVariant {
   quantity_on_hand: number;
   reorder_level: number;
   is_active: boolean;
+  is_published: boolean;
+  child_pim_id: number | null;
+  operational_product_id: number | null;
   attribute_values: PimVariantAttributeValue[];
   is_low_stock: boolean;
   variant_label: string;
@@ -92,6 +95,7 @@ export interface PimProduct {
   cost_price: string | null;
   is_active: boolean;
   is_published: boolean;
+  product_type?: "FINISHED_GOOD" | "RAW_MATERIAL" | "ACCESSORY" | "SERVICE";
   locked_attributes?: number[];
   variant_count?: number;
   /** Set when this PIM product is a variant SKU under a base product */
@@ -121,6 +125,7 @@ export interface PimProductCreatePayload {
   cost_price?: string;
   is_active?: boolean;
   is_published?: boolean;
+  product_type?: "FINISHED_GOOD" | "RAW_MATERIAL" | "ACCESSORY" | "SERVICE";
   locked_attributes?: number[];
   remove_attributes?: number[];
   attributes?: {
@@ -171,6 +176,21 @@ export interface SyncResult {
 const BASE = "/api/v1/pim";
 
 // DRF global pagination wraps lists in {count, results}. Unwrap safely.
+export interface PimMediaItem {
+  id: number;
+  product: number;
+  variant: number | null;
+  variant_sku: string | null;
+  kind: "IMAGE" | "VIDEO";
+  scope: "ALL_VARIANTS" | "VARIANT";
+  file: string;
+  file_url: string | null;
+  title: string;
+  is_hero: boolean;
+  display_order: number;
+  created_at: string;
+}
+
 type PaginatedOrArray<T> = { results?: T[]; count?: number } | T[];
 function unwrap<T>(raw: PaginatedOrArray<T>): T[] {
   if (Array.isArray(raw)) return raw;
@@ -498,4 +518,33 @@ export const pimService = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+
+  // Media gallery
+  listMedia: (params: { product?: number; variant?: number; kind?: string }): Promise<PimMediaItem[]> => {
+    const qs = new URLSearchParams();
+    if (params.product) qs.set("product", String(params.product));
+    if (params.variant) qs.set("variant", String(params.variant));
+    if (params.kind) qs.set("kind", params.kind);
+    return request<{ results: PimMediaItem[] } | PimMediaItem[]>(`${BASE}/media/?${qs}`).then((r) =>
+      Array.isArray(r) ? r : (r as { results: PimMediaItem[] }).results ?? []
+    );
+  },
+
+  uploadMedia: (formData: FormData): Promise<PimMediaItem> =>
+    request<PimMediaItem>(`${BASE}/media/`, {
+      method: "POST",
+      body: formData,
+    }),
+
+  updateMedia: (id: number, data: Partial<Pick<PimMediaItem, "title" | "display_order" | "is_hero">>): Promise<PimMediaItem> =>
+    request<PimMediaItem>(`${BASE}/media/${id}/`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  deleteMedia: (id: number): Promise<void> =>
+    request<void>(`${BASE}/media/${id}/`, { method: "DELETE" }),
+
+  setHeroMedia: (id: number): Promise<PimMediaItem> =>
+    request<PimMediaItem>(`${BASE}/media/${id}/set_hero/`, { method: "POST" }),
 };

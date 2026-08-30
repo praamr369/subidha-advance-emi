@@ -9,13 +9,14 @@ from .models import (
     ProductVariant,
     VariantAttributeValue,
     AttributeDataType,
+    ProductMediaItem,
 )
 
 
 class AttributeOptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = AttributeOption
-        fields = ["id", "value", "display_name", "display_order", "extra_cost"]
+        fields = ["id", "attribute", "value", "display_name", "display_order", "extra_cost"]
 
 
 class CategoryAttributeSerializer(serializers.ModelSerializer):
@@ -96,19 +97,30 @@ class ProductVariantSerializer(serializers.ModelSerializer):
     attribute_values = VariantAttributeValueSerializer(many=True, read_only=True)
     is_low_stock = serializers.BooleanField(read_only=True)
     variant_label = serializers.SerializerMethodField()
+    # Publish status comes from the linked child PimProduct, not the variant itself
+    is_published = serializers.SerializerMethodField()
+    child_pim_id = serializers.SerializerMethodField()
+    operational_product_id = serializers.IntegerField(source="operational_product.id", read_only=True, default=None)
 
     class Meta:
         model = ProductVariant
         fields = [
-            "id", "sku", "barcode", "price", "cost_price", "image",
+            "id", "sku", "barcode", "price", "cost_price", "image", "video",
             "quantity_on_hand", "reorder_level", "is_active",
             "attribute_values", "is_low_stock", "variant_label",
+            "is_published", "child_pim_id", "operational_product_id",
         ]
 
     def get_variant_label(self, obj):
         vals = obj.attribute_values.all()
         parts = [v.value_text or str(v.value_number) for v in vals if (v.value_text or v.value_number)]
         return " / ".join(parts) if parts else obj.sku
+
+    def get_is_published(self, obj):
+        return obj.product.is_published if obj.product_id else False
+
+    def get_child_pim_id(self, obj):
+        return obj.product_id
 
 
 class PimProductListSerializer(serializers.ModelSerializer):
@@ -126,7 +138,7 @@ class PimProductListSerializer(serializers.ModelSerializer):
         fields = [
             "id", "code", "brand", "name", "category", "category_name",
             "subcategory", "subcategory_name", "base_price",
-            "is_active", "is_published", "variant_count",
+            "is_active", "is_published", "product_type", "variant_count",
             "parent_id", "parent_code", "parent_name", "parent_is_published", "child_count",
         ]
 
@@ -167,8 +179,8 @@ class PimProductListSerializer(serializers.ModelSerializer):
 
 
 class PimProductDetailSerializer(serializers.ModelSerializer):
-    category_name = serializers.CharField(source="category.name", read_only=True)
-    subcategory_name = serializers.CharField(source="subcategory.name", read_only=True)
+    category_name = serializers.SerializerMethodField()
+    subcategory_name = serializers.SerializerMethodField()
     attributes = ProductAttributeSerializer(many=True, read_only=True)
     variants = ProductVariantSerializer(many=True, read_only=True)
     variant_count = serializers.SerializerMethodField()
@@ -185,12 +197,35 @@ class PimProductDetailSerializer(serializers.ModelSerializer):
         fields = [
             "id", "code", "brand", "name", "description", "category", "category_name",
             "subcategory", "subcategory_name", "base_price", "cost_price",
-            "is_active", "is_published", "locked_attributes",
+            "is_active", "is_published", "product_type", "locked_attributes",
             "parent_id", "parent_code", "parent_name",
             "created_at", "updated_at",
             "attributes", "variants", "variant_count",
             "inherited_attribute_values", "variant_attribute_values",
         ]
+
+    def _effective_category(self, obj):
+        cat = obj.category
+        if cat and getattr(cat, "slug", "") != "unclassified":
+            return cat
+        if obj.parent_id and obj.parent:
+            return obj.parent.category
+        return cat
+
+    def _effective_subcategory(self, obj):
+        if obj.subcategory:
+            return obj.subcategory
+        if obj.parent_id and obj.parent:
+            return obj.parent.subcategory
+        return None
+
+    def get_category_name(self, obj):
+        cat = self._effective_category(obj)
+        return cat.name if cat else None
+
+    def get_subcategory_name(self, obj):
+        sub = self._effective_subcategory(obj)
+        return sub.name if sub else None
 
     def get_variant_count(self, obj):
         return obj.variants.filter(is_active=True).count()
@@ -228,7 +263,7 @@ class PimProductCreateUpdateSerializer(serializers.ModelSerializer):
         fields = [
             "id", "code", "brand", "name", "description", "category",
             "subcategory", "base_price", "cost_price",
-            "is_active", "is_published", "locked_attributes", "attributes", "remove_attributes",
+            "is_active", "is_published", "product_type", "locked_attributes", "attributes", "remove_attributes",
         ]
 
     def _save_attributes(self, product, attrs_data):
@@ -323,10 +358,12 @@ class ProductVariantCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProductVariant
-        fields = ["id", "sku", "barcode", "price", "cost_price", "image", "quantity_on_hand", "reorder_level", "attribute_values"]
+        fields = ["id", "sku", "barcode", "price", "cost_price", "image", "video", "quantity_on_hand", "reorder_level", "attribute_values"]
 
     def create(self, validated_data):
         av_data = validated_data.pop("attribute_values", [])
+        if "barcode" not in validated_data or not validated_data["barcode"]:
+            validated_data["barcode"] = validated_data.get("sku")
         variant = super().create(validated_data)
         for av in av_data:
             attribute_id = av.get("attribute")
@@ -339,3 +376,46 @@ class ProductVariantCreateSerializer(serializers.ModelSerializer):
                     value_boolean=av.get("value_boolean"),
                 )
         return variant
+
+from products_core.models import ProductRelationship
+
+class PimProductRelationshipSerializer(serializers.ModelSerializer):
+    related_pim_product_id = serializers.IntegerField(source='related_product.pim.first.id', read_only=True)
+    related_pim_product_name = serializers.CharField(source='related_product.pim.first.name', read_only=True)
+    related_pim_product_code = serializers.CharField(source='related_product.pim.first.code', read_only=True)
+
+    class Meta:
+        model = ProductRelationship
+        fields = [
+            "id",
+            "product",
+            "parent_variant",
+            "related_product",
+            "related_variant",
+            "parent_variant_sku",
+            "related_variant_sku",
+            "related_pim_product_id",
+            "related_pim_product_name",
+            "related_pim_product_code"
+        ]
+        read_only_fields = ["product"]
+
+
+
+class ProductMediaItemSerializer(serializers.ModelSerializer):
+    file_url = serializers.SerializerMethodField()
+    variant_sku = serializers.CharField(source="variant.sku", read_only=True, allow_null=True)
+
+    class Meta:
+        model = ProductMediaItem
+        fields = [
+            "id", "product", "variant", "variant_sku", "kind", "scope",
+            "file", "file_url", "title", "is_hero", "display_order", "created_at",
+        ]
+        read_only_fields = ["id", "created_at", "file_url", "variant_sku"]
+
+    def get_file_url(self, obj):
+        request = self.context.get("request")
+        if obj.file and request:
+            return request.build_absolute_uri(obj.file.url)
+        return str(obj.file) if obj.file else None

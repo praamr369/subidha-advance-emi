@@ -157,6 +157,18 @@ class PimProduct(models.Model):
         related_name="child_pim_products",
         db_index=True,
     )
+    PRODUCT_TYPE_CHOICES = [
+        ("FINISHED_GOOD", "Finished Good"),
+        ("RAW_MATERIAL", "Raw Material"),
+        ("ACCESSORY", "Accessory"),
+        ("SERVICE", "Service"),
+    ]
+    product_type = models.CharField(
+        max_length=20,
+        choices=PRODUCT_TYPE_CHOICES,
+        default="FINISHED_GOOD",
+        db_index=True,
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -213,6 +225,7 @@ class ProductVariant(models.Model):
     price = models.DecimalField(max_digits=14, decimal_places=2, validators=[MinValueValidator(0)])
     cost_price = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
     image = models.ImageField(upload_to="pim/variants/", null=True, blank=True)
+    video = models.FileField(upload_to="pim/variants/videos/", null=True, blank=True)
     quantity_on_hand = models.IntegerField(default=0)
     reorder_level = models.IntegerField(default=0)
     is_active = models.BooleanField(default=True)
@@ -229,6 +242,26 @@ class ProductVariant(models.Model):
     @property
     def is_low_stock(self):
         return self.quantity_on_hand <= self.reorder_level
+
+    def save(self, *args, **kwargs):
+        if not self.barcode:
+            import random
+            while True:
+                # Generate a 13-digit pseudo-EAN13 starting with 200 (Commonly used for internal barcodes)
+                base = "200" + "".join([str(random.randint(0, 9)) for _ in range(9)])
+                
+                # Calculate EAN13 check digit
+                # sum_even uses 0-indexed positions 1, 3, 5, 7, 9, 11
+                # sum_odd uses 0-indexed positions 0, 2, 4, 6, 8, 10
+                sum_even = sum(int(base[i]) for i in range(1, 12, 2)) * 3
+                sum_odd = sum(int(base[i]) for i in range(0, 12, 2))
+                check_digit = (10 - ((sum_even + sum_odd) % 10)) % 10
+                new_barcode = base + str(check_digit)
+                
+                if not ProductVariant.objects.filter(barcode=new_barcode).exists():
+                    self.barcode = new_barcode
+                    break
+        super().save(*args, **kwargs)
 
 
 class VariantAttributeValue(models.Model):
@@ -263,4 +296,37 @@ class ProductAsset(models.Model):
 
     def __str__(self):
         return f"{self.product.code} - Asset {self.id}"
+
+
+class MediaKind(models.TextChoices):
+    IMAGE = "IMAGE", "Image"
+    VIDEO = "VIDEO", "Video"
+
+
+class MediaScope(models.TextChoices):
+    ALL_VARIANTS = "ALL_VARIANTS", "Shared across all variants"
+    VARIANT = "VARIANT", "Specific variant only"
+
+
+class ProductMediaItem(models.Model):
+    """Unified media gallery — images and videos at product level or per-variant."""
+    product = models.ForeignKey(PimProduct, on_delete=models.CASCADE, related_name="media_items")
+    variant = models.ForeignKey(
+        ProductVariant, on_delete=models.CASCADE, null=True, blank=True, related_name="media_items"
+    )
+    kind = models.CharField(max_length=10, choices=MediaKind.choices, default=MediaKind.IMAGE)
+    scope = models.CharField(max_length=20, choices=MediaScope.choices, default=MediaScope.ALL_VARIANTS)
+    file = models.FileField(upload_to="pim/gallery/")
+    title = models.CharField(max_length=200, blank=True)
+    is_hero = models.BooleanField(default=False, help_text="Hero image shown as primary in catalog")
+    display_order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["display_order", "-created_at"]
+        verbose_name = "Product Media Item"
+        verbose_name_plural = "Product Media Items"
+
+    def __str__(self):
+        return f"{self.product.code} / {self.kind} / {self.id}"
 

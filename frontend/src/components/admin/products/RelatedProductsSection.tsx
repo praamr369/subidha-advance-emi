@@ -9,9 +9,11 @@ import {
   createProduct,
   updateProduct,
   cloneProductRelationships,
+  getProductVariants,
   type ProductRelationship,
   type ProductRelationshipType,
   type ProductSearchResult,
+  type ProductVariantCompact,
   RELATIONSHIP_TYPE_LABELS,
 } from "@/services/products";
 
@@ -19,13 +21,16 @@ interface RelatedProductsSectionProps {
   productId: number;
   productName: string;
   saving: boolean;
+  lockedParentVariantSku?: string;
 }
 
 export default function RelatedProductsSection({
   productId,
   saving,
+  lockedParentVariantSku,
 }: RelatedProductsSectionProps) {
   const [relationships, setRelationships] = useState<ProductRelationship[]>([]);
+  const [variants, setVariants] = useState<ProductVariantCompact[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,12 +48,17 @@ export default function RelatedProductsSection({
   const [quantity, setQuantity] = useState("1");
   const [isPriceIncluded, setIsPriceIncluded] = useState(true);
   const [notes, setNotes] = useState("");
+  const [selectedParentVariantId, setSelectedParentVariantId] = useState<number | "">("");
+  const [selectedRelatedVariantId, setSelectedRelatedVariantId] = useState<number | "">("");
+  const [relatedProductVariants, setRelatedProductVariants] = useState<ProductVariantCompact[]>([]);
+  const [fetchingRelatedVariants, setFetchingRelatedVariants] = useState(false);
   const [adding, setAdding] = useState(false);
 
   // Create new product state
   const [newProdName, setNewProdName] = useState("");
   const [newProdPrice, setNewProdPrice] = useState("");
   const [newProdItemType, setNewProdItemType] = useState<string>("ACCESSORY");
+  const [newProdParentVariantId, setNewProdParentVariantId] = useState<number | "">("");
 
   // Edit product state
   const [editingRel, setEditingRel] = useState<ProductRelationship | null>(null);
@@ -66,20 +76,44 @@ export default function RelatedProductsSection({
   const [cloning, setCloning] = useState(false);
   const [selectedTargets, setSelectedTargets] = useState<Set<number>>(new Set());
 
-  // Load relationships on mount
   useEffect(() => {
-    loadRelationships();
+    loadRelationshipsAndVariants();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productId]);
 
-  async function loadRelationships() {
+  useEffect(() => {
+    if (selectedProduct) {
+      setFetchingRelatedVariants(true);
+      getProductVariants(selectedProduct.id)
+        .then(data => setRelatedProductVariants(data || []))
+        .catch(err => console.error("Failed to fetch related variants", err))
+        .finally(() => setFetchingRelatedVariants(false));
+    } else {
+      setRelatedProductVariants([]);
+      setSelectedRelatedVariantId("");
+    }
+  }, [selectedProduct]);
+
+  async function loadRelationshipsAndVariants() {
     setLoading(true);
     setError(null);
     try {
-      const data = await getProductRelationships(productId);
-      setRelationships(data || []);
+      const [relData, varData] = await Promise.all([
+        getProductRelationships(productId),
+        getProductVariants(productId)
+      ]);
+      setRelationships(relData || []);
+      setVariants(varData || []);
+
+      if (lockedParentVariantSku && varData) {
+        const matchingVariant = varData.find(v => v.sku === lockedParentVariantSku);
+        if (matchingVariant) {
+          setSelectedParentVariantId(matchingVariant.id);
+          setNewProdParentVariantId(matchingVariant.id);
+        }
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load related products.");
+      setError(err instanceof Error ? err.message : "Failed to load data.");
     } finally {
       setLoading(false);
     }
@@ -125,15 +159,20 @@ export default function RelatedProductsSection({
     setAdding(true);
     setError(null);
     try {
+      const parentSku = selectedParentVariantId === "" ? undefined : variants.find(v => v.id === selectedParentVariantId)?.sku;
+      const relatedSku = selectedRelatedVariantId === "" ? undefined : relatedProductVariants.find(v => v.id === selectedRelatedVariantId)?.sku;
+
       await addProductRelationship(
         productId,
         selectedProduct.id,
         relationshipType,
         Number(quantity) || 1,
         notes,
-        isPriceIncluded
+        isPriceIncluded,
+        parentSku,
+        relatedSku
       );
-      await loadRelationships();
+      await loadRelationshipsAndVariants();
       resetForms();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add relationship.");
@@ -157,9 +196,11 @@ export default function RelatedProductsSection({
         is_emi_enabled: false,
         is_rent_enabled: false,
         is_lease_enabled: false,
-        is_direct_sale_enabled: false,
+        is_direct_sale_enabled: true,
         plan_type_default: "EMI",
       });
+
+      const parentSku = newProdParentVariantId === "" ? undefined : variants.find(v => v.id === newProdParentVariantId)?.sku;
 
       // 2. Attach it
       await addProductRelationship(
@@ -168,13 +209,15 @@ export default function RelatedProductsSection({
         newProdItemType as ProductRelationshipType,
         Number(quantity) || 1,
         notes,
-        isPriceIncluded
+        isPriceIncluded,
+        parentSku
       );
       
-      await loadRelationships();
+      await loadRelationshipsAndVariants();
       resetForms();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create and attach product.");
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.message || (typeof err === 'string' ? err : "Failed to create and attach product."));
     } finally {
       setAdding(false);
     }
@@ -185,7 +228,7 @@ export default function RelatedProductsSection({
     setRemoving(relationshipId);
     try {
       await removeProductRelationship(productId, relationshipId);
-      await loadRelationships();
+      await loadRelationshipsAndVariants();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to remove relationship.");
     } finally {
@@ -208,7 +251,7 @@ export default function RelatedProductsSection({
         name: editName.trim(),
         ...(editPrice.trim() ? { base_price: editPrice.trim() } : {})
       });
-      await loadRelationships();
+      await loadRelationshipsAndVariants();
       setEditingRel(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update product.");
@@ -269,11 +312,21 @@ export default function RelatedProductsSection({
       ) : (
         <>
           {/* Existing relationships */}
-          {relationships.length > 0 && (
+          {relationships.filter(r => 
+            !lockedParentVariantSku || 
+            r.parent_variant === selectedParentVariantId || 
+            r.parent_variant_sku === lockedParentVariantSku ||
+            (!r.parent_variant && !r.parent_variant_sku)
+          ).length > 0 && (
             <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground uppercase">Attached products ({relationships.length})</p>
+              <p className="text-xs font-medium text-muted-foreground uppercase">Attached products ({relationships.filter(r => !lockedParentVariantSku || r.parent_variant === selectedParentVariantId || r.parent_variant_sku === lockedParentVariantSku || (!r.parent_variant && !r.parent_variant_sku)).length})</p>
               <div className="space-y-2">
-                {relationships.map((rel) => (
+                {relationships.filter(r => 
+                  !lockedParentVariantSku || 
+                  r.parent_variant === selectedParentVariantId || 
+                  r.parent_variant_sku === lockedParentVariantSku ||
+                  (!r.parent_variant && !r.parent_variant_sku)
+                ).map((rel) => (
                   <div
                     key={rel.id}
                     className="flex flex-col sm:flex-row items-start justify-between rounded-lg border border-border bg-muted/30 p-3"
@@ -283,6 +336,23 @@ export default function RelatedProductsSection({
                       <div className="text-xs text-muted-foreground mt-0.5">
                         {rel.related_product_code} · {rel.related_product_item_type}
                       </div>
+                      {(rel.parent_variant_name || rel.parent_variant_sku || rel.related_variant_name || rel.related_variant_sku) && (
+                        <div className="flex items-center gap-1.5 mt-1.5 text-xs">
+                          {(rel.parent_variant_name || rel.parent_variant_sku) && (
+                            <span className="inline-block px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium border border-blue-200">
+                              For: {rel.parent_variant_name || rel.parent_variant_sku}
+                            </span>
+                          )}
+                          {(rel.parent_variant_name || rel.parent_variant_sku) && (rel.related_variant_name || rel.related_variant_sku) && (
+                            <span className="text-muted-foreground">→</span>
+                          )}
+                          {(rel.related_variant_name || rel.related_variant_sku) && (
+                            <span className="inline-block px-1.5 py-0.5 rounded bg-green-100 text-green-700 font-medium border border-green-200">
+                              Spec: {rel.related_variant_name || rel.related_variant_sku}
+                            </span>
+                          )}
+                        </div>
+                      )}
                       <div className="flex items-center gap-2 mt-1 text-xs">
                         <span className="inline-block px-2 py-1 rounded bg-primary/10 text-primary font-medium">
                           {RELATIONSHIP_TYPE_LABELS[rel.relationship_type as ProductRelationshipType]}
@@ -488,18 +558,18 @@ export default function RelatedProductsSection({
               </div>
 
               {searchResults.length > 0 && !selectedProduct && (
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">{searchResults.length} results</p>
-                  <div className="max-h-40 overflow-y-auto space-y-1">
+                <div className="overflow-y-auto rounded-xl border-2 border-slate-300 dark:border-slate-600 shadow-[0_4px_16px_rgba(0,0,0,0.18)]" style={{ maxHeight: "14rem" }}>
+                  <div className="rounded-xl overflow-hidden bg-white dark:bg-slate-900 divide-y-2 divide-slate-100 dark:divide-slate-800">
                     {searchResults.map((product) => (
                       <button
                         key={product.id}
                         type="button"
                         onClick={() => setSelectedProduct(product)}
-                        className="w-full text-left px-3 py-2 rounded-lg border border-border hover:bg-muted text-sm transition"
+                        className="flex w-full items-center gap-2 px-4 py-2.5 text-left hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
                       >
-                        <div className="font-medium">{product.name}</div>
-                        <div className="text-xs text-muted-foreground">{product.product_code} · {product.item_type}</div>
+                        <span className="shrink-0 rounded border border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 font-mono text-[11px] font-bold text-slate-700 dark:text-slate-200">{product.product_code}</span>
+                        <span className="flex-1 text-[13px] font-semibold text-slate-900 dark:text-slate-100">{product.name}</span>
+                        <span className="shrink-0 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">{product.item_type}</span>
                       </button>
                     ))}
                   </div>
@@ -514,6 +584,40 @@ export default function RelatedProductsSection({
                   </div>
 
                   <div className="grid gap-3 md:grid-cols-2">
+                    {variants.length > 0 && (
+                      <label className="text-xs font-medium text-muted-foreground">
+                        Applies to Variant (Parent Product)
+                        <select
+                          value={selectedParentVariantId}
+                          onChange={(e) => setSelectedParentVariantId(e.target.value === "" ? "" : Number(e.target.value))}
+                          className="mt-1 h-9 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-ring disabled:opacity-50"
+                          disabled={!!lockedParentVariantSku}
+                        >
+                          <option value="">All Variants (Base Product)</option>
+                          {variants.map(v => (
+                            <option key={v.id} value={v.id}>{v.variant_label} ({v.sku})</option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+                    {relatedProductVariants.length > 0 && (
+                      <label className="text-xs font-medium text-muted-foreground">
+                        Attach Specific Variant (Related Item)
+                        <select
+                          value={selectedRelatedVariantId}
+                          onChange={(e) => setSelectedRelatedVariantId(e.target.value === "" ? "" : Number(e.target.value))}
+                          className="mt-1 h-9 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-ring"
+                          disabled={fetchingRelatedVariants}
+                        >
+                          <option value="">Base Product (Any Variant)</option>
+                          {relatedProductVariants.map(v => (
+                            <option key={v.id} value={v.id}>{v.variant_label} ({v.sku})</option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2 mt-3">
                     <label className="text-xs font-medium text-muted-foreground">
                       Relationship type
                       <select
@@ -592,6 +696,22 @@ export default function RelatedProductsSection({
               </div>
               
               <div className="grid gap-4 md:grid-cols-2">
+                {variants.length > 0 && (
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">
+                    Applies to Variant (Parent Product)
+                    <select
+                      value={newProdParentVariantId}
+                      onChange={(e) => setNewProdParentVariantId(e.target.value === "" ? "" : Number(e.target.value))}
+                      className="h-9 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-ring disabled:opacity-50"
+                      disabled={!!lockedParentVariantSku}
+                    >
+                      <option value="">All Variants (Base Product)</option>
+                      {variants.map(v => (
+                        <option key={v.id} value={v.id}>{v.variant_label} ({v.sku})</option>
+                      ))}
+                    </select>
+                  </label>
+                )}
                 <label className="text-xs font-medium text-foreground">
                   Item Type
                   <select

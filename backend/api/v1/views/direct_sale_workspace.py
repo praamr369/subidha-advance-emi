@@ -104,12 +104,25 @@ def _serialize_product_row(product: Product, *, include_extended: bool) -> dict:
         "unit_of_measure": getattr(product, "unit_of_measure", "PCS") or "PCS",
         "base_specs": getattr(product, "base_specs", None) or {},
         "description": getattr(product, "description", "") or "",
+        "stock_item_type": getattr(product, "item_type", None) or getattr(product, "stock_item_type", None),
     }
     if include_extended:
+        from django.db.models import Q as _Q
         payload["lifecycle_status"] = getattr(product, "lifecycle_status", None)
-        accessories = ProductRelationship.objects.filter(
-            product_id=product.id, relationship_type="ACCESSORY",
-        ).select_related("related_product").order_by("id")
+
+        # Base-level accessories on this product (no variant scoping)
+        acc_q = _Q(product_id=product.id, relationship_type="ACCESSORY", parent_variant__isnull=True)
+
+        # Variant-specific accessories: stored with parent_variant_sku matching this product's SKU
+        sku = getattr(product, "sku", None) or ""
+        if sku:
+            acc_q = acc_q | _Q(parent_variant_sku=sku, relationship_type="ACCESSORY")
+
+        accessories = (
+            ProductRelationship.objects.filter(acc_q)
+            .select_related("related_product")
+            .order_by("id")
+        )
         payload["accessories"] = [
             {
                 "id": rel.related_product_id,
