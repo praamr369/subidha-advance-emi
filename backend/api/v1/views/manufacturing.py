@@ -154,7 +154,6 @@ class ProductionJobViewSet(AdminManufacturingModelViewSet):
         if self.action == "post_output":
             return ProductionOutputPostSerializer
         if self.action == "post_labor":
-            from api.v1.serializers.manufacturing import ManufacturingEmptyActionSerializer
             return ManufacturingEmptyActionSerializer
         if self.action == "cancel_job":
             return ProductionCancelSerializer

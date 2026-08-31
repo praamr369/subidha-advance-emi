@@ -1176,6 +1176,27 @@ def build_stock_adjustments(
 
     results = []
     for row in paginated_queryset:
+        posting_readiness = compute_adjustment_posting_readiness(row)
+        lines_out = []
+        for line in row.lines.all():
+            line_readiness = compute_adjustment_line_readiness(line)
+            eff = line_readiness["effective_unit_cost"]
+            lv = line_readiness["line_valuation"]
+            lines_out.append({
+                "id": line.id,
+                "inventory_item_id": line.inventory_item_id,
+                "inventory_item_sku": getattr(line.inventory_item, "sku", None),
+                "product_code": getattr(line.inventory_item.product, "product_code", None),
+                "product_name": getattr(line.inventory_item.product, "name", None),
+                "quantity_delta": f"{line.quantity_delta:.3f}",
+                "unit_cost_snapshot": f"{line.unit_cost_snapshot:.2f}" if line.unit_cost_snapshot else None,
+                "valuation_amount_snapshot": f"{line.valuation_amount_snapshot:.2f}" if line.valuation_amount_snapshot else None,
+                "effective_unit_cost": f"{eff:.2f}" if eff is not None else None,
+                "line_valuation": f"{lv:.2f}" if lv is not None else None,
+                "requires_unit_cost": line_readiness["requires_unit_cost"],
+                "valuation_status": line_readiness["valuation_status"],
+                "notes": line.notes,
+            })
         result = {
             "id": row.id,
             "adjustment_no": row.adjustment_no,
@@ -1184,24 +1205,11 @@ def build_stock_adjustments(
             "stock_location_id": row.stock_location_id,
             "stock_location_name": getattr(row.stock_location, "name", None),
             "reason": row.reason,
-            "lines": [
-                {
-                    "id": line.id,
-                    "inventory_item_id": line.inventory_item_id,
-                    "inventory_item_sku": getattr(line.inventory_item, "sku", None),
-                    "product_code": getattr(line.inventory_item.product, "product_code", None),
-                    "product_name": getattr(line.inventory_item.product, "name", None),
-                    "quantity_delta": f"{line.quantity_delta:.3f}",
-                    "unit_cost_snapshot": f"{line.unit_cost_snapshot:.2f}" if line.unit_cost_snapshot else None,
-                    "valuation_amount_snapshot": f"{line.valuation_amount_snapshot:.2f}" if line.valuation_amount_snapshot else None,
-                    "line_valuation": line.line_valuation,
-                    "requires_unit_cost": line.requires_unit_cost,
-                    "notes": line.notes,
-                }
-                for line in row.lines.all()
-            ],
-            "requires_unit_cost": row.requires_unit_cost,
-            "can_post": row.can_post,
+            "lines": lines_out,
+            "requires_unit_cost": posting_readiness["requires_unit_cost"],
+            "can_post": posting_readiness["can_post"],
+            "posting_blockers": posting_readiness["posting_blockers"],
+            "valuation_status": posting_readiness["valuation_status"],
             "created_by_username": getattr(row.created_by, "username", None),
             "approved_by_username": getattr(row.approved_by, "username", None),
             "posted_by_username": getattr(row.posted_by, "username", None),

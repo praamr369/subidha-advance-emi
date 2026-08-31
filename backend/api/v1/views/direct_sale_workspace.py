@@ -39,6 +39,7 @@ def _product_search_queryset(query: str):
         | Q(sku__icontains=query)
         | Q(category__icontains=query)
         | Q(subcategory__icontains=query)
+        | Q(inventory_profile__sku__icontains=query)
     )
     if query.isdigit():
         base_query = base_query | Q(id=int(query))
@@ -183,6 +184,7 @@ class AdminBillingProductSearchView(APIView):
             if include_inventory:
                 inventory_item = getattr(product, "inventory_profile", None)
                 row["inventory_item_id"] = getattr(inventory_item, "id", None)
+                row["sku"] = getattr(inventory_item, "sku", None)
                 row["current_stock_qty"] = row["inventory_status"]["available"]
                 row["stock_tracking_enabled"] = bool(getattr(inventory_item, "stock_tracking_enabled", False))
                 row["delivery_stock_bridge_enabled"] = bool(getattr(inventory_item, "delivery_stock_bridge_enabled", False))
