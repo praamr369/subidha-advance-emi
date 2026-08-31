@@ -8,6 +8,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("products_core", "0004_brand_and_allow_zero_base_price"),
+        ("subscriptions", "0123_add_product_relationship_model"),
     ]
 
     operations = [

@@ -1178,24 +1178,26 @@ def build_stock_adjustments(
     for row in paginated_queryset:
         posting_readiness = compute_adjustment_posting_readiness(row)
         lines_out = []
-        for line in row.lines.all():
-            line_readiness = compute_adjustment_line_readiness(line)
-            eff = line_readiness["effective_unit_cost"]
-            lv = line_readiness["line_valuation"]
+        for adj_line in row.lines.all():
+            readiness = compute_adjustment_line_readiness(adj_line)
+            eff = readiness["effective_unit_cost"]
+            lv = readiness["line_valuation"]
+            item = adj_line.inventory_item
+            product = getattr(item, "product", None)
             lines_out.append({
-                "id": line.id,
-                "inventory_item_id": line.inventory_item_id,
-                "inventory_item_sku": getattr(line.inventory_item, "sku", None),
-                "product_code": getattr(line.inventory_item.product, "product_code", None),
-                "product_name": getattr(line.inventory_item.product, "name", None),
-                "quantity_delta": f"{line.quantity_delta:.3f}",
-                "unit_cost_snapshot": f"{line.unit_cost_snapshot:.2f}" if line.unit_cost_snapshot else None,
-                "valuation_amount_snapshot": f"{line.valuation_amount_snapshot:.2f}" if line.valuation_amount_snapshot else None,
+                "id": adj_line.id,
+                "inventory_item_id": adj_line.inventory_item_id,
+                "inventory_item_sku": getattr(item, "sku", None),
+                "product_code": getattr(product, "product_code", None),
+                "product_name": getattr(product, "name", None),
+                "quantity_delta": f"{adj_line.quantity_delta:.3f}",
+                "unit_cost_snapshot": f"{adj_line.unit_cost_snapshot:.2f}" if adj_line.unit_cost_snapshot else None,
+                "valuation_amount_snapshot": f"{adj_line.valuation_amount_snapshot:.2f}" if adj_line.valuation_amount_snapshot else None,
                 "effective_unit_cost": f"{eff:.2f}" if eff is not None else None,
                 "line_valuation": f"{lv:.2f}" if lv is not None else None,
-                "requires_unit_cost": line_readiness["requires_unit_cost"],
-                "valuation_status": line_readiness["valuation_status"],
-                "notes": line.notes,
+                "requires_unit_cost": readiness["requires_unit_cost"],
+                "valuation_status": readiness["valuation_status"],
+                "notes": adj_line.notes,
             })
         result = {
             "id": row.id,
