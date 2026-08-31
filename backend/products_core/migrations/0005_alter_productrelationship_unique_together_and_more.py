@@ -8,37 +8,73 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("products_core", "0004_brand_and_allow_zero_base_price"),
-        ("subscriptions", "0123_add_product_relationship_model"),
+        # Must run after subscriptions.0138 which adds is_price_included_in_parent to
+        # subscriptions_productrelationship via SQLite table recreation (because it's
+        # a NOT NULL BooleanField). That recreation uses the subscriptions migration
+        # state, which doesn't know about parent_variant_id/related_variant_id, so
+        # running 0138 after this migration would silently drop those columns.
+        ("subscriptions", "0138_productrelationship_is_price_included_in_parent"),
     ]
 
     operations = [
-        migrations.AlterUniqueTogether(
-            name="productrelationship",
-            unique_together=set(),
+        # State-only: the old unique constraint was created by subscriptions.0123 and
+        # cannot be reliably found/dropped via AlterUniqueTogether in a fresh SQLite
+        # test DB (constraint name mismatch between subscriptions and products_core
+        # migration state). Production already has 0005 applied; test DB gets the
+        # columns via AddField below and a fresh unique index via the second
+        # AlterUniqueTogether which starts from an empty state.
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.AlterUniqueTogether(
+                    name="productrelationship",
+                    unique_together=set(),
+                ),
+            ],
+            database_operations=[],
         ),
-        migrations.AddField(
-            model_name="productrelationship",
-            name="parent_variant",
-            field=models.ForeignKey(
-                blank=True,
-                help_text="If set, this relationship only applies to this specific variant of the parent product.",
-                null=True,
-                on_delete=django.db.models.deletion.CASCADE,
-                related_name="variant_related_products",
-                to="products_core.productvariant",
-            ),
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.AddField(
+                    model_name="productrelationship",
+                    name="parent_variant",
+                    field=models.ForeignKey(
+                        blank=True,
+                        help_text="If set, this relationship only applies to this specific variant of the parent product.",
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="variant_related_products",
+                        to="products_core.productvariant",
+                    ),
+                ),
+            ],
+            database_operations=[
+                migrations.RunSQL(
+                    sql='ALTER TABLE "subscriptions_productrelationship" ADD COLUMN "parent_variant_id" integer NULL REFERENCES "products_core_productvariant" ("id")',
+                    reverse_sql='SELECT 1',
+                ),
+            ],
         ),
-        migrations.AddField(
-            model_name="productrelationship",
-            name="related_variant",
-            field=models.ForeignKey(
-                blank=True,
-                help_text="If set, attaches a specific variant of the related accessory/raw material.",
-                null=True,
-                on_delete=django.db.models.deletion.CASCADE,
-                related_name="variant_parent_products",
-                to="products_core.productvariant",
-            ),
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.AddField(
+                    model_name="productrelationship",
+                    name="related_variant",
+                    field=models.ForeignKey(
+                        blank=True,
+                        help_text="If set, attaches a specific variant of the related accessory/raw material.",
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="variant_parent_products",
+                        to="products_core.productvariant",
+                    ),
+                ),
+            ],
+            database_operations=[
+                migrations.RunSQL(
+                    sql='ALTER TABLE "subscriptions_productrelationship" ADD COLUMN "related_variant_id" integer NULL REFERENCES "products_core_productvariant" ("id")',
+                    reverse_sql='SELECT 1',
+                ),
+            ],
         ),
         migrations.AlterUniqueTogether(
             name="productrelationship",
