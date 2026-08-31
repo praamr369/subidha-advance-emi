@@ -356,28 +356,29 @@ class AccountingSetupService:
         created = 0
         existing = 0
         details: list[dict[str, Any]] = []
-        for account_type, name, system_code in REQUIRED_COA:
-            instance = ChartOfAccount.objects.filter(system_code=system_code).first()
+        for spec in CANONICAL_CHART_ACCOUNTS:
+            instance = ChartOfAccount.objects.filter(system_code=spec.key).first()
             if instance:
                 existing += 1
-                details.append({"name": name, "status": "existing"})
+                details.append({"name": spec.name, "status": "existing"})
                 continue
             created += 1
-            details.append({"name": name, "status": "created"})
+            details.append({"name": spec.name, "status": "created"})
             if dry_run:
                 continue
             instance = ChartOfAccount.objects.create(
-                name=name,
-                account_type=account_type,
-                system_code=system_code,
+                name=spec.name,
+                account_type=spec.account_type,
+                system_code=spec.key,
+                code=spec.code,
                 is_active=True,
-                allow_manual_posting=True,
+                allow_manual_posting=spec.allow_manual_posting,
             )
             log_audit(
                 action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
                 instance=instance,
                 performed_by=actor,
-                metadata={"event": "ACCOUNTING_SETUP_COA_CREATED", "system_code": system_code},
+                metadata={"event": "ACCOUNTING_SETUP_COA_CREATED", "system_code": spec.key},
             )
         return SetupResult(created=created, existing=existing, details=details)
 
