@@ -1,9 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import { ImageOff } from "lucide-react";
 import { useState } from "react";
 
+import ProductImagePlaceholder from "./ProductImagePlaceholder";
 import { shouldBypassNextImageOptimization } from "@/lib/media";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +17,8 @@ type PublicProductMediaProps = {
   quality?: number;
   fallbackLabel?: string;
   badge?: string | null;
+  /** Drives the stand-in artwork shown when there is no photograph. */
+  category?: string | null;
 };
 
 export default function PublicProductMedia({
@@ -27,8 +29,9 @@ export default function PublicProductMedia({
   sizes,
   priority = false,
   quality = 74,
-  fallbackLabel = "Media pending",
+  fallbackLabel = "Photography coming soon",
   badge,
+  category,
 }: PublicProductMediaProps) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const resolvedSrc = src ?? null;
@@ -61,13 +64,18 @@ export default function PublicProductMedia({
           onError={() => setFailedSrc(resolvedSrc)}
         />
       ) : (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-card text-muted-foreground">
-          <div className="rounded-full border border-border bg-muted p-3">
-            <ImageOff className="h-5 w-5" />
-          </div>
-          <div className="text-sm font-medium">{fallbackLabel}</div>
-          <div className="max-w-[14rem] text-center text-xs text-muted-foreground">
-            Uploaded product media will appear here once the catalog image is available.
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+          <ProductImagePlaceholder
+            name={alt}
+            category={category}
+            showCategory={false}
+            iconClassName="h-14 w-14"
+          />
+          <div className="absolute bottom-6 flex flex-col items-center gap-1 px-6 text-center">
+            <div className="text-sm font-medium text-foreground/70">{fallbackLabel}</div>
+            <div className="max-w-[16rem] text-xs text-muted-foreground">
+              Visit the Asansol showroom or ask the branch for photographs of this product.
+            </div>
           </div>
         </div>
       )}

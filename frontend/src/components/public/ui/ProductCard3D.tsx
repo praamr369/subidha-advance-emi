@@ -4,6 +4,7 @@ import { useI18n } from "@/components/i18n/I18nProvider";
 import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import ProductImagePlaceholder from "../ProductImagePlaceholder";
 
 interface ProductCard3DProps {
   id: string;
@@ -49,7 +50,7 @@ export default function ProductCard3D({
         {imageUrl ? (
           <Image src={imageUrl} alt={title} fill className="object-cover" sizes="(max-width: 768px) 100vw, 33vw" />
         ) : (
-          <div className="text-muted-foreground/40 font-medium text-sm">{t('public.ProductCard3D_text2')}</div>
+          <ProductImagePlaceholder name={title} category={category} />
         )}
         <div className="absolute top-2 left-2 z-20 rounded border border-white/40 bg-white/80 px-2 py-0.5 text-[10px] font-semibold text-slate-800 backdrop-blur-md dark:border-black/40 dark:bg-black/60 dark:text-slate-200">
           {category}

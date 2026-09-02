@@ -66,7 +66,8 @@ export default function PublicProductDetailMedia({
           quality={isPrimaryImage ? 78 : 70}
           className="absolute inset-0 size-full rounded-[1.7rem]"
           imageClassName="transition duration-500 hover:scale-[1.02]"
-          fallbackLabel="Product media pending"
+          fallbackLabel="Photography coming soon"
+          category={product.category}
         />
       </AspectRatio>
     );
