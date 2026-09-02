@@ -63,6 +63,10 @@ class Phase8CmsPublicContentControlTests(APITestCase):
             "parent_product_code",
             "selected_attributes",
             "sibling_variants",
+            # Customer-facing cash/EMI/rent/lease pricing. Publishing which
+            # schemes a product can be bought on is the point of the field; the
+            # raw is_*_enabled booleans stay private (asserted below).
+            "scheme_pricing",
         }
         self.assertEqual(set(row.keys()), allowed)
 
@@ -79,6 +83,36 @@ class Phase8CmsPublicContentControlTests(APITestCase):
         }
         for key in forbidden_fields:
             self.assertNotIn(key, row)
+
+        # The pricing block must not become a side door for internal data.
+        pricing = row.get("scheme_pricing")
+        if pricing:
+            self.assertEqual(
+                set(pricing.keys()),
+                {
+                    "product_id",
+                    "product_code",
+                    "priced_on",
+                    "cash_price",
+                    "cash_base_price",
+                    "cash_has_discount",
+                    "lowest_monthly",
+                    "available_schemes",
+                    "schemes",
+                    "rules",
+                },
+            )
+            for scheme in pricing["schemes"].values():
+                # Only offerable schemes are listed, so no internal reason
+                # string restates a product's configuration flags.
+                self.assertTrue(scheme["available"])
+                self.assertNotIn("unavailable_reason", scheme)
+                if scheme.get("discount"):
+                    # Offer name and saving only — no internal package code or
+                    # discount configuration.
+                    self.assertEqual(
+                        set(scheme["discount"].keys()), {"package_name", "amount_off"}
+                    )
 
     def test_admin_public_profile_updates_do_not_mutate_product_price_or_stock_truth(self):
         product = create_product(

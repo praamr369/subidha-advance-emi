@@ -37,6 +37,8 @@ class PublicProductSerializer(serializers.ModelSerializer):
     # PIM media gallery — images and videos from ProductMediaItem
     gallery_images = serializers.SerializerMethodField()
     gallery_videos = serializers.SerializerMethodField()
+    # Scheme pricing: cash/EMI/rent/lease with live offer discounts applied.
+    scheme_pricing = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -64,7 +66,42 @@ class PublicProductSerializer(serializers.ModelSerializer):
             "parent_product_code",
             "selected_attributes",
             "sibling_variants",
+            "scheme_pricing",
         ]
+
+    # ── scheme pricing ────────────────────────────────────────────────────────
+
+    def _pricing_catalog(self):
+        """
+        One PricingCatalog per serialization pass, cached on the serializer so a
+        product listing costs a couple of queries rather than a few per row.
+        """
+        from growth.services.scheme_pricing_service import PricingCatalog
+
+        catalog = getattr(self, "_scheme_pricing_catalog", None)
+        if catalog is None:
+            instance = self.instance
+            products = instance if isinstance(instance, (list, tuple)) else None
+            if products is None and hasattr(instance, "__iter__"):
+                products = list(instance)
+            catalog = PricingCatalog(products=products)
+            self._scheme_pricing_catalog = catalog
+        return catalog
+
+    def get_scheme_pricing(self, obj):
+        """
+        Cash / EMI / rent / lease pricing with any live offer discount applied.
+
+        Deliberately fail-soft: a pricing misconfiguration must never take the
+        public catalogue down, so on error the product simply renders without
+        scheme pricing.
+        """
+        from growth.services.scheme_pricing_service import quote_product
+
+        try:
+            return quote_product(obj, catalog=self._pricing_catalog(), public=True)
+        except Exception:  # noqa: BLE001 - catalogue availability wins over pricing detail
+            return None
 
     # ── helpers ──────────────────────────────────────────────────────────────
 

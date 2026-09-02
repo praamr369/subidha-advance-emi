@@ -8,6 +8,7 @@ import PublicProductDetailMedia from "./PublicProductDetailMedia";
 import PublicProductVariantSelector from "./PublicProductVariantSelector";
 import ProductEnquiryHandoffPanel from "./ProductEnquiryHandoffPanel";
 import PublicProductDescriptionAndSpecs from "./PublicProductDescriptionAndSpecs";
+import PublicProductSchemePricing from "./PublicProductSchemePricing";
 import type { PublicProduct } from "@/services/public";
 
 type Props = {
@@ -108,6 +109,13 @@ export default function PublicProductInteractiveDetail({
         image: matchedVariant.image || initialProduct.image,
         stock_status: matchedVariant.stock_status,
         pim_attributes: mergedPimAttributes,
+        // The base product's scheme pricing was computed from the base price and
+        // does not describe this variant. Drop it rather than quote the wrong
+        // instalment; the variant's own page carries its own pricing.
+        scheme_pricing:
+          matchedVariant.price === initialProduct.base_price
+            ? initialProduct.scheme_pricing
+            : null,
       }
     : initialProduct;
 
@@ -235,7 +243,10 @@ export default function PublicProductInteractiveDetail({
             </div>
           </div>
 
-          <ProductEnquiryHandoffPanel product={displayProduct} dict={dict} />
+          <div className="space-y-6">
+            <PublicProductSchemePricing pricing={displayProduct.scheme_pricing} />
+            <ProductEnquiryHandoffPanel product={displayProduct} dict={dict} />
+          </div>
         </div>
 
         <PublicProductDescriptionAndSpecs product={displayProduct} />

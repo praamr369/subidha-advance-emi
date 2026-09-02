@@ -306,16 +306,26 @@ export default function ProductGrid({
           isFetching ? "opacity-50" : "opacity-100"
         )}>
           {products.map((product) => {
-            const price = Number(product.base_price) || 0;
-            const emiAmount = Math.round(price / 12);
+            // Prefer server-computed scheme pricing (live offer discounts and
+            // real configured tenures) and fall back to the raw base price only
+            // when the pricing block is unavailable.
+            const pricing = product.scheme_pricing;
+            const basePrice = Number(product.base_price) || 0;
+            const price = Number(pricing?.cash_price ?? product.base_price) || 0;
+            const originalPrice = pricing?.cash_has_discount
+              ? Number(pricing.cash_base_price ?? product.base_price) || 0
+              : null;
+            const monthly = pricing?.lowest_monthly != null ? Number(pricing.lowest_monthly) : null;
             return (
               <ProductCard3D
                 key={product.id}
                 id={String(product.id)}
                 title={product.seo_name || product.name}
                 category={product.category || "Uncategorized"}
-                price={price}
-                emiAmount={emiAmount}
+                price={price || basePrice}
+                emiAmount={monthly != null ? Math.round(monthly) : 0}
+                hideMonthly={monthly == null}
+                originalPrice={originalPrice}
                 imageUrl={product.image || ""}
                 href={`/products/${product.product_code}`}
               />

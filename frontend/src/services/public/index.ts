@@ -172,6 +172,61 @@ export type PublicProduct = {
     product_id?: number | null;
     product_code?: string | null;
   }>;
+  /** Cash / EMI / rent / lease pricing with live offer discounts applied. */
+  scheme_pricing?: ProductSchemePricing | null;
+};
+
+/** One selectable tenure within a scheme. */
+export type SchemeTenureQuote = {
+  tenure_months: number;
+  monthly_amount: string;
+  /** Rent/lease only; null for cash and EMI. */
+  security_deposit_percent: string | null;
+  security_deposit_amount: string | null;
+  /** Security deposit + first instalment. */
+  upfront_total: string;
+  template_code: string;
+};
+
+/** Public shape: offer name and saving only — internal codes stay server-side. */
+export type SchemeDiscount = {
+  package_name: string;
+  amount_off: string;
+};
+
+export type SchemeQuote = {
+  scheme: PublicScheme;
+  available: boolean;
+  base_price: string;
+  effective_price: string;
+  has_discount: boolean;
+  discount: SchemeDiscount | null;
+  lowest_monthly: string | null;
+  tenures: SchemeTenureQuote[];
+};
+
+export type PublicScheme = "CASH" | "EMI" | "RENT" | "LEASE";
+
+/** Shared rules so a customer-typed tenure recalculates to the same figures the server would return. */
+export type SchemePricingRules = {
+  tenure_min: number;
+  tenure_max: number;
+  tenure_presets: number[];
+  deposit_schemes: PublicScheme[];
+  deposit_bands: Array<{ up_to: string | null; percent: string }>;
+};
+
+export type ProductSchemePricing = {
+  product_id: number;
+  product_code: string | null;
+  priced_on: string;
+  cash_price: string | null;
+  cash_base_price: string | null;
+  cash_has_discount: boolean;
+  lowest_monthly: string | null;
+  available_schemes: PublicScheme[];
+  schemes: Partial<Record<PublicScheme, SchemeQuote>>;
+  rules: SchemePricingRules;
 };
 
 export type PublicBusinessProfile = {

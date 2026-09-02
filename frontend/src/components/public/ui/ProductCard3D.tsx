@@ -14,6 +14,10 @@ interface ProductCard3DProps {
   imageUrl: string;
   href: string;
   className?: string;
+  /** Undiscounted cash price; shown struck through when an offer is live. */
+  originalPrice?: number | null;
+  /** True when no monthly plan is configured, so the EMI figure is hidden. */
+  hideMonthly?: boolean;
 }
 
 export default function ProductCard3D({
@@ -25,6 +29,8 @@ export default function ProductCard3D({
   imageUrl,
   href,
   className,
+  originalPrice = null,
+  hideMonthly = false,
 }: ProductCard3DProps) {
   const { t } = useI18n();
 
@@ -57,12 +63,23 @@ export default function ProductCard3D({
         
         <div className="mt-2 flex items-end justify-between">
           <div className="flex flex-col">
-            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{t('public.ProductCard3D_text3')}</span>
-            <span className="text-lg font-bold text-primary">₹{emiAmount.toLocaleString()}<span className="text-xs font-medium text-muted-foreground">{t('public.ProductCard3D_text4')}</span></span>
+            {hideMonthly ? null : (
+              <>
+                <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{t('public.ProductCard3D_text3')}</span>
+                <span className="text-lg font-bold text-primary">₹{emiAmount.toLocaleString()}<span className="text-xs font-medium text-muted-foreground">{t('public.ProductCard3D_text4')}</span></span>
+              </>
+            )}
           </div>
           <div className="flex flex-col items-end">
             <span className="text-[10px] font-medium text-muted-foreground">{t('public.ProductCard3D_text5')}</span>
-            <span className="text-sm font-semibold text-foreground">₹{price.toLocaleString()}</span>
+            <span className="flex items-baseline gap-1.5">
+              {originalPrice != null && originalPrice > price ? (
+                <span className="text-xs font-medium text-muted-foreground line-through">
+                  ₹{originalPrice.toLocaleString()}
+                </span>
+              ) : null}
+              <span className="text-sm font-semibold text-foreground">₹{price.toLocaleString()}</span>
+            </span>
           </div>
         </div>
         
