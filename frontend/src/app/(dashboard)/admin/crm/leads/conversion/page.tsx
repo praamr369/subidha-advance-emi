@@ -88,7 +88,7 @@ export default function LeadConversionPage() {
       });
 
       if (result.status === "success") {
-        setSuccess("✓ Lead converted to customer and direct sale recorded successfully!");
+        setSuccess("✓ Direct sale request raised — it now needs approval before the sale is booked.");
         await fetchJourney();
         setActiveTab("result");
       }
@@ -262,9 +262,9 @@ export default function LeadConversionPage() {
                 </p>
                 <ul className="text-sm text-green-800 dark:text-green-300 space-y-1 ml-4">
                   <li>✓ Creates customer account (auto-generated credentials)</li>
-                  <li>✓ Issues a numbered direct sale document</li>
-                  <li>✓ Updates lead status: NEW → CONVERTED</li>
-                  <li>✓ Complete order tracking in customer profile</li>
+                  <li>✓ Raises a direct sale request for approval</li>
+                  <li>✓ Updates lead status: NEW → CONTACTED</li>
+                  <li>✓ Approving the request issues the numbered sale document</li>
                 </ul>
               </div>
             </div>

@@ -92,8 +92,15 @@ class LeadConversionServiceTests(TestCase):
                 product_name="Nonexistent Product",
             )
 
-    def test_process_direct_sale(self):
-        sale, customer, lead, created_customer = LeadConversionService.process_direct_sale(
+    def test_process_direct_sale_raises_a_request_and_books_nothing(self):
+        """
+        A numbered DirectSale is a real accounting document. Raising it straight
+        from a lead screen skipped the approval gate every other route respects,
+        so this now only creates a request.
+        """
+        from billing.models import DirectSale
+
+        request_obj, customer, lead, created_customer = LeadConversionService.process_direct_sale(
             phone="5555555555",
             email="sale@example.com",
             name="Sale User",
@@ -104,17 +111,44 @@ class LeadConversionServiceTests(TestCase):
 
         self.assertTrue(created_customer)
         self.assertEqual(customer.phone, "5555555555")
+        self.assertEqual(request_obj.customer, customer)
+        self.assertEqual(request_obj.request_type, "DIRECT_SALE")
+        self.assertEqual(request_obj.status, "DRAFT")
+        self.assertEqual(request_obj.total_amount, Decimal("2000.00"))
+        self.assertEqual(request_obj.product, self.sale_product)
+
+        # Nothing booked, and no sale number consumed.
+        self.assertEqual(DirectSale.objects.count(), 0)
+
+        self.assertEqual(lead.converted_customer, customer)
+        self.assertEqual(lead.converted_online_request, request_obj)
+        self.assertEqual(lead.phone, "5555555555")
+        self.assertNotEqual(lead.status, "CONVERTED")
+
+    def test_approving_the_request_is_what_issues_the_sale_document(self):
+        from billing.models import DirectSale
+        from crm.services.crm_approval_service import approve_online_request
+
+        request_obj, customer, _lead, _created = LeadConversionService.process_direct_sale(
+            phone="5555555556",
+            email="sale2@example.com",
+            name="Sale User Two",
+            product_name="Sale Product",
+            amount="2000.00",
+            created_by=self.admin,
+        )
+        self.assertEqual(DirectSale.objects.count(), 0)
+
+        sale = approve_online_request(
+            request_obj, approval_type="DIRECT_SALE", approval_user=self.admin
+        )
+
+        self.assertEqual(DirectSale.objects.count(), 1)
         self.assertEqual(sale.customer, customer)
-        self.assertEqual(sale.grand_total, Decimal("2000.00"))
-        # A real numbered billing document is issued.
         self.assertTrue(sale.sale_no)
         self.assertIsNotNone(sale.doc_series_id)
         self.assertEqual(sale.lines.count(), 1)
         self.assertEqual(sale.lines.first().product, self.sale_product)
-        self.assertEqual(lead.converted_customer, customer)
-        self.assertEqual(lead.converted_direct_sale, sale)
-        self.assertEqual(lead.phone, "5555555555")
-        self.assertEqual(lead.status, "CONVERTED")
 
     def test_process_product_request_creates_request_against_real_product(self):
         customer, _ = LeadConversionService._find_or_create_customer(

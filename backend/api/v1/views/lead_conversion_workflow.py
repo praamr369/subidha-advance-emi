@@ -90,12 +90,17 @@ class ProcessOnlineEnquiryView(APIView):
 
 
 class ProcessDirectSaleView(APIView):
-    """Convert direct sale to customer + lead link"""
+    """
+    Raise a direct-sale request for a lead, pending approval.
+
+    Does not book a sale. Approving the resulting OnlineRequest is what issues
+    the numbered DirectSale document.
+    """
     permission_classes = [IsAuthenticated, IsAdmin]
 
     def post(self, request):
         """
-        Process direct sale and link to lead/customer
+        Raise a direct-sale request and link it to the lead/customer
 
         Request body:
         {
@@ -119,8 +124,9 @@ class ProcessDirectSaleView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            # Process direct sale
-            direct_sale, customer, lead, created_customer = LeadConversionService.process_direct_sale(
+            # Raise a direct-sale request. Approving it is what issues the
+            # numbered sale document.
+            online_request, customer, lead, created_customer = LeadConversionService.process_direct_sale(
                 phone=phone,
                 email=email,
                 name=name,
@@ -131,12 +137,14 @@ class ProcessDirectSaleView(APIView):
 
             return Response({
                 "status": "success",
-                "message": "Direct sale processed successfully",
+                "message": "Direct sale request raised and is awaiting approval",
                 "data": {
-                    "direct_sale": {
-                        "id": direct_sale.id,
-                        "amount": str(direct_sale.grand_total),
-                        "status": direct_sale.status,
+                    "online_request": {
+                        "id": online_request.id,
+                        "request_number": online_request.request_number,
+                        "amount": str(online_request.total_amount),
+                        "status": online_request.status,
+                        "awaiting_approval": True,
                     },
                     "customer": {
                         "id": customer.id,

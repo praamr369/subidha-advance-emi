@@ -185,12 +185,16 @@ class LeadConversionService:
     @transaction.atomic
     def process_direct_sale(phone, email, name, product_name=None, amount=None, sale_details=None, created_by=None):
         """
-        Process a direct sale and link to existing lead + customer
+        Raise a direct-sale request for approval and link it to the lead.
 
-        Creates a real, numbered DirectSale document through the billing service
-        so the document series, financial year, tax snapshot and lines are correct.
+        This deliberately does NOT book a sale. A numbered DirectSale is a real
+        accounting document, and issuing one straight from a lead screen skipped
+        the quote/approval gate every other route through the system respects.
+        The request lands as a DRAFT OnlineRequest; approving it
+        (crm_approval_service.approve_online_request with DIRECT_SALE) is what
+        issues the document.
 
-        Returns: (direct_sale, customer, lead, created_customer)
+        Returns: (online_request, customer, lead, created_customer)
         """
         # Step 1: Find or create customer
         customer, created_customer = LeadConversionService._find_or_create_customer(
@@ -207,50 +211,48 @@ class LeadConversionService:
             name=name
         )
 
-        # Step 3: Create direct sale
-        from billing.services.billing_service import create_direct_sale
-
         product = LeadConversionService._resolve_product(product_name)
         unit_price = Decimal(str(amount)) if amount else (product.base_price or Decimal("0"))
-        direct_sale = create_direct_sale(
-            payload={
-                "customer": customer,
-                "sale_date": timezone.localdate(),
-                "lines": [
-                    {
-                        "product": product,
-                        "quantity": Decimal("1"),
-                        "unit_price": unit_price,
-                    }
-                ],
-            },
-            created_by=created_by,
-        )
 
-        # Step 4: Link lead to customer and direct sale
-        if lead:
-            lead.converted_customer = customer
-            lead.converted_direct_sale = direct_sale
-
-            # A booked sale document means the lead has converted.
-            lead.status = "CONVERTED"
-
-            lead.save()
-        else:
-            # Create a new lead from the direct sale
+        # Step 3: Ensure the lead exists before the request, so the OnlineRequest
+        # post_save signal does not invent a second lead for the same person.
+        if not lead:
             lead = PublicLead.objects.create(
                 name=name,
                 phone=phone,
                 email=email,
                 product=product,
                 interested_product=product.name,
-                status="CONVERTED",
+                status="CONTACTED",
                 source="DIRECT_SALE",
                 converted_customer=customer,
-                converted_direct_sale=direct_sale,
             )
 
-        return direct_sale, customer, lead, created_customer
+        # Step 4: Raise the request, pending approval
+        from crm.services.crm_pipeline_service import _generate_online_request_number
+
+        online_request = OnlineRequest.objects.create(
+            request_number=_generate_online_request_number(),
+            customer=customer,
+            product=product,
+            request_type="DIRECT_SALE",
+            quantity=1,
+            unit_price=unit_price,
+            sub_total=unit_price,
+            total_amount=unit_price,
+            status="DRAFT",
+            source_public_lead=lead,
+        )
+
+        # Step 5: Link the lead. The lead is not CONVERTED — nothing is booked
+        # until someone approves the request.
+        lead.converted_customer = customer
+        lead.converted_online_request = online_request
+        if lead.status == "NEW":
+            lead.status = "CONTACTED"
+        lead.save()
+
+        return online_request, customer, lead, created_customer
 
     @staticmethod
     @transaction.atomic
