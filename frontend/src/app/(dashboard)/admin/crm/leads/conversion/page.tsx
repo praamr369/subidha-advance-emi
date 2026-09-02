@@ -262,8 +262,8 @@ export default function LeadConversionPage() {
                 </p>
                 <ul className="text-sm text-green-800 dark:text-green-300 space-y-1 ml-4">
                   <li>✓ Creates customer account (auto-generated credentials)</li>
-                  <li>✓ Records direct sale transaction</li>
-                  <li>✓ Updates lead status: NEW → QUALIFIED</li>
+                  <li>✓ Issues a numbered direct sale document</li>
+                  <li>✓ Updates lead status: NEW → CONVERTED</li>
                   <li>✓ Complete order tracking in customer profile</li>
                 </ul>
               </div>
