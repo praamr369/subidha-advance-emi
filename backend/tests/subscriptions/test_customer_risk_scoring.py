@@ -263,7 +263,7 @@ class TestEnforcement(TestCase):
             total_amount = Decimal("10000.00")
             pk = None
 
-        with patch("subscriptions.services.customer_risk_service._get_policy", side_effect=_mock_policy):
+        with patch("customers.services.customer_risk_service._get_policy", side_effect=_mock_policy):
             with self.assertRaises(ValueError) as ctx:
                 assert_customer_risk_allows_contract(FakeSub(), customer=customer)
         self.assertIn("CUSTOMER_RISK_BLOCKED", str(ctx.exception))
@@ -293,7 +293,7 @@ class TestEnforcement(TestCase):
             total_amount = Decimal("10000.00")
             pk = None
 
-        with patch("subscriptions.services.customer_risk_service._get_policy", side_effect=_mock_policy):
+        with patch("customers.services.customer_risk_service._get_policy", side_effect=_mock_policy):
             result = assert_customer_risk_allows_contract(FakeSub(), customer=customer)
         # EMI must not be blocked even with BLOCKED band
         self.assertEqual(result["blocker_codes"], [])
@@ -323,7 +323,7 @@ class TestEnforcement(TestCase):
             total_amount = Decimal("10000.00")
             pk = None
 
-        with patch("subscriptions.services.customer_risk_service._get_policy", side_effect=_mock_policy):
+        with patch("customers.services.customer_risk_service._get_policy", side_effect=_mock_policy):
             result = evaluate_contract_risk(FakeSub(), customer=customer)
 
         self.assertTrue(result["approval_required"])

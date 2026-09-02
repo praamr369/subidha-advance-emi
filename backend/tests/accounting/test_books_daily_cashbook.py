@@ -46,11 +46,10 @@ class BooksDailyCashbookTests(TestCase):
             opening_balance=Decimal("0.00"),
         )
         ensure_test_collection_purpose_mapping(finance_account=self.finance_account)
-        sequence = DocumentSequence.objects.create(
-            series_code="BILL_INV",
+        sequence = DocumentSequence.objects.get(
+            document_type="TAX_INVOICE",
             financial_year="2026-27",
-            prefix="INV-2026-27",
-            next_number=1,
+            is_active=True,
         )
         invoice = BillingInvoice.objects.create(
             invoice_date=date(2026, 4, 22),

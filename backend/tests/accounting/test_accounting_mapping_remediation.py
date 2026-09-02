@@ -43,8 +43,7 @@ class AccountingMappingRemediationApiTests(APITestCase):
         self.assertIn("manufacturing_wastage", rows)
         self.assertIn("staff_advance", rows)
         self.assertFalse(rows["staff_advance"]["can_post"])
-        self.assertFalse(rows["staff_advance"]["is_supported"])
-        self.assertEqual(rows["staff_advance"]["status"], "UNSUPPORTED_SOURCE")
+        self.assertTrue(rows["staff_advance"]["is_supported"])
 
     def test_create_missing_cogs_account_is_idempotent_and_does_not_post(self):
         bridge_before = AccountingBridgePosting.objects.count()
@@ -115,16 +114,15 @@ class AccountingMappingRemediationApiTests(APITestCase):
         self.assertTrue(first.data["created"])
         self.assertFalse(second.data["created"])
 
-    def test_staff_advance_create_account_remains_blocked_without_source_model(self):
+    def test_staff_advance_create_account_succeeds(self):
         response = self.client.post(
             "/api/v1/admin/accounting/mapping-remediation/create-account/",
             {"event_type": "staff_advance"},
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
-        self.assertFalse(ChartOfAccount.objects.filter(system_code="STAFF_ADVANCE_ASSET").exists())
-        self.assertFalse(AccountingPostingProfile.objects.filter(key="STAFF_ADVANCE_ASSET").exists())
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertTrue(response.data.get("created"))
 
     def test_bridge_reconciliation_filter_accepts_ready_unposted_status(self):
         response = self.client.get("/api/v1/admin/accounting/bridge-reconciliation/?status=READY_UNPOSTED")

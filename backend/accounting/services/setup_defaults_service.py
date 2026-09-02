@@ -74,6 +74,8 @@ PURPOSE_TO_TARGET_CHART_KEY: dict[str, str] = {
     FinanceAccountMappingPurpose.DELIVERY_EXPENSE: "DELIVERY_EXPENSE",
     FinanceAccountMappingPurpose.SALARY_EXPENSE: "SALARY_EXPENSE",
     FinanceAccountMappingPurpose.INVENTORY_ASSET: "INVENTORY_ASSET",
+    FinanceAccountMappingPurpose.ADVANCE_FORFEITURE_INCOME: "ADVANCE_FORFEITURE_INCOME",
+    FinanceAccountMappingPurpose.BAD_DEBT_EXPENSE: "BAD_DEBT_EXPENSE",
 }
 
 
@@ -362,7 +364,6 @@ def _ensure_bank_upi_finance_account(*, bank_chart: ChartOfAccount) -> FinanceAc
     if existing is None:
         existing = (
             FinanceAccount.objects.filter(name__iexact="Main Bank Account").order_by("id").first()
-            or FinanceAccount.objects.filter(name__iexact="UPI Account").order_by("id").first()
             or FinanceAccount.objects.filter(name__iexact="Payment Gateway Settlement Account").order_by("id").first()
         )
     if existing is None:
@@ -781,6 +782,16 @@ def apply_accounting_setup_defaults(*, performed_by=None) -> dict[str, Any]:
     # lets an old rent/lease-only cash desk collapse into Main Cash Desk safely,
     # while rows with real historical business references remain protected.
     legacy_cleanup = _delete_legacy_standard_finance_accounts(keep_ids={cash.id, bank_upi.id})
+
+    # Demote any non-canonical real settlement accounts to is_real_settlement_account=False.
+    # This covers test-fixture accounts and any legacy accounts that weren't deleted due to
+    # protected references. Their mappings are intentionally preserved.
+    FinanceAccount.objects.filter(
+        is_real_settlement_account=True,
+    ).exclude(
+        id__in={cash.id, bank_upi.id}
+    ).update(is_real_settlement_account=False, updated_at=timezone.now())
+
     journal_numbering = _ensure_journal_entry_numbering_profile()
 
     legacy_marked: list[dict[str, Any]] = []

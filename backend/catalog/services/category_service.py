@@ -18,6 +18,9 @@ def save_category(*, category: CatalogCategory, validated_data: dict) -> Catalog
         setattr(category, field, value)
     if category.parent_id:
         category.parent = CatalogCategory.objects.select_for_update().get(pk=category.parent_id)
+    if not (category.slug or "").strip():
+        from django.utils.text import slugify
+        category.slug = slugify(category.name or "")[:140]
     category.path = _path_for(category)
     category.save()
     _rebuild_descendant_paths(category)

@@ -7,10 +7,15 @@ Handles complete lead-to-customer-to-fulfillment workflow
 from decimal import Decimal
 from django.db import transaction
 from django.utils import timezone
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 
 from subscriptions.models import Customer, PublicLead, OnlineRequest, ProductRequest, Subscription
 from billing.models import DirectSale
+from products_core.models import Product
+
+
+class LeadConversionError(ValueError):
+    """Operator-correctable input problem (surfaced to the caller as a 400)."""
 
 
 class LeadConversionService:
@@ -57,6 +62,31 @@ class LeadConversionService:
         return None
 
     @staticmethod
+    def _resolve_product(product_name):
+        """
+        Resolve a free-text product name to a real Product row.
+
+        OnlineRequest.product and DirectSaleLine.product are both required FKs,
+        so a name that matches nothing is an operator error, not a server fault.
+        """
+        name = (product_name or "").strip()
+        if not name:
+            raise LeadConversionError("product_name is required.")
+
+        product = Product.objects.filter(name__iexact=name, is_active=True).first()
+        if product:
+            return product
+
+        matches = list(Product.objects.filter(name__icontains=name, is_active=True)[:2])
+        if len(matches) == 1:
+            return matches[0]
+        if len(matches) > 1:
+            raise LeadConversionError(
+                f"Product name '{name}' matches more than one active product; use the exact name."
+            )
+        raise LeadConversionError(f"No active product found matching '{name}'.")
+
+    @staticmethod
     def _find_or_create_customer(phone, email, name, source="ONLINE"):
         """Find existing customer or create new one"""
         # Try to find by phone first (most reliable)
@@ -68,9 +98,10 @@ class LeadConversionService:
         # Create new customer if not found
         try:
             # Create a user account for the customer
-            user = User.objects.create_user(
+            user = get_user_model().objects.create_user(
                 username=f"cust_{phone}_{timezone.now().timestamp()}",
                 email=email or "",
+                phone=phone,
             )
 
             customer = Customer.objects.create(
@@ -106,46 +137,58 @@ class LeadConversionService:
             name=name
         )
 
-        # Step 3: Create online request
-        online_request = OnlineRequest.objects.create(
-            customer=customer,
-            product_name=product_name or "Not Specified",
-            request_number=request_number or f"ONL-{phone}-{timezone.now().timestamp()}",
-            amount=Decimal(amount) if amount else None,
-            status="SUBMITTED"
-        )
+        product = LeadConversionService._resolve_product(product_name)
+        unit_price = Decimal(str(amount)) if amount else (product.base_price or Decimal("0"))
 
-        # Step 4: Link lead to customer and online request
-        if lead:
-            lead.converted_customer = customer
-            lead.converted_online_request = online_request
-
-            # Update lead status based on current state
-            if lead.status == "NEW":
-                lead.status = "CONTACTED"
-
-            lead.save()
-        else:
-            # Create a new lead from the online enquiry
+        # Step 3: Ensure the lead exists BEFORE the online request. The
+        # OnlineRequest post_save signal (sync_online_request_to_pipeline) will
+        # otherwise invent a PublicLead keyed on name alone, which duplicates
+        # this lead and breaks on the next enquiry for the same name.
+        if not lead:
             lead = PublicLead.objects.create(
                 name=name,
                 phone=phone,
                 email=email,
-                product=None,
-                interested_product=product_name or "Not Specified",
+                product=product,
+                interested_product=product.name,
                 status="CONTACTED",
                 source="ONLINE_ENQUIRY",
                 converted_customer=customer,
-                converted_online_request=online_request,
             )
+
+        # Step 4: Create online request, anchored to that lead
+        from crm.services.crm_pipeline_service import _generate_online_request_number
+
+        online_request = OnlineRequest.objects.create(
+            request_number=request_number or _generate_online_request_number(),
+            customer=customer,
+            product=product,
+            request_type="DIRECT_SALE",
+            quantity=1,
+            unit_price=unit_price,
+            sub_total=unit_price,
+            total_amount=unit_price,
+            status="DRAFT",
+            source_public_lead=lead,
+        )
+
+        # Step 5: Link lead to customer and online request
+        lead.converted_customer = customer
+        lead.converted_online_request = online_request
+        if lead.status == "NEW":
+            lead.status = "CONTACTED"
+        lead.save()
 
         return online_request, customer, lead, created_customer
 
     @staticmethod
     @transaction.atomic
-    def process_direct_sale(phone, email, name, product_name=None, amount=None, sale_details=None):
+    def process_direct_sale(phone, email, name, product_name=None, amount=None, sale_details=None, created_by=None):
         """
         Process a direct sale and link to existing lead + customer
+
+        Creates a real, numbered DirectSale document through the billing service
+        so the document series, financial year, tax snapshot and lines are correct.
 
         Returns: (direct_sale, customer, lead, created_customer)
         """
@@ -165,11 +208,23 @@ class LeadConversionService:
         )
 
         # Step 3: Create direct sale
-        direct_sale = DirectSale.objects.create(
-            customer=customer,
-            product_name=product_name or "Direct Sale",
-            grand_total=Decimal(amount) if amount else Decimal("0"),
-            status="PENDING_APPROVAL"
+        from billing.services.billing_service import create_direct_sale
+
+        product = LeadConversionService._resolve_product(product_name)
+        unit_price = Decimal(str(amount)) if amount else (product.base_price or Decimal("0"))
+        direct_sale = create_direct_sale(
+            payload={
+                "customer": customer,
+                "sale_date": timezone.localdate(),
+                "lines": [
+                    {
+                        "product": product,
+                        "quantity": Decimal("1"),
+                        "unit_price": unit_price,
+                    }
+                ],
+            },
+            created_by=created_by,
         )
 
         # Step 4: Link lead to customer and direct sale
@@ -177,11 +232,8 @@ class LeadConversionService:
             lead.converted_customer = customer
             lead.converted_direct_sale = direct_sale
 
-            # Update lead status
-            if lead.status in ["NEW", "CONTACTED"]:
-                lead.status = "QUALIFIED"
-            elif lead.status == "QUALIFIED":
-                lead.status = "PROPOSAL_SENT"
+            # A booked sale document means the lead has converted.
+            lead.status = "CONVERTED"
 
             lead.save()
         else:
@@ -190,8 +242,9 @@ class LeadConversionService:
                 name=name,
                 phone=phone,
                 email=email,
-                interested_product=product_name or "Direct Sale",
-                status="QUALIFIED",
+                product=product,
+                interested_product=product.name,
+                status="CONVERTED",
                 source="DIRECT_SALE",
                 converted_customer=customer,
                 converted_direct_sale=direct_sale,
@@ -201,47 +254,43 @@ class LeadConversionService:
 
     @staticmethod
     @transaction.atomic
-    def process_product_request(customer_id, lead_id=None, product_name=None, request_type="PRODUCT_REQUEST"):
+    def process_product_request(customer_id, requester, lead_id=None, product_name=None, request_type="DIRECT_SALE"):
         """
         Process a product request and update lead status
 
         Returns: (product_request, lead)
         """
-        try:
-            customer = Customer.objects.get(id=customer_id)
-        except Customer.DoesNotExist:
-            raise Exception(f"Customer {customer_id} not found")
+        customer = Customer.objects.filter(id=customer_id).first()
+        if not customer:
+            raise LeadConversionError(f"Customer {customer_id} not found")
+        if requester is None:
+            raise LeadConversionError("A requester user is required to raise a product request.")
 
-        # Create product request
-        product_request = ProductRequest.objects.create(
-            customer=customer,
-            request_type=request_type,
-            product_name=product_name or "Product Request",
-            status="SUBMITTED"
-        )
+        product = LeadConversionService._resolve_product(product_name)
 
-        # Find or update lead
+        # Find the lead first so the request can record where it came from.
         lead = None
         if lead_id:
-            try:
-                lead = PublicLead.objects.get(id=lead_id)
-            except PublicLead.DoesNotExist:
-                pass
-
+            lead = PublicLead.objects.filter(id=lead_id).first()
         if not lead:
-            # Try to find by customer phone
             lead = PublicLead.objects.filter(phone=customer.phone).first()
+
+        product_request = ProductRequest.objects.create(
+            requester=requester,
+            requester_role_snapshot=getattr(requester, "role", "") or "",
+            customer=customer,
+            product=product,
+            request_type=request_type,
+            status="SUBMITTED",
+            source_public_lead=lead,
+            notes=f"Raised from lead conversion for {customer.name}",
+        )
 
         # Link lead to product request
         if lead:
             lead.converted_product_request = product_request
-
-            # Update lead status
-            if lead.status == "CONTACTED":
-                lead.status = "QUALIFIED"
-            elif lead.status == "QUALIFIED":
-                lead.status = "PROPOSAL_SENT"
-
+            if lead.status == "NEW":
+                lead.status = "CONTACTED"
             lead.save()
 
         return product_request, lead

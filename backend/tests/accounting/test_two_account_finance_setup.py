@@ -61,7 +61,7 @@ class TwoAccountFinanceSetupTests(TestCase):
             chart_account=legacy_chart,
             purpose=FinanceAccountMappingPurpose.UPI_COLLECTION,
             is_active=True,
-            is_default=True,
+            is_default=False,
         )
 
         payload = apply_accounting_setup_defaults(performed_by=self.admin)

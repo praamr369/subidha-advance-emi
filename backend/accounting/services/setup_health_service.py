@@ -404,6 +404,39 @@ def get_accounting_setup_health() -> dict[str, Any]:
     if coa["duplicate_names"]:
         warnings.append("Duplicate normalized ChartOfAccount names detected.")
 
+    all_active_cash = list(
+        FinanceAccount.objects.filter(
+            kind=FinanceAccountKind.CASH,
+            is_active=True,
+            is_real_settlement_account=True,
+        )
+    )
+    if len(all_active_cash) > 1:
+        unmapped_ids = [
+            a.id for a in all_active_cash
+            if not _collection_mapping_ready(a, FinanceAccountMappingPurpose.CASH_COLLECTION)
+        ]
+        if unmapped_ids:
+            warnings.append(
+                _issue(
+                    level="WARNING",
+                    code="MULTIPLE_ACTIVE_CASH_ACCOUNTS_WITH_BLOCKED_MAPPING",
+                    message="Multiple active CASH settlement accounts detected; some lack a CASH_COLLECTION mapping.",
+                    affected_ids=unmapped_ids,
+                    operator_action="Run collection mapping repair or remove unused cash desk accounts.",
+                )
+            )
+        else:
+            infos.append(
+                _issue(
+                    level="INFO",
+                    code="MULTIPLE_ACTIVE_CASH_ACCOUNTS",
+                    message="Multiple active CASH settlement accounts are configured.",
+                    affected_ids=[a.id for a in all_active_cash],
+                    operator_action="Review if multiple cash desks are intentional (e.g., branch cashiers).",
+                )
+            )
+
     status = "OK"
     if blockers:
         status = "BLOCKED"

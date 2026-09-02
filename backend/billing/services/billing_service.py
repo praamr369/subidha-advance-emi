@@ -1241,7 +1241,7 @@ def generate_emi_payment_receipt(*, payment_id: int, finance_account_id: int, pe
 
 
 @transaction.atomic
-def void_receipt_document(*, receipt_id: int, performed_by, reason: str):
+def void_receipt_document(*, receipt_id: int, performed_by, reason: str, skip_bridge: bool = False):
     ReceiptDocument.objects.select_for_update(of=("self",)).get(pk=receipt_id)
     receipt = (
         ReceiptDocument.objects.select_related(
@@ -1261,44 +1261,47 @@ def void_receipt_document(*, receipt_id: int, performed_by, reason: str):
     if not reason:
         raise ValueError("Void reason is required.")
 
-    accounts = ensure_phase3_system_accounts()
-    offset_account = (
-        accounts["EMI_COLLECTION_CLEARING"]
-        if receipt.receipt_type == ReceiptType.EMI_PAYMENT_RECEIPT
-        else accounts["ACCOUNTS_RECEIVABLE"]
-    )
-    reversal_journal, _ = post_bridge_entry(
-        source_instance=receipt,
-        purpose=f"{receipt.receipt_type}_VOID",
-        entry_date=timezone.localdate(),
-        memo=f"Void receipt {receipt.receipt_no or receipt.id}",
-        lines=[
-            {
-                "chart_account": offset_account,
-                "description": receipt.receipt_no or str(receipt.id),
-                "debit_amount": receipt.amount,
-                "credit_amount": Decimal("0.00"),
+    if skip_bridge:
+        reversal_journal = None
+    else:
+        accounts = ensure_phase3_system_accounts()
+        offset_account = (
+            accounts["EMI_COLLECTION_CLEARING"]
+            if receipt.receipt_type == ReceiptType.EMI_PAYMENT_RECEIPT
+            else accounts["ACCOUNTS_RECEIVABLE"]
+        )
+        reversal_journal, _ = post_bridge_entry(
+            source_instance=receipt,
+            purpose=f"{receipt.receipt_type}_VOID",
+            entry_date=timezone.localdate(),
+            memo=f"Void receipt {receipt.receipt_no or receipt.id}",
+            lines=[
+                {
+                    "chart_account": offset_account,
+                    "description": receipt.receipt_no or str(receipt.id),
+                    "debit_amount": receipt.amount,
+                    "credit_amount": Decimal("0.00"),
+                },
+                {
+                    "chart_account": receipt.finance_account.chart_account,
+                    "description": receipt.receipt_no or str(receipt.id),
+                    "debit_amount": Decimal("0.00"),
+                    "credit_amount": receipt.amount,
+                },
+            ],
+            voucher_type="RECEIPT_VOID",
+            source_type=receipt.source_type or "RECEIPT_DOCUMENT",
+            source_reference=receipt.source_reference or receipt.receipt_no or f"RCT-{receipt.id}",
+            source_document_no=receipt.receipt_no or "",
+            source_event_date=timezone.localdate(),
+            trace_metadata={
+                "receipt_id": receipt.id,
+                "receipt_type": receipt.receipt_type,
+                "payment_id": receipt.payment_id,
+                "reason": reason,
             },
-            {
-                "chart_account": receipt.finance_account.chart_account,
-                "description": receipt.receipt_no or str(receipt.id),
-                "debit_amount": Decimal("0.00"),
-                "credit_amount": receipt.amount,
-            },
-        ],
-        voucher_type="RECEIPT_VOID",
-        source_type=receipt.source_type or "RECEIPT_DOCUMENT",
-        source_reference=receipt.source_reference or receipt.receipt_no or f"RCT-{receipt.id}",
-        source_document_no=receipt.receipt_no or "",
-        source_event_date=timezone.localdate(),
-        trace_metadata={
-            "receipt_id": receipt.id,
-            "receipt_type": receipt.receipt_type,
-            "payment_id": receipt.payment_id,
-            "reason": reason,
-        },
-        posted_by=performed_by,
-    )
+            posted_by=performed_by,
+        )
     receipt.status = BillingDocumentStatus.VOID
     receipt.notes = f"{(receipt.notes or '').strip()}\nVoid reason: {reason}".strip()
     receipt.save(update_fields=["status", "notes", "updated_at"])
@@ -1322,7 +1325,7 @@ def void_receipt_document(*, receipt_id: int, performed_by, reason: str):
             "receipt_id": receipt.id,
             "receipt_no": receipt.receipt_no,
             "reason": reason,
-            "reversal_journal_entry_id": reversal_journal.id,
+            "reversal_journal_entry_id": reversal_journal.id if reversal_journal is not None else None,
         },
     )
     return receipt, True

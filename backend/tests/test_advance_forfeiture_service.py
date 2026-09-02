@@ -4,8 +4,8 @@ from decimal import Decimal
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from subscriptions.models import CustomerAdvance, CustomerAdvanceStatus
-from payments.models import AdvanceForfeiture, AdvanceForfeitureStatus
+from payments.models import CustomerAdvance, AdvanceForfeiture, AdvanceForfeitureStatus
+from subscriptions.enums import CustomerAdvanceStatus
 from payments.services.advance_forfeiture_service import (
     DORMANCY_DAYS,
     MIN_CONTACT_ATTEMPTS,
@@ -22,16 +22,24 @@ class AdvanceForfeitureServiceTests(APITestCase):
         self.admin = create_admin_user(username="forf_admin", phone="9400100001")
         self.customer = create_customer_profile(name="Dormant Customer", phone="7400100001")
         self.product = create_product(name="Forf Product", product_code="FORF-P1", base_price=Decimal("6000.00"))
-        self.batch = create_batch(batch_code="FORFBATCH", duration_months=6, total_slots=50)
+        self.batch = create_batch(batch_code="FORFBATCH", duration_months=6, total_slots=100)
         self.lucky_id = create_lucky_id(batch=self.batch, lucky_number=1)
         self.subscription = create_subscription(
             customer=self.customer, product=self.product, batch=self.batch,
             lucky_id=self.lucky_id, total_amount=Decimal("6000.00"),
             monthly_amount=Decimal("1000.00"), tenure_months=6,
         )
-        from accounting.models import FinanceAccount, FinanceAccountKind
+        from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind
+        chart = ChartOfAccount.objects.create(
+            code="TEST-FORF-CASH",
+            name="Test Forfeiture Cash Ledger",
+            account_type=ChartOfAccountType.ASSET,
+            is_active=True,
+            allow_manual_posting=True,
+        )
         self.finance_account = FinanceAccount.objects.create(
             name="Test Cash Desk Forf", kind=FinanceAccountKind.CASH, is_active=True,
+            chart_account=chart,
         )
 
     def _create_dormant_advance(self, *, days_ago=DORMANCY_DAYS + 30, amount=Decimal("500.00")):

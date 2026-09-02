@@ -5,7 +5,9 @@ Handles lead approval, auto-conversion to contracts, and customer notifications
 
 from decimal import Decimal
 from django.utils import timezone
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 from subscriptions.models import (
     PublicLead,
@@ -14,7 +16,7 @@ from subscriptions.models import (
     Product,
 )
 from crm.models import CRMPipeline
-from billing.models import DirectSale, DirectSaleLine
+from billing.models import DirectSale
 
 
 def approve_online_request(
@@ -53,7 +55,7 @@ def approve_online_request(
     # Step 2: Auto-create contract based on approval type
     if auto_convert:
         if approval_type == 'DIRECT_SALE':
-            created_contract = create_direct_sale_from_enquiry(online_request)
+            created_contract = create_direct_sale_from_enquiry(online_request, created_by=approval_user)
             online_request.approved_direct_sale = created_contract
 
         elif approval_type == 'SUBSCRIPTION':
@@ -121,35 +123,36 @@ def approve_online_request(
     return created_contract
 
 
-def create_direct_sale_from_enquiry(online_request: OnlineRequest) -> DirectSale:
-    """Auto-create DirectSale from approved OnlineRequest"""
+def create_direct_sale_from_enquiry(online_request: OnlineRequest, created_by=None) -> DirectSale:
+    """
+    Auto-create DirectSale from approved OnlineRequest.
 
-    ds = DirectSale.objects.create(
-        customer=online_request.customer,
-        online_request=online_request,
-        status='DRAFT',
-        subtotal=online_request.sub_total or Decimal('0'),
-        tax_total=online_request.gst_amount or Decimal('0'),
-        grand_total=online_request.total_amount or Decimal('0'),
-        delivery_required=True,
-        delivery_reference=online_request.request_number,
-        # Copy customer info
-        customer_name_snapshot=online_request.customer.name if online_request.customer else 'Unknown',
-        customer_phone_snapshot=online_request.customer.phone if online_request.customer else '',
-        notes=f'Auto-created from approval of {online_request.request_number}',
+    Routed through billing_service.create_direct_sale so the document series,
+    financial year, tax profile snapshot and line totals are all issued the same
+    way as a manually created sale.
+    """
+    from billing.services.billing_service import create_direct_sale
+
+    return create_direct_sale(
+        payload={
+            'customer': online_request.customer,
+            'sale_date': timezone.localdate(),
+            'delivery_required': True,
+            'delivery_reference': (online_request.request_number or '')[:64],
+            'notes': f'Auto-created from approval of {online_request.request_number}',
+            'lines': [
+                {
+                    'product': online_request.product,
+                    'quantity': Decimal(str(online_request.quantity or 1)),
+                    'unit_price': online_request.unit_price
+                    if online_request.unit_price is not None
+                    else (online_request.product.base_price or Decimal('0')),
+                    'gst_rate': online_request.tax_percentage,
+                }
+            ],
+        },
+        created_by=created_by,
     )
-
-    # Create line items if product is specified
-    if online_request.product:
-        DirectSaleLine.objects.create(
-            direct_sale=ds,
-            product=online_request.product,
-            quantity=online_request.quantity or 1,
-            unit_price=online_request.unit_price or Decimal('0'),
-            tax_percentage=online_request.tax_percentage or Decimal('18'),
-        )
-
-    return ds
 
 
 def create_subscription_from_enquiry(

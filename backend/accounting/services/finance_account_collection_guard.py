@@ -34,6 +34,13 @@ _COLLECTION_PURPOSES: tuple[str, ...] = (
     FinanceAccountMappingPurpose.PAYMENT_GATEWAY_COLLECTION,
 )
 
+_COLLECTION_PURPOSES_SET: frozenset[str] = frozenset(_COLLECTION_PURPOSES)
+
+_RESERVED_OPERATIONAL_PURPOSES: frozenset[str] = frozenset(
+    p for p in FinanceAccountMappingPurpose.values
+    if p not in _COLLECTION_PURPOSES_SET
+)
+
 
 def _collection_mapping_exists(account: FinanceAccount) -> bool:
     return FinanceAccountCoaMapping.objects.filter(
@@ -82,6 +89,16 @@ def assert_finance_account_allowed_for_payment_collection(account: FinanceAccoun
         raise ValueError(
             "This finance account has no active cash, bank, UPI, or payment-gateway collection mapping. "
             "Run Accounting Setup defaults or repair collection mappings before collecting receipts.",
+        )
+    reserved = FinanceAccountCoaMapping.objects.filter(
+        finance_account_id=account.pk,
+        is_active=True,
+        purpose__in=_RESERVED_OPERATIONAL_PURPOSES,
+    ).first()
+    if reserved is not None:
+        raise ValueError(
+            f"This finance account is designated as an operational ledger account "
+            f"({reserved.purpose}) and cannot receive payment collections."
         )
 
 

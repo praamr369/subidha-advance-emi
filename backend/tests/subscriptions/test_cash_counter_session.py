@@ -61,7 +61,7 @@ from subscriptions.services.control_daily_close_service import (
     get_daily_close_readiness,
     run_daily_close,
 )
-from tests.helpers import create_admin_user, create_cashier_user, create_user
+from tests.helpers import create_admin_user, create_cashier_user, create_user, ensure_test_collection_purpose_mapping
 
 TODAY = date(2026, 6, 17)
 ZERO = Decimal("0.00")
@@ -83,13 +83,15 @@ def _make_cash_account(branch, code="P2B-CASH-01"):
         name=f"P2B Cash {code}",
         account_type=ChartOfAccountType.ASSET,
     )
-    return FinanceAccount.objects.create(
+    account = FinanceAccount.objects.create(
         name=f"P2B Cash Account {code}",
         branch=branch,
         kind=FinanceAccountKind.CASH,
         chart_account=coa,
         opening_balance=ZERO,
     )
+    ensure_test_collection_purpose_mapping(finance_account=account)
+    return account
 
 
 def _make_counter(branch, account, code="P2B-CTR-01", cashier=None):
@@ -585,6 +587,7 @@ class AdminCashDeskEndpointPermissionTests(APITestCase):
             {"run_date": str(TODAY), "is_dry_run": True},
             format="json",
         )
+        import sys; print(f"DEBUG daily close resp: {resp.status_code} {dict(resp.data)}", file=sys.stderr)
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
         self.assertEqual(resp.data["status"], DailyCloseStatus.DRY_RUN)
         self.assertIn("checks", resp.data)

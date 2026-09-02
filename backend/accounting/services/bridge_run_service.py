@@ -161,7 +161,7 @@ def _post_payment_reversal_bridge(*, payment: Payment, performed_by=None):
         receipt = None
     if (
         receipt is not None
-        and receipt.status == BillingDocumentStatus.POSTED
+        and receipt.status in {BillingDocumentStatus.POSTED, BillingDocumentStatus.VOID}
         and receipt.finance_account_id
     ):
         lines.extend(

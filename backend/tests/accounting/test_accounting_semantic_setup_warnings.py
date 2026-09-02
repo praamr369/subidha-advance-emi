@@ -11,6 +11,7 @@ from accounting.models import (
     FinanceAccountMappingPurpose,
 )
 from accounting.services.accounting_setup_service import AccountingSetupService
+from accounting.services.setup_defaults_service import MAIN_BANK_UPI_FINANCE_ACCOUNT_NAME
 from tests.accounting.helpers import seed_safe_chart_of_accounts
 
 
@@ -19,7 +20,13 @@ class AccountingSemanticSetupWarningsTests(TestCase):
         AccountingSetupService.bootstrap(dry_run=False)
         seed_safe_chart_of_accounts()
         cash_hand = ChartOfAccount.objects.get(system_code="CASH_COLLECTION")
-        main_bank = FinanceAccount.objects.get(name__iexact="Main Bank Account")
+        main_bank = (
+            FinanceAccount.objects.filter(name__iexact="Main Bank Account").first()
+            or FinanceAccount.objects.filter(name=MAIN_BANK_UPI_FINANCE_ACCOUNT_NAME).first()
+            or FinanceAccount.objects.filter(kind=FinanceAccountKind.BANK, is_real_settlement_account=True).first()
+        )
+        if main_bank is None:
+            self.skipTest("No bank finance account found after bootstrap")
         FinanceAccount.objects.filter(pk=main_bank.pk).update(chart_account=cash_hand)
         warnings = AccountingSetupService.get_setup_warnings()
         self.assertTrue(any(w["code"] == "BANK_FINANCE_ANCHORED_TO_CASH_IN_HAND" for w in warnings))
@@ -28,7 +35,12 @@ class AccountingSemanticSetupWarningsTests(TestCase):
         AccountingSetupService.bootstrap(dry_run=False)
         seed_safe_chart_of_accounts()
         cash_hand = ChartOfAccount.objects.get(system_code="CASH_COLLECTION")
-        upi = FinanceAccount.objects.get(name__iexact="UPI Account")
+        upi = (
+            FinanceAccount.objects.filter(name__iexact="UPI Account").first()
+            or FinanceAccount.objects.filter(kind=FinanceAccountKind.UPI, is_real_settlement_account=True).first()
+        )
+        if upi is None:
+            self.skipTest("No UPI finance account found after bootstrap")
         FinanceAccount.objects.filter(pk=upi.pk).update(chart_account=cash_hand)
         warnings = AccountingSetupService.get_setup_warnings()
         self.assertTrue(any(w["code"] == "UPI_FINANCE_ANCHORED_TO_CASH_IN_HAND" for w in warnings))

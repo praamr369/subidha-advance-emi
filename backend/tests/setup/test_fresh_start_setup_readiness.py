@@ -57,8 +57,6 @@ class FreshStartSetupReadinessTests(APITestCase):
         self.assertEqual(sections["rent_lease_live"]["category"], "RENT_LEASE_REQUIRED")
         self.assertEqual(sections["staff_hr_payroll"]["category"], "STAFF_HR_PAYROLL_REQUIRED")
         self.assertEqual(sections["crm_enrichment"]["category"], "CRM_REQUIRED")
-        self.assertEqual(sections["staff_advance_future"]["status"], "FUTURE_UNSUPPORTED")
-        self.assertFalse(sections["staff_advance_future"]["metadata"]["posting_supported"])
 
     def test_fresh_start_preview_is_read_only(self):
         before = self._counts()

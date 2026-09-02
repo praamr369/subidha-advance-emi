@@ -27,6 +27,7 @@ from tests.helpers import (
     create_subscription,
     ensure_document_numbering_profile_for_date,
     ensure_test_accounting_posting_prerequisites,
+    ensure_test_collection_purpose_mapping,
 )
 
 
@@ -102,6 +103,7 @@ class FinanceAccountCollectionGuardTests(TestCase):
 
     def test_record_emi_payment_rejects_reserved_finance_account(self):
         admin = create_admin_user(username="guard_admin", phone="9389111101")
+        ensure_test_accounting_posting_prerequisites(date(2026, 4, 22), performed_by=admin)
         partner = create_partner_user(username="guard_partner", phone="9389111102")
         customer = create_customer_profile(name="Guard EMI Customer", phone="7389111101")
         product = create_product(base_price=Decimal("9000.00"), product_code="GUARD-EMI-P1")
@@ -230,6 +232,7 @@ class FinanceAccountCollectionGuardTests(TestCase):
             opening_balance=Decimal("0.00"),
             is_active=True,
         )
+        ensure_test_collection_purpose_mapping(finance_account=clean_counter_fa)
 
         payload = {
             "sale_date": date(2026, 4, 21),
@@ -293,6 +296,12 @@ class CashCounterFinanceAccountFilterTests(TestCase):
             is_active=True,
             is_real_settlement_account=True,
         )
+        FinanceAccountCoaMapping.objects.create(
+            finance_account=cash_ok,
+            chart_account=asset,
+            purpose=FinanceAccountMappingPurpose.CASH_COLLECTION,
+            is_active=True,
+        )
         bank_row = FinanceAccount.objects.create(
             name="CTR Filter Bank",
             kind=FinanceAccountKind.BANK,
@@ -339,6 +348,12 @@ class CashCounterFinanceAccountFilterTests(TestCase):
             is_active=True,
             is_real_settlement_account=True,
         )
+        FinanceAccountCoaMapping.objects.create(
+            finance_account=cash_a,
+            chart_account=asset,
+            purpose=FinanceAccountMappingPurpose.CASH_COLLECTION,
+            is_active=True,
+        )
         cash_b = FinanceAccount.objects.create(
             name="Cash B",
             branch=branch_b,
@@ -347,6 +362,12 @@ class CashCounterFinanceAccountFilterTests(TestCase):
             opening_balance=Decimal("0.00"),
             is_active=True,
             is_real_settlement_account=True,
+        )
+        FinanceAccountCoaMapping.objects.create(
+            finance_account=cash_b,
+            chart_account=asset,
+            purpose=FinanceAccountMappingPurpose.CASH_COLLECTION,
+            is_active=True,
         )
         qs = FinanceAccount.objects.filter(pk__in=[cash_a.pk, cash_b.pk]).order_by("id")
         scoped = filter_finance_accounts_for_cash_counter(qs, branch_id=branch_a.pk)

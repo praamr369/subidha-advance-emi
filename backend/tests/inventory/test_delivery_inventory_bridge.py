@@ -74,6 +74,8 @@ class DeliveryInventoryBridgeTests(TestCase):
             performed_by=self.admin,
             status=DeliveryStatus.SCHEDULED,
             scheduled_date=date(2026, 4, 10),
+            admin_override=True,
+            admin_override_reason="Test override",
         )
         delivery = transition_subscription_delivery_status(
             delivery=delivery,
@@ -112,6 +114,8 @@ class DeliveryInventoryBridgeTests(TestCase):
             performed_by=self.admin,
             status=DeliveryStatus.SCHEDULED,
             scheduled_date=date(2026, 4, 11),
+            admin_override=True,
+            admin_override_reason="Test override",
         )
         delivery = transition_subscription_delivery_status(
             delivery=delivery,
@@ -163,6 +167,8 @@ class DeliveryInventoryBridgeTests(TestCase):
             performed_by=self.admin,
             status=DeliveryStatus.SCHEDULED,
             scheduled_date=date(2026, 4, 12),
+            admin_override=True,
+            admin_override_reason="Test override",
         )
         delivery = transition_subscription_delivery_status(
             delivery=delivery,

@@ -4,8 +4,9 @@ from django.utils import timezone
 
 
 def _generate_reference(prefix: str) -> str:
+    import uuid
     timestamp = timezone.now().strftime("%Y%m%d%H%M%S%f")
-    return f"{prefix}-{timestamp}"
+    return f"{prefix}-{timestamp}-{uuid.uuid4().hex[:6].upper()}"
 
 
 def generate_bank_statement_import_no() -> str:

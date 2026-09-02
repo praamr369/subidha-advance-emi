@@ -18,6 +18,8 @@ from tests.helpers import (
     create_lucky_id,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
+    ensure_test_collection_purpose_mapping,
 )
 
 
@@ -26,6 +28,7 @@ class PaymentRemindersRetailAndEmiTests(TestCase):
         super().setUp()
         self.today = timezone.localdate()
         self.admin = create_admin_user(username="reminder_run_admin", phone="9386300001")
+        ensure_test_accounting_posting_prerequisites(self.today, performed_by=self.admin)
         self.customer = create_customer_profile(name="Reminder Run Customer", phone="7386300001")
         cash_chart = ChartOfAccount.objects.create(
             code="REM-CASH-001",
@@ -38,11 +41,11 @@ class PaymentRemindersRetailAndEmiTests(TestCase):
             chart_account=cash_chart,
             opening_balance=Decimal("0.00"),
         )
-        sequence = DocumentSequence.objects.create(
-            series_code="REM-BILL-INV",
+        ensure_test_collection_purpose_mapping(finance_account=finance_account)
+        sequence = DocumentSequence.objects.get(
+            document_type="TAX_INVOICE",
             financial_year="2026-27",
-            prefix="INV-2026-27",
-            next_number=1,
+            is_active=True,
         )
         invoice = BillingInvoice.objects.create(
             invoice_date=self.today - timedelta(days=3),

@@ -4,6 +4,7 @@ Tests for 100% faster workflow
 """
 
 from django.test import TestCase, TransactionTestCase, Client
+from rest_framework.test import APIClient
 from subscriptions.models import Customer, Product, OnlineRequest, ProductRequest
 from subscriptions.services.workbench_service import WorkbenchService
 from accounts.models import User, UserRole
@@ -102,7 +103,7 @@ class WorkbenchServiceTestCase(TransactionTestCase):
 
         # Verify product request in workbench
         self.assertEqual(len(workbench["product_requests"]), 1)
-        self.assertEqual(workbench["product_requests"][0]["type"], "DIRECT_SALE")
+        self.assertEqual(workbench["product_requests"][0]["request_type"], "DIRECT_SALE")
         self.assertEqual(workbench["product_requests"][0]["status"], "SUBMITTED")
 
     def test_update_customer_profile(self):
@@ -183,7 +184,7 @@ class WorkbenchAPITestCase(TransactionTestCase):
 
     def setUp(self):
         """Setup test data"""
-        self.client = Client()
+        self.client = APIClient()
 
         # Create admin
         self.admin = User.objects.create_user(
@@ -192,10 +193,8 @@ class WorkbenchAPITestCase(TransactionTestCase):
             password="testpass123",
             phone="9111111111"
         )
-        self.admin_role = UserRole.objects.create(
-            user=self.admin,
-            role_type="ADMIN"
-        )
+        self.admin.role = UserRole.ADMIN
+        self.admin.save(update_fields=["role"])
 
         # Create customer
         self.user = User.objects.create_user(
@@ -218,8 +217,7 @@ class WorkbenchAPITestCase(TransactionTestCase):
             is_active=True
         )
 
-        # Login
-        self.client.login(username="admin", password="testpass123")
+        self.client.force_authenticate(user=self.admin)
 
     def test_workbench_api_get(self):
         """Test GET workbench API"""

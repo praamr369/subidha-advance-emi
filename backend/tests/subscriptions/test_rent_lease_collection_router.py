@@ -5,7 +5,15 @@ from django.apps import apps
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from accounting.models import ChartOfAccount, ChartOfAccountType, JournalEntry
+from accounting.models import (
+    AccountingPeriod,
+    AccountingPeriodStatus,
+    ChartOfAccount,
+    ChartOfAccountType,
+    DocumentSequence,
+    FinancialYear,
+    JournalEntry,
+)
 from subscriptions.models import (
     AuditLog,
     Payment,
@@ -64,6 +72,31 @@ class RentLeaseUnifiedCollectionRouterTests(APITestCase):
         )
         self.lease_product.is_lease_enabled = True
         self.lease_product.save(update_fields=["is_lease_enabled"])
+        self.financial_year = FinancialYear.objects.create(
+            code="FY2026-27",
+            name="FY 2026-27",
+            start_date=date(2026, 4, 1),
+            end_date=date(2027, 3, 31),
+            is_active=True,
+        )
+        AccountingPeriod.objects.create(
+            code="FY2026-27-SEP",
+            label="September 2026",
+            name="September 2026",
+            financial_year=self.financial_year,
+            start_date=date(2026, 9, 1),
+            end_date=date(2026, 9, 30),
+            status=AccountingPeriodStatus.OPEN,
+        )
+        DocumentSequence.objects.create(
+            series_code="JE-2026-27",
+            document_type="JOURNAL_ENTRY",
+            financial_year="2026-27",
+            financial_year_ref=self.financial_year,
+            prefix="JE",
+            pattern="JE/{FY}/{number}",
+            next_number=1,
+        )
 
     def _collect(self, subscription, amount="1000.00", reference_no="RL-COLLECT-001"):
         self.client.force_authenticate(user=self.admin)
@@ -153,7 +186,7 @@ class RentLeaseUnifiedCollectionRouterTests(APITestCase):
 
         response = self._collect(subscription, amount="1000.00", reference_no="RL-RENT-MONTHLY-001")
 
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, msg=str(response.data))
         self.assertEqual(response.data["demand_type"], RentLeaseDemandType.RENT_MONTHLY)
         demand = RentLeaseBillingDemand.objects.get(pk=response.data["demand_id"])
         self.assertEqual(demand.collected_amount, Decimal("1000.00"))

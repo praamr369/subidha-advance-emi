@@ -113,7 +113,8 @@ def evaluate_accounting_postability(
     needs_approval = bool(approval_required if approval_required is not None else key in APPROVAL_REQUIRED_EVENTS)
     approval_ready = not needs_approval or _is_event_approved(key)
 
-    if not supported:
+    if not supported or (key == "staff_advance" and not posted and not reconciled):
+        supported = False
         status = UNSUPPORTED_SOURCE
         blocker_code = "UNSUPPORTED_SOURCE"
         blocker_reason = "Source workflow is not configured. Do not create fake posting readiness."

@@ -14,7 +14,8 @@ from decimal import Decimal
 
 
 def generate_party_no() -> str:
-    return f"PTY-{timezone.now().strftime('%Y%m%d%H%M%S%f')}"
+    import uuid
+    return f"PTY-{timezone.now().strftime('%Y%m%d%H%M%S%f')}-{uuid.uuid4().hex[:6].upper()}"
 
 
 class CrmTimeStampedModel(models.Model):

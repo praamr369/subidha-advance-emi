@@ -9,7 +9,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from decimal import Decimal
 
-from crm.services.lead_conversion_service import LeadConversionService
+from crm.services.lead_conversion_service import LeadConversionService, LeadConversionError
 from api.v1.permissions import IsAdmin
 
 
@@ -80,6 +80,8 @@ class ProcessOnlineEnquiryView(APIView):
                 }
             })
 
+        except LeadConversionError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response(
                 {"error": str(e)},
@@ -124,6 +126,7 @@ class ProcessDirectSaleView(APIView):
                 name=name,
                 product_name=product_name,
                 amount=amount,
+                created_by=request.user,
             )
 
             return Response({
@@ -151,6 +154,8 @@ class ProcessDirectSaleView(APIView):
                 }
             })
 
+        except LeadConversionError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response(
                 {"error": str(e)},

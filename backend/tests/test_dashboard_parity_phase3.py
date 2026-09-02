@@ -16,6 +16,7 @@ from tests.helpers import (
     create_lucky_id,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 
@@ -25,6 +26,7 @@ class DashboardParityPhase3Tests(APITestCase):
         super().setUp()
         today = timezone.localdate()
         self.admin = create_admin_user(username="dash_phase3_admin", phone="9363300001")
+        ensure_test_accounting_posting_prerequisites(today, performed_by=self.admin)
         self.customer_user = create_customer_user(username="dash_phase3_customer", phone="7363300001")
         customer = create_customer_profile(user=self.customer_user, name="Dash Phase3 Customer", phone="7363300001")
         product = create_product(name="Dash Phase3 Product", product_code="DP3-001", base_price=Decimal("3000.00"))

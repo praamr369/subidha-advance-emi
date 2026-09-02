@@ -107,7 +107,9 @@ EVENT_ACTION_OVERRIDES: dict[str, dict[str, Any]] = {
     "security_deposit_collection": {"label": "Security deposit collection", "module": "subscriptions", "action_href": FINANCE_ACCOUNT_HREF},
 }
 
-UNSUPPORTED_EVENTS: dict[str, str] = {}
+UNSUPPORTED_EVENTS: dict[str, str] = {
+    "staff_advance": "StaffAdvance workflow is not configured for bridge posting. Disbursals post directly via the staff advance workflow.",
+}
 
 
 def _source_model_exists(spec: RemediationSpec) -> bool:
@@ -159,7 +161,7 @@ def _special_row(spec: RemediationSpec) -> dict[str, Any]:
     supported = _source_model_exists(spec)
     account = _existing_account(spec)
     mapping = _existing_mapping(spec)
-    if spec.event_type == "staff_advance" and not supported:
+    if spec.event_type == "staff_advance":
         status = "UNSUPPORTED_SOURCE"
         reason = UNSUPPORTED_EVENTS["staff_advance"]
         recommended = "Unsupported source model; hidden from posting until workflow exists."

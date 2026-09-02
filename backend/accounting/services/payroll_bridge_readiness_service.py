@@ -146,10 +146,13 @@ def _expense_claim_payment_event() -> dict[str, Any]:
     return event
 
 
+_ALWAYS_UNSUPPORTED_PAYROLL_KEYS = frozenset({"staff_advance"})
+
+
 def build_payroll_readiness_events() -> list[dict[str, Any]]:
     events: list[dict[str, Any]] = []
     for spec in PAYROLL_SUPPLEMENTAL_EVENT_REGISTRY:
-        if not _source_model_exists(spec):
+        if spec.event_key in _ALWAYS_UNSUPPORTED_PAYROLL_KEYS or not _source_model_exists(spec):
             events.append(
                 _not_configured_event(
                     event_key=spec.event_key,

@@ -23,7 +23,7 @@ class BadDebtServiceTests(APITestCase):
         self.admin = create_admin_user(username="bd_admin", phone="9400200001")
         self.customer = create_customer_profile(name="Default Customer", phone="7400200001")
         self.product = create_product(name="BD Product", product_code="BD-P1", base_price=Decimal("12000.00"))
-        self.batch = create_batch(batch_code="BDBATCH", duration_months=12, total_slots=50)
+        self.batch = create_batch(batch_code="BDBATCH", duration_months=12, total_slots=100)
         self.lucky_id = create_lucky_id(batch=self.batch, lucky_number=2)
         self.subscription = create_subscription(
             customer=self.customer, product=self.product, batch=self.batch,

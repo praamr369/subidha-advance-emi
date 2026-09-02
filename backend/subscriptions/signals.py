@@ -108,22 +108,28 @@ def sync_online_request_to_pipeline(sender, instance, created, **kwargs):
 
     stage = stage_mapping.get(instance.approval_status, 'LEAD')
 
-    # Get or create PublicLead
+    # Get or create PublicLead. Match on phone first: name alone is not unique,
+    # and get_or_create on it raises MultipleObjectsReturned once two leads
+    # share a name.
     lead = instance.source_public_lead
     if not lead:
-        lead, _ = PublicLead.objects.get_or_create(
-            name=instance.customer.name if instance.customer else 'Unknown',
-            defaults={
-                'phone': instance.customer.phone if instance.customer else '',
-                'email': instance.customer.email if hasattr(instance.customer, 'email') else '',
-            }
-        )
+        customer_phone = instance.customer.phone if instance.customer else ''
+        customer_name = instance.customer.name if instance.customer else 'Unknown'
+        lead = PublicLead.objects.filter(phone=customer_phone).first() if customer_phone else None
+        if not lead:
+            lead = PublicLead.objects.create(
+                name=customer_name,
+                phone=customer_phone,
+                email=instance.customer.email if hasattr(instance.customer, 'email') else '',
+            )
 
-    # Get or create CRMPipeline
+    # Get or create CRMPipeline. CRMPipeline.lead is one-to-one, so the pipeline
+    # is keyed on the lead and re-pointed at the latest online request; keying on
+    # online_request instead violates the lead uniqueness on a second enquiry.
     pipeline, created_pipeline = CRMPipeline.objects.get_or_create(
-        online_request=instance,
+        lead=lead,
         defaults={
-            'lead': lead,
+            'online_request': instance,
             'current_stage': stage,
             'request_type': instance.request_type,
             'quoted_amount': float(instance.total_amount or 0),
@@ -131,6 +137,7 @@ def sync_online_request_to_pipeline(sender, instance, created, **kwargs):
             'expected_close_date': instance.expected_close_date,
         }
     )
+    pipeline.online_request = instance
 
     # Update pipeline with latest data
     pipeline.current_stage = stage

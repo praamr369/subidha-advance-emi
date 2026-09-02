@@ -243,6 +243,9 @@ class CustomerSource(models.TextChoices):
     ADMIN = "ADMIN", "Admin Created"
     PARTNER = "PARTNER", "Partner Created"
     IMPORT = "IMPORT", "Imported"
+    ONLINE = "ONLINE", "Online"
+    ONLINE_ENQUIRY = "ONLINE_ENQUIRY", "Online Enquiry"
+    DIRECT_SALE = "DIRECT_SALE", "Direct Sale"
 
 
 # ---------------------------------------------------------------------------

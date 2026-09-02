@@ -365,7 +365,7 @@ class SetupDefaultsAndHealthTests(TestCase):
     def test_validation_passes_after_defaults_and_fails_when_required_purpose_mapping_is_inactive(self):
         apply_accounting_setup_defaults(performed_by=self.admin)
         ready = AccountingSetupService.validate_accounting_setup()
-        self.assertTrue(ready["mappings_complete"])
+        self.assertTrue(ready["mappings_complete"], msg=str(ready))
 
         mapping = FinanceAccountCoaMapping.objects.filter(
             purpose=FinanceAccountMappingPurpose.EMI_INCOME,

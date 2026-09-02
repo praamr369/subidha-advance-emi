@@ -193,7 +193,11 @@ DEFAULT_BANK_ACCOUNT_SYSTEM_CODE = "BANK_COLLECTION"
 DEFAULT_UPI_GATEWAY_SYSTEM_CODE = "UPI_COLLECTION"
 
 # Warnings that remain visible but do not block readiness.
-READINESS_INFORMATIONAL_WARNING_CODES: frozenset[str] = frozenset()
+READINESS_INFORMATIONAL_WARNING_CODES: frozenset[str] = frozenset({
+    # Demoted non-canonical settlement accounts (e.g. legacy accounts and test fixtures) are
+    # informational: the canonical Cash + Bank/UPI desks are present, so the system is operational.
+    "LEGACY_NON_SETTLEMENT_FINANCE_ACCOUNT",
+})
 
 
 def _setup_issue(

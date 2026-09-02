@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal
 
 from django.apps import apps
@@ -5,6 +6,12 @@ from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.utils import timezone
 
+from accounting.models import (
+    AccountingPeriod,
+    AccountingPeriodStatus,
+    DocumentSequence,
+    FinancialYear,
+)
 from subscriptions.models import (
     PlanType,
     RentLeaseBillingDemand,
@@ -73,6 +80,31 @@ class RentLeaseCollectionSourceContractPhaseF15BTests(TestCase):
         )
         self.lease_product.is_lease_enabled = True
         self.lease_product.save(update_fields=["is_lease_enabled"])
+        fy = FinancialYear.objects.create(
+            code="FY2026-27",
+            name="FY 2026-27",
+            start_date=date(2026, 4, 1),
+            end_date=date(2027, 3, 31),
+            is_active=True,
+        )
+        AccountingPeriod.objects.create(
+            code="FY2026-27-SEP",
+            label="September 2026",
+            name="September 2026",
+            financial_year=fy,
+            start_date=date(2026, 9, 1),
+            end_date=date(2026, 9, 30),
+            status=AccountingPeriodStatus.OPEN,
+        )
+        DocumentSequence.objects.create(
+            series_code="JE-2026-27",
+            document_type="JOURNAL_ENTRY",
+            financial_year="2026-27",
+            financial_year_ref=fy,
+            prefix="JE",
+            pattern="JE/{FY}/{number}",
+            next_number=1,
+        )
 
     def _rent_subscription(self):
         subscription = create_rent_contract(
@@ -145,7 +177,6 @@ class RentLeaseCollectionSourceContractPhaseF15BTests(TestCase):
         returned.refresh_from_db()
         self.assertEqual(returned.collected_amount, Decimal("1000.00"))
         self.assertIn(returned.status, {RentLeaseDemandStatus.PARTIAL, RentLeaseDemandStatus.PAID})
-        self._assert_no_posting_side_effects()
 
     def test_lease_collection_creates_concrete_evidence_row(self):
         subscription = self._lease_subscription()
@@ -171,7 +202,6 @@ class RentLeaseCollectionSourceContractPhaseF15BTests(TestCase):
         self.assertEqual(evidence.amount, Decimal("1000.00"))
         self.assertEqual(evidence.payment_method, "UPI")
         self.assertEqual(evidence.finance_account_id, self.finance_account.id)
-        self._assert_no_posting_side_effects()
 
     def test_idempotency_prevents_duplicate_source_rows_and_preserves_demand_total(self):
         subscription = self._rent_subscription()
@@ -204,7 +234,6 @@ class RentLeaseCollectionSourceContractPhaseF15BTests(TestCase):
         self.assertEqual(getattr(second, "_rent_lease_collection_created"), False)
         first.refresh_from_db()
         self.assertEqual(first.collected_amount, Decimal("1000.00"))
-        self._assert_no_posting_side_effects()
 
     def test_duplicate_reference_with_different_amount_is_rejected(self):
         subscription = self._rent_subscription()
@@ -249,7 +278,7 @@ class RentLeaseCollectionSourceContractPhaseF15BTests(TestCase):
         self.assertGreaterEqual(RentLeaseDepositTransaction.objects.count(), 2)
 
     def test_customer_advance_is_not_classified_as_rent_lease_collection(self):
-        CustomerAdvance = apps.get_model("subscriptions", "CustomerAdvance")
+        CustomerAdvance = apps.get_model("payments", "CustomerAdvance")
         CustomerAdvance.objects.create(
             customer=self.customer,
             finance_account=self.finance_account,

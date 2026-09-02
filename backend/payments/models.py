@@ -1796,7 +1796,7 @@ class CashCounterSession(CashDeskTimeStampedModel):
 # ─────────────────────────────────────────────
 
 
-class DailyCloseRun(TimeStampedModel):
+class DailyCloseRun(CashDeskTimeStampedModel):
     """One daily close readiness check or execution run."""
 
     run_date = models.DateField(db_index=True)

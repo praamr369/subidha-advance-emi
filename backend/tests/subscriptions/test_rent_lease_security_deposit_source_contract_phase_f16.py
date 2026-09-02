@@ -223,7 +223,7 @@ class RentLeaseSecurityDepositSourceContractPhaseF16Tests(TestCase):
             payment_date=self.today,
             idempotency_key="monthly-f16-key",
         )
-        CustomerAdvance = apps.get_model("subscriptions", "CustomerAdvance")
+        CustomerAdvance = apps.get_model("payments", "CustomerAdvance")
         CustomerAdvance.objects.create(
             customer=self.customer,
             finance_account=self.finance_account,

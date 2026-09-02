@@ -13,7 +13,7 @@ class CatalogCategoryServiceTests(TestCase):
         self.assertEqual(bed.path, "furniture/bedroom/bed")
 
         home = save_category(category=CatalogCategory(), validated_data={"name": "Home"})
-        save_category(category=bedroom, validated_data={"parent": home})
+        bedroom = save_category(category=bedroom, validated_data={"parent": home})
         bed.refresh_from_db()
         self.assertEqual(bedroom.path, "home/bedroom")
         self.assertEqual(bed.path, "home/bedroom/bed")

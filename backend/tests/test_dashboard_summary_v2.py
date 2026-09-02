@@ -18,6 +18,7 @@ from tests.helpers import (
     create_lucky_id,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 
@@ -74,6 +75,7 @@ class DashboardSummaryV2Tests(TestCase):
             amount=Decimal("1000.00"),
             due_date=self.today + timedelta(days=12),
         )
+        ensure_test_accounting_posting_prerequisites(self.today, performed_by=self.admin)
         record_emi_payment(
             emi_id=paid_emi.id,
             amount=Decimal("1000.00"),

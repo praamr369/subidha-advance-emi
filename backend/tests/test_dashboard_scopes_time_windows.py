@@ -20,6 +20,7 @@ from tests.helpers import (
     create_partner_user,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 
@@ -31,6 +32,7 @@ class DashboardScopesTimeWindowTests(TestCase):
             username="dashboard_window_admin",
             phone="9362000001",
         )
+        ensure_test_accounting_posting_prerequisites(self.today, performed_by=self.admin)
         self.partner = create_partner_user(
             username="dashboard_window_partner",
             phone="9362000002",

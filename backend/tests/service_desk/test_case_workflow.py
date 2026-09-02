@@ -188,6 +188,8 @@ class ServiceDeskCaseWorkflowTests(TestCase):
             performed_by=self.admin,
             status=DeliveryStatus.SCHEDULED,
             scheduled_date=date(2026, 4, 18),
+            admin_override=True,
+            admin_override_reason="Test override",
         )
         delivery = transition_subscription_delivery_status(
             delivery=delivery,

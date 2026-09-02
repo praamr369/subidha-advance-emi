@@ -1,80 +1,145 @@
-import pytest
 from decimal import Decimal
-from django.contrib.auth.models import User
-from subscriptions.models import Customer, PublicLead, OnlineRequest
-from billing.models import DirectSale
-from crm.services.lead_conversion_service import LeadConversionService
 
-pytestmark = pytest.mark.django_db
+from django.test import TestCase
 
-def test_find_or_create_customer():
-    # Test creation
-    customer, created = LeadConversionService._find_or_create_customer(
-        phone="1234567890",
-        email="test@example.com",
-        name="Test User",
-        source="ONLINE"
-    )
-    assert created is True
-    assert customer.name == "Test User"
-    assert customer.phone == "1234567890"
-    assert customer.customer_source == "ONLINE"
-    
-    # Test finding existing
-    customer2, created2 = LeadConversionService._find_or_create_customer(
-        phone="1234567890",
-        email="test2@example.com",
-        name="Test User 2",
-        source="ONLINE"
-    )
-    assert created2 is False
-    assert customer.id == customer2.id
+from crm.services.lead_conversion_service import (
+    LeadConversionError,
+    LeadConversionService,
+)
+from tests.helpers import (
+    create_admin_user,
+    create_product,
+    ensure_test_accounting_posting_prerequisites,
+)
 
-def test_process_online_enquiry():
-    online_req, customer, lead, created_customer = LeadConversionService.process_online_enquiry(
-        phone="9876543210",
-        email="online@example.com",
-        name="Online User",
-        product_name="Test Product",
-        amount="1000.00"
-    )
-    
-    assert created_customer is True
-    assert customer.phone == "9876543210"
-    assert online_req.customer == customer
-    assert online_req.product_name == "Test Product"
-    assert online_req.amount == Decimal("1000.00")
-    assert lead.converted_customer == customer
-    assert lead.converted_online_request == online_req
-    assert lead.phone == "9876543210"
-    assert lead.status == "CONTACTED"
-    
-    # Second enquiry with same phone, different name
-    online_req2, customer2, lead2, created_customer2 = LeadConversionService.process_online_enquiry(
-        phone="9876543210",
-        email="online2@example.com",
-        name="Online User Changed",
-    )
-    assert created_customer2 is False
-    assert customer2.id == customer.id
-    assert lead2.id == lead.id
-    assert lead2.converted_online_request == online_req2
 
-def test_process_direct_sale():
-    sale, customer, lead, created_customer = LeadConversionService.process_direct_sale(
-        phone="5555555555",
-        email="sale@example.com",
-        name="Sale User",
-        product_name="Sale Product",
-        amount="2000.00"
-    )
-    
-    assert created_customer is True
-    assert customer.phone == "5555555555"
-    assert sale.customer == customer
-    assert sale.product_name == "Sale Product"
-    assert sale.grand_total == Decimal("2000.00")
-    assert lead.converted_customer == customer
-    assert lead.converted_direct_sale == sale
-    assert lead.phone == "5555555555"
-    assert lead.status == "QUALIFIED"
+class LeadConversionServiceTests(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.admin = create_admin_user(username="lead_conv_admin", phone="9364000992")
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
+        self.product = create_product(
+            name="Test Product",
+            product_code="LEADCONV-001",
+            base_price=Decimal("1000.00"),
+        )
+        self.sale_product = create_product(
+            name="Sale Product",
+            product_code="LEADCONV-002",
+            base_price=Decimal("2000.00"),
+        )
+
+    def test_find_or_create_customer(self):
+        customer, created = LeadConversionService._find_or_create_customer(
+            phone="1234567890",
+            email="test@example.com",
+            name="Test User",
+            source="ONLINE"
+        )
+        self.assertTrue(created)
+        self.assertEqual(customer.name, "Test User")
+        self.assertEqual(customer.phone, "1234567890")
+        self.assertEqual(customer.customer_source, "ONLINE")
+
+        customer2, created2 = LeadConversionService._find_or_create_customer(
+            phone="1234567890",
+            email="test2@example.com",
+            name="Test User 2",
+            source="ONLINE"
+        )
+        self.assertFalse(created2)
+        self.assertEqual(customer.id, customer2.id)
+
+    def test_process_online_enquiry(self):
+        online_req, customer, lead, created_customer = LeadConversionService.process_online_enquiry(
+            phone="9876543210",
+            email="online@example.com",
+            name="Online User",
+            product_name="Test Product",
+            amount="1000.00"
+        )
+
+        self.assertTrue(created_customer)
+        self.assertEqual(customer.phone, "9876543210")
+        self.assertEqual(online_req.customer, customer)
+        self.assertEqual(online_req.product, self.product)
+        self.assertEqual(online_req.total_amount, Decimal("1000.00"))
+        self.assertEqual(online_req.status, "DRAFT")
+        self.assertEqual(lead.converted_customer, customer)
+        self.assertEqual(lead.converted_online_request, online_req)
+        self.assertEqual(lead.phone, "9876543210")
+        self.assertEqual(lead.status, "CONTACTED")
+
+        online_req2, customer2, lead2, created_customer2 = LeadConversionService.process_online_enquiry(
+            phone="9876543210",
+            email="online2@example.com",
+            name="Online User Changed",
+            product_name="Test Product",
+        )
+        self.assertFalse(created_customer2)
+        self.assertEqual(customer2.id, customer.id)
+        self.assertEqual(lead2.id, lead.id)
+        self.assertEqual(lead2.converted_online_request, online_req2)
+        # Price falls back to the product master when no amount is supplied.
+        self.assertEqual(online_req2.total_amount, Decimal("1000.00"))
+
+    def test_process_online_enquiry_rejects_unknown_product(self):
+        with self.assertRaises(LeadConversionError):
+            LeadConversionService.process_online_enquiry(
+                phone="9876500000",
+                email="nomatch@example.com",
+                name="No Match",
+                product_name="Nonexistent Product",
+            )
+
+    def test_process_direct_sale(self):
+        sale, customer, lead, created_customer = LeadConversionService.process_direct_sale(
+            phone="5555555555",
+            email="sale@example.com",
+            name="Sale User",
+            product_name="Sale Product",
+            amount="2000.00",
+            created_by=self.admin,
+        )
+
+        self.assertTrue(created_customer)
+        self.assertEqual(customer.phone, "5555555555")
+        self.assertEqual(sale.customer, customer)
+        self.assertEqual(sale.grand_total, Decimal("2000.00"))
+        # A real numbered billing document is issued.
+        self.assertTrue(sale.sale_no)
+        self.assertIsNotNone(sale.doc_series_id)
+        self.assertEqual(sale.lines.count(), 1)
+        self.assertEqual(sale.lines.first().product, self.sale_product)
+        self.assertEqual(lead.converted_customer, customer)
+        self.assertEqual(lead.converted_direct_sale, sale)
+        self.assertEqual(lead.phone, "5555555555")
+        self.assertEqual(lead.status, "CONVERTED")
+
+    def test_process_product_request_creates_request_against_real_product(self):
+        customer, _ = LeadConversionService._find_or_create_customer(
+            phone="4444444444",
+            email="preq@example.com",
+            name="Product Request User",
+            source="ADMIN",
+        )
+
+        product_request, lead = LeadConversionService.process_product_request(
+            customer_id=customer.id,
+            requester=self.admin,
+            product_name="Test Product",
+        )
+
+        self.assertEqual(product_request.customer, customer)
+        self.assertEqual(product_request.product, self.product)
+        self.assertEqual(product_request.request_type, "DIRECT_SALE")
+        self.assertEqual(product_request.status, "SUBMITTED")
+        self.assertEqual(product_request.requester, self.admin)
+
+    def test_process_product_request_rejects_unknown_customer(self):
+        with self.assertRaises(LeadConversionError):
+            LeadConversionService.process_product_request(
+                customer_id=999999,
+                requester=self.admin,
+                product_name="Test Product",
+            )

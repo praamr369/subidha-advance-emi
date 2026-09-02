@@ -121,10 +121,13 @@ def export_setup_snapshot(*, exported_by: str | None = None) -> SnapshotExportRe
 
 def is_setup_import_allowed() -> bool:
     """Setup-snapshot import is permitted only in known-safe environments.
-    
-    Production is fail-closed: import is blocked unless ALLOW_BUSINESS_RESET is True.
+
+    Production is fail-closed: blocked unless ALLOW_BUSINESS_RESET is explicitly True.
     """
-    return getattr(settings, "ALLOW_BUSINESS_RESET", True)
+    env = getattr(settings, "ENVIRONMENT_NAME", "development").lower()
+    if env in SETUP_IMPORT_ALLOWED_ENVS:
+        return True
+    return bool(getattr(settings, "ALLOW_BUSINESS_RESET", False))
 
 
 class SetupSnapshotImportError(Exception):

@@ -10,6 +10,7 @@ Covers:
 """
 from __future__ import annotations
 
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -290,10 +291,12 @@ class MilestoneReadinessComputationTests(TestCase):
         self.assertEqual(deposit["details"]["collected_amount"], "0.00")
 
     def test_partial_deposit_stays_separate_from_monthly_demand_readiness(self):
+        # start_date in future so create_rent_contract doesn't auto-generate monthly demands
         sub = create_rent_contract(
             customer=self.customer,
             product=self.product,
             tenure_months=12,
+            start_date=date.today() + timedelta(days=1),
             security_deposit_percent=Decimal("20.00"),
             performed_by=self.admin,
         )
@@ -445,7 +448,8 @@ class LeaseHandoverConditionProofGateTests(TestCase):
         self.sub.lease_profile.handover_notes = "Condition documented at handover."
         self.sub.lease_profile.save(update_fields=["handover_notes"])
         delivery = create_subscription_delivery(
-            subscription=self.sub, performed_by=self.admin
+            subscription=self.sub, performed_by=self.admin,
+            admin_override=True, admin_override_reason="lease handover test override",
         )
         self.assertIsNotNone(delivery.pk)
 

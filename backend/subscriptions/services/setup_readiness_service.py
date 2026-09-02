@@ -346,6 +346,7 @@ def _accounting_period_section() -> dict[str, Any]:
         why_this_matters="Every journal post asserts an OPEN accounting period for its date. A fresh production database with no seeded financial year will silently reject the very first collection or opening-balance post.",
         category=FINANCE_ACCOUNTING_REQUIRED,
         repairable=True,
+        optional_for_initial_start=True,
         metadata={
             "current_period_code": getattr(current, "code", None),
             "current_period_status": getattr(current, "status", None),

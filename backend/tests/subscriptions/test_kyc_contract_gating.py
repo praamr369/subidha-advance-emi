@@ -198,6 +198,14 @@ class KycReadinessComputationTests(TestCase):
             status=CustomerKycDocumentStatus.APPROVED,
             expiry_date=date.today() + timedelta(days=90),
         )
+        # ADDRESS_PROOF required for EMI "activate" stage (which gates "deliver")
+        CustomerKycDocument.objects.create(
+            customer=self.customer,
+            document_type=CustomerKycDocumentType.OTHER,
+            category=KycDocumentCategory.ADDRESS_PROOF,
+            file=_small_file("address-proof.pdf"),
+            status=CustomerKycDocumentStatus.APPROVED,
+        )
         readiness = evaluate_kyc_readiness(self.customer, "refund_release")
         self.assertTrue(readiness["ready"])
         self.assertEqual(readiness["status"], "READY")
@@ -375,7 +383,8 @@ class DeliveryHandoverGateTests(TestCase):
         )
         self.sub.refresh_from_db()
         delivery = create_subscription_delivery(
-            subscription=self.sub, performed_by=self.admin
+            subscription=self.sub, performed_by=self.admin,
+            admin_override=True, admin_override_reason="kyc gate test override",
         )
         self.assertIsNotNone(delivery.pk)
 

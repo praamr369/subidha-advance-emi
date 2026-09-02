@@ -32,6 +32,7 @@ from tests.helpers import (
     create_partner_user,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 
@@ -74,6 +75,7 @@ class DashboardCanonicalSummaryTests(TestCase):
             product_code="CAN-DASH-001",
             base_price=Decimal("3000.00"),
         )
+        ensure_test_accounting_posting_prerequisites(self.today, performed_by=self.admin)
 
         self.active_subscription = self._create_active_subscription()
         self.winner_subscription = self._create_winner_subscription()

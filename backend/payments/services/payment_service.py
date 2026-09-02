@@ -1008,6 +1008,7 @@ def reverse_payment_for_admin(
             receipt_id=receipt.id,
             performed_by=reversed_by,
             reason=f"Payment reversal: {reason}",
+            skip_bridge=True,
         )
 
     _reconcile_after_payment(subscription, emi)

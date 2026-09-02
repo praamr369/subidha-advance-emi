@@ -585,7 +585,7 @@ class AdminHrStaffDocumentsListCreateView(_AdminBase):
                 "status": document.status,
             },
         )
-        return Response(EmployeeDocumentSerializer(document, context={"request": request}).data)
+        return Response(EmployeeDocumentSerializer(document, context={"request": request}).data, status=status.HTTP_201_CREATED)
 
 
 class AdminHrStaffDocumentPatchView(_AdminBase):
