@@ -505,3 +505,129 @@ class GrowthRequestDecision(models.Model):
 
     def __str__(self):
         return f"GrowthDecision[{self.growth_request_id}:{self.decision}]"
+
+
+# ─────────────────────────────────────────────
+# CustomerOfferGrant — per-customer offer entitlement
+# ─────────────────────────────────────────────
+
+class CustomerOfferGrantStatus(models.TextChoices):
+    PENDING = "PENDING", "Pending approval"
+    APPROVED = "APPROVED", "Approved"
+    REJECTED = "REJECTED", "Rejected"
+    WITHDRAWN = "WITHDRAWN", "Withdrawn"
+
+
+class CustomerOfferGrantSource(models.TextChoices):
+    """How the customer came to be offered this."""
+
+    INDIVIDUAL = "INDIVIDUAL", "Granted to this customer directly"
+    SEGMENT = "SEGMENT", "Granted from an audience segment"
+
+
+class CustomerOfferGrant(GrowthTimeStampedModel):
+    """
+    One customer's entitlement to an OfferPackage.
+
+    A grant is what actually moves a price for a customer. Segment membership
+    (OfferPackage.audience_type) only makes a customer a *candidate*; a person
+    still has to approve the grant before the discount is honoured, so margin is
+    never given away automatically.
+
+    Applies on authenticated surfaces only — the customer portal and admin
+    quoting. The anonymous public catalogue has no customer and is unaffected.
+    """
+
+    customer = models.ForeignKey(
+        "customers.Customer",
+        on_delete=models.PROTECT,
+        related_name="offer_grants",
+        db_index=True,
+    )
+    offer_package = models.ForeignKey(
+        OfferPackage,
+        on_delete=models.PROTECT,
+        related_name="customer_grants",
+        db_index=True,
+    )
+
+    status = models.CharField(
+        max_length=12,
+        choices=CustomerOfferGrantStatus.choices,
+        default=CustomerOfferGrantStatus.PENDING,
+        db_index=True,
+    )
+    source = models.CharField(
+        max_length=12,
+        choices=CustomerOfferGrantSource.choices,
+        default=CustomerOfferGrantSource.INDIVIDUAL,
+        db_index=True,
+    )
+
+    # Beyond this date the grant stops applying even if approved. Independent of
+    # the package's own start/end window, which is also enforced.
+    expires_on = models.DateField(null=True, blank=True, db_index=True)
+
+    note = models.TextField(blank=True, default="")
+    decision_note = models.TextField(blank=True, default="")
+
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="offer_grants_requested",
+        null=True,
+        blank=True,
+    )
+    decided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="offer_grants_decided",
+        null=True,
+        blank=True,
+    )
+    decided_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "growth_customer_offer_grants"
+        ordering = ["-created_at"]
+        constraints = [
+            # One live grant per customer/package. History is kept by moving old
+            # grants to REJECTED/WITHDRAWN rather than deleting them.
+            models.UniqueConstraint(
+                fields=["customer", "offer_package"],
+                condition=models.Q(status__in=["PENDING", "APPROVED"]),
+                name="uq_live_offer_grant_per_customer_package",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["customer", "status"], name="growth_cog_cust_status_idx"),
+            models.Index(fields=["status", "expires_on"], name="growth_cog_status_exp_idx"),
+        ]
+
+    def __str__(self):
+        return f"CustomerOfferGrant[{self.customer_id}:{self.offer_package_id}] {self.status}"
+
+    def clean(self):
+        if self.status in (
+            CustomerOfferGrantStatus.APPROVED,
+            CustomerOfferGrantStatus.REJECTED,
+        ) and not self.decided_by_id:
+            raise ValidationError(
+                {"decided_by": "A decided grant must record who decided it."}
+            )
+
+    def is_live(self, on_date=None) -> bool:
+        """Approved, not expired, and its package window is open."""
+        on_date = on_date or timezone.localdate()
+        if self.status != CustomerOfferGrantStatus.APPROVED:
+            return False
+        if self.expires_on and on_date > self.expires_on:
+            return False
+        pkg = self.offer_package
+        if pkg.status != OfferPackageStatus.ACTIVE:
+            return False
+        if pkg.start_date and on_date < pkg.start_date:
+            return False
+        if pkg.end_date and on_date > pkg.end_date:
+            return False
+        return True

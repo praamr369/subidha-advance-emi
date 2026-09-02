@@ -38,6 +38,10 @@ EMI = "EMI"
 RENT = "RENT"
 LEASE = "LEASE"
 
+# Audience that needs no grant — the offer is open to everybody, so it is the
+# only kind that can move an anonymous catalogue price.
+PUBLIC_AUDIENCE = "ALL"
+
 # Cash is always available; the rest are gated by the product's own flags.
 SCHEME_PRODUCT_FLAG = {
     EMI: "is_emi_enabled",
@@ -221,6 +225,7 @@ class PricingCatalog:
         self._templates: dict[str, list] = {}
         self._lines: dict[tuple[int, str], list] | None = None
         self._batch_durations: list[int] | None = None
+        self._grants: dict[int, set[int]] = {}
         if products is not None:
             self.prefetch(products)
 
@@ -251,6 +256,24 @@ class PricingCatalog:
         if self._lines is not None:
             return self._lines.get((product.pk, plan_type), [])
         return list(_live_lines_queryset(self.on_date, plan_type=plan_type, product_ids=[product.pk]))
+
+    def granted_package_ids(self, customer) -> set[int]:
+        """Packages this customer holds an approved, in-window grant for."""
+        if customer is None:
+            return set()
+        key = getattr(customer, "pk", None)
+        if key is None:
+            return set()
+        if key not in self._grants:
+            from growth.services.customer_offer_service import live_grants_for
+
+            try:
+                self._grants[key] = {
+                    g.offer_package_id for g in live_grants_for(customer, on_date=self.on_date)
+                }
+            except Exception:  # noqa: BLE001 - pricing must survive a grant lookup failure
+                self._grants[key] = set()
+        return self._grants[key]
 
     def batch_durations(self) -> list[int]:
         """Distinct tenures of Lucky Plan batches, used as EMI shortcuts."""
@@ -304,11 +327,23 @@ def _apply_line(base_price: Decimal, line) -> tuple[Decimal, DiscountApplication
     )
 
 
-def _best_price(product, plan_type: str, base_price: Decimal, catalog: "PricingCatalog"):
-    """Pick the cheapest live offer for this product+scheme."""
+def _best_price(product, plan_type: str, base_price: Decimal, catalog: "PricingCatalog", customer=None):
+    """
+    Cheapest live offer for this product+scheme.
+
+    Packages open to everyone apply to anyone. A package aimed at a customer
+    segment only applies where the customer holds an APPROVED grant for it — by
+    policy an offer is never handed out automatically, so an anonymous visitor
+    and an unapproved customer both see the standard price.
+    """
+    granted_package_ids = catalog.granted_package_ids(customer)
+
     best_price = base_price
     best_discount = None
     for line in catalog.lines(product, plan_type):
+        pkg = line.offer_package
+        if pkg.audience_type != PUBLIC_AUDIENCE and pkg.id not in granted_package_ids:
+            continue
         candidate, discount = _apply_line(base_price, line)
         if discount is not None and candidate < best_price:
             best_price, best_discount = candidate, discount
@@ -398,13 +433,19 @@ def _tenure_quotes(plan_type: str, effective_price: Decimal, catalog: "PricingCa
     return sorted(quotes, key=lambda q: q.tenure_months)
 
 
-def quote_scheme(product, plan_type: str, on_date=None, catalog: "PricingCatalog | None" = None) -> SchemeQuote:
-    """Price one product under one scheme."""
+def quote_scheme(
+    product,
+    plan_type: str,
+    on_date=None,
+    catalog: "PricingCatalog | None" = None,
+    customer=None,
+) -> SchemeQuote:
+    """Price one product under one scheme, for `customer` when one is known."""
     catalog = catalog or PricingCatalog(on_date=on_date)
     base_price = _q2(getattr(product, "base_price", 0))
 
     if plan_type == CASH:
-        effective, discount = _best_price(product, CASH, base_price, catalog)
+        effective, discount = _best_price(product, CASH, base_price, catalog, customer)
         return SchemeQuote(
             scheme=CASH,
             available=base_price > ZERO,
@@ -436,7 +477,7 @@ def quote_scheme(product, plan_type: str, on_date=None, catalog: "PricingCatalog
             unavailable_reason="Price not published.",
         )
 
-    effective, discount = _best_price(product, plan_type, base_price, catalog)
+    effective, discount = _best_price(product, plan_type, base_price, catalog, customer)
     tenures = _tenure_quotes(plan_type, effective, catalog)
 
     # Availability follows the product's own scheme flags and having a price.
@@ -453,7 +494,13 @@ def quote_scheme(product, plan_type: str, on_date=None, catalog: "PricingCatalog
     )
 
 
-def quote_product(product, on_date=None, catalog: "PricingCatalog | None" = None, public: bool = False) -> dict:
+def quote_product(
+    product,
+    on_date=None,
+    catalog: "PricingCatalog | None" = None,
+    public: bool = False,
+    customer=None,
+) -> dict:
     """
     Pricing payload for one product: each scheme, its discount, and every tenure
     with its instalment and deposit.
@@ -467,7 +514,10 @@ def quote_product(product, on_date=None, catalog: "PricingCatalog | None" = None
     """
     catalog = catalog or PricingCatalog(on_date=on_date)
     on_date = catalog.on_date
-    schemes = [quote_scheme(product, s, catalog=catalog) for s in (CASH, EMI, RENT, LEASE)]
+    schemes = [
+        quote_scheme(product, s, catalog=catalog, customer=customer)
+        for s in (CASH, EMI, RENT, LEASE)
+    ]
     available = [s for s in schemes if s.available]
     listed = available if public else schemes
 

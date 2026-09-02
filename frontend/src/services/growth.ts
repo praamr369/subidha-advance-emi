@@ -219,3 +219,87 @@ export function rejectGrowthRequest(id: number, reason: string) {
 export function getGrowthRequestPreview(id: number) {
   return apiFetch<Record<string, unknown>>(`/admin/growth/requests/${id}/preview/`);
 }
+
+// ─── Customer Offer Grants ─────────────────────────────────────────────────
+// A grant is what actually moves a price for a customer, and only once a
+// person has approved it. Segment membership alone makes them a candidate.
+
+export type CustomerOfferGrant = {
+  id: number;
+  customer_id: number;
+  customer_name: string | null;
+  offer_package_id: number;
+  package_code: string;
+  package_name: string;
+  plan_type: "EMI" | "RENT" | "LEASE";
+  audience_type: string;
+  status: "PENDING" | "APPROVED" | "REJECTED" | "WITHDRAWN";
+  source: "INDIVIDUAL" | "SEGMENT";
+  expires_on: string | null;
+  is_live: boolean;
+  note: string;
+  decision_note: string;
+  requested_by: string | null;
+  decided_by: string | null;
+  decided_at: string | null;
+  created_at: string | null;
+};
+
+export type CustomerOfferCandidate = {
+  package_id: number;
+  package_code: string;
+  package_name: string;
+  plan_type: "EMI" | "RENT" | "LEASE";
+  audience_type: string;
+  requires_approval: boolean;
+  already_held: boolean;
+  segment_reason: string;
+};
+
+export function listCustomerOfferCandidates(customerId: number, planType?: string) {
+  const qs = planType ? `?plan_type=${encodeURIComponent(planType)}` : "";
+  return apiFetch<{
+    customer_id: number;
+    customer_name: string;
+    candidates: CustomerOfferCandidate[];
+  }>(`/admin/growth/customers/${customerId}/offer-candidates/${qs}`);
+}
+
+export function listCustomerOfferGrants(customerId: number, status?: string) {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : "";
+  return apiFetch<{ results: CustomerOfferGrant[] }>(
+    `/admin/growth/customers/${customerId}/offer-grants/${qs}`
+  );
+}
+
+export function requestCustomerOfferGrant(
+  customerId: number,
+  payload: { offer_package_id: number; note?: string; expires_on?: string | null }
+) {
+  return apiFetch<CustomerOfferGrant>(
+    `/admin/growth/customers/${customerId}/offer-grants/`,
+    { method: "POST", body: JSON.stringify(payload) }
+  );
+}
+
+export function decideCustomerOfferGrant(
+  grantId: number,
+  approve: boolean,
+  decisionNote?: string
+) {
+  return apiFetch<CustomerOfferGrant>(`/admin/growth/offer-grants/${grantId}/decision/`, {
+    method: "POST",
+    body: JSON.stringify({ approve, decision_note: decisionNote ?? "" }),
+  });
+}
+
+export function withdrawCustomerOfferGrant(grantId: number, decisionNote?: string) {
+  return apiFetch<CustomerOfferGrant>(`/admin/growth/offer-grants/${grantId}/withdraw/`, {
+    method: "POST",
+    body: JSON.stringify({ decision_note: decisionNote ?? "" }),
+  });
+}
+
+export function listPendingOfferGrants() {
+  return apiFetch<{ results: CustomerOfferGrant[] }>(`/admin/growth/offer-grants/pending/`);
+}
