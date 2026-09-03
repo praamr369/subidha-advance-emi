@@ -51,6 +51,16 @@ jobs:
             lucky_plan crm accounting billing inventory growth business_setup \
             finance_control audit products_core
 
+      # Blocking: model FIELD drift. The migration check above catches models
+      # changed without a migration; this catches the opposite direction —
+      # code still writing fields the model no longer has. Four services were
+      # found raising on every call this way, each reachable from a live
+      # endpoint and none covered by a test, so nothing surfaced them.
+      - name: Model field drift check
+        run: |
+          python manage.py check_model_field_drift \
+            --settings=core.settings.test --fail-on-findings
+
       # Blocking: Layer-A verification gate. Walks the whole /api/v1 surface and
       # asserts (1) no auth-gated endpoint serves data to anon, (2) no admin-only
       # endpoint serves data to ANY non-admin portal role (customer/partner/

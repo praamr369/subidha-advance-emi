@@ -173,20 +173,29 @@ class Command(BaseCommand):
             },
         )[0]
         
-        try:
-            from products_pim.models import PimProduct
-            PimProduct.objects.update_or_create(
-                product=product,
-                defaults={
-                    "is_published": True,
-                    "title": "Smoke EMI Product (PIM)",
-                    "slug": "smoke-emi-product-pim",
-                    "description": "Seeded PIM product for automation testing.",
-                    "meta_title": "Smoke EMI Product",
-                }
-            )
-        except Exception:
-            pass
+        # The PIM record is what makes a product visible on the public catalogue,
+        # so the smoke seed needs it published. This previously keyed on
+        # `product` (the field is source_product) and set title/slug/meta_title,
+        # none of which exist — and the bare except swallowed the TypeError, so
+        # it silently seeded nothing.
+        from products_pim.models import PimProduct, ProductCategory
+
+        category, _ = ProductCategory.objects.get_or_create(
+            slug="smoke-automation",
+            defaults={"name": "Smoke Automation"},
+        )
+        PimProduct.objects.update_or_create(
+            source_product=product,
+            defaults={
+                "code": product.product_code,
+                "name": "Smoke EMI Product (PIM)",
+                "description": "Seeded PIM product for automation testing.",
+                "category": category,
+                "base_price": product.base_price,
+                "is_active": True,
+                "is_published": True,
+            },
+        )
 
         paid_batch = self._upsert_open_batch(
             code="SMOKEPAID",
