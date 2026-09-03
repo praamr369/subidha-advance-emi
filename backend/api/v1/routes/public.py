@@ -412,6 +412,10 @@ class PublicProductsView(generics.ListAPIView):
         # without any PimProduct are shown as-is (operational-only catalogue).
         queryset = (
             Product.objects.filter(is_active=True, item_type="FINISHED_GOOD")
+            # Honour the PIM publish flag. This filter was described in the
+            # comment above but never implemented, so unpublishing a product in
+            # the PIM did not remove it from the public site.
+            .filter(Q(pim__isnull=True) | Q(pim__is_published=True))
             .distinct()
             .exclude(inventory_profile__stock_item_type__in=["RAW_MATERIAL", "ACCESSORY"])
             .select_related("category_master")
@@ -471,6 +475,9 @@ class PublicProductDetailView(APIView):
         try:
             base_qs = (
                 Product.objects.filter(is_active=True)
+                # Same publish rule as the listing, otherwise an unpublished
+                # product stays reachable by direct URL.
+                .filter(Q(pim__isnull=True) | Q(pim__is_published=True))
                 .distinct()
                 .exclude(inventory_profile__stock_item_type__in=["RAW_MATERIAL", "ACCESSORY"])
                 .prefetch_related("pim", "pim__attributes__attribute", "pim__variants__attribute_values__attribute")

@@ -296,8 +296,17 @@ def create_product(
     name="Test Product",
     product_code="TP-001",
     base_price=Decimal("15000.00"),
+    published=True,
 ):
-    return Product.objects.create(
+    """
+    Create an operational product.
+
+    A post_save signal links a PimProduct automatically, and that record
+    defaults to is_published=False. Since the public catalogue honours that
+    flag, fixtures publish by default so a helper-made product behaves like a
+    normal, visible one. Pass published=False to exercise the publish gate.
+    """
+    product = Product.objects.create(
         name=name,
         product_code=product_code,
         base_price=base_price,
@@ -309,6 +318,11 @@ def create_product(
         is_rent_enabled=False,
         is_lease_enabled=False,
     )
+    if published:
+        from products_pim.models import PimProduct
+
+        PimProduct.objects.filter(source_product=product).update(is_published=True)
+    return product
 
 
 def ensure_waiver_launch_approved():
