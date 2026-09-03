@@ -136,6 +136,9 @@ def create_direct_sale_from_enquiry(online_request: OnlineRequest, created_by=No
     return create_direct_sale(
         payload={
             'customer': online_request.customer,
+            # DirectSale.online_request is a reverse relation, not a writable
+            # field. The link runs the other way: OnlineRequest.approved_direct_sale,
+            # which approve_online_request sets on the caller side.
             'sale_date': timezone.localdate(),
             'delivery_required': True,
             'delivery_reference': (online_request.request_number or '')[:64],
@@ -168,7 +171,9 @@ def create_subscription_from_enquiry(
 
     sub = Subscription.objects.create(
         customer=online_request.customer,
-        online_request=online_request,
+        # Subscription.online_request is a reverse relation, not a writable
+        # field. approve_online_request sets the forward link from the other
+        # side, via OnlineRequest.approved_subscription.
         product=online_request.product,
         plan_type=plan_type,
         status='DRAFT',
@@ -176,7 +181,8 @@ def create_subscription_from_enquiry(
         tenure_months=tenure,
         total_amount=online_request.total_amount or Decimal('0'),
         start_date=timezone.now().date(),
-        notes=f'Auto-created from approval of {online_request.request_number}',
+        # Subscription has no `notes` field; passing one raised TypeError on
+        # every SUBSCRIPTION / RENT / LEASE approval.
     )
 
     # Auto-create EMI schedule

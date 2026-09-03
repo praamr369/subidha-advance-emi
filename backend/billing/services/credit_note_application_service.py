@@ -125,9 +125,12 @@ def apply_credit_note_to_invoice(
 
     AuditLog.objects.create(
         action_type=AuditLog.ActionType.CREDIT_NOTE_APPLIED,
-        actor=applied_by,
-        target_type="BillingCreditNote",
-        target_id=str(note.id),
+        # AuditLog's columns are performed_by / model_name / object_id. The
+        # previous actor / target_type / target_id raised TypeError, so applying
+        # a credit note failed at the audit step after the invoice was updated.
+        performed_by=applied_by,
+        model_name="BillingCreditNote",
+        object_id=str(note.id),
         metadata={
             "credit_note_id": note.id,
             "credit_note_no": note.note_no,

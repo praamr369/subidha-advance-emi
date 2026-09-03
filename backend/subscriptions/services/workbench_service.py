@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.db import transaction
 from django.utils import timezone
 from django.core.exceptions import ValidationError
@@ -405,8 +407,17 @@ class WorkbenchService:
             }
 
     def approve_request(self, customer_id: int, request_id: int, admin, notes: str = ''):
-        """Approve product request and create invoice"""
-        from billing.models import DirectSale
+        """
+        Approve a product request and issue the sale document.
+
+        Goes through billing_service.create_direct_sale so the document series,
+        financial year, tax snapshot and line items are all correct. The previous
+        implementation wrote `product` and `created_by` straight onto DirectSale
+        (neither is a field), used the non-existent status 'CREATED', and omitted
+        the required sale_date / financial_year / doc_series — so every approval
+        through this path raised.
+        """
+        from billing.services.billing_service import create_direct_sale
 
         with transaction.atomic():
             product_request = ProductRequest.objects.get(id=request_id, customer_id=customer_id)
@@ -414,12 +425,20 @@ class WorkbenchService:
             if product_request.status != 'SUBMITTED':
                 raise ValueError(f"Cannot approve request in {product_request.status} status")
 
-            # Create invoice
-            invoice = DirectSale.objects.create(
-                customer_id=customer_id,
-                product=product_request.product,
-                subtotal=product_request.product.base_price,
-                status='CREATED',
+            product = product_request.product
+            invoice = create_direct_sale(
+                payload={
+                    'customer': Customer.objects.get(pk=customer_id),
+                    'sale_date': timezone.localdate(),
+                    'notes': notes or f'Approved from product request #{request_id}',
+                    'lines': [
+                        {
+                            'product': product,
+                            'quantity': Decimal('1'),
+                            'unit_price': product.base_price or Decimal('0'),
+                        }
+                    ],
+                },
                 created_by=admin,
             )
 

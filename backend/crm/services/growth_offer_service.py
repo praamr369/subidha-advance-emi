@@ -163,10 +163,13 @@ def evaluate_offer_package_eligibility(offer_package, customer=None, context=Non
         doc_warnings = _get_customer_document_warnings(customer)
         warnings.extend(doc_warnings)
 
-        # Audience type check
+        # Audience type check. A segment mismatch makes the customer ineligible;
+        # treating it as a mere warning is what let targeted offers read as
+        # available to everyone.
         audience_ok, audience_reason = _check_audience_eligibility(offer_package, customer)
         if not audience_ok:
-            warnings.append(audience_reason)
+            eligible = False
+            reasons.append(audience_reason)
 
     return {
         "eligible": eligible,
@@ -206,25 +209,17 @@ def _get_customer_document_warnings(customer) -> list[str]:
 
 
 def _check_audience_eligibility(offer_package, customer) -> tuple[bool, str]:
-    from subscriptions.models_growth_offers import OfferAudienceType
-    audience = offer_package.audience_type
+    """
+    Delegates to the single implementation of segment membership.
 
-    if audience == OfferAudienceType.ALL:
-        return True, ""
+    This previously returned True on every path — NEW_CUSTOMER,
+    EXISTING_CUSTOMER and HIGH_TRUST_CUSTOMER were never checked at all, and
+    PARTNER_REFERRED returned True precisely when no referral existed. The admin
+    preview therefore told staff a customer qualified for offers they did not.
+    """
+    from growth.services.customer_offer_service import customer_matches_segment
 
-    if audience == OfferAudienceType.PARTNER_REFERRED:
-        try:
-            from subscriptions.models import Subscription
-            has_partner = Subscription.objects.filter(
-                customer=customer,
-                referred_by__isnull=False,
-            ).exists()
-            if not has_partner:
-                return True, "Offer targets partner-referred customers; no existing partner relation found (advisory)."
-        except Exception:
-            pass
-
-    return True, ""
+    return customer_matches_segment(customer, offer_package.audience_type)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

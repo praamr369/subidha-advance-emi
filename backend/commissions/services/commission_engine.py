@@ -16,8 +16,12 @@ def process_monthly_commissions(*, month, processed_by):
 
     total_batch_amount = approved.aggregate(total=Sum("commission_amount"))["total"] or 0
 
+    # CommissionPayoutBatch has no `month` column; it records the payout_date and
+    # a batch_code. Passing month= raised TypeError, so no monthly commission run
+    # could ever complete.
     batch = CommissionPayoutBatch.objects.create(
-        month=month,
+        batch_code=f"CPB-{month:%Y%m}",
+        payout_date=month,
         total_amount=total_batch_amount,
         processed_by=processed_by,
     )
