@@ -182,6 +182,7 @@ urlpatterns = [
     path("admin/", include("api.v1.routes.admin_solopreneur_today")),
     path("admin/", include("api.v1.routes.admin_growth_offers")),
     path("admin/", include("api.v1.routes.admin_customer_offers")),
+    path("admin/", include("api.v1.routes.admin_photo_coverage")),
     path("admin/", include("api.v1.routes.admin_growth_requests")),
     path("admin/", include("api.v1.routes.admin_partner_performance")),
     path("admin/", include("api.v1.routes.admin_retention_intelligence")),
