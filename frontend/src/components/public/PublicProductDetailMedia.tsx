@@ -68,6 +68,7 @@ export default function PublicProductDetailMedia({
           imageClassName="transition duration-500 hover:scale-[1.02]"
           fallbackLabel="Photography coming soon"
           category={product.category}
+          subcategory={product.subcategory}
         />
       </AspectRatio>
     );

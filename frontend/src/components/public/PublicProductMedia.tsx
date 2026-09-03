@@ -19,6 +19,7 @@ type PublicProductMediaProps = {
   badge?: string | null;
   /** Drives the stand-in artwork shown when there is no photograph. */
   category?: string | null;
+  subcategory?: string | null;
 };
 
 export default function PublicProductMedia({
@@ -32,6 +33,7 @@ export default function PublicProductMedia({
   fallbackLabel = "Photography coming soon",
   badge,
   category,
+  subcategory,
 }: PublicProductMediaProps) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const resolvedSrc = src ?? null;
@@ -68,6 +70,7 @@ export default function PublicProductMedia({
           <ProductImagePlaceholder
             name={alt}
             category={category}
+            subcategory={subcategory}
             showCategory={false}
             iconClassName="h-14 w-14"
           />

@@ -19,6 +19,8 @@ interface ProductCard3DProps {
   originalPrice?: number | null;
   /** True when no monthly plan is configured, so the EMI figure is hidden. */
   hideMonthly?: boolean;
+  /** Drives the placeholder icon; more descriptive than the category. */
+  subcategory?: string | null;
 }
 
 export default function ProductCard3D({
@@ -32,6 +34,7 @@ export default function ProductCard3D({
   className,
   originalPrice = null,
   hideMonthly = false,
+  subcategory = null,
 }: ProductCard3DProps) {
   const { t } = useI18n();
 
@@ -50,7 +53,7 @@ export default function ProductCard3D({
         {imageUrl ? (
           <Image src={imageUrl} alt={title} fill className="object-cover" sizes="(max-width: 768px) 100vw, 33vw" />
         ) : (
-          <ProductImagePlaceholder name={title} category={category} />
+          <ProductImagePlaceholder name={title} category={category} subcategory={subcategory} />
         )}
         <div className="absolute top-2 left-2 z-20 rounded border border-white/40 bg-white/80 px-2 py-0.5 text-[10px] font-semibold text-slate-800 backdrop-blur-md dark:border-black/40 dark:bg-black/60 dark:text-slate-200">
           {category}

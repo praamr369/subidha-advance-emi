@@ -2,12 +2,15 @@ import {
   Armchair,
   BedDouble,
   Fan,
+  Flame,
   Lamp,
   type LucideIcon,
   Microwave,
   Package,
   Refrigerator,
   Sofa,
+  Speaker,
+  Tv,
   UtensilsCrossed,
 } from "lucide-react";
 
@@ -22,7 +25,13 @@ import { cn } from "@/lib/utils";
  * so a grid of unphotographed products still looks varied and intentional.
  */
 
+// First match wins, so the more specific patterns come first. Heating is listed
+// above cooling because "water geyser" and "room heater" would otherwise be
+// caught by the broad air/cooler pattern.
 const CATEGORY_ICONS: Array<{ match: RegExp; icon: LucideIcon }> = [
+  { match: /\b(heater|geyser|blower|radiant|warmer|immersion)\b/i, icon: Flame },
+  { match: /\b(sound|speaker|amplifier|audio|stereo|home theat(re|er)|woofer|mic)\b/i, icon: Speaker },
+  { match: /\b(television|tv|led|monitor|display)\b/i, icon: Tv },
   { match: /\b(sofa|couch|recliner|settee)\b/i, icon: Sofa },
   { match: /\b(bed|mattress|wardrobe|almirah)\b/i, icon: BedDouble },
   { match: /\b(chair|stool|seating)\b/i, icon: Armchair },
@@ -42,10 +51,21 @@ const TINTS = [
   "from-rose-500/10 to-pink-500/5 text-rose-700/50 dark:text-rose-300/40",
 ];
 
-function pickIcon(category?: string | null, name?: string | null): LucideIcon {
-  const haystack = `${category ?? ""} ${name ?? ""}`;
-  for (const { match, icon } of CATEGORY_ICONS) {
-    if (match.test(haystack)) return icon;
+/**
+ * Subcategory first: it is by far the most descriptive field. "Sound System"
+ * identifies an amplifier that the name ("Ahuja BTA 660") and the category
+ * ("Home Appliances") both fail to describe.
+ */
+function pickIcon(
+  category?: string | null,
+  name?: string | null,
+  subcategory?: string | null,
+): LucideIcon {
+  for (const haystack of [subcategory ?? "", `${name ?? ""} ${category ?? ""}`]) {
+    if (!haystack.trim()) continue;
+    for (const { match, icon } of CATEGORY_ICONS) {
+      if (match.test(haystack)) return icon;
+    }
   }
   return Package;
 }
@@ -63,17 +83,20 @@ function pickTint(seed?: string | null): string {
 export default function ProductImagePlaceholder({
   name,
   category,
+  subcategory,
   className,
   iconClassName,
   showCategory = true,
 }: {
   name?: string | null;
   category?: string | null;
+  /** Most specific signal for icon choice, e.g. "Sound System", "Geyser". */
+  subcategory?: string | null;
   className?: string;
   iconClassName?: string;
   showCategory?: boolean;
 }) {
-  const Icon = pickIcon(category, name);
+  const Icon = pickIcon(category, name, subcategory);
   const tint = pickTint(name || category);
 
   return (

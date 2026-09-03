@@ -322,6 +322,7 @@ export default function ProductGrid({
                 id={String(product.id)}
                 title={product.seo_name || product.name}
                 category={product.category || "Uncategorized"}
+                subcategory={product.subcategory}
                 price={price || basePrice}
                 emiAmount={monthly != null ? Math.round(monthly) : 0}
                 hideMonthly={monthly == null}
