@@ -10,6 +10,7 @@ APP_DIR="${APP_DIR:-/var/www/subidha/app}"
 BACKUP_ROOT="${BACKUP_ROOT:-/var/backups/subidha}"
 SERVICE="${SERVICE:-subidha-gunicorn}"
 FRONTEND_SERVICE="${FRONTEND_SERVICE:-subidha-next}"
+CELERY_SERVICES="${CELERY_SERVICES:-subidha-celery subidha-celery-beat}"
 BACKEND_ENV="${BACKEND_ENV:-/etc/subidha/backend.env}"
 FRONTEND_ENV="${FRONTEND_ENV:-/etc/subidha/frontend.env}"
 HEALTH_URL="${HEALTH_URL:-https://subidhafurnitureasansol.com/api/v1/health/}"
@@ -69,6 +70,19 @@ NODE_OPTIONS='--max-old-space-size=6144' npm run build > /tmp/next-build-deploy.
 echo "==> [6/7] Restarting services"
 systemctl restart "$SERVICE"
 systemctl restart "$FRONTEND_SERVICE"
+
+# Background workers run the same codebase, so a release that restarts only
+# gunicorn leaves them executing the previous revision until something else
+# restarts them. Skipped without complaint when the units are not installed,
+# so this stays safe on a host that does not run background jobs.
+for unit in $CELERY_SERVICES; do
+  if systemctl list-unit-files "$unit.service" --no-legend 2>/dev/null | grep -q .; then
+    echo "    restarting $unit"
+    systemctl restart "$unit"
+  else
+    echo "    $unit not installed — skipping"
+  fi
+done
 
 echo "==> [7/7] Smoke check"
 sleep 5

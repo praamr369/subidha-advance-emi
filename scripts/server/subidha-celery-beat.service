@@ -1,0 +1,35 @@
+[Unit]
+Description=Subidha ERP Celery beat scheduler
+Documentation=file:///var/www/subidha/app/scripts/server/README.md
+After=network.target redis-server.service subidha-celery.service
+Wants=redis-server.service
+
+[Service]
+WorkingDirectory=/var/www/subidha/app/backend
+EnvironmentFile=/etc/subidha/backend.env
+
+# systemd creates and owns /var/lib/subidha. Beat persists "when did each
+# entry last fire" there; without a writable path it would default to the
+# working directory, which is inside the deploy tree and gets replaced on
+# every release — losing the schedule state each deploy.
+StateDirectory=subidha
+
+ExecStart=/var/www/subidha/app/backend/.venv/bin/celery -A core beat \
+    --loglevel=INFO \
+    --schedule=/var/lib/subidha/celerybeat-schedule \
+    --pidfile=
+
+# --pidfile= (empty) disables the pidfile entirely. systemd already tracks the
+# process, and a stale pidfile left by an unclean stop makes beat refuse to
+# start with "Seems we're already running?".
+
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+
+# IMPORTANT: exactly one beat process may run cluster-wide. Two schedulers
+# means every job is dispatched twice. The job bodies are guarded by
+# run_idempotent_job (date-keyed), so a duplicate would be skipped rather than
+# double-applied — but do not rely on that as the control.

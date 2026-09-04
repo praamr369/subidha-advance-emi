@@ -1,0 +1,43 @@
+[Unit]
+Description=Subidha ERP Celery worker
+Documentation=file:///var/www/subidha/app/scripts/server/README.md
+# Redis is the broker; PostgreSQL is needed by every task body.
+After=network.target postgresql.service redis-server.service
+Wants=redis-server.service
+
+[Service]
+WorkingDirectory=/var/www/subidha/app/backend
+# Carries DJANGO_SETTINGS_MODULE=core.settings.production and CELERY_BROKER_URL.
+# Without this file the worker would fall back to the development settings
+# hardcoded in core/celery.py and talk to the wrong database.
+EnvironmentFile=/etc/subidha/backend.env
+
+ExecStart=/var/www/subidha/app/backend/.venv/bin/celery -A core worker \
+    --loglevel=INFO \
+    --concurrency=2 \
+    --max-tasks-per-child=200 \
+    --without-gossip \
+    --without-mingle
+
+# concurrency=2: the schedule is seven daily jobs, not a throughput workload.
+# max-tasks-per-child recycles the child process periodically so a slow leak in
+# a long-lived worker cannot accumulate for weeks.
+# gossip/mingle are peer-discovery chatter that only matter with several
+# workers; off here to keep the Redis traffic quiet.
+
+Restart=always
+RestartSec=5
+
+# SIGTERM makes Celery warm-shutdown: it stops accepting new tasks and finishes
+# what it is holding. CELERY_TASK_TIME_LIMIT is 3600, so a task could in
+# principle outlast this and be killed mid-run. All seven jobs go through
+# run_idempotent_job with a date-keyed idempotency key, so a killed run is
+# retried safely rather than double-applied.
+KillSignal=SIGTERM
+TimeoutStopSec=600
+
+# Restart the worker whenever the code changes underneath it.
+# deploy.sh restarts this alongside gunicorn.
+
+[Install]
+WantedBy=multi-user.target
