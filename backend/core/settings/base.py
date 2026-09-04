@@ -537,6 +537,14 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
+    # Versioning. Reads the version from the /api/<version>/ prefix that is
+    # already in every URL — see api.v1.versioning for why the stock
+    # URLPathVersioning is not used (it would empty the DefaultRouter api-root
+    # listings). Adding a v2 means mounting it and appending to ALLOWED_VERSIONS;
+    # deprecating a v1 endpoint means api.v1.deprecation.deprecate_endpoint.
+    "DEFAULT_VERSIONING_CLASS": "api.v1.versioning.PathPrefixVersioning",
+    "DEFAULT_VERSION": "v1",
+    "ALLOWED_VERSIONS": ["v1"],
     # Global baseline throttling. Endpoint-specific scoped throttles (login,
     # payment_mutation, …) still apply on top of these.
     "DEFAULT_THROTTLE_CLASSES": [
