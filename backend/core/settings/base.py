@@ -628,6 +628,11 @@ REST_FRAMEWORK = {
         "reset_password": "20/hour",
         "payment_mutation": "60/minute",
         "username_change_self": "5/hour",
+        # Unauthenticated lead submission. The global anon rate would allow
+        # 7,200/hour per IP, which is no limit at all for an endpoint that
+        # writes a row and lands it in a human worklist. Generous for a real
+        # person filling in the form more than once; useless for flooding.
+        "public_lead": "20/hour",
         # Anonymous baseline.
         "anon": "120/minute",
         # Role-aware per-user baselines (generous — a cap on abuse, not normal

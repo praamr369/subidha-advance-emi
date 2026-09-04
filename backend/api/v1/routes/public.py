@@ -30,6 +30,7 @@ from subscriptions.models import (
     Subscription,
 )
 from subscriptions.services.audit_service import log_audit
+from api.v1.throttles.public import PublicLeadThrottle
 from crm.services.public_lead_service import create_public_lead
 from lucky_plan.services.winner_state_service import winner_history_q
 
@@ -503,6 +504,10 @@ class PublicProductDetailView(APIView):
 class PublicLeadView(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
+    # The only public endpoint that writes. Without this it inherits the global
+    # anon rate (120/minute), which is not a meaningful limit for something that
+    # creates a CRM row a human then has to triage.
+    throttle_classes = [PublicLeadThrottle]
 
     def post(self, request):
         serializer = PublicLeadSerializer(data=request.data)
