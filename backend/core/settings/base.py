@@ -334,7 +334,58 @@ def _get_database_config() -> dict[str, str | int]:
     )
 
 
+def _get_replica_database_config() -> dict[str, str | int] | None:
+    """Read-only replica for reporting queries, or None when not provisioned.
+
+    Configured with DB_REPLICA_HOST / DB_REPLICA_PORT (name, user and password
+    default to the primary's, since streaming replication serves the same
+    database with the same roles). Absent host and port means no replica, and
+    the "replica" alias is simply not defined — nothing in the codebase then
+    pretends one exists.
+    """
+    replica_host = (os.getenv("DB_REPLICA_HOST") or "").strip()
+    replica_port = (os.getenv("DB_REPLICA_PORT") or "").strip()
+    if not replica_host and not replica_port:
+        return None
+
+    primary = _get_database_config()
+    if primary.get("ENGINE") != "django.db.backends.postgresql":
+        raise RuntimeError("DB_REPLICA_* is only supported on PostgreSQL.")
+
+    config = dict(primary)
+    config["HOST"] = replica_host or primary["HOST"]
+    if replica_port:
+        try:
+            config["PORT"] = int(replica_port)
+        except (TypeError, ValueError):
+            raise RuntimeError("DB_REPLICA_PORT must be an integer.")
+    # A replica must never be wrapped in a write transaction.
+    config["ATOMIC_REQUESTS"] = False
+    return config
+
+
 def _get_conn_max_age() -> int:
+    """Seconds to keep a database connection open between requests.
+
+    This, plus CONN_HEALTH_CHECKS, is the whole connection-reuse story here —
+    there is deliberately no external pooler.
+
+    Measured on production 2026-09-04: 12 connections against max_connections
+    100 (6 idle, 1 active), with 3 gunicorn workers. PgBouncer was evaluated
+    and rejected at this size: it would put a new daemon in the path of every
+    query on a live double-entry system, and take the whole site down if it
+    died, to relieve pressure that does not exist.
+
+    Revisit when any of these becomes true:
+      * gunicorn workers (or Celery concurrency) above ~12,
+      * sustained pg_stat_activity count above ~50,
+      * a second application host sharing this database.
+
+    If it is ever added, it must run in SESSION pooling mode. Transaction mode
+    breaks server-side cursors, and 41 call sites use QuerySet.iterator();
+    Django requires DISABLE_SERVER_SIDE_CURSORS=True under transaction pooling,
+    which would buffer whole result sets in memory on the ledger exports.
+    """
     raw_value = os.getenv("DB_CONN_MAX_AGE")
     if raw_value is None:
         return 60 if not _is_local_dev_mode() else 0
@@ -489,6 +540,24 @@ DATABASES = {"default": _get_database_config()}
 DATABASES["default"]["ATOMIC_REQUESTS"] = True
 DATABASES["default"]["CONN_MAX_AGE"] = _get_conn_max_age()
 DATABASES["default"]["CONN_HEALTH_CHECKS"] = True
+
+# Optional read-only replica for reporting. The alias exists only when
+# DB_REPLICA_HOST/PORT are set, so dev, CI and any unprovisioned environment
+# behave exactly as before.
+_REPLICA_CONFIG = _get_replica_database_config()
+REPLICA_DATABASE_ALIAS = "replica" if _REPLICA_CONFIG else "default"
+if _REPLICA_CONFIG:
+    DATABASES["replica"] = _REPLICA_CONFIG
+    DATABASES["replica"]["CONN_MAX_AGE"] = _get_conn_max_age()
+    DATABASES["replica"]["CONN_HEALTH_CHECKS"] = True
+
+# The router does not silently redirect reads. Routing every read to a replica
+# would let a lagging standby answer a trial balance or a ledger export with
+# figures that never existed together, and ATOMIC_REQUESTS means a request can
+# read its own uncommitted writes — which a replica cannot see at all.
+# Reporting call sites opt in explicitly with .using(REPLICA_DATABASE_ALIAS);
+# the router's job is to stop writes and migrations reaching the standby.
+DATABASE_ROUTERS = ["core.db_routers.ReplicaRouter"]
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
