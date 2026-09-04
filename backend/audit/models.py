@@ -260,6 +260,7 @@ class AuditLog(models.Model):
         RENTAL_ASSET_UNDER_REPAIR = "RENTAL_ASSET_UNDER_REPAIR", "Rental Asset Sent for Repair"
         RENTAL_ASSET_RETIRED = "RENTAL_ASSET_RETIRED", "Rental Asset Retired"
         RENTAL_ASSET_CONDITION_SNAPSHOT = "RENTAL_ASSET_CONDITION_SNAPSHOT", "Asset Condition Snapshot Recorded"
+        BACKGROUND_TASK_FAILED = "BACKGROUND_TASK_FAILED", "Background Task Failed"
 
     action_type = models.CharField(
         max_length=50,
