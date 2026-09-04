@@ -86,32 +86,31 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-      # TEMPORARILY NON-BLOCKING — and this is a known-red step, not a passing
-      # one. The suite is green locally (2723 tests, 0 failures, same command
-      # and --parallel) but fails on GitHub runners, and that difference has not
-      # been diagnosed: the failing test names have never been read.
+      # Blocking. This step was non-blocking from 2026-09-04 because it failed
+      # only on GitHub runners and the cause was thought to be undiagnosable.
+      # It was not: tests.migration_center.test_migration_center.test_xlsx_upload
+      # imports openpyxl, which was used by migration_center at runtime but
+      # never declared in requirements.txt. The runner had no openpyxl, the
+      # test raised ModuleNotFoundError, and --parallel then died trying to
+      # pickle that exception ("TypeError: cannot pickle 'traceback' object"),
+      # taking the whole run down before it could name the failing test.
       #
-      # Restore the gate by deleting continue-on-error below. Until then a
-      # genuinely broken change can merge and deploy without CI objecting, which
-      # is how seven services that raised on every call reached production
-      # before this step ran the full suite at all.
-      #
-      # It still runs all 2723 tests (the runner previously collected only
-      # tests.api + tests.domain, so 916 ran) and still uploads its output, so
-      # the failure stays visible on the run page.
-      #
-      # Output is teed and uploaded on failure for the same reason Layer-A is:
-      # job logs need repo admin scope on the REST API, so a failure is
-      # otherwise only readable by someone signed in.
-      - name: Test suite (reported, not blocking)
-        continue-on-error: true
+      # openpyxl is now pinned in requirements.txt. The same gap meant XLSX
+      # upload and template download were broken in production too, which is
+      # exactly the kind of bug this step exists to catch.
+      - name: Test suite
         run: |
           set -o pipefail
           python manage.py test --settings=core.settings.test --parallel --verbosity 2 2>&1 \
             | tee /tmp/test-suite-output.log
 
-      - name: Upload test output on failure
-        if: failure()
+      # always(), not failure(): while the step above carried continue-on-error
+      # the job still concluded successfully, so failure() was never true and
+      # this artifact was never uploaded — which is why the failing test name
+      # went unread for as long as it did. Keep always() so the output survives
+      # even if the step is ever made non-blocking again.
+      - name: Upload test output
+        if: always()
         uses: actions/upload-artifact@v5
         with:
           name: test-suite-output
