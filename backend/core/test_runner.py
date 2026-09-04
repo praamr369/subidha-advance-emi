@@ -10,7 +10,11 @@ class ProjectTestRunner(DiscoverRunner):
     `manage.py test` needs explicit default labels.
     """
 
-    default_test_labels = ["tests.api", "tests.domain"]
+    # Run the whole backend suite. This was ["tests.api", "tests.domain"], so
+    # bare `manage.py test` - which is what CI runs - executed 916 of 2723
+    # tests. CI passed while roughly 1,800 tests never ran, including every
+    # accounting, growth, crm and products_pim test.
+    default_test_labels = ["tests"]
 
     def build_suite(self, test_labels=None, *args, **kwargs):
         labels = list(test_labels or [])
