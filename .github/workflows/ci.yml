@@ -95,8 +95,24 @@ jobs:
       # tests.api + tests.domain, so CI passed on 916 of 2723 tests and passed
       # even when those failed. Seven services that raised on every call
       # reached production under that gate.
+      #
+      # Output is teed and uploaded on failure for the same reason Layer-A is:
+      # job logs need repo admin scope on the REST API, so a failure is
+      # otherwise only readable by someone signed in.
       - name: Test suite
-        run: python manage.py test --settings=core.settings.test --parallel --verbosity 1
+        run: |
+          set -o pipefail
+          python manage.py test --settings=core.settings.test --parallel --verbosity 2 2>&1 \
+            | tee /tmp/test-suite-output.log
+
+      - name: Upload test output on failure
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: test-suite-output
+          path: /tmp/test-suite-output.log
+          if-no-files-found: warn
+          retention-days: 7
 
   frontend:
     name: frontend (lint + typecheck)
