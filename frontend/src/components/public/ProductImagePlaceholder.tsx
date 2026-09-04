@@ -1,3 +1,5 @@
+import { createElement } from "react";
+
 import {
   Armchair,
   BedDouble,
@@ -96,7 +98,13 @@ export default function ProductImagePlaceholder({
   iconClassName?: string;
   showCategory?: boolean;
 }) {
-  const Icon = pickIcon(category, name, subcategory);
+  // createElement rather than binding the icon to a capitalised local and
+  // rendering <Icon />: the compiler cannot tell a component picked at render
+  // time is stable, and flags it as creating a component during render.
+  const icon = createElement(pickIcon(category, name, subcategory), {
+    className: cn("h-10 w-10 opacity-80", iconClassName),
+    strokeWidth: 1.25,
+  });
   const tint = pickTint(name || category);
 
   return (
@@ -108,7 +116,7 @@ export default function ProductImagePlaceholder({
         className,
       )}
     >
-      <Icon className={cn("h-10 w-10 opacity-80", iconClassName)} strokeWidth={1.25} />
+      {icon}
       {showCategory && category ? (
         <span className="px-3 text-center text-[10px] font-semibold uppercase tracking-[0.18em] opacity-70">
           {category}

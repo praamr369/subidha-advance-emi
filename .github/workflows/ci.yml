@@ -23,10 +23,10 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -79,18 +79,23 @@ jobs:
             | tee /tmp/layer-a-output.log
       - name: Upload Layer-A output on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: layer-a-output
           path: /tmp/layer-a-output.log
           if-no-files-found: warn
           retention-days: 7
 
-      # Reported but NON-BLOCKING until the ~pre-existing suite failures
-      # (uq_payment_per_emi + accounting-fixture gaps) are triaged. Flip
-      # continue-on-error to false to make the full suite a hard gate.
-      - name: Test suite (reported)
-        continue-on-error: true
+      # Blocking. The pre-existing failures this step was waiting on
+      # (uq_payment_per_emi + accounting-fixture gaps) are fixed, and the suite
+      # is green: 2723 tests, 0 failures, verified with this exact invocation
+      # including --parallel.
+      #
+      # It was previously continue-on-error, and the runner only collected
+      # tests.api + tests.domain, so CI passed on 916 of 2723 tests and passed
+      # even when those failed. Seven services that raised on every call
+      # reached production under that gate.
+      - name: Test suite
         run: python manage.py test --settings=core.settings.test --parallel --verbosity 1
 
   frontend:
@@ -100,10 +105,10 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: "20.18.0"
           cache: npm
