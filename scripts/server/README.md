@@ -94,6 +94,67 @@ the cache), but there was no worker, no beat, and no `CELERY_BROKER_URL`.
   release cannot leave the worker executing the previous revision. It skips
   them without complaint when the units are not installed.
 
+## Connection pooling (PgBouncer) — optional
+
+`pgbouncer.ini` + `setup-pgbouncer.sh`. **Session** pooling, not transaction
+pooling: 41 call sites use `QuerySet.iterator()`, which needs server-side
+cursors, and Django requires `DISABLE_SERVER_SIDE_CURSORS=True` under
+transaction pooling — which would buffer whole result sets in memory on the
+ledger and stock exports.
+
+Measured 2026-09-04: production ran **12 connections against `max_connections`
+100** with 3 gunicorn workers. There is no pressure to relieve today, so this is
+prepared rather than required. Revisit above ~12 workers or ~50 sustained
+connections.
+
+```bash
+sudo apt-get install -y pgbouncer
+sudo ./scripts/server/setup-pgbouncer.sh            # install + verify; app untouched
+sudo ./scripts/server/setup-pgbouncer.sh --cutover  # move the app onto it
+sudo ./scripts/server/setup-pgbouncer.sh --rollback # undo
+```
+
+Install and cutover are separate steps. After the first command PgBouncer is
+running and proven to serve real queries while production still connects
+directly, so stopping there costs nothing. `--cutover` health-checks and rolls
+itself back automatically if the check fails.
+
+`userlist.txt` is generated from `backend.env` and holds a **second copy of the
+database password** (PgBouncer needs plaintext to authenticate outward under
+scram-sha-256; a stored verifier only checks incoming clients). It is written
+`0600 postgres:postgres` and never printed.
+
+## Read replica — optional
+
+`setup-replica.sh` provisions a streaming standby on port 5433.
+
+```bash
+sudo ./scripts/server/setup-replica.sh           # create + start the standby
+sudo ./scripts/server/setup-replica.sh --status  # replication lag and slots
+sudo ./scripts/server/setup-replica.sh --enable  # add DB_REPLICA_* to backend.env
+sudo systemctl restart subidha-gunicorn
+```
+
+On the same host the standby shares disk and CPU, so it buys read **isolation**,
+not read **capacity**. Moving it to its own host is what buys capacity.
+
+Nothing routes to it automatically. `core/db_routers.ReplicaRouter` keeps writes
+and migrations off it; reporting opts in explicitly:
+
+```python
+Model.objects.using(settings.REPLICA_DATABASE_ALIAS).filter(...)
+```
+
+That is deliberate. Replication lag is unbounded under load, and a trial balance
+or ledger export built from a lagging standby reports figures that never existed
+together while looking entirely plausible. `ATOMIC_REQUESTS` also means requests
+routinely read rows they just wrote, which a standby cannot see.
+
+Two things to watch once it is live: `hot_standby_feedback=on` means long
+reporting queries on the standby hold back vacuum on the **primary**, so watch
+for bloat if reports run for hours; and an inactive replication slot retains WAL
+on the primary indefinitely, so drop the slot if you retire the standby.
+
 ## Daily use
 
 **Release a new version** (after merging `update` -> `main` on GitHub):
