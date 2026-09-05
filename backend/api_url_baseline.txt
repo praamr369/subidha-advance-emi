@@ -62,14 +62,10 @@
 /api/v1/privacy/retention-policies/
 /api/v1/privacy/retention-policies/{}/purge/
 /api/v1/public/lucky-plan/verify-seed/
-/api/v1/refunds/admin-list/
 /api/v1/refunds/assess-damage/
 /api/v1/refunds/assess-damage/{}/
-/api/v1/refunds/history/
 /api/v1/refunds/inspect/{}/
 /api/v1/refunds/inspection-jobs/
-/api/v1/refunds/request/
-/api/v1/refunds/status/{}/
 /api/v1/refunds/{}/advance/
 /api/v1/subscriptions/
 /api/v1/subscriptions/deposits/
