@@ -261,6 +261,24 @@ class AuditLog(models.Model):
         RENTAL_ASSET_RETIRED = "RENTAL_ASSET_RETIRED", "Rental Asset Retired"
         RENTAL_ASSET_CONDITION_SNAPSHOT = "RENTAL_ASSET_CONDITION_SNAPSHOT", "Asset Condition Snapshot Recorded"
         BACKGROUND_TASK_FAILED = "BACKGROUND_TASK_FAILED", "Background Task Failed"
+        # PAYMENT_FLAGGED is used across the codebase as a catch-all for events
+        # that have no type of their own — 89 call sites in 41 files, spanning
+        # accounting, billing, contracts, payments, inventory and reminders. A
+        # journal void is therefore recorded as a flagged payment. The rows are
+        # all written, so nothing is lost, but action_type carries no meaning
+        # and the only way to find a void is a metadata substring search.
+        #
+        # Fixing that properly needs a taxonomy across all six domains, not a
+        # find-and-replace. These three are added now because journal posting,
+        # voiding and reversal are the transitions an auditor asks for by name,
+        # and they all flow through one choke point. Everything else keeps
+        # PAYMENT_FLAGGED until the wider taxonomy exists.
+        ACCOUNTING_JOURNAL_POSTED = "ACCOUNTING_JOURNAL_POSTED", "Journal Entry Posted"
+        ACCOUNTING_JOURNAL_VOIDED = "ACCOUNTING_JOURNAL_VOIDED", "Journal Entry Voided"
+        ACCOUNTING_JOURNAL_GROUP_REVERSED = (
+            "ACCOUNTING_JOURNAL_GROUP_REVERSED",
+            "Journal Group Reversed",
+        )
 
     action_type = models.CharField(
         max_length=50,

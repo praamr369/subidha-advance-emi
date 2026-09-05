@@ -28,12 +28,29 @@ def _money(value) -> Decimal:
     return Decimal(str(value or MONEY_ZERO)).quantize(Decimal("0.01"))
 
 
+# Journal lifecycle transitions an auditor asks for by name. Everything else
+# keeps the existing PAYMENT_FLAGGED catch-all, unchanged — relabelling the
+# rest needs a taxonomy across accounting, billing, contracts, payments,
+# inventory and reminders, which share that same catch-all.
+#
+# The *_BLOCKED events are deliberately absent: they record a refusal, not a
+# state change. Filing ACCOUNTING_JOURNAL_VOID_BLOCKED as a void would tell an
+# auditor the opposite of what happened.
+_EVENT_ACTION_TYPES = {
+    "ACCOUNTING_JOURNAL_POSTED": AuditLog.ActionType.ACCOUNTING_JOURNAL_POSTED,
+    "ACCOUNTING_JOURNAL_VOIDED": AuditLog.ActionType.ACCOUNTING_JOURNAL_VOIDED,
+    "ACCOUNTING_JOURNAL_GROUP_REVERSED": (
+        AuditLog.ActionType.ACCOUNTING_JOURNAL_GROUP_REVERSED
+    ),
+}
+
+
 def _log_accounting_event(*, event: str, instance, performed_by=None, metadata=None):
     payload = {"event": event}
     if isinstance(metadata, dict):
         payload.update(metadata)
     log_audit(
-        action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
+        action_type=_EVENT_ACTION_TYPES.get(event, AuditLog.ActionType.PAYMENT_FLAGGED),
         instance=instance,
         performed_by=performed_by,
         metadata=payload,
