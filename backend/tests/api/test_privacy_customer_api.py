@@ -235,7 +235,16 @@ class DataAccessRequestTests(PrivacyApiTestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         record = DataAccessRequest.objects.get(customer=self.customer)
         self.assertEqual(record.status, DataRequestStatus.RECEIVED)
-        self.assertEqual((record.due_date - record.requested_at).days, 30)
+        # requested_at is auto_now_add, so the database stamps it microseconds
+        # after the due_date was computed. timedelta.days truncates, which turns
+        # "30 days minus a few microseconds" into 29 — asserting the exact day
+        # count is a coin flip decided by clock resolution, and passed on
+        # Windows while failing on Linux.
+        self.assertAlmostEqual(
+            (record.due_date - record.requested_at).total_seconds(),
+            30 * 24 * 3600,
+            delta=60,
+        )
 
     def test_export_records_a_request_rather_than_claiming_to_deliver(self):
         response = self.client.post(
@@ -273,7 +282,15 @@ class GrievanceTests(PrivacyApiTestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         record = DPOGrievance.objects.get(customer=self.customer)
-        self.assertEqual((record.stage_1_due - record.filed_at).days, 30)
+        # filed_at is auto_now_add — same truncation trap as the data-request
+        # test, so compare durations with tolerance rather than whole days.
+        self.assertAlmostEqual(
+            (record.stage_1_due - record.filed_at).total_seconds(),
+            30 * 24 * 3600,
+            delta=60,
+        )
+        # Both stage dates are set explicitly from the same instant, so this one
+        # is exact and stays an equality check.
         self.assertEqual((record.stage_2_due - record.stage_1_due).days, 14)
 
     def test_list_excludes_other_customers_grievances(self):
