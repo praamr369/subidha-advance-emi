@@ -94,6 +94,10 @@ urlpatterns = [
     path("realtime/ticket/", RealtimeTicketView.as_view()),
     path("realtime/stream/", realtime_stream),
     path("auth/", include("api.v1.routes.auth")),
+    # DPDP 2023 customer privacy rights. The privacy app has had models since
+    # 2026-07-10 and the portal has called these paths since 2026-07-11, but
+    # nothing ever mounted them — every request 404'd until this line.
+    path("privacy/", include("api.v1.routes.privacy")),
     path("admin/payments/collect/", IdempotentAdminPaymentCollectView.as_view()),
     path("admin/solopreneur/today/", admin_solopreneur_today.AdminSolopreneurTodayView.as_view()),
     path("admin/solopreneur-dashboard/", SolopreneurUniversalDashboardView.as_view()),
