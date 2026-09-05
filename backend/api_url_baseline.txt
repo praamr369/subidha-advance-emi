@@ -77,13 +77,7 @@
 /api/v1/subscriptions/{}/balance/
 /api/v1/subscriptions/{}/emis/
 /api/v1/warranty/admin-claims/
-/api/v1/warranty/check/{}/
-/api/v1/warranty/claim-status/{}/
-/api/v1/warranty/claim/
 /api/v1/warranty/claim/{}/approve/
 /api/v1/warranty/claim/{}/schedule/
-/api/v1/warranty/enroll-extended/
-/api/v1/warranty/extended-plans/{}/
 /api/v1/warranty/service-call/{}/complete/
-/api/v1/warranty/service-history/
 /api/v1/warranty/service-schedule/
