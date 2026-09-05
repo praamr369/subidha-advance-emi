@@ -98,6 +98,10 @@ urlpatterns = [
     # 2026-07-10 and the portal has called these paths since 2026-07-11, but
     # nothing ever mounted them — every request 404'd until this line.
     path("privacy/", include("api.v1.routes.privacy")),
+    # Customer warranty. Same story as privacy: the portal has called these
+    # paths since July 2026 and they were never mounted. The admin warranty
+    # surface already exists under admin/warranty-claims/.
+    path("warranty/", include("api.v1.routes.warranty")),
     path("admin/payments/collect/", IdempotentAdminPaymentCollectView.as_view()),
     path("admin/solopreneur/today/", admin_solopreneur_today.AdminSolopreneurTodayView.as_view()),
     path("admin/solopreneur-dashboard/", SolopreneurUniversalDashboardView.as_view()),
