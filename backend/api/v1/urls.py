@@ -102,6 +102,9 @@ urlpatterns = [
     # paths since July 2026 and they were never mounted. The admin warranty
     # surface already exists under admin/warranty-claims/.
     path("warranty/", include("api.v1.routes.warranty")),
+    # Customer refund requests. Partial by design — the damage-assessment half
+    # of this surface has no model behind it; see api/v1/routes/refunds.py.
+    path("refunds/", include("api.v1.routes.refunds")),
     path("admin/payments/collect/", IdempotentAdminPaymentCollectView.as_view()),
     path("admin/solopreneur/today/", admin_solopreneur_today.AdminSolopreneurTodayView.as_view()),
     path("admin/solopreneur-dashboard/", SolopreneurUniversalDashboardView.as_view()),
