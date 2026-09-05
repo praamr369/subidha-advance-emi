@@ -57,6 +57,33 @@ def _normalise(url: str) -> str:
     return url
 
 
+_BASELINE_HEADER = """\
+# Frontend /api/v1 calls that currently have no backend route.
+#
+# This is a ratchet, not an allowlist of acceptable state. Every line is a
+# feature the UI offers and the backend cannot serve: the page renders, accepts
+# input, and 404s. CI fails on anything NOT in this file, so the count can only
+# go down.
+#
+# Regenerate deliberately (never to silence a failure):
+#   python manage.py check_frontend_api_urls --baseline api_url_baseline.txt \\
+#       --write-baseline
+#
+# Adding a line here to make CI pass is hiding a broken feature from the only
+# check that looks for one.
+"""
+
+
+def _read_baseline(path: Path) -> set[str]:
+    if not path.exists():
+        return set()
+    return {
+        line.strip()
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    }
+
+
 def _is_noise(url: str) -> bool:
     """Filter shapes that are not really endpoint calls.
 
@@ -126,6 +153,21 @@ class Command(BaseCommand):
             help="Exit non-zero when any frontend call has no route. For CI.",
         )
         parser.add_argument(
+            "--baseline",
+            default=None,
+            help=(
+                "File of already-known unmatched URLs, one per line. With "
+                "--fail-on-missing, only URLs absent from it fail the run. This "
+                "is a ratchet: the existing breakage is recorded, and the count "
+                "can only go down."
+            ),
+        )
+        parser.add_argument(
+            "--write-baseline",
+            action="store_true",
+            help="Rewrite the --baseline file from the current state.",
+        )
+        parser.add_argument(
             "--show-unused",
             action="store_true",
             help="Also list backend routes no frontend file calls.",
@@ -172,5 +214,51 @@ class Command(BaseCommand):
             if len(unused) > 60:
                 self.stdout.write(f"  ... and {len(unused) - 60} more")
 
-        if missing and options["fail_on_missing"]:
+        baseline_path = Path(options["baseline"]) if options["baseline"] else None
+
+        if options["write_baseline"]:
+            if baseline_path is None:
+                self.stderr.write("--write-baseline requires --baseline PATH")
+                raise SystemExit(2)
+            baseline_path.write_text(
+                _BASELINE_HEADER + "".join(f"{url}\n" for url in sorted(missing)),
+                encoding="utf-8",
+            )
+            self.stdout.write(f"\nBaseline written: {baseline_path} ({len(missing)})")
+            return
+
+        if baseline_path is None:
+            if missing and options["fail_on_missing"]:
+                raise SystemExit(1)
+            return
+
+        known = _read_baseline(baseline_path)
+        new_breakage = sorted(url for url in missing if url not in known)
+        # A baseline entry that now resolves is good news, but leaving it in the
+        # file lets real breakage hide behind it later.
+        resolved = sorted(url for url in known if url not in missing)
+
+        self.stdout.write("")
+        self.stdout.write(f"Known (baseline)    : {len(known)}")
+        self.stdout.write(f"New breakage        : {len(new_breakage)}")
+        self.stdout.write(f"Fixed since baseline: {len(resolved)}")
+
+        if new_breakage:
+            self.stdout.write("")
+            self.stdout.write("NEW: frontend calls with no backend route")
+            for url in new_breakage:
+                files = sorted(
+                    {Path(f).as_posix().split("/src/", 1)[-1] for f in missing[url]}
+                )
+                self.stdout.write(f"  {url}")
+                for f in files[:4]:
+                    self.stdout.write(f"      src/{f}")
+
+        if resolved:
+            self.stdout.write("")
+            self.stdout.write("FIXED — remove these from the baseline:")
+            for url in resolved:
+                self.stdout.write(f"  {url}")
+
+        if new_breakage and options["fail_on_missing"]:
             raise SystemExit(1)

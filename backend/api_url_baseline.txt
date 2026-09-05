@@ -1,0 +1,89 @@
+# Frontend /api/v1 calls that currently have no backend route.
+#
+# This is a ratchet, not an allowlist of acceptable state. Every line is a
+# feature the UI offers and the backend cannot serve: the page renders, accepts
+# input, and 404s. CI fails on anything NOT in this file, so the count can only
+# go down.
+#
+# Regenerate deliberately (never to silence a failure):
+#   python manage.py check_frontend_api_urls --baseline api_url_baseline.txt \
+#       --write-baseline
+#
+# Adding a line here to make CI pass is hiding a broken feature from the only
+# check that looks for one.
+/api/v1/admin/consumer/defect-claims/
+/api/v1/admin/consumer/defect-claims/{}/{}/
+/api/v1/admin/consumer/return-requests/
+/api/v1/admin/consumer/return-requests/{}/cpa-override/
+/api/v1/admin/consumer/return-requests/{}/{}/
+/api/v1/admin/customers/search/{}/
+/api/v1/admin/customers/{}/kyc-documents/{}/download/
+/api/v1/admin/inventory/opening-stock/{}/post/
+/api/v1/admin/lucky-plan/draw-authorisations/
+/api/v1/admin/lucky-plan/draw-authorisations/{}/{}/
+/api/v1/admin/lucky-plan/waiver-settlements/
+/api/v1/admin/lucky-plan/waiver-settlements/{}/approve/
+/api/v1/admin/privacy/breach-notifications/
+/api/v1/admin/privacy/breach-notifications/{}/{}/
+/api/v1/admin/privacy/retention-schedule/
+/api/v1/admin/privacy/retention-schedule/{}/{}/
+/api/v1/admin/products/{}/
+/api/v1/admin/repossessions/
+/api/v1/admin/repossessions/{}/{}/
+/api/v1/admin/subscriptions/{}/documents/
+/api/v1/business/msme/
+/api/v1/crm-pipeline/leads/public/
+/api/v1/customer/addresses/
+/api/v1/customer/returns/
+/api/v1/customers/document-consents/
+/api/v1/customers/kyc-status/
+/api/v1/customers/kyc-upload/
+/api/v1/dashboard/calendar-events{}/
+/api/v1/dashboard/memos/
+/api/v1/deliveries/handover-receipts/
+/api/v1/lucky-plan/draw-audit/
+/api/v1/lucky-plan/draw-results/
+/api/v1/lucky-plan/draw-results/{}/
+/api/v1/lucky-plan/eligibility/
+/api/v1/lucky-plan/lucky-id/
+/api/v1/lucky-plan/waiver-history/
+/api/v1/partner/
+/api/v1/partner/profile-info/
+/api/v1/partner/support/tickets/
+/api/v1/payments/history/
+/api/v1/payments/receipt/{}/
+/api/v1/pim/categories/export_categories/
+/api/v1/pim/categories/import_categories/
+/api/v1/pincode/{}/details/
+/api/v1/privacy/admin-grievances/
+/api/v1/privacy/data-breaches/
+/api/v1/privacy/data-breaches/{}/notify/
+/api/v1/privacy/grievance/{}/resolve/
+/api/v1/privacy/retention-policies/
+/api/v1/privacy/retention-policies/{}/purge/
+/api/v1/public/lucky-plan/verify-seed/
+/api/v1/refunds/admin-list/
+/api/v1/refunds/assess-damage/
+/api/v1/refunds/assess-damage/{}/
+/api/v1/refunds/history/
+/api/v1/refunds/inspect/{}/
+/api/v1/refunds/inspection-jobs/
+/api/v1/refunds/request/
+/api/v1/refunds/status/{}/
+/api/v1/refunds/{}/advance/
+/api/v1/subscriptions/
+/api/v1/subscriptions/deposits/
+/api/v1/subscriptions/{}/
+/api/v1/subscriptions/{}/balance/
+/api/v1/subscriptions/{}/emis/
+/api/v1/warranty/admin-claims/
+/api/v1/warranty/check/{}/
+/api/v1/warranty/claim-status/{}/
+/api/v1/warranty/claim/
+/api/v1/warranty/claim/{}/approve/
+/api/v1/warranty/claim/{}/schedule/
+/api/v1/warranty/enroll-extended/
+/api/v1/warranty/extended-plans/{}/
+/api/v1/warranty/service-call/{}/complete/
+/api/v1/warranty/service-history/
+/api/v1/warranty/service-schedule/

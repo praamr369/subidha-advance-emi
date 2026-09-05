@@ -61,6 +61,28 @@ jobs:
           python manage.py check_model_field_drift \
             --settings=core.settings.test --fail-on-findings
 
+      # Blocking: frontend/backend URL reconciliation, as a ratchet.
+      #
+      # 87 of 161 frontend /api/v1 URL shapes matched no backend route when this
+      # was first measured. Whole features called 404s in production — all of
+      # warranty, all of refunds, customer lucky-plan, KYC upload, and the entire
+      # DPDP privacy surface. The frontend had been written against endpoints
+      # that were never implemented.
+      #
+      # Nothing in this pipeline could have caught it. tsc passes because a wrong
+      # URL is still a valid string, the test suite never sees the frontend, and
+      # the Layer-A gate below walks routes that exist — it cannot walk a route
+      # nobody wrote.
+      #
+      # api_url_baseline.txt records the breakage that predates this check. Only
+      # URLs absent from it fail the build, so the count can only go down.
+      # Regenerating the baseline to make a red build pass would hide a broken
+      # feature from the one check that looks for it.
+      - name: Frontend/backend URL reconciliation
+        run: |
+          python manage.py check_frontend_api_urls \
+            --baseline api_url_baseline.txt --fail-on-missing
+
       # Blocking: Layer-A verification gate. Walks the whole /api/v1 surface and
       # asserts (1) no auth-gated endpoint serves data to anon, (2) no admin-only
       # endpoint serves data to ANY non-admin portal role (customer/partner/
