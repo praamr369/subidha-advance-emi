@@ -105,6 +105,10 @@ urlpatterns = [
     # Customer refund requests. Partial by design — the damage-assessment half
     # of this surface has no model behind it; see api/v1/routes/refunds.py.
     path("refunds/", include("api.v1.routes.refunds")),
+    # Customer lucky plan. Only eligibility, lucky-id and waiver-history —
+    # draw-results, draw-audit and verify-seed duplicate working endpoints, and
+    # a second implementation in a cryptographic draw is an integrity problem.
+    path("lucky-plan/", include("api.v1.routes.lucky_plan")),
     path("admin/payments/collect/", IdempotentAdminPaymentCollectView.as_view()),
     path("admin/solopreneur/today/", admin_solopreneur_today.AdminSolopreneurTodayView.as_view()),
     path("admin/solopreneur-dashboard/", SolopreneurUniversalDashboardView.as_view()),
