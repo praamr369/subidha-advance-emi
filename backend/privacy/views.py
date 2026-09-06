@@ -27,6 +27,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from privacy.models import (
+    ConsentAction,
+    ConsentEvent,
     ConsentStatus,
     CookieConsent,
     CustomerConsent,
@@ -73,6 +75,30 @@ def _customer_or_404(request):
     return customer
 
 
+def _record_consent_event(*, customer, consent_type, action, request, consent=None):
+    """Append to the consent evidence trail.
+
+    Called on every decision that changes consent. CustomerConsent holds only
+    the current state — see ConsentEvent's docstring — so this is the only
+    record that can answer "what did they agree to, and when" after the fact.
+
+    Deliberately inside the same transaction as the state change: an evidence
+    trail with gaps where the write failed is worse than none, because the gaps
+    are invisible.
+    """
+    ConsentEvent.objects.create(
+        customer=customer,
+        consent_type=consent_type,
+        action=action,
+        purpose_text=(getattr(consent, "purpose_text", "") or ""),
+        notice_version=(getattr(consent, "notice_version", "") or ""),
+        language_code=(getattr(consent, "language_code", "") or ""),
+        occurred_at=timezone.now(),
+        source_ip=_client_ip(request),
+        given_via="CUSTOMER_PORTAL",
+    )
+
+
 def _client_ip(request) -> str:
     forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
     if forwarded:
@@ -96,13 +122,10 @@ class ConsentListView(APIView):
 class ConsentGrantView(APIView):
     """Record consent for one purpose.
 
-    NOTE FOR COMPLIANCE REVIEW: CustomerConsent is unique_together on
-    (customer, consent_type), so the schema stores only the *current* decision.
-    Granting, withdrawing and re-granting the same purpose overwrite one row.
-    Under DPDP 2023 the ability to show what was consented to, when, and against
-    which notice version is normally expected to be historical. Preserving that
-    needs a schema change (an append-only consent-event table), which is a
-    deliberate decision rather than something to slip into this endpoint.
+    CustomerConsent is unique_together on (customer, consent_type), so it holds
+    only the current decision and re-granting overwrites it. The evidence DPDP
+    2023 expects — what was agreed, when, against which notice version — lives
+    in ConsentEvent, which this appends to in the same transaction.
     """
 
     permission_classes = [IsAuthenticated]
@@ -113,10 +136,7 @@ class ConsentGrantView(APIView):
         payload.is_valid(raise_exception=True)
         data = payload.validated_data
 
-        # CustomerConsent is unique_together on (customer, consent_type), so the
-        # schema holds one current decision per type and re-granting updates it
-        # in place. That means the model does NOT retain consent history — see
-        # the note on this class.
+        # Current state is updated in place; the evidence is appended.
         with transaction.atomic():
             consent, created = CustomerConsent.objects.update_or_create(
                 customer=customer,
@@ -132,6 +152,13 @@ class ConsentGrantView(APIView):
                     # Re-granting clears the previous withdrawal.
                     "withdrawn_at": None,
                 },
+            )
+            _record_consent_event(
+                customer=customer,
+                consent_type=data["consent_type"],
+                action=ConsentAction.GRANTED,
+                request=request,
+                consent=consent,
             )
 
         return Response(
@@ -150,14 +177,27 @@ class ConsentWithdrawView(APIView):
         payload = ConsentWithdrawSerializer(data=request.data)
         payload.is_valid(raise_exception=True)
 
-        updated = CustomerConsent.objects.filter(
-            customer=customer,
-            consent_type=payload.validated_data["consent_type"],
-            status=ConsentStatus.GIVEN,
-        ).update(status=ConsentStatus.WITHDRAWN, withdrawn_at=timezone.now())
+        # Atomic with its event: a withdrawal recorded in state but missing
+        # from the trail is an invisible gap in the evidence.
+        with transaction.atomic():
+            updated = CustomerConsent.objects.filter(
+                customer=customer,
+                consent_type=payload.validated_data["consent_type"],
+                status=ConsentStatus.GIVEN,
+            ).update(status=ConsentStatus.WITHDRAWN, withdrawn_at=timezone.now())
+
+            if updated:
+                _record_consent_event(
+                    customer=customer,
+                    consent_type=payload.validated_data["consent_type"],
+                    action=ConsentAction.WITHDRAWN,
+                    request=request,
+                )
 
         # Withdrawing something never granted is not an error from the
         # customer's side — the end state they asked for is the end state.
+        # No event is recorded in that case: nothing changed, so there is
+        # nothing to evidence.
         return Response({"withdrawn": updated})
 
 
@@ -174,6 +214,13 @@ class ConsentWithdrawByIdView(APIView):
             consent.status = ConsentStatus.WITHDRAWN
             consent.withdrawn_at = timezone.now()
             consent.save(update_fields=["status", "withdrawn_at", "updated_at"])
+            _record_consent_event(
+                customer=customer,
+                consent_type=consent.consent_type,
+                action=ConsentAction.WITHDRAWN,
+                request=request,
+                consent=consent,
+            )
 
         return Response(CustomerConsentSerializer(consent).data)
 

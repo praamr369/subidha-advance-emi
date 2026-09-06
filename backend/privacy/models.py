@@ -1,4 +1,5 @@
 """Privacy & Data Protection Models (DPDP 2023 Compliance)"""
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
@@ -481,3 +482,68 @@ class DataRetentionPolicy(TimeStampedModel):
 
     def __str__(self):
         return f"{self.data_category} - {self.retention_months} months"
+
+
+class ConsentAction(models.TextChoices):
+    GRANTED = 'GRANTED', 'Granted'
+    WITHDRAWN = 'WITHDRAWN', 'Withdrawn'
+    EXPIRED = 'EXPIRED', 'Expired'
+
+
+class ConsentEvent(TimeStampedModel):
+    """Append-only record of every consent decision.
+
+    CustomerConsent is unique_together on (customer, consent_type), so it holds
+    only the *current* decision — granting, withdrawing and re-granting the same
+    purpose overwrite one row. That is fine for "what may we do right now" and
+    useless for "prove what they agreed to, and when".
+
+    DPDP 2023 expects a Data Fiduciary to be able to demonstrate consent: what
+    was agreed, at what time, against which notice version. A single mutable row
+    cannot answer that after the fact. This table is the evidence; CustomerConsent
+    remains the fast current-state projection.
+
+    Nothing updates or deletes rows here. Corrections are made by appending a new
+    event, never by editing an old one — an evidence trail that can be rewritten
+    is not evidence.
+    """
+
+    customer = models.ForeignKey(
+        'customers.Customer',
+        on_delete=models.CASCADE,
+        related_name='consent_events',
+    )
+    consent_type = models.CharField(max_length=32, choices=ConsentType.choices)
+    action = models.CharField(max_length=16, choices=ConsentAction.choices)
+
+    # Captured at the moment of the decision rather than read from the customer
+    # record later: the notice they accepted is the one that was current then,
+    # and it may since have been superseded.
+    purpose_text = models.TextField(blank=True)
+    notice_version = models.CharField(max_length=32, blank=True)
+    language_code = models.CharField(max_length=8, blank=True)
+
+    occurred_at = models.DateTimeField(db_index=True)
+    source_ip = models.CharField(max_length=45, blank=True)
+    given_via = models.CharField(max_length=32, blank=True)
+
+    class Meta:
+        db_table = 'consent_events'
+        ordering = ['-occurred_at', '-id']
+        indexes = [
+            models.Index(fields=['customer', 'consent_type', '-occurred_at']),
+            models.Index(fields=['action', '-occurred_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.customer_id} {self.consent_type} {self.action} @ {self.occurred_at}"
+
+    def save(self, *args, **kwargs):
+        if self.pk is not None:
+            # Guards the property the table exists for. Without this, an
+            # ordinary .save() on a loaded instance would silently rewrite
+            # history and nothing would notice.
+            raise ValidationError(
+                "ConsentEvent rows are append-only; record a new event instead of editing one."
+            )
+        super().save(*args, **kwargs)

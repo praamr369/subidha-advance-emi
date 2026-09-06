@@ -12,7 +12,11 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from django.core.exceptions import ValidationError as DjangoValidationError
+
 from privacy.models import (
+    ConsentAction,
+    ConsentEvent,
     ConsentStatus,
     ConsentType,
     CookieConsent,
@@ -395,3 +399,114 @@ class AuthenticationTests(APITestCase):
         response = self.client.get(reverse("privacy-consents"))
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+
+class ConsentEvidenceTrailTests(PrivacyApiTestCase):
+    """The trail exists because CustomerConsent cannot evidence history.
+
+    unique_together (customer, consent_type) means grant -> withdraw -> re-grant
+    overwrites a single row, leaving no record that consent was ever withdrawn
+    or which notice version was accepted first. DPDP 2023 expects a Data
+    Fiduciary to be able to demonstrate consent after the fact.
+    """
+
+    def test_full_lifecycle_is_recoverable_from_the_trail(self):
+        grant = reverse("privacy-consent-grant")
+        self.client.post(
+            grant,
+            {"consent_type": ConsentType.MARKETING, "notice_version": "v1"},
+            format="json",
+        )
+        self.client.post(
+            reverse("privacy-consent-withdraw"),
+            {"consent_type": ConsentType.MARKETING},
+            format="json",
+        )
+        self.client.post(
+            grant,
+            {"consent_type": ConsentType.MARKETING, "notice_version": "v2"},
+            format="json",
+        )
+
+        # Current state keeps one row and says nothing about the journey.
+        self.assertEqual(
+            CustomerConsent.objects.filter(customer=self.customer).count(), 1
+        )
+
+        events = list(
+            ConsentEvent.objects.filter(customer=self.customer).order_by("id")
+        )
+        self.assertEqual(
+            [e.action for e in events],
+            [ConsentAction.GRANTED, ConsentAction.WITHDRAWN, ConsentAction.GRANTED],
+        )
+        # The notice version accepted at each point survives, which is the part
+        # a regulator asks about.
+        self.assertEqual(events[0].notice_version, "v1")
+        self.assertEqual(events[2].notice_version, "v2")
+
+    def test_events_capture_when_and_from_where(self):
+        self.client.post(
+            reverse("privacy-consent-grant"),
+            {"consent_type": ConsentType.EMAIL},
+            format="json",
+        )
+
+        event = ConsentEvent.objects.get(customer=self.customer)
+        self.assertIsNotNone(event.occurred_at)
+        self.assertEqual(event.given_via, "CUSTOMER_PORTAL")
+        self.assertEqual(event.consent_type, ConsentType.EMAIL)
+
+    def test_withdraw_by_id_is_also_recorded(self):
+        self.client.post(
+            reverse("privacy-consent-grant"),
+            {"consent_type": ConsentType.SMS},
+            format="json",
+        )
+        consent = CustomerConsent.objects.get(customer=self.customer)
+
+        self.client.post(reverse("privacy-consent-withdraw-by-id", args=[consent.id]))
+
+        self.assertEqual(
+            ConsentEvent.objects.filter(
+                customer=self.customer, action=ConsentAction.WITHDRAWN
+            ).count(),
+            1,
+        )
+
+    def test_no_event_when_nothing_changed(self):
+        """Withdrawing something never granted changes no state to evidence."""
+        self.client.post(
+            reverse("privacy-consent-withdraw"),
+            {"consent_type": ConsentType.PROFILING},
+            format="json",
+        )
+
+        self.assertEqual(ConsentEvent.objects.count(), 0)
+
+    def test_events_are_append_only(self):
+        """An evidence trail that can be rewritten is not evidence."""
+        self.client.post(
+            reverse("privacy-consent-grant"),
+            {"consent_type": ConsentType.ANALYTICS},
+            format="json",
+        )
+        event = ConsentEvent.objects.get(customer=self.customer)
+
+        event.action = ConsentAction.WITHDRAWN
+        with self.assertRaises(DjangoValidationError):
+            event.save()
+
+        event.refresh_from_db()
+        self.assertEqual(event.action, ConsentAction.GRANTED)
+
+    def test_one_customers_trail_is_not_visible_to_another(self):
+        self.client.post(
+            reverse("privacy-consent-grant"),
+            {"consent_type": ConsentType.MARKETING},
+            format="json",
+        )
+
+        self.assertEqual(
+            ConsentEvent.objects.filter(customer=self.other_customer).count(), 0
+        )
