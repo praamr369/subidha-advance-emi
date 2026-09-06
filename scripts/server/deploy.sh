@@ -47,7 +47,18 @@ git checkout -q "$NEW_COMMIT"
 cd "$APP_DIR/backend"
 "$PIP" install -q -r requirements.txt
 set -a; . "$BACKEND_ENV"; set +a
-if ! DB_NAME="$REHEARSAL_DB" "$PY" manage.py migrate --no-input; then
+# The rehearsal DB is created ad hoc, so it is not in PgBouncer's [databases]
+# list — connecting through the pooler fails with "no such database" before a
+# single migration runs, which reads as a migration failure and aborts a
+# perfectly good deploy. Point the rehearsal at the real cluster instead. The
+# pooler is what production traffic uses; rehearsing the schema change does not
+# need it, and bypassing it also keeps the rehearsal off the production pool.
+REHEARSAL_DB_HOST="${REHEARSAL_DB_HOST:-127.0.0.1}"
+REHEARSAL_DB_PORT="${REHEARSAL_DB_PORT:-5432}"
+if ! DB_NAME="$REHEARSAL_DB" \
+     DB_HOST="$REHEARSAL_DB_HOST" \
+     DB_PORT="$REHEARSAL_DB_PORT" \
+     "$PY" manage.py migrate --no-input; then
   echo "!!! Migration FAILED on the rehearsal copy. Production untouched."
   echo "    Reverting code checkout. Fix the migration in dev and redeploy."
   git checkout -q "$OLD_COMMIT"
