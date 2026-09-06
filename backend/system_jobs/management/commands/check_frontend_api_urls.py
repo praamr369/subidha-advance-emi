@@ -47,6 +47,12 @@ _PATH_CONVERTER = re.compile(r"<[^>]+>")
 _REGEX_GROUP = re.compile(r"\(\?P<[^>]+>[^)]*\)")
 # Template interpolation: ${...}
 _TEMPLATE_EXPR = re.compile(r"\$\{[^}]*\}")
+# Variable names that conventionally hold a "?a=b" string rather than a path
+# segment. Deliberately a short, literal list — inferring intent from any other
+# name would start hiding genuinely missing endpoints.
+_TRAILING_QUERY_VAR = re.compile(
+    r"/\$\{(?:qs|suffix|query|queryString|querystring|search|params)\}/?$"
+)
 
 
 def _normalise(url: str) -> str:
@@ -60,11 +66,37 @@ def _normalise(url: str) -> str:
     # "(?P<pk>[^/.]+)" — so splitting on "?" first truncated every route
     # registered through a DRF router at the opening parenthesis. Those routes
     # then matched nothing, and the tool reported working endpoints as missing.
+    # A trailing interpolation whose variable is named like a query string is
+    # a query string, not a path segment:
+    #   `/admin/growth/customers/${id}/offer-candidates/${qs}`   qs = "?a=b"
+    #   `/admin/customers/${id}/timeline/${suffix}`          suffix = "?x=1"
+    # Template expressions are collapsed before the "?" split (see below), so
+    # the query string became a phantom segment and five working endpoints were
+    # reported missing. Only these names are stripped, and only in tail
+    # position: a trailing `${id}` is a real path parameter and must survive,
+    # and the two idioms are indistinguishable without the variable's value.
+    url = _TRAILING_QUERY_VAR.sub("/", url)
     url = _TEMPLATE_EXPR.sub("{}", url)
     url = _REGEX_GROUP.sub("{}", url)
     url = _PATH_CONVERTER.sub("{}", url)
     url = url.split("?", 1)[0].split("#", 1)[0]
     url = url.replace("^", "").replace("$", "")
+    # An unmatched "{" is a template expression the regex could not close,
+    # because it spans a line or nests braces:
+    #   apiFetch(`/admin/support/tickets/${qs(params)}`)
+    # captured as ".../tickets/{qs(params". Everything from that brace on is
+    # interpolated, so treat it as one dynamic segment rather than keeping the
+    # fragment, which matched nothing and reported a working endpoint missing.
+    # Note the placeholder "{}" is itself braces, so look only for a brace
+    # that is NOT the start of one. Checking for a bare "{" instead truncated
+    # every parameterised route and cut the backend route count by a thousand.
+    stray = re.search(r"\{(?!\})", url)
+    if stray:
+        url = url[: stray.start()].rstrip("/") + "/{}/"
+    # Trailing sentence punctuation. These URLs are written in prose as often
+    # as in code — "Uploads use POST /api/v1/admin/hr/staff-documents/." — and
+    # the full stop was being captured as part of the path.
+    url = re.sub(r"[.,;:!]+/?$", "/", url)
     url = re.sub(r"/{2,}", "/", url)
     if not url.startswith("/"):
         url = "/" + url

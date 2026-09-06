@@ -49,7 +49,7 @@ export default function PublicLeadFormPage() {
     setError(null);
 
     try {
-      await apiFetch("/api/v1/crm-pipeline/leads/public/", {
+      await apiFetch("/api/v1/public/leads/", {
         method: "POST",
         body: data,
       });

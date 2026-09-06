@@ -49,7 +49,7 @@ export default function AdminCashierClosePage() {
 
   const load = () => {
     setLoading(true);
-    apiFetch(`/settlements/cashier-day-closes/?date=${today}`)
+    apiFetch(`/admin/settlements/cashier-day-closes/?date=${today}`)
       .then((d) => {
         const arr = Array.isArray(d) ? d : ((d as { results?: DayClose[] })?.results ?? []);
         setCloses(arr as DayClose[]);
@@ -64,7 +64,7 @@ export default function AdminCashierClosePage() {
     if (!confirm(`${action === "approve" ? "Approve" : "Reject"} this day close?`)) return;
     setProcessing(id);
     try {
-      await apiFetch(`/settlements/cashier-day-closes/${id}/${action}/`, { method: "POST" });
+      await apiFetch(`/admin/settlements/cashier-day-closes/${id}/${action}/`, { method: "POST" });
       showToast(`Day close ${action}d successfully.`);
       load();
     } catch (e: unknown) {

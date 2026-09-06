@@ -61,7 +61,7 @@ export default function BatchAlertsPage() {
         payment_discipline_threshold: String(paymentThreshold),
         draw_completion_threshold: String(drawThreshold),
       });
-      const res: CheckResult = await apiFetch(`/batches/performance-check/?${q}`);
+      const res: CheckResult = await apiFetch(`/admin/batches/performance-check/?${q}`);
       setCheckResult(res);
     } catch {
       setError("Failed to check batch performance.");
@@ -76,7 +76,7 @@ export default function BatchAlertsPage() {
     setError(null);
     setAlertResult(null);
     try {
-      const res: AlertResult = await apiFetch("/batches/performance-alert/", {
+      const res: AlertResult = await apiFetch("/admin/batches/performance-alert/", {
         method: "POST",
         body: JSON.stringify({
           fill_rate_threshold: fillThreshold,

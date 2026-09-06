@@ -67,7 +67,7 @@ export async function createPublicLead(data: {
   preferred_emi_amount?: number;
   notes?: string;
 }) {
-  const response = await fetch('/api/v1/crm-pipeline/leads/public/', {
+  const response = await fetch('/api/v1/public/leads/', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),

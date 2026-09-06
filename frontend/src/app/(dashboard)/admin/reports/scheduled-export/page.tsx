@@ -41,7 +41,7 @@ export default function ScheduledExportPage() {
     setError(null);
     setResult(null);
     try {
-      const res: ExportResult = await apiFetch("/reports/scheduled-export/", {
+      const res: ExportResult = await apiFetch("/admin/reports/scheduled-export/", {
         method: "POST",
         body: JSON.stringify({
           report_type: reportType,

@@ -43,7 +43,7 @@ export function listDisputes(params: { stage?: string; dispute_type?: string; cu
   if (params.stage) q.set("stage", params.stage);
   if (params.dispute_type) q.set("dispute_type", params.dispute_type);
   if (params.customer_id) q.set("customer_id", params.customer_id);
-  return apiFetch(`/crm/disputes/?${q}`);
+  return apiFetch(`/admin/crm/disputes/?${q}`);
 }
 
 export function createDispute(payload: {
@@ -54,11 +54,11 @@ export function createDispute(payload: {
   description: string;
   priority?: DisputePriority;
 }): Promise<CustomerDispute> {
-  return apiFetch("/crm/disputes/", { method: "POST", body: JSON.stringify(payload) });
+  return apiFetch("/admin/crm/disputes/", { method: "POST", body: JSON.stringify(payload) });
 }
 
 export function getDispute(id: number): Promise<CustomerDispute> {
-  return apiFetch(`/crm/disputes/${id}/`);
+  return apiFetch(`/admin/crm/disputes/${id}/`);
 }
 
 export function updateDispute(id: number, payload: Partial<{
@@ -67,9 +67,9 @@ export function updateDispute(id: number, payload: Partial<{
   assigned_to_id: number | null;
   priority: DisputePriority;
 }>): Promise<CustomerDispute> {
-  return apiFetch(`/crm/disputes/${id}/`, { method: "PATCH", body: JSON.stringify(payload) });
+  return apiFetch(`/admin/crm/disputes/${id}/`, { method: "PATCH", body: JSON.stringify(payload) });
 }
 
 export function notifyCustomerDispute(id: number, message: string): Promise<{ message: string; email: string; dispute_ref: string }> {
-  return apiFetch(`/crm/disputes/${id}/notify/`, { method: "POST", body: JSON.stringify({ message }) });
+  return apiFetch(`/admin/crm/disputes/${id}/notify/`, { method: "POST", body: JSON.stringify({ message }) });
 }
