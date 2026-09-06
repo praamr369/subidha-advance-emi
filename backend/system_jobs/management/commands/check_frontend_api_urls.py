@@ -42,10 +42,15 @@ def _normalise(url: str) -> str:
     Every dynamic segment becomes {} so that `/warranty/check/${id}/` and
     `warranty/check/<int:product_id>/` compare equal.
     """
-    url = url.split("?", 1)[0].split("#", 1)[0]
+    # Dynamic segments are collapsed BEFORE the query string is stripped.
+    # Django re_path patterns contain a literal "?" inside named groups —
+    # "(?P<pk>[^/.]+)" — so splitting on "?" first truncated every route
+    # registered through a DRF router at the opening parenthesis. Those routes
+    # then matched nothing, and the tool reported working endpoints as missing.
     url = _TEMPLATE_EXPR.sub("{}", url)
     url = _REGEX_GROUP.sub("{}", url)
     url = _PATH_CONVERTER.sub("{}", url)
+    url = url.split("?", 1)[0].split("#", 1)[0]
     url = url.replace("^", "").replace("$", "")
     url = re.sub(r"/{2,}", "/", url)
     if not url.startswith("/"):

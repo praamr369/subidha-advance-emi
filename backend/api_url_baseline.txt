@@ -17,8 +17,6 @@
 /api/v1/admin/consumer/return-requests/{}/cpa-override/
 /api/v1/admin/consumer/return-requests/{}/{}/
 /api/v1/admin/customers/search/{}/
-/api/v1/admin/customers/{}/kyc-documents/{}/download/
-/api/v1/admin/inventory/opening-stock/{}/post/
 /api/v1/admin/lucky-plan/draw-authorisations/
 /api/v1/admin/lucky-plan/draw-authorisations/{}/{}/
 /api/v1/admin/lucky-plan/waiver-settlements/
@@ -27,10 +25,8 @@
 /api/v1/admin/privacy/breach-notifications/{}/{}/
 /api/v1/admin/privacy/retention-schedule/
 /api/v1/admin/privacy/retention-schedule/{}/{}/
-/api/v1/admin/products/{}/
 /api/v1/admin/repossessions/
 /api/v1/admin/repossessions/{}/{}/
-/api/v1/admin/subscriptions/{}/documents/
 /api/v1/business/msme/
 /api/v1/crm-pipeline/leads/public/
 /api/v1/customer/addresses/
