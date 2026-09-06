@@ -13,6 +13,7 @@ from django.shortcuts import get_object_or_404
 from django.db.models import Sum, Q
 from django.db import transaction
 
+from accounting.services.period_service import assert_accounting_period_open
 from accounting.models import (
     LeaseContract, LeaseSchedule, FixedAssetDepreciation, DepreciationSchedule,
     CostCentre, CostAllocationRule, DeferredTax, ChartOfAccount, JournalEntry, JournalEntryLine,
@@ -163,6 +164,20 @@ def lease_post_to_gl_view(request, lease_id):
             # Guard: skip if amounts are zero/negative (shouldn't happen but safe)
             if principal <= Decimal("0") and schedule.interest_expense <= Decimal("0"):
                 continue
+
+            # Every other posting path routes through
+            # journal_posting_service.post_journal_entry, which calls
+            # assert_accounting_period_open first. This view builds and posts
+            # its journal directly, so without this guard an IFRS-16 lease
+            # schedule dated inside a closed period would be written as POSTED
+            # — backdating the books after close, which is exactly what the
+            # period lock exists to prevent.
+            assert_accounting_period_open(
+                reference_date=schedule.payment_date,
+                performed_by=request.user,
+                instance=lease,
+                event="ACCOUNTING_LEASE_POST_BLOCKED",
+            )
 
             je = JournalEntry.objects.create(
                 entry_date=schedule.payment_date,
