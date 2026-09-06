@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api";
 /**
  * Settlement workflow API service
  * Handles recovery case settlement request/approval
@@ -24,30 +25,20 @@ export interface SettlementDetails {
 }
 
 export async function getSettlementDetails(caseId: number): Promise<SettlementDetails> {
-  const response = await fetch(`/api/v1/admin/recovery-cases/${caseId}/settlement/`, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-  });
-  if (!response.ok) throw new Error(`Failed to fetch settlement details: ${response.statusText}`);
-  return response.json();
+  return apiFetch(`/admin/recovery-cases/${caseId}/settlement/`);
 }
 
 export async function requestSettlement(
   caseId: number,
   settlementNotes: string
 ): Promise<{ status: string; settlement_requested_at: string; settlement_requested_by: string }> {
-  const response = await fetch(`/api/v1/admin/recovery-cases/${caseId}/settlement/`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
+  return apiFetch(`/admin/recovery-cases/${caseId}/settlement/`, {
+    method: "POST",
     body: JSON.stringify({
       action: 'request',
       settlement_notes: settlementNotes,
     }),
   });
-  if (!response.ok) throw new Error(`Failed to request settlement: ${response.statusText}`);
-  return response.json();
 }
 
 export async function approveSettlement(
@@ -56,10 +47,8 @@ export async function approveSettlement(
   settledAmount: number,
   approvalNotes: string
 ): Promise<{ status: string; settlement_type: string; settled_amount: string; settlement_approved_by: string }> {
-  const response = await fetch(`/api/v1/admin/recovery-cases/${caseId}/settlement/`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
+  return apiFetch(`/admin/recovery-cases/${caseId}/settlement/`, {
+    method: "POST",
     body: JSON.stringify({
       action: 'approve',
       settlement_type: settlementType,
@@ -67,6 +56,4 @@ export async function approveSettlement(
       approval_notes: approvalNotes,
     }),
   });
-  if (!response.ok) throw new Error(`Failed to approve settlement: ${response.statusText}`);
-  return response.json();
 }

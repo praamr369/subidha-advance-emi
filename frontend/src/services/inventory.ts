@@ -1,3 +1,5 @@
+import { getAccessToken } from "@/lib/auth/tokens";
+import { getStoredSession } from "@/lib/auth/session";
 import { apiFetch } from "@/lib/api";
 
 // ============================================================================
@@ -980,7 +982,14 @@ export async function exportServiceCatalogToCSV(params?: {
   if (params?.service_type) query.append("service_type", params.service_type);
   query.append("format", "csv");
   const url = `/admin/inventory/service-catalog/?${query}`;
-  const response = await fetch(`/api/v1${url}`, { credentials: "include" });
+  const accessToken = getAccessToken() ?? getStoredSession()?.accessToken ?? null;
+  const response = await fetch(`/api/v1${url}`, {
+    credentials: "include",
+    // Raw fetch is intentional: this returns a CSV blob, not JSON, so
+    // apiFetch cannot be used. The bearer token still has to be sent —
+    // the backend authenticates with JWT and ignores cookies.
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+  });
   if (!response.ok) throw new Error("Export failed");
   const blob = await response.blob();
   const a = document.createElement("a");
@@ -1398,7 +1407,14 @@ export async function exportStockReservationsToCSV(params?: {
   if (params?.status) query.append("status", params.status);
   if (params?.source_module) query.append("source_module", params.source_module);
   query.append("format", "csv");
-  const response = await fetch(`/api/v1/admin/inventory/reservations/?${query}`, { credentials: "include" });
+  const accessToken = getAccessToken() ?? getStoredSession()?.accessToken ?? null;
+  const response = await fetch(`/api/v1/admin/inventory/reservations/?${query}`, {
+    credentials: "include",
+    // Raw fetch is intentional: this returns a CSV blob, not JSON, so
+    // apiFetch cannot be used. The bearer token still has to be sent —
+    // the backend authenticates with JWT and ignores cookies.
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+  });
   if (!response.ok) throw new Error("Export failed");
   const blob = await response.blob();
   const a = document.createElement("a");

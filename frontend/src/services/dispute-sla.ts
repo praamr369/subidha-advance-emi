@@ -1,7 +1,15 @@
 /**
  * Dispute SLA tracking API service
  * Handles SLA compliance monitoring and escalation
+ *
+ * Uses apiFetch, not raw fetch. These functions previously called fetch()
+ * directly with `credentials: 'include'` and no Authorization header. The
+ * backend authenticates with JWT only (DEFAULT_AUTHENTICATION_CLASSES is
+ * JWTAuthentication), which reads the bearer token from the header and ignores
+ * cookies — so every one of these returned 401 and the whole SLA surface was
+ * dead. The endpoints themselves were fine.
  */
+import { apiFetch } from "@/lib/api";
 
 export interface DisputeSLAStatus {
   dispute_ref: string;
@@ -34,54 +42,34 @@ export interface DisputeWithSLA {
 }
 
 export async function getDisputeSLAStatus(disputeId: number): Promise<DisputeSLAStatus> {
-  const response = await fetch(`/api/v1/admin/crm/disputes/${disputeId}/sla-status/`, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-  });
-  if (!response.ok) throw new Error(`Failed to fetch SLA status: ${response.statusText}`);
-  return response.json();
+  return apiFetch(`/admin/crm/disputes/${disputeId}/sla-status/`) as Promise<DisputeSLAStatus>;
 }
 
 export async function getBreachedSLADisputes(): Promise<{ count: number; results: DisputeWithSLA[] }> {
-  const response = await fetch(`/api/v1/admin/crm/disputes/sla-breached/`, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-  });
-  if (!response.ok) throw new Error(`Failed to fetch breached disputes: ${response.statusText}`);
-  return response.json();
+  return apiFetch(`/admin/crm/disputes/sla-breached/`) as Promise<{
+    count: number;
+    results: DisputeWithSLA[];
+  }>;
 }
 
 export async function getPendingEscalationDisputes(): Promise<{ count: number; results: DisputeWithSLA[] }> {
-  const response = await fetch(`/api/v1/admin/crm/disputes/pending-escalation/`, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-  });
-  if (!response.ok) throw new Error(`Failed to fetch pending escalation disputes: ${response.statusText}`);
-  return response.json();
+  return apiFetch(`/admin/crm/disputes/pending-escalation/`) as Promise<{
+    count: number;
+    results: DisputeWithSLA[];
+  }>;
 }
 
 export async function moveDisputeToReview(disputeId: number, assignedToId?: number): Promise<DisputeWithSLA> {
-  const response = await fetch(`/api/v1/admin/crm/disputes/${disputeId}/move-to-review/`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
+  return apiFetch(`/admin/crm/disputes/${disputeId}/move-to-review/`, {
+    method: "POST",
     body: JSON.stringify({ assigned_to_id: assignedToId }),
-  });
-  if (!response.ok) throw new Error(`Failed to move to review: ${response.statusText}`);
-  return response.json();
+  }) as Promise<DisputeWithSLA>;
 }
 
 export async function escalateDispute(disputeId: number): Promise<DisputeWithSLA> {
-  const response = await fetch(`/api/v1/admin/crm/disputes/${disputeId}/escalate/`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-  });
-  if (!response.ok) throw new Error(`Failed to escalate dispute: ${response.statusText}`);
-  return response.json();
+  return apiFetch(`/admin/crm/disputes/${disputeId}/escalate/`, {
+    method: "POST",
+  }) as Promise<DisputeWithSLA>;
 }
 
 export function formatSLAStatus(status: DisputeSLAStatus): {
