@@ -26,7 +26,20 @@ from django.urls import get_resolver
 
 # A URL literal in TS/TSX: starts /api/v1/, runs until the quote or an
 # interpolation boundary. Query strings are stripped later.
-_FRONTEND_URL = re.compile(r"/api/v1/[^\s\"'`)\\]*")
+# Stops at "<" and ">" as well as quotes and whitespace. Without that, a URL
+# written in prose inside a JSX tag — <code>/api/v1/admin/customers/search/</code>
+# — was captured with the closing tag attached, and the path-converter regex
+# below then turned "</code>" into "{}", inventing an endpoint nobody calls.
+_FRONTEND_URL = re.compile(r"/api/v1/[^\s\"'`)<>\\]*")
+
+# API_BASE_URL already ends with "/api/v1" (see frontend lib/env.ts), and
+# apiFetch accepts both forms — so most call sites write the path WITHOUT the
+# prefix: apiFetch("/admin/accounting/assets/"). Matching only the prefixed
+# form checked a minority of the surface. This catches the relative literals
+# passed directly to apiFetch; they are prefixed before comparison.
+_APIFETCH_RELATIVE = re.compile(
+    r"""apiFetch(?:<[^>]*>)?\(\s*[`'"](/(?!api/v1)[a-zA-Z0-9][^\s"'`)<>\\]*)"""
+)
 
 # Django path() converters: <int:pk>, <str:slug>, <uuid:id>, and bare <pk>.
 _PATH_CONVERTER = re.compile(r"<[^>]+>")
@@ -89,6 +102,30 @@ def _read_baseline(path: Path) -> set[str]:
     }
 
 
+def _matches(url: str, routes: set[str]) -> bool:
+    """Whether a frontend URL corresponds to a real route.
+
+    Exact first. Failing that, a frontend call may spell out a value where the
+    route declares a parameter — the audit-log timeline is written as
+    ".../timeline/Customer/${id}/" against a route of
+    ".../timeline/{model}/{pk}/". Generalising one literal segment at a time
+    catches that without loosening the check into uselessness: a URL still has
+    to align with a real route on every other segment.
+    """
+    if url in routes:
+        return True
+
+    parts = url.strip("/").split("/")
+    for index, part in enumerate(parts):
+        if part == "{}":
+            continue
+        candidate = list(parts)
+        candidate[index] = "{}"
+        if "/" + "/".join(candidate) + "/" in routes:
+            return True
+    return False
+
+
 def _is_noise(url: str) -> bool:
     """Filter shapes that are not really endpoint calls.
 
@@ -132,7 +169,11 @@ def _frontend_calls(frontend_src: Path) -> dict[str, list[str]]:
             text = path.read_text(encoding="utf-8", errors="ignore")
         except OSError:
             continue
-        for raw in _FRONTEND_URL.findall(text):
+        found = list(_FRONTEND_URL.findall(text))
+        # Relative apiFetch paths carry the same meaning once prefixed.
+        found += ["/api/v1" + m for m in _APIFETCH_RELATIVE.findall(text)]
+
+        for raw in found:
             # A trailing interpolation with no closing brace on the same match
             # means the regex clipped mid-expression; skip those rather than
             # invent a shape.
@@ -191,7 +232,7 @@ class Command(BaseCommand):
         missing = {
             url: files
             for url, files in calls.items()
-            if url not in routes and not _is_noise(url)
+            if not _matches(url, routes) and not _is_noise(url)
         }
 
         self.stdout.write(f"Backend routes      : {len(routes)}")
