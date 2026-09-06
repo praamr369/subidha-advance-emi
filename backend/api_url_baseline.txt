@@ -44,9 +44,6 @@
 /api/v1/lucky-plan/draw-audit/
 /api/v1/lucky-plan/draw-results/
 /api/v1/lucky-plan/draw-results/{}/
-/api/v1/lucky-plan/eligibility/
-/api/v1/lucky-plan/lucky-id/
-/api/v1/lucky-plan/waiver-history/
 /api/v1/partner/
 /api/v1/partner/profile-info/
 /api/v1/partner/support/tickets/
