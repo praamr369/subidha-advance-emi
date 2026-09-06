@@ -69,7 +69,13 @@ fi
 
 # ---------------------------------------------------------------- provision ---
 command -v pg_createcluster >/dev/null 2>&1 || die "pg_createcluster not found (Debian/Ubuntu only)."
-[[ -d "$REPLICA_DATA" ]] && die "$REPLICA_DATA already exists — refusing to overwrite."
+
+# Refuse to clobber a standby that holds data. An empty directory is the
+# residue of a failed earlier attempt and is safe to reuse — distinguishing the
+# two matters, because the destructive rm below runs either way.
+if [[ -d "$REPLICA_DATA" ]] && [[ -n "$(ls -A "$REPLICA_DATA" 2>/dev/null)" ]]; then
+  die "$REPLICA_DATA exists and is not empty — refusing to overwrite. Remove the cluster first: pg_dropcluster $PG_VERSION $REPLICA_CLUSTER"
+fi
 
 note "[1/6] Ensuring a replication role and slot on the primary"
 # NOLOGIN would block streaming; REPLICATION is the only extra privilege needed,
@@ -88,15 +94,43 @@ SQL
 
 note "[2/6] Allowing local replication connections"
 HBA="/etc/postgresql/$PG_VERSION/main/pg_hba.conf"
-if ! grep -qE "^local\s+replication\s+$REPL_USER\s+peer" "$HBA"; then
-  cp -a "$HBA" "$HBA.bak-$(date +%Y%m%d-%H%M%S)"
-  echo "local   replication     $REPL_USER                              peer" >> "$HBA"
-  systemctl reload "postgresql@$PG_VERSION-main"
-  note "      pg_hba.conf updated and reloaded (backup kept)"
+IDENT="/etc/postgresql/$PG_VERSION/main/pg_ident.conf"
+MAP_NAME="subidha_repl_map"
+
+# pg_basebackup runs as OS user "postgres" but must authenticate as the
+# dedicated replication role. Plain peer auth maps OS name to DB name and so
+# rejects that. An ident map lets postgres act as $REPL_USER without loosening
+# anything to trust and without falling back to the superuser for streaming.
+if ! grep -qE "^${MAP_NAME}\s+postgres\s+${REPL_USER}" "$IDENT"; then
+  cp -a "$IDENT" "$IDENT.bak-$(date +%Y%m%d-%H%M%S)"
+  echo "$MAP_NAME   postgres   $REPL_USER" >> "$IDENT"
+  note "      pg_ident.conf map added (backup kept)"
 fi
 
+# pg_hba is FIRST MATCH WINS. Debian ships "local replication all peer" near
+# the top, which matches this connection before any appended line is reached —
+# so the mapped rule must be inserted ABOVE it, not added at the end.
+cp -a "$HBA" "$HBA.bak-$(date +%Y%m%d-%H%M%S)"
+# Drop any previous attempt at this rule, wherever it landed.
+sed -i -E "/^local[[:space:]]+replication[[:space:]]+${REPL_USER}[[:space:]]/d" "$HBA"
+
+MAPPED_RULE="local   replication     $REPL_USER                              peer map=$MAP_NAME"
+FIRST_REPL_LINE="$(grep -nE '^local[[:space:]]+replication' "$HBA" | head -1 | cut -d: -f1 || true)"
+if [[ -n "$FIRST_REPL_LINE" ]]; then
+  sed -i "${FIRST_REPL_LINE}i ${MAPPED_RULE}" "$HBA"
+  note "      pg_hba.conf rule inserted above the existing replication rule (line $FIRST_REPL_LINE)"
+else
+  echo "$MAPPED_RULE" >> "$HBA"
+  note "      pg_hba.conf rule appended (no existing replication rule)"
+fi
+systemctl reload "postgresql@$PG_VERSION-main"
+
 note "[3/6] Creating the standby cluster (this copies the whole database)"
-pg_createcluster "$PG_VERSION" "$REPLICA_CLUSTER" --port="$REPLICA_PORT" --start-conf=manual >/dev/null
+if ! pg_lsclusters -h 2>/dev/null | awk '{print $1" "$2}' | grep -qx "$PG_VERSION $REPLICA_CLUSTER"; then
+  pg_createcluster "$PG_VERSION" "$REPLICA_CLUSTER" --port="$REPLICA_PORT" --start-conf=manual >/dev/null
+else
+  note "      cluster $PG_VERSION/$REPLICA_CLUSTER already exists — reusing it"
+fi
 rm -rf "${REPLICA_DATA:?}/"*
 sudo -u postgres pg_basebackup \
   --pgdata="$REPLICA_DATA" \

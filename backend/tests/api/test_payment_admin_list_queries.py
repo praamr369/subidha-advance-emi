@@ -109,6 +109,22 @@ class PaymentAdminListQueryCountTests(APITestCase):
             "relation the view does not select_related.",
         )
 
+    def test_the_viewset_still_uses_the_serializer_under_test(self):
+        """Both consumers of PaymentAdminSerializer are accounted for.
+
+        The list route below is the only one that can scale with row count.
+        The other consumer — admin_payment_collection, which serializes a
+        single payment after collection — is a fixed cost by construction.
+
+        If someone swaps this viewset's serializer_class, the query-count test
+        would keep passing while no longer testing the serializer the finding
+        was about.
+        """
+        from api.v1.serializers.admin_resources import PaymentAdminSerializer
+        from api.v1.views.admin_resources import PaymentAdminViewSet
+
+        self.assertIs(PaymentAdminViewSet.serializer_class, PaymentAdminSerializer)
+
     def test_serializer_exposes_the_customer_it_traverses(self):
         """Guards the assumption the query-count test rests on.
 

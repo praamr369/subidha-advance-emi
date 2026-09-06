@@ -75,11 +75,44 @@ pip install -r requirements.txt               # backend deps if changed
 python manage.py migrate                      # already rehearsed, low risk
 python manage.py collectstatic --noinput
 # rebuild/restart frontend if it changed
-sudo systemctl restart <gunicorn-service>     # and the Next.js service if any
+sudo systemctl restart subidha-gunicorn subidha-next subidha-celery subidha-celery-beat
 ```
 
 Smoke test immediately: log in, open the admin dashboard, open one customer,
 one EMI register page, `GET /api/v1/health/deep/`.
+
+## 3b. What is actually running (as of 2026-09-06)
+
+Six services. A rollback that restarts only gunicorn leaves three of them on
+the old code or in the wrong state.
+
+| Service | Role | If it is down |
+|---|---|---|
+| `subidha-gunicorn` | Django/API | Site is down |
+| `subidha-next` | Frontend | Site is down |
+| `subidha-celery` | Background worker | Seven daily jobs silently stop; failures land in `AuditLog` as `BACKGROUND_TASK_FAILED` |
+| `subidha-celery-beat` | Scheduler | Same, and nothing dispatches |
+| `pgbouncer` | Connection pooler on **127.0.0.1:6432** | **Total outage** — the app connects through it, not directly |
+| `postgresql@16-replica` | Read standby on **5433** | Reporting that opts in via `settings.REPLICA_DATABASE_ALIAS` fails; nothing else |
+
+**The pooler is in the query path.** `DB_PORT=6432` in `/etc/subidha/backend.env`.
+If the database seems unreachable, check pgbouncer before PostgreSQL. To take it
+out of the path entirely:
+
+```bash
+sudo ./scripts/server/setup-pgbouncer.sh --rollback   # back to direct 5432
+```
+
+**The standby is not a backup.** It replicates deletions and bad migrations in
+seconds. Restores come from `$BACKUP_ROOT`, never from the replica. Check lag
+and slot health with:
+
+```bash
+sudo ./scripts/server/setup-replica.sh --status
+```
+
+An inactive replication slot retains WAL on the primary indefinitely — if the
+standby is retired, drop the slot or the primary's disk fills.
 
 ## 4. When something goes wrong — decision table
 
@@ -99,7 +132,7 @@ cd /path/to/app
 git checkout $(cat "$BACKUP_ROOT/pre-update-$STAMP/deployed-commit.txt")
 # If the update's migrations are reversible, undo just those:
 python manage.py migrate <app_label> <last_good_migration_name>
-sudo systemctl restart <gunicorn-service>
+sudo systemctl restart subidha-gunicorn subidha-celery subidha-celery-beat
 ```
 
 Find `<last_good_migration_name>` in `migration-state.txt` from step 1d.
@@ -111,8 +144,10 @@ Use when the schema/data is in a bad state and the post-update writes are
 disposable (you rolled back within minutes).
 
 ```bash
-# 1. Stop the app so nothing writes during restore
-sudo systemctl stop <gunicorn-service>
+# 1. Stop EVERYTHING that writes, not just the web tier. Celery workers run
+#    the same codebase and will keep writing to the database during the
+#    restore if left running.
+sudo systemctl stop subidha-gunicorn subidha-celery subidha-celery-beat
 
 # 2. Restore the database (drop-and-recreate is the clean way)
 dropdb <db_name>          # or: ALTER DATABASE ... RENAME for extra safety
@@ -126,7 +161,7 @@ pg_restore -U <db_user> -d <db_name> "$BACKUP_ROOT/pre-update-$STAMP/db.dump"
 git checkout $(cat "$BACKUP_ROOT/pre-update-$STAMP/deployed-commit.txt")
 
 # 5. Restart and smoke test
-sudo systemctl start <gunicorn-service>
+sudo systemctl start subidha-gunicorn subidha-celery subidha-celery-beat
 ```
 
 Result: the server is byte-for-byte back to the moment before the update.
