@@ -69,8 +69,8 @@ export function SubscriptionDocumentUploadPanel({
       
       <form onSubmit={handleUpload} className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-end">
         <div className="flex-1 space-y-1">
-          <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Document Type</label>
-          <select 
+          <label htmlFor="f-document-type" className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Document Type</label>
+          <select id="f-document-type" 
             value={documentType}
             onChange={(e) => setDocumentType(e.target.value)}
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
@@ -82,8 +82,8 @@ export function SubscriptionDocumentUploadPanel({
         </div>
         
         <div className="flex-1 space-y-1">
-          <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">File</label>
-          <input
+          <label htmlFor="f-file" className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">File</label>
+          <input id="f-file"
             type="file"
             accept=".pdf,.jpg,.jpeg,.png"
             onChange={(e) => setFile(e.target.files?.[0] || null)}

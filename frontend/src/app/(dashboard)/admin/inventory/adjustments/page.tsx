@@ -409,7 +409,7 @@ export default function InventoryAdjustmentsPage() {
       >
         <div className="space-y-4">
           <div className="grid gap-4 xl:grid-cols-4">
-            <label className="grid gap-2 text-sm text-foreground">
+            <label htmlFor="f-adjustment-number-setform-current-curren" className="grid gap-2 text-sm text-foreground">
               <span className="font-medium">Adjustment Number</span>
               <input
                 type="text"
@@ -645,7 +645,7 @@ export default function InventoryAdjustmentsPage() {
             {/* Status Filter */}
             <div>
               <label className="text-sm font-medium text-foreground">Status</label>
-              <select
+              <select id="f-adjustment-number-setform-current-curren"
                 className="mt-2 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
                 value={statusFilter}
                 onChange={(event) => {

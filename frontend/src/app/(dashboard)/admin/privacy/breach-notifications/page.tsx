@@ -121,8 +121,8 @@ export default function BreachNotificationsPage() {
         <WorkspaceSection title="Report a data breach">
           <form onSubmit={submit} className="space-y-4 max-w-lg">
             <div>
-              <label className="block text-sm font-medium mb-1">Severity</label>
-              <select value={newBreach.severity}
+              <label htmlFor="f-severity" className="block text-sm font-medium mb-1">Severity</label>
+              <select id="f-severity" value={newBreach.severity}
                 onChange={(e) => setNewBreach((v) => ({ ...v, severity: e.target.value }))}
                 className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
                 <option value="LOW">Low</option>
@@ -132,16 +132,16 @@ export default function BreachNotificationsPage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Description</label>
-              <textarea value={newBreach.description}
+              <label htmlFor="f-description" className="block text-sm font-medium mb-1">Description</label>
+              <textarea id="f-description" value={newBreach.description}
                 onChange={(e) => setNewBreach((v) => ({ ...v, description: e.target.value }))}
                 rows={4} required
                 className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
                 placeholder="Describe the breach — what happened, how it was discovered…" />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Data categories affected (comma-separated)</label>
-              <input value={newBreach.data_categories}
+              <label htmlFor="f-data-categories-affected-comma-separated" className="block text-sm font-medium mb-1">Data categories affected (comma-separated)</label>
+              <input id="f-data-categories-affected-comma-separated" value={newBreach.data_categories}
                 onChange={(e) => setNewBreach((v) => ({ ...v, data_categories: e.target.value }))}
                 className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 placeholder="e.g. email, phone, aadhaar, payment" />

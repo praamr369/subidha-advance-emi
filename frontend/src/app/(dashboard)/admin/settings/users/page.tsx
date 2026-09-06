@@ -272,8 +272,8 @@ async function handleDeactivate(user: InternalUserRecord) {
       >
         <div className="grid gap-4 md:grid-cols-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">Role</label>
-            <select
+            <label htmlFor="f-role" className="text-sm font-medium text-foreground">Role</label>
+            <select id="f-role"
               value={draftFilters.role}
               onChange={(e) =>
                 setDraftFilters((current) => ({
@@ -291,8 +291,8 @@ async function handleDeactivate(user: InternalUserRecord) {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">Status</label>
-            <select
+            <label htmlFor="f-status" className="text-sm font-medium text-foreground">Status</label>
+            <select id="f-status"
               value={draftFilters.is_active}
               onChange={(e) =>
                 setDraftFilters((current) => ({
@@ -309,8 +309,8 @@ async function handleDeactivate(user: InternalUserRecord) {
           </div>
 
           <div className="space-y-2 md:col-span-2">
-            <label className="text-sm font-medium text-foreground">Search</label>
-            <input
+            <label htmlFor="f-search" className="text-sm font-medium text-foreground">Search</label>
+            <input id="f-search"
               value={draftFilters.q}
               onChange={(e) =>
                 setDraftFilters((current) => ({

@@ -100,8 +100,8 @@ export default function LuckyPlanWinnersPage() {
       >
         <div className="flex flex-wrap gap-3 items-end">
           <div>
-            <label className="block text-xs font-semibold text-muted-foreground mb-1">Batch ID</label>
-            <input
+            <label htmlFor="f-batch-id" className="block text-xs font-semibold text-muted-foreground mb-1">Batch ID</label>
+            <input id="f-batch-id"
               type="number"
               value={batchFilter}
               onChange={(e) => { setBatchFilter(e.target.value); setPage(1); }}

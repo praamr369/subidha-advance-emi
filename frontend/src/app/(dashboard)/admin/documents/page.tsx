@@ -300,8 +300,8 @@ export default function DocumentCenterPage() {
             <h2 className="text-base font-semibold text-gray-900 dark:text-white">Upload Document</h2>
 
             <div>
-              <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">File *</label>
-              <input
+              <label htmlFor="f-file" className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">File *</label>
+              <input id="f-file"
                 ref={fileInputRef}
                 type="file"
                 required
@@ -310,8 +310,8 @@ export default function DocumentCenterPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Category *</label>
-              <select
+              <label htmlFor="f-category" className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Category *</label>
+              <select id="f-category"
                 value={uploadForm.category}
                 onChange={(e) => setUploadForm((f) => ({ ...f, category: e.target.value }))}
                 className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
@@ -323,8 +323,8 @@ export default function DocumentCenterPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Title</label>
-              <input
+              <label htmlFor="f-title" className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Title</label>
+              <input id="f-title"
                 type="text"
                 value={uploadForm.title}
                 onChange={(e) => setUploadForm((f) => ({ ...f, title: e.target.value }))}
@@ -334,8 +334,8 @@ export default function DocumentCenterPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Description</label>
-              <textarea
+              <label htmlFor="f-description" className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Description</label>
+              <textarea id="f-description"
                 value={uploadForm.description}
                 onChange={(e) => setUploadForm((f) => ({ ...f, description: e.target.value }))}
                 rows={2}
@@ -345,8 +345,8 @@ export default function DocumentCenterPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Retention Date</label>
-                <input
+                <label htmlFor="f-retention-date" className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Retention Date</label>
+                <input id="f-retention-date"
                   type="date"
                   value={uploadForm.retention_date}
                   onChange={(e) => setUploadForm((f) => ({ ...f, retention_date: e.target.value }))}
@@ -354,8 +354,8 @@ export default function DocumentCenterPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Tags</label>
-                <input
+                <label htmlFor="f-tags" className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Tags</label>
+                <input id="f-tags"
                   type="text"
                   value={uploadForm.tags}
                   onChange={(e) => setUploadForm((f) => ({ ...f, tags: e.target.value }))}

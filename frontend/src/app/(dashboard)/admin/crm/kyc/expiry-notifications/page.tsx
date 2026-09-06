@@ -108,8 +108,8 @@ export default function KycExpiryNotificationsPage() {
         <h2 className="font-semibold">Configuration</h2>
         <div className="flex flex-wrap gap-4 items-end">
           <div>
-            <label className="text-xs font-semibold text-muted-foreground block mb-1">Look-ahead Window (days)</label>
-            <input
+            <label htmlFor="f-look-ahead-window-days" className="text-xs font-semibold text-muted-foreground block mb-1">Look-ahead Window (days)</label>
+            <input id="f-look-ahead-window-days"
               type="number"
               min={1}
               max={365}

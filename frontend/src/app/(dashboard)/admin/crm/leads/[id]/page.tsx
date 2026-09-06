@@ -493,40 +493,40 @@ export default function AdminCrmLeadDetailPage() {
                     {editError ? <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{editError}</div> : null}
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div>
-                        <label className="block text-xs font-medium mb-1">Name</label>
-                        <input type="text" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm" />
+                        <label htmlFor="f-name" className="block text-xs font-medium mb-1">Name</label>
+                        <input id="f-name" type="text" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm" />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium mb-1">Phone</label>
-                        <input type="tel" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm" />
+                        <label htmlFor="f-phone" className="block text-xs font-medium mb-1">Phone</label>
+                        <input id="f-phone" type="tel" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm" />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium mb-1">Email</label>
-                        <input type="email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm" />
+                        <label htmlFor="f-email" className="block text-xs font-medium mb-1">Email</label>
+                        <input id="f-email" type="email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm" />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium mb-1">Address</label>
-                        <input type="text" value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm" />
+                        <label htmlFor="f-address" className="block text-xs font-medium mb-1">Address</label>
+                        <input id="f-address" type="text" value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm" />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium mb-1">Lead source</label>
-                        <select value={editForm.source} onChange={(e) => setEditForm({ ...editForm, source: e.target.value })} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm">
+                        <label htmlFor="f-lead-source" className="block text-xs font-medium mb-1">Lead source</label>
+                        <select id="f-lead-source" value={editForm.source} onChange={(e) => setEditForm({ ...editForm, source: e.target.value })} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm">
                           {SOURCES.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs font-medium mb-1">Plan interest</label>
-                        <select value={editForm.interested_plan_type} onChange={(e) => setEditForm({ ...editForm, interested_plan_type: e.target.value as LeadPlanType })} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm">
+                        <label htmlFor="f-plan-interest" className="block text-xs font-medium mb-1">Plan interest</label>
+                        <select id="f-plan-interest" value={editForm.interested_plan_type} onChange={(e) => setEditForm({ ...editForm, interested_plan_type: e.target.value as LeadPlanType })} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm">
                           {PLAN_TYPES.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs font-medium mb-1">Next follow-up</label>
-                        <input type="datetime-local" value={editForm.next_follow_up_at} onChange={(e) => setEditForm({ ...editForm, next_follow_up_at: e.target.value })} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm" />
+                        <label htmlFor="f-next-follow-up" className="block text-xs font-medium mb-1">Next follow-up</label>
+                        <input id="f-next-follow-up" type="datetime-local" value={editForm.next_follow_up_at} onChange={(e) => setEditForm({ ...editForm, next_follow_up_at: e.target.value })} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm" />
                       </div>
                       <div className="sm:col-span-2">
-                        <label className="block text-xs font-medium mb-1">Notes</label>
-                        <textarea value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} rows={3} placeholder="General notes about this lead…" className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm resize-none" />
+                        <label htmlFor="f-notes" className="block text-xs font-medium mb-1">Notes</label>
+                        <textarea id="f-notes" value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} rows={3} placeholder="General notes about this lead…" className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm resize-none" />
                       </div>
                     </div>
                     <div className="flex gap-2">
@@ -698,8 +698,8 @@ export default function AdminCrmLeadDetailPage() {
                   <div className="rounded-xl border border-border bg-card p-4">
                     <div className="grid gap-3 sm:grid-cols-3">
                       <div>
-                        <label className="block text-xs font-medium mb-1">Document type</label>
-                        <select
+                        <label htmlFor="f-document-type" className="block text-xs font-medium mb-1">Document type</label>
+                        <select id="f-document-type"
                           value={kycDocType}
                           onChange={(e) => setKycDocType(e.target.value)}
                           className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm"
@@ -708,8 +708,8 @@ export default function AdminCrmLeadDetailPage() {
                         </select>
                       </div>
                       <div className="sm:col-span-2">
-                        <label className="block text-xs font-medium mb-1">File (PDF / image)</label>
-                        <input
+                        <label htmlFor="f-file-pdf-image" className="block text-xs font-medium mb-1">File (PDF / image)</label>
+                        <input id="f-file-pdf-image"
                           type="file"
                           accept="image/*,application/pdf"
                           onChange={(e) => setKycFile(e.target.files?.[0] ?? null)}
@@ -789,12 +789,12 @@ export default function AdminCrmLeadDetailPage() {
               <div className="mb-4 rounded-xl border border-border bg-card p-4">
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <label className="block text-xs font-medium mb-1">Due date & time *</label>
-                    <input type="datetime-local" value={taskDue} onChange={(e) => setTaskDue(e.target.value)} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm" />
+                    <label htmlFor="f-due-date-time" className="block text-xs font-medium mb-1">Due date & time *</label>
+                    <input id="f-due-date-time" type="datetime-local" value={taskDue} onChange={(e) => setTaskDue(e.target.value)} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm" />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium mb-1">Note</label>
-                    <input type="text" value={taskNote} onChange={(e) => setTaskNote(e.target.value)} placeholder="Call note…" className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm" />
+                    <label htmlFor="f-note" className="block text-xs font-medium mb-1">Note</label>
+                    <input id="f-note" type="text" value={taskNote} onChange={(e) => setTaskNote(e.target.value)} placeholder="Call note…" className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm" />
                   </div>
                 </div>
                 <div className="mt-3 flex gap-2">
@@ -844,16 +844,16 @@ export default function AdminCrmLeadDetailPage() {
               <div className="mb-4 rounded-xl border border-border bg-card p-4">
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div className="sm:col-span-2">
-                    <label className="block text-xs font-medium mb-1">Title *</label>
-                    <input type="text" value={oppTitle} onChange={(e) => setOppTitle(e.target.value)} placeholder="e.g. 3-seater sofa EMI deal" className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm" />
+                    <label htmlFor="f-title" className="block text-xs font-medium mb-1">Title *</label>
+                    <input id="f-title" type="text" value={oppTitle} onChange={(e) => setOppTitle(e.target.value)} placeholder="e.g. 3-seater sofa EMI deal" className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm" />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium mb-1">Estimated value (₹)</label>
-                    <input type="number" value={oppValue} onChange={(e) => setOppValue(e.target.value)} placeholder="0" className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm" />
+                    <label htmlFor="f-estimated-value" className="block text-xs font-medium mb-1">Estimated value (₹)</label>
+                    <input id="f-estimated-value" type="number" value={oppValue} onChange={(e) => setOppValue(e.target.value)} placeholder="0" className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm" />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium mb-1">Expected close date</label>
-                    <input type="date" value={oppDate} onChange={(e) => setOppDate(e.target.value)} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm" />
+                    <label htmlFor="f-expected-close-date" className="block text-xs font-medium mb-1">Expected close date</label>
+                    <input id="f-expected-close-date" type="date" value={oppDate} onChange={(e) => setOppDate(e.target.value)} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm" />
                   </div>
                 </div>
                 <div className="mt-3 flex gap-2">
@@ -918,10 +918,10 @@ export default function AdminCrmLeadDetailPage() {
 
             <div className="mt-4 space-y-3">
               <div>
-                <label className="block text-xs font-medium mb-1">
+                <label htmlFor="f-pendingstage-lost-lost-reason-feedback-c" className="block text-xs font-medium mb-1">
                   {pendingStage === "LOST" ? "Lost reason *" : "Feedback / call note"}
                 </label>
-                <textarea
+                <textarea id="f-pendingstage-lost-lost-reason-feedback-c"
                   value={stageNote}
                   onChange={(e) => setStageNote(e.target.value)}
                   rows={3}
@@ -936,10 +936,10 @@ export default function AdminCrmLeadDetailPage() {
               </div>
               {pendingStage !== "LOST" && pendingStage !== "CONVERTED" ? (
                 <div>
-                  <label className="block text-xs font-medium mb-1">
+                  <label htmlFor="f-next-follow-up-optional" className="block text-xs font-medium mb-1">
                     Next follow-up (optional)
                   </label>
-                  <input
+                  <input id="f-next-follow-up-optional"
                     type="datetime-local"
                     value={stageFollowUp}
                     onChange={(e) => setStageFollowUp(e.target.value)}

@@ -86,47 +86,47 @@ function ServiceForm({
       <div className="mb-4 text-sm font-semibold text-primary">{title}</div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Code * <span className="text-muted-foreground font-normal">(unique, auto-uppercased)</span></label>
-          <input value={f.code} onChange={set("code")} onBlur={() => setF((s) => ({ ...s, code: s.code.trim().toUpperCase() }))} placeholder="SVC-INSTALL-BED" maxLength={40} className={INP + " font-mono"} />
+          <label htmlFor="f-code-unique-auto-uppercased" className="mb-1 block text-xs font-medium text-muted-foreground">Code * <span className="text-muted-foreground font-normal">(unique, auto-uppercased)</span></label>
+          <input id="f-code-unique-auto-uppercased" value={f.code} onChange={set("code")} onBlur={() => setF((s) => ({ ...s, code: s.code.trim().toUpperCase() }))} placeholder="SVC-INSTALL-BED" maxLength={40} className={INP + " font-mono"} />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Service Type *</label>
-          <select value={f.service_type} onChange={set("service_type")} className={SEL}>
+          <label htmlFor="f-service-type" className="mb-1 block text-xs font-medium text-muted-foreground">Service Type *</label>
+          <select id="f-service-type" value={f.service_type} onChange={set("service_type")} className={SEL}>
             {SERVICE_TYPES.map((t) => (
               <option key={t} value={t}>{SERVICE_TYPE_LABELS[t]}</option>
             ))}
           </select>
         </div>
         <div className="sm:col-span-2">
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Service Name *</label>
-          <input value={f.name} onChange={set("name")} placeholder="e.g. Bed Assembly & Installation" maxLength={200} className={INP} />
+          <label htmlFor="f-service-name" className="mb-1 block text-xs font-medium text-muted-foreground">Service Name *</label>
+          <input id="f-service-name" value={f.name} onChange={set("name")} placeholder="e.g. Bed Assembly & Installation" maxLength={200} className={INP} />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Category <span className="font-normal text-muted-foreground">(free text)</span></label>
-          <input value={f.category} onChange={set("category")} placeholder="After-Sales, Pre-Delivery, AMC…" maxLength={80} className={INP} />
+          <label htmlFor="f-category-free-text" className="mb-1 block text-xs font-medium text-muted-foreground">Category <span className="font-normal text-muted-foreground">(free text)</span></label>
+          <input id="f-category-free-text" value={f.category} onChange={set("category")} placeholder="After-Sales, Pre-Delivery, AMC…" maxLength={80} className={INP} />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Status</label>
-          <select value={f.status} onChange={set("status")} className={SEL}>
+          <label htmlFor="f-status" className="mb-1 block text-xs font-medium text-muted-foreground">Status</label>
+          <select id="f-status" value={f.status} onChange={set("status")} className={SEL}>
             <option value="ACTIVE">Active</option>
             <option value="INACTIVE">Inactive</option>
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Standard Price (₹) *</label>
-          <input type="number" min="0" step="0.01" value={f.standard_price} onChange={set("standard_price")} placeholder="0.00" className={INP} />
+          <label htmlFor="f-standard-price" className="mb-1 block text-xs font-medium text-muted-foreground">Standard Price (₹) *</label>
+          <input id="f-standard-price" type="number" min="0" step="0.01" value={f.standard_price} onChange={set("standard_price")} placeholder="0.00" className={INP} />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">GST Rate %</label>
-          <input type="number" min="0" max="100" step="0.01" value={f.tax_rate_percent} onChange={set("tax_rate_percent")} className={INP} />
+          <label htmlFor="f-gst-rate" className="mb-1 block text-xs font-medium text-muted-foreground">GST Rate %</label>
+          <input id="f-gst-rate" type="number" min="0" max="100" step="0.01" value={f.tax_rate_percent} onChange={set("tax_rate_percent")} className={INP} />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">HSN / SAC Code</label>
-          <input value={f.hsn_sac_code} onChange={set("hsn_sac_code")} placeholder="998391" maxLength={20} className={INP + " font-mono"} />
+          <label htmlFor="f-hsn-sac-code" className="mb-1 block text-xs font-medium text-muted-foreground">HSN / SAC Code</label>
+          <input id="f-hsn-sac-code" value={f.hsn_sac_code} onChange={set("hsn_sac_code")} placeholder="998391" maxLength={20} className={INP + " font-mono"} />
         </div>
         <div className="sm:col-span-2">
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Internal Notes</label>
-          <textarea value={f.notes} onChange={set("notes")} rows={2} placeholder="Optional description for admins" className={INP} />
+          <label htmlFor="f-internal-notes" className="mb-1 block text-xs font-medium text-muted-foreground">Internal Notes</label>
+          <textarea id="f-internal-notes" value={f.notes} onChange={set("notes")} rows={2} placeholder="Optional description for admins" className={INP} />
         </div>
         {error && (
           <div className="sm:col-span-2 rounded-lg bg-destructive/10 border border-destructive/30 px-3 py-2 text-sm text-destructive flex gap-2 items-start">

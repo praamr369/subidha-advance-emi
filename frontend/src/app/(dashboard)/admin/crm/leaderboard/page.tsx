@@ -108,8 +108,8 @@ export default function LeaderboardPage() {
       <ERPSectionShell title="Period">
         <div className="flex flex-wrap gap-3 items-center">
           <div>
-            <label className="block text-xs font-semibold text-muted-foreground mb-1">Month</label>
-            <select
+            <label htmlFor="f-month" className="block text-xs font-semibold text-muted-foreground mb-1">Month</label>
+            <select id="f-month"
               value={month}
               onChange={(e) => setMonth(Number(e.target.value))}
               className="h-9 rounded-xl border border-border bg-background px-3 text-sm"
@@ -118,8 +118,8 @@ export default function LeaderboardPage() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-muted-foreground mb-1">Year</label>
-            <select
+            <label htmlFor="f-year" className="block text-xs font-semibold text-muted-foreground mb-1">Year</label>
+            <select id="f-year"
               value={year}
               onChange={(e) => setYear(Number(e.target.value))}
               className="h-9 rounded-xl border border-border bg-background px-3 text-sm"
@@ -148,8 +148,8 @@ export default function LeaderboardPage() {
                 { label: "Target Revenue (₹)", key: "target_revenue", type: "number" },
               ].map(({ label, key, type, placeholder }) => (
                 <div key={key}>
-                  <label className="block text-xs text-muted-foreground mb-1">{label}</label>
-                  <input
+                  <label htmlFor="f-label" className="block text-xs text-muted-foreground mb-1">{label}</label>
+                  <input id="f-label"
                     type={type}
                     value={targetForm[key as keyof typeof targetForm]}
                     onChange={(e) => setTargetForm((f) => ({ ...f, [key]: e.target.value }))}
@@ -160,8 +160,8 @@ export default function LeaderboardPage() {
               ))}
             </div>
             <div>
-              <label className="block text-xs text-muted-foreground mb-1">Notes</label>
-              <input
+              <label htmlFor="f-notes" className="block text-xs text-muted-foreground mb-1">Notes</label>
+              <input id="f-notes"
                 value={targetForm.notes}
                 onChange={(e) => setTargetForm((f) => ({ ...f, notes: e.target.value }))}
                 className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm"

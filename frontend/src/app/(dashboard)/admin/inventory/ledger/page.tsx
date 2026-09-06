@@ -157,8 +157,8 @@ export default function StockLedgerPage() {
         <div className="border rounded-lg p-4 bg-card space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-foreground mb-2">Search</label>
-              <input
+              <label htmlFor="f-search" className="block text-sm font-medium text-foreground mb-2">Search</label>
+              <input id="f-search"
                 type="text"
                 placeholder="Product, SKU, reference..."
                 value={searchQuery}
@@ -169,8 +169,8 @@ export default function StockLedgerPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-foreground mb-2">Movement Type</label>
-              <select
+              <label htmlFor="f-movement-type" className="block text-sm font-medium text-foreground mb-2">Movement Type</label>
+              <select id="f-movement-type"
                 value={movementType}
                 onChange={(e) => setMovementType(e.target.value)}
                 disabled={loading}
@@ -184,8 +184,8 @@ export default function StockLedgerPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-foreground mb-2">Reference Model</label>
-              <input
+              <label htmlFor="f-reference-model" className="block text-sm font-medium text-foreground mb-2">Reference Model</label>
+              <input id="f-reference-model"
                 type="text"
                 placeholder="e.g. BillingInvoiceLine, StockAdjustment"
                 value={referenceModel}
@@ -198,8 +198,8 @@ export default function StockLedgerPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-foreground mb-2">From Date</label>
-              <input
+              <label htmlFor="f-from-date" className="block text-sm font-medium text-foreground mb-2">From Date</label>
+              <input id="f-from-date"
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
@@ -208,8 +208,8 @@ export default function StockLedgerPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-foreground mb-2">To Date</label>
-              <input
+              <label htmlFor="f-to-date" className="block text-sm font-medium text-foreground mb-2">To Date</label>
+              <input id="f-to-date"
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}

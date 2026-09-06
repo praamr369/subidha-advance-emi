@@ -250,8 +250,8 @@ export default function InventoryProfilesPage() {
         <div className="space-y-4 p-4 border rounded-lg bg-muted/20">
           <div className="flex flex-wrap gap-4 items-end">
             <div className="flex-1 min-w-[240px]">
-              <label className="text-sm font-medium text-foreground">Search</label>
-              <input
+              <label htmlFor="f-search" className="text-sm font-medium text-foreground">Search</label>
+              <input id="f-search"
                 type="text"
                 placeholder="Search by product name, SKU, product code..."
                 value={searchQuery}
@@ -264,8 +264,8 @@ export default function InventoryProfilesPage() {
             </div>
 
             <div className="min-w-[180px]">
-              <label className="text-sm font-medium text-foreground">Stock Tracking</label>
-              <select
+              <label htmlFor="f-stock-tracking" className="text-sm font-medium text-foreground">Stock Tracking</label>
+              <select id="f-stock-tracking"
                 value={filters.stock_tracking_enabled}
                 onChange={(e) => {
                   setFilters({ ...filters, stock_tracking_enabled: e.target.value });

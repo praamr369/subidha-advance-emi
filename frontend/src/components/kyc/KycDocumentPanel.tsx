@@ -479,8 +479,8 @@ export default function KycDocumentPanel(props: KycDocumentPanelProps) {
 
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Document type</label>
-            <select
+            <label htmlFor="f-document-type" className="text-xs font-medium text-muted-foreground">Document type</label>
+            <select id="f-document-type"
               value={docType}
               onChange={(e) => setDocType(e.target.value)}
               className={inputClass}
@@ -494,10 +494,10 @@ export default function KycDocumentPanel(props: KycDocumentPanelProps) {
             </select>
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
+            <label htmlFor="f-document-file" className="text-xs font-medium text-muted-foreground">
               Document file <span className="text-red-600">*</span>
             </label>
-            <input
+            <input id="f-document-file"
               type="file"
               accept={ACCEPT_ATTR}
               onChange={(e) => onSelectFile(e.target.files?.[0] ?? null)}
@@ -506,8 +506,8 @@ export default function KycDocumentPanel(props: KycDocumentPanelProps) {
             />
           </div>
           <div className="space-y-1.5 sm:col-span-2">
-            <label className="text-xs font-medium text-muted-foreground">Notes (optional)</label>
-            <input
+            <label htmlFor="f-notes-optional" className="text-xs font-medium text-muted-foreground">Notes (optional)</label>
+            <input id="f-notes-optional"
               type="text"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
@@ -518,8 +518,8 @@ export default function KycDocumentPanel(props: KycDocumentPanelProps) {
           </div>
           {props.mode === "admin" && (
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Document expiry date (optional)</label>
-              <input
+              <label htmlFor="f-document-expiry-date-optional" className="text-xs font-medium text-muted-foreground">Document expiry date (optional)</label>
+              <input id="f-document-expiry-date-optional"
                 type="date"
                 value={expiryDate}
                 onChange={(e) => setExpiryDate(e.target.value)}
@@ -531,7 +531,7 @@ export default function KycDocumentPanel(props: KycDocumentPanelProps) {
           )}
           {props.mode === "admin" && (
             <div className="space-y-1.5 sm:col-span-2">
-              <label className="flex items-start gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm">
+              <label htmlFor="f-setforcereview-e-target-checked-disabled" className="flex items-start gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm">
                 <input
                   type="checkbox"
                   checked={forceReview}
@@ -676,7 +676,7 @@ export default function KycDocumentPanel(props: KycDocumentPanelProps) {
                         {actionKind === "reject" ? "Rejection reason" : "Resubmission reason"}{" "}
                         <span className="text-red-600">*</span>
                       </label>
-                      <textarea
+                      <textarea id="f-setforcereview-e-target-checked-disabled"
                         value={actionReason}
                         onChange={(e) => setActionReason(e.target.value)}
                         rows={2}

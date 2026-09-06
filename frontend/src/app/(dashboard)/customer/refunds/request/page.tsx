@@ -82,8 +82,8 @@ export default function RefundRequestPage() {
             )}
 
             <div>
-              <label className="block text-sm font-medium mb-1">Select Subscription *</label>
-              <select
+              <label htmlFor="f-select-subscription" className="block text-sm font-medium mb-1">Select Subscription *</label>
+              <select id="f-select-subscription"
                 className="w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600"
                 value={form.subscription_id}
                 onChange={(e) => setForm({ ...form, subscription_id: e.target.value })}
@@ -99,8 +99,8 @@ export default function RefundRequestPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">Reason for Return *</label>
-              <select
+              <label htmlFor="f-reason-for-return" className="block text-sm font-medium mb-1">Reason for Return *</label>
+              <select id="f-reason-for-return"
                 className="w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600"
                 value={form.reason}
                 onChange={(e) => setForm({ ...form, reason: e.target.value })}
@@ -114,8 +114,8 @@ export default function RefundRequestPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">Additional Details</label>
-              <textarea
+              <label htmlFor="f-additional-details" className="block text-sm font-medium mb-1">Additional Details</label>
+              <textarea id="f-additional-details"
                 className="w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600 resize-none"
                 rows={3}
                 value={form.notes}
@@ -125,8 +125,8 @@ export default function RefundRequestPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">Pickup Address</label>
-              <textarea
+              <label htmlFor="f-pickup-address" className="block text-sm font-medium mb-1">Pickup Address</label>
+              <textarea id="f-pickup-address"
                 className="w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600 resize-none"
                 rows={2}
                 value={form.pickup_address}

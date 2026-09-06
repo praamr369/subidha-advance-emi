@@ -85,8 +85,8 @@ export default function ExtendedWarrantyPage() {
       <div className="max-w-2xl mx-auto space-y-6">
         <WorkspaceSection title="Extended Warranty Plans">
           <div>
-            <label className="block text-sm font-medium mb-1">Select Product</label>
-            <select
+            <label htmlFor="f-select-product" className="block text-sm font-medium mb-1">Select Product</label>
+            <select id="f-select-product"
               className="w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600 mb-4"
               value={selectedSub}
               onChange={(e) => { setSelectedSub(e.target.value); setSelectedPlan(null); }}

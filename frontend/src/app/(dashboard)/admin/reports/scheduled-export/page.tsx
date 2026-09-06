@@ -74,8 +74,8 @@ export default function ScheduledExportPage() {
 
       <div className="rounded-xl border border-border bg-card p-6 space-y-4">
         <div>
-          <label className="text-xs font-semibold text-muted-foreground uppercase block mb-1">Report Type</label>
-          <select
+          <label htmlFor="f-report-type" className="text-xs font-semibold text-muted-foreground uppercase block mb-1">Report Type</label>
+          <select id="f-report-type"
             value={reportType}
             onChange={e => setReportType(e.target.value)}
             className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm"
@@ -86,8 +86,8 @@ export default function ScheduledExportPage() {
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase block mb-1">Date From</label>
-            <input
+            <label htmlFor="f-date-from" className="text-xs font-semibold text-muted-foreground uppercase block mb-1">Date From</label>
+            <input id="f-date-from"
               type="date"
               value={dateFrom}
               onChange={e => setDateFrom(e.target.value)}
@@ -96,8 +96,8 @@ export default function ScheduledExportPage() {
             <p className="text-xs text-muted-foreground mt-1">Leave blank for last 30 days</p>
           </div>
           <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase block mb-1">Date To</label>
-            <input
+            <label htmlFor="f-date-to" className="text-xs font-semibold text-muted-foreground uppercase block mb-1">Date To</label>
+            <input id="f-date-to"
               type="date"
               value={dateTo}
               onChange={e => setDateTo(e.target.value)}
@@ -108,8 +108,8 @@ export default function ScheduledExportPage() {
         </div>
 
         <div>
-          <label className="text-xs font-semibold text-muted-foreground uppercase block mb-1">Notify Email *</label>
-          <input
+          <label htmlFor="f-notify-email" className="text-xs font-semibold text-muted-foreground uppercase block mb-1">Notify Email *</label>
+          <input id="f-notify-email"
             type="email"
             value={notifyEmail}
             onChange={e => setNotifyEmail(e.target.value)}

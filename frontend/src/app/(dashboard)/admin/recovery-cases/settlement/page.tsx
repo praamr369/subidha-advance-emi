@@ -253,8 +253,8 @@ export default function SettlementPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold mb-2">Settlement Notes *</label>
-                <textarea
+                <label htmlFor="f-settlement-notes" className="block text-sm font-semibold mb-2">Settlement Notes *</label>
+                <textarea id="f-settlement-notes"
                   value={requestNotes}
                   onChange={e => setRequestNotes(e.target.value)}
                   rows={4}
@@ -288,7 +288,7 @@ export default function SettlementPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold mb-2">Settlement Type *</label>
+                <label htmlFor="f-settlement-type-setsettlementtype-e-targ" className="block text-sm font-semibold mb-2">Settlement Type *</label>
                 <div className="flex gap-3">
                   <label className="flex items-center gap-2">
                     <input
@@ -315,7 +315,7 @@ export default function SettlementPage() {
 
               <div>
                 <label className="block text-sm font-semibold mb-2">Settled Amount (₹) *</label>
-                <input
+                <input id="f-settlement-type-setsettlementtype-e-targ"
                   type="number"
                   value={settledAmount}
                   onChange={e => setSettledAmount(e.target.value)}
@@ -328,8 +328,8 @@ export default function SettlementPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold mb-2">Approval Notes</label>
-                <textarea
+                <label htmlFor="f-approval-notes" className="block text-sm font-semibold mb-2">Approval Notes</label>
+                <textarea id="f-approval-notes"
                   value={approvalNotes}
                   onChange={e => setApprovalNotes(e.target.value)}
                   rows={3}

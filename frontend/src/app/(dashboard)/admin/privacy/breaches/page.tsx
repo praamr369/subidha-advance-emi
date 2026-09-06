@@ -88,25 +88,25 @@ export default function DataBreachesPage() {
             <form onSubmit={handleReport} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
-                  <label className="block text-sm font-medium mb-1">Incident Title *</label>
-                  <input type="text" required className="w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600"
+                  <label htmlFor="f-incident-title" className="block text-sm font-medium mb-1">Incident Title *</label>
+                  <input id="f-incident-title" type="text" required className="w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600"
                     value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Severity</label>
-                  <select className="w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600"
+                  <label htmlFor="f-severity" className="block text-sm font-medium mb-1">Severity</label>
+                  <select id="f-severity" className="w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600"
                     value={form.severity} onChange={(e) => setForm({ ...form, severity: e.target.value })}>
                     {["LOW", "MEDIUM", "HIGH", "CRITICAL"].map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Affected Records</label>
-                  <input type="number" min={0} className="w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600"
+                  <label htmlFor="f-affected-records" className="block text-sm font-medium mb-1">Affected Records</label>
+                  <input id="f-affected-records" type="number" min={0} className="w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600"
                     value={form.affected_records} onChange={(e) => setForm({ ...form, affected_records: Number(e.target.value) })} />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-sm font-medium mb-1">Description</label>
-                  <textarea className="w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600 resize-none" rows={3}
+                  <label htmlFor="f-description" className="block text-sm font-medium mb-1">Description</label>
+                  <textarea id="f-description" className="w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600 resize-none" rows={3}
                     value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
                 </div>
               </div>

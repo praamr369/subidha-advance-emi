@@ -791,8 +791,8 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
         <h3 className="font-semibold">Basic Information</h3>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className="block text-sm font-medium mb-1">Product Code *</label>
-            <input
+            <label htmlFor="f-product-code" className="block text-sm font-medium mb-1">Product Code *</label>
+            <input id="f-product-code"
               required
               className="w-full rounded-md border px-3 py-2 text-sm bg-background"
               value={code}
@@ -801,8 +801,8 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Product Name *</label>
-            <input
+            <label htmlFor="f-product-name" className="block text-sm font-medium mb-1">Product Name *</label>
+            <input id="f-product-name"
               required
               className="w-full rounded-md border px-3 py-2 text-sm bg-background"
               value={name}
@@ -812,7 +812,7 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
           </div>
           <div className="sm:col-span-2">
             <div className="flex items-center justify-between mb-1">
-              <label className="block text-sm font-medium">Description</label>
+              <label htmlFor="f-description-isedit-variants-length-0-set" className="block text-sm font-medium">Description</label>
               {isEdit && variants.length > 0 && (
                 <button
                   type="button"
@@ -883,7 +883,7 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="block text-sm font-medium mb-1">Category *</label>
-            <select
+            <select id="f-description-isedit-variants-length-0-set"
               required
               className="w-full rounded-md border px-3 py-2 text-sm bg-background"
               value={categoryId}
@@ -901,8 +901,8 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
           </div>
           {subcategories.length > 0 && (
             <div>
-              <label className="block text-sm font-medium mb-1">Subcategory</label>
-              <select
+              <label htmlFor="f-subcategory" className="block text-sm font-medium mb-1">Subcategory</label>
+              <select id="f-subcategory"
                 className="w-full rounded-md border px-3 py-2 text-sm bg-background"
                 value={subcategoryId}
                 onChange={(e) => {
@@ -930,7 +930,7 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className="block text-sm font-medium mb-1">
+            <label htmlFor="f-base-price-optional-set-per-variant-setb" className="block text-sm font-medium mb-1">
               Base Price
               <span className="ml-1.5 text-xs font-normal text-muted-foreground">optional — set per variant</span>
             </label>
@@ -1068,7 +1068,7 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="text-xs font-medium block mb-1">Attribute Name *</label>
-                      <input
+                      <input id="f-base-price-optional-set-per-variant-setb"
                         className="w-full rounded-md border px-3 py-2 text-sm bg-background"
                         placeholder="e.g. Frame Color"
                         value={newAttrName}
@@ -1076,8 +1076,8 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-medium block mb-1">Data Type *</label>
-                      <select
+                      <label htmlFor="f-data-type" className="text-xs font-medium block mb-1">Data Type *</label>
+                      <select id="f-data-type"
                         className="w-full rounded-md border px-3 py-2 text-sm bg-background"
                         value={newAttrType}
                         onChange={(e) => {

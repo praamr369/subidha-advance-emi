@@ -91,7 +91,7 @@ export default function PublicBrochurePage() {
         <h2 className="text-xl font-bold">Products</h2>
         <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {brochure.products.map((product) => (
-            <label key={product.id} className={`cursor-pointer rounded-2xl border p-5 ${selected.has(product.id) ? "border-primary bg-primary/5" : "border-border bg-card"}`}>
+            <label htmlFor="f-toggleproduct-product-id-classname-mt-1-" key={product.id} className={`cursor-pointer rounded-2xl border p-5 ${selected.has(product.id) ? "border-primary bg-primary/5" : "border-border bg-card"}`}>
               <div className="flex items-start gap-3">
                 <input type="checkbox" checked={selected.has(product.id)} onChange={() => toggleProduct(product.id)} className="mt-1 h-4 w-4 accent-primary" />
                 <div><div className="font-semibold">{product.name}</div><div className="text-xs text-muted-foreground">{product.product_code} · {product.category}</div><p className="mt-2 text-sm text-muted-foreground">{product.short_description}</p></div>
@@ -117,7 +117,7 @@ export default function PublicBrochurePage() {
               {PLANS.map((plan) => <option key={plan.value} value={plan.value}>{plan.label}</option>)}
             </select>
             <label className="space-y-1 text-sm"><span>Expected delivery date (optional)</span><input type="date" value={form.expected_delivery_date} onChange={(event) => setForm({ ...form, expected_delivery_date: event.target.value })} className="h-11 w-full rounded-xl border border-border px-4" /></label>
-            <textarea rows={4} maxLength={2000} placeholder="Tell us what you need" value={form.message} onChange={(event) => setForm({ ...form, message: event.target.value })} className="rounded-xl border border-border p-4 md:col-span-2" />
+            <textarea id="f-toggleproduct-product-id-classname-mt-1-" rows={4} maxLength={2000} placeholder="Tell us what you need" value={form.message} onChange={(event) => setForm({ ...form, message: event.target.value })} className="rounded-xl border border-border p-4 md:col-span-2" />
             {error ? <p className="text-sm text-destructive md:col-span-2">{error}</p> : null}
             <button disabled={submitting} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 font-semibold text-primary-foreground disabled:opacity-60 md:w-fit"><Send className="h-4 w-4" /> {submitting ? "Sending…" : "Submit enquiry"}</button>
           </form>

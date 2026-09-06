@@ -121,8 +121,8 @@ function CreatePaymentForm({ vendors, bills, financeAccounts, onSaved, onCancel 
       <div className="grid grid-cols-2 gap-3">
         {/* Vendor */}
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Vendor *</label>
-          <select
+          <label htmlFor="f-vendor" className="mb-1 block text-xs font-medium text-muted-foreground">Vendor *</label>
+          <select id="f-vendor"
             value={vendorId}
             onChange={(e) => { setVendorId(e.target.value); setBillId(""); setAmount(""); }}
             className={inputCls}
@@ -137,17 +137,17 @@ function CreatePaymentForm({ vendors, bills, financeAccounts, onSaved, onCancel 
 
         {/* Payment date */}
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Payment Date *</label>
-          <input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} className={inputCls} />
+          <label htmlFor="f-payment-date" className="mb-1 block text-xs font-medium text-muted-foreground">Payment Date *</label>
+          <input id="f-payment-date" type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} className={inputCls} />
           {errors.payment_date && <p className="mt-0.5 text-[10px] text-red-600">{errors.payment_date}</p>}
         </div>
 
         {/* Vendor bill (optional — only posted bills) */}
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">
+          <label htmlFor="f-vendor-bill-optional" className="mb-1 block text-xs font-medium text-muted-foreground">
             Vendor Bill <span className="text-muted-foreground/60">(optional)</span>
           </label>
-          <select value={billId} onChange={(e) => handleBillChange(e.target.value)} className={inputCls} disabled={!vendorId}>
+          <select id="f-vendor-bill-optional" value={billId} onChange={(e) => handleBillChange(e.target.value)} className={inputCls} disabled={!vendorId}>
             <option value="">— None / advance payment —</option>
             {vendorBills.map((b) => (
               <option key={b.id} value={b.id}>
@@ -162,8 +162,8 @@ function CreatePaymentForm({ vendors, bills, financeAccounts, onSaved, onCancel 
 
         {/* Amount */}
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Amount (₹) *</label>
-          <input
+          <label htmlFor="f-amount" className="mb-1 block text-xs font-medium text-muted-foreground">Amount (₹) *</label>
+          <input id="f-amount"
             type="number"
             min="0.01"
             step="0.01"
@@ -177,8 +177,8 @@ function CreatePaymentForm({ vendors, bills, financeAccounts, onSaved, onCancel 
 
         {/* Finance account */}
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Pay From (Finance Account) *</label>
-          <select value={financeAccountId} onChange={(e) => setFinanceAccountId(e.target.value)} className={inputCls}>
+          <label htmlFor="f-pay-from-finance-account" className="mb-1 block text-xs font-medium text-muted-foreground">Pay From (Finance Account) *</label>
+          <select id="f-pay-from-finance-account" value={financeAccountId} onChange={(e) => setFinanceAccountId(e.target.value)} className={inputCls}>
             <option value="">— Select account —</option>
             {financeAccounts.filter((a) => a.is_active && a.is_real_settlement_account).map((a) => (
               <option key={a.id} value={a.id}>{a.name} ({a.kind})</option>
@@ -189,10 +189,10 @@ function CreatePaymentForm({ vendors, bills, financeAccounts, onSaved, onCancel 
 
         {/* Reference no */}
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">
+          <label htmlFor="f-reference-no-optional" className="mb-1 block text-xs font-medium text-muted-foreground">
             Reference No <span className="text-muted-foreground/60">(optional)</span>
           </label>
-          <input
+          <input id="f-reference-no-optional"
             type="text"
             placeholder="Cheque / UTR / transfer ref"
             value={referenceNo}
@@ -203,8 +203,8 @@ function CreatePaymentForm({ vendors, bills, financeAccounts, onSaved, onCancel 
 
         {/* Notes */}
         <div className="col-span-2">
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Notes</label>
-          <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} placeholder="Optional" />
+          <label htmlFor="f-notes" className="mb-1 block text-xs font-medium text-muted-foreground">Notes</label>
+          <input id="f-notes" type="text" value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} placeholder="Optional" />
         </div>
       </div>
 

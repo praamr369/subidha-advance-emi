@@ -121,22 +121,22 @@ export default function CustomerReviewsPage() {
         )}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Your Name *</label>
-            <input value={form.reviewer_name} onChange={(e) => setForm((f) => ({ ...f, reviewer_name: e.target.value }))}
+            <label htmlFor="f-your-name" className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Your Name *</label>
+            <input id="f-your-name" value={form.reviewer_name} onChange={(e) => setForm((f) => ({ ...f, reviewer_name: e.target.value }))}
               className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-2">Rating *</label>
+            <label htmlFor="f-rating-setform-f-f-rating-v-title" className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-2">Rating *</label>
             <StarPicker value={form.rating} onChange={(v) => setForm((f) => ({ ...f, rating: v }))} />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Title</label>
-            <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+            <input id="f-rating-setform-f-f-rating-v-title" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
               className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Your Review *</label>
-            <textarea value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))}
+            <label htmlFor="f-your-review" className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Your Review *</label>
+            <textarea id="f-your-review" value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))}
               rows={3} className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white resize-none" />
           </div>
           {formError && <p className="text-red-500 text-xs">{formError}</p>}

@@ -195,10 +195,10 @@ export default function AdminPartnerPaymentRequestsPage() {
                 Approving will post a real payment and EMI record. This cannot be undone.
               </div>
             ) : null}
-            <label className="mt-4 block text-sm font-medium text-foreground">
+            <label htmlFor="f-modal-action-approve-note-optional-rejec" className="mt-4 block text-sm font-medium text-foreground">
               {modal.action === "approve" ? "Note (optional)" : "Rejection reason (optional)"}
             </label>
-            <textarea
+            <textarea id="f-modal-action-approve-note-optional-rejec"
               value={note}
               onChange={(e) => setNote(e.target.value)}
               rows={3}

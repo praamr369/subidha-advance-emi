@@ -101,8 +101,8 @@ export default function ReturnInspectionPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Agent Condition Assessment *</label>
-                <select
+                <label htmlFor="f-agent-condition-assessment" className="block text-sm font-medium mb-1">Agent Condition Assessment *</label>
+                <select id="f-agent-condition-assessment"
                   className="w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600"
                   value={agentForm.condition}
                   onChange={(e) => setAgentForm({ ...agentForm, condition: e.target.value })}
@@ -112,8 +112,8 @@ export default function ReturnInspectionPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Deduction % (0–100)</label>
-                <input
+                <label htmlFor="f-deduction-0100" className="block text-sm font-medium mb-1">Deduction % (0–100)</label>
+                <input id="f-deduction-0100"
                   type="number"
                   min={0} max={100}
                   className="w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600"
@@ -123,8 +123,8 @@ export default function ReturnInspectionPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Inspection Notes</label>
-                <textarea
+                <label htmlFor="f-inspection-notes" className="block text-sm font-medium mb-1">Inspection Notes</label>
+                <textarea id="f-inspection-notes"
                   className="w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600 resize-none"
                   rows={3}
                   value={agentForm.notes}

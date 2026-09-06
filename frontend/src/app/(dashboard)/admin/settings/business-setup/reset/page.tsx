@@ -219,13 +219,13 @@ function DryRunsSection() {
       <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
         <div className="text-sm font-semibold text-foreground">Run options</div>
         <div className="mt-3 flex flex-wrap gap-4 text-sm text-muted-foreground">
-          <label className="flex items-center gap-2"><input type="checkbox" checked={includeFinancial} onChange={(e) => setIncludeFinancial(e.target.checked)} />Include financial checks</label>
+          <label htmlFor="f-setincludefinancial-e-target-checked-inc" className="flex items-center gap-2"><input type="checkbox" checked={includeFinancial} onChange={(e) => setIncludeFinancial(e.target.checked)} />Include financial checks</label>
           <label className="flex items-center gap-2"><input type="checkbox" checked={includePersonal} onChange={(e) => setIncludePersonal(e.target.checked)} />Personal data awareness</label>
           <label className="flex items-center gap-2"><input type="checkbox" checked={includeHighRisk} onChange={(e) => setIncludeHighRisk(e.target.checked)} />High-risk scopes (descriptive only)</label>
         </div>
         <div className="mt-3">
           <label className="text-xs font-medium text-muted-foreground">Optional app scopes (comma-separated)</label>
-          <input className="mt-1 w-full max-w-xl rounded-lg border border-input bg-background px-3 py-2 text-sm" placeholder="e.g. subscriptions, accounting" value={scopesText} onChange={(e) => setScopesText(e.target.value)} />
+          <input id="f-setincludefinancial-e-target-checked-inc" className="mt-1 w-full max-w-xl rounded-lg border border-input bg-background px-3 py-2 text-sm" placeholder="e.g. subscriptions, accounting" value={scopesText} onChange={(e) => setScopesText(e.target.value)} />
         </div>
       </div>
 
@@ -239,7 +239,7 @@ function DryRunsSection() {
             <div className="text-sm font-semibold text-foreground mb-2">{section.title}</div>
             <div className="grid gap-3 md:grid-cols-2">
               {sectionChecks.map((c) => (
-                <label key={c.key} className="flex cursor-pointer gap-3 rounded-xl border border-border bg-card p-4 shadow-sm hover:border-ring">
+                <label htmlFor="f-toggle-c-key-c-label-c-risk-level-c-desc" key={c.key} className="flex cursor-pointer gap-3 rounded-xl border border-border bg-card p-4 shadow-sm hover:border-ring">
                   <input type="checkbox" className="mt-1 shrink-0" checked={selected.has(c.key)} onChange={() => toggle(c.key)} />
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -485,7 +485,7 @@ function ResetRestoreSection() {
           <div className="mt-3 space-y-3">
             <div>
               <label className="text-xs font-medium text-muted-foreground">Choose snapshot file</label>
-              <input type="file" accept=".json,application/json" className="mt-1 block text-sm"
+              <input id="f-toggle-c-key-c-label-c-risk-level-c-desc" type="file" accept=".json,application/json" className="mt-1 block text-sm"
                 onChange={(e) => { setSnapImportFile(e.target.files?.[0] ?? null); setSnapImportPreview(null); setSnapError(null); setSnapMessage(null); }} />
               {snapImportFile ? <p className="mt-1 text-xs text-muted-foreground">{snapImportFile.name} ({Math.round(snapImportFile.size / 1024)} KB)</p> : null}
             </div>
@@ -531,7 +531,7 @@ function ResetRestoreSection() {
         <p className="mt-1 text-sm text-muted-foreground">Select which modules to include in the reset or backup operation.</p>
         <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
           {scopes.map((scope) => (
-            <label key={scope.code} className="flex items-center gap-2 rounded-lg border border-border p-3 text-sm hover:bg-muted/40 cursor-pointer">
+            <label htmlFor="f-setselected-prev-e-target-checked-prev-s" key={scope.code} className="flex items-center gap-2 rounded-lg border border-border p-3 text-sm hover:bg-muted/40 cursor-pointer">
               <input type="checkbox" checked={selected.includes(scope.code)} onChange={(e) => setSelected((prev) => e.target.checked ? [...prev, scope.code] : prev.filter((item) => item !== scope.code))} />
               <span className="flex-1 font-medium text-foreground">{scope.label}</span>
               <span className="text-xs text-muted-foreground">{scope.danger_level}</span>
@@ -554,11 +554,11 @@ function ResetRestoreSection() {
             <div className="grid gap-3 md:grid-cols-2">
               <div>
                 <label className="text-sm text-muted-foreground">Preserve username</label>
-                <input className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" value={preserveUsername} onChange={(e) => setPreserveUsername(e.target.value)} placeholder="subidhafurniture" />
+                <input id="f-setselected-prev-e-target-checked-prev-s" className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" value={preserveUsername} onChange={(e) => setPreserveUsername(e.target.value)} placeholder="subidhafurniture" />
               </div>
               <div>
-                <label className="text-sm text-muted-foreground">Confirmation phrase</label>
-                <input className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" value={confirmation} onChange={(e) => setConfirmation(e.target.value)} placeholder={PHRASE} />
+                <label htmlFor="f-confirmation-phrase" className="text-sm text-muted-foreground">Confirmation phrase</label>
+                <input id="f-confirmation-phrase" className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" value={confirmation} onChange={(e) => setConfirmation(e.target.value)} placeholder={PHRASE} />
               </div>
             </div>
             <div className="flex flex-wrap gap-2">

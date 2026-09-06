@@ -246,8 +246,8 @@ export default function PartnerCollectionCreatePage() {
       {selectedSubscription && (
         <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
           <div className="space-y-2">
-            <label className="text-sm font-semibold text-foreground">Amount (₹)</label>
-            <input
+            <label htmlFor="f-amount" className="text-sm font-semibold text-foreground">Amount (₹)</label>
+            <input id="f-amount"
               type="number"
               name="amount"
               step="0.01"
@@ -259,8 +259,8 @@ export default function PartnerCollectionCreatePage() {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-semibold text-foreground">Collection Date</label>
-            <input
+            <label htmlFor="f-collection-date" className="text-sm font-semibold text-foreground">Collection Date</label>
+            <input id="f-collection-date"
               type="date"
               name="paid_at"
               required
@@ -271,8 +271,8 @@ export default function PartnerCollectionCreatePage() {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-semibold text-foreground">Payment Mode</label>
-            <select
+            <label htmlFor="f-payment-mode" className="text-sm font-semibold text-foreground">Payment Mode</label>
+            <select id="f-payment-mode"
               name="payment_mode"
               value={form.payment_mode}
               onChange={handleInputChange}
@@ -284,8 +284,8 @@ export default function PartnerCollectionCreatePage() {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-semibold text-foreground">Reference (Optional)</label>
-            <input
+            <label htmlFor="f-reference-optional" className="text-sm font-semibold text-foreground">Reference (Optional)</label>
+            <input id="f-reference-optional"
               type="text"
               name="reference_no"
               value={form.reference_no}
@@ -296,8 +296,8 @@ export default function PartnerCollectionCreatePage() {
           </div>
           
           <div className="space-y-2">
-            <label className="text-sm font-semibold text-foreground">Notes (Optional)</label>
-            <textarea
+            <label htmlFor="f-notes-optional" className="text-sm font-semibold text-foreground">Notes (Optional)</label>
+            <textarea id="f-notes-optional"
               name="notes"
               value={form.notes}
               onChange={handleInputChange}

@@ -170,8 +170,8 @@ function RecoveryDrawer({
         ) : null}
 
         <div className="mb-4">
-          <label className="block text-xs font-semibold text-muted-foreground mb-1">Recovery Stage</label>
-          <select
+          <label htmlFor="f-recovery-stage" className="block text-xs font-semibold text-muted-foreground mb-1">Recovery Stage</label>
+          <select id="f-recovery-stage"
             value={stage}
             onChange={(e) => setStage(e.target.value)}
             className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm"
@@ -189,8 +189,8 @@ function RecoveryDrawer({
           const isFull = settled > 0 && settled >= overdue;
           return (
             <div className="mb-4">
-              <label className="block text-xs font-semibold text-muted-foreground mb-1">Settled Amount (₹) *</label>
-              <input
+              <label htmlFor="f-settled-amount" className="block text-xs font-semibold text-muted-foreground mb-1">Settled Amount (₹) *</label>
+              <input id="f-settled-amount"
                 type="number"
                 min="0"
                 step="0.01"
@@ -223,8 +223,8 @@ function RecoveryDrawer({
         })()}
 
         <div className="mb-4">
-          <label className="block text-xs font-semibold text-muted-foreground mb-1">Notes</label>
-          <textarea
+          <label htmlFor="f-notes" className="block text-xs font-semibold text-muted-foreground mb-1">Notes</label>
+          <textarea id="f-notes"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={4}

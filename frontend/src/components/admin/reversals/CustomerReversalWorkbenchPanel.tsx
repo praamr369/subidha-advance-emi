@@ -145,8 +145,8 @@ export default function CustomerReversalWorkbenchPanel() {
       <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
         <div className="flex flex-wrap items-end gap-3">
           <div className="min-w-[220px]">
-            <label className="mb-1 block text-xs font-medium text-muted-foreground">Customer ID</label>
-            <input
+            <label htmlFor="f-customer-id" className="mb-1 block text-xs font-medium text-muted-foreground">Customer ID</label>
+            <input id="f-customer-id"
               value={customerInput}
               onChange={(e) => setCustomerInput(e.target.value)}
               onKeyDown={(e) => {

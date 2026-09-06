@@ -488,7 +488,7 @@ export default function AdminManufacturingJobDetailPage() {
                 }
               >
                 <div className="grid gap-4 md:grid-cols-2">
-                  <label className="grid gap-2 text-sm">
+                  <label htmlFor="f-movement-date-setmaterialform-current-cu" className="grid gap-2 text-sm">
                     <span>Movement Date</span>
                     <input
                       type="date"
@@ -774,7 +774,7 @@ export default function AdminManufacturingJobDetailPage() {
                       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
                         <div className="space-y-1.5 lg:col-span-1">
                           <label className="text-xs font-medium text-muted-foreground">Employee</label>
-                          <select
+                          <select id="f-movement-date-setmaterialform-current-cu"
                             value={laborForm.employee}
                             onChange={(e) => setLaborForm((prev) => ({ ...prev, employee: e.target.value }))}
                             className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
@@ -788,8 +788,8 @@ export default function AdminManufacturingJobDetailPage() {
                           </select>
                         </div>
                         <div className="space-y-1.5 lg:col-span-1">
-                          <label className="text-xs font-medium text-muted-foreground">Activity</label>
-                          <input
+                          <label htmlFor="f-activity" className="text-xs font-medium text-muted-foreground">Activity</label>
+                          <input id="f-activity"
                             type="text"
                             placeholder={job.job_type === "FINISHING" ? `e.g. ${job.finishing_category_display || "Finishing work"}` : "e.g. Assembly"}
                             value={laborForm.activity_name}
@@ -798,8 +798,8 @@ export default function AdminManufacturingJobDetailPage() {
                           />
                         </div>
                         <div className="space-y-1.5 lg:col-span-1">
-                          <label className="text-xs font-medium text-muted-foreground">Hours</label>
-                          <input
+                          <label htmlFor="f-hours" className="text-xs font-medium text-muted-foreground">Hours</label>
+                          <input id="f-hours"
                             type="number"
                             min="0"
                             step="0.5"
@@ -810,8 +810,8 @@ export default function AdminManufacturingJobDetailPage() {
                           />
                         </div>
                         <div className="space-y-1.5 lg:col-span-1">
-                          <label className="text-xs font-medium text-muted-foreground">Pieces</label>
-                          <input
+                          <label htmlFor="f-pieces" className="text-xs font-medium text-muted-foreground">Pieces</label>
+                          <input id="f-pieces"
                             type="number"
                             min="0"
                             step="1"
@@ -822,8 +822,8 @@ export default function AdminManufacturingJobDetailPage() {
                           />
                         </div>
                         <div className="space-y-1.5 lg:col-span-1">
-                          <label className="text-xs font-medium text-muted-foreground">Wage Amount</label>
-                          <input
+                          <label htmlFor="f-wage-amount" className="text-xs font-medium text-muted-foreground">Wage Amount</label>
+                          <input id="f-wage-amount"
                             type="number"
                             min="0"
                             step="0.01"

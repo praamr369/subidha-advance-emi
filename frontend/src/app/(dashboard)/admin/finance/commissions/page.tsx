@@ -1050,10 +1050,10 @@ export default function AdminFinanceCommissionsPage() {
         >
           <div className="grid gap-4 md:grid-cols-3">
             <div>
-              <label className="mb-2 block text-sm font-medium text-foreground">
+              <label htmlFor="f-from" className="mb-2 block text-sm font-medium text-foreground">
                 From
               </label>
-              <input
+              <input id="f-from"
                 type="date"
                 value={exportDateFrom}
                 onChange={(event) => setExportDateFrom(event.target.value)}
@@ -1061,10 +1061,10 @@ export default function AdminFinanceCommissionsPage() {
               />
             </div>
             <div>
-              <label className="mb-2 block text-sm font-medium text-foreground">
+              <label htmlFor="f-to" className="mb-2 block text-sm font-medium text-foreground">
                 To
               </label>
-              <input
+              <input id="f-to"
                 type="date"
                 value={exportDateTo}
                 onChange={(event) => setExportDateTo(event.target.value)}

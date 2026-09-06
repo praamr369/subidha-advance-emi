@@ -420,10 +420,10 @@ export default function CustomerSelector({
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
-              <label className="text-xs font-medium text-foreground">
+              <label htmlFor="f-name" className="text-xs font-medium text-foreground">
                 Name <span className="text-destructive">*</span>
               </label>
-              <input
+              <input id="f-name"
                 type="text"
                 value={createName}
                 onChange={(e) => setCreateName(e.target.value)}
@@ -433,10 +433,10 @@ export default function CustomerSelector({
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-foreground">
+              <label htmlFor="f-phone" className="text-xs font-medium text-foreground">
                 Phone <span className="text-destructive">*</span>
               </label>
-              <input
+              <input id="f-phone"
                 type="tel"
                 value={createPhone}
                 onChange={(e) => setCreatePhone(e.target.value)}
@@ -445,10 +445,10 @@ export default function CustomerSelector({
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">
+              <label htmlFor="f-email-optional" className="text-xs font-medium text-muted-foreground">
                 Email <span className="text-xs opacity-60">(optional)</span>
               </label>
-              <input
+              <input id="f-email-optional"
                 type="email"
                 value={createEmail}
                 onChange={(e) => setCreateEmail(e.target.value)}
@@ -457,10 +457,10 @@ export default function CustomerSelector({
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">
+              <label htmlFor="f-address-optional" className="text-xs font-medium text-muted-foreground">
                 Address <span className="text-xs opacity-60">(optional)</span>
               </label>
-              <input
+              <input id="f-address-optional"
                 type="text"
                 value={createAddress}
                 onChange={(e) => setCreateAddress(e.target.value)}

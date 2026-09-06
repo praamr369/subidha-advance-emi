@@ -83,8 +83,8 @@ export default function GuarantorSection({ subscriptionId }: Props) {
         <div className="mb-4 rounded-xl border border-border bg-muted/50 p-4 space-y-3">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="block text-xs font-semibold text-muted-foreground mb-1">Name *</label>
-              <input
+              <label htmlFor="f-name" className="block text-xs font-semibold text-muted-foreground mb-1">Name *</label>
+              <input id="f-name"
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                 className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm"
@@ -92,8 +92,8 @@ export default function GuarantorSection({ subscriptionId }: Props) {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-muted-foreground mb-1">Phone *</label>
-              <input
+              <label htmlFor="f-phone" className="block text-xs font-semibold text-muted-foreground mb-1">Phone *</label>
+              <input id="f-phone"
                 value={form.phone}
                 onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
                 className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm"
@@ -101,8 +101,8 @@ export default function GuarantorSection({ subscriptionId }: Props) {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-muted-foreground mb-1">Relation</label>
-              <select
+              <label htmlFor="f-relation" className="block text-xs font-semibold text-muted-foreground mb-1">Relation</label>
+              <select id="f-relation"
                 value={form.relation}
                 onChange={(e) => setForm((f) => ({ ...f, relation: e.target.value }))}
                 className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm"
@@ -111,8 +111,8 @@ export default function GuarantorSection({ subscriptionId }: Props) {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-muted-foreground mb-1">Aadhaar No</label>
-              <input
+              <label htmlFor="f-aadhaar-no" className="block text-xs font-semibold text-muted-foreground mb-1">Aadhaar No</label>
+              <input id="f-aadhaar-no"
                 value={form.aadhaar_no}
                 onChange={(e) => setForm((f) => ({ ...f, aadhaar_no: e.target.value }))}
                 className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm"
@@ -121,8 +121,8 @@ export default function GuarantorSection({ subscriptionId }: Props) {
             </div>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-muted-foreground mb-1">Address</label>
-            <input
+            <label htmlFor="f-address" className="block text-xs font-semibold text-muted-foreground mb-1">Address</label>
+            <input id="f-address"
               value={form.address}
               onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
               className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm"

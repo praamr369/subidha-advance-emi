@@ -148,8 +148,8 @@ export default function PrepaymentPage({ params }: { params: Promise<{ id: strin
       {!result?.success && (
         <div className="rounded-2xl border border-border bg-card p-4 mb-5 space-y-3">
           <div>
-            <label className="text-xs font-semibold text-muted-foreground">Prepayment Amount (₹)</label>
-            <input
+            <label htmlFor="f-prepayment-amount" className="text-xs font-semibold text-muted-foreground">Prepayment Amount (₹)</label>
+            <input id="f-prepayment-amount"
               type="number"
               value={prepayAmount}
               onChange={(e) => setPrepayAmount(e.target.value)}

@@ -262,8 +262,8 @@ export default function SmartCollectionCockpitPanel() {
             <div className="border-t border-border p-5 bg-muted/30 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Payment Method</label>
-                  <select
+                  <label htmlFor="f-payment-method" className="block text-sm font-medium text-foreground mb-1">Payment Method</label>
+                  <select id="f-payment-method"
                     value={paymentMethod}
                     onChange={(e) => setPaymentMethod(e.target.value)}
                     disabled={executing}
@@ -276,8 +276,8 @@ export default function SmartCollectionCockpitPanel() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Deposit To (Finance Account)</label>
-                  <select
+                  <label htmlFor="f-deposit-to-finance-account" className="block text-sm font-medium text-foreground mb-1">Deposit To (Finance Account)</label>
+                  <select id="f-deposit-to-finance-account"
                     value={selectedFinanceAccount}
                     onChange={(e) => setSelectedFinanceAccount(Number(e.target.value))}
                     disabled={executing}

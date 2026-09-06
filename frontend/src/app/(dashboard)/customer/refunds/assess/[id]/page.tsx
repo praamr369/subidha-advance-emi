@@ -84,7 +84,7 @@ export default function DamageAssessmentPage() {
             )}
 
             <div>
-              <label className="block text-sm font-medium mb-2">Product Condition *</label>
+              <label htmlFor="f-product-condition-conditions-map-c-setfo" className="block text-sm font-medium mb-2">Product Condition *</label>
               <div className="space-y-2">
                 {CONDITIONS.map((c) => (
                   <label key={c.value} className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
@@ -108,7 +108,7 @@ export default function DamageAssessmentPage() {
 
             <div>
               <label className="block text-sm font-medium mb-1">Notes about damage / condition</label>
-              <textarea
+              <textarea id="f-product-condition-conditions-map-c-setfo"
                 className="w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600 resize-none"
                 rows={3}
                 value={form.notes}

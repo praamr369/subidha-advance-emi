@@ -99,20 +99,20 @@ function CreateRequestForm({ vendors, items, onSaved, onCancel }: CreateRequestF
     <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Request Date *</label>
-          <input type="date" value={requestDate} onChange={(e) => setRequestDate(e.target.value)} className={inputCls} />
+          <label htmlFor="f-request-date" className="mb-1 block text-xs font-medium text-muted-foreground">Request Date *</label>
+          <input id="f-request-date" type="date" value={requestDate} onChange={(e) => setRequestDate(e.target.value)} className={inputCls} />
           {errors.request_date ? <p className="mt-0.5 text-[10px] text-red-600">{errors.request_date}</p> : null}
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Preferred Vendor (optional)</label>
-          <select value={vendorId} onChange={(e) => setVendorId(e.target.value)} className={inputCls}>
+          <label htmlFor="f-preferred-vendor-optional" className="mb-1 block text-xs font-medium text-muted-foreground">Preferred Vendor (optional)</label>
+          <select id="f-preferred-vendor-optional" value={vendorId} onChange={(e) => setVendorId(e.target.value)} className={inputCls}>
             <option value="">— None —</option>
             {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
           </select>
         </div>
         <div className="col-span-2">
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Notes</label>
-          <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} placeholder="Reason for request (optional)" />
+          <label htmlFor="f-notes" className="mb-1 block text-xs font-medium text-muted-foreground">Notes</label>
+          <input id="f-notes" type="text" value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} placeholder="Reason for request (optional)" />
         </div>
       </div>
 

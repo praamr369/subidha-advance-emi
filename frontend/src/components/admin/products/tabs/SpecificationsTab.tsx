@@ -21,10 +21,10 @@ export default function SpecificationsTab() {
           control={control}
           render={({ field }) => (
             <div>
-              <label className="block text-sm font-medium mb-2">
+              <label htmlFor="f-catalog-category-optional" className="block text-sm font-medium mb-2">
                 Catalog Category (Optional)
               </label>
-              <input
+              <input id="f-catalog-category-optional"
                 {...field}
                 type="number"
                 placeholder="Select a PIM category to unlock dynamic specs"

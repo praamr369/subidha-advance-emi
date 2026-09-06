@@ -106,7 +106,7 @@ export default function AMLScreeningPage() {
   };
 
   const CheckRow = ({ label, field }: { label: string; field: keyof typeof screenForm }) => (
-    <label className="flex items-center gap-2 text-sm cursor-pointer">
+    <label htmlFor="f-setscreenform-f-f-field-e-target-checked" className="flex items-center gap-2 text-sm cursor-pointer">
       <input
         type="checkbox"
         checked={screenForm[field] as boolean}
@@ -281,17 +281,17 @@ export default function AMLScreeningPage() {
             <div className="space-y-3">
               <div>
                 <label className="text-xs text-muted-foreground">Customer ID</label>
-                <input type="number" value={screenCustomerId} onChange={e => setScreenCustomerId(e.target.value)}
+                <input id="f-setscreenform-f-f-field-e-target-checked" type="number" value={screenCustomerId} onChange={e => setScreenCustomerId(e.target.value)}
                   className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground">Screening Date</label>
-                <input type="date" value={screenForm.screening_date} onChange={e => setScreenForm(f => ({ ...f, screening_date: e.target.value }))}
+                <label htmlFor="f-screening-date" className="text-xs text-muted-foreground">Screening Date</label>
+                <input id="f-screening-date" type="date" value={screenForm.screening_date} onChange={e => setScreenForm(f => ({ ...f, screening_date: e.target.value }))}
                   className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground">Result</label>
-                <select value={screenForm.result} onChange={e => setScreenForm(f => ({ ...f, result: e.target.value as AMLResult }))}
+                <label htmlFor="f-result" className="text-xs text-muted-foreground">Result</label>
+                <select id="f-result" value={screenForm.result} onChange={e => setScreenForm(f => ({ ...f, result: e.target.value as AMLResult }))}
                   className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1">
                   {AML_RESULTS.map(r => <option key={r} value={r}>{AML_RESULT_LABELS[r]}</option>)}
                 </select>
@@ -305,13 +305,13 @@ export default function AMLScreeningPage() {
                 <CheckRow label="PEP List" field="checked_pep_list" />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground">Watchlist Reference</label>
-                <input value={screenForm.watchlist_reference} onChange={e => setScreenForm(f => ({ ...f, watchlist_reference: e.target.value }))}
+                <label htmlFor="f-watchlist-reference" className="text-xs text-muted-foreground">Watchlist Reference</label>
+                <input id="f-watchlist-reference" value={screenForm.watchlist_reference} onChange={e => setScreenForm(f => ({ ...f, watchlist_reference: e.target.value }))}
                   className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground">Notes</label>
-                <textarea value={screenForm.notes} onChange={e => setScreenForm(f => ({ ...f, notes: e.target.value }))}
+                <label htmlFor="f-notes" className="text-xs text-muted-foreground">Notes</label>
+                <textarea id="f-notes" value={screenForm.notes} onChange={e => setScreenForm(f => ({ ...f, notes: e.target.value }))}
                   rows={3} className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm mt-1 resize-none" />
               </div>
               {screenErr && <div className="text-xs text-red-600">{screenErr}</div>}

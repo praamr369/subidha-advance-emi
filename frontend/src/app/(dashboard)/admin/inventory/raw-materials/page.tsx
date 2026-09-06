@@ -138,24 +138,24 @@ export default function RawMaterialsPage() {
             <div className="mb-4 text-sm font-semibold text-primary">Create New Raw Material</div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label className="mb-1 block text-xs font-medium text-muted-foreground">Product Code * <span className="font-normal">(unique)</span></label>
-                <input value={cf.product_code} onChange={(e) => setCf((f) => ({ ...f, product_code: e.target.value.toUpperCase() }))} placeholder="RM-PLY-18MM" maxLength={40} className={INP + " font-mono"} />
+                <label htmlFor="f-product-code-unique" className="mb-1 block text-xs font-medium text-muted-foreground">Product Code * <span className="font-normal">(unique)</span></label>
+                <input id="f-product-code-unique" value={cf.product_code} onChange={(e) => setCf((f) => ({ ...f, product_code: e.target.value.toUpperCase() }))} placeholder="RM-PLY-18MM" maxLength={40} className={INP + " font-mono"} />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-muted-foreground">Unit of Measure</label>
-                <input value={cf.unit_of_measure} onChange={(e) => setCf((f) => ({ ...f, unit_of_measure: e.target.value }))} placeholder="SqFt / KG / PCS / Mtr" className={INP} />
+                <label htmlFor="f-unit-of-measure" className="mb-1 block text-xs font-medium text-muted-foreground">Unit of Measure</label>
+                <input id="f-unit-of-measure" value={cf.unit_of_measure} onChange={(e) => setCf((f) => ({ ...f, unit_of_measure: e.target.value }))} placeholder="SqFt / KG / PCS / Mtr" className={INP} />
               </div>
               <div className="sm:col-span-2">
-                <label className="mb-1 block text-xs font-medium text-muted-foreground">Material Name *</label>
-                <input value={cf.name} onChange={(e) => setCf((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. 18mm Commercial Ply – BWR Grade" maxLength={200} className={INP} />
+                <label htmlFor="f-material-name" className="mb-1 block text-xs font-medium text-muted-foreground">Material Name *</label>
+                <input id="f-material-name" value={cf.name} onChange={(e) => setCf((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. 18mm Commercial Ply – BWR Grade" maxLength={200} className={INP} />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-muted-foreground">Purchase Price (₹ per unit)</label>
-                <input type="number" min="0" step="0.01" value={cf.base_price} onChange={(e) => setCf((f) => ({ ...f, base_price: e.target.value }))} className={INP} />
+                <label htmlFor="f-purchase-price-per-unit" className="mb-1 block text-xs font-medium text-muted-foreground">Purchase Price (₹ per unit)</label>
+                <input id="f-purchase-price-per-unit" type="number" min="0" step="0.01" value={cf.base_price} onChange={(e) => setCf((f) => ({ ...f, base_price: e.target.value }))} className={INP} />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-muted-foreground">Category</label>
-                <input value={cf.category} onChange={(e) => setCf((f) => ({ ...f, category: e.target.value }))} placeholder="Timber, Hardware, Fabric…" className={INP} />
+                <label htmlFor="f-category" className="mb-1 block text-xs font-medium text-muted-foreground">Category</label>
+                <input id="f-category" value={cf.category} onChange={(e) => setCf((f) => ({ ...f, category: e.target.value }))} placeholder="Timber, Hardware, Fabric…" className={INP} />
               </div>
               {createErr && (
                 <div className="sm:col-span-2 flex gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -243,36 +243,36 @@ export default function RawMaterialsPage() {
                       <div className="mb-3 text-xs font-semibold text-primary">Edit Raw Material</div>
                       <div className="grid gap-3 sm:grid-cols-2">
                         <div className="sm:col-span-2">
-                          <label className="mb-1 block text-xs font-medium text-muted-foreground">Name *</label>
-                          <input value={ef.name} onChange={(e) => setEf((f) => f ? { ...f, name: e.target.value } : f)} className={INP} />
+                          <label htmlFor="f-name" className="mb-1 block text-xs font-medium text-muted-foreground">Name *</label>
+                          <input id="f-name" value={ef.name} onChange={(e) => setEf((f) => f ? { ...f, name: e.target.value } : f)} className={INP} />
                         </div>
                         <div>
-                          <label className="mb-1 block text-xs font-medium text-muted-foreground">Purchase Price (₹)</label>
-                          <input type="number" min="0" step="0.01" value={ef.base_price} onChange={(e) => setEf((f) => f ? { ...f, base_price: e.target.value } : f)} className={INP} />
+                          <label htmlFor="f-purchase-price" className="mb-1 block text-xs font-medium text-muted-foreground">Purchase Price (₹)</label>
+                          <input id="f-purchase-price" type="number" min="0" step="0.01" value={ef.base_price} onChange={(e) => setEf((f) => f ? { ...f, base_price: e.target.value } : f)} className={INP} />
                         </div>
                         <div>
-                          <label className="mb-1 block text-xs font-medium text-muted-foreground">Std Unit Cost (₹) <span className="font-normal text-muted-foreground">— used in BOM costing</span></label>
-                          <input type="number" min="0" step="0.0001" value={ef.standard_unit_cost} onChange={(e) => setEf((f) => f ? { ...f, standard_unit_cost: e.target.value } : f)} className={INP} />
+                          <label htmlFor="f-std-unit-cost-used-in-bom-costing" className="mb-1 block text-xs font-medium text-muted-foreground">Std Unit Cost (₹) <span className="font-normal text-muted-foreground">— used in BOM costing</span></label>
+                          <input id="f-std-unit-cost-used-in-bom-costing" type="number" min="0" step="0.0001" value={ef.standard_unit_cost} onChange={(e) => setEf((f) => f ? { ...f, standard_unit_cost: e.target.value } : f)} className={INP} />
                         </div>
                         <div>
-                          <label className="mb-1 block text-xs font-medium text-muted-foreground">Unit of Measure</label>
-                          <input value={ef.unit_of_measure} onChange={(e) => setEf((f) => f ? { ...f, unit_of_measure: e.target.value } : f)} placeholder="SqFt / KG / PCS / Mtr" className={INP} />
+                          <label htmlFor="f-unit-of-measure-2" className="mb-1 block text-xs font-medium text-muted-foreground">Unit of Measure</label>
+                          <input id="f-unit-of-measure-2" value={ef.unit_of_measure} onChange={(e) => setEf((f) => f ? { ...f, unit_of_measure: e.target.value } : f)} placeholder="SqFt / KG / PCS / Mtr" className={INP} />
                         </div>
                         <div>
-                          <label className="mb-1 block text-xs font-medium text-muted-foreground">Reorder Level</label>
-                          <input type="number" min="0" step="0.001" value={ef.reorder_level_qty} onChange={(e) => setEf((f) => f ? { ...f, reorder_level_qty: e.target.value } : f)} className={INP} />
+                          <label htmlFor="f-reorder-level" className="mb-1 block text-xs font-medium text-muted-foreground">Reorder Level</label>
+                          <input id="f-reorder-level" type="number" min="0" step="0.001" value={ef.reorder_level_qty} onChange={(e) => setEf((f) => f ? { ...f, reorder_level_qty: e.target.value } : f)} className={INP} />
                         </div>
                         <div>
-                          <label className="mb-1 block text-xs font-medium text-muted-foreground">Category</label>
-                          <input value={ef.category} onChange={(e) => setEf((f) => f ? { ...f, category: e.target.value } : f)} className={INP} />
+                          <label htmlFor="f-category-2" className="mb-1 block text-xs font-medium text-muted-foreground">Category</label>
+                          <input id="f-category-2" value={ef.category} onChange={(e) => setEf((f) => f ? { ...f, category: e.target.value } : f)} className={INP} />
                         </div>
                         <div>
-                          <label className="mb-1 block text-xs font-medium text-muted-foreground">Subcategory</label>
-                          <input value={ef.subcategory} onChange={(e) => setEf((f) => f ? { ...f, subcategory: e.target.value } : f)} className={INP} />
+                          <label htmlFor="f-subcategory" className="mb-1 block text-xs font-medium text-muted-foreground">Subcategory</label>
+                          <input id="f-subcategory" value={ef.subcategory} onChange={(e) => setEf((f) => f ? { ...f, subcategory: e.target.value } : f)} className={INP} />
                         </div>
                         <div>
-                          <label className="mb-1 block text-xs font-medium text-muted-foreground">Barcode</label>
-                          <input value={ef.barcode} onChange={(e) => setEf((f) => f ? { ...f, barcode: e.target.value } : f)} placeholder="Leave blank to clear" className={INP + " font-mono"} />
+                          <label htmlFor="f-barcode" className="mb-1 block text-xs font-medium text-muted-foreground">Barcode</label>
+                          <input id="f-barcode" value={ef.barcode} onChange={(e) => setEf((f) => f ? { ...f, barcode: e.target.value } : f)} placeholder="Leave blank to clear" className={INP + " font-mono"} />
                         </div>
                         <div className="flex items-center gap-2">
                           <input id={`act-${row.id}`} type="checkbox" checked={ef.is_active} onChange={(e) => setEf((f) => f ? { ...f, is_active: e.target.checked } : f)} className="h-4 w-4 rounded border-border" />

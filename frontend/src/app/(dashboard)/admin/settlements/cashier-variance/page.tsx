@@ -128,8 +128,8 @@ export default function CashierVariancePage() {
         <h2 className="font-semibold">Filter</h2>
         <div className="flex flex-wrap gap-3 items-end">
           <div>
-            <label className="text-xs font-semibold text-muted-foreground block mb-1">Variance Threshold (₹)</label>
-            <input
+            <label htmlFor="f-variance-threshold" className="text-xs font-semibold text-muted-foreground block mb-1">Variance Threshold (₹)</label>
+            <input id="f-variance-threshold"
               type="number"
               value={threshold}
               onChange={e => setThreshold(e.target.value)}
@@ -138,8 +138,8 @@ export default function CashierVariancePage() {
             />
           </div>
           <div>
-            <label className="text-xs font-semibold text-muted-foreground block mb-1">Date From</label>
-            <input
+            <label htmlFor="f-date-from" className="text-xs font-semibold text-muted-foreground block mb-1">Date From</label>
+            <input id="f-date-from"
               type="date"
               value={dateFrom}
               onChange={e => setDateFrom(e.target.value)}
@@ -147,8 +147,8 @@ export default function CashierVariancePage() {
             />
           </div>
           <div>
-            <label className="text-xs font-semibold text-muted-foreground block mb-1">Date To</label>
-            <input
+            <label htmlFor="f-date-to" className="text-xs font-semibold text-muted-foreground block mb-1">Date To</label>
+            <input id="f-date-to"
               type="date"
               value={dateTo}
               onChange={e => setDateTo(e.target.value)}
@@ -173,8 +173,8 @@ export default function CashierVariancePage() {
           <p className="text-xs text-muted-foreground">These apply to all escalation emails sent from this page.</p>
           <div className="flex flex-wrap gap-3 items-end">
             <div className="flex-1 min-w-52">
-              <label className="text-xs font-semibold text-muted-foreground block mb-1">Notify Email (optional — uses ADMIN_EMAIL if blank)</label>
-              <input
+              <label htmlFor="f-notify-email-optional-uses-admin-email-i" className="text-xs font-semibold text-muted-foreground block mb-1">Notify Email (optional — uses ADMIN_EMAIL if blank)</label>
+              <input id="f-notify-email-optional-uses-admin-email-i"
                 type="email"
                 value={notifyEmail}
                 onChange={e => setNotifyEmail(e.target.value)}
@@ -183,8 +183,8 @@ export default function CashierVariancePage() {
               />
             </div>
             <div className="flex-1 min-w-52">
-              <label className="text-xs font-semibold text-muted-foreground block mb-1">Notes (optional — included in email)</label>
-              <input
+              <label htmlFor="f-notes-optional-included-in-email" className="text-xs font-semibold text-muted-foreground block mb-1">Notes (optional — included in email)</label>
+              <input id="f-notes-optional-included-in-email"
                 type="text"
                 value={escalateNotes}
                 onChange={e => setEscalateNotes(e.target.value)}

@@ -106,8 +106,8 @@ export default function PODCapturePage() {
         {/* Delivery Info */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-xs font-semibold text-muted-foreground">Delivery ID *</label>
-            <input
+            <label htmlFor="f-delivery-id" className="text-xs font-semibold text-muted-foreground">Delivery ID *</label>
+            <input id="f-delivery-id"
               type="number"
               value={deliveryId}
               onChange={(e) => setDeliveryId(e.target.value)}
@@ -115,8 +115,8 @@ export default function PODCapturePage() {
             />
           </div>
           <div>
-            <label className="text-xs font-semibold text-muted-foreground">Delivery Date *</label>
-            <input
+            <label htmlFor="f-delivery-date" className="text-xs font-semibold text-muted-foreground">Delivery Date *</label>
+            <input id="f-delivery-date"
               type="date"
               value={deliveryDate}
               onChange={(e) => setDeliveryDate(e.target.value)}
@@ -124,24 +124,24 @@ export default function PODCapturePage() {
             />
           </div>
           <div>
-            <label className="text-xs font-semibold text-muted-foreground">Driver Name *</label>
-            <input
+            <label htmlFor="f-driver-name" className="text-xs font-semibold text-muted-foreground">Driver Name *</label>
+            <input id="f-driver-name"
               value={driverName}
               onChange={(e) => setDriverName(e.target.value)}
               className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1"
             />
           </div>
           <div>
-            <label className="text-xs font-semibold text-muted-foreground">Driver Phone</label>
-            <input
+            <label htmlFor="f-driver-phone" className="text-xs font-semibold text-muted-foreground">Driver Phone</label>
+            <input id="f-driver-phone"
               value={driverPhone}
               onChange={(e) => setDriverPhone(e.target.value)}
               className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1"
             />
           </div>
           <div>
-            <label className="text-xs font-semibold text-muted-foreground">Customer Signature Name *</label>
-            <input
+            <label htmlFor="f-customer-signature-name" className="text-xs font-semibold text-muted-foreground">Customer Signature Name *</label>
+            <input id="f-customer-signature-name"
               value={custSigName}
               onChange={(e) => setCustSigName(e.target.value)}
               className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1"
@@ -152,8 +152,8 @@ export default function PODCapturePage() {
         {/* GPS Location */}
         <div className="border-t border-border pt-4 grid grid-cols-2 gap-3">
           <div>
-            <label className="text-xs font-semibold text-muted-foreground">GPS Latitude</label>
-            <input
+            <label htmlFor="f-gps-latitude" className="text-xs font-semibold text-muted-foreground">GPS Latitude</label>
+            <input id="f-gps-latitude"
               type="number"
               step="0.0001"
               placeholder="28.6139"
@@ -163,8 +163,8 @@ export default function PODCapturePage() {
             />
           </div>
           <div>
-            <label className="text-xs font-semibold text-muted-foreground">GPS Longitude</label>
-            <input
+            <label htmlFor="f-gps-longitude" className="text-xs font-semibold text-muted-foreground">GPS Longitude</label>
+            <input id="f-gps-longitude"
               type="number"
               step="0.0001"
               placeholder="77.2090"
@@ -180,7 +180,7 @@ export default function PODCapturePage() {
           <div className="text-xs font-semibold">Photos & Signature *</div>
 
           <div>
-            <label className="text-xs text-muted-foreground">Photo 1: Item/Box *</label>
+            <label htmlFor="f-photo-1-item-box-preview1-click-to-uploa" className="text-xs text-muted-foreground">Photo 1: Item/Box *</label>
             <div className="flex gap-2 mt-1">
               <label className="flex-1 h-20 rounded-xl border-2 border-dashed border-border flex items-center justify-center cursor-pointer hover:bg-muted/20 bg-muted/10">
                 {preview1 ? (
@@ -240,7 +240,7 @@ export default function PODCapturePage() {
         {/* Notes */}
         <div className="border-t border-border pt-4">
           <label className="text-xs font-semibold text-muted-foreground">Delivery Notes</label>
-          <textarea
+          <textarea id="f-photo-1-item-box-preview1-click-to-uploa"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="e.g., Delivered to customer, received safely…"

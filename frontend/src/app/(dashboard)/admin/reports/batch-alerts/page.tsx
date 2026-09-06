@@ -127,8 +127,8 @@ export default function BatchAlertsPage() {
             { label: "Draw Completion (%)", value: drawThreshold, setter: setDrawThreshold },
           ].map(({ label, value, setter }) => (
             <div key={label}>
-              <label className="text-xs text-muted-foreground block mb-1">{label}</label>
-              <input
+              <label htmlFor="f-label" className="text-xs text-muted-foreground block mb-1">{label}</label>
+              <input id="f-label"
                 type="number"
                 min={0}
                 max={100}

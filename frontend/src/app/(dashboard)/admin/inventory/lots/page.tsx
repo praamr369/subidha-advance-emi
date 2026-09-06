@@ -167,8 +167,8 @@ export default function InventoryLotsPage() {
             <div className="rounded-lg border bg-card p-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">Status</label>
-                  <select
+                  <label htmlFor="f-status" className="block text-sm font-medium text-foreground mb-2">Status</label>
+                  <select id="f-status"
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
                     disabled={loading}

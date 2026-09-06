@@ -507,11 +507,11 @@ export default function AdminCrmKycReviewQueuePage() {
 
                     {isActionOpen ? (
                       <div className="mt-3 rounded-lg border border-border bg-muted/30 p-3">
-                        <label className="text-xs font-medium text-muted-foreground">
+                        <label htmlFor="f-actionkind-reject-rejection-reason-resub" className="text-xs font-medium text-muted-foreground">
                           {actionKind === "reject" ? "Rejection reason" : "Resubmission reason"}{" "}
                           <span className="text-red-600">*</span>
                         </label>
-                        <textarea
+                        <textarea id="f-actionkind-reject-rejection-reason-resub"
                           value={actionReason}
                           onChange={(e) => setActionReason(e.target.value)}
                           rows={2}

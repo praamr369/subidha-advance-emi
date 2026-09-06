@@ -822,7 +822,7 @@ export default function AdminProductsPage() {
           <form onSubmit={applyFilters} className="space-y-3">
             {/* Row 1: Search + quick dropdowns */}
             <div className="flex flex-wrap gap-2">
-              <label className="relative flex-1 min-w-[200px]">
+              <label htmlFor="f-setqueryinput-e-target-value-placeholder" className="relative flex-1 min-w-[200px]">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <input
                   type="text"
@@ -905,7 +905,7 @@ export default function AdminProductsPage() {
               <div className="grid gap-2 rounded-xl border border-border bg-muted/30 p-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-muted-foreground">Stock Type</label>
-                  <select
+                  <select id="f-setqueryinput-e-target-value-placeholder"
                     value={filters.stock_type}
                     onChange={(e) => changeFilter("stock_type", e.target.value)}
                     className="h-9 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-ring"
@@ -925,8 +925,8 @@ export default function AdminProductsPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Readiness</label>
-                  <select
+                  <label htmlFor="f-readiness" className="text-xs font-medium text-muted-foreground">Readiness</label>
+                  <select id="f-readiness"
                     value={filters.readiness}
                     onChange={(e) => changeFilter("readiness", e.target.value)}
                     className="h-9 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-ring"
@@ -944,8 +944,8 @@ export default function AdminProductsPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Capability</label>
-                  <select
+                  <label htmlFor="f-capability" className="text-xs font-medium text-muted-foreground">Capability</label>
+                  <select id="f-capability"
                     value={filters.capability}
                     onChange={(e) => changeFilter("capability", e.target.value)}
                     className="h-9 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-ring"
@@ -959,8 +959,8 @@ export default function AdminProductsPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Active Status</label>
-                  <select
+                  <label htmlFor="f-active-status" className="text-xs font-medium text-muted-foreground">Active Status</label>
+                  <select id="f-active-status"
                     value={filters.active}
                     onChange={(e) => changeFilter("active", e.target.value)}
                     className="h-9 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-ring"
@@ -972,8 +972,8 @@ export default function AdminProductsPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Image</label>
-                  <select
+                  <label htmlFor="f-image" className="text-xs font-medium text-muted-foreground">Image</label>
+                  <select id="f-image"
                     value={filters.image_status}
                     onChange={(e) => changeFilter("image_status", e.target.value)}
                     className="h-9 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-ring"

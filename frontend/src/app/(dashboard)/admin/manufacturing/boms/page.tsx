@@ -114,7 +114,7 @@ function LineRow({ line, index, total, onChange, onRemove }: {
   return (
     <div className="grid gap-3 rounded-xl border border-border bg-muted/20 p-3 sm:grid-cols-[1fr_90px_80px_1fr_32px]">
       <div>
-        {index === 0 && <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Material / Accessory *</label>}
+        {index === 0 && <label htmlFor="f-material-accessory-onchange-item-v-index" className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Material / Accessory *</label>}
         <ItemSearch value={line.item} onChange={(v) => onChange({ item: v })} />
       </div>
       <div>
@@ -395,15 +395,15 @@ function CreateBomForm({ onCreated, onCancel }: { onCreated: () => void; onCance
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-muted-foreground">Revision No</label>
-          <input type="number" min="1" value={revision} onChange={(e) => setRevision(e.target.value)} className={INP} />
+          <input id="f-material-accessory-onchange-item-v-index" type="number" min="1" value={revision} onChange={(e) => setRevision(e.target.value)} className={INP} />
         </div>
         <div className="flex items-center gap-2 mt-5">
           <input id="is-default" type="checkbox" checked={isDefault} onChange={(e) => setIsDefault(e.target.checked)} className="h-4 w-4 rounded border-border" />
           <label htmlFor="is-default" className="text-sm">Mark as default revision</label>
         </div>
         <div className="sm:col-span-2">
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Notes</label>
-          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Optional — describe changes in this revision" className={INP} />
+          <label htmlFor="f-notes" className="mb-1 block text-xs font-medium text-muted-foreground">Notes</label>
+          <textarea id="f-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Optional — describe changes in this revision" className={INP} />
         </div>
       </div>
 
@@ -525,8 +525,8 @@ function EditBomLinesPanel({ bom, onSaved, onClose }: { bom: ManufacturingBom; o
           <label htmlFor={`def-${bom.id}`} className="text-sm">Default revision</label>
         </div>
         <div className="sm:col-span-2">
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Notes</label>
-          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className={INP} />
+          <label htmlFor="f-notes-2" className="mb-1 block text-xs font-medium text-muted-foreground">Notes</label>
+          <textarea id="f-notes-2" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className={INP} />
         </div>
       </div>
 

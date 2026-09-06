@@ -263,42 +263,42 @@ export default function TDSPage() {
             <div className="font-semibold mb-4">Record TDS Deduction</div>
             <div className="space-y-3">
               <div>
-                <label className="text-xs text-muted-foreground">Vendor ID</label>
-                <input type="number" value={form.vendor_id} onChange={e => setForm(f => ({ ...f, vendor_id: e.target.value }))}
+                <label htmlFor="f-vendor-id" className="text-xs text-muted-foreground">Vendor ID</label>
+                <input id="f-vendor-id" type="number" value={form.vendor_id} onChange={e => setForm(f => ({ ...f, vendor_id: e.target.value }))}
                   className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground">TDS Section</label>
-                <select value={form.section} onChange={e => setForm(f => ({ ...f, section: e.target.value }))}
+                <label htmlFor="f-tds-section" className="text-xs text-muted-foreground">TDS Section</label>
+                <select id="f-tds-section" value={form.section} onChange={e => setForm(f => ({ ...f, section: e.target.value }))}
                   className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1">
                   {TDS_SECTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-xs text-muted-foreground">Transaction Date</label>
-                <input type="date" value={form.transaction_date} onChange={e => setForm(f => ({ ...f, transaction_date: e.target.value }))}
+                <label htmlFor="f-transaction-date" className="text-xs text-muted-foreground">Transaction Date</label>
+                <input id="f-transaction-date" type="date" value={form.transaction_date} onChange={e => setForm(f => ({ ...f, transaction_date: e.target.value }))}
                   className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
               </div>
               <div className="flex gap-2">
                 <div className="flex-1">
-                  <label className="text-xs text-muted-foreground">Gross Amount (₹)</label>
-                  <input type="number" step="0.01" value={form.gross_amount} onChange={e => setForm(f => ({ ...f, gross_amount: e.target.value }))}
+                  <label htmlFor="f-gross-amount" className="text-xs text-muted-foreground">Gross Amount (₹)</label>
+                  <input id="f-gross-amount" type="number" step="0.01" value={form.gross_amount} onChange={e => setForm(f => ({ ...f, gross_amount: e.target.value }))}
                     className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
                 </div>
                 <div className="flex-1">
-                  <label className="text-xs text-muted-foreground">TDS Rate (%)</label>
-                  <input type="number" step="0.01" value={form.tds_rate} onChange={e => setForm(f => ({ ...f, tds_rate: e.target.value }))}
+                  <label htmlFor="f-tds-rate" className="text-xs text-muted-foreground">TDS Rate (%)</label>
+                  <input id="f-tds-rate" type="number" step="0.01" value={form.tds_rate} onChange={e => setForm(f => ({ ...f, tds_rate: e.target.value }))}
                     className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
                 </div>
               </div>
               <div>
-                <label className="text-xs text-muted-foreground">Reference No.</label>
-                <input value={form.reference_no} onChange={e => setForm(f => ({ ...f, reference_no: e.target.value }))}
+                <label htmlFor="f-reference-no" className="text-xs text-muted-foreground">Reference No.</label>
+                <input id="f-reference-no" value={form.reference_no} onChange={e => setForm(f => ({ ...f, reference_no: e.target.value }))}
                   className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground">Notes</label>
-                <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+                <label htmlFor="f-notes" className="text-xs text-muted-foreground">Notes</label>
+                <textarea id="f-notes" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
                   rows={2} className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm mt-1 resize-none" />
               </div>
               {formErr && <div className="text-xs text-red-600">{formErr}</div>}
@@ -322,13 +322,13 @@ export default function TDSPage() {
             <div className="text-sm text-muted-foreground mb-4">TDS Amount: ₹{depositModal.tds_amount}</div>
             <div className="space-y-3">
               <div>
-                <label className="text-xs text-muted-foreground">Challan No.</label>
-                <input value={challan} onChange={e => setChallan(e.target.value)}
+                <label htmlFor="f-challan-no" className="text-xs text-muted-foreground">Challan No.</label>
+                <input id="f-challan-no" value={challan} onChange={e => setChallan(e.target.value)}
                   className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground">Deposit Date</label>
-                <input type="date" value={depositDate} onChange={e => setDepositDate(e.target.value)}
+                <label htmlFor="f-deposit-date" className="text-xs text-muted-foreground">Deposit Date</label>
+                <input id="f-deposit-date" type="date" value={depositDate} onChange={e => setDepositDate(e.target.value)}
                   className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
               </div>
               <div className="flex gap-2 pt-1">

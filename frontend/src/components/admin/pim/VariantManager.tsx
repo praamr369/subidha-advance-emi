@@ -204,7 +204,7 @@ function VariantEditPanel({
       return (
         <div className="flex gap-3 mt-1">
           {["Yes", "No"].map((l) => (
-            <label key={l} className="flex items-center gap-1.5 text-xs cursor-pointer">
+            <label htmlFor="f-setattr-attr-id-l-classname-accent-prima" key={l} className="flex items-center gap-1.5 text-xs cursor-pointer">
               <input type="radio" name={`bool-${variant.id}-${attr.id}`}
                 checked={val === l} onChange={() => setAttr(attr.id, l)} className="accent-primary" />
               {l}
@@ -313,12 +313,12 @@ function VariantEditPanel({
           </div>
           <div>
             <label className="text-xs font-medium">Barcode</label>
-            <input type="text" className="mt-1 w-full rounded-lg border bg-background px-3 py-1.5 text-sm font-mono"
+            <input id="f-setattr-attr-id-l-classname-accent-prima" type="text" className="mt-1 w-full rounded-lg border bg-background px-3 py-1.5 text-sm font-mono"
               value={state.barcode} onChange={(e) => set("barcode", e.target.value)} placeholder="EAN/UPC" />
           </div>
           <div>
-            <label className="text-xs font-medium">Reorder Level</label>
-            <input type="number" className="mt-1 w-full rounded-lg border bg-background px-3 py-1.5 text-sm"
+            <label htmlFor="f-reorder-level" className="text-xs font-medium">Reorder Level</label>
+            <input id="f-reorder-level" type="number" className="mt-1 w-full rounded-lg border bg-background px-3 py-1.5 text-sm"
               value={state.reorder_level} onChange={(e) => set("reorder_level", e.target.value)} />
           </div>
         </div>
@@ -787,7 +787,7 @@ export default function VariantManager({ productId, productCode, productName, ba
                   {wbAttributes.map((attr) => {
                     const optPreview = attr.options.slice(0, 3).map((o) => o.display_name).join(", ") + (attr.options.length > 3 ? ` +${attr.options.length - 3} more` : "");
                     return (
-                      <label key={attr.id} className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-colors ${selectedAttrIds.has(attr.id) ? 'border-primary bg-primary/5 shadow-sm' : 'bg-background hover:border-primary/50'}`}>
+                      <label htmlFor="f-toggleattrselection-attr-id-attr-name-at" key={attr.id} className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-colors ${selectedAttrIds.has(attr.id) ? 'border-primary bg-primary/5 shadow-sm' : 'bg-background hover:border-primary/50'}`}>
                         <input type="checkbox" className="mt-1 accent-primary h-4 w-4" checked={selectedAttrIds.has(attr.id)} onChange={() => toggleAttrSelection(attr.id)} />
                         <div className="min-w-0 flex-1 space-y-1.5">
                           <div className="flex items-center justify-between gap-2">
@@ -894,15 +894,15 @@ export default function VariantManager({ productId, productCode, productName, ba
           <div className="flex flex-wrap items-end gap-3">
             <div>
               <label className="text-xs font-medium">Mode</label>
-              <select className="mt-1 block w-full rounded-lg border bg-background px-3 py-2 text-sm"
+              <select id="f-toggleattrselection-attr-id-attr-name-at" className="mt-1 block w-full rounded-lg border bg-background px-3 py-2 text-sm"
                 value={bulkMode} onChange={(e) => setBulkMode(e.target.value as "percent" | "fixed")}>
                 <option value="percent">Percentage (%)</option>
                 <option value="fixed">Fixed amount (₹)</option>
               </select>
             </div>
             <div>
-              <label className="text-xs font-medium">{bulkMode === "percent" ? "Percentage" : "Amount"}</label>
-              <input type="number" step={bulkMode === "percent" ? "1" : "100"}
+              <label htmlFor="f-bulkmode-percent-percentage-amount" className="text-xs font-medium">{bulkMode === "percent" ? "Percentage" : "Amount"}</label>
+              <input id="f-bulkmode-percent-percentage-amount" type="number" step={bulkMode === "percent" ? "1" : "100"}
                 className="mt-1 block w-32 rounded-lg border bg-background px-3 py-2 text-sm"
                 value={bulkAmount} onChange={(e) => setBulkAmount(e.target.value)}
                 placeholder={bulkMode === "percent" ? "+10 or -5" : "+500"} />
@@ -924,30 +924,30 @@ export default function VariantManager({ productId, productCode, productName, ba
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <div>
-              <label className="text-xs font-medium">SKU *
+              <label htmlFor="f-sku-auto-generated-editable" className="text-xs font-medium">SKU *
                 <span className="ml-1.5 text-[10px] font-normal text-emerald-600 dark:text-emerald-400">auto-generated — editable</span>
               </label>
-              <input
+              <input id="f-sku-auto-generated-editable"
                 className="mt-1 w-full rounded-lg border-2 border-primary/40 focus:border-primary px-3 py-1.5 text-sm bg-background font-mono font-semibold"
                 value={form.sku}
                 onChange={(e) => setForm({ ...form, sku: e.target.value })}
                 placeholder="PROD-001-A"
               />
             </div>
-            <div><label className="text-xs font-medium">Barcode</label>
-              <input className="mt-1 w-full rounded-lg border px-3 py-1.5 text-sm bg-background font-mono"
+            <div><label htmlFor="f-barcode" className="text-xs font-medium">Barcode</label>
+              <input id="f-barcode" className="mt-1 w-full rounded-lg border px-3 py-1.5 text-sm bg-background font-mono"
                 value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} placeholder="EAN/UPC (optional)" /></div>
-            <div><label className="text-xs font-medium">Selling Price *</label>
-              <input type="number" className="mt-1 w-full rounded-lg border px-3 py-1.5 text-sm bg-background"
+            <div><label htmlFor="f-selling-price" className="text-xs font-medium">Selling Price *</label>
+              <input id="f-selling-price" type="number" className="mt-1 w-full rounded-lg border px-3 py-1.5 text-sm bg-background"
                 value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="0.00" /></div>
-            <div><label className="text-xs font-medium">Cost Price</label>
-              <input type="number" className="mt-1 w-full rounded-lg border px-3 py-1.5 text-sm bg-background"
+            <div><label htmlFor="f-cost-price" className="text-xs font-medium">Cost Price</label>
+              <input id="f-cost-price" type="number" className="mt-1 w-full rounded-lg border px-3 py-1.5 text-sm bg-background"
                 value={form.cost_price} onChange={(e) => setForm({ ...form, cost_price: e.target.value })} placeholder="0.00" /></div>
-            <div><label className="text-xs font-medium">Opening Stock</label>
-              <input type="number" className="mt-1 w-full rounded-lg border px-3 py-1.5 text-sm bg-background"
+            <div><label htmlFor="f-opening-stock" className="text-xs font-medium">Opening Stock</label>
+              <input id="f-opening-stock" type="number" className="mt-1 w-full rounded-lg border px-3 py-1.5 text-sm bg-background"
                 value={form.quantity_on_hand} onChange={(e) => setForm({ ...form, quantity_on_hand: e.target.value })} /></div>
-            <div><label className="text-xs font-medium">Reorder Level</label>
-              <input type="number" className="mt-1 w-full rounded-lg border px-3 py-1.5 text-sm bg-background"
+            <div><label htmlFor="f-reorder-level-2" className="text-xs font-medium">Reorder Level</label>
+              <input id="f-reorder-level-2" type="number" className="mt-1 w-full rounded-lg border px-3 py-1.5 text-sm bg-background"
                 value={form.reorder_level} onChange={(e) => setForm({ ...form, reorder_level: e.target.value })} /></div>
           </div>
           {allAttributes.length > 0 && (

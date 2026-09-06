@@ -230,10 +230,10 @@ export default function GrowthRequestsPage() {
               {" · "}
               {modal.requestType.replace(/_/g, " ")}
             </p>
-            <label className="mt-4 block text-sm font-medium text-foreground">
+            <label htmlFor="f-modal-action-approve-reason-note-optiona" className="mt-4 block text-sm font-medium text-foreground">
               {modal.action === "approve" ? "Reason / note (optional)" : "Rejection reason"}
             </label>
-            <textarea
+            <textarea id="f-modal-action-approve-reason-note-optiona"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               rows={3}

@@ -127,8 +127,8 @@ function CreatePOForm({ vendors, items, onSaved, onCancel }: CreatePOFormProps) 
     <form onSubmit={(e) => void rhfHandleSubmit(onSubmit)(e)} className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Vendor *</label>
-          <select {...register("vendorId")} className={inputCls}>
+          <label htmlFor="f-vendor" className="mb-1 block text-xs font-medium text-muted-foreground">Vendor *</label>
+          <select id="f-vendor" {...register("vendorId")} className={inputCls}>
             <option value="">— Select vendor —</option>
             {vendors.filter((v) => v.is_active).map((v) => (
               <option key={v.id} value={v.id}>{v.name}</option>
@@ -137,17 +137,17 @@ function CreatePOForm({ vendors, items, onSaved, onCancel }: CreatePOFormProps) 
           {formErrors.vendorId ? <p className="mt-0.5 text-[10px] text-red-600">{formErrors.vendorId.message}</p> : null}
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">PO Date *</label>
-          <input type="date" {...register("poDate")} className={inputCls} />
+          <label htmlFor="f-po-date" className="mb-1 block text-xs font-medium text-muted-foreground">PO Date *</label>
+          <input id="f-po-date" type="date" {...register("poDate")} className={inputCls} />
           {formErrors.poDate ? <p className="mt-0.5 text-[10px] text-red-600">{formErrors.poDate.message}</p> : null}
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Expected Delivery</label>
-          <input type="date" {...register("expectedDate")} className={inputCls} />
+          <label htmlFor="f-expected-delivery" className="mb-1 block text-xs font-medium text-muted-foreground">Expected Delivery</label>
+          <input id="f-expected-delivery" type="date" {...register("expectedDate")} className={inputCls} />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Notes</label>
-          <input type="text" {...register("notes")} className={inputCls} placeholder="Optional" />
+          <label htmlFor="f-notes" className="mb-1 block text-xs font-medium text-muted-foreground">Notes</label>
+          <input id="f-notes" type="text" {...register("notes")} className={inputCls} placeholder="Optional" />
         </div>
       </div>
 

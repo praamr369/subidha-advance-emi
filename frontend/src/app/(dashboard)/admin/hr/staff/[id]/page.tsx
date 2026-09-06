@@ -296,7 +296,7 @@ function EditPanel({ staff, branches, onCancel, onSaved }: {
 
   function inp(label: string, key: keyof EditForm, type = "text") {
     return (
-      <label key={key} className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      <label htmlFor="f-label-up-key-e-target-value-as-editform-" key={key} className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         {label}
         <input type={type} value={String(form[key])} onChange={(e) => up(key, e.target.value as EditForm[typeof key])}
           className="h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary" />
@@ -985,7 +985,7 @@ export default function AdminHrStaffProfilePage() {
           <DetailPanel title="Attendance" description="Month-wise attendance. Re-marking the same date corrects it.">
             <div className="mb-4 flex flex-wrap items-center gap-3">
               <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Month</label>
-              <input type="month" value={attMonth} onChange={(e) => setAttMonth(e.target.value)}
+              <input id="f-label-up-key-e-target-value-as-editform-" type="month" value={attMonth} onChange={(e) => setAttMonth(e.target.value)}
                 className="rounded-lg border border-border bg-background px-3 py-2 text-sm" />
               <span className="text-xs text-muted-foreground">{attendanceSummary.daysInMonth} days · {attendance.length} marked</span>
             </div>
@@ -1014,7 +1014,7 @@ export default function AdminHrStaffProfilePage() {
             <div className="rounded-2xl border border-border bg-muted/20 p-4">
               <p className="mb-3 text-sm font-semibold text-foreground">Mark / correct attendance</p>
               <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-                <label className="grid gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                <label htmlFor="f-date-setattform-c-c-date-e-target-value-" className="grid gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                   Date
                   <input type="date" value={attForm.date} onChange={(e) => setAttForm((c) => ({ ...c, date: e.target.value }))}
                     className="h-9 rounded-lg border border-border bg-background px-3 text-sm" />
@@ -1593,7 +1593,7 @@ export default function AdminHrStaffProfilePage() {
             <label className="mt-4 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Notes {reviewModal.action === "reject" ? "(strongly recommended)" : "(optional)"}
             </label>
-            <textarea value={reviewNotes} onChange={(e) => setReviewNotes(e.target.value)}
+            <textarea id="f-date-setattform-c-c-date-e-target-value-" value={reviewNotes} onChange={(e) => setReviewNotes(e.target.value)}
               placeholder={reviewModal.action === "reject" ? "Reason for rejection" : "Optional review notes"}
               className="mt-1 min-h-24 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary" />
             <div className="mt-4 flex justify-end gap-2">

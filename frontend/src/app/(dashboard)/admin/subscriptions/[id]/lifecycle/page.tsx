@@ -104,11 +104,11 @@ function ConfirmInput({
 }) {
   return (
     <div>
-      <label className="text-xs font-medium text-muted-foreground">
+      <label htmlFor="f-label-required" className="text-xs font-medium text-muted-foreground">
         {label}
         {required && <span className="ml-0.5 text-red-500">*</span>}
       </label>
-      <textarea
+      <textarea id="f-label-required"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
@@ -595,8 +595,8 @@ export default function ContractLifecyclePage() {
                 {showHandoverForm && (
                   <div className="space-y-3 rounded-xl border border-border bg-background p-4">
                     <div>
-                      <label className="text-xs font-medium text-muted-foreground">Handover Date</label>
-                      <input
+                      <label htmlFor="f-handover-date" className="text-xs font-medium text-muted-foreground">Handover Date</label>
+                      <input id="f-handover-date"
                         type="date"
                         value={handoverDate}
                         onChange={(e) => setHandoverDate(e.target.value)}
@@ -623,8 +623,8 @@ export default function ContractLifecyclePage() {
                 {showReturnForm && (
                   <div className="space-y-3 rounded-xl border border-border bg-background p-4">
                     <div>
-                      <label className="text-xs font-medium text-muted-foreground">Return Date</label>
-                      <input
+                      <label htmlFor="f-return-date" className="text-xs font-medium text-muted-foreground">Return Date</label>
+                      <input id="f-return-date"
                         type="date"
                         value={returnDate}
                         onChange={(e) => setReturnDate(e.target.value)}
@@ -662,8 +662,8 @@ export default function ContractLifecyclePage() {
                 {showPossessionForm && (
                   <div className="space-y-3 rounded-xl border border-border bg-background p-4">
                     <div>
-                      <label className="text-xs font-medium text-muted-foreground">Serial Number (optional)</label>
-                      <input
+                      <label htmlFor="f-serial-number-optional" className="text-xs font-medium text-muted-foreground">Serial Number (optional)</label>
+                      <input id="f-serial-number-optional"
                         type="text"
                         value={possessionSerial}
                         onChange={(e) => setPossessionSerial(e.target.value)}
@@ -672,8 +672,8 @@ export default function ContractLifecyclePage() {
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-muted-foreground">Expected Return Date</label>
-                      <input
+                      <label htmlFor="f-expected-return-date" className="text-xs font-medium text-muted-foreground">Expected Return Date</label>
+                      <input id="f-expected-return-date"
                         type="date"
                         value={possessionReturnDate}
                         onChange={(e) => setPossessionReturnDate(e.target.value)}
@@ -742,8 +742,8 @@ export default function ContractLifecyclePage() {
                       <div className="space-y-3 rounded-xl border border-border bg-background p-4">
                         <div className="grid gap-3 md:grid-cols-2">
                           <div>
-                            <label className="text-xs font-medium text-muted-foreground">Condition</label>
-                            <select
+                            <label htmlFor="f-condition" className="text-xs font-medium text-muted-foreground">Condition</label>
+                            <select id="f-condition"
                               value={inspCondition}
                               onChange={(e) => setInspCondition(e.target.value as InspectionCondition)}
                               className="mt-1 h-9 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-ring"
@@ -754,8 +754,8 @@ export default function ContractLifecyclePage() {
                             </select>
                           </div>
                           <div>
-                            <label className="text-xs font-medium text-muted-foreground">Outcome</label>
-                            <select
+                            <label htmlFor="f-outcome" className="text-xs font-medium text-muted-foreground">Outcome</label>
+                            <select id="f-outcome"
                               value={inspOutcome}
                               onChange={(e) => setInspOutcome(e.target.value as InspectionOutcome)}
                               className="mt-1 h-9 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-ring"
@@ -766,8 +766,8 @@ export default function ContractLifecyclePage() {
                             </select>
                           </div>
                           <div>
-                            <label className="text-xs font-medium text-muted-foreground">Damage Deduction (₹)</label>
-                            <input
+                            <label htmlFor="f-damage-deduction" className="text-xs font-medium text-muted-foreground">Damage Deduction (₹)</label>
+                            <input id="f-damage-deduction"
                               type="number"
                               min="0"
                               step="0.01"
@@ -777,8 +777,8 @@ export default function ContractLifecyclePage() {
                             />
                           </div>
                           <div>
-                            <label className="text-xs font-medium text-muted-foreground">Deposit Refund (₹)</label>
-                            <input
+                            <label htmlFor="f-deposit-refund" className="text-xs font-medium text-muted-foreground">Deposit Refund (₹)</label>
+                            <input id="f-deposit-refund"
                               type="number"
                               min="0"
                               step="0.01"

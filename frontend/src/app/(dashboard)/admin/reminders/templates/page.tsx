@@ -204,8 +204,8 @@ export default function NotificationTemplatesPage() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-muted-foreground mb-1">Template Key *</label>
-                  <input
+                  <label htmlFor="f-template-key" className="block text-xs font-semibold text-muted-foreground mb-1">Template Key *</label>
+                  <input id="f-template-key"
                     value={form.key}
                     onChange={(e) => setForm({ ...form, key: e.target.value })}
                     className={inputClass}
@@ -214,8 +214,8 @@ export default function NotificationTemplatesPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-muted-foreground mb-1">Display Name *</label>
-                  <input
+                  <label htmlFor="f-display-name" className="block text-xs font-semibold text-muted-foreground mb-1">Display Name *</label>
+                  <input id="f-display-name"
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
                     className={inputClass}
@@ -223,8 +223,8 @@ export default function NotificationTemplatesPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-muted-foreground mb-1">Channel *</label>
-                  <select
+                  <label htmlFor="f-channel" className="block text-xs font-semibold text-muted-foreground mb-1">Channel *</label>
+                  <select id="f-channel"
                     value={form.channel}
                     onChange={(e) => setForm({ ...form, channel: e.target.value })}
                     className={inputClass}
@@ -235,7 +235,7 @@ export default function NotificationTemplatesPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-muted-foreground mb-1">Active</label>
+                  <label htmlFor="f-active-setform-form-is-active-e-target-c" className="block text-xs font-semibold text-muted-foreground mb-1">Active</label>
                   <label className="flex items-center gap-2 text-sm">
                     <input
                       type="checkbox"
@@ -249,7 +249,7 @@ export default function NotificationTemplatesPage() {
               {(form.channel === "EMAIL") && (
                 <div>
                   <label className="block text-xs font-semibold text-muted-foreground mb-1">Email Subject</label>
-                  <input
+                  <input id="f-active-setform-form-is-active-e-target-c"
                     value={form.subject}
                     onChange={(e) => setForm({ ...form, subject: e.target.value })}
                     className={inputClass}
@@ -258,8 +258,8 @@ export default function NotificationTemplatesPage() {
                 </div>
               )}
               <div>
-                <label className="block text-xs font-semibold text-muted-foreground mb-1">Message Body *</label>
-                <textarea
+                <label htmlFor="f-message-body" className="block text-xs font-semibold text-muted-foreground mb-1">Message Body *</label>
+                <textarea id="f-message-body"
                   value={form.body}
                   onChange={(e) => setForm({ ...form, body: e.target.value })}
                   rows={5}
@@ -268,8 +268,8 @@ export default function NotificationTemplatesPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-muted-foreground mb-1">Description (internal notes)</label>
-                <input
+                <label htmlFor="f-description-internal-notes" className="block text-xs font-semibold text-muted-foreground mb-1">Description (internal notes)</label>
+                <input id="f-description-internal-notes"
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                   className={inputClass}

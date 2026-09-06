@@ -92,10 +92,10 @@ export default function CreateReferralPage() {
             )}
 
             <div>
-              <label className="block text-sm font-medium mb-2">
+              <label htmlFor="f-customer-id" className="block text-sm font-medium mb-2">
                 Customer ID <span className="text-red-500">*</span>
               </label>
-              <input
+              <input id="f-customer-id"
                 type="number"
                 value={formData.referred_customer_id || ""}
                 onChange={(e) =>
@@ -114,10 +114,10 @@ export default function CreateReferralPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-2">
+              <label htmlFor="f-notes-optional" className="block text-sm font-medium mb-2">
                 Notes <span className="text-gray-500">(optional)</span>
               </label>
-              <textarea
+              <textarea id="f-notes-optional"
                 value={formData.notes}
                 onChange={(e) =>
                   setFormData({ ...formData, notes: e.target.value })

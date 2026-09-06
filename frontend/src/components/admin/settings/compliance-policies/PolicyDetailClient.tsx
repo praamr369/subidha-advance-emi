@@ -589,8 +589,8 @@ export function PolicyDetailClient({ slug }: { slug: string }) {
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-xs font-semibold text-muted-foreground">Title</label>
-                  <input value={editTitle}
+                  <label htmlFor="f-title" className="mb-1 block text-xs font-semibold text-muted-foreground">Title</label>
+                  <input id="f-title" value={editTitle}
                     onChange={(e) => { setEditTitle(e.target.value); markDirty(); }}
                     disabled={!canEdit}
                     className="w-full rounded-xl border border-input bg-background px-3 py-2 font-mono text-sm disabled:cursor-not-allowed disabled:opacity-50"
@@ -598,19 +598,19 @@ export function PolicyDetailClient({ slug }: { slug: string }) {
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-xs font-semibold text-muted-foreground">Summary</label>
-                  <textarea value={editSummary}
+                  <label htmlFor="f-summary" className="mb-1 block text-xs font-semibold text-muted-foreground">Summary</label>
+                  <textarea id="f-summary" value={editSummary}
                     onChange={(e) => { setEditSummary(e.target.value); markDirty(); }}
                     disabled={!canEdit}
                     className="min-h-[80px] w-full rounded-xl border border-input bg-background px-3 py-2 font-mono text-sm disabled:cursor-not-allowed disabled:opacity-50" />
                 </div>
 
                 <div>
-                  <label className="mb-1 flex items-center justify-between text-xs font-semibold text-muted-foreground">
+                  <label htmlFor="f-content-markdown-editcontent-length-tolo" className="mb-1 flex items-center justify-between text-xs font-semibold text-muted-foreground">
                     <span>Content (Markdown)</span>
                     <span className="font-normal">{editContent.length.toLocaleString()} chars · {editContent.split(/\s+/).filter(Boolean).length} words</span>
                   </label>
-                  <textarea
+                  <textarea id="f-content-markdown-editcontent-length-tolo"
                     ref={contentRef}
                     value={editContent}
                     onChange={(e) => { setEditContent(e.target.value); markDirty(); }}

@@ -244,10 +244,10 @@ export default function AdminHrStaffDocumentsPage() {
                 ? " will be marked ACTIVE (verified)."
                 : " will be marked INACTIVE (rejected)."}
             </p>
-            <label className="block text-xs font-semibold text-muted-foreground mb-1">
+            <label htmlFor="f-notes-reviewmodal-action-reject-recommen" className="block text-xs font-semibold text-muted-foreground mb-1">
               Notes {reviewModal.action === "reject" ? "(recommended)" : "(optional)"}
             </label>
-            <textarea
+            <textarea id="f-notes-reviewmodal-action-reject-recommen"
               className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm min-h-[72px] resize-none"
               placeholder={reviewModal.action === "reject" ? "Reason for rejection…" : "Verification notes…"}
               value={reviewNotes}

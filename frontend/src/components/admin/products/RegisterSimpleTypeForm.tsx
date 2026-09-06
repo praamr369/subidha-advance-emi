@@ -306,8 +306,8 @@ export default function RegisterSimpleTypeForm({ productType, productId }: Props
         <CollapsibleSection title="Identity">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-1">{meta.label} Code <span className="text-destructive">*</span></label>
-              <input
+              <label htmlFor="f-meta-label-code" className="block text-sm font-medium mb-1">{meta.label} Code <span className="text-destructive">*</span></label>
+              <input id="f-meta-label-code"
                 value={form.product_code}
                 onChange={(e) => set("product_code", e.target.value)}
                 placeholder={meta.codePlaceholder}
@@ -316,8 +316,8 @@ export default function RegisterSimpleTypeForm({ productType, productId }: Props
               {errors.product_code && <p className="text-xs text-destructive mt-1">{errors.product_code}</p>}
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Name <span className="text-destructive">*</span></label>
-              <input
+              <label htmlFor="f-name" className="block text-sm font-medium mb-1">Name <span className="text-destructive">*</span></label>
+              <input id="f-name"
                 value={form.name}
                 onChange={(e) => set("name", e.target.value)}
                 placeholder={meta.namePlaceholder}
@@ -330,8 +330,8 @@ export default function RegisterSimpleTypeForm({ productType, productId }: Props
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {meta.showSku && (
               <div>
-                <label className="block text-sm font-medium mb-1">SKU / Barcode</label>
-                <input
+                <label htmlFor="f-sku-barcode" className="block text-sm font-medium mb-1">SKU / Barcode</label>
+                <input id="f-sku-barcode"
                   value={form.sku}
                   onChange={(e) => set("sku", e.target.value)}
                   placeholder="Optional SKU or barcode"
@@ -340,10 +340,10 @@ export default function RegisterSimpleTypeForm({ productType, productId }: Props
               </div>
             )}
             <div>
-              <label className="block text-sm font-medium mb-1">
+              <label htmlFor="f-producttype-service-billing-unit-unit-of" className="block text-sm font-medium mb-1">
                 {productType === "SERVICE" ? "Billing Unit" : "Unit of Measure"} <span className="text-destructive">*</span>
               </label>
-              <select
+              <select id="f-producttype-service-billing-unit-unit-of"
                 value={form.unit_of_measure}
                 onChange={(e) => set("unit_of_measure", e.target.value)}
                 className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
@@ -354,8 +354,8 @@ export default function RegisterSimpleTypeForm({ productType, productId }: Props
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Description</label>
-            <textarea
+            <label htmlFor="f-description" className="block text-sm font-medium mb-1">Description</label>
+            <textarea id="f-description"
               value={form.description}
               onChange={(e) => set("description", e.target.value)}
               rows={3}
@@ -373,8 +373,8 @@ export default function RegisterSimpleTypeForm({ productType, productId }: Props
         <CollapsibleSection title="Tax Classification">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-1">{meta.showSac ? "SAC Code" : "HSN Code"}</label>
-              <input
+              <label htmlFor="f-meta-showsac-sac-code-hsn-code" className="block text-sm font-medium mb-1">{meta.showSac ? "SAC Code" : "HSN Code"}</label>
+              <input id="f-meta-showsac-sac-code-hsn-code"
                 value={form.hsn_sac_code}
                 onChange={(e) => set("hsn_sac_code", e.target.value)}
                 placeholder={meta.showSac ? "e.g. 9987" : "e.g. 4409"}
@@ -385,8 +385,8 @@ export default function RegisterSimpleTypeForm({ productType, productId }: Props
               </p>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">GST Rate (%)</label>
-              <select
+              <label htmlFor="f-gst-rate" className="block text-sm font-medium mb-1">GST Rate (%)</label>
+              <select id="f-gst-rate"
                 value={form.gst_rate}
                 onChange={(e) => set("gst_rate", e.target.value)}
                 className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
@@ -403,10 +403,10 @@ export default function RegisterSimpleTypeForm({ productType, productId }: Props
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {meta.showPrice && (
                 <div>
-                  <label className="block text-sm font-medium mb-1">
+                  <label htmlFor="f-producttype-service-base-service-rate-sa" className="block text-sm font-medium mb-1">
                     {productType === "SERVICE" ? "Base Service Rate (₹)" : "Sale Price (₹)"}
                   </label>
-                  <input
+                  <input id="f-producttype-service-base-service-rate-sa"
                     type="number"
                     min="0"
                     step="0.01"
@@ -422,10 +422,10 @@ export default function RegisterSimpleTypeForm({ productType, productId }: Props
               )}
               {meta.showCost && (
                 <div>
-                  <label className="block text-sm font-medium mb-1">
+                  <label htmlFor="f-producttype-raw-material-purchase-landed" className="block text-sm font-medium mb-1">
                     {productType === "RAW_MATERIAL" ? "Purchase / Landed Cost (₹)" : "Cost Price (₹)"}
                   </label>
-                  <input
+                  <input id="f-producttype-raw-material-purchase-landed"
                     type="number"
                     min="0"
                     step="0.01"
@@ -446,8 +446,8 @@ export default function RegisterSimpleTypeForm({ productType, productId }: Props
           <CollapsibleSection title="Stock & Inventory">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Stock Type</label>
-                <select
+                <label htmlFor="f-stock-type" className="block text-sm font-medium mb-1">Stock Type</label>
+                <select id="f-stock-type"
                   value={form.stock_type}
                   onChange={(e) => set("stock_type", e.target.value)}
                   className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
@@ -458,8 +458,8 @@ export default function RegisterSimpleTypeForm({ productType, productId }: Props
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Reorder Level ({form.unit_of_measure})</label>
-                <input
+                <label htmlFor="f-reorder-level-form-unit-of-measure" className="block text-sm font-medium mb-1">Reorder Level ({form.unit_of_measure})</label>
+                <input id="f-reorder-level-form-unit-of-measure"
                   type="number"
                   min="0"
                   value={reorderLevel}
@@ -470,8 +470,8 @@ export default function RegisterSimpleTypeForm({ productType, productId }: Props
                 <p className="text-xs text-muted-foreground mt-1">Alert when stock falls below this level</p>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Min Order Quantity ({form.unit_of_measure})</label>
-                <input
+                <label htmlFor="f-min-order-quantity-form-unit-of-measure" className="block text-sm font-medium mb-1">Min Order Quantity ({form.unit_of_measure})</label>
+                <input id="f-min-order-quantity-form-unit-of-measure"
                   type="number"
                   min="0"
                   value={minOrderQty}
@@ -481,8 +481,8 @@ export default function RegisterSimpleTypeForm({ productType, productId }: Props
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Lead Time (days)</label>
-                <input
+                <label htmlFor="f-lead-time-days" className="block text-sm font-medium mb-1">Lead Time (days)</label>
+                <input id="f-lead-time-days"
                   type="number"
                   min="0"
                   value={leadTimeDays}
@@ -493,8 +493,8 @@ export default function RegisterSimpleTypeForm({ productType, productId }: Props
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Storage Conditions</label>
-              <input
+              <label htmlFor="f-storage-conditions" className="block text-sm font-medium mb-1">Storage Conditions</label>
+              <input id="f-storage-conditions"
                 value={storageConditions}
                 onChange={(e) => setStorageConditions(e.target.value)}
                 placeholder="e.g. Dry area, avoid direct sunlight, 20–30°C"
@@ -509,8 +509,8 @@ export default function RegisterSimpleTypeForm({ productType, productId }: Props
           <CollapsibleSection title="Quality & Procurement" defaultOpen={false}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Quality Grade</label>
-                <select
+                <label htmlFor="f-quality-grade" className="block text-sm font-medium mb-1">Quality Grade</label>
+                <select id="f-quality-grade"
                   value={qualityGrade}
                   onChange={(e) => setQualityGrade(e.target.value)}
                   className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
@@ -521,8 +521,8 @@ export default function RegisterSimpleTypeForm({ productType, productId }: Props
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Supplier Notes</label>
-              <textarea
+              <label htmlFor="f-supplier-notes" className="block text-sm font-medium mb-1">Supplier Notes</label>
+              <textarea id="f-supplier-notes"
                 value={supplierNotes}
                 onChange={(e) => setSupplierNotes(e.target.value)}
                 rows={2}
@@ -543,8 +543,8 @@ export default function RegisterSimpleTypeForm({ productType, productId }: Props
               {serviceTiers.map((tier, i) => (
                 <div key={i} className="grid grid-cols-3 gap-3 items-end">
                   <div>
-                    <label className="block text-xs font-medium mb-1">Tier Name</label>
-                    <input
+                    <label htmlFor="f-tier-name" className="block text-xs font-medium mb-1">Tier Name</label>
+                    <input id="f-tier-name"
                       value={tier.label}
                       onChange={(e) => setServiceTiers(tiers => tiers.map((t, j) => j === i ? { ...t, label: e.target.value } : t))}
                       placeholder="e.g. Standard"
@@ -552,8 +552,8 @@ export default function RegisterSimpleTypeForm({ productType, productId }: Props
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium mb-1">Rate (₹)</label>
-                    <input
+                    <label htmlFor="f-rate" className="block text-xs font-medium mb-1">Rate (₹)</label>
+                    <input id="f-rate"
                       type="number"
                       min="0"
                       step="0.01"
@@ -564,8 +564,8 @@ export default function RegisterSimpleTypeForm({ productType, productId }: Props
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium mb-1">Per Unit</label>
-                    <select
+                    <label htmlFor="f-per-unit" className="block text-xs font-medium mb-1">Per Unit</label>
+                    <select id="f-per-unit"
                       value={tier.unit}
                       onChange={(e) => setServiceTiers(tiers => tiers.map((t, j) => j === i ? { ...t, unit: e.target.value } : t))}
                       className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
@@ -591,8 +591,8 @@ export default function RegisterSimpleTypeForm({ productType, productId }: Props
           <CollapsibleSection title="Scope & Terms" defaultOpen={false}>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Scope of Work</label>
-                <textarea
+                <label htmlFor="f-scope-of-work" className="block text-sm font-medium mb-1">Scope of Work</label>
+                <textarea id="f-scope-of-work"
                   value={serviceScope}
                   onChange={(e) => setServiceScope(e.target.value)}
                   rows={3}
@@ -602,8 +602,8 @@ export default function RegisterSimpleTypeForm({ productType, productId }: Props
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Estimated Duration</label>
-                  <input
+                  <label htmlFor="f-estimated-duration" className="block text-sm font-medium mb-1">Estimated Duration</label>
+                  <input id="f-estimated-duration"
                     value={estimatedDuration}
                     onChange={(e) => setEstimatedDuration(e.target.value)}
                     placeholder="e.g. 2–4 hours, 1 day"
@@ -611,8 +611,8 @@ export default function RegisterSimpleTypeForm({ productType, productId }: Props
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Warranty / Guarantee</label>
-                  <input
+                  <label htmlFor="f-warranty-guarantee" className="block text-sm font-medium mb-1">Warranty / Guarantee</label>
+                  <input id="f-warranty-guarantee"
                     value={warrantyTerms}
                     onChange={(e) => setWarrantyTerms(e.target.value)}
                     placeholder="e.g. 30-day workmanship guarantee"
@@ -621,8 +621,8 @@ export default function RegisterSimpleTypeForm({ productType, productId }: Props
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Terms & Conditions</label>
-                <textarea
+                <label htmlFor="f-terms-conditions" className="block text-sm font-medium mb-1">Terms & Conditions</label>
+                <textarea id="f-terms-conditions"
                   value={termsConditions}
                   onChange={(e) => setTermsConditions(e.target.value)}
                   rows={2}

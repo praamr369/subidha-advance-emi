@@ -172,8 +172,8 @@ export default function KYCPage() {
 
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Document Type</label>
-                    <select className={inputCls} value={docType} onChange={(e) => setDocType(e.target.value)}>
+                    <label htmlFor="f-document-type" className="block text-xs font-semibold text-muted-foreground mb-1.5">Document Type</label>
+                    <select id="f-document-type" className={inputCls} value={docType} onChange={(e) => setDocType(e.target.value)}>
                       {DOC_TYPES.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
                     </select>
                   </div>

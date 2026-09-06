@@ -269,26 +269,26 @@ function InjectionRow({
                 <p className="text-xs text-muted-foreground">Outstanding: <strong>{formatRupee(item.loan_outstanding)}</strong></p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-muted-foreground mb-1">Amount (max {formatRupee(item.loan_outstanding)})</label>
-                    <input type="number" step="0.01" min="0.01" max={item.loan_outstanding} value={form.amount}
+                    <label htmlFor="f-amount-max-formatrupee-item-loan-outstan" className="block text-xs font-medium text-muted-foreground mb-1">Amount (max {formatRupee(item.loan_outstanding)})</label>
+                    <input id="f-amount-max-formatrupee-item-loan-outstan" type="number" step="0.01" min="0.01" max={item.loan_outstanding} value={form.amount}
                       onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
                       className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" placeholder="0.00" />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-muted-foreground mb-1">Date</label>
-                    <input type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+                    <label htmlFor="f-date" className="block text-xs font-medium text-muted-foreground mb-1">Date</label>
+                    <input id="f-date" type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
                       className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-muted-foreground mb-1">Pay From Account</label>
-                    <select value={form.finance_account_id} onChange={(e) => setForm((f) => ({ ...f, finance_account_id: e.target.value }))}
+                    <label htmlFor="f-pay-from-account" className="block text-xs font-medium text-muted-foreground mb-1">Pay From Account</label>
+                    <select id="f-pay-from-account" value={form.finance_account_id} onChange={(e) => setForm((f) => ({ ...f, finance_account_id: e.target.value }))}
                       className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm">
                       {financeAccounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-muted-foreground mb-1">Notes</label>
-                    <input type="text" value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                    <label htmlFor="f-notes" className="block text-xs font-medium text-muted-foreground mb-1">Notes</label>
+                    <input id="f-notes" type="text" value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
                       className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" placeholder="e.g. NEFT transfer" />
                   </div>
                 </div>
@@ -417,7 +417,7 @@ function InjectModal({ financeAccounts, onClose, onCreated }: {
         <div className="p-6 space-y-5">
           {/* Type */}
           <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-2">Injection Type</label>
+            <label htmlFor="f-injection-type-capital-loan-as-injection" className="block text-xs font-medium text-muted-foreground mb-2">Injection Type</label>
             <div className="grid grid-cols-2 gap-3">
               {(["CAPITAL", "LOAN"] as InjectionType[]).map((t) => (
                 <button key={t} type="button"
@@ -443,21 +443,21 @@ function InjectModal({ financeAccounts, onClose, onCreated }: {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1">Amount (₹) *</label>
-              <input type="number" step="0.01" min="1" value={form.amount}
+              <input id="f-injection-type-capital-loan-as-injection" type="number" step="0.01" min="1" value={form.amount}
                 onChange={(e) => { setForm((f) => ({ ...f, amount: e.target.value })); setPreviewLines(null); }}
                 className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" placeholder="0.00" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1">Date *</label>
-              <input type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+              <label htmlFor="f-date-2" className="block text-xs font-medium text-muted-foreground mb-1">Date *</label>
+              <input id="f-date-2" type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
                 className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" />
             </div>
           </div>
 
           {/* Account */}
           <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">Destination Account *</label>
-            <select value={form.finance_account_id} onChange={(e) => setForm((f) => ({ ...f, finance_account_id: e.target.value }))}
+            <label htmlFor="f-destination-account" className="block text-xs font-medium text-muted-foreground mb-1">Destination Account *</label>
+            <select id="f-destination-account" value={form.finance_account_id} onChange={(e) => setForm((f) => ({ ...f, finance_account_id: e.target.value }))}
               className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm">
               {financeAccounts.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.kind})</option>)}
             </select>
@@ -473,7 +473,7 @@ function InjectModal({ financeAccounts, onClose, onCreated }: {
 
               {/* Tenure presets */}
               <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-2">Tenure (months)</label>
+                <label htmlFor="f-tenure-months-tenure-presets-map-m-setlo" className="block text-xs font-medium text-muted-foreground mb-2">Tenure (months)</label>
                 <div className="flex flex-wrap gap-2 mb-2">
                   {TENURE_PRESETS.map((m) => (
                     <button key={m} type="button"
@@ -506,7 +506,7 @@ function InjectModal({ financeAccounts, onClose, onCreated }: {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-muted-foreground mb-1">Interest Type</label>
-                  <select value={loan.interest_type}
+                  <select id="f-tenure-months-tenure-presets-map-m-setlo" value={loan.interest_type}
                     onChange={(e) => { setLoan((l) => ({ ...l, interest_type: e.target.value as InterestType })); setPreviewLines(null); }}
                     className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm">
                     <option value="NONE">Interest-Free</option>
@@ -516,8 +516,8 @@ function InjectModal({ financeAccounts, onClose, onCreated }: {
                 </div>
                 {loan.interest_type !== "NONE" && (
                   <div>
-                    <label className="block text-xs font-medium text-muted-foreground mb-1">Rate (% per annum)</label>
-                    <input type="number" step="0.01" min="0" max="100" value={loan.interest_rate}
+                    <label htmlFor="f-rate-per-annum" className="block text-xs font-medium text-muted-foreground mb-1">Rate (% per annum)</label>
+                    <input id="f-rate-per-annum" type="number" step="0.01" min="0" max="100" value={loan.interest_rate}
                       onChange={(e) => { setLoan((l) => ({ ...l, interest_rate: e.target.value })); setPreviewLines(null); }}
                       className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" placeholder="e.g. 12" />
                   </div>
@@ -527,8 +527,8 @@ function InjectModal({ financeAccounts, onClose, onCreated }: {
               {/* Frequency + Start Date */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1">Repayment Frequency</label>
-                  <select value={loan.repayment_frequency}
+                  <label htmlFor="f-repayment-frequency" className="block text-xs font-medium text-muted-foreground mb-1">Repayment Frequency</label>
+                  <select id="f-repayment-frequency" value={loan.repayment_frequency}
                     onChange={(e) => { setLoan((l) => ({ ...l, repayment_frequency: e.target.value as RepaymentFrequency })); setPreviewLines(null); }}
                     className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm">
                     <option value="MONTHLY">Monthly</option>
@@ -537,8 +537,8 @@ function InjectModal({ financeAccounts, onClose, onCreated }: {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1">First Repayment Date</label>
-                  <input type="date" value={loan.repayment_start_date}
+                  <label htmlFor="f-first-repayment-date" className="block text-xs font-medium text-muted-foreground mb-1">First Repayment Date</label>
+                  <input id="f-first-repayment-date" type="date" value={loan.repayment_start_date}
                     onChange={(e) => { setLoan((l) => ({ ...l, repayment_start_date: e.target.value })); setPreviewLines(null); }}
                     className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" />
                 </div>
@@ -574,13 +574,13 @@ function InjectModal({ financeAccounts, onClose, onCreated }: {
           {/* Ref + Notes */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1">Reference / Cheque / UTR</label>
-              <input type="text" value={form.reference} onChange={(e) => setForm((f) => ({ ...f, reference: e.target.value }))}
+              <label htmlFor="f-reference-cheque-utr" className="block text-xs font-medium text-muted-foreground mb-1">Reference / Cheque / UTR</label>
+              <input id="f-reference-cheque-utr" type="text" value={form.reference} onChange={(e) => setForm((f) => ({ ...f, reference: e.target.value }))}
                 className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" placeholder="e.g. UTR123456" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1">Notes</label>
-              <input type="text" value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+              <label htmlFor="f-notes-2" className="block text-xs font-medium text-muted-foreground mb-1">Notes</label>
+              <input id="f-notes-2" type="text" value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                 className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" placeholder="Optional details" />
             </div>
           </div>

@@ -195,8 +195,8 @@ export default function InventoryValuationPage() {
 
           <div className="flex flex-wrap items-center gap-4 p-4 border rounded-md bg-muted/20">
             <div className="flex flex-col gap-1.5 min-w-[240px] flex-1">
-              <label className="text-sm font-medium text-foreground">Search Products</label>
-              <input
+              <label htmlFor="f-search-products" className="text-sm font-medium text-foreground">Search Products</label>
+              <input id="f-search-products"
                 type="text"
                 placeholder="Search by SKU, product name, or code..."
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -206,8 +206,8 @@ export default function InventoryValuationPage() {
             </div>
 
             <div className="flex flex-col gap-1.5 min-w-[180px]">
-              <label className="text-sm font-medium text-foreground">Category</label>
-              <select
+              <label htmlFor="f-category" className="text-sm font-medium text-foreground">Category</label>
+              <select id="f-category"
                 disabled={categoriesLoading}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 value={category}
@@ -223,8 +223,8 @@ export default function InventoryValuationPage() {
             </div>
 
             <div className="flex flex-col gap-1.5 min-w-[180px]">
-              <label className="text-sm font-medium text-foreground">Location</label>
-              <select
+              <label htmlFor="f-location" className="text-sm font-medium text-foreground">Location</label>
+              <select id="f-location"
                 disabled={locationsLoading}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 value={locationId || ""}

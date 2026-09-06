@@ -258,8 +258,8 @@ const PimSyncSection = forwardRef<PimSyncSectionHandle, Props>(function PimSyncS
           {/* Category selector */}
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-xs font-medium mb-1 text-muted-foreground">PIM Category</label>
-              <select
+              <label htmlFor="f-pim-category" className="block text-xs font-medium mb-1 text-muted-foreground">PIM Category</label>
+              <select id="f-pim-category"
                 className="w-full rounded-lg border px-3 py-2 text-sm bg-background"
                 value={selectedCatId}
                 onChange={(e) => {
@@ -279,8 +279,8 @@ const PimSyncSection = forwardRef<PimSyncSectionHandle, Props>(function PimSyncS
             </div>
             {subcategories.length > 0 && (
               <div>
-                <label className="block text-xs font-medium mb-1 text-muted-foreground">PIM Subcategory</label>
-                <select
+                <label htmlFor="f-pim-subcategory" className="block text-xs font-medium mb-1 text-muted-foreground">PIM Subcategory</label>
+                <select id="f-pim-subcategory"
                   className="w-full rounded-lg border px-3 py-2 text-sm bg-background"
                   value={selectedSubId}
                   onChange={(e) => {

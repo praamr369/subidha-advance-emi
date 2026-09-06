@@ -127,8 +127,8 @@ function ApplyCreditNoteDialog({
         {!success ? (
           <div className="mt-4 space-y-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-foreground">Invoice</label>
-              <select
+              <label htmlFor="f-invoice" className="mb-1 block text-sm font-medium text-foreground">Invoice</label>
+              <select id="f-invoice"
                 value={selectedInvoice}
                 onChange={(e) => setSelectedInvoice(e.target.value)}
                 className="h-10 w-full rounded-xl border border-border bg-card px-3 text-sm text-foreground outline-none focus:border-sky-400"
@@ -143,8 +143,8 @@ function ApplyCreditNoteDialog({
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-foreground">Amount</label>
-              <input
+              <label htmlFor="f-amount" className="mb-1 block text-sm font-medium text-foreground">Amount</label>
+              <input id="f-amount"
                 type="number"
                 step="0.01"
                 min="0.01"
@@ -157,8 +157,8 @@ function ApplyCreditNoteDialog({
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-foreground">Notes (optional)</label>
-              <input
+              <label htmlFor="f-notes-optional" className="mb-1 block text-sm font-medium text-foreground">Notes (optional)</label>
+              <input id="f-notes-optional"
                 type="text"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}

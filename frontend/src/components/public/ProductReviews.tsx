@@ -225,7 +225,7 @@ export default function ProductReviews({ productId, productName, initialData }: 
           </h3>
 
           <div>
-            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+            <label htmlFor="f-your-rating-name" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
               Your Rating <span className="text-red-500">*</span>
             </label>
             <InteractiveStars value={rating} onChange={setRating} />
@@ -236,7 +236,7 @@ export default function ProductReviews({ productId, productName, initialData }: 
               <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
                 Name <span className="text-red-500">*</span>
               </label>
-              <input
+              <input id="f-your-rating-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 text-sm"
@@ -244,8 +244,8 @@ export default function ProductReviews({ productId, productName, initialData }: 
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Email (optional)</label>
-              <input
+              <label htmlFor="f-email-optional" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Email (optional)</label>
+              <input id="f-email-optional"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -256,10 +256,10 @@ export default function ProductReviews({ productId, productName, initialData }: 
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+            <label htmlFor="f-review-title" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
               Review Title
             </label>
-            <input
+            <input id="f-review-title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 text-sm"
@@ -268,10 +268,10 @@ export default function ProductReviews({ productId, productName, initialData }: 
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+            <label htmlFor="f-your-review" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
               Your Review
             </label>
-            <textarea
+            <textarea id="f-your-review"
               value={body}
               onChange={(e) => setBody(e.target.value)}
               rows={4}

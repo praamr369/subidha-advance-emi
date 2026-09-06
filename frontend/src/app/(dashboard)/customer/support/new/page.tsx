@@ -110,10 +110,10 @@ export default function CustomerSupportNewPage() {
           ) : null}
 
           <div>
-            <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+            <label htmlFor="f-what-is-this-about" className="block text-xs font-semibold text-muted-foreground mb-1.5">
               What is this about? *
             </label>
-            <select
+            <select id="f-what-is-this-about"
               className={inputCls}
               value={category}
               onChange={(ev) => setCategory(ev.target.value as SupportTicketCategory)}
@@ -126,10 +126,10 @@ export default function CustomerSupportNewPage() {
 
           {subs.length > 0 ? (
             <div>
-              <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+              <label htmlFor="f-related-contract-optional" className="block text-xs font-semibold text-muted-foreground mb-1.5">
                 Related contract (optional)
               </label>
-              <select
+              <select id="f-related-contract-optional"
                 className={inputCls}
                 value={linkSubId}
                 onChange={(ev) => setLinkSubId(ev.target.value)}
@@ -143,10 +143,10 @@ export default function CustomerSupportNewPage() {
           ) : null}
 
           <div>
-            <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+            <label htmlFor="f-subject" className="block text-xs font-semibold text-muted-foreground mb-1.5">
               Subject *
             </label>
-            <input
+            <input id="f-subject"
               className={inputCls}
               value={subject}
               onChange={(ev) => setSubject(ev.target.value)}
@@ -156,10 +156,10 @@ export default function CustomerSupportNewPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+            <label htmlFor="f-description" className="block text-xs font-semibold text-muted-foreground mb-1.5">
               Description *
             </label>
-            <textarea
+            <textarea id="f-description"
               className={`${inputCls} min-h-[120px] resize-none`}
               value={description}
               onChange={(ev) => setDescription(ev.target.value)}
@@ -168,10 +168,10 @@ export default function CustomerSupportNewPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+            <label htmlFor="f-best-time-to-call-optional" className="block text-xs font-semibold text-muted-foreground mb-1.5">
               Best time to call (optional)
             </label>
-            <input
+            <input id="f-best-time-to-call-optional"
               className={inputCls}
               value={preferredContactTime}
               onChange={(ev) => setPreferredContactTime(ev.target.value)}

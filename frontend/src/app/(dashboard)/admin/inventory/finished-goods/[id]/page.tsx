@@ -112,21 +112,21 @@ function InlineLinkEditor({
   return (
     <div className="mt-3 rounded-xl border border-primary/30 bg-primary/5 p-4 grid gap-3 sm:grid-cols-2">
       <div>
-        <label className="mb-1 block text-xs font-medium text-muted-foreground">Charge Mode</label>
-        <select value={v.charge_mode} onChange={(e) => setV((s) => ({ ...s, charge_mode: e.target.value, sale_price: e.target.value === "FREE" ? "0.00" : s.sale_price }))} className={SEL}>
+        <label htmlFor="f-charge-mode" className="mb-1 block text-xs font-medium text-muted-foreground">Charge Mode</label>
+        <select id="f-charge-mode" value={v.charge_mode} onChange={(e) => setV((s) => ({ ...s, charge_mode: e.target.value, sale_price: e.target.value === "FREE" ? "0.00" : s.sale_price }))} className={SEL}>
           <option value="FREE">Free / Included</option>
           <option value="CHARGEABLE">Chargeable (add price)</option>
         </select>
       </div>
       {v.charge_mode === "CHARGEABLE" && (
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Sale Price Override (₹)</label>
-          <input type="number" min="0" step="0.01" value={v.sale_price} onChange={(e) => setV((s) => ({ ...s, sale_price: e.target.value }))} className={INP} />
+          <label htmlFor="f-sale-price-override" className="mb-1 block text-xs font-medium text-muted-foreground">Sale Price Override (₹)</label>
+          <input id="f-sale-price-override" type="number" min="0" step="0.01" value={v.sale_price} onChange={(e) => setV((s) => ({ ...s, sale_price: e.target.value }))} className={INP} />
         </div>
       )}
       <div>
-        <label className="mb-1 block text-xs font-medium text-muted-foreground">Notes</label>
-        <input value={v.notes} onChange={(e) => setV((s) => ({ ...s, notes: e.target.value }))} placeholder="Optional" className={INP} />
+        <label htmlFor="f-notes" className="mb-1 block text-xs font-medium text-muted-foreground">Notes</label>
+        <input id="f-notes" value={v.notes} onChange={(e) => setV((s) => ({ ...s, notes: e.target.value }))} placeholder="Optional" className={INP} />
       </div>
       <div className="flex items-center gap-2 sm:col-span-2">
         <input type="checkbox" id="ile-def" checked={v.is_default_included} onChange={(e) => setV((s) => ({ ...s, is_default_included: e.target.checked }))} className="h-4 w-4 rounded border-border" />
@@ -515,8 +515,8 @@ export default function FGProfilePage() {
 
                     {barcodeEditing ? (
                       <div className="space-y-2">
-                        <label className="text-xs font-medium text-muted-foreground">Custom Barcode Value</label>
-                        <input
+                        <label htmlFor="f-custom-barcode-value" className="text-xs font-medium text-muted-foreground">Custom Barcode Value</label>
+                        <input id="f-custom-barcode-value"
                           value={barcodeInput}
                           onChange={(e) => setBarcodeInput(e.target.value)}
                           placeholder="e.g. BC-SHAKBED-0042"
@@ -612,37 +612,37 @@ export default function FGProfilePage() {
                   <form onSubmit={handleQuickCreateAccessory} className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 grid gap-3 sm:grid-cols-2 dark:border-amber-900/40 dark:bg-amber-900/10">
                     <div className="sm:col-span-2 text-xs font-semibold text-amber-700 dark:text-amber-400">Create New Accessory → Saved to Accessories catalog and linked immediately</div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-muted-foreground">Product Code *</label>
-                      <input value={qaForm.product_code} onChange={(e) => setQaForm((f) => ({ ...f, product_code: e.target.value.toUpperCase() }))} placeholder="ACC-SIDERAIL-01" maxLength={40} className={INP + " font-mono"} />
+                      <label htmlFor="f-product-code" className="mb-1 block text-xs font-medium text-muted-foreground">Product Code *</label>
+                      <input id="f-product-code" value={qaForm.product_code} onChange={(e) => setQaForm((f) => ({ ...f, product_code: e.target.value.toUpperCase() }))} placeholder="ACC-SIDERAIL-01" maxLength={40} className={INP + " font-mono"} />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-muted-foreground">Unit of Measure</label>
-                      <input value={qaForm.unit_of_measure} onChange={(e) => setQaForm((f) => ({ ...f, unit_of_measure: e.target.value }))} placeholder="PCS" className={INP} />
+                      <label htmlFor="f-unit-of-measure" className="mb-1 block text-xs font-medium text-muted-foreground">Unit of Measure</label>
+                      <input id="f-unit-of-measure" value={qaForm.unit_of_measure} onChange={(e) => setQaForm((f) => ({ ...f, unit_of_measure: e.target.value }))} placeholder="PCS" className={INP} />
                     </div>
                     <div className="sm:col-span-2">
-                      <label className="mb-1 block text-xs font-medium text-muted-foreground">Accessory Name *</label>
-                      <input value={qaForm.name} onChange={(e) => setQaForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Side Rail – Sagwan Wood" maxLength={200} className={INP} />
+                      <label htmlFor="f-accessory-name" className="mb-1 block text-xs font-medium text-muted-foreground">Accessory Name *</label>
+                      <input id="f-accessory-name" value={qaForm.name} onChange={(e) => setQaForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Side Rail – Sagwan Wood" maxLength={200} className={INP} />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-muted-foreground">Catalogue Price (₹)</label>
-                      <input type="number" min="0" step="0.01" value={qaForm.base_price} onChange={(e) => setQaForm((f) => ({ ...f, base_price: e.target.value }))} className={INP} />
+                      <label htmlFor="f-catalogue-price" className="mb-1 block text-xs font-medium text-muted-foreground">Catalogue Price (₹)</label>
+                      <input id="f-catalogue-price" type="number" min="0" step="0.01" value={qaForm.base_price} onChange={(e) => setQaForm((f) => ({ ...f, base_price: e.target.value }))} className={INP} />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-muted-foreground">Charge Mode on this FG</label>
-                      <select value={qaForm.charge_mode} onChange={(e) => setQaForm((f) => ({ ...f, charge_mode: e.target.value, sale_price: e.target.value === "FREE" ? "0.00" : f.sale_price }))} className={SEL}>
+                      <label htmlFor="f-charge-mode-on-this-fg" className="mb-1 block text-xs font-medium text-muted-foreground">Charge Mode on this FG</label>
+                      <select id="f-charge-mode-on-this-fg" value={qaForm.charge_mode} onChange={(e) => setQaForm((f) => ({ ...f, charge_mode: e.target.value, sale_price: e.target.value === "FREE" ? "0.00" : f.sale_price }))} className={SEL}>
                         <option value="FREE">Free / Included</option>
                         <option value="CHARGEABLE">Chargeable</option>
                       </select>
                     </div>
                     {qaForm.charge_mode === "CHARGEABLE" && (
                       <div>
-                        <label className="mb-1 block text-xs font-medium text-muted-foreground">Sale Price Override (₹)</label>
-                        <input type="number" min="0" step="0.01" value={qaForm.sale_price} onChange={(e) => setQaForm((f) => ({ ...f, sale_price: e.target.value }))} className={INP} />
+                        <label htmlFor="f-sale-price-override-2" className="mb-1 block text-xs font-medium text-muted-foreground">Sale Price Override (₹)</label>
+                        <input id="f-sale-price-override-2" type="number" min="0" step="0.01" value={qaForm.sale_price} onChange={(e) => setQaForm((f) => ({ ...f, sale_price: e.target.value }))} className={INP} />
                       </div>
                     )}
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-muted-foreground">Notes</label>
-                      <input value={qaForm.notes} onChange={(e) => setQaForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Optional" className={INP} />
+                      <label htmlFor="f-notes-2" className="mb-1 block text-xs font-medium text-muted-foreground">Notes</label>
+                      <input id="f-notes-2" value={qaForm.notes} onChange={(e) => setQaForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Optional" className={INP} />
                     </div>
                     <div className="flex items-center gap-2 sm:col-span-2">
                       <input id="qa-def" type="checkbox" checked={qaForm.is_default_included} onChange={(e) => setQaForm((f) => ({ ...f, is_default_included: e.target.checked }))} className="h-4 w-4 rounded border-border" />
@@ -675,8 +675,8 @@ export default function FGProfilePage() {
                           <div className="sm:col-span-2 text-sm text-muted-foreground">All accessories already linked. <Link href={ROUTES.admin.inventoryAccessories} className="underline">Manage accessories →</Link></div>
                         ) : (
                           <div>
-                            <label className="mb-1 block text-xs font-medium text-muted-foreground">Accessory *</label>
-                            <select value={accForm.accessory} onChange={(e) => setAccForm((f) => ({ ...f, accessory: Number(e.target.value) }))} className={SEL}>
+                            <label htmlFor="f-accessory" className="mb-1 block text-xs font-medium text-muted-foreground">Accessory *</label>
+                            <select id="f-accessory" value={accForm.accessory} onChange={(e) => setAccForm((f) => ({ ...f, accessory: Number(e.target.value) }))} className={SEL}>
                               <option value={0}>— Select accessory —</option>
                               {availableAcc.map((a) => <option key={a.id} value={a.id}>{a.product_name} ({a.product_code})</option>)}
                             </select>
@@ -687,8 +687,8 @@ export default function FGProfilePage() {
                           <div className="sm:col-span-2 text-sm text-muted-foreground">All groups already linked.</div>
                         ) : (
                           <div>
-                            <label className="mb-1 block text-xs font-medium text-muted-foreground">Variant Group *</label>
-                            <select value={accForm.variant_group} onChange={(e) => setAccForm((f) => ({ ...f, variant_group: Number(e.target.value) }))} className={SEL}>
+                            <label htmlFor="f-variant-group" className="mb-1 block text-xs font-medium text-muted-foreground">Variant Group *</label>
+                            <select id="f-variant-group" value={accForm.variant_group} onChange={(e) => setAccForm((f) => ({ ...f, variant_group: Number(e.target.value) }))} className={SEL}>
                               <option value={0}>— Select group —</option>
                               {availableGroups.map((g) => <option key={g.id} value={g.id}>{g.name} ({g.code}) — {g.variant_count} variants</option>)}
                             </select>
@@ -696,25 +696,25 @@ export default function FGProfilePage() {
                         )
                       )}
                       <div>
-                        <label className="mb-1 block text-xs font-medium text-muted-foreground">Charge Mode</label>
-                        <select value={accForm.charge_mode} onChange={(e) => setAccForm((f) => ({ ...f, charge_mode: e.target.value, sale_price: e.target.value === "FREE" ? "0.00" : f.sale_price }))} className={SEL}>
+                        <label htmlFor="f-charge-mode-2" className="mb-1 block text-xs font-medium text-muted-foreground">Charge Mode</label>
+                        <select id="f-charge-mode-2" value={accForm.charge_mode} onChange={(e) => setAccForm((f) => ({ ...f, charge_mode: e.target.value, sale_price: e.target.value === "FREE" ? "0.00" : f.sale_price }))} className={SEL}>
                           <option value="FREE">Free / Included</option>
                           <option value="CHARGEABLE">Chargeable</option>
                         </select>
                       </div>
                       {accForm.charge_mode === "CHARGEABLE" && (
                         <div>
-                          <label className="mb-1 block text-xs font-medium text-muted-foreground">Sale Price (₹) *</label>
-                          <input type="number" step="0.01" min="0.01" value={accForm.sale_price} onChange={(e) => setAccForm((f) => ({ ...f, sale_price: e.target.value }))} className={INP} />
+                          <label htmlFor="f-sale-price" className="mb-1 block text-xs font-medium text-muted-foreground">Sale Price (₹) *</label>
+                          <input id="f-sale-price" type="number" step="0.01" min="0.01" value={accForm.sale_price} onChange={(e) => setAccForm((f) => ({ ...f, sale_price: e.target.value }))} className={INP} />
                         </div>
                       )}
                       <div>
-                        <label className="mb-1 block text-xs font-medium text-muted-foreground">Sort Order</label>
-                        <input type="number" min={1} value={accForm.sort_order} onChange={(e) => setAccForm((f) => ({ ...f, sort_order: Number(e.target.value) }))} className={INP} />
+                        <label htmlFor="f-sort-order" className="mb-1 block text-xs font-medium text-muted-foreground">Sort Order</label>
+                        <input id="f-sort-order" type="number" min={1} value={accForm.sort_order} onChange={(e) => setAccForm((f) => ({ ...f, sort_order: Number(e.target.value) }))} className={INP} />
                       </div>
                       <div>
-                        <label className="mb-1 block text-xs font-medium text-muted-foreground">Notes</label>
-                        <input type="text" value={accForm.notes} onChange={(e) => setAccForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Optional" className={INP} />
+                        <label htmlFor="f-notes-3" className="mb-1 block text-xs font-medium text-muted-foreground">Notes</label>
+                        <input id="f-notes-3" type="text" value={accForm.notes} onChange={(e) => setAccForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Optional" className={INP} />
                       </div>
                       <div className="flex items-center gap-2 sm:col-span-2">
                         <input id="acc-def" type="checkbox" checked={accForm.is_default_included} onChange={(e) => setAccForm((f) => ({ ...f, is_default_included: e.target.checked }))} className="h-4 w-4 rounded border-border" />
@@ -804,34 +804,34 @@ export default function FGProfilePage() {
                   <form onSubmit={handleQuickCreateService} className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 grid gap-3 sm:grid-cols-2 dark:border-amber-900/40 dark:bg-amber-900/10">
                     <div className="sm:col-span-2 text-xs font-semibold text-amber-700 dark:text-amber-400">Create New Service → Saved to catalog and auto-selected below</div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-muted-foreground">Code *</label>
-                      <input value={qsForm.code} onChange={(e) => setQsForm((f) => ({ ...f, code: e.target.value }))} placeholder="SVC-INSTALL-BED" maxLength={40} className={INP} />
+                      <label htmlFor="f-code" className="mb-1 block text-xs font-medium text-muted-foreground">Code *</label>
+                      <input id="f-code" value={qsForm.code} onChange={(e) => setQsForm((f) => ({ ...f, code: e.target.value }))} placeholder="SVC-INSTALL-BED" maxLength={40} className={INP} />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-muted-foreground">Service Type *</label>
-                      <select value={qsForm.service_type} onChange={(e) => setQsForm((f) => ({ ...f, service_type: e.target.value as ServiceType }))} className={SEL}>
+                      <label htmlFor="f-service-type" className="mb-1 block text-xs font-medium text-muted-foreground">Service Type *</label>
+                      <select id="f-service-type" value={qsForm.service_type} onChange={(e) => setQsForm((f) => ({ ...f, service_type: e.target.value as ServiceType }))} className={SEL}>
                         {SERVICE_TYPES.map((t) => <option key={t} value={t}>{SERVICE_TYPE_LABELS[t]}</option>)}
                       </select>
                     </div>
                     <div className="sm:col-span-2">
-                      <label className="mb-1 block text-xs font-medium text-muted-foreground">Name *</label>
-                      <input value={qsForm.name} onChange={(e) => setQsForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Bed Assembly & Installation" maxLength={160} className={INP} />
+                      <label htmlFor="f-name" className="mb-1 block text-xs font-medium text-muted-foreground">Name *</label>
+                      <input id="f-name" value={qsForm.name} onChange={(e) => setQsForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Bed Assembly & Installation" maxLength={160} className={INP} />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-muted-foreground">Standard Price (₹) *</label>
-                      <input type="number" min="0" step="0.01" value={qsForm.standard_price} onChange={(e) => setQsForm((f) => ({ ...f, standard_price: e.target.value }))} className={INP} />
+                      <label htmlFor="f-standard-price" className="mb-1 block text-xs font-medium text-muted-foreground">Standard Price (₹) *</label>
+                      <input id="f-standard-price" type="number" min="0" step="0.01" value={qsForm.standard_price} onChange={(e) => setQsForm((f) => ({ ...f, standard_price: e.target.value }))} className={INP} />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-muted-foreground">GST Rate %</label>
-                      <input type="number" min="0" max="100" step="0.01" value={qsForm.tax_rate_percent} onChange={(e) => setQsForm((f) => ({ ...f, tax_rate_percent: e.target.value }))} className={INP} />
+                      <label htmlFor="f-gst-rate" className="mb-1 block text-xs font-medium text-muted-foreground">GST Rate %</label>
+                      <input id="f-gst-rate" type="number" min="0" max="100" step="0.01" value={qsForm.tax_rate_percent} onChange={(e) => setQsForm((f) => ({ ...f, tax_rate_percent: e.target.value }))} className={INP} />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-muted-foreground">Category</label>
-                      <input value={qsForm.category} onChange={(e) => setQsForm((f) => ({ ...f, category: e.target.value }))} placeholder="After-Sales" className={INP} />
+                      <label htmlFor="f-category" className="mb-1 block text-xs font-medium text-muted-foreground">Category</label>
+                      <input id="f-category" value={qsForm.category} onChange={(e) => setQsForm((f) => ({ ...f, category: e.target.value }))} placeholder="After-Sales" className={INP} />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-muted-foreground">HSN / SAC Code</label>
-                      <input value={qsForm.hsn_sac_code} onChange={(e) => setQsForm((f) => ({ ...f, hsn_sac_code: e.target.value }))} placeholder="998391" className={INP} />
+                      <label htmlFor="f-hsn-sac-code" className="mb-1 block text-xs font-medium text-muted-foreground">HSN / SAC Code</label>
+                      <input id="f-hsn-sac-code" value={qsForm.hsn_sac_code} onChange={(e) => setQsForm((f) => ({ ...f, hsn_sac_code: e.target.value }))} placeholder="998391" className={INP} />
                     </div>
                     {qsErr && <div className="sm:col-span-2 rounded-lg bg-destructive/10 border border-destructive/30 px-3 py-2 text-sm text-destructive">{qsErr}</div>}
                     <div className="sm:col-span-2 flex gap-2">
@@ -850,8 +850,8 @@ export default function FGProfilePage() {
                     ) : (
                       <form onSubmit={handleAddService} className="grid gap-3 sm:grid-cols-2">
                         <div className="sm:col-span-2">
-                          <label className="mb-1 block text-xs font-medium text-muted-foreground">Service *</label>
-                          <select value={svcForm.service} onChange={(e) => setSvcForm((f) => ({ ...f, service: Number(e.target.value) }))} className={SEL}>
+                          <label htmlFor="f-service" className="mb-1 block text-xs font-medium text-muted-foreground">Service *</label>
+                          <select id="f-service" value={svcForm.service} onChange={(e) => setSvcForm((f) => ({ ...f, service: Number(e.target.value) }))} className={SEL}>
                             <option value={0}>— Select service —</option>
                             {availableSvc.map((s) => (
                               <option key={s.id} value={s.id}>[{SERVICE_TYPE_LABELS[s.service_type as ServiceType] ?? s.service_type}] {s.name} ({s.code}) — ₹{s.standard_price}</option>
@@ -859,25 +859,25 @@ export default function FGProfilePage() {
                           </select>
                         </div>
                         <div>
-                          <label className="mb-1 block text-xs font-medium text-muted-foreground">Charge Mode</label>
-                          <select value={svcForm.charge_mode} onChange={(e) => setSvcForm((f) => ({ ...f, charge_mode: e.target.value, sale_price: e.target.value === "FREE" ? "0.00" : f.sale_price }))} className={SEL}>
+                          <label htmlFor="f-charge-mode-3" className="mb-1 block text-xs font-medium text-muted-foreground">Charge Mode</label>
+                          <select id="f-charge-mode-3" value={svcForm.charge_mode} onChange={(e) => setSvcForm((f) => ({ ...f, charge_mode: e.target.value, sale_price: e.target.value === "FREE" ? "0.00" : f.sale_price }))} className={SEL}>
                             <option value="FREE">Free / Included</option>
                             <option value="CHARGEABLE">Chargeable</option>
                           </select>
                         </div>
                         {svcForm.charge_mode === "CHARGEABLE" && (
                           <div>
-                            <label className="mb-1 block text-xs font-medium text-muted-foreground">Sale Price Override (₹) — 0 = use standard</label>
-                            <input type="number" step="0.01" min="0" value={svcForm.sale_price} onChange={(e) => setSvcForm((f) => ({ ...f, sale_price: e.target.value }))} className={INP} />
+                            <label htmlFor="f-sale-price-override-0-use-standard" className="mb-1 block text-xs font-medium text-muted-foreground">Sale Price Override (₹) — 0 = use standard</label>
+                            <input id="f-sale-price-override-0-use-standard" type="number" step="0.01" min="0" value={svcForm.sale_price} onChange={(e) => setSvcForm((f) => ({ ...f, sale_price: e.target.value }))} className={INP} />
                           </div>
                         )}
                         <div>
-                          <label className="mb-1 block text-xs font-medium text-muted-foreground">Sort Order</label>
-                          <input type="number" min={1} value={svcForm.sort_order} onChange={(e) => setSvcForm((f) => ({ ...f, sort_order: Number(e.target.value) }))} className={INP} />
+                          <label htmlFor="f-sort-order-2" className="mb-1 block text-xs font-medium text-muted-foreground">Sort Order</label>
+                          <input id="f-sort-order-2" type="number" min={1} value={svcForm.sort_order} onChange={(e) => setSvcForm((f) => ({ ...f, sort_order: Number(e.target.value) }))} className={INP} />
                         </div>
                         <div>
-                          <label className="mb-1 block text-xs font-medium text-muted-foreground">Notes</label>
-                          <input value={svcForm.notes} onChange={(e) => setSvcForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Optional" className={INP} />
+                          <label htmlFor="f-notes-4" className="mb-1 block text-xs font-medium text-muted-foreground">Notes</label>
+                          <input id="f-notes-4" value={svcForm.notes} onChange={(e) => setSvcForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Optional" className={INP} />
                         </div>
                         <div className="flex items-center gap-2 sm:col-span-2">
                           <input id="svc-def" type="checkbox" checked={svcForm.is_default_included} onChange={(e) => setSvcForm((f) => ({ ...f, is_default_included: e.target.checked }))} className="h-4 w-4 rounded border-border" />

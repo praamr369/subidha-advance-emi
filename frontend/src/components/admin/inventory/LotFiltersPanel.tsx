@@ -122,8 +122,8 @@ const LotFiltersPanel: React.FC<LotFiltersPanelProps> = ({
           <div className="border-t p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Status Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-              <select
+              <label htmlFor="f-status" className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+              <select id="f-status"
                 value={selectedStatus}
                 onChange={(e) => handleStatusChange(e.target.value)}
                 disabled={isLoading}
@@ -139,8 +139,8 @@ const LotFiltersPanel: React.FC<LotFiltersPanelProps> = ({
 
             {/* Source Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Source</label>
-              <select
+              <label htmlFor="f-source" className="block text-sm font-medium text-gray-700 mb-2">Source</label>
+              <select id="f-source"
                 value={selectedSource}
                 onChange={(e) => handleSourceChange(e.target.value)}
                 disabled={isLoading}
@@ -156,8 +156,8 @@ const LotFiltersPanel: React.FC<LotFiltersPanelProps> = ({
 
             {/* Priority Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
-              <select
+              <label htmlFor="f-priority" className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+              <select id="f-priority"
                 value={selectedPriority}
                 onChange={(e) => handlePriorityChange(e.target.value)}
                 disabled={isLoading}

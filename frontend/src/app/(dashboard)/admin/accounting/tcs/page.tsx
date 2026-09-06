@@ -265,47 +265,47 @@ export default function TCSPage() {
             <div className="font-semibold mb-4">Record TCS Collection</div>
             <div className="space-y-3">
               <div>
-                <label className="text-xs text-muted-foreground">Customer Name</label>
-                <input value={form.customer_name} onChange={e => setForm(f => ({ ...f, customer_name: e.target.value }))}
+                <label htmlFor="f-customer-name" className="text-xs text-muted-foreground">Customer Name</label>
+                <input id="f-customer-name" value={form.customer_name} onChange={e => setForm(f => ({ ...f, customer_name: e.target.value }))}
                   className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground">Customer PAN</label>
-                <input value={form.customer_pan} onChange={e => setForm(f => ({ ...f, customer_pan: e.target.value }))}
+                <label htmlFor="f-customer-pan" className="text-xs text-muted-foreground">Customer PAN</label>
+                <input id="f-customer-pan" value={form.customer_pan} onChange={e => setForm(f => ({ ...f, customer_pan: e.target.value }))}
                   placeholder="ABCDE1234F" className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground">TCS Section</label>
-                <select value={form.section} onChange={e => setForm(f => ({ ...f, section: e.target.value }))}
+                <label htmlFor="f-tcs-section" className="text-xs text-muted-foreground">TCS Section</label>
+                <select id="f-tcs-section" value={form.section} onChange={e => setForm(f => ({ ...f, section: e.target.value }))}
                   className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1">
                   {TCS_SECTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-xs text-muted-foreground">Transaction Date</label>
-                <input type="date" value={form.transaction_date} onChange={e => setForm(f => ({ ...f, transaction_date: e.target.value }))}
+                <label htmlFor="f-transaction-date" className="text-xs text-muted-foreground">Transaction Date</label>
+                <input id="f-transaction-date" type="date" value={form.transaction_date} onChange={e => setForm(f => ({ ...f, transaction_date: e.target.value }))}
                   className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
               </div>
               <div className="flex gap-2">
                 <div className="flex-1">
-                  <label className="text-xs text-muted-foreground">Sale Amount (₹)</label>
-                  <input type="number" step="0.01" value={form.sale_amount} onChange={e => setForm(f => ({ ...f, sale_amount: e.target.value }))}
+                  <label htmlFor="f-sale-amount" className="text-xs text-muted-foreground">Sale Amount (₹)</label>
+                  <input id="f-sale-amount" type="number" step="0.01" value={form.sale_amount} onChange={e => setForm(f => ({ ...f, sale_amount: e.target.value }))}
                     className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
                 </div>
                 <div className="flex-1">
-                  <label className="text-xs text-muted-foreground">TCS Rate (%)</label>
-                  <input type="number" step="0.01" value={form.tcs_rate} onChange={e => setForm(f => ({ ...f, tcs_rate: e.target.value }))}
+                  <label htmlFor="f-tcs-rate" className="text-xs text-muted-foreground">TCS Rate (%)</label>
+                  <input id="f-tcs-rate" type="number" step="0.01" value={form.tcs_rate} onChange={e => setForm(f => ({ ...f, tcs_rate: e.target.value }))}
                     className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
                 </div>
               </div>
               <div>
-                <label className="text-xs text-muted-foreground">Reference No.</label>
-                <input value={form.reference_no} onChange={e => setForm(f => ({ ...f, reference_no: e.target.value }))}
+                <label htmlFor="f-reference-no" className="text-xs text-muted-foreground">Reference No.</label>
+                <input id="f-reference-no" value={form.reference_no} onChange={e => setForm(f => ({ ...f, reference_no: e.target.value }))}
                   className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground">Notes</label>
-                <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+                <label htmlFor="f-notes" className="text-xs text-muted-foreground">Notes</label>
+                <textarea id="f-notes" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
                   rows={2} className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm mt-1 resize-none" />
               </div>
               {formErr && <div className="text-xs text-red-600">{formErr}</div>}
@@ -329,13 +329,13 @@ export default function TCSPage() {
             <div className="text-sm text-muted-foreground mb-4">TCS Amount: ₹{depositModal.tcs_amount}</div>
             <div className="space-y-3">
               <div>
-                <label className="text-xs text-muted-foreground">Challan No.</label>
-                <input value={challan} onChange={e => setChallan(e.target.value)}
+                <label htmlFor="f-challan-no" className="text-xs text-muted-foreground">Challan No.</label>
+                <input id="f-challan-no" value={challan} onChange={e => setChallan(e.target.value)}
                   className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground">Deposit Date</label>
-                <input type="date" value={depositDate} onChange={e => setDepositDate(e.target.value)}
+                <label htmlFor="f-deposit-date" className="text-xs text-muted-foreground">Deposit Date</label>
+                <input id="f-deposit-date" type="date" value={depositDate} onChange={e => setDepositDate(e.target.value)}
                   className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
               </div>
               <div className="flex gap-2 pt-1">

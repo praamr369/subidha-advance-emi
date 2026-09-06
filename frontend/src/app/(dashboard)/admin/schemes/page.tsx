@@ -83,8 +83,8 @@ function SchemeForm({
 
   const field = (label: string, key: keyof typeof form, type: string = "text", placeholder = "") => (
     <div>
-      <label className="block text-xs font-semibold text-muted-foreground mb-1">{label}</label>
-      <input
+      <label htmlFor="f-label" className="block text-xs font-semibold text-muted-foreground mb-1">{label}</label>
+      <input id="f-label"
         type={type}
         value={form[key] as string}
         onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
@@ -101,8 +101,8 @@ function SchemeForm({
         {field("Scheme Name *", "name", "text", "e.g. Diwali 2025")}
         {field("Code *", "code", "text", "e.g. DIWALI25")}
         <div>
-          <label className="block text-xs font-semibold text-muted-foreground mb-1">Plan Type</label>
-          <select
+          <label htmlFor="f-plan-type" className="block text-xs font-semibold text-muted-foreground mb-1">Plan Type</label>
+          <select id="f-plan-type"
             value={form.plan_type}
             onChange={(e) => setForm((f) => ({ ...f, plan_type: e.target.value }))}
             className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm"
@@ -111,8 +111,8 @@ function SchemeForm({
           </select>
         </div>
         <div>
-          <label className="block text-xs font-semibold text-muted-foreground mb-1">Discount Type</label>
-          <select
+          <label htmlFor="f-discount-type" className="block text-xs font-semibold text-muted-foreground mb-1">Discount Type</label>
+          <select id="f-discount-type"
             value={form.discount_type}
             onChange={(e) => setForm((f) => ({ ...f, discount_type: e.target.value as EMIScheme["discount_type"] }))}
             className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm"
@@ -126,8 +126,8 @@ function SchemeForm({
         {field("Max Uses", "max_uses", "number", "Blank = unlimited")}
       </div>
       <div>
-        <label className="block text-xs font-semibold text-muted-foreground mb-1">Description</label>
-        <textarea
+        <label htmlFor="f-description" className="block text-xs font-semibold text-muted-foreground mb-1">Description</label>
+        <textarea id="f-description"
           value={form.description}
           onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
           rows={2}

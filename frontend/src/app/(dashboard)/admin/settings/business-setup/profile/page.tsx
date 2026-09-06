@@ -166,7 +166,7 @@ function LogoUploadButton({ name, disabled, onUploadSuccess, onError }: { name: 
   }
   
   return (
-    <label className={`cursor-pointer text-xs font-semibold text-primary hover:underline ${uploading || disabled ? "opacity-50 pointer-events-none" : ""}`}>
+    <label htmlFor="f-uploading-uploading-direct-upload-void-h" className={`cursor-pointer text-xs font-semibold text-primary hover:underline ${uploading || disabled ? "opacity-50 pointer-events-none" : ""}`}>
       {uploading ? "Uploading..." : "Direct Upload"}
       <input type="file" accept="image/png, image/jpeg, image/svg+xml, image/webp" className="hidden" onChange={(e) => void handleFile(e)} disabled={uploading || disabled} />
     </label>
@@ -542,7 +542,7 @@ export default function UnifiedBusinessProfilePage() {
                 <InputField label="Trade Name / Brand Name" name="trade_name" value={form.trade_name as string | undefined} onChange={handleChange} disabled={loading || saving} placeholder="E.g., Subidha Furniture" hint="The name you operate under (may differ from legal name)." />
                 <div className="space-y-1">
                   <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Business Type</label>
-                  <select name="business_type" value={form.business_type} onChange={(e) => setForm(c => ({ ...c, business_type: e.target.value }))} disabled={loading || saving}
+                  <select id="f-uploading-uploading-direct-upload-void-h" name="business_type" value={form.business_type} onChange={(e) => setForm(c => ({ ...c, business_type: e.target.value }))} disabled={loading || saving}
                     className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm">
                     <option value="">— Select type —</option>
                     <option value="SOLE_PROPRIETORSHIP">Sole Proprietorship</option>

@@ -92,39 +92,39 @@ function AgreementForm({ vendors, initial, onSaved, onCancel }: AgreementFormPro
     <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Vendor *</label>
-          <select value={vendorId} onChange={(e) => setVendorId(e.target.value)} className={inputCls} disabled={isEdit}>
+          <label htmlFor="f-vendor" className="mb-1 block text-xs font-medium text-muted-foreground">Vendor *</label>
+          <select id="f-vendor" value={vendorId} onChange={(e) => setVendorId(e.target.value)} className={inputCls} disabled={isEdit}>
             <option value="">— Select Vendor —</option>
             {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
           </select>
           {errors.vendor ? <p className="mt-0.5 text-[10px] text-red-600">{errors.vendor}</p> : null}
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Status</label>
-          <select value={agreementStatus} onChange={(e) => setAgreementStatus(e.target.value as VendorAgreement["status"])} className={inputCls}>
+          <label htmlFor="f-status" className="mb-1 block text-xs font-medium text-muted-foreground">Status</label>
+          <select id="f-status" value={agreementStatus} onChange={(e) => setAgreementStatus(e.target.value as VendorAgreement["status"])} className={inputCls}>
             {AGREEMENT_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Effective From *</label>
-          <input type="date" value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} className={inputCls} />
+          <label htmlFor="f-effective-from" className="mb-1 block text-xs font-medium text-muted-foreground">Effective From *</label>
+          <input id="f-effective-from" type="date" value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} className={inputCls} />
           {errors.effective_from ? <p className="mt-0.5 text-[10px] text-red-600">{errors.effective_from}</p> : null}
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Effective To (optional)</label>
-          <input type="date" value={effectiveTo} onChange={(e) => setEffectiveTo(e.target.value)} className={inputCls} />
+          <label htmlFor="f-effective-to-optional" className="mb-1 block text-xs font-medium text-muted-foreground">Effective To (optional)</label>
+          <input id="f-effective-to-optional" type="date" value={effectiveTo} onChange={(e) => setEffectiveTo(e.target.value)} className={inputCls} />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Credit Period (days)</label>
-          <input type="number" min="0" step="1" value={creditPeriodDays} onChange={(e) => setCreditPeriodDays(e.target.value)} className={inputCls} />
+          <label htmlFor="f-credit-period-days" className="mb-1 block text-xs font-medium text-muted-foreground">Credit Period (days)</label>
+          <input id="f-credit-period-days" type="number" min="0" step="1" value={creditPeriodDays} onChange={(e) => setCreditPeriodDays(e.target.value)} className={inputCls} />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Payment Terms</label>
-          <input type="text" value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} placeholder="e.g. Net 30" className={inputCls} />
+          <label htmlFor="f-payment-terms" className="mb-1 block text-xs font-medium text-muted-foreground">Payment Terms</label>
+          <input id="f-payment-terms" type="text" value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} placeholder="e.g. Net 30" className={inputCls} />
         </div>
         <div className="col-span-2">
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Notes</label>
-          <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} placeholder="Optional" />
+          <label htmlFor="f-notes" className="mb-1 block text-xs font-medium text-muted-foreground">Notes</label>
+          <input id="f-notes" type="text" value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} placeholder="Optional" />
         </div>
       </div>
 

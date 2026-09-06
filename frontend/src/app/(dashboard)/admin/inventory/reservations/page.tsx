@@ -141,8 +141,8 @@ export default function AdminInventoryReservationsPage() {
         <div className="space-y-4 p-4 border rounded-lg bg-muted/20">
           <div className="flex flex-wrap gap-4 items-end">
             <div className="flex-1 min-w-[240px]">
-              <label className="text-sm font-medium text-foreground">Search</label>
-              <input
+              <label htmlFor="f-search" className="text-sm font-medium text-foreground">Search</label>
+              <input id="f-search"
                 type="text"
                 placeholder="Search by product, warehouse, or source ID…"
                 value={searchQuery}
@@ -155,8 +155,8 @@ export default function AdminInventoryReservationsPage() {
             </div>
 
             <div className="min-w-[180px]">
-              <label className="text-sm font-medium text-foreground">Status</label>
-              <select
+              <label htmlFor="f-status" className="text-sm font-medium text-foreground">Status</label>
+              <select id="f-status"
                 value={filters.status}
                 onChange={(e) => {
                   setFilters({ ...filters, status: e.target.value });
@@ -171,8 +171,8 @@ export default function AdminInventoryReservationsPage() {
             </div>
 
             <div className="min-w-[180px]">
-              <label className="text-sm font-medium text-foreground">Source Module</label>
-              <select
+              <label htmlFor="f-source-module" className="text-sm font-medium text-foreground">Source Module</label>
+              <select id="f-source-module"
                 value={filters.source_module}
                 onChange={(e) => {
                   setFilters({ ...filters, source_module: e.target.value });

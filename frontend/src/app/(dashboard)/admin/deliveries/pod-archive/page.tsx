@@ -94,8 +94,8 @@ export default function PODArchivePage() {
       <div className="rounded-xl border border-border bg-card p-4 mb-5">
         <div className="flex items-center gap-3 flex-wrap">
           <div>
-            <label className="text-xs text-muted-foreground">Select Year</label>
-            <select
+            <label htmlFor="f-select-year" className="text-xs text-muted-foreground">Select Year</label>
+            <select id="f-select-year"
               value={year}
               onChange={(e) => setYear(Number(e.target.value))}
               className="h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1"

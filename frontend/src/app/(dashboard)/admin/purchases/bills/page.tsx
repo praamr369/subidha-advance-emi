@@ -132,25 +132,25 @@ function CreateBillForm({ vendors, receipts, items, onSaved, onCancel }: CreateB
     <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Vendor *</label>
-          <select value={vendorId} onChange={(e) => setVendorId(e.target.value)} className={inputCls}>
+          <label htmlFor="f-vendor" className="mb-1 block text-xs font-medium text-muted-foreground">Vendor *</label>
+          <select id="f-vendor" value={vendorId} onChange={(e) => setVendorId(e.target.value)} className={inputCls}>
             <option value="">— Select Vendor —</option>
             {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
           </select>
           {errors.vendor ? <p className="mt-0.5 text-[10px] text-red-600">{errors.vendor}</p> : null}
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Bill Date *</label>
-          <input type="date" value={billDate} onChange={(e) => setBillDate(e.target.value)} className={inputCls} />
+          <label htmlFor="f-bill-date" className="mb-1 block text-xs font-medium text-muted-foreground">Bill Date *</label>
+          <input id="f-bill-date" type="date" value={billDate} onChange={(e) => setBillDate(e.target.value)} className={inputCls} />
           {errors.bill_date ? <p className="mt-0.5 text-[10px] text-red-600">{errors.bill_date}</p> : null}
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Vendor Bill No (optional)</label>
-          <input type="text" value={billNo} onChange={(e) => setBillNo(e.target.value)} placeholder="Leave blank to auto-generate" className={inputCls} />
+          <label htmlFor="f-vendor-bill-no-optional" className="mb-1 block text-xs font-medium text-muted-foreground">Vendor Bill No (optional)</label>
+          <input id="f-vendor-bill-no-optional" type="text" value={billNo} onChange={(e) => setBillNo(e.target.value)} placeholder="Leave blank to auto-generate" className={inputCls} />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Goods Receipt (optional)</label>
-          <select value={grId} onChange={(e) => setGrId(e.target.value)} className={inputCls}>
+          <label htmlFor="f-goods-receipt-optional" className="mb-1 block text-xs font-medium text-muted-foreground">Goods Receipt (optional)</label>
+          <select id="f-goods-receipt-optional" value={grId} onChange={(e) => setGrId(e.target.value)} className={inputCls}>
             <option value="">— None —</option>
             {vendorReceipts.filter((r) => r.status === "RECEIVED").map((r) => (
               <option key={r.id} value={r.id}>{r.receipt_no} — {fmt(r.receipt_date)}</option>
@@ -158,8 +158,8 @@ function CreateBillForm({ vendors, receipts, items, onSaved, onCancel }: CreateB
           </select>
         </div>
         <div className="col-span-2">
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Notes</label>
-          <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} placeholder="Optional" />
+          <label htmlFor="f-notes" className="mb-1 block text-xs font-medium text-muted-foreground">Notes</label>
+          <input id="f-notes" type="text" value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} placeholder="Optional" />
         </div>
       </div>
 

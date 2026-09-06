@@ -68,8 +68,8 @@ export default function PrivacyGrievancePage() {
           )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Type of Concern *</label>
-              <select
+              <label htmlFor="f-type-of-concern" className="block text-sm font-medium mb-1">Type of Concern *</label>
+              <select id="f-type-of-concern"
                 className="w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600"
                 value={form.grievance_type}
                 onChange={(e) => setForm({ ...form, grievance_type: e.target.value })}
@@ -78,8 +78,8 @@ export default function PrivacyGrievancePage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Subject *</label>
-              <input
+              <label htmlFor="f-subject" className="block text-sm font-medium mb-1">Subject *</label>
+              <input id="f-subject"
                 type="text"
                 className="w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600"
                 value={form.subject}
@@ -89,8 +89,8 @@ export default function PrivacyGrievancePage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Description *</label>
-              <textarea
+              <label htmlFor="f-description" className="block text-sm font-medium mb-1">Description *</label>
+              <textarea id="f-description"
                 className="w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600 resize-none"
                 rows={5}
                 value={form.description}

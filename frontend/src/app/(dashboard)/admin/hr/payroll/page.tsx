@@ -280,7 +280,7 @@ function SheetRow({ sheet, financeAccounts, onAction }: {
         <div className="border-t border-emerald-200 bg-emerald-50 px-4 py-4">
           <p className="mb-3 text-xs font-bold uppercase tracking-wide text-emerald-800">Record salary payment</p>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <label className="grid gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            <label htmlFor="f-payment-date-setpayform-c-c-paymentdate-" className="grid gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
               Payment date
               <input type="date" value={payForm.paymentDate}
                 onChange={(e) => setPayForm((c) => ({ ...c, paymentDate: e.target.value }))}
@@ -555,7 +555,7 @@ export default function AdminHrPayrollPage() {
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
         <div className="flex items-center gap-2">
           <label className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Period</label>
-          <select value={selMonth} onChange={(e) => setSelMonth(Number(e.target.value))}
+          <select id="f-payment-date-setpayform-c-c-paymentdate-" value={selMonth} onChange={(e) => setSelMonth(Number(e.target.value))}
             className="h-9 rounded-xl border border-input bg-background px-3 text-sm font-semibold">
             {MONTHS.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
           </select>

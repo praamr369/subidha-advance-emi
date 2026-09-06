@@ -111,8 +111,8 @@ function CreateGRForm({ purchaseOrders, items, onSaved, onCancel }: CreateGRForm
     <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Purchase Order *</label>
-          <select value={poId} onChange={(e) => setPoId(e.target.value)} className={inputCls}>
+          <label htmlFor="f-purchase-order" className="mb-1 block text-xs font-medium text-muted-foreground">Purchase Order *</label>
+          <select id="f-purchase-order" value={poId} onChange={(e) => setPoId(e.target.value)} className={inputCls}>
             <option value="">— Select PO —</option>
             {draftPOs.map((p) => (
               <option key={p.id} value={p.id}>{p.po_no} — {p.vendor_name}</option>
@@ -121,12 +121,12 @@ function CreateGRForm({ purchaseOrders, items, onSaved, onCancel }: CreateGRForm
           {errors.po ? <p className="mt-0.5 text-[10px] text-red-600">{errors.po}</p> : null}
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Receipt Date *</label>
-          <input type="date" value={receiptDate} onChange={(e) => setReceiptDate(e.target.value)} className={inputCls} />
+          <label htmlFor="f-receipt-date" className="mb-1 block text-xs font-medium text-muted-foreground">Receipt Date *</label>
+          <input id="f-receipt-date" type="date" value={receiptDate} onChange={(e) => setReceiptDate(e.target.value)} className={inputCls} />
         </div>
         <div className="col-span-2">
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Notes</label>
-          <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} placeholder="Optional" />
+          <label htmlFor="f-notes" className="mb-1 block text-xs font-medium text-muted-foreground">Notes</label>
+          <input id="f-notes" type="text" value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} placeholder="Optional" />
         </div>
       </div>
 

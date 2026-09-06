@@ -462,7 +462,7 @@ export default function InventoryOpeningStockPage() {
               <form onSubmit={(ev) => void handleSaveManualDraft(ev)} className="p-6 space-y-6">
                 {/* Product picker — isolated z-context so dropdown floats above everything */}
                 <div className="relative z-50 space-y-1.5">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80">
+                  <label htmlFor="f-product-inventory-item-setpickeditem-ite" className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80">
                     Product / Inventory Item <span className="text-destructive">*</span>
                   </label>
                   <ProductPickerCombobox
@@ -490,7 +490,7 @@ export default function InventoryOpeningStockPage() {
                     <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80">
                       Warehouse / Location <span className="text-destructive">*</span>
                     </label>
-                    <select
+                    <select id="f-product-inventory-item-setpickeditem-ite"
                       required
                       data-testid="opening-stock-location-select"
                       className="w-full rounded-xl border-2 border-border bg-card px-3 py-2.5 text-sm font-medium text-foreground transition-all focus:border-primary focus:ring-4 focus:ring-primary/10"
@@ -508,10 +508,10 @@ export default function InventoryOpeningStockPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80">
+                    <label htmlFor="f-quantity" className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80">
                       Quantity <span className="text-destructive">*</span>
                     </label>
-                    <input
+                    <input id="f-quantity"
                       required
                       data-testid="opening-stock-qty-input"
                       type="text"
@@ -526,13 +526,13 @@ export default function InventoryOpeningStockPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80">
+                    <label htmlFor="f-unit-cost-optional-falls-back-to-std-cos" className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80">
                       Unit cost
                       <span className="ml-1.5 font-semibold normal-case tracking-normal text-muted-foreground/60">
                         (optional — falls back to std cost)
                       </span>
                     </label>
-                    <input
+                    <input id="f-unit-cost-optional-falls-back-to-std-cos"
                       data-testid="opening-stock-cost-input"
                       type="text"
                       inputMode="decimal"
@@ -547,10 +547,10 @@ export default function InventoryOpeningStockPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80">
+                    <label htmlFor="f-effective-date" className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80">
                       Effective date <span className="text-destructive">*</span>
                     </label>
-                    <input
+                    <input id="f-effective-date"
                       required
                       data-testid="opening-stock-date-input"
                       type="date"
@@ -565,8 +565,8 @@ export default function InventoryOpeningStockPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80">Note / reason</label>
-                  <textarea
+                  <label htmlFor="f-note-reason" className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80">Note / reason</label>
+                  <textarea id="f-note-reason"
                     data-testid="opening-stock-note-input"
                     className="w-full rounded-xl border-2 border-border bg-card px-3 py-2.5 text-sm font-medium text-foreground transition-all focus:border-primary focus:ring-4 focus:ring-primary/10 resize-none"
                     rows={2}
@@ -645,7 +645,7 @@ export default function InventoryOpeningStockPage() {
                 <div className="grid gap-4 md:grid-cols-[1fr_220px]">
                   {/* Search Input */}
                   <div>
-                    <label className="text-sm font-medium text-foreground">Search</label>
+                    <label htmlFor="f-search-setsearchquery-e-target-value-set" className="text-sm font-medium text-foreground">Search</label>
                     <div className="relative mt-2">
                       <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                       <input
@@ -664,7 +664,7 @@ export default function InventoryOpeningStockPage() {
                   {/* Status Filter */}
                   <div>
                     <label className="text-sm font-medium text-foreground">Status</label>
-                    <select
+                    <select id="f-search-setsearchquery-e-target-value-set"
                       className="mt-2 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
                       value={statusFilter}
                       onChange={(event) => {
@@ -866,7 +866,7 @@ export default function InventoryOpeningStockPage() {
                 </div>
 
                 <div className="flex flex-wrap gap-5 text-sm">
-                  <label className="flex items-center gap-2 text-muted-foreground">
+                  <label htmlFor="f-setbulkdryrun-ev-target-checked-dry-run-" className="flex items-center gap-2 text-muted-foreground">
                     <input type="checkbox" checked={bulkDryRun} onChange={(ev) => setBulkDryRun(ev.target.checked)} />
                     Dry run (rollback after summary)
                   </label>
@@ -1052,7 +1052,7 @@ export default function InventoryOpeningStockPage() {
                 <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Reason <span className="text-destructive">*</span>
                 </label>
-                <textarea
+                <textarea id="f-setbulkdryrun-ev-target-checked-dry-run-"
                   required
                   data-testid="opening-stock-correction-reason"
                   value={corrReason}
@@ -1063,10 +1063,10 @@ export default function InventoryOpeningStockPage() {
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <label htmlFor="f-quantity-delta" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Quantity delta (+/-) <span className="text-destructive">*</span>
                 </label>
-                <input
+                <input id="f-quantity-delta"
                   required
                   data-testid="opening-stock-correction-delta"
                   value={corrDelta}

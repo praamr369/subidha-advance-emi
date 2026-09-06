@@ -260,8 +260,8 @@ export default function GstrReportPage() {
       <ERPSectionShell title="Report Period">
         <div className="flex flex-wrap gap-4 items-end">
           <div>
-            <label className="block text-xs font-semibold text-muted-foreground mb-1">From Date</label>
-            <input
+            <label htmlFor="f-from-date" className="block text-xs font-semibold text-muted-foreground mb-1">From Date</label>
+            <input id="f-from-date"
               type="date"
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
@@ -269,8 +269,8 @@ export default function GstrReportPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-muted-foreground mb-1">To Date</label>
-            <input
+            <label htmlFor="f-to-date" className="block text-xs font-semibold text-muted-foreground mb-1">To Date</label>
+            <input id="f-to-date"
               type="date"
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}

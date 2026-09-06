@@ -66,7 +66,7 @@ export default function DataAccessPage() {
           )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-2">Request Type *</label>
+              <label htmlFor="f-request-type-request-types-map-rt-setfor" className="block text-sm font-medium mb-2">Request Type *</label>
               <div className="space-y-2">
                 {REQUEST_TYPES.map((rt) => (
                   <label key={rt.value} className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer ${
@@ -84,7 +84,7 @@ export default function DataAccessPage() {
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Additional Notes</label>
-              <textarea
+              <textarea id="f-request-type-request-types-map-rt-setfor"
                 className="w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600 resize-none"
                 rows={3}
                 value={form.notes}

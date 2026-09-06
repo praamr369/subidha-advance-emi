@@ -228,8 +228,8 @@ export default function AccountingCloseCockpitPage() {
       </div>
       {/* Period selector */}
       <div className="mb-6 flex flex-wrap items-center gap-3">
-        <label className="text-sm font-medium">Period:</label>
-        <select
+        <label htmlFor="f-period" className="text-sm font-medium">Period:</label>
+        <select id="f-period"
           className="rounded-md border border-border bg-background px-3 py-1.5 text-sm"
           value={month}
           onChange={(e) => setMonth(Number(e.target.value))}

@@ -423,7 +423,7 @@ export default function AdminBatchesPage() {
                   onSubmit={handleApplyFilters}
                   className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_auto]"
                 >
-                  <label className="relative block">
+                  <label htmlFor="f-setqueryinput-event-target-value-placeho" className="relative block">
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <input
                       type="text"
@@ -433,8 +433,7 @@ export default function AdminBatchesPage() {
                       className="h-10 w-full rounded-xl border border-border bg-background pl-9 pr-4 text-sm outline-none transition focus:border-ring"
                     />
                   </label>
-
-                  <select
+                  <select id="f-setqueryinput-event-target-value-placeho"
                     title="Batch status filter"
                     value={statusInput}
                     onChange={(event) =>

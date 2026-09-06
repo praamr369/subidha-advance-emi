@@ -100,8 +100,8 @@ export default function PartnerAmendmentCreatePage() {
         
         <div className="space-y-4">
           <div>
-            <label className="text-sm font-bold text-foreground">Contract type</label>
-            <select 
+            <label htmlFor="f-contract-type" className="text-sm font-bold text-foreground">Contract type</label>
+            <select id="f-contract-type" 
               className="mt-2 h-12 w-full rounded-2xl border border-border bg-background px-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" 
               value={contractType} 
               onChange={(event) => { setContractType(event.target.value as AmendmentContractType); setSourceId(""); }}
@@ -112,8 +112,8 @@ export default function PartnerAmendmentCreatePage() {
           </div>
           
           <div>
-            <label className="text-sm font-bold text-foreground">Linked source contract</label>
-            <select 
+            <label htmlFor="f-linked-source-contract" className="text-sm font-bold text-foreground">Linked source contract</label>
+            <select id="f-linked-source-contract" 
               className="mt-2 h-12 w-full rounded-2xl border border-border bg-background px-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" 
               value={sourceId} 
               onChange={(event) => setSourceId(event.target.value)}
@@ -124,8 +124,8 @@ export default function PartnerAmendmentCreatePage() {
           </div>
 
           <div>
-            <label className="text-sm font-bold text-foreground">Amendment type</label>
-            <select 
+            <label htmlFor="f-amendment-type" className="text-sm font-bold text-foreground">Amendment type</label>
+            <select id="f-amendment-type" 
               className="mt-2 h-12 w-full rounded-2xl border border-border bg-background px-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" 
               value={amendmentType} 
               onChange={(event) => { setAmendmentType(event.target.value as AmendmentType); setFieldValues({}); }}
@@ -135,8 +135,8 @@ export default function PartnerAmendmentCreatePage() {
           </div>
 
           <div>
-            <label className="text-sm font-bold text-foreground">Reason</label>
-            <input 
+            <label htmlFor="f-reason" className="text-sm font-bold text-foreground">Reason</label>
+            <input id="f-reason" 
               className="mt-2 h-12 w-full rounded-2xl border border-border bg-background px-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" 
               value={reason} 
               onChange={(event) => setReason(event.target.value)} 

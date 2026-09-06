@@ -305,10 +305,10 @@ export default function AdminCommissionPayoutQueuePage() {
         >
           <form onSubmit={handleApplyFilters} className="grid gap-4 lg:grid-cols-5">
             <div>
-              <label className="mb-2 block text-sm font-medium text-foreground">
+              <label htmlFor="f-partner-id" className="mb-2 block text-sm font-medium text-foreground">
                 Partner ID
               </label>
-              <input
+              <input id="f-partner-id"
                 value={partnerInput}
                 onChange={(event) => setPartnerInput(event.target.value)}
                 placeholder="All partners"
@@ -316,10 +316,10 @@ export default function AdminCommissionPayoutQueuePage() {
               />
             </div>
             <div>
-              <label className="mb-2 block text-sm font-medium text-foreground">
+              <label htmlFor="f-from" className="mb-2 block text-sm font-medium text-foreground">
                 From
               </label>
-              <input
+              <input id="f-from"
                 type="date"
                 value={dateFromInput}
                 onChange={(event) => setDateFromInput(event.target.value)}
@@ -327,10 +327,10 @@ export default function AdminCommissionPayoutQueuePage() {
               />
             </div>
             <div>
-              <label className="mb-2 block text-sm font-medium text-foreground">
+              <label htmlFor="f-to" className="mb-2 block text-sm font-medium text-foreground">
                 To
               </label>
-              <input
+              <input id="f-to"
                 type="date"
                 value={dateToInput}
                 onChange={(event) => setDateToInput(event.target.value)}
@@ -338,10 +338,10 @@ export default function AdminCommissionPayoutQueuePage() {
               />
             </div>
             <div className="lg:col-span-2">
-              <label className="mb-2 block text-sm font-medium text-foreground">
+              <label htmlFor="f-search" className="mb-2 block text-sm font-medium text-foreground">
                 Search
               </label>
-              <input
+              <input id="f-search"
                 value={searchInput}
                 onChange={(event) => setSearchInput(event.target.value)}
                 placeholder="Partner, customer, subscription, payment ref"
@@ -439,10 +439,10 @@ export default function AdminCommissionPayoutQueuePage() {
           </div>
 
           <div className="mt-4">
-            <label className="mb-2 block text-sm font-medium text-foreground">
+            <label htmlFor="f-batch-notes" className="mb-2 block text-sm font-medium text-foreground">
               Batch Notes
             </label>
-            <textarea
+            <textarea id="f-batch-notes"
               value={batchNotes}
               onChange={(event) => setBatchNotes(event.target.value)}
               rows={3}

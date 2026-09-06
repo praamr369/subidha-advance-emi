@@ -190,12 +190,12 @@ function AttributeForm({ categoryId, subcategoryId, initial, onSave, onCancel }:
     <form onSubmit={submit} className="p-4 bg-muted/20 rounded-xl border space-y-3 ml-4">
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="sm:col-span-2">
-          <label className="block text-xs font-medium mb-1 text-muted-foreground">Attribute Name *</label>
-          <input required className="w-full rounded-lg border px-3 py-2 text-sm bg-background" placeholder="e.g. Material, Color, Storage" value={name} onChange={e => setName(e.target.value)} />
+          <label htmlFor="f-attribute-name" className="block text-xs font-medium mb-1 text-muted-foreground">Attribute Name *</label>
+          <input id="f-attribute-name" required className="w-full rounded-lg border px-3 py-2 text-sm bg-background" placeholder="e.g. Material, Color, Storage" value={name} onChange={e => setName(e.target.value)} />
         </div>
         <div>
-          <label className="block text-xs font-medium mb-1 text-muted-foreground">Data Type</label>
-          <select className="w-full rounded-lg border px-3 py-2 text-sm bg-background" value={dataType} onChange={e => setDataType(e.target.value as PimAttr["data_type"])}>
+          <label htmlFor="f-data-type" className="block text-xs font-medium mb-1 text-muted-foreground">Data Type</label>
+          <select id="f-data-type" className="w-full rounded-lg border px-3 py-2 text-sm bg-background" value={dataType} onChange={e => setDataType(e.target.value as PimAttr["data_type"])}>
             {DATA_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
         </div>
@@ -203,7 +203,7 @@ function AttributeForm({ categoryId, subcategoryId, initial, onSave, onCancel }:
 
       {needsRange && (
         <div className="grid gap-3 sm:grid-cols-2">
-          <div><label className="block text-xs font-medium mb-1 text-muted-foreground">Min Value</label><input type="number" className="w-full rounded-lg border px-3 py-2 text-sm bg-background" value={minVal} onChange={e => setMinVal(e.target.value)} /></div>
+          <div><label htmlFor="f-min-value-setminval-e-target-value-max-v" className="block text-xs font-medium mb-1 text-muted-foreground">Min Value</label><input type="number" className="w-full rounded-lg border px-3 py-2 text-sm bg-background" value={minVal} onChange={e => setMinVal(e.target.value)} /></div>
           <div><label className="block text-xs font-medium mb-1 text-muted-foreground">Max Value</label><input type="number" className="w-full rounded-lg border px-3 py-2 text-sm bg-background" value={maxVal} onChange={e => setMaxVal(e.target.value)} /></div>
         </div>
       )}
@@ -267,7 +267,7 @@ function AttributeForm({ categoryId, subcategoryId, initial, onSave, onCancel }:
         </label>
         <div className="flex items-center gap-2">
           <label className="text-xs text-muted-foreground">Order</label>
-          <input type="number" className="w-16 rounded-lg border px-2 py-1 text-sm bg-background" value={order} onChange={e => setOrder(Number(e.target.value))} />
+          <input id="f-min-value-setminval-e-target-value-max-v" type="number" className="w-16 rounded-lg border px-2 py-1 text-sm bg-background" value={order} onChange={e => setOrder(Number(e.target.value))} />
         </div>
       </div>
 

@@ -292,8 +292,8 @@ export default function CustomerProfilePage() {
                   </div>
                 ))}
                 <div>
-                  <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Address</label>
-                  <textarea
+                  <label htmlFor="f-address" className="block text-xs font-semibold text-muted-foreground mb-1.5">Address</label>
+                  <textarea id="f-address"
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
                     rows={3}
@@ -321,12 +321,12 @@ export default function CustomerProfilePage() {
               ) : null}
               <form onSubmit={(e) => void handleUsernameChange(e)} className="space-y-3">
                 <div>
-                  <label className="block text-xs font-semibold text-muted-foreground mb-1.5">New Username</label>
-                  <input value={newUsername} onChange={(e) => setNewUsername(e.target.value)} className={inputCls} placeholder="letters, numbers, dots, underscores" required />
+                  <label htmlFor="f-new-username" className="block text-xs font-semibold text-muted-foreground mb-1.5">New Username</label>
+                  <input id="f-new-username" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} className={inputCls} placeholder="letters, numbers, dots, underscores" required />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Current Password</label>
-                  <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className={inputCls} required />
+                  <label htmlFor="f-current-password" className="block text-xs font-semibold text-muted-foreground mb-1.5">Current Password</label>
+                  <input id="f-current-password" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className={inputCls} required />
                 </div>
                 <button
                   type="submit"
@@ -352,16 +352,16 @@ export default function CustomerProfilePage() {
                   {kycError ? <div className="rounded-xl bg-red-50 dark:bg-red-950/30 px-3 py-2 text-xs text-red-700">{kycError}</div> : null}
                   {kycSuccess ? <div className="rounded-xl bg-emerald-50 dark:bg-emerald-950/30 px-3 py-2 text-xs text-emerald-700">Document submitted for review.</div> : null}
                   <div>
-                    <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Document Type</label>
-                    <select value={kycDocType} onChange={(e) => setKycDocType(e.target.value)} className={inputCls}>
+                    <label htmlFor="f-document-type" className="block text-xs font-semibold text-muted-foreground mb-1.5">Document Type</label>
+                    <select id="f-document-type" value={kycDocType} onChange={(e) => setKycDocType(e.target.value)} className={inputCls}>
                       {[["AADHAAR", "Aadhaar Card"], ["PAN", "PAN Card"], ["PASSPORT", "Passport"], ["DRIVING_LICENSE", "Driving Licence"], ["VOTER_ID", "Voter ID"]].map(([v, l]) => (
                         <option key={v} value={v}>{l}</option>
                       ))}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Document File *</label>
-                    <input
+                    <label htmlFor="f-document-file" className="block text-xs font-semibold text-muted-foreground mb-1.5">Document File *</label>
+                    <input id="f-document-file"
                       type="file"
                       accept="image/*,.pdf"
                       onChange={(e) => setKycFile(e.target.files?.[0] ?? null)}

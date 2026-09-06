@@ -235,27 +235,27 @@ export default function ReviewsPage() {
           <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-bold text-gray-900 dark:text-white">Write Your Review</h2>
             <div>
-              <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Your Name *</label>
-              <input value={form.reviewer_name} onChange={(e) => setForm((f) => ({ ...f, reviewer_name: e.target.value }))}
+              <label htmlFor="f-your-name" className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Your Name *</label>
+              <input id="f-your-name" value={form.reviewer_name} onChange={(e) => setForm((f) => ({ ...f, reviewer_name: e.target.value }))}
                 className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white" placeholder="e.g. Rahul Sharma" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Phone (optional)</label>
-              <input value={form.reviewer_phone} onChange={(e) => setForm((f) => ({ ...f, reviewer_phone: e.target.value }))}
+              <label htmlFor="f-phone-optional" className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Phone (optional)</label>
+              <input id="f-phone-optional" value={form.reviewer_phone} onChange={(e) => setForm((f) => ({ ...f, reviewer_phone: e.target.value }))}
                 className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white" placeholder="10-digit mobile" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-2">Rating *</label>
+              <label htmlFor="f-rating-setform-f-f-rating-v-title-option" className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-2">Rating *</label>
               <StarPicker value={form.rating} onChange={(v) => setForm((f) => ({ ...f, rating: v }))} />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Title (optional)</label>
-              <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+              <input id="f-rating-setform-f-f-rating-v-title-option" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
                 className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Your Review *</label>
-              <textarea value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))}
+              <label htmlFor="f-your-review" className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Your Review *</label>
+              <textarea id="f-your-review" value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))}
                 rows={4} className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white resize-none"
                 placeholder="Tell others about your experience…" />
             </div>

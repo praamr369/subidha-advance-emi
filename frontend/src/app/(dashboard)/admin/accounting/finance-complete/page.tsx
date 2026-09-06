@@ -245,8 +245,8 @@ export default function FinanceCompletePage() {
 
             <div className="space-y-3">
               <div>
-                <label className="text-xs font-semibold">Subscription ID</label>
-                <input
+                <label htmlFor="f-subscription-id" className="text-xs font-semibold">Subscription ID</label>
+                <input id="f-subscription-id"
                   type="number"
                   value={leaseSubId}
                   onChange={(e) => setLeaseSubId(e.target.value)}
@@ -298,31 +298,31 @@ export default function FinanceCompletePage() {
               <div className="bg-muted/20 rounded-xl p-4 mb-4 space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="col-span-2">
-                    <label className="text-xs font-semibold text-muted-foreground">Asset Description</label>
-                    <input value={leaseForm.asset_description} onChange={e => setLeaseForm(p => ({...p, asset_description: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" placeholder="Office building lease" />
+                    <label htmlFor="f-asset-description" className="text-xs font-semibold text-muted-foreground">Asset Description</label>
+                    <input id="f-asset-description" value={leaseForm.asset_description} onChange={e => setLeaseForm(p => ({...p, asset_description: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" placeholder="Office building lease" />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-muted-foreground">Lease Type</label>
-                    <select value={leaseForm.lease_type} onChange={e => setLeaseForm(p => ({...p, lease_type: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1">
+                    <label htmlFor="f-lease-type" className="text-xs font-semibold text-muted-foreground">Lease Type</label>
+                    <select id="f-lease-type" value={leaseForm.lease_type} onChange={e => setLeaseForm(p => ({...p, lease_type: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1">
                       <option value="FINANCE">Finance Lease (IFRS-16)</option>
                       <option value="OPERATING">Operating Lease</option>
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-muted-foreground">Discount Rate (%)</label>
-                    <input type="number" step="0.1" value={leaseForm.discount_rate} onChange={e => setLeaseForm(p => ({...p, discount_rate: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" placeholder="8.5" />
+                    <label htmlFor="f-discount-rate" className="text-xs font-semibold text-muted-foreground">Discount Rate (%)</label>
+                    <input id="f-discount-rate" type="number" step="0.1" value={leaseForm.discount_rate} onChange={e => setLeaseForm(p => ({...p, discount_rate: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" placeholder="8.5" />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-muted-foreground">Lease Start Date</label>
-                    <input type="date" value={leaseForm.lease_start_date} onChange={e => setLeaseForm(p => ({...p, lease_start_date: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
+                    <label htmlFor="f-lease-start-date" className="text-xs font-semibold text-muted-foreground">Lease Start Date</label>
+                    <input id="f-lease-start-date" type="date" value={leaseForm.lease_start_date} onChange={e => setLeaseForm(p => ({...p, lease_start_date: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-muted-foreground">Lease End Date</label>
-                    <input type="date" value={leaseForm.lease_end_date} onChange={e => setLeaseForm(p => ({...p, lease_end_date: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
+                    <label htmlFor="f-lease-end-date" className="text-xs font-semibold text-muted-foreground">Lease End Date</label>
+                    <input id="f-lease-end-date" type="date" value={leaseForm.lease_end_date} onChange={e => setLeaseForm(p => ({...p, lease_end_date: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-muted-foreground">Monthly Lease Payment (₹)</label>
-                    <input value={leaseForm.monthly_lease_payment} onChange={e => setLeaseForm(p => ({...p, monthly_lease_payment: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" placeholder="25000.00" />
+                    <label htmlFor="f-monthly-lease-payment" className="text-xs font-semibold text-muted-foreground">Monthly Lease Payment (₹)</label>
+                    <input id="f-monthly-lease-payment" value={leaseForm.monthly_lease_payment} onChange={e => setLeaseForm(p => ({...p, monthly_lease_payment: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" placeholder="25000.00" />
                   </div>
                 </div>
                 <button onClick={() => void handleCreateLease()} disabled={leaseCreateBusy} className="w-full h-9 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50">
@@ -382,53 +382,53 @@ export default function FinanceCompletePage() {
               <div className="bg-muted/20 rounded-xl p-4 mb-4 space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-semibold text-muted-foreground">Asset Code *</label>
-                    <input value={assetForm.asset_code} onChange={e => setAssetForm(p => ({...p, asset_code: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" placeholder="COMP-001" />
+                    <label htmlFor="f-asset-code" className="text-xs font-semibold text-muted-foreground">Asset Code *</label>
+                    <input id="f-asset-code" value={assetForm.asset_code} onChange={e => setAssetForm(p => ({...p, asset_code: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" placeholder="COMP-001" />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-muted-foreground">Asset Name *</label>
-                    <input value={assetForm.asset_name} onChange={e => setAssetForm(p => ({...p, asset_name: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" placeholder="Laptop Dell XPS" />
+                    <label htmlFor="f-asset-name" className="text-xs font-semibold text-muted-foreground">Asset Name *</label>
+                    <input id="f-asset-name" value={assetForm.asset_name} onChange={e => setAssetForm(p => ({...p, asset_name: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" placeholder="Laptop Dell XPS" />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-muted-foreground">Asset Type</label>
-                    <select value={assetForm.asset_type} onChange={e => setAssetForm(p => ({...p, asset_type: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1">
+                    <label htmlFor="f-asset-type" className="text-xs font-semibold text-muted-foreground">Asset Type</label>
+                    <select id="f-asset-type" value={assetForm.asset_type} onChange={e => setAssetForm(p => ({...p, asset_type: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1">
                       {["COMPUTERS", "FURNITURE", "VEHICLES", "MACHINERY", "BUILDING", "LAND", "OTHER"].map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-muted-foreground">Depreciation Method</label>
-                    <select value={assetForm.depreciation_method} onChange={e => setAssetForm(p => ({...p, depreciation_method: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1">
+                    <label htmlFor="f-depreciation-method" className="text-xs font-semibold text-muted-foreground">Depreciation Method</label>
+                    <select id="f-depreciation-method" value={assetForm.depreciation_method} onChange={e => setAssetForm(p => ({...p, depreciation_method: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1">
                       <option value="STRAIGHT_LINE">Straight Line (SLM)</option>
                       <option value="DECLINING_BALANCE">Declining Balance (WDV)</option>
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-muted-foreground">Acquisition Date *</label>
-                    <input type="date" value={assetForm.acquisition_date} onChange={e => setAssetForm(p => ({...p, acquisition_date: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
+                    <label htmlFor="f-acquisition-date" className="text-xs font-semibold text-muted-foreground">Acquisition Date *</label>
+                    <input id="f-acquisition-date" type="date" value={assetForm.acquisition_date} onChange={e => setAssetForm(p => ({...p, acquisition_date: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-muted-foreground">Acquisition Cost *</label>
-                    <input value={assetForm.acquisition_cost} onChange={e => setAssetForm(p => ({...p, acquisition_cost: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" placeholder="50000.00" />
+                    <label htmlFor="f-acquisition-cost" className="text-xs font-semibold text-muted-foreground">Acquisition Cost *</label>
+                    <input id="f-acquisition-cost" value={assetForm.acquisition_cost} onChange={e => setAssetForm(p => ({...p, acquisition_cost: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" placeholder="50000.00" />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-muted-foreground">Useful Life (years)</label>
-                    <input type="number" min="1" value={assetForm.useful_life_years} onChange={e => setAssetForm(p => ({...p, useful_life_years: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
+                    <label htmlFor="f-useful-life-years" className="text-xs font-semibold text-muted-foreground">Useful Life (years)</label>
+                    <input id="f-useful-life-years" type="number" min="1" value={assetForm.useful_life_years} onChange={e => setAssetForm(p => ({...p, useful_life_years: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-muted-foreground">Salvage Value</label>
-                    <input value={assetForm.salvage_value} onChange={e => setAssetForm(p => ({...p, salvage_value: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" placeholder="0.00" />
+                    <label htmlFor="f-salvage-value" className="text-xs font-semibold text-muted-foreground">Salvage Value</label>
+                    <input id="f-salvage-value" value={assetForm.salvage_value} onChange={e => setAssetForm(p => ({...p, salvage_value: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" placeholder="0.00" />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-muted-foreground">Asset Account ID</label>
-                    <input value={assetForm.asset_account_id} onChange={e => setAssetForm(p => ({...p, asset_account_id: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" placeholder="GL Account ID" />
+                    <label htmlFor="f-asset-account-id" className="text-xs font-semibold text-muted-foreground">Asset Account ID</label>
+                    <input id="f-asset-account-id" value={assetForm.asset_account_id} onChange={e => setAssetForm(p => ({...p, asset_account_id: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" placeholder="GL Account ID" />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-muted-foreground">Accum. Depr Account ID</label>
-                    <input value={assetForm.accumulated_depreciation_account_id} onChange={e => setAssetForm(p => ({...p, accumulated_depreciation_account_id: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" placeholder="GL Account ID" />
+                    <label htmlFor="f-accum-depr-account-id" className="text-xs font-semibold text-muted-foreground">Accum. Depr Account ID</label>
+                    <input id="f-accum-depr-account-id" value={assetForm.accumulated_depreciation_account_id} onChange={e => setAssetForm(p => ({...p, accumulated_depreciation_account_id: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" placeholder="GL Account ID" />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-muted-foreground">Depr Expense Account ID</label>
-                    <input value={assetForm.depreciation_expense_account_id} onChange={e => setAssetForm(p => ({...p, depreciation_expense_account_id: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" placeholder="GL Account ID" />
+                    <label htmlFor="f-depr-expense-account-id" className="text-xs font-semibold text-muted-foreground">Depr Expense Account ID</label>
+                    <input id="f-depr-expense-account-id" value={assetForm.depreciation_expense_account_id} onChange={e => setAssetForm(p => ({...p, depreciation_expense_account_id: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" placeholder="GL Account ID" />
                   </div>
                 </div>
                 <button onClick={() => void handleCreateAsset()} className="w-full h-9 rounded-xl bg-primary text-primary-foreground text-sm font-semibold">
@@ -481,12 +481,12 @@ export default function FinanceCompletePage() {
               <h3 className="text-sm font-bold mb-3">Generate Depreciation Schedule — Asset #{selectedAssetId}</h3>
               <div className="flex gap-3 items-end mb-3">
                 <div>
-                  <label className="text-xs font-semibold text-muted-foreground">Period Start</label>
-                  <input type="date" value={deprStart} onChange={e => setDeprStart(e.target.value)} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
+                  <label htmlFor="f-period-start" className="text-xs font-semibold text-muted-foreground">Period Start</label>
+                  <input id="f-period-start" type="date" value={deprStart} onChange={e => setDeprStart(e.target.value)} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-muted-foreground">Period End</label>
-                  <input type="date" value={deprEnd} onChange={e => setDeprEnd(e.target.value)} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
+                  <label htmlFor="f-period-end" className="text-xs font-semibold text-muted-foreground">Period End</label>
+                  <input id="f-period-end" type="date" value={deprEnd} onChange={e => setDeprEnd(e.target.value)} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
                 </div>
                 <button onClick={() => void handleGenerateDepr()} disabled={!deprStart || !deprEnd} className="h-9 px-5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50">
                   Generate
@@ -504,12 +504,12 @@ export default function FinanceCompletePage() {
           <div className="rounded-xl border border-border bg-card p-6">
             <div className="flex gap-3 mb-4">
               <div className="flex-1">
-                <label className="text-xs font-semibold">Period Start</label>
-                <input type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
+                <label htmlFor="f-period-start-2" className="text-xs font-semibold">Period Start</label>
+                <input id="f-period-start-2" type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
               </div>
               <div className="flex-1">
-                <label className="text-xs font-semibold">Period End</label>
-                <input type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
+                <label htmlFor="f-period-end-2" className="text-xs font-semibold">Period End</label>
+                <input id="f-period-end-2" type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
               </div>
             </div>
 

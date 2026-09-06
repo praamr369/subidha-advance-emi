@@ -216,8 +216,8 @@ export default function AccessoriesPage() {
             <div className="mb-4 text-sm font-semibold text-primary">Create New Accessory</div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label className="mb-1 block text-xs font-medium text-muted-foreground">Product Code * <span className="font-normal">(unique)</span></label>
-                <input
+                <label htmlFor="f-product-code-unique" className="mb-1 block text-xs font-medium text-muted-foreground">Product Code * <span className="font-normal">(unique)</span></label>
+                <input id="f-product-code-unique"
                   value={cf.product_code}
                   onChange={(e) => setCf((f) => ({ ...f, product_code: e.target.value.toUpperCase() }))}
                   placeholder="ACC-SIDERAIL-SAG"
@@ -226,8 +226,8 @@ export default function AccessoriesPage() {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-muted-foreground">Unit of Measure</label>
-                <input
+                <label htmlFor="f-unit-of-measure" className="mb-1 block text-xs font-medium text-muted-foreground">Unit of Measure</label>
+                <input id="f-unit-of-measure"
                   value={cf.unit_of_measure}
                   onChange={(e) => setCf((f) => ({ ...f, unit_of_measure: e.target.value }))}
                   placeholder="PCS"
@@ -235,8 +235,8 @@ export default function AccessoriesPage() {
                 />
               </div>
               <div className="sm:col-span-2">
-                <label className="mb-1 block text-xs font-medium text-muted-foreground">Name *</label>
-                <input
+                <label htmlFor="f-name" className="mb-1 block text-xs font-medium text-muted-foreground">Name *</label>
+                <input id="f-name"
                   value={cf.name}
                   onChange={(e) => setCf((f) => ({ ...f, name: e.target.value }))}
                   placeholder="e.g. Side Rail – Sagwan Wood"
@@ -245,8 +245,8 @@ export default function AccessoriesPage() {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-muted-foreground">Catalogue Price (₹)</label>
-                <input
+                <label htmlFor="f-catalogue-price" className="mb-1 block text-xs font-medium text-muted-foreground">Catalogue Price (₹)</label>
+                <input id="f-catalogue-price"
                   type="number" min="0" step="0.01"
                   value={cf.base_price}
                   onChange={(e) => setCf((f) => ({ ...f, base_price: e.target.value }))}
@@ -254,8 +254,8 @@ export default function AccessoriesPage() {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-muted-foreground">Category</label>
-                <input
+                <label htmlFor="f-category" className="mb-1 block text-xs font-medium text-muted-foreground">Category</label>
+                <input id="f-category"
                   value={cf.category}
                   onChange={(e) => setCf((f) => ({ ...f, category: e.target.value }))}
                   placeholder="Bed Accessory, Hardware…"
@@ -263,8 +263,8 @@ export default function AccessoriesPage() {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-muted-foreground">Subcategory</label>
-                <input
+                <label htmlFor="f-subcategory" className="mb-1 block text-xs font-medium text-muted-foreground">Subcategory</label>
+                <input id="f-subcategory"
                   value={cf.subcategory}
                   onChange={(e) => setCf((f) => ({ ...f, subcategory: e.target.value }))}
                   placeholder="Optional"
@@ -408,36 +408,36 @@ export default function AccessoriesPage() {
                       <div className="mb-3 text-xs font-semibold text-primary">Edit Accessory</div>
                       <div className="grid gap-3 sm:grid-cols-2">
                         <div className="sm:col-span-2">
-                          <label className="mb-1 block text-xs font-medium text-muted-foreground">Name *</label>
-                          <input value={ef.name} onChange={(e) => setEf((f) => f ? { ...f, name: e.target.value } : f)} className={INP} />
+                          <label htmlFor="f-name-2" className="mb-1 block text-xs font-medium text-muted-foreground">Name *</label>
+                          <input id="f-name-2" value={ef.name} onChange={(e) => setEf((f) => f ? { ...f, name: e.target.value } : f)} className={INP} />
                         </div>
                         <div>
-                          <label className="mb-1 block text-xs font-medium text-muted-foreground">Catalogue Price (₹)</label>
-                          <input type="number" min="0" step="0.01" value={ef.base_price} onChange={(e) => setEf((f) => f ? { ...f, base_price: e.target.value } : f)} className={INP} />
+                          <label htmlFor="f-catalogue-price-2" className="mb-1 block text-xs font-medium text-muted-foreground">Catalogue Price (₹)</label>
+                          <input id="f-catalogue-price-2" type="number" min="0" step="0.01" value={ef.base_price} onChange={(e) => setEf((f) => f ? { ...f, base_price: e.target.value } : f)} className={INP} />
                         </div>
                         <div>
-                          <label className="mb-1 block text-xs font-medium text-muted-foreground">Std Unit Cost (₹)</label>
-                          <input type="number" min="0" step="0.01" value={ef.standard_unit_cost} onChange={(e) => setEf((f) => f ? { ...f, standard_unit_cost: e.target.value } : f)} className={INP} />
+                          <label htmlFor="f-std-unit-cost" className="mb-1 block text-xs font-medium text-muted-foreground">Std Unit Cost (₹)</label>
+                          <input id="f-std-unit-cost" type="number" min="0" step="0.01" value={ef.standard_unit_cost} onChange={(e) => setEf((f) => f ? { ...f, standard_unit_cost: e.target.value } : f)} className={INP} />
                         </div>
                         <div>
-                          <label className="mb-1 block text-xs font-medium text-muted-foreground">Unit of Measure</label>
-                          <input value={ef.unit_of_measure} onChange={(e) => setEf((f) => f ? { ...f, unit_of_measure: e.target.value } : f)} className={INP} />
+                          <label htmlFor="f-unit-of-measure-2" className="mb-1 block text-xs font-medium text-muted-foreground">Unit of Measure</label>
+                          <input id="f-unit-of-measure-2" value={ef.unit_of_measure} onChange={(e) => setEf((f) => f ? { ...f, unit_of_measure: e.target.value } : f)} className={INP} />
                         </div>
                         <div>
-                          <label className="mb-1 block text-xs font-medium text-muted-foreground">Reorder Level</label>
-                          <input type="number" min="0" step="0.001" value={ef.reorder_level_qty} onChange={(e) => setEf((f) => f ? { ...f, reorder_level_qty: e.target.value } : f)} className={INP} />
+                          <label htmlFor="f-reorder-level" className="mb-1 block text-xs font-medium text-muted-foreground">Reorder Level</label>
+                          <input id="f-reorder-level" type="number" min="0" step="0.001" value={ef.reorder_level_qty} onChange={(e) => setEf((f) => f ? { ...f, reorder_level_qty: e.target.value } : f)} className={INP} />
                         </div>
                         <div>
-                          <label className="mb-1 block text-xs font-medium text-muted-foreground">Category</label>
-                          <input value={ef.category} onChange={(e) => setEf((f) => f ? { ...f, category: e.target.value } : f)} className={INP} />
+                          <label htmlFor="f-category-2" className="mb-1 block text-xs font-medium text-muted-foreground">Category</label>
+                          <input id="f-category-2" value={ef.category} onChange={(e) => setEf((f) => f ? { ...f, category: e.target.value } : f)} className={INP} />
                         </div>
                         <div>
-                          <label className="mb-1 block text-xs font-medium text-muted-foreground">Subcategory</label>
-                          <input value={ef.subcategory} onChange={(e) => setEf((f) => f ? { ...f, subcategory: e.target.value } : f)} className={INP} />
+                          <label htmlFor="f-subcategory-2" className="mb-1 block text-xs font-medium text-muted-foreground">Subcategory</label>
+                          <input id="f-subcategory-2" value={ef.subcategory} onChange={(e) => setEf((f) => f ? { ...f, subcategory: e.target.value } : f)} className={INP} />
                         </div>
                         <div>
-                          <label className="mb-1 block text-xs font-medium text-muted-foreground">Barcode</label>
-                          <input value={ef.barcode} onChange={(e) => setEf((f) => f ? { ...f, barcode: e.target.value } : f)} placeholder="Leave blank to clear" className={INP + " font-mono"} />
+                          <label htmlFor="f-barcode" className="mb-1 block text-xs font-medium text-muted-foreground">Barcode</label>
+                          <input id="f-barcode" value={ef.barcode} onChange={(e) => setEf((f) => f ? { ...f, barcode: e.target.value } : f)} placeholder="Leave blank to clear" className={INP + " font-mono"} />
                         </div>
                         <div className="flex items-center gap-2">
                           <input id={`active-${row.id}`} type="checkbox" checked={ef.is_active} onChange={(e) => setEf((f) => f ? { ...f, is_active: e.target.checked } : f)} className="h-4 w-4 rounded border-border" />

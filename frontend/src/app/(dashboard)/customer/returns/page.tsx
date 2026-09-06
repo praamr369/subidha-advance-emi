@@ -96,8 +96,8 @@ export default function CustomerReturnsPage() {
         <WorkspaceSection title="File a new return request">
           <form onSubmit={submit} className="space-y-4 max-w-md">
             <div>
-              <label className="block text-sm font-medium mb-1">Subscription ID</label>
-              <input
+              <label htmlFor="f-subscription-id" className="block text-sm font-medium mb-1">Subscription ID</label>
+              <input id="f-subscription-id"
                 type="number"
                 value={subscriptionId}
                 onChange={(e) => setSubscriptionId(e.target.value)}
@@ -107,8 +107,8 @@ export default function CustomerReturnsPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Reason for return</label>
-              <textarea
+              <label htmlFor="f-reason-for-return" className="block text-sm font-medium mb-1">Reason for return</label>
+              <textarea id="f-reason-for-return"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 placeholder="Describe the defect or reason for return…"

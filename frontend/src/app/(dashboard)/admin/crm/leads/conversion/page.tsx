@@ -144,8 +144,8 @@ export default function LeadConversionPage() {
           >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <div>
-                <label className="text-sm font-medium block mb-2">Phone Number *</label>
-                <input
+                <label htmlFor="f-phone-number" className="text-sm font-medium block mb-2">Phone Number *</label>
+                <input id="f-phone-number"
                   type="text"
                   value={formData.phone}
                   onChange={(e) => handleInputChange("phone", e.target.value)}
@@ -154,8 +154,8 @@ export default function LeadConversionPage() {
                 />
               </div>
               <div>
-                <label className="text-sm font-medium block mb-2">Customer Name *</label>
-                <input
+                <label htmlFor="f-customer-name" className="text-sm font-medium block mb-2">Customer Name *</label>
+                <input id="f-customer-name"
                   type="text"
                   value={formData.name}
                   onChange={(e) => handleInputChange("name", e.target.value)}
@@ -164,8 +164,8 @@ export default function LeadConversionPage() {
                 />
               </div>
               <div>
-                <label className="text-sm font-medium block mb-2">Email</label>
-                <input
+                <label htmlFor="f-email" className="text-sm font-medium block mb-2">Email</label>
+                <input id="f-email"
                   type="email"
                   value={formData.email}
                   onChange={(e) => handleInputChange("email", e.target.value)}
@@ -174,8 +174,8 @@ export default function LeadConversionPage() {
                 />
               </div>
               <div>
-                <label className="text-sm font-medium block mb-2">Product Name</label>
-                <input
+                <label htmlFor="f-product-name" className="text-sm font-medium block mb-2">Product Name</label>
+                <input id="f-product-name"
                   type="text"
                   value={formData.product_name}
                   onChange={(e) => handleInputChange("product_name", e.target.value)}
@@ -184,8 +184,8 @@ export default function LeadConversionPage() {
                 />
               </div>
               <div className="md:col-span-2">
-                <label className="text-sm font-medium block mb-2">Amount</label>
-                <input
+                <label htmlFor="f-amount" className="text-sm font-medium block mb-2">Amount</label>
+                <input id="f-amount"
                   type="number"
                   value={formData.amount}
                   onChange={(e) => handleInputChange("amount", e.target.value)}

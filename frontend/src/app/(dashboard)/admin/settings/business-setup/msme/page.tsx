@@ -151,16 +151,16 @@ export default function MSMEPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
-                  <label className="block text-sm font-medium mb-1">Udyam Number</label>
-                  <input type="text" className="w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600 font-mono"
+                  <label htmlFor="f-udyam-number" className="block text-sm font-medium mb-1">Udyam Number</label>
+                  <input id="f-udyam-number" type="text" className="w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600 font-mono"
                     value={form.udyam_number || ""}
                     onChange={(e) => setForm({ ...form, udyam_number: e.target.value })}
                     placeholder="UDYAM-XX-00-0000000" />
                   {errors.udyam_number ? <p className="text-sm text-destructive mt-1">{errors.udyam_number}</p> : null}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Enterprise Type</label>
-                  <select className="w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600"
+                  <label htmlFor="f-enterprise-type" className="block text-sm font-medium mb-1">Enterprise Type</label>
+                  <select id="f-enterprise-type" className="w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600"
                     value={form.enterprise_type || ""}
                     onChange={(e) => setForm({ ...form, enterprise_type: e.target.value as MSMEInfo["enterprise_type"] })}>
                     <option value="">Select...</option>
@@ -170,8 +170,8 @@ export default function MSMEPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">NIC Code</label>
-                  <input type="text" className="w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600"
+                  <label htmlFor="f-nic-code" className="block text-sm font-medium mb-1">NIC Code</label>
+                  <input id="f-nic-code" type="text" className="w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600"
                     value={form.nic_code || ""}
                     onChange={(e) => setForm({ ...form, nic_code: e.target.value })} />
                 </div>

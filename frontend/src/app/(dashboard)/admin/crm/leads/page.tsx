@@ -334,32 +334,32 @@ export default function AdminCrmLeadRegisterPage() {
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Full Name *</label>
-                  <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:ring-1 focus:ring-primary" />
+                  <label htmlFor="f-full-name" className="text-xs font-medium text-muted-foreground">Full Name *</label>
+                  <input id="f-full-name" type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:ring-1 focus:ring-primary" />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Phone *</label>
-                  <input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:ring-1 focus:ring-primary" />
+                  <label htmlFor="f-phone" className="text-xs font-medium text-muted-foreground">Phone *</label>
+                  <input id="f-phone" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:ring-1 focus:ring-primary" />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Email</label>
-                  <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:ring-1 focus:ring-primary" />
+                  <label htmlFor="f-email" className="text-xs font-medium text-muted-foreground">Email</label>
+                  <input id="f-email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:ring-1 focus:ring-primary" />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Lead Source</label>
-                  <select value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:ring-1 focus:ring-primary">
+                  <label htmlFor="f-lead-source" className="text-xs font-medium text-muted-foreground">Lead Source</label>
+                  <select id="f-lead-source" value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:ring-1 focus:ring-primary">
                     {SOURCES.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Plan Interest</label>
-                  <select value={form.interested_plan_type} onChange={(e) => setForm({ ...form, interested_plan_type: e.target.value as LeadPlanType })} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:ring-1 focus:ring-primary">
+                  <label htmlFor="f-plan-interest" className="text-xs font-medium text-muted-foreground">Plan Interest</label>
+                  <select id="f-plan-interest" value={form.interested_plan_type} onChange={(e) => setForm({ ...form, interested_plan_type: e.target.value as LeadPlanType })} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:ring-1 focus:ring-primary">
                     {PLAN_TYPES.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">First Follow-up Date</label>
-                  <input type="datetime-local" value={form.next_follow_up_at} onChange={(e) => setForm({ ...form, next_follow_up_at: e.target.value })} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:ring-1 focus:ring-primary" />
+                  <label htmlFor="f-first-follow-up-date" className="text-xs font-medium text-muted-foreground">First Follow-up Date</label>
+                  <input id="f-first-follow-up-date" type="datetime-local" value={form.next_follow_up_at} onChange={(e) => setForm({ ...form, next_follow_up_at: e.target.value })} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:ring-1 focus:ring-primary" />
                 </div>
               </div>
               

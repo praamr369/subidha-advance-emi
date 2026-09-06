@@ -90,8 +90,8 @@ export default function WarrantyClaimPage() {
             )}
 
             <div>
-              <label className="block text-sm font-medium mb-1">Select Product *</label>
-              <select
+              <label htmlFor="f-select-product" className="block text-sm font-medium mb-1">Select Product *</label>
+              <select id="f-select-product"
                 className="w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600"
                 value={form.subscription_id}
                 onChange={(e) => setForm({ ...form, subscription_id: e.target.value })}
@@ -105,8 +105,8 @@ export default function WarrantyClaimPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">Type of Defect *</label>
-              <select
+              <label htmlFor="f-type-of-defect" className="block text-sm font-medium mb-1">Type of Defect *</label>
+              <select id="f-type-of-defect"
                 className="w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600"
                 value={form.defect_type}
                 onChange={(e) => setForm({ ...form, defect_type: e.target.value })}
@@ -119,8 +119,8 @@ export default function WarrantyClaimPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">Describe the Issue *</label>
-              <textarea
+              <label htmlFor="f-describe-the-issue" className="block text-sm font-medium mb-1">Describe the Issue *</label>
+              <textarea id="f-describe-the-issue"
                 className="w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600 resize-none"
                 rows={4}
                 value={form.description}
@@ -131,8 +131,8 @@ export default function WarrantyClaimPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">Preferred Service Date</label>
-              <input
+              <label htmlFor="f-preferred-service-date" className="block text-sm font-medium mb-1">Preferred Service Date</label>
+              <input id="f-preferred-service-date"
                 type="date"
                 className="w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600"
                 value={form.preferred_date}

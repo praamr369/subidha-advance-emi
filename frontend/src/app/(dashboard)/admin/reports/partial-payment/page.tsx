@@ -105,8 +105,8 @@ export default function PartialPaymentPage() {
         <h2 className="font-semibold">Lookup</h2>
         <div className="flex flex-wrap gap-3 items-end">
           <div>
-            <label className="text-xs font-semibold text-muted-foreground block mb-1">Subscription ID</label>
-            <input
+            <label htmlFor="f-subscription-id" className="text-xs font-semibold text-muted-foreground block mb-1">Subscription ID</label>
+            <input id="f-subscription-id"
               type="number"
               value={subscriptionId}
               onChange={e => { setSubscriptionId(e.target.value); setPreview(null); setSplit(null); }}
@@ -165,8 +165,8 @@ export default function PartialPaymentPage() {
             <h3 className="font-semibold text-sm">Calculate Waterfall Split</h3>
             <div className="flex gap-3 items-end">
               <div>
-                <label className="text-xs font-semibold text-muted-foreground block mb-1">Payment Amount (₹)</label>
-                <input
+                <label htmlFor="f-payment-amount" className="text-xs font-semibold text-muted-foreground block mb-1">Payment Amount (₹)</label>
+                <input id="f-payment-amount"
                   type="number"
                   step="0.01"
                   value={paymentAmount}
