@@ -1323,9 +1323,9 @@ export function postExpenseVoucher(id: number) {
 }
 
 export function listEmployees(params: Record<string, string | number | undefined | null> = {}) {
-  return apiFetch<AccountingPaginatedResponse<EmployeeProfile>>(
-    `/accounting/employees/${buildQuery(params)}`
-  );
+  // /accounting/employees/ was removed by the HR consolidation; the migrated
+  // twin below is the live path.
+  return listEmployeesSafe(params);
 }
 
 /** Employees moved to /admin/hr/staff/ — use this for the module-level salary/staff-ledger pages. */
@@ -1336,14 +1336,14 @@ export function listEmployeesSafe(params: Record<string, string | number | undef
 }
 
 export function createEmployeeProfile(payload: Partial<EmployeeProfile>) {
-  return apiFetch<EmployeeProfile>("/accounting/employees/", {
+  return apiFetch<EmployeeProfile>("/admin/hr/staff/", {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
 export function updateEmployeeProfile(id: number, payload: Partial<EmployeeProfile>) {
-  return apiFetch<EmployeeProfile>(`/accounting/employees/${id}/`, {
+  return apiFetch<EmployeeProfile>(`/admin/hr/staff/${id}/`, {
     method: "PATCH",
     body: JSON.stringify(payload),
   });
@@ -1462,52 +1462,59 @@ export function cancelLeaveRequest(id: number, reason: string) {
   );
 }
 
-export function listSalarySheets(params: Record<string, string | number | undefined | null> = {}) {
-  return apiFetch<AccountingPaginatedResponse<SalarySheet>>(
-    `/accounting/salary-sheets/${buildQuery(params)}`
+export async function listSalarySheets(
+  params: Record<string, string | number | undefined | null> = {}
+): Promise<AccountingPaginatedResponse<SalarySheet>> {
+  // /admin/hr/payroll/ returns { current_period, salary_sheets: [...] } with no
+  // pagination, so the paginated shape callers expect is assembled here. This
+  // is the same adaptation listSalarySheetsSafe was doing; that function now
+  // delegates here so there is one adapter rather than two.
+  const { status, ...rest } = params;
+  const res = await apiFetch<{ salary_sheets?: SalarySheet[] }>(
+    `/admin/hr/payroll/${buildQuery(rest)}`
   );
+  let sheets = Array.isArray(res?.salary_sheets) ? res.salary_sheets : [];
+  if (status) {
+    // The endpoint does not filter by status server-side, unlike expense
+    // claims, so it is applied here rather than silently ignored.
+    const wanted = String(status).toUpperCase();
+    sheets = sheets.filter(
+      (sheet) => String((sheet as { status?: string }).status ?? "").toUpperCase() === wanted
+    );
+  }
+  return { count: sheets.length, next: null, previous: null, results: sheets };
 }
 
 /**
  * Dashboard-safe salary sheet summary.
- * Salary sheets moved from /accounting/salary-sheets/ to /admin/hr/payroll/
- * (HR consolidation). That endpoint returns { salary_sheets: [...] } (no
- * pagination), so we adapt it to the paginated shape and optionally filter by
- * status. Always resolves (never throws) so a single widget can't break the
- * dashboard.
+ *
+ * Identical to listSalarySheets except that it never throws, so one failing
+ * widget cannot take down a dashboard built from many.
+ *
+ * That swallowing is why the old /accounting/salary-sheets/ breakage went
+ * unnoticed for so long: the endpoint had moved to /admin/hr/payroll/, every
+ * call 404'd, and this returned an empty list, so the dashboard showed "no
+ * salary sheets" rather than an error. Use this ONLY where an empty result is
+ * genuinely indistinguishable from a failure to the reader. Anywhere the
+ * number is acted on, call listSalarySheets and let it throw.
  */
 export async function listSalarySheetsSafe(
   params: Record<string, string | number | undefined | null> = {}
 ): Promise<AccountingPaginatedResponse<SalarySheet>> {
-  const empty: AccountingPaginatedResponse<SalarySheet> = {
-    count: 0,
-    next: null,
-    previous: null,
-    results: [],
-  };
   try {
-    const { status, ...rest } = params;
-    const res = await apiFetch<{ salary_sheets?: SalarySheet[] }>(
-      `/admin/hr/payroll/${buildQuery(rest)}`
-    );
-    let sheets = Array.isArray(res?.salary_sheets) ? res.salary_sheets : [];
-    if (status) {
-      const wanted = String(status).toUpperCase();
-      sheets = sheets.filter(
-        (sheet) => String((sheet as { status?: string }).status ?? "").toUpperCase() === wanted
-      );
-    }
-    return { ...empty, count: sheets.length, results: sheets };
+    return await listSalarySheets(params);
   } catch {
-    return empty;
+    return { count: 0, next: null, previous: null, results: [] };
   }
 }
 
+// The four functions below kept calling /accounting/salary-sheets/ after the
+// HR consolidation moved that surface to /admin/hr/payroll/. Every call 404'd.
+// Their "Safe" twins are the migrated versions with identical signatures — for
+// these four "Safe" only ever meant "moved", not "swallows errors" — so the
+// old names now delegate rather than duplicating a second, dead path.
 export function createSalarySheet(payload: Partial<SalarySheet>) {
-  return apiFetch<SalarySheet>("/accounting/salary-sheets/", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+  return createSalarySheetSafe(payload);
 }
 
 /** Salary sheets moved to /admin/hr/payroll/ — use this for the module-level salary page. */
@@ -1519,7 +1526,7 @@ export function createSalarySheetSafe(payload: Partial<SalarySheet>) {
 }
 
 export function getSalarySheet(id: number) {
-  return apiFetch<SalarySheet>(`/accounting/salary-sheets/${id}/`);
+  return getSalarySheetSafe(id);
 }
 
 /** Salary sheets moved to /admin/hr/payroll/ — use this for the module-level salary page. */
@@ -1528,13 +1535,7 @@ export function getSalarySheetSafe(id: number) {
 }
 
 export function approveSalarySheet(id: number) {
-  return apiFetch<AccountingActionResponse<{ salary_sheet: SalarySheet }>>(
-    `/accounting/salary-sheets/${id}/approve/`,
-    {
-      method: "POST",
-      body: JSON.stringify({}),
-    }
-  );
+  return approveSalarySheetSafe(id);
 }
 
 /** Salary sheets moved to /admin/hr/payroll/ — use this for the module-level salary page. */
@@ -1549,13 +1550,7 @@ export function approveSalarySheetSafe(id: number) {
 }
 
 export function postSalarySheet(id: number) {
-  return apiFetch<AccountingActionResponse<{ salary_sheet: SalarySheet }>>(
-    `/accounting/salary-sheets/${id}/post/`,
-    {
-      method: "POST",
-      body: JSON.stringify({}),
-    }
-  );
+  return postSalarySheetSafe(id);
 }
 
 /** Salary sheets moved to /admin/hr/payroll/ — use this for the module-level salary page. */
@@ -1584,7 +1579,7 @@ export function createSalaryPayment(payload: Partial<SalaryPayment>) {
 
 export function listExpenseClaims(params: Record<string, string | number | undefined | null> = {}) {
   return apiFetch<AccountingPaginatedResponse<EmployeeExpenseClaim>>(
-    `/accounting/expense-claims/${buildQuery(params)}`
+    `/admin/hr/expense-claims/${buildQuery(params)}`
   );
 }
 
@@ -1619,14 +1614,14 @@ export async function listExpenseClaimsSafe(
 }
 
 export function createExpenseClaim(payload: Partial<EmployeeExpenseClaim>) {
-  return apiFetch<EmployeeExpenseClaim>("/accounting/expense-claims/", {
+  return apiFetch<EmployeeExpenseClaim>("/admin/hr/expense-claims/", {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
 export function updateExpenseClaim(id: number, payload: Partial<EmployeeExpenseClaim>) {
-  return apiFetch<EmployeeExpenseClaim>(`/accounting/expense-claims/${id}/`, {
+  return apiFetch<EmployeeExpenseClaim>(`/admin/hr/expense-claims/${id}/`, {
     method: "PATCH",
     body: JSON.stringify(payload),
   });
@@ -1634,7 +1629,7 @@ export function updateExpenseClaim(id: number, payload: Partial<EmployeeExpenseC
 
 export function approveExpenseClaim(id: number, approved_amount?: string) {
   return apiFetch<AccountingActionResponse<{ expense_claim: EmployeeExpenseClaim }>>(
-    `/accounting/expense-claims/${id}/approve/`,
+    `/admin/hr/expense-claims/${id}/approve/`,
     {
       method: "POST",
       body: JSON.stringify(approved_amount ? { approved_amount } : {}),
@@ -1644,7 +1639,7 @@ export function approveExpenseClaim(id: number, approved_amount?: string) {
 
 export function rejectExpenseClaim(id: number, reason: string) {
   return apiFetch<AccountingActionResponse<{ expense_claim: EmployeeExpenseClaim }>>(
-    `/accounting/expense-claims/${id}/reject/`,
+    `/admin/hr/expense-claims/${id}/reject/`,
     {
       method: "POST",
       body: JSON.stringify({ reason }),
@@ -1654,7 +1649,7 @@ export function rejectExpenseClaim(id: number, reason: string) {
 
 export function postExpenseClaim(id: number) {
   return apiFetch<AccountingActionResponse<{ expense_claim: EmployeeExpenseClaim }>>(
-    `/accounting/expense-claims/${id}/post/`,
+    `/admin/hr/expense-claims/${id}/post/`,
     {
       method: "POST",
       body: JSON.stringify({}),

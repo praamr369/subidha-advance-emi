@@ -21,6 +21,12 @@ __pycache__/
 *.pyo
 *.pyd
 *.sqlite3
+# SQLite writes a sibling journal/WAL while a transaction is open; the pattern
+# above does not cover it, and a file-backed test database (SUBIDHA_TEST_DB_FILE)
+# leaves one behind whenever a run is interrupted.
+*.sqlite3-journal
+*.sqlite3-wal
+*.sqlite3-shm
 *.log
 *.pot
 *.pyc

@@ -11,9 +11,6 @@
 #
 # Adding a line here to make CI pass is hiding a broken feature from the only
 # check that looks for one.
-/api/v1/accounting/employees/{}/
-/api/v1/accounting/expense-claims/{}/
-/api/v1/accounting/salary-sheets/{}/
 /api/v1/admin/collections/due-today/
 /api/v1/admin/collections/overdue/
 /api/v1/admin/collections/recent/

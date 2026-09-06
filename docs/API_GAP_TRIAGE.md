@@ -135,9 +135,25 @@ concrete counter-example to reading silence as evidence of disuse — the failur
 was engineered to be invisible. **Check that catch after repointing**; it will
 keep hiding the next breakage too.
 
-**Verdict:** REPOINT with shape adaptation — `admin/hr/payroll/` returns
-`{salary_sheets: [...]}` unpaginated, not the paginated shape the old callers
-expect. `listSalarySheetsSafe` already contains the adapter to copy.
+**FIXED 2026-09-07.** All 16 dead call sites migrated:
+
+- `listSalarySheets` now calls `/admin/hr/payroll/` and does the shape
+  adaptation itself; `listSalarySheetsSafe` delegates to it, so there is one
+  adapter instead of two.
+- `createSalarySheet`, `getSalarySheet`, `approveSalarySheet`,
+  `postSalarySheet` now delegate to their migrated twins. Those twins already
+  existed and already pointed at the live paths — for these four, "Safe" only
+  ever meant "moved", not "swallows errors", so the old names were duplicating
+  a second, dead path for no reason. `approveSalarySheet` alone had 9 callers.
+- `listEmployees` delegates to `listEmployeesSafe`;
+  `createEmployeeProfile` / `updateEmployeeProfile` moved to `/admin/hr/staff/`.
+- All six expense-claim calls moved to `/admin/hr/expense-claims/`; that
+  endpoint already returns `{count, results}`, so no adaptation was needed.
+
+The `catch { return empty }` in the two `*Safe` list functions is kept — a
+dashboard of many widgets genuinely should not die for one — but it now carries
+a comment naming it as the reason this breakage went unseen, and saying to use
+the throwing variant anywhere the number is acted on.
 
 ## BUILD — models exist, no HTTP layer
 
