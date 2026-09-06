@@ -28,7 +28,7 @@ export default function WarrantyCheckPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    apiFetch("/api/v1/subscriptions/?page_size=50")
+    apiFetch("/api/v1/customer/subscriptions/?page_size=50")
       .then((d) => setSubs(Array.isArray(d) ? d as Subscription[] : ((d as { results?: Subscription[] })?.results ?? [])))
       .catch(() => {});
   }, []);

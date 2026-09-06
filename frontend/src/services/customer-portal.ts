@@ -38,7 +38,7 @@ export async function submitCustomerReturn(data: { subscription: number; reason:
 // ── Refunds ──
 
 export async function fetchActiveSubscriptionsForRefund(): Promise<unknown> {
-  return apiFetch('/api/v1/subscriptions/?status=ACTIVE&page_size=50')
+  return apiFetch('/api/v1/customer/subscriptions/?status=ACTIVE&page_size=50')
 }
 
 export async function submitRefundRequest(data: {

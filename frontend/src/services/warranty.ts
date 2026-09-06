@@ -91,13 +91,13 @@ class WarrantyService {
   // --- Admin methods ---
 
   async adminGetClaims(queryString = ''): Promise<unknown[]> {
-    const d = await apiFetch(`/api/v1/warranty/admin-claims/?${queryString}`)
+    const d = await apiFetch(`/api/v1/admin/warranty-claims/?${queryString}`)
     if (Array.isArray(d)) return d
     return (d as { results?: unknown[] })?.results ?? []
   }
 
   async adminApproveClaim(claimId: number): Promise<unknown> {
-    return apiFetch(`/api/v1/warranty/claim/${claimId}/approve/`, { method: 'POST' })
+    return apiFetch(`/api/v1/admin/warranty-claims/${claimId}/approve/`, { method: 'POST' })
   }
 
   async adminScheduleClaim(

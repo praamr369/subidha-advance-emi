@@ -237,7 +237,7 @@ export const paymentService = new PaymentService()
 export async function getAdminSubscriptionForCollection(
   id: number | string
 ): Promise<AdminSubscriptionCollectionCandidate> {
-  return apiFetch(`/api/v1/subscriptions/${id}/`) as Promise<AdminSubscriptionCollectionCandidate>
+  return apiFetch(`/api/v1/admin/subscriptions/${id}/`) as Promise<AdminSubscriptionCollectionCandidate>
 }
 
 export async function listSubscriptionEmisForCollection(
@@ -252,7 +252,7 @@ export async function listSubscriptionEmisForCollection(
 export async function searchAdminSubscriptionsForCollection(
   q: string
 ): Promise<AdminSubscriptionCollectionCandidate[]> {
-  const d = await apiFetch(`/api/v1/subscriptions/?search=${encodeURIComponent(q)}`)
+  const d = await apiFetch(`/api/v1/admin/subscriptions/?search=${encodeURIComponent(q)}`)
   return Array.isArray(d)
     ? (d as AdminSubscriptionCollectionCandidate[])
     : ((d as { results?: AdminSubscriptionCollectionCandidate[] })?.results ?? [])
