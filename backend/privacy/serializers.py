@@ -11,12 +11,14 @@ from __future__ import annotations
 from rest_framework import serializers
 
 from privacy.models import (
+    BreachSeverity,
     ConsentStatus,
     ConsentType,
     CookieConsent,
     CustomerConsent,
     DataAccessLog,
     DataAccessRequest,
+    DataBreachLog,
     DataRequestType,
     DPOGrievance,
     PrivacyPreference,
@@ -192,3 +194,139 @@ class DataAccessLogSerializer(serializers.ModelSerializer):
             "accessed_at",
         )
         read_only_fields = fields
+
+
+# ---------------------------------------------------------------------------
+# Admin / back-office
+#
+# The customer half of this app shipped first; staff had no screen to answer
+# anything a customer filed. These serialize the same records for the people
+# who have to act on them, which means they expose the fields the customer
+# serializers deliberately withhold — who it belongs to, and who acted.
+# ---------------------------------------------------------------------------
+
+
+class AdminDPOGrievanceSerializer(serializers.ModelSerializer):
+    """A grievance as the DPO sees it: with the customer attached.
+
+    The customer-facing DPOGrievanceSerializer omits the customer (they know
+    who they are) and the assignee. Both matter here — a queue you cannot
+    attribute is not a queue.
+    """
+
+    grievance_type_display = serializers.CharField(
+        source="get_grievance_type_display", read_only=True
+    )
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+    customer_name = serializers.CharField(source="customer.name", read_only=True)
+    customer_phone = serializers.CharField(source="customer.phone", read_only=True)
+    assigned_to_dpo_name = serializers.SerializerMethodField()
+    is_overdue = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DPOGrievance
+        fields = (
+            "id",
+            "customer",
+            "customer_name",
+            "customer_phone",
+            "grievance_type",
+            "grievance_type_display",
+            "title",
+            "description",
+            "status",
+            "status_display",
+            "filed_at",
+            "acknowledged_at",
+            "stage_1_due",
+            "stage_1_completed_at",
+            "stage_2_due",
+            "stage_2_completed_at",
+            "assigned_to_dpo",
+            "assigned_to_dpo_name",
+            "resolved_at",
+            "resolution_notes",
+            "is_overdue",
+        )
+        read_only_fields = fields
+
+    def get_assigned_to_dpo_name(self, obj) -> str:
+        user = obj.assigned_to_dpo
+        if user is None:
+            return ""
+        return user.get_full_name() or user.get_username()
+
+    def get_is_overdue(self, obj) -> bool:
+        """Past the statutory stage-1 deadline and still not resolved.
+
+        Resolved grievances are never overdue, however late they were — the
+        deadline is for acting, and the record of lateness is the gap between
+        filed_at and resolved_at, not a flag that stays lit forever.
+        """
+        from django.utils import timezone
+
+        if obj.status in ("RESOLVED",):
+            return False
+        return bool(obj.stage_1_due and obj.stage_1_due < timezone.now())
+
+
+class GrievanceResolveSerializer(serializers.Serializer):
+    resolution_notes = serializers.CharField()
+
+
+class AdminDataBreachSerializer(serializers.ModelSerializer):
+    severity_display = serializers.CharField(
+        source="get_severity_display", read_only=True
+    )
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+    # The frontend was written against this name; the model calls it
+    # affected_customer_count. Alias rather than rename — the model name is the
+    # accurate one and other code reads it.
+    affected_records = serializers.IntegerField(
+        source="affected_customer_count", read_only=True
+    )
+    description = serializers.CharField(source="breach_description", read_only=True)
+
+    class Meta:
+        model = DataBreachLog
+        fields = (
+            "id",
+            "title",
+            "description",
+            "breach_description",
+            "severity",
+            "severity_display",
+            "status",
+            "status_display",
+            "data_types_affected",
+            "affected_customer_count",
+            "affected_records",
+            "discovered_at",
+            "reported_at",
+            "contained_at",
+            "board_notified_at",
+            "notified_at",
+            "closed_at",
+            "authority_notified",
+            "root_cause",
+            "remediation_steps",
+        )
+        read_only_fields = fields
+
+
+class AdminDataBreachCreateSerializer(serializers.Serializer):
+    """Accepts the shape the admin page sends.
+
+    `title` and `affected_records` are the frontend's names; `severity` is
+    required because a breach whose severity nobody stated cannot be triaged,
+    and defaulting it would silently downgrade a critical one.
+    """
+
+    title = serializers.CharField(max_length=255)
+    severity = serializers.ChoiceField(choices=BreachSeverity.choices)
+    description = serializers.CharField()
+    affected_records = serializers.IntegerField(min_value=0)
+    data_types_affected = serializers.ListField(
+        child=serializers.CharField(), required=False, default=list
+    )
+    discovered_at = serializers.DateTimeField(required=False)

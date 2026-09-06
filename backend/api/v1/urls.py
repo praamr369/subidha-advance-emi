@@ -98,6 +98,14 @@ urlpatterns = [
     # 2026-07-10 and the portal has called these paths since 2026-07-11, but
     # nothing ever mounted them — every request 404'd until this line.
     path("privacy/", include("api.v1.routes.privacy")),
+    # The staff half of the same surface: the DPO queue and breach response.
+    path("admin/privacy/", include("api.v1.routes.admin_privacy")),
+    # Consumer-protection back office: defect claims and return requests.
+    path("admin/consumer/", include("api.v1.routes.admin_consumer")),
+    # The two-person control that gates running a monthly draw.
+    path("admin/lucky-plan/", include("api.v1.routes.admin_lucky_plan_queue")),
+    # Repossession notices and recovery.
+    path("admin/repossessions/", include("api.v1.routes.admin_repossessions")),
     # Customer warranty. Same story as privacy: the portal has called these
     # paths since July 2026 and they were never mounted. The admin warranty
     # surface already exists under admin/warranty-claims/.

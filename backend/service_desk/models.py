@@ -550,6 +550,21 @@ class WarrantyClaim(ServiceDeskTimeStampedModel):
     authorized_service_center = models.CharField(max_length=160, blank=True, default="")
     service_center_contact = models.CharField(max_length=20, blank=True, default="")
 
+    # Service visit scheduling.
+    #
+    # These live on the claim rather than on WarrantyServiceCall because the
+    # visit being scheduled here has not happened yet. WarrantyServiceCall
+    # requires a WarrantyServiceRecord and records a visit that took place,
+    # with a cost and technician notes; creating one at scheduling time would
+    # mean inventing a service record for work nobody has done, and would make
+    # "how many service calls have we performed" wrong.
+    scheduled_date = models.DateField(null=True, blank=True, db_index=True)
+    preferred_date = models.DateField(
+        null=True, blank=True, help_text="Date the customer asked for"
+    )
+    technician_name = models.CharField(max_length=160, blank=True, default="")
+    service_completed_at = models.DateTimeField(null=True, blank=True)
+
     # Timeline
     approved_at = models.DateTimeField(null=True, blank=True)
     approved_by = models.ForeignKey(

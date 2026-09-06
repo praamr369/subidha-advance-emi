@@ -26,7 +26,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from api.v1.permissions import IsAdmin
 from privacy.models import (
+    BreachStatus,
     ConsentAction,
     ConsentEvent,
     ConsentStatus,
@@ -34,13 +36,18 @@ from privacy.models import (
     CustomerConsent,
     DataAccessLog,
     DataAccessRequest,
+    DataBreachLog,
     DataRequestStatus,
     DataRequestType,
     DPOGrievance,
     PrivacyPreference,
 )
 from privacy.serializers import (
+    AdminDataBreachCreateSerializer,
+    AdminDataBreachSerializer,
+    AdminDPOGrievanceSerializer,
     ConsentGrantSerializer,
+    GrievanceResolveSerializer,
     ConsentWithdrawSerializer,
     CookieConsentSerializer,
     CookieConsentWriteSerializer,
@@ -448,3 +455,217 @@ class PrivacyDashboardSummaryView(APIView):
                 ).count(),
             }
         )
+
+
+# ===========================================================================
+# Admin / back-office
+#
+# Everything above is the customer's half. It shipped first, which left the
+# system able to *accept* a grievance or a breach report and unable to answer
+# one: staff had no screen and no endpoint. These are the other half.
+#
+# Two admin pages exist per concept (breaches/breach-notifications,
+# data-retention/retention-schedule) using different URL conventions. Both
+# 404'd, so neither is established. Each concept is implemented once here and
+# mounted at both paths rather than built twice — see routes/privacy.py.
+# ===========================================================================
+
+
+def _audit(action_type, *, performed_by, model_name, object_id, metadata=None):
+    """Record a back-office action against the shared audit trail.
+
+    Privacy actions are exactly the ones a regulator asks to see evidence of,
+    so these writes are not optional decoration. They are deliberately inside
+    the caller's transaction: an action that happened without an audit row, or
+    an audit row for an action that rolled back, are both worse than failing.
+    """
+    from subscriptions.models import AuditLog
+
+    AuditLog.objects.create(
+        action_type=action_type,
+        performed_by=performed_by,
+        model_name=model_name,
+        object_id=str(object_id),
+        metadata=metadata or {},
+    )
+
+
+class AdminGrievanceListView(APIView):
+    """The DPO queue: every grievance, newest first.
+
+    Unlike the customer view this is not filtered to one customer, so it is
+    admin-only — the permission class is the whole access control here.
+    """
+
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        grievances = (
+            DPOGrievance.objects.select_related("customer", "assigned_to_dpo")
+            .all()
+            .order_by("-filed_at")
+        )
+        return Response(AdminDPOGrievanceSerializer(grievances, many=True).data)
+
+
+class AdminGrievanceResolveView(APIView):
+    permission_classes = [IsAdmin]
+
+    @transaction.atomic
+    def post(self, request, grievance_id):
+        grievance = get_object_or_404(DPOGrievance, pk=grievance_id)
+
+        if grievance.status == "RESOLVED":
+            # Not an error worth 400-ing a queue over, but it must not
+            # overwrite the original resolution or move resolved_at — the
+            # first resolution is the one with statutory meaning.
+            return Response(
+                AdminDPOGrievanceSerializer(grievance).data, status=status.HTTP_200_OK
+            )
+
+        payload = GrievanceResolveSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+
+        now = timezone.now()
+        grievance.status = "RESOLVED"
+        grievance.resolution_notes = payload.validated_data["resolution_notes"]
+        grievance.resolved_at = now
+        if grievance.stage_1_completed_at is None:
+            grievance.stage_1_completed_at = now
+        if grievance.assigned_to_dpo is None:
+            grievance.assigned_to_dpo = request.user
+        grievance.save(
+            update_fields=[
+                "status",
+                "resolution_notes",
+                "resolved_at",
+                "stage_1_completed_at",
+                "assigned_to_dpo",
+                "updated_at",
+            ]
+        )
+
+        _audit(
+            "PRIVACY_GRIEVANCE_RESOLVED",
+            performed_by=request.user,
+            model_name="DPOGrievance",
+            object_id=grievance.pk,
+            metadata={
+                "grievance_type": grievance.grievance_type,
+                # Whether the statutory deadline was met is the fact a
+                # regulator asks about; deriving it later from timestamps
+                # relies on the deadline never having been edited.
+                "within_stage_1_deadline": bool(
+                    grievance.stage_1_due and now <= grievance.stage_1_due
+                ),
+            },
+        )
+        return Response(AdminDPOGrievanceSerializer(grievance).data)
+
+
+# Action name -> (new status, timestamp field it stamps).
+# Hyphenated because that is what the admin page sends.
+BREACH_ACTIONS = {
+    "investigate": (BreachStatus.INVESTIGATING, None),
+    "notify-board": (BreachStatus.NOTIFIED_BOARD, "board_notified_at"),
+    "notify-principals": (BreachStatus.NOTIFIED_PRINCIPALS, "notified_at"),
+    "close": (BreachStatus.CLOSED, "closed_at"),
+}
+
+
+class AdminDataBreachListView(APIView):
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        breaches = DataBreachLog.objects.all().order_by("-discovered_at")
+        return Response(AdminDataBreachSerializer(breaches, many=True).data)
+
+    @transaction.atomic
+    def post(self, request):
+        payload = AdminDataBreachCreateSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        data = payload.validated_data
+
+        breach = DataBreachLog.objects.create(
+            title=data["title"],
+            breach_description=data["description"],
+            severity=data["severity"],
+            affected_customer_count=data["affected_records"],
+            data_types_affected=data.get("data_types_affected") or [],
+            # A breach with no stated discovery time defaults to now. The
+            # statutory clock runs from discovery, so this is the earliest
+            # defensible value, never a backdated one.
+            discovered_at=data.get("discovered_at") or timezone.now(),
+            status=BreachStatus.REPORTED,
+        )
+        _audit(
+            "PRIVACY_BREACH_REPORTED",
+            performed_by=request.user,
+            model_name="DataBreachLog",
+            object_id=breach.pk,
+            metadata={
+                "severity": breach.severity,
+                "affected_customer_count": breach.affected_customer_count,
+            },
+        )
+        return Response(
+            AdminDataBreachSerializer(breach).data, status=status.HTTP_201_CREATED
+        )
+
+
+class AdminDataBreachActionView(APIView):
+    """Advance a breach through the DPDP response sequence.
+
+    Deliberately not a strict state machine. A breach can be notified to the
+    Board before or after the principals depending on severity and what is
+    known, and refusing a legitimate ordering would leave staff unable to
+    record what actually happened. What it does refuse is an unknown action,
+    and it never un-stamps a timestamp that is already set — the first
+    notification is the one that counts for the statutory clock.
+    """
+
+    permission_classes = [IsAdmin]
+
+    @transaction.atomic
+    def post(self, request, breach_id, action):
+        if action not in BREACH_ACTIONS:
+            return Response(
+                {
+                    "detail": "Unknown action '{}'.".format(action),
+                    "allowed": sorted(BREACH_ACTIONS),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        breach = get_object_or_404(DataBreachLog, pk=breach_id)
+        new_status, stamp_field = BREACH_ACTIONS[action]
+
+        breach.status = new_status
+        updated = ["status", "updated_at"]
+        if stamp_field and getattr(breach, stamp_field) is None:
+            setattr(breach, stamp_field, timezone.now())
+            updated.append(stamp_field)
+        if action == "notify-board" and not breach.authority_notified:
+            breach.authority_notified = True
+            updated.append("authority_notified")
+        breach.save(update_fields=updated)
+
+        _audit(
+            "PRIVACY_BREACH_" + action.replace("-", "_").upper(),
+            performed_by=request.user,
+            model_name="DataBreachLog",
+            object_id=breach.pk,
+            metadata={"severity": breach.severity, "new_status": breach.status},
+        )
+        return Response(AdminDataBreachSerializer(breach).data)
+
+
+class AdminDataBreachNotifyView(AdminDataBreachActionView):
+    """Alias for the older admin page, which posts to `{id}/notify/`.
+
+    That page predates the board/principal split and means "notify the
+    principals". Mapped explicitly rather than guessed at the URL layer.
+    """
+
+    def post(self, request, breach_id):
+        return super().post(request, breach_id, "notify-principals")

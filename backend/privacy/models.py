@@ -292,13 +292,52 @@ class CookieConsent(TimeStampedModel):
         return timezone.now() <= self.expires_at
 
 
+class BreachSeverity(models.TextChoices):
+    LOW = 'LOW', 'Low'
+    MEDIUM = 'MEDIUM', 'Medium'
+    HIGH = 'HIGH', 'High'
+    CRITICAL = 'CRITICAL', 'Critical'
+
+
+class BreachStatus(models.TextChoices):
+    """DPDP 2023 s.8(6) requires notifying both the Board and each affected
+    Data Principal. They are separate obligations with separate evidence, so
+    they are separate states rather than one "notified" flag — a breach can be
+    reported to the Board while principal notices are still going out.
+    """
+
+    REPORTED = 'REPORTED', 'Reported'
+    INVESTIGATING = 'INVESTIGATING', 'Investigating'
+    NOTIFIED_BOARD = 'NOTIFIED_BOARD', 'Data Protection Board notified'
+    NOTIFIED_PRINCIPALS = 'NOTIFIED_PRINCIPALS', 'Data principals notified'
+    CLOSED = 'CLOSED', 'Closed'
+
+
 class DataBreachLog(TimeStampedModel):
     """Log data breach incidents (DPDP 2023 Article 7)"""
 
     # Breach details
+    title = models.CharField(max_length=255, blank=True)
     breach_description = models.TextField()
     data_types_affected = models.JSONField()  # ['email', 'phone', 'address']
     affected_customer_count = models.PositiveIntegerField()
+    severity = models.CharField(
+        max_length=20,
+        choices=BreachSeverity.choices,
+        default=BreachSeverity.MEDIUM,
+        db_index=True,
+    )
+    status = models.CharField(
+        max_length=30,
+        choices=BreachStatus.choices,
+        default=BreachStatus.REPORTED,
+        db_index=True,
+    )
+    # Distinct from notified_at, which this model already used for the
+    # principal notification. Keeping them apart is what lets the two DPDP
+    # obligations be evidenced independently.
+    board_notified_at = models.DateTimeField(null=True, blank=True)
+    closed_at = models.DateTimeField(null=True, blank=True)
 
     # Timeline
     discovered_at = models.DateTimeField()

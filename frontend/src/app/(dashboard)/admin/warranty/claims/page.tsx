@@ -38,14 +38,14 @@ export default function WarrantyClaimsPage() {
     const qs = filter === "OPEN"
       ? "status=FILED,UNDER_REVIEW,APPROVED,SCHEDULED,IN_PROGRESS"
       : filter === "RESOLVED" ? "status=RESOLVED" : "";
-    apiFetch(`/api/v1/warranty/admin-claims/?${qs}`)
+    apiFetch(`/api/v1/admin/warranty-claims/?${qs}`)
       .then((d) => setClaims(Array.isArray(d) ? d as Claim[] : ((d as { results?: Claim[] })?.results ?? [])))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [filter, scheduling]);
 
   const handleApprove = async (id: number) => {
-    await apiFetch(`/api/v1/warranty/claim/${id}/approve/`, { method: "POST" });
+    await apiFetch(`/api/v1/admin/warranty-claims/${id}/approve/`, { method: "POST" });
     setClaims((prev) => prev.map((c) => c.id === id ? { ...c, status: "APPROVED" } : c));
   };
 

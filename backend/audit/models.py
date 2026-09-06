@@ -280,6 +280,78 @@ class AuditLog(models.Model):
             "Journal Group Reversed",
         )
 
+        # Back-office queue actions, added for the same reason as the three
+        # above: each is a transition someone outside the company asks about by
+        # name. A regulator asks when a breach was reported to the Board; a
+        # consumer forum asks who approved a late return; an auditor asks who
+        # authorised a draw. Recording all of those as PAYMENT_FLAGGED would
+        # make each answerable only by substring-searching metadata.
+        #
+        # These do not attempt the wider taxonomy the comment above describes.
+        # They cover one surface — the staff side of customer-facing queues —
+        # where the audit row is the entire evidence trail, because nothing
+        # else records that a human made the decision.
+        PRIVACY_GRIEVANCE_RESOLVED = (
+            "PRIVACY_GRIEVANCE_RESOLVED",
+            "DPDP Grievance Resolved",
+        )
+        PRIVACY_BREACH_REPORTED = "PRIVACY_BREACH_REPORTED", "Data Breach Reported"
+        PRIVACY_BREACH_INVESTIGATE = (
+            "PRIVACY_BREACH_INVESTIGATE",
+            "Data Breach Investigation Opened",
+        )
+        PRIVACY_BREACH_NOTIFY_BOARD = (
+            "PRIVACY_BREACH_NOTIFY_BOARD",
+            "Data Protection Board Notified",
+        )
+        PRIVACY_BREACH_NOTIFY_PRINCIPALS = (
+            "PRIVACY_BREACH_NOTIFY_PRINCIPALS",
+            "Affected Data Principals Notified",
+        )
+        PRIVACY_BREACH_CLOSE = "PRIVACY_BREACH_CLOSE", "Data Breach Closed"
+
+        CONSUMER_DEFECT_REVIEW = "CONSUMER_DEFECT_REVIEW", "Defect Claim Under Review"
+        CONSUMER_DEFECT_ACCEPT = "CONSUMER_DEFECT_ACCEPT", "Defect Claim Accepted"
+        CONSUMER_DEFECT_REJECT = "CONSUMER_DEFECT_REJECT", "Defect Claim Rejected"
+        CONSUMER_DEFECT_RESOLVE = "CONSUMER_DEFECT_RESOLVE", "Defect Claim Resolved"
+        CONSUMER_RETURN_APPROVE = "CONSUMER_RETURN_APPROVE", "Return Request Approved"
+        CONSUMER_RETURN_REJECT = "CONSUMER_RETURN_REJECT", "Return Request Rejected"
+        CONSUMER_RETURN_COMPLETE = "CONSUMER_RETURN_COMPLETE", "Return Completed"
+        CONSUMER_RETURN_CPA_OVERRIDE = (
+            "CONSUMER_RETURN_CPA_OVERRIDE",
+            "Return Window Overridden (CPA)",
+        )
+
+        REPOSSESSION_INITIATE = "REPOSSESSION_INITIATE", "Repossession Initiated"
+        REPOSSESSION_COMPLETE = "REPOSSESSION_COMPLETE", "Repossession Completed"
+        REPOSSESSION_CANCEL = "REPOSSESSION_CANCEL", "Repossession Cancelled"
+
+        LUCKY_DRAW_AUTHORISATION_AUTHORISED = (
+            "LUCKY_DRAW_AUTHORISATION_AUTHORISED",
+            "Draw Authorised",
+        )
+        LUCKY_DRAW_AUTHORISATION_REJECTED = (
+            "LUCKY_DRAW_AUTHORISATION_REJECTED",
+            "Draw Authorisation Rejected",
+        )
+        LUCKY_DRAW_AUTHORISATION_REVOKED = (
+            "LUCKY_DRAW_AUTHORISATION_REVOKED",
+            "Draw Authorisation Revoked",
+        )
+
+        WARRANTY_SERVICE_SCHEDULED = (
+            "WARRANTY_SERVICE_SCHEDULED",
+            "Warranty Service Visit Scheduled",
+        )
+        WARRANTY_SERVICE_RESCHEDULED = (
+            "WARRANTY_SERVICE_RESCHEDULED",
+            "Warranty Service Visit Rescheduled",
+        )
+        WARRANTY_SERVICE_COMPLETED = (
+            "WARRANTY_SERVICE_COMPLETED",
+            "Warranty Service Visit Completed",
+        )
+
     action_type = models.CharField(
         max_length=50,
         choices=ActionType.choices,

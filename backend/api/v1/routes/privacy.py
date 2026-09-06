@@ -7,6 +7,10 @@ is the fixed side of this contract and the routes are shaped to it.
 from django.urls import path
 
 from privacy.views import (
+    AdminDataBreachListView,
+    AdminDataBreachNotifyView,
+    AdminGrievanceListView,
+    AdminGrievanceResolveView,
     CommunicationPreferencesView,
     ConsentGrantView,
     ConsentListView,
@@ -51,5 +55,29 @@ urlpatterns = [
         "dashboard-summary/",
         PrivacyDashboardSummaryView.as_view(),
         name="privacy-dashboard-summary",
+    ),
+    # --- Admin / back-office, mounted under /privacy/ ---------------------
+    # These sit here rather than under /admin/privacy/ only because that is
+    # where the older admin pages call them. The canonical paths are in
+    # admin_privacy.py; both resolve to the same views.
+    path(
+        "admin-grievances/",
+        AdminGrievanceListView.as_view(),
+        name="privacy-admin-grievances",
+    ),
+    path(
+        "grievance/<int:grievance_id>/resolve/",
+        AdminGrievanceResolveView.as_view(),
+        name="privacy-grievance-resolve",
+    ),
+    path(
+        "data-breaches/",
+        AdminDataBreachListView.as_view(),
+        name="privacy-data-breaches",
+    ),
+    path(
+        "data-breaches/<int:breach_id>/notify/",
+        AdminDataBreachNotifyView.as_view(),
+        name="privacy-data-breach-notify",
     ),
 ]
