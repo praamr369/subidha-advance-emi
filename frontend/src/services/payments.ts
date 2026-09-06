@@ -205,11 +205,6 @@ export interface PaymentRegisterSummary {
 
 // ── PaymentService (legacy helper) ───────────────────────────────────────────
 class PaymentService {
-  async getPaymentHistory(limit = 20, offset = 0): Promise<{ count: number; results: Payment[] }> {
-    const d = await apiFetch(`/api/v1/payments/history/?limit=${limit}&offset=${offset}`)
-    return d as { count: number; results: Payment[] }
-  }
-
   async getReceipt(paymentId: string): Promise<Receipt> {
     return apiFetch(`/api/v1/payments/receipt/${paymentId}/`) as Promise<Receipt>
   }

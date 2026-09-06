@@ -59,7 +59,6 @@
 /api/v1/crm/disputes/
 /api/v1/crm/disputes/{}/
 /api/v1/crm/disputes/{}/notify/
-/api/v1/customer/addresses/
 /api/v1/customer/returns/
 /api/v1/customers/document-consents/
 /api/v1/customers/kyc-status/
@@ -74,9 +73,7 @@
 /api/v1/partner/product-requests/{}/cancel/
 /api/v1/partner/profile-info/
 /api/v1/partner/support/tickets/
-/api/v1/payments/history/
 /api/v1/payments/receipt/{}/
-/api/v1/pincode/{}/details/
 /api/v1/privacy/admin-grievances/
 /api/v1/privacy/data-breaches/
 /api/v1/privacy/data-breaches/{}/notify/
