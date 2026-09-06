@@ -58,7 +58,12 @@ restart_app() {
 }
 
 health_ok() {
-  curl -fsSk "${HEALTH_URL:-http://127.0.0.1:8000/api/v1/health/deep/}" >/dev/null 2>&1
+  # Must match deploy.sh. Django validates the Host header against
+  # DJANGO_ALLOWED_HOSTS, which lists real hostnames only — hitting
+  # 127.0.0.1:8000 returns 400 Bad Request regardless of application health.
+  # An earlier version defaulted to the loopback address, so this check could
+  # never pass: the cutover always "failed" and always rolled itself back.
+  curl -fsSk "${HEALTH_URL:-https://subidhafurnitureasansol.com/api/v1/health/}" >/dev/null 2>&1
 }
 
 # ---------------------------------------------------------------- rollback ---
