@@ -115,6 +115,30 @@ class MatchesTests(SimpleTestCase):
             _matches("/api/v1/admin/customers/{}/timeline/Customer/{}/", self.ROUTES)
         )
 
+    def test_a_runtime_chosen_action_segment_matches_a_parent_with_actions(self):
+        """Real source: apiFetch(`/admin/payments/reversals/${id}/${action}/`).
+
+        The action is a variable, so it can never match a literal route however
+        the segments are generalised — yet .../{}/approve/ and .../{}/reject/
+        both exist. Three endpoints were reported missing for this reason.
+        """
+        routes = {
+            "/api/v1/admin/payments/reversals/{}/approve/",
+            "/api/v1/admin/payments/reversals/{}/reject/",
+        }
+        self.assertTrue(_matches("/api/v1/admin/payments/reversals/{}/{}/", routes))
+
+    def test_a_trailing_variable_does_not_match_a_parent_with_no_actions(self):
+        """The bound on the rule above, and the reason it is not just
+        "anything ending in a variable matches".
+
+        If nothing is registered beneath the prefix, the call really does go
+        nowhere and must still be reported.
+        """
+        routes = {"/api/v1/admin/payments/reversals/"}
+        self.assertFalse(_matches("/api/v1/admin/payments/reversals/{}/{}/", routes))
+        self.assertFalse(_matches("/api/v1/admin/no-such-thing/{}/{}/", routes))
+
     def test_generalisation_does_not_invent_a_match_for_an_absent_resource(self):
         """The risk generalisation carries, pinned so it stays bounded.
 

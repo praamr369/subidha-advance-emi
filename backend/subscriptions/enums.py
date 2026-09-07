@@ -10,6 +10,8 @@ Usage:
     from subscriptions.enums import PlanType, SubscriptionStatus
 """
 
+from decimal import Decimal
+
 from django.db import models
 
 
@@ -648,6 +650,36 @@ class InspectionOutcome(models.TextChoices):
     MAINTENANCE_REQUIRED = "MAINTENANCE_REQUIRED", "Maintenance Required"
     DAMAGED = "DAMAGED", "Damaged – Damage recovery"
     SCRAPPED = "SCRAPPED", "Scrapped – Write off"
+
+
+class DamageGrade(models.TextChoices):
+    """Condition grades for a returned item, and the refund deduction each carries.
+
+    Policy set by the business owner on 2026-09-07: a fixed percentage per
+    grade rather than a per-item repair valuation. The point is that the rule
+    is written down and identical for every customer — a consumer forum asks
+    what the deduction was and why, and "25% because it was graded Major" is
+    answerable in a way that a discretionary figure is not.
+
+    The percentages live in DAMAGE_DEDUCTION_PERCENT below rather than on the
+    member, so changing a band is one edit in one place and every historical
+    assessment keeps the amount that was actually applied (the amount is stored
+    on the row, not recomputed).
+    """
+
+    GOOD = "GOOD", "Good — no deduction"
+    MINOR = "MINOR", "Minor wear"
+    MAJOR = "MAJOR", "Major damage"
+    SEVERE = "SEVERE", "Severe damage"
+
+
+# Grade -> percentage of the refundable base withheld.
+DAMAGE_DEDUCTION_PERCENT = {
+    DamageGrade.GOOD: Decimal("0"),
+    DamageGrade.MINOR: Decimal("10"),
+    DamageGrade.MAJOR: Decimal("25"),
+    DamageGrade.SEVERE: Decimal("50"),
+}
 
 
 class InspectionCondition(models.TextChoices):

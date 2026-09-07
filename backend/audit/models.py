@@ -317,6 +317,26 @@ class AuditLog(models.Model):
         CONSUMER_RETURN_APPROVE = "CONSUMER_RETURN_APPROVE", "Return Request Approved"
         CONSUMER_RETURN_REJECT = "CONSUMER_RETURN_REJECT", "Return Request Rejected"
         CONSUMER_RETURN_COMPLETE = "CONSUMER_RETURN_COMPLETE", "Return Completed"
+        CONSUMER_RETURN_DAMAGE_ASSESSED = (
+            "CONSUMER_RETURN_DAMAGE_ASSESSED",
+            "Return Damage Assessed",
+        )
+        PRIVACY_RETENTION_PURGE_PREVIEWED = (
+            "PRIVACY_RETENTION_PURGE_PREVIEWED",
+            "Retention Purge Previewed",
+        )
+        PRIVACY_RETENTION_PURGE_APPROVED = (
+            "PRIVACY_RETENTION_PURGE_APPROVED",
+            "Retention Purge Approved",
+        )
+        PRIVACY_RETENTION_PURGE_EXECUTED = (
+            "PRIVACY_RETENTION_PURGE_EXECUTED",
+            "Retention Purge Executed",
+        )
+        PRIVACY_RETENTION_PURGE_CANCELLED = (
+            "PRIVACY_RETENTION_PURGE_CANCELLED",
+            "Retention Purge Cancelled",
+        )
         CONSUMER_RETURN_CPA_OVERRIDE = (
             "CONSUMER_RETURN_CPA_OVERRIDE",
             "Return Window Overridden (CPA)",

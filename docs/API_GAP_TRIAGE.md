@@ -31,7 +31,53 @@ confident-looking group dissolved on inspection.
 
 ---
 
-## DECIDE — 10 endpoints, blocked on Pradip
+## RESOLVED 2026-09-07 — the four decisions were made and built
+
+Gap **44 → 32**. Decisions taken by the business owner; what was built from
+each, and what each deliberately refuses.
+
+**Refund damage: fixed percentage per condition grade** (Good 0, Minor 10,
+Major 25, Severe 50). Chosen over per-item repair valuation so every customer
+meets the same written rule and the figure is answerable if disputed.
+Five endpoints. Three refusals worth knowing: staff pick a *grade*, never an
+amount (a free-text figure is the discretion the policy exists to avoid);
+anything worse than Good requires written notes; and a second assessment is
+refused with 409 rather than overwriting a figure already given to a customer.
+
+**Waiver approval: removed, not built.** A settlement row *is* the waiver,
+written by the draw process, and the draw is already two-person authorised —
+there was nothing pending for a second person to approve. The button and its
+service call are gone, with a comment in the empty cell saying why.
+
+**Retention purge: preview → approval → execute, never scheduled.** Built on
+the existing `DataRetentionSchedule` (CTRL-DPDP-8), which already had exactly
+these statuses — a duplicate model was written and deleted on discovering it.
+
+  *"Purge" cannot mean delete here.* Removing a customer row takes the
+  payments, EMIs, invoices and ledger entries with it, and those must be kept
+  6–8 years under the Companies Act s.128, the Income Tax Act s.44AA and GST
+  Rule 56. Execution therefore delegates to the existing anonymisation service,
+  which redacts personal fields and retains financial history with a statutory
+  reason recorded per field. Categories with no handler are **refused**, not
+  reported as done.
+
+**Draw verification: public verify-seed is canonical.** No preference was
+expressed, so this is my call and is reversible. Unauthenticated and throttled,
+because a verification only staff can run proves nothing to the person who
+needs convincing. It answers one narrow question — does this seed hash to the
+value committed before the draw — and says so in the response rather than
+implying a broader claim of fairness. `getDrawDetails` and the old `verifySeed`
+had zero callers and were deleted.
+
+**Still not repointed, deliberately:** `lucky-plan/draw-results/` and
+`draw-audit/`. Endpoints exist (`customer/lucky-draws/`, `admin/lucky-draws/`)
+but the shapes disagree substantially — backend returns `batch_code`,
+`draw_month`, `is_revealed`, `lucky_number`; the frontend expects `batch_name`,
+`seed_hash`, `total_participants`, `winner_details`. Only `id` and `draw_date`
+overlap. Repointing would trade a 404 for a screen of blank fields, which is
+the `kyc-status` trap. Needs a mapper, not a URL edit.
+
+## DECIDE — the original blocked list (now resolved above)
 
 Nothing technical blocks these. Each pays money to a customer or creates legal
 evidence, which is why none should be built on a guessed policy.

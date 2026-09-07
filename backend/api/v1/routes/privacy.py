@@ -6,6 +6,10 @@ is the fixed side of this contract and the routes are shaped to it.
 """
 from django.urls import path
 
+from api.v1.views.admin_retention_purge import (
+    admin_retention_policy_purge_view,
+    admin_retention_schedule_view,
+)
 from privacy.views import (
     AdminDataBreachListView,
     AdminDataBreachNotifyView,
@@ -79,5 +83,19 @@ urlpatterns = [
         "data-breaches/<int:breach_id>/notify/",
         AdminDataBreachNotifyView.as_view(),
         name="privacy-data-breach-notify",
+    ),
+    # The older data-retention page's paths. Same views as
+    # /admin/privacy/retention-schedule/ — one implementation, two URLs, as
+    # with breaches above. "purge" here creates/executes an approval-gated job;
+    # it is not a direct delete.
+    path(
+        "retention-policies/",
+        admin_retention_schedule_view,
+        name="privacy-retention-policies",
+    ),
+    path(
+        "retention-policies/<int:job_id>/purge/",
+        admin_retention_policy_purge_view,
+        name="privacy-retention-policy-purge",
     ),
 ]

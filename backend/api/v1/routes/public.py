@@ -31,6 +31,7 @@ from subscriptions.models import (
 )
 from subscriptions.services.audit_service import log_audit
 from api.v1.throttles.public import PublicLeadThrottle
+from api.v1.views.public_draw_verification import public_verify_seed_view
 from crm.services.public_lead_service import create_public_lead
 from lucky_plan.services.winner_state_service import winner_history_q
 
@@ -649,6 +650,13 @@ urlpatterns = [
     path("products/<str:slug>/", PublicProductDetailView.as_view(), name="public-product-detail"),
     path("products/by-id/<int:id>/", PublicProductDetailView.as_view(), name="public-product-detail-by-id"),
     path("leads/", PublicLeadView.as_view(), name="public-leads"),
+    # Public commit-reveal check. Unauthenticated on purpose: a verification
+    # only staff can run proves nothing to the person who needs convincing.
+    path(
+        "lucky-plan/verify-seed/",
+        public_verify_seed_view,
+        name="public-lucky-plan-verify-seed",
+    ),
     path("latest-winner/", LatestWinnerView.as_view(), name="latest-winner"),
     path("winners/", PublicWinnersView.as_view(), name="public-winners"),
     path("winner-history/", PublicWinnerHistoryView.as_view(), name="public-winner-history"),

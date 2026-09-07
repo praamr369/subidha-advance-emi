@@ -14,6 +14,10 @@ strictly better than serving neither while it is made.
 """
 from django.urls import path
 
+from api.v1.views.admin_retention_purge import (
+    admin_retention_schedule_action_view,
+    admin_retention_schedule_view,
+)
 from privacy.views import (
     AdminDataBreachActionView,
     AdminDataBreachListView,
@@ -44,5 +48,18 @@ urlpatterns = [
         "breach-notifications/<int:breach_id>/<str:action>/",
         AdminDataBreachActionView.as_view(),
         name="admin-privacy-breach-notification-action",
+    ),
+    # Retention purge (CTRL-DPDP-8). Approval-gated and never scheduled — see
+    # the module docstring in views/admin_retention_purge.py for why "purge"
+    # means anonymise-and-retain-financials rather than delete.
+    path(
+        "retention-schedule/",
+        admin_retention_schedule_view,
+        name="admin-privacy-retention-schedule",
+    ),
+    path(
+        "retention-schedule/<int:job_id>/<str:action>/",
+        admin_retention_schedule_action_view,
+        name="admin-privacy-retention-schedule-action",
     ),
 ]

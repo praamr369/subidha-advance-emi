@@ -28,12 +28,6 @@ export default function WaiverSettlementsPage() {
     .filter((i) => i.settlement_status === "PAID")
     .reduce((s, i) => s + Number(i.waiver_amount), 0);
 
-  const approve = async (id: number) => {
-    setItems((prev) => prev.map((s) => (s.id === id ? { ...s, settlement_status: "APPROVED" } : s)));
-    await luckyPlanService.approveWaiverSettlement(id);
-    reload();
-  };
-
   return (
     <ERPPageShell
       title="EMI Waiver Settlements"
@@ -80,13 +74,13 @@ export default function WaiverSettlementsPage() {
                       </span>
                     </td>
                     <td className="py-2 px-3 text-xs text-muted-foreground">{s.settlement_date ?? "—"}</td>
-                    <td className="py-2 px-3">
-                      {s.settlement_status === "PENDING" && (
-                        <button onClick={() => approve(s.id)}
-                          className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700">
-                          Approve
-                        </button>
-                      )}
+                    <td className="py-2 px-3 text-xs text-muted-foreground">
+                      {/* No action here by design. A settlement row IS the
+                          waiver — it is written by the draw process when a
+                          winner's EMIs are waived, and the draw is already
+                          two-person authorised. There is nothing pending for a
+                          second person to approve. */}
+                      &mdash;
                     </td>
                   </tr>
                 ))}

@@ -47,11 +47,51 @@ export default function KYCPage() {
 
   const inputCls = "w-full rounded-2xl border border-border bg-card px-4 py-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/30 transition";
 
+  // The backend serves the document list, not a pre-shaped status object:
+  // { count, kyc_status, results: [...] }. There is no /kyc-status/ endpoint
+  // and never was — this page called one for two months and silently caught
+  // the 404, which is why it always rendered empty. Mapping here rather than
+  // adding a backend endpoint keeps one source of truth for KYC state.
+  type KycDocumentRow = {
+    document_type: string;
+    status: string;
+    created_at: string;
+    reviewed_at: string | null;
+    rejection_reason: string | null;
+  };
+
   async function load() {
     setLoading(true);
     try {
-      const d = await apiFetch<KYCStatus>("/api/v1/customers/kyc-status/");
-      setKycStatus(d);
+      const d = await apiFetch<{ kyc_status?: string; results?: KycDocumentRow[] }>(
+        "/api/v1/customer/kyc-documents/"
+      );
+      const docs = Array.isArray(d?.results) ? d.results : [];
+      // Earliest upload is when the customer submitted; latest review is when
+      // a decision was reached. Both are absent until they happen, which is
+      // what the nulls mean.
+      const uploadedAt = docs
+        .map((doc) => doc.created_at)
+        .filter(Boolean)
+        .sort()[0] ?? null;
+      const reviewedAt = docs
+        .map((doc) => doc.reviewed_at)
+        .filter((value): value is string => Boolean(value))
+        .sort()
+        .at(-1) ?? null;
+      const rejected = docs.find((doc) => doc.status === "REJECTED");
+
+      setKycStatus({
+        status: (d?.kyc_status ?? "PENDING") as KYCStatus["status"],
+        submitted_at: uploadedAt,
+        verified_at: reviewedAt,
+        rejection_reason: rejected?.rejection_reason ?? null,
+        documents: docs.map((doc) => ({
+          type: doc.document_type,
+          status: doc.status,
+          uploaded_at: doc.created_at,
+        })),
+      });
     } catch { /* silent */ }
     finally { setLoading(false); }
   }
@@ -90,7 +130,7 @@ export default function KYCPage() {
       const formData = new FormData();
       formData.append("document_type", docType);
       formData.append("file", file);
-      await apiFetch("/api/v1/customers/kyc-upload/", { method: "POST", body: formData });
+      await apiFetch("/api/v1/customer/kyc-documents/", { method: "POST", body: formData });
       setUploaded(true);
       setTimeout(() => setUploaded(false), 3000);
     } catch {

@@ -737,6 +737,45 @@ class ConsumerReturnRequest(TimeStampedModel):
     )
     rejection_reason = models.TextField(blank=True, default="")
 
+    # --- Damage assessment -------------------------------------------------
+    # A returned item is graded, and the grade carries a fixed percentage
+    # deduction (subscriptions.enums.DAMAGE_DEDUCTION_PERCENT). Both the
+    # percentage and the resulting amount are stored rather than recomputed on
+    # read: if the bands are ever revised, an assessment already communicated
+    # to a customer must keep the figure they were actually given.
+    damage_grade = models.CharField(
+        max_length=10,
+        choices=DamageGrade.choices,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="Blank until the item has been inspected.",
+    )
+    damage_deduction_percent = models.DecimalField(
+        max_digits=5, decimal_places=2, default=Decimal("0.00")
+    )
+    damage_deduction_amount = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00")
+    )
+    refundable_base_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        help_text="Net paid at assessment time; the figure the deduction applied to.",
+    )
+    refund_amount = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00")
+    )
+    assessment_notes = models.TextField(blank=True, default="")
+    assessed_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    assessed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="assessed_return_damage",
+    )
+
     class Meta:
         db_table = "consumer_return_requests"
         ordering = ["-requested_at", "-id"]

@@ -28,7 +28,7 @@ export type CreateMemoPayload = {
 };
 
 export async function createDashboardMemo(payload: CreateMemoPayload): Promise<{ id: number }> {
-  return apiFetch(`/api/v1/dashboard/memos`, {
+  return apiFetch(`/api/v1/dashboard/calendar-memos`, {
     method: "POST",
     body: JSON.stringify(payload),
   });

@@ -50,8 +50,11 @@ _TEMPLATE_EXPR = re.compile(r"\$\{[^}]*\}")
 # Variable names that conventionally hold a "?a=b" string rather than a path
 # segment. Deliberately a short, literal list — inferring intent from any other
 # name would start hiding genuinely missing endpoints.
+# The leading "/" is optional: a query string is written both as
+# ".../offer-candidates/${qs}" and glued straight on as
+# ".../calendar-events${query}". Both are query strings, neither is a segment.
 _TRAILING_QUERY_VAR = re.compile(
-    r"/\$\{(?:qs|suffix|query|queryString|querystring|search|params)\}/?$"
+    r"/?\$\{(?:qs|suffix|query|queryString|querystring|search|params)\}/?$"
 )
 
 
@@ -155,6 +158,26 @@ def _matches(url: str, routes: set[str]) -> bool:
         candidate[index] = "{}"
         if "/" + "/".join(candidate) + "/" in routes:
             return True
+
+    # A trailing dynamic segment is often an ACTION chosen at runtime:
+    #     apiFetch(`/admin/payments/reversals/${id}/${action}/`)
+    # against routes .../<pk>/approve/ and .../<pk>/reject/. The action is a
+    # variable, so it can never match a literal path however the segments are
+    # generalised — yet the endpoints plainly exist.
+    #
+    # Treat it as matched only when the parent really does expose actions:
+    # some registered route must share the whole prefix and add exactly one
+    # more segment. That keeps this from degenerating into "anything ending in
+    # a variable matches" — an unknown resource with no routes beneath it still
+    # fails, which is what the check is for.
+    if len(parts) > 1 and parts[-1] == "{}":
+        prefix = "/" + "/".join(parts[:-1]) + "/"
+        for route in routes:
+            if not route.startswith(prefix):
+                continue
+            remainder = route[len(prefix):].strip("/")
+            if remainder and "/" not in remainder:
+                return True
     return False
 
 

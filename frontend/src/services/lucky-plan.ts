@@ -118,29 +118,6 @@ class LuckyPlanService {
     return apiFetch('/api/v1/lucky-plan/lucky-id/') as Promise<LuckyIDTracker>
   }
 
-  async getDrawDetails(drawId: string): Promise<DrawResult> {
-    return apiFetch(`/api/v1/lucky-plan/draw-results/${drawId}/`) as Promise<DrawResult>
-  }
-
-  async verifySeed(batchId: string, seed: string): Promise<{
-    is_valid: boolean
-    hash: string
-    batch_name: string
-    draw_date: string
-    participants_count: number
-  }> {
-    const d = await apiFetch(
-      `/api/v1/public/lucky-plan/verify-seed/?batch_id=${encodeURIComponent(batchId)}&seed=${encodeURIComponent(seed)}`
-    )
-    return d as {
-      is_valid: boolean
-      hash: string
-      batch_name: string
-      draw_date: string
-      participants_count: number
-    }
-  }
-
   async getDrawAudit(): Promise<DrawAudit[]> {
     const d = await apiFetch('/api/v1/lucky-plan/draw-audit/')
     return Array.isArray(d) ? (d as DrawAudit[]) : ((d as { results?: DrawAudit[] })?.results ?? [])
@@ -176,10 +153,6 @@ class LuckyPlanService {
   async getWaiverSettlements(): Promise<WaiverSettlement[]> {
     const d = await apiFetch('/api/v1/admin/lucky-plan/waiver-settlements/')
     return Array.isArray(d) ? (d as WaiverSettlement[]) : ((d as { results?: WaiverSettlement[] })?.results ?? [])
-  }
-
-  async approveWaiverSettlement(id: number): Promise<unknown> {
-    return apiFetch(`/api/v1/admin/lucky-plan/waiver-settlements/${id}/approve/`, { method: 'POST' })
   }
 
   // Path helpers for pages that page through results themselves via a
