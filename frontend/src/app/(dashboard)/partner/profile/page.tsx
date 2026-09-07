@@ -27,6 +27,7 @@ import { changePartnerPassword, changePartnerUsername } from "@/services/partner
 import { useLogout } from "@/hooks/useLogout";
 
 import { apiFetch } from "@/lib/api";
+import { apiPaths } from "@/lib/api-paths";
 
 type PartnerProfileInfo = {
   name?: string;
@@ -65,7 +66,7 @@ function fmtMoney(v?: string | number | null) {
 
 async function fetchPartnerProfileInfo(): Promise<PartnerProfileInfo> {
   try {
-    return await apiFetch<PartnerProfileInfo>("/api/v1/partner/profile-info/");
+    return await apiFetch<PartnerProfileInfo>(apiPaths.partner.profileInfo);
   } catch {
     return {};
   }

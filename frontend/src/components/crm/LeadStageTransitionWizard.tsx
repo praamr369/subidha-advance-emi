@@ -148,7 +148,7 @@ const LeadStageTransitionWizard: React.FC<LeadStageTransitionWizardProps> = ({
               Step {currentStep + 1} of {steps.length}
             </p>
           </div>
-          <button
+          <button aria-label="Close"
             onClick={onCancel}
             className="p-1 hover:bg-gray-100 rounded-lg transition"
           >

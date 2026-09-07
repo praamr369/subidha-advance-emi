@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { apiFetch } from "@/lib/api";
+import { apiPaths } from "@/lib/api-paths";
 
 type ServiceJob = {
   id: number;
@@ -26,22 +27,33 @@ export default function ServiceSchedulePage() {
   const [editForm, setEditForm] = useState({ scheduled_date: "", technician_name: "" });
 
   useEffect(() => {
-    apiFetch("/api/v1/warranty/service-schedule/")
+    apiFetch(apiPaths.warranty.serviceSchedule)
       .then((d) => setJobs(Array.isArray(d) ? d as ServiceJob[] : ((d as { results?: ServiceJob[] })?.results ?? [])))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [editing]);
 
+  const [saveError, setSaveError] = useState<string | null>(null);
+
   const handleSave = async (id: number) => {
-    await apiFetch(`/api/v1/warranty/claim/${id}/schedule/`, {
-      method: "POST",
-      body: JSON.stringify(editForm),
-    });
-    setEditing(null);
+    if (!editForm.scheduled_date) {
+      setSaveError("Pick a date for the visit.");
+      return;
+    }
+    setSaveError(null);
+    try {
+      await apiFetch(apiPaths.warranty.scheduleClaim(id), {
+        method: "POST",
+        body: JSON.stringify(editForm),
+      });
+      setEditing(null);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Could not save the visit.");
+    }
   };
 
   const handleComplete = async (id: number) => {
-    await apiFetch(`/api/v1/warranty/service-call/${id}/complete/`, { method: "POST" });
+    await apiFetch(apiPaths.warranty.completeServiceCall(id), { method: "POST" });
     setJobs((prev) => prev.map((j) => j.id === id ? { ...j, status: "RESOLVED" } : j));
   };
 
@@ -93,6 +105,9 @@ export default function ServiceSchedulePage() {
                     <input type="date" className="border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-800"
                       value={editForm.scheduled_date} onChange={(e) => setEditForm({ ...editForm, scheduled_date: e.target.value })}
                       min={today} />
+                    {saveError && (
+                      <p role="alert" className="w-full text-xs text-red-600 mt-1">{saveError}</p>
+                    )}
                     <input type="text" className="border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-800 flex-1 min-w-32"
                       placeholder="Technician name"
                       value={editForm.technician_name} onChange={(e) => setEditForm({ ...editForm, technician_name: e.target.value })} />

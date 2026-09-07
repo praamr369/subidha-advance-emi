@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { apiFetch } from "@/lib/api";
+import { apiPaths } from "@/lib/api-paths";
 
 type ClaimStatus = {
   id: number;
@@ -33,7 +34,7 @@ export default function WarrantyStatusPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiFetch(`/api/v1/warranty/claim-status/${id}/`)
+    apiFetch(apiPaths.warranty.claimStatus(id))
       .then((d) => setData(d as ClaimStatus))
       .catch(() => {})
       .finally(() => setLoading(false));

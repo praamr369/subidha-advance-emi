@@ -4,6 +4,7 @@ import { Plus, Pencil, Trash2, ChevronRight, Save, X, Layers } from "lucide-reac
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import { request } from "@/services/api";
+import { apiPaths } from "@/lib/api-paths";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -22,7 +23,7 @@ type Paginated<T> = { results?: T[]; count?: number } | T[];
 function unwrap<T>(r: Paginated<T>): T[] { return Array.isArray(r) ? r : (r.results ?? []); }
 
 const DATA_TYPES: PimAttr["data_type"][] = ["TEXT", "NUMBER", "DECIMAL", "CHOICE", "MULTI_CHOICE", "BOOLEAN", "DATE"];
-const BASE = "/api/v1/pim";
+const BASE = apiPaths.pim.root;
 
 async function api<T>(path: string, opts?: RequestInit): Promise<T> {
   return request<T>(path, opts);
@@ -63,7 +64,7 @@ function CategoryForm({ initial, onSave, onCancel }: {
         <button type="submit" disabled={saving} className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-50">
           <Save className="h-3.5 w-3.5" />{saving ? "Saving…" : "Save"}
         </button>
-        <button type="button" onClick={onCancel} className="rounded-lg border px-3 py-2 text-sm hover:bg-muted">
+        <button aria-label="Close" type="button" onClick={onCancel} className="rounded-lg border px-3 py-2 text-sm hover:bg-muted">
           <X className="h-3.5 w-3.5" />
         </button>
         {err && <span className="text-xs text-destructive">{err}</span>}

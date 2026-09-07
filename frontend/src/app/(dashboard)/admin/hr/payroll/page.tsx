@@ -75,7 +75,7 @@ function Notice({ ok, children, onClose }: { ok?: boolean; children: ReactNode; 
     <div className={`flex items-start gap-2 rounded-xl border px-4 py-3 text-sm ${cls}`}>
       {ok ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" /> : <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />}
       <span className="flex-1">{children}</span>
-      {onClose && <button type="button" onClick={onClose} className="ml-2 shrink-0 opacity-60 hover:opacity-100"><X className="h-3.5 w-3.5" /></button>}
+      {onClose && <button aria-label="Close" type="button" onClick={onClose} className="ml-2 shrink-0 opacity-60 hover:opacity-100"><X className="h-3.5 w-3.5" /></button>}
     </div>
   );
 }
@@ -377,7 +377,7 @@ function GenerateModal({ staff, year, month, onClose, onCreated }: {
             <h2 className="text-base font-bold text-foreground">Generate salary sheets</h2>
             <p className="text-xs text-muted-foreground">{periodLabel(year, month)} — auto-generate from attendance, leave balance &amp; advances</p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-lg p-1.5 hover:bg-muted"><X className="h-4 w-4" /></button>
+          <button aria-label="Close" type="button" onClick={onClose} className="rounded-lg p-1.5 hover:bg-muted"><X className="h-4 w-4" /></button>
         </div>
 
         {/* How it works */}

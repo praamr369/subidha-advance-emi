@@ -36,6 +36,8 @@ export default function EMICalculatorWidget({ className }: EMICalculatorWidgetPr
               </span>
             </div>
             <input
+              aria-label="Purchase amount in rupees"
+              aria-valuetext={`₹${principal.toLocaleString("en-IN")}`}
               type="range"
               min={5000}
               max={150000}
@@ -59,6 +61,8 @@ export default function EMICalculatorWidget({ className }: EMICalculatorWidgetPr
               </span>
             </div>
             <input
+              aria-label="Number of months"
+              aria-valuetext={`${months} months`}
               type="range"
               min={3}
               max={18}

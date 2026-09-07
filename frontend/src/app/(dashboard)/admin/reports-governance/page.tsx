@@ -31,9 +31,9 @@ const REPORTS = [
 
 const PRIVACY = [
   { href: "/admin/privacy/breach-notifications", label: "Breach Notifications", icon: Eye, description: "Data breach disclosure log." },
-  { href: "/admin/privacy/breaches", label: "Breach Register", icon: ShieldCheck, description: "Internal data breach records." },
+  { href: "/admin/privacy/breach-notifications", label: "Breach Register", icon: ShieldCheck, description: "Internal data breach records." },
   { href: "/admin/privacy/compliance", label: "Privacy Compliance", icon: Scale, description: "Overall privacy compliance posture." },
-  { href: "/admin/privacy/data-retention", label: "Data Retention", icon: FileText, description: "Data retention schedules." },
+  { href: "/admin/privacy/retention-schedule", label: "Data Retention", icon: FileText, description: "Data retention schedules." },
   { href: "/admin/privacy/erasure-requests", label: "Erasure Requests", icon: Eye, description: "Right to be forgotten requests." },
   { href: "/admin/privacy/grievances", label: "Grievances", icon: ShieldCheck, description: "Privacy-related grievances." },
   { href: "/admin/privacy/retention-schedule", label: "Retention Schedule", icon: FileText, description: "Configured retention periods." },

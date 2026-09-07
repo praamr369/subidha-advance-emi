@@ -470,10 +470,15 @@
     // PIM extras
 
     // Privacy
-    privacyBreaches: "/admin/privacy/breaches",
+    // Was its own page. Both breach screens rendered the same DataBreachLog
+    // rows through different URL conventions, and both 404'd until the backend
+    // was built; breach-notifications is the fuller of the two and the one
+    // kept. Alias retained so existing links and bookmarks still land.
+    privacyBreaches: "/admin/privacy/breach-notifications",
     privacyBreachNotifications: "/admin/privacy/breach-notifications",
     privacyCompliance: "/admin/privacy/compliance",
-    privacyDataRetention: "/admin/privacy/data-retention",
+    // Same story as privacyBreaches: retention-schedule is the surviving page.
+    privacyDataRetention: "/admin/privacy/retention-schedule",
     privacyErasureRequests: "/admin/privacy/erasure-requests",
     privacyGrievances: "/admin/privacy/grievances",
     privacyRetentionSchedule: "/admin/privacy/retention-schedule",

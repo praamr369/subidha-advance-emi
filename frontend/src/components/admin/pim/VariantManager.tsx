@@ -232,7 +232,7 @@ function VariantEditPanel({
           <Pencil className="h-4 w-4 text-primary" />
           <span className="font-semibold text-sm">Edit Variant — <span className="font-mono">{variant.sku}</span></span>
         </div>
-        <button type="button" onClick={onCancel} className="text-muted-foreground hover:text-foreground">
+        <button aria-label="Close" type="button" onClick={onCancel} className="text-muted-foreground hover:text-foreground">
           <X className="h-4 w-4" />
         </button>
       </div>

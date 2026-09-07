@@ -128,7 +128,7 @@ function BomVariantRow({ variant, productId }: { variant: PimVariant; productId:
       {/* Header row */}
       <div className="flex items-center justify-between gap-3 px-4 py-3">
         <div className="flex items-center gap-3 min-w-0">
-          <button type="button" onClick={handleToggle} className="flex items-center gap-2 min-w-0">
+          <button aria-expanded={open} type="button" onClick={handleToggle} className="flex items-center gap-2 min-w-0">
             {open ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
             <span className="font-mono text-xs font-semibold truncate">{variant.sku}</span>
           </button>

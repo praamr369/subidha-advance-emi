@@ -325,7 +325,7 @@ function Wizard({ form, options, branches, editing, saving, fieldErrors, onChang
           <h3 className="text-sm font-bold text-foreground">{editing ? "Edit staff" : "Recruit new staff"}</h3>
           <p className="text-xs text-muted-foreground">Draft → Onboarding → Active. No payroll/accounting entries at this stage.</p>
         </div>
-        <button type="button" onClick={onClose} className="rounded-lg p-1.5 hover:bg-muted"><X className="h-4 w-4" /></button>
+        <button aria-label="Close" type="button" onClick={onClose} className="rounded-lg p-1.5 hover:bg-muted"><X className="h-4 w-4" /></button>
       </div>
 
       {/* Step nav */}

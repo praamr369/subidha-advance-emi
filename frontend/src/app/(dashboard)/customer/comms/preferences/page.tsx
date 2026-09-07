@@ -61,8 +61,16 @@ export default function CommsPreferencesPage() {
     }
   };
 
-  const Toggle = ({ enabled, onClick, disabled }: { enabled: boolean; onClick: () => void; disabled?: boolean }) => (
+  // role="switch" + aria-checked so assistive tech announces both what this
+  // control is and whether it is on. Without them it is an unnamed button
+  // whose state is conveyed only by background colour — a 1.4.1 and 4.1.2
+  // failure, and on this page it decides whether a customer receives payment
+  // reminders at all.
+  const Toggle = ({ enabled, onClick, disabled, label }: { enabled: boolean; onClick: () => void; disabled?: boolean; label: string }) => (
     <button
+      role="switch"
+      aria-checked={enabled}
+      aria-label={label}
       onClick={onClick}
       disabled={disabled}
       className={`relative inline-flex h-6 w-11 flex-shrink-0 rounded-full border-2 border-transparent transition-colors ${
@@ -100,7 +108,7 @@ export default function CommsPreferencesPage() {
                     <div className="text-xs text-gray-500">{ch.description}</div>
                   </div>
                 </div>
-                <Toggle enabled={prefs[ch.key]} onClick={() => toggle(ch.key)} />
+                <Toggle enabled={prefs[ch.key]} onClick={() => toggle(ch.key)} label={ch.label} />
               </div>
             ))}
           </div>
@@ -117,7 +125,7 @@ export default function CommsPreferencesPage() {
                   </div>
                   <div className="text-xs text-gray-500 mt-0.5">{topic.description}</div>
                 </div>
-                <Toggle enabled={prefs[topic.key]} onClick={() => !topic.mandatory && toggle(topic.key)} disabled={topic.mandatory} />
+                <Toggle enabled={prefs[topic.key]} onClick={() => !topic.mandatory && toggle(topic.key)} disabled={topic.mandatory} label={topic.label} />
               </div>
             ))}
           </div>

@@ -6,6 +6,7 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import { apiFetch } from "@/lib/api";
 import { ROUTES } from "@/lib/routes";
 import { Database } from "lucide-react";
+import { apiPaths } from "@/lib/api-paths";
 
 function toErr(e: unknown): string {
   if (e instanceof Error) return e.message;
@@ -49,7 +50,7 @@ export default function CustomerOpeningBalancesPage() {
     setSyncing(true);
     setSyncResult(null);
     try {
-      const res = await apiFetch("/api/v1/admin/opening-balances/customers/sync/", {
+      const res = await apiFetch(apiPaths.admin.openingBalanceCustomersSync, {
         method: "POST",
       }) as { newly_linked: number; already_linked: number; unresolvable: number };
       setSyncResult(res);
@@ -65,7 +66,7 @@ export default function CustomerOpeningBalancesPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await apiFetch("/api/v1/admin/opening-balances/customers/") as { results?: LegacyReceivable[]; total_outstanding?: string; };
+      const res = await apiFetch(apiPaths.admin.openingBalanceCustomers) as { results?: LegacyReceivable[]; total_outstanding?: string; };
       setRows(res.results || []);
       setTotalOutstanding(res.total_outstanding || "0.00");
     } catch (e) {
@@ -84,7 +85,7 @@ export default function CustomerOpeningBalancesPage() {
     setTogglingId(row.id);
     try {
       const newStatus = !row.admin_verified;
-      await apiFetch(`/api/v1/admin/opening-balances/customers/${row.id}/`, {
+      await apiFetch(apiPaths.admin.openingBalanceCustomer(row.id), {
         method: "PATCH",
         body: JSON.stringify({ admin_verified: newStatus }),
       });

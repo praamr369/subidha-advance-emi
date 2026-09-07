@@ -20,8 +20,9 @@ import {
 import Link from "next/link";
 
 import { apiFetch } from "@/lib/api";
+import { apiPaths } from "@/lib/api-paths";
 
-const API = "/api/v1/partner";
+const API = apiPaths.partner.root;
 
 type ReqType = "KYC_UPGRADE" | "LOGIN_ID_SETUP" | "KYC_DOCUMENT_UPLOAD";
 type ReqStatus = "PENDING" | "APPROVED" | "REJECTED" | "MORE_INFO" | "IN_PROGRESS";
@@ -391,7 +392,7 @@ export default function PartnerKycRequestsPage() {
                           <KycBadge status={selectedCustomer.kyc_status} />
                         </div>
                       </div>
-                      <button type="button" onClick={clearCustomer} className="shrink-0 text-muted-foreground hover:text-foreground">
+                      <button aria-label="Close" type="button" onClick={clearCustomer} className="shrink-0 text-muted-foreground hover:text-foreground">
                         <X className="size-4" />
                       </button>
                     </div>

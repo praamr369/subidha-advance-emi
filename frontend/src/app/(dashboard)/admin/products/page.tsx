@@ -189,7 +189,11 @@ function PimProductRow({
           {isChild ? (
             <GitBranch className="h-3 w-3 text-muted-foreground/60 shrink-0" />
           ) : hasChildren ? (
+            // aria-expanded carries the state; the label follows it, because a
+            // static "Collapse" would be wrong half the time.
             <button
+              aria-expanded={expanded}
+              aria-label={expanded ? "Collapse" : "Expand"}
               onClick={onToggle}
               className="p-0.5 rounded hover:bg-muted text-muted-foreground"
             >

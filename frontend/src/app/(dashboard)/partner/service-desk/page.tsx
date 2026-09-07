@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
+import { apiPaths } from "@/lib/api-paths";
 
 type TicketStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
 
@@ -89,7 +90,7 @@ function Notice({ tone, children }: { tone: NoticeTone; children: React.ReactNod
 }
 
 async function fetchTickets(): Promise<Ticket[]> {
-  const data = await apiFetch<{ results?: unknown[]; data?: unknown[] } | unknown[]>("/api/v1/partner/support/tickets/");
+  const data = await apiFetch<{ results?: unknown[]; data?: unknown[] } | unknown[]>(apiPaths.partner.supportTickets);
   const list = Array.isArray(data)
     ? data
     : (Array.isArray((data as { results?: unknown[] }).results)
@@ -104,7 +105,7 @@ async function submitTicket(payload: {
   priority: string;
   description: string;
 }) {
-  return apiFetch("/api/v1/partner/support/tickets/", {
+  return apiFetch(apiPaths.partner.supportTickets, {
     method: "POST",
     body: payload,
   });

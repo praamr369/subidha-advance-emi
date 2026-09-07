@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { apiFetch } from "@/lib/api";
+import { apiPaths } from "@/lib/api-paths";
 
 type Grievance = {
   id: number;
@@ -31,7 +32,7 @@ export default function PrivacyGrievancesAdminPage() {
   const [resolution, setResolution] = useState("");
 
   useEffect(() => {
-    apiFetch("/api/v1/privacy/admin-grievances/")
+    apiFetch(apiPaths.privacy.adminGrievances)
       .then((d) => setGrievances(Array.isArray(d) ? d as Grievance[] : ((d as { results?: Grievance[] })?.results ?? [])))
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -41,7 +42,7 @@ export default function PrivacyGrievancesAdminPage() {
     if (!resolution.trim()) return;
     setResponding(id);
     try {
-      await apiFetch(`/api/v1/privacy/grievance/${id}/resolve/`, {
+      await apiFetch(apiPaths.privacy.resolveGrievance(id), {
         method: "POST",
         body: JSON.stringify({ resolution_notes: resolution }),
       });

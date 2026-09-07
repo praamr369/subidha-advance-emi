@@ -11,10 +11,10 @@ const COMPLIANCE_AREAS = [
     items: [
       { label: "Consent Management", href: "/admin/settings/legal-controls", status: "ACTIVE" },
       { label: "Data Access Requests", href: "#", status: "ACTIVE" },
-      { label: "Data Retention Policy", href: "/admin/privacy/data-retention", status: "ACTIVE" },
-      { label: "Breach Incident Log", href: "/admin/privacy/breaches", status: "ACTIVE" },
+      { label: "Data Retention Policy", href: "/admin/privacy/retention-schedule", status: "ACTIVE" },
+      { label: "Breach Incident Log", href: "/admin/privacy/breach-notifications", status: "ACTIVE" },
       { label: "DPO Grievances", href: "/admin/privacy/grievances", status: "ACTIVE" },
-      { label: "Cookie Consent (DPDP 2023)", href: "/admin/privacy/data-retention", status: "ACTIVE" },
+      { label: "Cookie Consent (DPDP 2023)", href: "/admin/privacy/retention-schedule", status: "ACTIVE" },
     ],
   },
   {
@@ -29,7 +29,7 @@ const COMPLIANCE_AREAS = [
     title: "ITA 1961 — Tax Compliance",
     icon: "📊",
     items: [
-      { label: "7-Year Record Retention", href: "/admin/privacy/data-retention", status: "ACTIVE" },
+      { label: "7-Year Record Retention", href: "/admin/privacy/retention-schedule", status: "ACTIVE" },
       { label: "Accounting Audit Logs", href: "/admin/audit-logs", status: "ACTIVE" },
     ],
   },
@@ -84,9 +84,9 @@ export default function PrivacyCompliancePage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
               { label: "Audit Logs", href: "/admin/audit-logs", icon: "📋" },
-              { label: "Data Breaches", href: "/admin/privacy/breaches", icon: "🚨" },
+              { label: "Data Breaches", href: "/admin/privacy/breach-notifications", icon: "🚨" },
               { label: "Grievances", href: "/admin/privacy/grievances", icon: "⚖️" },
-              { label: "Data Retention", href: "/admin/privacy/data-retention", icon: "🗄️" },
+              { label: "Data Retention", href: "/admin/privacy/retention-schedule", icon: "🗄️" },
               { label: "Legal Controls", href: "/admin/settings/legal-controls", icon: "🔒" },
               { label: "Roles & Access", href: "/admin/settings/roles-permissions", icon: "👥" },
               { label: "KYC Review", href: "/admin/compliance/kyc", icon: "🪪" },

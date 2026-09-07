@@ -6,6 +6,7 @@ import RefreshBar from "@/components/feedback/RefreshBar";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { useRefreshableList } from "@/hooks/useRefreshableList";
 import { apiFetch } from "@/lib/api";
+import { apiPaths } from "@/lib/api-paths";
 
 type BreachNotification = {
   id: number;
@@ -46,7 +47,7 @@ const ACTION_NEXT: Record<string, string> = {
 };
 
 async function fetchBreaches(): Promise<BreachNotification[]> {
-  const d = await apiFetch("/api/v1/admin/privacy/breach-notifications/");
+  const d = await apiFetch(apiPaths.privacy.breachNotifications);
   return Array.isArray(d) ? (d as BreachNotification[]) : ((d as { results?: BreachNotification[] })?.results ?? []);
 }
 
@@ -70,7 +71,7 @@ export default function BreachNotificationsPage() {
   const advance = async (id: number, action: string, body?: object) => {
     const next = ACTION_NEXT[action];
     if (next) setItems((prev) => prev.map((b) => (b.id === id ? { ...b, status: next as BreachNotification["status"] } : b)));
-    await apiFetch(`/api/v1/admin/privacy/breach-notifications/${id}/${action}/`, {
+    await apiFetch(apiPaths.privacy.breachNotificationAction(id, action), {
       method: "POST",
       body: body ? JSON.stringify(body) : undefined,
     });
@@ -81,7 +82,7 @@ export default function BreachNotificationsPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await apiFetch("/api/v1/admin/privacy/breach-notifications/", {
+      await apiFetch(apiPaths.privacy.breachNotifications, {
         method: "POST",
         body: JSON.stringify({
           description: newBreach.description,

@@ -5,6 +5,7 @@ import { z } from "zod";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { apiFetch } from "@/lib/api";
+import { apiPaths } from "@/lib/api-paths";
 
 type MSMEInfo = {
   udyam_number: string | null;
@@ -43,7 +44,7 @@ export default function MSMEPage() {
   });
 
   useEffect(() => {
-    apiFetch("/api/v1/business/msme/")
+    apiFetch(apiPaths.business.msme)
       .then((d) => { const info = d as MSMEInfo; setInfo(info); setForm(info); })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -63,7 +64,7 @@ export default function MSMEPage() {
     setErrors({});
     setSaving(true);
     try {
-      await apiFetch("/api/v1/business/msme/", {
+      await apiFetch(apiPaths.business.msme, {
         method: "PATCH",
         body: JSON.stringify(form),
       });

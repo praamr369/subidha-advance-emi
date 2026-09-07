@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { apiFetch } from "@/lib/api";
+import { apiPaths } from "@/lib/api-paths";
 
 type Grievance = { id: number; subject: string; status: string; created_at: string; resolved_at: string | null };
 
@@ -24,7 +25,7 @@ export default function PrivacyGrievancePage() {
   ];
 
   useEffect(() => {
-    apiFetch("/api/v1/privacy/grievance/")
+    apiFetch(apiPaths.privacy.grievance)
       .then((d) => setGrievances(Array.isArray(d) ? d as Grievance[] : ((d as { results?: Grievance[] })?.results ?? [])))
       .catch(() => {});
   }, [submitted]);
@@ -35,7 +36,7 @@ export default function PrivacyGrievancePage() {
     setSubmitting(true);
     setError(null);
     try {
-      await apiFetch("/api/v1/privacy/grievance/", {
+      await apiFetch(apiPaths.privacy.grievance, {
         method: "POST",
         body: JSON.stringify(form),
       });

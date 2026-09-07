@@ -411,7 +411,7 @@ function InjectModal({ financeAccounts, onClose, onCreated }: {
             <h2 className="text-base font-semibold">Record Owner Fund Injection</h2>
             <p className="text-xs text-muted-foreground mt-0.5">Posts a real double-entry journal immediately</p>
           </div>
-          <button type="button" onClick={onClose}><X className="h-5 w-5 text-muted-foreground hover:text-foreground" /></button>
+          <button aria-label="Close" type="button" onClick={onClose}><X className="h-5 w-5 text-muted-foreground hover:text-foreground" /></button>
         </div>
 
         <div className="p-6 space-y-5">

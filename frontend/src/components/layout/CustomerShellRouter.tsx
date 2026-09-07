@@ -91,7 +91,7 @@ export default function CustomerShellRouter({ children }: { children: ReactNode 
                 <h2 className="text-base font-bold text-foreground">All Sections</h2>
                 <p className="text-xs text-muted-foreground mt-0.5">{displayName}</p>
               </div>
-              <button
+              <button aria-label="Close menu"
                 onClick={closeMobileMenu}
                 className="rounded-full bg-muted p-2 text-muted-foreground transition hover:bg-muted/80"
               >

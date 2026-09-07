@@ -489,7 +489,7 @@ export default function AdminPartnerCollectionRequestsPage() {
                   {formatDate(actionPanel.row.payment_date)}
                 </div>
               </div>
-              <button
+              <button aria-label="Close"
                 type="button"
                 onClick={closePanel}
                 className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"

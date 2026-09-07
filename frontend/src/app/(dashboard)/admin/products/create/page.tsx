@@ -240,7 +240,7 @@ function ImageUploadZone({ preview, onFileChange, onClear, disabled, error }: {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={preview} alt="Product preview" className="h-72 w-full object-cover" />
         {!disabled && (
-          <button type="button" onClick={onClear}
+          <button aria-label="Close" type="button" onClick={onClear}
             className="absolute right-2 top-2 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70">
             <X className="h-4 w-4" />
           </button>

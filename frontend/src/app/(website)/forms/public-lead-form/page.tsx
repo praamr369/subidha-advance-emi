@@ -6,6 +6,7 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { apiFetch } from "@/lib/api";
+import { apiPaths } from "@/lib/api-paths";
 
 const publicLeadSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -49,7 +50,7 @@ export default function PublicLeadFormPage() {
     setError(null);
 
     try {
-      await apiFetch("/api/v1/public/leads/", {
+      await apiFetch(apiPaths.publicSite.leads, {
         method: "POST",
         body: data,
       });

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { apiFetch } from "@/lib/api";
+import { apiPaths } from "@/lib/api-paths";
 
 type CookiePrefs = {
   essential: boolean;
@@ -48,7 +49,7 @@ export default function CookiePreferencesPage() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    apiFetch("/api/v1/privacy/cookie-consent/")
+    apiFetch(apiPaths.privacy.cookieConsent)
       .then((d) => { if (d) setPrefs(d as CookiePrefs); })
       .catch(() => {
         const stored = localStorage.getItem("cookie_prefs");
@@ -59,7 +60,7 @@ export default function CookiePreferencesPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await apiFetch("/api/v1/privacy/cookie-consent/", {
+      await apiFetch(apiPaths.privacy.cookieConsent, {
         method: "POST",
         body: JSON.stringify(prefs),
       });

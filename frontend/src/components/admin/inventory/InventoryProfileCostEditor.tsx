@@ -116,7 +116,7 @@ export default function InventoryProfileCostEditor({
             <h2 className="text-lg font-semibold">{productName}</h2>
             <p className="text-xs text-muted-foreground mt-1">Cost & Pricing Configuration</p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-muted">
+          <button aria-label="Close" onClick={onClose} className="rounded-lg p-1.5 hover:bg-muted">
             <X className="h-5 w-5" />
           </button>
         </div>

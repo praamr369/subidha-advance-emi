@@ -86,6 +86,9 @@ export default function GlobalSearch() {
         </div>
         <input
           type="text"
+          // A placeholder is not a label: it disappears the moment someone
+          // types, and screen readers are inconsistent about announcing it.
+          aria-label="Search products and help"
           placeholder="Search for furniture, appliances, or help..."
           className="h-full w-full bg-transparent px-2 text-sm text-foreground outline-none placeholder:text-muted-foreground/70"
           value={query}

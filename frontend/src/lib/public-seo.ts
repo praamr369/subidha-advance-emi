@@ -40,7 +40,12 @@ export function buildPublicMetadata(input: {
 
   return {
     metadataBase: new URL(getPublicSiteUrl()),
-    title,
+    // `absolute` opts out of the root layout's "%s | Subidha Furniture"
+    // template. This function has already composed the full title, so letting
+    // the template run again produced "Subidha Furniture | Subidha Furniture"
+    // on the homepage — the first thing a screen reader announces, and the
+    // text that shows in a search result and a bookmark.
+    title: { absolute: title },
     description,
     alternates: { canonical: canonicalPath },
     robots: input.noIndex

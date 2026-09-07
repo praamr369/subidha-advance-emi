@@ -6,6 +6,7 @@ import { apiFetch } from "@/lib/api";
 import { Wallet, PackageSearch, Users, Activity, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { ROUTES } from "@/lib/routes";
+import { apiPaths } from "@/lib/api-paths";
 
 interface SolopreneurData {
   total_liquid_balance: number;
@@ -20,7 +21,7 @@ export default function UniversalControlCenterPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiFetch("/api/v1/admin/solopreneur-dashboard/")
+    apiFetch(apiPaths.admin.solopreneurDashboard)
       .then((res: any) => {
         setData(res.data);
       })

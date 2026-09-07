@@ -14,6 +14,7 @@ import {
   Timeline,
 } from "@/components/ui/operations";
 import { apiFetch } from "@/lib/api";
+import { z } from "zod";
 
 type KycStatus = "NOT_PROVIDED" | "PENDING" | "VERIFIED" | "REJECTED";
 
@@ -82,6 +83,7 @@ export default function AdminCustomerEditPage() {
   const [toggling, setToggling] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [success, setSuccess] = useState<string | null>(null);
 
   const [name, setName] = useState("");
@@ -155,9 +157,42 @@ export default function AdminCustomerEditPage() {
     void loadPage();
   }, [loadPage]);
 
+  const customerEditSchema = z.object({
+    name: z.string().min(1, "Name is required"),
+    // Ten digits, matching the backend's own rule. Kept in step deliberately:
+    // a client rule looser than the server's just moves the error later, and
+    // one that is stricter rejects data the business would accept.
+    phone: z.string().regex(/^[0-9]{10}$/, "Enter a valid 10-digit phone number"),
+    email: z.string().email("Enter a valid email address").or(z.literal("")),
+    city: z.string().optional().default(""),
+  });
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!customerId) return;
+
+    // Validated before the round-trip. The backend validates too and remains
+    // the authority; this exists so a mistyped phone is caught next to the
+    // field rather than coming back as a raw API error with no field attached.
+    // Phone matters most: it is how this customer is contacted about payments,
+    // and a wrong one fails silently until someone cannot be reached.
+    const parsed = customerEditSchema.safeParse({
+      name: name.trim(),
+      phone: phone.trim(),
+      email: email.trim(),
+      city: city.trim(),
+    });
+    if (!parsed.success) {
+      const first = parsed.error.issues[0];
+      setFieldErrors(
+        Object.fromEntries(
+          parsed.error.issues.map((issue) => [String(issue.path[0]), issue.message])
+        )
+      );
+      setError(first?.message ?? "Please correct the highlighted fields.");
+      return;
+    }
+    setFieldErrors({});
 
     setSaving(true);
     setError(null);
@@ -328,9 +363,14 @@ export default function AdminCustomerEditPage() {
                   id="name"
                   value={name}
                   onChange={(event) => setName(event.target.value)}
+                  aria-invalid={Boolean(fieldErrors.name)}
+                  aria-describedby={fieldErrors.name ? "name-error" : undefined}
                   className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:border-ring"
                   required
                 />
+                {fieldErrors.name && (
+                  <p id="name-error" className="mt-1 text-xs text-destructive">{fieldErrors.name}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <label htmlFor="phone" className="text-sm font-medium text-foreground">
@@ -340,9 +380,14 @@ export default function AdminCustomerEditPage() {
                   id="phone"
                   value={phone}
                   onChange={(event) => setPhone(event.target.value)}
+                  aria-invalid={Boolean(fieldErrors.phone)}
+                  aria-describedby={fieldErrors.phone ? "phone-error" : undefined}
                   className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:border-ring"
                   required
                 />
+                {fieldErrors.phone && (
+                  <p id="phone-error" className="mt-1 text-xs text-destructive">{fieldErrors.phone}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <label htmlFor="email" className="text-sm font-medium text-foreground">
@@ -353,9 +398,14 @@ export default function AdminCustomerEditPage() {
                   type="email"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
+                  aria-invalid={Boolean(fieldErrors.email)}
+                  aria-describedby={fieldErrors.email ? "email-error" : undefined}
                   className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:border-ring"
                   required
                 />
+                {fieldErrors.email && (
+                  <p id="email-error" className="mt-1 text-xs text-destructive">{fieldErrors.email}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <label htmlFor="city" className="text-sm font-medium text-foreground">

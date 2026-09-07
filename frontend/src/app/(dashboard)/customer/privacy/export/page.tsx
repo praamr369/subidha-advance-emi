@@ -4,6 +4,7 @@ import { useState } from "react";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { apiFetch } from "@/lib/api";
+import { apiPaths } from "@/lib/api-paths";
 
 const DATA_CATEGORIES = [
   { key: "profile", label: "Profile & KYC", description: "Name, address, contact, identity documents" },
@@ -31,7 +32,7 @@ export default function DataExportPage() {
     setExporting(true);
     setError(null);
     try {
-      const res = await apiFetch("/api/v1/privacy/data-export/", {
+      const res = await apiFetch(apiPaths.privacy.dataExport, {
         method: "POST",
         body: JSON.stringify({ categories: selected, format }),
       });

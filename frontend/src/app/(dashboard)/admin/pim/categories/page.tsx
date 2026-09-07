@@ -7,6 +7,7 @@ import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import { pimService, type PimCategory } from "@/services/pim";
 import { request } from "@/services/api";
+import { apiPaths } from "@/lib/api-paths";
 
 const DATA_TYPE_LABELS: Record<string, string> = {
   TEXT: "Text",
@@ -155,7 +156,7 @@ export default function PimCategoriesPage() {
       <div className="flex items-center gap-2 mb-6">
         <button
           onClick={() => {
-            request("/api/v1/pim/categories/export_categories/")
+            request(apiPaths.pim.exportCategories)
               .then((data) => {
                 const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
                 const url = URL.createObjectURL(blob);
@@ -186,7 +187,7 @@ export default function PimCategoriesPage() {
               reader.onload = async (ev) => {
                 try {
                   const content = JSON.parse(ev.target?.result as string);
-                  await request("/api/v1/pim/categories/import_categories/", {
+                  await request(apiPaths.pim.importCategories, {
                     method: "POST",
                     body: JSON.stringify(content),
                   });

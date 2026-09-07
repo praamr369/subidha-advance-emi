@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { apiFetch } from "@/lib/api";
+import { apiPaths } from "@/lib/api-paths";
 
 type Claim = {
   id: number;
@@ -38,25 +39,41 @@ export default function WarrantyClaimsPage() {
     const qs = filter === "OPEN"
       ? "status=FILED,UNDER_REVIEW,APPROVED,SCHEDULED,IN_PROGRESS"
       : filter === "RESOLVED" ? "status=RESOLVED" : "";
-    apiFetch(`/api/v1/admin/warranty-claims/?${qs}`)
+    apiFetch(`${apiPaths.warranty.adminClaims}?${qs}`)
       .then((d) => setClaims(Array.isArray(d) ? d as Claim[] : ((d as { results?: Claim[] })?.results ?? [])))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [filter, scheduling]);
 
   const handleApprove = async (id: number) => {
-    await apiFetch(`/api/v1/admin/warranty-claims/${id}/approve/`, { method: "POST" });
+    await apiFetch(apiPaths.warranty.approveClaim(id), { method: "POST" });
     setClaims((prev) => prev.map((c) => c.id === id ? { ...c, status: "APPROVED" } : c));
   };
 
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
+
   const handleSchedule = async (id: number) => {
-    await apiFetch(`/api/v1/warranty/claim/${id}/schedule/`, {
-      method: "POST",
-      body: JSON.stringify({ scheduled_date: schedDate, technician_name: techName }),
-    });
-    setScheduling(null);
-    setSchedDate("");
-    setTechName("");
+    // A visit with no date is not a booking. The server rejects it too; this
+    // just says so beside the field instead of after a round-trip.
+    if (!schedDate) {
+      setScheduleError("Pick a date for the visit.");
+      return;
+    }
+    setScheduleError(null);
+    try {
+      await apiFetch(apiPaths.warranty.scheduleClaim(id), {
+        method: "POST",
+        body: JSON.stringify({ scheduled_date: schedDate, technician_name: techName.trim() }),
+      });
+      setScheduling(null);
+      setSchedDate("");
+      setTechName("");
+    } catch (err) {
+      // Previously unhandled: a failed booking closed the dialog and looked
+      // like a success, so a customer would be waiting for a visit nobody
+      // scheduled.
+      setScheduleError(err instanceof Error ? err.message : "Could not schedule the visit.");
+    }
   };
 
   return (
@@ -112,6 +129,9 @@ export default function WarrantyClaimsPage() {
                       placeholder="Technician name" value={techName} onChange={(e) => setTechName(e.target.value)} />
                     <button onClick={() => handleSchedule(c.id)}
                       className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs">Schedule</button>
+                    {scheduleError && (
+                      <p role="alert" className="w-full text-xs text-red-600 mt-1">{scheduleError}</p>
+                    )}
                     <button onClick={() => setScheduling(null)} className="px-3 py-1.5 border rounded text-xs">Cancel</button>
                   </div>
                 ) : (

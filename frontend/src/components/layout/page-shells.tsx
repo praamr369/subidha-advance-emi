@@ -623,17 +623,22 @@ export type PublicMarketingShellProps = {
 export function PublicMarketingShell({ className, hero, trust, sections, cta, children }: PublicMarketingShellProps) {
   const structured = hasRenderable(hero) || hasRenderable(trust) || hasRenderable(sections) || hasRenderable(cta);
 
+  // <div>, not <main>. PublicVisualShell already renders the page's <main>
+  // landmark (it carries #main-content, the skip link's target), and this
+  // shell renders INSIDE it. Two nested main landmarks is a 1.3.1 failure and
+  // makes "jump to main content" ambiguous for a screen-reader user — the very
+  // navigation the skip link exists to provide.
   if (!structured && hasRenderable(children)) {
-    return <main className={cn("min-w-0 text-foreground [&_*]:min-w-0 [&_*]:max-w-full", className)}>{children}</main>;
+    return <div className={cn("min-w-0 text-foreground [&_*]:min-w-0 [&_*]:max-w-full", className)}>{children}</div>;
   }
 
   return (
-    <main className={cn("flex min-w-0 flex-col gap-8 text-foreground [&_*]:min-w-0 [&_*]:max-w-full", className)}>
+    <div className={cn("flex min-w-0 flex-col gap-8 text-foreground [&_*]:min-w-0 [&_*]:max-w-full", className)}>
       <ShellSlot aria-label="Hero">{hero}</ShellSlot>
       <ShellSlot aria-label="Trust and proof">{trust}</ShellSlot>
       <ShellSlot aria-label="Content sections">{sections}</ShellSlot>
       <ShellSlot aria-label="Call to action">{cta}</ShellSlot>
       {hasRenderable(children) ? <div className="min-w-0 space-y-8">{children}</div> : null}
-    </main>
+    </div>
   );
 }

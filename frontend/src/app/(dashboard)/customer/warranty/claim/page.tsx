@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { apiFetch } from "@/lib/api";
+import { apiPaths } from "@/lib/api-paths";
 
 type Subscription = { id: number; product_name: string; subscription_number: string; product_id: number };
 
@@ -21,7 +22,7 @@ export default function WarrantyClaimPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    apiFetch("/api/v1/customer/subscriptions/?page_size=50")
+    apiFetch(`${apiPaths.customer.subscriptions}?page_size=50`)
       .then((d) => setSubs(Array.isArray(d) ? d as Subscription[] : ((d as { results?: Subscription[] })?.results ?? [])))
       .catch(() => {});
   }, []);
@@ -44,7 +45,7 @@ export default function WarrantyClaimPage() {
     setError(null);
     try {
       const sub = subs.find((s) => String(s.id) === form.subscription_id);
-      const res = await apiFetch("/api/v1/warranty/claim/", {
+      const res = await apiFetch(apiPaths.warranty.claim, {
         method: "POST",
         body: JSON.stringify({
           subscription_id: form.subscription_id,

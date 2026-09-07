@@ -179,7 +179,7 @@ export default function ProductGrid({
             </div>
 
             {hasActiveFilters ? (
-              <button
+              <button aria-label="Close"
                 type="button"
                 onClick={resetFilters}
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-medium text-foreground shadow-[0_18px_36px_-28px_rgba(15,23,42,0.72)] transition hover:-translate-y-0.5 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/40 focus-visible:ring-offset-2"

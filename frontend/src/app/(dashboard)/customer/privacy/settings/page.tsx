@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { apiFetch } from "@/lib/api";
+import { apiPaths } from "@/lib/api-paths";
 
 type Consent = { id: number; consent_type: string; is_active: boolean; granted_at: string; withdrawn_at: string | null };
 
@@ -20,7 +21,7 @@ export default function PrivacySettingsPage() {
   const [saving, setSaving] = useState<string | null>(null);
 
   useEffect(() => {
-    apiFetch("/api/v1/privacy/consents/")
+    apiFetch(apiPaths.privacy.consents)
       .then((d) => setConsents(Array.isArray(d) ? d as Consent[] : ((d as { results?: Consent[] })?.results ?? [])))
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -31,12 +32,12 @@ export default function PrivacySettingsPage() {
     setSaving(consent.consent_type);
     try {
       if (consent.is_active) {
-        await apiFetch("/api/v1/privacy/consent/withdraw/", {
+        await apiFetch(apiPaths.privacy.consentWithdraw, {
           method: "POST",
           body: JSON.stringify({ consent_id: consent.id }),
         });
       } else {
-        await apiFetch("/api/v1/privacy/consent/grant/", {
+        await apiFetch(apiPaths.privacy.consentGrant, {
           method: "POST",
           body: JSON.stringify({ consent_type: consent.consent_type }),
         });

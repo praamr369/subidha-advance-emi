@@ -23,6 +23,7 @@ import { apiFetch, ApiError } from "@/lib/api";
 import ActionButton from "@/components/ui/ActionButton";
 import AuthBrand from "@/components/auth/AuthBrand";
 import { useI18n } from "@/components/i18n/I18nProvider";
+import { apiPaths } from "@/lib/api-paths";
 
 type RegisterResponse = {
   access?: string;
@@ -243,7 +244,7 @@ export default function RegisterPage() {
       setError(null);
       setSuccessMessage(null);
 
-      await apiFetch("/api/v1/auth/register/", {
+      await apiFetch(apiPaths.auth.register, {
         method: "POST",
         body: {
           username: trimmedUsername,

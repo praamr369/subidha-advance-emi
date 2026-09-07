@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { apiFetch } from "@/lib/api";
+import { apiPaths } from "@/lib/api-paths";
 
 type Subscription = { id: number; product_name: string; subscription_number: string; product_id: number };
 type WarrantyInfo = {
@@ -28,7 +29,7 @@ export default function WarrantyCheckPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    apiFetch("/api/v1/customer/subscriptions/?page_size=50")
+    apiFetch(`${apiPaths.customer.subscriptions}?page_size=50`)
       .then((d) => setSubs(Array.isArray(d) ? d as Subscription[] : ((d as { results?: Subscription[] })?.results ?? [])))
       .catch(() => {});
   }, []);
@@ -39,7 +40,7 @@ export default function WarrantyCheckPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await apiFetch(`/api/v1/warranty/check/${sub.product_id}/`);
+      const res = await apiFetch(apiPaths.warranty.check(sub.product_id));
       setInfo(res as WarrantyInfo);
     } catch {
       setError("Could not fetch warranty information.");

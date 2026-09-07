@@ -292,7 +292,7 @@ export default function SmartCollectionCockpitPanel() {
               </div>
 
               <div className="flex gap-3 pt-2">
-                <button
+                <button aria-label="Continue"
                   onClick={handleExecute}
                   disabled={executing}
                   className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50 transition-all active:scale-[0.98]"

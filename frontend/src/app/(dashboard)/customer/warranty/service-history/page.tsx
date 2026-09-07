@@ -5,6 +5,7 @@ import Link from "next/link";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { apiFetch } from "@/lib/api";
+import { apiPaths } from "@/lib/api-paths";
 
 type ServiceRecord = {
   id: number;
@@ -21,7 +22,7 @@ export default function ServiceHistoryPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiFetch("/api/v1/warranty/service-history/")
+    apiFetch(apiPaths.warranty.serviceHistory)
       .then((d) => setRecords(Array.isArray(d) ? d as ServiceRecord[] : ((d as { results?: ServiceRecord[] })?.results ?? [])))
       .catch(() => {})
       .finally(() => setLoading(false));

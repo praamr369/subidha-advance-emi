@@ -182,7 +182,7 @@ export default function ProductPickerCombobox({
               {value.sku ? <span className="ml-2 text-xs text-muted-foreground">{value.sku}</span> : null}
               {value.category ? <span className="ml-2 text-xs text-muted-foreground">{value.category}</span> : null}
             </span>
-            <button
+            <button aria-label="Close"
               type="button"
               onClick={clearValue}
               className="shrink-0 rounded-full p-0.5 text-muted-foreground hover:text-foreground hover:bg-muted"

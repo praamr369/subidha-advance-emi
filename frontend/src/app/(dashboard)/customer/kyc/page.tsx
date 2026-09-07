@@ -5,6 +5,7 @@ import { z } from "zod";
 import CustomerPageShell, { CPageCard, CPageSection } from "@/components/layout/CustomerPageShell";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import { apiFetch } from "@/lib/api";
+import { apiPaths } from "@/lib/api-paths";
 
 type KYCStatus = {
   status: "PENDING" | "SUBMITTED" | "UNDER_REVIEW" | "VERIFIED" | "REJECTED";
@@ -64,7 +65,7 @@ export default function KYCPage() {
     setLoading(true);
     try {
       const d = await apiFetch<{ kyc_status?: string; results?: KycDocumentRow[] }>(
-        "/api/v1/customer/kyc-documents/"
+        apiPaths.customer.kycDocuments
       );
       const docs = Array.isArray(d?.results) ? d.results : [];
       // Earliest upload is when the customer submitted; latest review is when
@@ -130,7 +131,7 @@ export default function KYCPage() {
       const formData = new FormData();
       formData.append("document_type", docType);
       formData.append("file", file);
-      await apiFetch("/api/v1/customer/kyc-documents/", { method: "POST", body: formData });
+      await apiFetch(apiPaths.customer.kycDocuments, { method: "POST", body: formData });
       setUploaded(true);
       setTimeout(() => setUploaded(false), 3000);
     } catch {

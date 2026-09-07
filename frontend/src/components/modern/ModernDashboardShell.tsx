@@ -93,7 +93,7 @@ export const ModernDashboardShell: React.FC<ModernDashboardShellProps> = ({
                   <p className="text-xs text-slate-500 dark:text-slate-400">Admin</p>
                 </div>
                 {userMenu || (
-                  <button className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition">
+                  <button aria-label="Account" className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition">
                     <User className="w-5 h-5 text-slate-600 dark:text-slate-400" />
                   </button>
                 )}

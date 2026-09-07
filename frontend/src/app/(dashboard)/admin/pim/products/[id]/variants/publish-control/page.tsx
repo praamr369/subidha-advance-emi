@@ -144,7 +144,7 @@ export default function VariantPublishControlPage() {
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">{data.base.name}</p>
               </div>
-              <button
+              <button aria-label="Hide"
                 type="button"
                 onClick={toggleBase}
                 className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition hover:-translate-y-0.5 ${

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { apiFetch } from "@/lib/api";
+import { apiPaths } from "@/lib/api-paths";
 
 type Request = { id: number; request_type: string; status: string; created_at: string; completed_at: string | null };
 
@@ -23,7 +24,7 @@ export default function DataAccessPage() {
   const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
-    apiFetch("/api/v1/privacy/data-access-request/")
+    apiFetch(apiPaths.privacy.dataAccessRequest)
       .then((d) => setRequests(Array.isArray(d) ? d as Request[] : ((d as { results?: Request[] })?.results ?? [])))
       .catch(() => {});
   }, [submitted]);
@@ -33,7 +34,7 @@ export default function DataAccessPage() {
     setSubmitting(true);
     setError(null);
     try {
-      await apiFetch("/api/v1/privacy/data-access-request/", {
+      await apiFetch(apiPaths.privacy.dataAccessRequest, {
         method: "POST",
         body: JSON.stringify(form),
       });

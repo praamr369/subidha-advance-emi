@@ -5,6 +5,7 @@ import RefreshBar from "@/components/feedback/RefreshBar";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { useRefreshableList } from "@/hooks/useRefreshableList";
 import { apiFetch } from "@/lib/api";
+import { apiPaths } from "@/lib/api-paths";
 
 type RetentionSchedule = {
   id: number;
@@ -30,7 +31,7 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 async function fetchSchedule(): Promise<RetentionSchedule[]> {
-  const d = await apiFetch("/api/v1/admin/privacy/retention-schedule/");
+  const d = await apiFetch(apiPaths.privacy.retentionSchedule);
   return Array.isArray(d) ? (d as RetentionSchedule[]) : ((d as { results?: RetentionSchedule[] })?.results ?? []);
 }
 
@@ -49,7 +50,7 @@ export default function RetentionSchedulePage() {
     const nextMap: Record<string, string> = { approve: "APPROVED", cancel: "CANCELLED", execute: "IN_PROGRESS" };
     const next = nextMap[action];
     if (next) setItems((prev) => prev.map((s) => (s.id === id ? { ...s, status: next as RetentionSchedule["status"] } : s)));
-    await apiFetch(`/api/v1/admin/privacy/retention-schedule/${id}/${action}/`, { method: "POST" });
+    await apiFetch(apiPaths.privacy.retentionScheduleAction(id, action), { method: "POST" });
     reload();
   };
 

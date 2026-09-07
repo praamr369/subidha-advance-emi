@@ -89,7 +89,7 @@ export function OperationalCalendar() {
             {format(currentMonth, "MMMM yyyy")}
           </div>
           <div className="flex items-center gap-1">
-            <button 
+            <button aria-label="Previous month"
               onClick={prevMonth}
               className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
             >
@@ -101,7 +101,7 @@ export function OperationalCalendar() {
             >
               Today
             </button>
-            <button 
+            <button aria-label="Next month"
               onClick={nextMonth}
               className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
             >

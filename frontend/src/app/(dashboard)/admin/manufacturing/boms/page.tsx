@@ -130,7 +130,7 @@ function LineRow({ line, index, total, onChange, onRemove }: {
         <input value={line.notes} onChange={(e) => onChange({ notes: e.target.value })} placeholder="Optional" className={INP} />
       </div>
       <div className={index === 0 ? "mt-5" : ""}>
-        <button type="button" onClick={onRemove} disabled={total === 1} className="flex h-9 w-8 items-center justify-center rounded-lg border border-destructive/30 text-destructive hover:bg-destructive/10 disabled:opacity-30 transition">
+        <button aria-label="Close" type="button" onClick={onRemove} disabled={total === 1} className="flex h-9 w-8 items-center justify-center rounded-lg border border-destructive/30 text-destructive hover:bg-destructive/10 disabled:opacity-30 transition">
           <X className="h-3.5 w-3.5" />
         </button>
       </div>
@@ -278,7 +278,7 @@ function ServiceLineRow({ line, index, onChange, onRemove }: {
         <input value={line.notes} onChange={(e) => onChange({ notes: e.target.value })} placeholder="Optional" className={INP} />
       </div>
       <div className={index === 0 ? "mt-5" : ""}>
-        <button type="button" onClick={onRemove} className="flex h-9 w-8 items-center justify-center rounded-lg border border-destructive/30 text-destructive hover:bg-destructive/10 transition">
+        <button aria-label="Close" type="button" onClick={onRemove} className="flex h-9 w-8 items-center justify-center rounded-lg border border-destructive/30 text-destructive hover:bg-destructive/10 transition">
           <X className="h-3.5 w-3.5" />
         </button>
       </div>

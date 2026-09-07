@@ -20,6 +20,7 @@ import { getAccessToken } from "@/lib/auth/tokens";
 import { getStoredSession } from "@/lib/auth/session";
 import type { InventoryValuationReport, InventoryValuationRow, StockLocation } from "@/services/inventory";
 import { getInventoryValuation, listStockLocations, listInventoryCategories } from "@/services/inventory";
+import { apiPaths } from "@/lib/api-paths";
 
 const columns: EnterpriseColumnDef<InventoryValuationRow>[] = [
   { key: "product_code", header: "Product" },
@@ -139,7 +140,7 @@ export default function InventoryValuationPage() {
       // returns a CSV blob that must be handled with response.blob().
       const accessToken = getAccessToken() ?? getStoredSession()?.accessToken ?? null;
       const response = await fetch(
-        `/api/v1/admin/inventory/valuation/?export=csv&as_of_date=${encodeURIComponent(asOfDate)}&search=${encodeURIComponent(debouncedSearch)}&category=${encodeURIComponent(debouncedCategory)}&exclude_zero=${excludeZero ? "true" : "false"}${locationId ? `&stock_location_id=${locationId}` : ""}`,
+        `${apiPaths.admin.inventoryValuation}?export=csv&as_of_date=${encodeURIComponent(asOfDate)}&search=${encodeURIComponent(debouncedSearch)}&category=${encodeURIComponent(debouncedCategory)}&exclude_zero=${excludeZero ? "true" : "false"}${locationId ? `&stock_location_id=${locationId}` : ""}`,
         {
           credentials: "include",
           headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},

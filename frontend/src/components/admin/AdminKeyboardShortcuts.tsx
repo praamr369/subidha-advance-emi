@@ -119,7 +119,7 @@ const KeyboardShortcutsHelpModal: React.FC<{
             <Keyboard className="w-6 h-6 text-slate-700" />
             <h2 className="text-2xl font-bold text-slate-900">Keyboard Shortcuts</h2>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded transition">
+          <button aria-label="Close" onClick={onClose} className="p-2 hover:bg-slate-100 rounded transition">
             <X className="w-5 h-5" />
           </button>
         </div>

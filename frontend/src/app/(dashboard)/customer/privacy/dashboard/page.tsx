@@ -5,6 +5,7 @@ import Link from "next/link";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { apiFetch } from "@/lib/api";
+import { apiPaths } from "@/lib/api-paths";
 
 type PrivacySummary = {
   active_consents: number;
@@ -27,7 +28,7 @@ export default function PrivacyDashboardPage() {
   const [summary, setSummary] = useState<PrivacySummary | null>(null);
 
   useEffect(() => {
-    apiFetch("/api/v1/privacy/dashboard-summary/")
+    apiFetch(apiPaths.privacy.dashboardSummary)
       .then((d) => setSummary(d as PrivacySummary))
       .catch(() => {});
   }, []);

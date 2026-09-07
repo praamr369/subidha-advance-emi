@@ -91,7 +91,7 @@ export default function ImageCropperModal({ imageSrc, onCropComplete, onCancel }
       <div className="relative flex h-[80vh] w-[90vw] max-w-2xl flex-col rounded-2xl bg-background shadow-2xl">
         <div className="flex items-center justify-between border-b p-4">
           <h2 className="text-lg font-semibold">Crop Image</h2>
-          <button type="button" onClick={onCancel} className="rounded-full p-1 hover:bg-muted">
+          <button aria-label="Close" type="button" onClick={onCancel} className="rounded-full p-1 hover:bg-muted">
             <X className="h-5 w-5" />
           </button>
         </div>

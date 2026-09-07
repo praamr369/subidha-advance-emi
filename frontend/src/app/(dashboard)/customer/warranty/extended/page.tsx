@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { apiFetch } from "@/lib/api";
+import { apiPaths } from "@/lib/api-paths";
 
 type Subscription = { id: number; product_name: string; subscription_number: string; product_id: number };
 type ExtendedPlan = { months: number; cost_percentage: number; estimated_cost: number };
@@ -18,7 +19,7 @@ export default function ExtendedWarrantyPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    apiFetch("/api/v1/customer/subscriptions/?page_size=50")
+    apiFetch(`${apiPaths.customer.subscriptions}?page_size=50`)
       .then((d) => setSubs(Array.isArray(d) ? d as Subscription[] : ((d as { results?: Subscription[] })?.results ?? [])))
       .catch(() => {});
   }, []);
@@ -27,7 +28,7 @@ export default function ExtendedWarrantyPage() {
     if (!selectedSub) { setPlans([]); return; }
     const sub = subs.find((s) => String(s.id) === selectedSub);
     if (!sub) return;
-    apiFetch(`/api/v1/warranty/extended-plans/${sub.product_id}/`)
+    apiFetch(apiPaths.warranty.extendedPlans(sub.product_id))
       .then((d) => setPlans(Array.isArray(d) ? d as ExtendedPlan[] : ((d as { plans?: ExtendedPlan[] })?.plans ?? [])))
       .catch(() => setPlans([
         { months: 12, cost_percentage: 2, estimated_cost: 0 },
@@ -44,7 +45,7 @@ export default function ExtendedWarrantyPage() {
     setSubmitting(true);
     setError(null);
     try {
-      await apiFetch("/api/v1/warranty/enroll-extended/", {
+      await apiFetch(apiPaths.warranty.enrolExtended, {
         method: "POST",
         body: JSON.stringify({ subscription_id: selectedSub, months: selectedPlan }),
       });

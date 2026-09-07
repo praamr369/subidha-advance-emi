@@ -5,6 +5,7 @@ import Link from "next/link";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { apiFetch } from "@/lib/api";
+import { apiPaths } from "@/lib/api-paths";
 
 type RefundCase = {
   id: number;
@@ -38,7 +39,7 @@ export default function RefundProcessPage() {
     const qs = statusFilter === "PENDING"
       ? "status=REQUESTED,UNDER_REVIEW,ITEM_RECEIVED,PROCESSING"
       : `status=${statusFilter}`;
-    apiFetch(`/api/v1/refunds/admin-list/?${qs}`)
+    apiFetch(`${apiPaths.refunds.adminList}?${qs}`)
       .then((d) => setCases(Array.isArray(d) ? d as RefundCase[] : ((d as { results?: RefundCase[] })?.results ?? [])))
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -46,7 +47,7 @@ export default function RefundProcessPage() {
 
   const handleAdvance = async (id: number) => {
     try {
-      await apiFetch(`/api/v1/refunds/${id}/advance/`, { method: "POST" });
+      await apiFetch(apiPaths.refunds.advance(id), { method: "POST" });
       setCases((prev) => prev.filter((c) => c.id !== id));
     } catch {
       // silent
