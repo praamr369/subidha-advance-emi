@@ -38,7 +38,7 @@
 |---|--------|---------|-----------------|
 | 12 | Admin Route Dedup | Route audit + pre-commit hook | ✅ audit-admin-routes.ts |
 | 13 | Route Drift Fix | Fixed 74 check:routes errors (74→0) | ✅ ROUTE_DRIFT_FIX_REPORT.md |
-| 14 | Verification Gate Layer-A | Auth matrix + endpoint smoke tests | ✅ verification_gate_layer_a.py |
+| 14 | Verification Gate Layer-A | Auth matrix + endpoint smoke tests | ✅ `backend/tests/verification/` (30 modules + `url_walker.py`) — this is what CI runs and what the full suite collects. A standalone `verification_gate_layer_a.py` also existed, but nothing referenced it, Django's `test*.py` discovery never collected it, and it failed at `setUpClass`; deleted 2026-09-07 so the working gate is the only one. |
 | 15 | Profile 360 | Shared 360° profile component | ✅ Profile360.tsx |
 | 16 | N+1 Performance Fixes | Query optimization (6013→0 queries) | ✅ N_PLUS_1_FIXES_REPORT.md |
 
