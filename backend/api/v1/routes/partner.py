@@ -1,5 +1,8 @@
 from django.urls import path
 
+from api.v1.views.partner_profile_info import partner_profile_info_view
+from api.v1.views.partner_support import partner_support_tickets_view
+
 from api.v1.views.catalog import (
     PartnerCatalogDetailView,
     PartnerCatalogFacetsView,
@@ -44,6 +47,7 @@ from api.v1.views.subscription_requests import (
     PartnerSubscriptionRequestOptionsView,
 )
 from api.v1.views.product_requests import (
+    PartnerProductRequestCancelView,
     PartnerProductRequestListView,
     PartnerProductRequestOptionsView,
 )
@@ -63,6 +67,8 @@ urlpatterns = [
     path("dashboard/summary/", PartnerDashboardView.as_view()),
     path("notifications/", PartnerNotificationListView.as_view()),
     path("notifications/summary/", PartnerNotificationSummaryView.as_view()),
+    path("profile-info/", partner_profile_info_view),
+    path("support/tickets/", partner_support_tickets_view),
     path("profile/username/", PartnerSelfUsernameChangeView.as_view()),
     path("profile/change-password/", PartnerSelfPasswordChangeView.as_view()),
     path("subscriptions/", PaginatedPartnerSubscriptionListView.as_view()),
@@ -73,6 +79,10 @@ urlpatterns = [
     path("subscription-requests/<int:pk>/cancel/", PartnerSubscriptionRequestCancelView.as_view()),
     path("product-request-options/", PartnerProductRequestOptionsView.as_view()),
     path("product-requests/", PartnerProductRequestListView.as_view()),
+    path(
+        "product-requests/<int:pk>/cancel/",
+        PartnerProductRequestCancelView.as_view(),
+    ),
     path("customers/", PaginatedPartnerCustomerListView.as_view()),
     path("customers/<int:pk>/", PartnerCustomerDetailView.as_view()),
     path("payments/", PartnerPaymentListView.as_view()),

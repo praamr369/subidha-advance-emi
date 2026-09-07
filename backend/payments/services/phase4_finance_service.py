@@ -514,8 +514,23 @@ def customer_invoice_list(*, customer, limit: int = 200) -> dict:
     }
 
 
+def customer_receipt_detail(*, customer, receipt_id: int) -> dict | None:
+    """One receipt, in the same shape the list serves.
+
+    Built by filtering the list rather than duplicating the row builder: two
+    shapes for one record is how a detail page starts disagreeing with the
+    list it was opened from. The customer filter is what scopes it — a receipt
+    belonging to someone else is simply not found.
+    """
+    payload = customer_receipt_list(customer=customer, limit=None)
+    for row in payload["results"]:
+        if row["id"] == receipt_id:
+            return row
+    return None
+
+
 def customer_receipt_list(*, customer, limit: int = 200) -> dict:
-    rows = list(
+    queryset = (
         ReceiptDocument.objects.filter(customer=customer)
         .select_related(
             "subscription",
@@ -524,8 +539,11 @@ def customer_receipt_list(*, customer, limit: int = 200) -> dict:
             "payment",
             "direct_sale",
         )
-        .order_by("-receipt_date", "-id")[:limit]
+        .order_by("-receipt_date", "-id")
     )
+    # limit=None is the detail lookup, which must be able to reach a receipt
+    # older than the list's window.
+    rows = list(queryset if limit is None else queryset[:limit])
     return {
         "count": len(rows),
         "results": [

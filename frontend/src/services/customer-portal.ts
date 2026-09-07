@@ -25,13 +25,18 @@ export function customerReceiptPdfUrl(receiptId: number | string): string {
 // ── Returns ──
 
 export async function fetchCustomerReturns(): Promise<unknown> {
-  return apiFetch('/api/v1/customer/returns/')
+  // A "return" and a "refund request" are the same ConsumerReturnRequest row;
+  // /customer/returns/ never existed, and the refund endpoints have served
+  // these records all along.
+  return apiFetch('/api/v1/refunds/history/')
 }
 
 export async function submitCustomerReturn(data: { subscription: number; reason: string }): Promise<unknown> {
-  return apiFetch('/api/v1/customer/returns/', {
+  return apiFetch('/api/v1/refunds/request/', {
     method: 'POST',
-    body: JSON.stringify(data),
+    // The API names it subscription_id. Mapped here rather than renaming the
+    // caller's field, so the page keeps its own vocabulary.
+    body: JSON.stringify({ subscription_id: data.subscription, reason: data.reason }),
   })
 }
 
@@ -98,5 +103,7 @@ export async function fetchCustomerDeposits(): Promise<unknown> {
 // ── Documents: Consent History ──
 
 export async function fetchCustomerDocumentConsents(): Promise<unknown> {
-  return apiFetch('/api/v1/customers/document-consents/')
+  // The DPDP consent surface owns this; /customers/document-consents/
+  // never existed. Same records, one implementation.
+  return apiFetch('/api/v1/privacy/consents/')
 }

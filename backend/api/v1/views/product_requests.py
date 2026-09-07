@@ -138,6 +138,37 @@ class CustomerProductRequestCancelView(APIView):
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
+class PartnerProductRequestCancelView(APIView):
+    """A partner withdrawing a request they raised.
+
+    Identical in substance to the customer and admin cancels — all three call
+    cancel_product_request, which owns the rules about which states may be
+    cancelled and by whom. Duplicating that logic per portal is how the three
+    paths would drift apart.
+
+    The partner page has called this since it was written; only the customer
+    and admin variants were ever mounted, so a partner's Cancel button 404'd.
+    """
+
+    permission_classes = [IsAuthenticated, IsPartner]
+
+    @transaction.atomic
+    def post(self, request, pk):
+        try:
+            req_obj = cancel_product_request(request_id=pk, user=request.user)
+            resp_serializer = ProductRequestReadSerializer(
+                _reload_request_for_response(req_obj.id),
+                context={"request": request},
+            )
+            return Response(resp_serializer.data)
+        except ProductRequest.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        except ValidationError as e:
+            return Response(_validation_error_payload(e), status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
 class PartnerProductRequestOptionsView(APIView):
     permission_classes = [IsAuthenticated, IsPartner]
 

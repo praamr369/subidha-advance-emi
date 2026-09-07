@@ -30,6 +30,7 @@ from payments.services.phase4_finance_service import (
     customer_finance_summary,
     customer_invoice_list,
     customer_payment_schedule,
+    customer_receipt_detail,
     customer_receipt_list,
 )
 from contracts.services.document_pdf_service import (
@@ -203,6 +204,30 @@ class CustomerReceiptListView(APIView):
         if customer is None:
             return _customer_missing_response()
         return Response(customer_receipt_list(customer=customer))
+
+
+class CustomerReceiptDetailView(APIView):
+    """One receipt as JSON.
+
+    The list and the PDF both existed; the detail did not, so the customer
+    receipt page 404'd. Scoped to the requesting customer, so another
+    customer's receipt id is "not found" rather than "forbidden" — which of
+    those is correct matters here, because "forbidden" would confirm the
+    receipt exists.
+    """
+
+    permission_classes = [IsCustomer]
+
+    def get(self, request, pk: int):
+        customer = _customer_or_404(request)
+        if customer is None:
+            return _customer_missing_response()
+        receipt = customer_receipt_detail(customer=customer, receipt_id=pk)
+        if receipt is None:
+            return Response(
+                {"detail": "Receipt not found."}, status=status.HTTP_404_NOT_FOUND
+            )
+        return Response(receipt)
 
 
 class CustomerReceiptPdfView(APIView):

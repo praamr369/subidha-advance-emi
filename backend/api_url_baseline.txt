@@ -11,22 +11,3 @@
 #
 # Adding a line here to make CI pass is hiding a broken feature from the only
 # check that looks for one.
-/api/v1/admin/collections/due-today/
-/api/v1/admin/collections/overdue/
-/api/v1/admin/collections/recent/
-/api/v1/admin/commissions/summary/{}/
-/api/v1/admin/{}/{}/
-/api/v1/business/msme/
-/api/v1/customer/returns/
-/api/v1/customers/document-consents/
-/api/v1/deliveries/handover-receipts/
-/api/v1/lucky-plan/draw-audit/
-/api/v1/lucky-plan/draw-results/
-/api/v1/partner/
-/api/v1/partner/product-requests/{}/cancel/
-/api/v1/partner/profile-info/
-/api/v1/partner/support/tickets/
-/api/v1/payments/receipt/{}/
-/api/v1/subscriptions/deposits/
-/api/v1/subscriptions/{}/balance/
-/api/v1/subscriptions/{}/emis/

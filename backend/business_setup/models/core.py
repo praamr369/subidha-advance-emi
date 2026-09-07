@@ -57,6 +57,32 @@ class BusinessProfile(BusinessSetupTimeStampedModel):
     cin_number = models.CharField(max_length=21, blank=True, default="", help_text="Company Identification Number (Pvt Ltd / LLP only). Printed on letterheads under Companies Act 2013.")
     tan_number = models.CharField(max_length=10, blank=True, default="", help_text="Tax Deduction Account Number. Required if the business deducts TDS.")
     udyam_number = models.CharField(max_length=20, blank=True, default="", help_text="Udyam / MSME Registration Number (e.g. UDYAM-MH-00-0000000).")
+    # The rest of the Udyam registration. The number alone does not say which
+    # category the business is registered under, and the MSME category decides
+    # the payment terms a buyer owes under the MSMED Act 2006 s.15 — so it is
+    # the field that matters commercially, not the certificate number.
+    enterprise_type = models.CharField(
+        max_length=10,
+        blank=True,
+        default="",
+        choices=[
+            ("MICRO", "Micro"),
+            ("SMALL", "Small"),
+            ("MEDIUM", "Medium"),
+        ],
+    )
+    enterprise_name = models.CharField(
+        max_length=200,
+        blank=True,
+        default="",
+        help_text="Name as printed on the Udyam certificate, which may differ from the trading name.",
+    )
+    nic_code = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+        help_text="National Industrial Classification code declared on the Udyam registration.",
+    )
     trade_license_number = models.CharField(max_length=64, blank=True, default="", help_text="Trade License issued by the local municipal authority.")
     shop_act_number = models.CharField(max_length=64, blank=True, default="", help_text="Shop & Establishment Act registration number (Shops Act license).")
 

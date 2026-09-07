@@ -53,8 +53,13 @@ _TEMPLATE_EXPR = re.compile(r"\$\{[^}]*\}")
 # The leading "/" is optional: a query string is written both as
 # ".../offer-candidates/${qs}" and glued straight on as
 # ".../calendar-events${query}". Both are query strings, neither is a segment.
+# Matched on the name's ENDING, so summarySuffix and filterQuery are covered
+# without listing every variable anyone might introduce. Still a closed set of
+# suffixes: a trailing ${id} or ${slug} is a real path parameter and must keep
+# failing when no route serves it.
 _TRAILING_QUERY_VAR = re.compile(
-    r"/?\$\{(?:qs|suffix|query|queryString|querystring|search|params)\}/?$"
+    r"/?\$\{\w*(?:qs|suffix|query|querystring|search|params)\}/?$",
+    re.IGNORECASE,
 )
 
 
@@ -157,6 +162,36 @@ def _matches(url: str, routes: set[str]) -> bool:
         candidate = list(parts)
         candidate[index] = "{}"
         if "/" + "/".join(candidate) + "/" in routes:
+            return True
+
+    # A captured "URL" that is really a base constant:
+    #     const API = "/api/v1/partner";
+    #     apiFetch(`${API}/customer-kyc-requests/`)
+    # The constant is scraped as though it were an endpoint. It is not one, but
+    # it IS a namespace: many real routes hang below it. Requiring several
+    # keeps this from excusing a genuine one-off miss, where at most the
+    # detail route beneath it would exist.
+    if url.count("/") >= 3:
+        beneath = sum(1 for route in routes if route.startswith(url) and route != url)
+        if beneath >= 3:
+            return True
+
+    # A generic accessor, where even the RESOURCE is a runtime parameter:
+    #     listResource(resource)  ->  apiFetch(`/admin/${resource}/`)
+    #     getResource(resource, id) -> apiFetch(`/admin/${resource}/${id}/`)
+    # This is a family of calls, not an endpoint, so no route can ever satisfy
+    # it and no amount of building would. Recognised only when everything after
+    # a real namespace is dynamic — a URL with any literal segment left is a
+    # specific call and must still be checked.
+    trimmed = parts
+    while trimmed and trimmed[-1] == "{}":
+        trimmed = trimmed[:-1]
+    if trimmed and len(trimmed) < len(parts):
+        namespace = "/" + "/".join(trimmed) + "/"
+        beneath = sum(
+            1 for route in routes if route.startswith(namespace) and route != namespace
+        )
+        if beneath >= 3:
             return True
 
     # A trailing dynamic segment is often an ACTION chosen at runtime:

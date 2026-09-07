@@ -139,6 +139,53 @@ class MatchesTests(SimpleTestCase):
         self.assertFalse(_matches("/api/v1/admin/payments/reversals/{}/{}/", routes))
         self.assertFalse(_matches("/api/v1/admin/no-such-thing/{}/{}/", routes))
 
+    def test_a_base_constant_is_not_reported_as_a_missing_endpoint(self):
+        """Real source: const API = "/api/v1/partner", then `${API}/thing/`.
+
+        The constant gets scraped as though it were an endpoint. It is not one,
+        but many real routes hang below it, which is what distinguishes it from
+        a genuine miss.
+        """
+        routes = {
+            "/api/v1/partner/customer-kyc-requests/",
+            "/api/v1/partner/customer-search/",
+            "/api/v1/partner/catalog/",
+        }
+        self.assertTrue(_matches("/api/v1/partner/", routes))
+
+    def test_a_prefix_with_almost_nothing_beneath_it_still_fails(self):
+        """The bound: one child route is a detail endpoint, not a namespace.
+
+        Without this, deleting every route under a prefix but one would make
+        the parent silently 'match' and hide the breakage.
+        """
+        routes = {"/api/v1/partner/catalog/"}
+        self.assertFalse(_matches("/api/v1/partner/", routes))
+
+    def test_a_generic_resource_accessor_is_not_a_missing_endpoint(self):
+        """Real source: getResource(resource, id) -> `/admin/${resource}/${id}/`.
+
+        The resource itself is a runtime parameter, so this is a family of
+        calls rather than an endpoint. No route can satisfy it and no amount of
+        building would — reporting it as missing is noise that never clears.
+        """
+        routes = {
+            "/api/v1/admin/customers/",
+            "/api/v1/admin/customers/{}/",
+            "/api/v1/admin/products/",
+        }
+        self.assertTrue(_matches("/api/v1/admin/{}/{}/", routes))
+
+    def test_a_call_with_any_literal_segment_is_still_checked(self):
+        """The bound. Only a fully dynamic tail is excused; one real segment
+        makes it a specific call that must still resolve."""
+        routes = {
+            "/api/v1/admin/customers/",
+            "/api/v1/admin/customers/{}/",
+            "/api/v1/admin/products/",
+        }
+        self.assertFalse(_matches("/api/v1/admin/no-such-resource/{}/", routes))
+
     def test_generalisation_does_not_invent_a_match_for_an_absent_resource(self):
         """The risk generalisation carries, pinned so it stays bounded.
 

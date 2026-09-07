@@ -886,3 +886,61 @@ from service_desk.support_ticket_models import (  # noqa: E402,F401
     SupportTicketSource,
     SupportTicketStatus,
 )
+
+class PartnerSupportTicketStatus(models.TextChoices):
+    OPEN = "OPEN", "Open"
+    IN_PROGRESS = "IN_PROGRESS", "In progress"
+    RESOLVED = "RESOLVED", "Resolved"
+    CLOSED = "CLOSED", "Closed"
+
+
+class PartnerSupportTicket(ServiceDeskTimeStampedModel):
+    """A support request raised by a partner about their own account.
+
+    Deliberately NOT CustomerSupportRequest with a nullable customer. A partner
+    is not a customer: the queue is different, the person answering is
+    different, and the questions are about commission and settlement rather
+    than a purchase. Making the customer FK nullable to accommodate a second
+    actor would mean every query against customer support requests has to
+    remember to exclude partner rows, and one that forgets shows a partner's
+    commission dispute in a customer queue.
+
+    Also not ServiceDeskCase, which is anchored to a subscription or delivery —
+    a partner asking why a settlement is late has neither.
+    """
+
+    partner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="support_tickets",
+    )
+    subject = models.CharField(max_length=200)
+    category = models.CharField(max_length=50, blank=True, default="")
+    priority = models.CharField(max_length=20, blank=True, default="MEDIUM")
+    description = models.TextField()
+    status = models.CharField(
+        max_length=20,
+        choices=PartnerSupportTicketStatus.choices,
+        default=PartnerSupportTicketStatus.OPEN,
+        db_index=True,
+    )
+    response = models.TextField(blank=True, default="")
+    responded_at = models.DateTimeField(null=True, blank=True)
+    responded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="answered_partner_tickets",
+    )
+
+    class Meta:
+        db_table = "partner_support_tickets"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["partner", "status"]),
+        ]
+
+    def __str__(self):
+        return f"PartnerTicket #{self.pk} ({self.status})"
+

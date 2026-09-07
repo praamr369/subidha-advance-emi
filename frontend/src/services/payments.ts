@@ -206,24 +206,17 @@ export interface PaymentRegisterSummary {
 // ── PaymentService (legacy helper) ───────────────────────────────────────────
 class PaymentService {
   async getReceipt(paymentId: string): Promise<Receipt> {
-    return apiFetch(`/api/v1/payments/receipt/${paymentId}/`) as Promise<Receipt>
+    return apiFetch(`/api/v1/customer/receipts/${paymentId}/`) as Promise<Receipt>
   }
 
   async downloadReceipt(paymentId: string): Promise<void> {
     const { downloadAuthenticatedFile } = await import("@/lib/export/auth-download");
     await downloadAuthenticatedFile(
-      `/payments/receipt/${paymentId}/download/`,
+      `/customer/receipts/${paymentId}/pdf/`,
       `receipt-${paymentId}.pdf`,
     );
   }
 
-  async getBalance(subscriptionId: string): Promise<{ outstanding: number; due: number; past_due: number }> {
-    return apiFetch(`/api/v1/subscriptions/${subscriptionId}/balance/`) as Promise<{
-      outstanding: number
-      due: number
-      past_due: number
-    }>
-  }
 }
 
 export const paymentService = new PaymentService()
@@ -235,14 +228,6 @@ export async function getAdminSubscriptionForCollection(
   return apiFetch(`/api/v1/admin/subscriptions/${id}/`) as Promise<AdminSubscriptionCollectionCandidate>
 }
 
-export async function listSubscriptionEmisForCollection(
-  subscriptionId: number
-): Promise<AdminEmiCollectionCandidate[]> {
-  const d = await apiFetch(`/api/v1/subscriptions/${subscriptionId}/emis/`)
-  return Array.isArray(d)
-    ? (d as AdminEmiCollectionCandidate[])
-    : ((d as { results?: AdminEmiCollectionCandidate[] })?.results ?? [])
-}
 
 export async function searchAdminSubscriptionsForCollection(
   q: string

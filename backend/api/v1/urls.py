@@ -6,6 +6,11 @@ from brochures.urls import public_urlpatterns as brochure_public_urlpatterns
 from brochures.urls import public_quotation_urlpatterns
 
 from api.v1.views.health import PublicApiDeepHealthView, PublicApiHealthView
+from api.v1.views.business_msme import business_msme_view
+from api.v1.views.customer_portal_reads import (
+    customer_deposits_view,
+    customer_handover_receipts_view,
+)
 from api.v1.views.realtime import RealtimeTicketView, realtime_stream
 from api.v1.views.admin_payment_collection import IdempotentAdminPaymentCollectView
 from api.v1.views.unified_workbench import urlpatterns as workbench_urlpatterns
@@ -100,6 +105,20 @@ urlpatterns = [
     path("privacy/", include("api.v1.routes.privacy")),
     # The staff half of the same surface: the DPO queue and breach response.
     path("admin/privacy/", include("api.v1.routes.admin_privacy")),
+    # MSME / Udyam registration — a slice of the business profile that is
+    # edited and audited on its own because it sets statutory payment terms.
+    path("business/msme/", business_msme_view, name="business-msme"),
+    # Two customer-portal reads whose models long predate any endpoint.
+    path(
+        "subscriptions/deposits/",
+        customer_deposits_view,
+        name="customer-subscription-deposits",
+    ),
+    path(
+        "deliveries/handover-receipts/",
+        customer_handover_receipts_view,
+        name="customer-handover-receipts",
+    ),
     # Consumer-protection back office: defect claims and return requests.
     path("admin/consumer/", include("api.v1.routes.admin_consumer")),
     # The two-person control that gates running a monthly draw.
