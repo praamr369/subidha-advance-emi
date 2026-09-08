@@ -58,6 +58,47 @@ function toErrorMessage(err: unknown): string {
   return "Action failed.";
 }
 
+/** Days from today until `iso` (negative = already past). */
+function daysUntil(iso: string | null | undefined): number | null {
+  if (!iso) return null;
+  const target = new Date(iso);
+  if (Number.isNaN(target.getTime())) return null;
+  const startOfDay = (d: Date) =>
+    new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  return Math.round((startOfDay(target) - startOfDay(new Date())) / 86_400_000);
+}
+
+function ReturnDueHint({
+  expected,
+  actualReturn,
+}: {
+  expected: string | null | undefined;
+  actualReturn: string | null | undefined;
+}) {
+  if (!expected || actualReturn) return null;
+  const days = daysUntil(expected);
+  if (days === null) return null;
+  if (days < 0) {
+    return (
+      <span className="ml-2 rounded-full border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-[11px] font-semibold text-destructive">
+        {Math.abs(days)} day{Math.abs(days) === 1 ? "" : "s"} overdue
+      </span>
+    );
+  }
+  if (days <= 30) {
+    return (
+      <span className="ml-2 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+        due in {days} day{days === 1 ? "" : "s"}
+      </span>
+    );
+  }
+  return (
+    <span className="ml-2 text-[11px] text-muted-foreground">
+      in {days} days
+    </span>
+  );
+}
+
 function FieldRow({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex flex-wrap items-baseline gap-2 py-1.5">
@@ -565,7 +606,18 @@ export default function ContractLifecyclePage() {
                   <FieldRow label="Status" value={<ERPStatusBadge status={possession.status} />} />
                   <FieldRow label="Serial No." value={possession.serial_number || "—"} />
                   <FieldRow label="Handover Date" value={formatDate(possession.handover_date)} />
-                  <FieldRow label="Expected Return" value={formatDate(possession.expected_return_date)} />
+                  <FieldRow
+                    label="Expected Return"
+                    value={
+                      <span className="inline-flex items-center">
+                        {formatDate(possession.expected_return_date)}
+                        <ReturnDueHint
+                          expected={possession.expected_return_date}
+                          actualReturn={possession.actual_return_date}
+                        />
+                      </span>
+                    }
+                  />
                   <FieldRow label="Actual Return" value={formatDate(possession.actual_return_date)} />
                   <FieldRow label="Handover Notes" value={possession.handover_condition_notes || "—"} />
                   <FieldRow label="Return Notes" value={possession.return_condition_notes || "—"} />

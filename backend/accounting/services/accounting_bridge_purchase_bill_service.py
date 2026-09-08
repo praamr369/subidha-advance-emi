@@ -11,7 +11,7 @@ from accounting.models import AccountingBridgePosting, ChartOfAccount, FinanceAc
 from accounting.services import accounting_bridge_candidate_service as base
 from accounting.services.document_sequence_service import DocumentNumberingSetupError, DocumentType, preview_document_number, validate_document_numbering_ready
 from accounting.services.bridge_posting_service import post_bridge_entry
-from inventory.models import GoodsReceiptLine, InventoryItem, OpeningStockEntry, PurchaseBill, PurchaseBillLine, PurchaseBillStatus, PurchaseTaxMode, StockAdjustmentLine, StockLedger, StockMovementType, VendorBillLine, VendorPayment, VendorPaymentStatus
+from inventory.models import GoodsReceiptLine, InventoryItem, OpeningStockEntry, PurchaseBill, PurchaseBillLine, PurchaseBillStatus, PurchaseTaxMode, RENT_LEASE_HANDOVER_OUT_TYPES, RENT_LEASE_RETURN_IN_TYPES, StockAdjustmentLine, StockLedger, StockMovementType, VendorBillLine, VendorPayment, VendorPaymentStatus
 from reconciliation.models import ReconciliationItemStatus
 
 PURCHASE_BILL_SOURCE_MODEL = "PurchaseBill"
@@ -64,6 +64,8 @@ STOCK_LEDGER_EVENT_KEYS = {
     "cogs_direct_sale_delivery",
     "cogs_subscription_delivery",
     "inventory_sale_stock_out",
+    "rental_asset_handover_out",
+    "rental_asset_return_in",
 }
 STOCK_LEDGER_PURPOSE_BY_EVENT = {key: key.upper() for key in STOCK_LEDGER_EVENT_KEYS}
 STOCK_LEDGER_LABEL_BY_EVENT = {
@@ -79,6 +81,8 @@ STOCK_LEDGER_LABEL_BY_EVENT = {
     "cogs_direct_sale_delivery": "COGS direct sale delivery",
     "cogs_subscription_delivery": "COGS subscription delivery",
     "inventory_sale_stock_out": "Inventory sale stock-out",
+    "rental_asset_handover_out": "Rental asset handover (inventory -> assets on hire)",
+    "rental_asset_return_in": "Rental asset return (assets on hire -> inventory)",
 }
 SKIPPED_STOCK_LEDGER_EVENT_KEY = "inventory_skipped_not_applicable"
 UNSUPPORTED_STOCK_LEDGER_EVENT_KEY = "unsupported_stockledger"
@@ -364,6 +368,33 @@ def _stock_ledger_source_cost(row: StockLedger) -> tuple[Decimal | None, Decimal
     return None, None, "StockLedger row has no reliable source valuation fields for accounting bridge posting."
 
 
+def _rental_asset_reclass_cost(row: StockLedger) -> tuple[Decimal | None, Decimal | None, str | None]:
+    """Carrying value to move between INVENTORY_ASSET and RENTAL_ASSET_IN_SERVICE.
+
+    Rent/lease handovers reference a SubscriptionDelivery, which carries no
+    price: nothing is being sold, so there is no sale value to read. The right
+    number is what the unit is already carried at in inventory.
+    """
+    quantity = Decimal(str(row.quantity_out or row.quantity_in or "0.000"))
+    if quantity <= Decimal("0.000"):
+        return None, None, "Rental asset movement has no quantity to value."
+
+    unit, amount, reason = _weighted_average_cost_evidence(row, quantity)
+    if not reason and unit is not None and amount is not None and amount > Decimal("0.00"):
+        return unit, amount, None
+
+    standard = getattr(row.inventory_item, "standard_unit_cost", None)
+    if standard is not None and Decimal(str(standard)) > Decimal("0"):
+        unit = base._money(standard)
+        return unit, base._money(unit * quantity), None
+
+    return None, None, (
+        "Rental asset reclassification needs a carrying value: set a standard unit "
+        "cost on the inventory item, or post opening stock/purchases so a weighted "
+        "average exists."
+    )
+
+
 def _nested_snapshot_value(snapshot: Any, keys: set[str]) -> Any:
     if not isinstance(snapshot, dict):
         return None
@@ -494,6 +525,18 @@ def _inventory_writeoff_account() -> ChartOfAccount | None:
     return base._posting_profile_account("INVENTORY_WRITEOFF_EXPENSE") or base._posting_profile_account("STOCK_LOSS") or _inventory_adjustment_loss_account()
 
 
+def _rental_asset_in_service_account() -> ChartOfAccount | None:
+    """Asset account holding goods that are physically out on rent/lease.
+
+    Falls back to nothing on purpose: without an explicit mapping the bridge
+    warns rather than silently posting rented goods to the wrong account.
+    """
+    return (
+        base._posting_profile_account("RENTAL_ASSET_IN_SERVICE")
+        or base._posting_profile_account("ASSETS_ON_HIRE")
+    )
+
+
 def _cogs_account() -> ChartOfAccount | None:
     return base._posting_profile_account("COGS") or base._posting_profile_account("COST_OF_GOODS_SOLD")
 
@@ -512,6 +555,13 @@ def _classify_stock_ledger_event(row: StockLedger) -> tuple[str, str, str | None
         return SKIPPED_STOCK_LEDGER_EVENT_KEY, "Stock transfer skipped", "Same-entity stock transfers have no accounting impact in this phase."
     if movement == StockMovementType.TRANSFER_OUT:
         return SKIPPED_STOCK_LEDGER_EVENT_KEY, "Stock transfer skipped", "Same-entity stock transfers have no accounting impact in this phase."
+    # RENT / LEASE handover is NOT a sale — the goods remain the company's asset
+    # while out on hire, so the value is reclassified between two asset accounts
+    # rather than expensed to COGS. Return reverses it.
+    if movement in RENT_LEASE_HANDOVER_OUT_TYPES:
+        return "rental_asset_handover_out", STOCK_LEDGER_LABEL_BY_EVENT["rental_asset_handover_out"], None
+    if movement in RENT_LEASE_RETURN_IN_TYPES:
+        return "rental_asset_return_in", STOCK_LEDGER_LABEL_BY_EVENT["rental_asset_return_in"], None
     if movement in COGS_STOCK_OUT_MOVEMENT_TYPES:
         event_key, event_label, _unit, _amount, reason = _stock_ledger_cogs_evidence(row)
         return event_key, event_label, reason
@@ -528,6 +578,8 @@ def _stock_ledger_lines(row: StockLedger, event_key: str) -> tuple[list[dict[str
         return [], ["Unsupported StockLedger event for Phase F8."], None
     if event_key in COGS_STOCK_LEDGER_EVENT_KEYS:
         unit_cost, amount, value_reason = _stock_ledger_cogs_evidence(row)[2:]
+    elif event_key in {"rental_asset_handover_out", "rental_asset_return_in"}:
+        unit_cost, amount, value_reason = _rental_asset_reclass_cost(row)
     else:
         unit_cost, amount, value_reason = _stock_ledger_source_cost(row)
     if amount is None or amount <= Decimal("0.00"):
@@ -585,6 +637,23 @@ def _stock_ledger_lines(row: StockLedger, event_key: str) -> tuple[list[dict[str
         return [
             {"chart_account": asset, "description": f"Inventory return in {reference}", "debit_amount": amount, "credit_amount": Decimal("0.00")},
             {"chart_account": gain, "description": f"Inventory return clearing {reference}", "debit_amount": Decimal("0.00"), "credit_amount": amount},
+        ], warnings, None
+    if event_key in {"rental_asset_handover_out", "rental_asset_return_in"}:
+        on_hire = _rental_asset_in_service_account()
+        if on_hire is None:
+            warnings.append(
+                "RENTAL_ASSET_IN_SERVICE / ASSETS_ON_HIRE posting profile/chart account is missing or inactive."
+            )
+        if warnings:
+            return [], warnings, None
+        if event_key == "rental_asset_handover_out":
+            return [
+                {"chart_account": on_hire, "description": f"Asset out on hire {reference}", "debit_amount": amount, "credit_amount": Decimal("0.00")},
+                {"chart_account": asset, "description": f"Inventory asset released on hire {reference}", "debit_amount": Decimal("0.00"), "credit_amount": amount},
+            ], warnings, None
+        return [
+            {"chart_account": asset, "description": f"Inventory asset returned from hire {reference}", "debit_amount": amount, "credit_amount": Decimal("0.00")},
+            {"chart_account": on_hire, "description": f"Asset returned from hire {reference}", "debit_amount": Decimal("0.00"), "credit_amount": amount},
         ], warnings, None
     if event_key in COGS_STOCK_LEDGER_EVENT_KEYS:
         cogs = _cogs_account()

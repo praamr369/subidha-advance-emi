@@ -62,6 +62,9 @@ SYSTEM_POSTING_PROFILE_ACCOUNTS: tuple[CanonicalChartAccountSpec, ...] = (
     CanonicalChartAccountSpec(key="ACCOUNTS_PAYABLE", code="AP-2000", name="Accounts Payable", account_type=ChartOfAccountType.LIABILITY),
     CanonicalChartAccountSpec(key="INVENTORY_ASSET", code="INV-1200", name="Inventory Asset", account_type=ChartOfAccountType.ASSET),
     CanonicalChartAccountSpec(key="WORK_IN_PROGRESS_INVENTORY", code="INV-1210", name="Work In Progress Inventory", account_type=ChartOfAccountType.ASSET),
+    # Goods physically out on rent/lease. Still ours, just not on the shop floor,
+    # so they sit in their own asset account rather than being expensed.
+    CanonicalChartAccountSpec(key="RENTAL_ASSET_IN_SERVICE", code="INV-1220", name="Rental Assets In Service (On Hire)", account_type=ChartOfAccountType.ASSET),
     CanonicalChartAccountSpec(key="COGS", code="COGS-5000", name="Cost of Goods Sold", account_type=ChartOfAccountType.EXPENSE),
     CanonicalChartAccountSpec(key="INVENTORY_ADJUSTMENT", code="INV-5100", name="Inventory Adjustments", account_type=ChartOfAccountType.EXPENSE),
     CanonicalChartAccountSpec(key="MANUFACTURING_WASTAGE", code="MFG-5200", name="Manufacturing Wastage / Scrap Expense", account_type=ChartOfAccountType.EXPENSE),

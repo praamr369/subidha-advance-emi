@@ -4,7 +4,11 @@ from decimal import Decimal
 
 from django.db import transaction
 
-from inventory.models import StockMovementType
+from inventory.models import (
+    HANDOVER_OUT_MOVEMENT_TYPE_BY_PLAN,
+    RETURN_IN_MOVEMENT_TYPE_BY_PLAN,
+    StockMovementType,
+)
 from inventory.services.audit_service import log_inventory_event
 from inventory.services.stock_service import create_stock_ledger_entry
 from subscriptions.models import AuditLog, DeliveryStatus
@@ -25,11 +29,22 @@ def sync_delivery_inventory_bridge(*, delivery, performed_by=None) -> dict:
     quantity_in = Decimal("0.000")
     quantity_out = Decimal("0.000")
 
+    # The movement type is plan-specific. An EMI handover is a sale-like outflow
+    # (ownership transfers on completion); a RENT/LEASE handover puts the asset
+    # out on hire and it is expected back. Labelling both EMI_DELIVERY_OUT made
+    # rent assets look sold — they were expensed as COGS and never came back
+    # into stock on return.
+    plan_type = str(getattr(subscription, "plan_type", "") or "")
+
     if delivery.status == DeliveryStatus.DELIVERED:
-        movement_type = StockMovementType.EMI_DELIVERY_OUT
+        movement_type = HANDOVER_OUT_MOVEMENT_TYPE_BY_PLAN.get(
+            plan_type, StockMovementType.EMI_DELIVERY_OUT
+        )
         quantity_out = Decimal("1.000")
     elif delivery.status == DeliveryStatus.RETURNED:
-        movement_type = StockMovementType.EMI_RETURN_IN
+        movement_type = RETURN_IN_MOVEMENT_TYPE_BY_PLAN.get(
+            plan_type, StockMovementType.EMI_RETURN_IN
+        )
         quantity_in = Decimal("1.000")
     else:
         return {"created": False, "skipped": True, "reason": "status_not_stock_relevant"}
@@ -57,6 +72,7 @@ def sync_delivery_inventory_bridge(*, delivery, performed_by=None) -> dict:
             "subscription_id": subscription.id,
             "inventory_item_id": inventory_item.id,
             "movement_type": movement_type,
+            "plan_type": plan_type,
             "stock_ledger_id": entry.id,
             "created": created,
         },

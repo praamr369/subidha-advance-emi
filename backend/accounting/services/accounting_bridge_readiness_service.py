@@ -68,6 +68,7 @@ PURPOSE_EXPECTED_ACCOUNT_TYPE: dict[str, str] = {
     FinanceAccountMappingPurpose.DELIVERY_EXPENSE: ChartOfAccountType.EXPENSE,
     FinanceAccountMappingPurpose.SALARY_EXPENSE: ChartOfAccountType.EXPENSE,
     FinanceAccountMappingPurpose.INVENTORY_ASSET: ChartOfAccountType.ASSET,
+    FinanceAccountMappingPurpose.RENTAL_ASSET_IN_SERVICE: ChartOfAccountType.ASSET,
 }
 
 @dataclass(frozen=True)
@@ -463,6 +464,30 @@ EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
         credit_requirements=("INVENTORY_ASSET",),
         debit_mapping_purposes=(FinanceAccountMappingPurpose.DELIVERY_EXPENSE,),
         credit_mapping_purposes=(FinanceAccountMappingPurpose.INVENTORY_ASSET,),
+    ),
+    BridgeEventSpec(
+        event_key="rental_asset_handover_out",
+        label="Rental asset handover (inventory to assets on hire)",
+        source_module="inventory",
+        source_app="inventory",
+        source_model="StockLedger",
+        event_group="Vendor / Inventory",
+        debit_requirements=("RENTAL_ASSET_IN_SERVICE",),
+        credit_requirements=("INVENTORY_ASSET",),
+        debit_mapping_purposes=(FinanceAccountMappingPurpose.RENTAL_ASSET_IN_SERVICE,),
+        credit_mapping_purposes=(FinanceAccountMappingPurpose.INVENTORY_ASSET,),
+    ),
+    BridgeEventSpec(
+        event_key="rental_asset_return_in",
+        label="Rental asset return (assets on hire to inventory)",
+        source_module="inventory",
+        source_app="inventory",
+        source_model="StockLedger",
+        event_group="Vendor / Inventory",
+        debit_requirements=("INVENTORY_ASSET",),
+        credit_requirements=("RENTAL_ASSET_IN_SERVICE",),
+        debit_mapping_purposes=(FinanceAccountMappingPurpose.INVENTORY_ASSET,),
+        credit_mapping_purposes=(FinanceAccountMappingPurpose.RENTAL_ASSET_IN_SERVICE,),
     ),
     BridgeEventSpec(
         event_key="manufacturing_consumption",

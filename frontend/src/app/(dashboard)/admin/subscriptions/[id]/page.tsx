@@ -39,12 +39,45 @@ import {
 } from "@/services/deliveries";
 import { listPayments, type PaymentRecord } from "@/services/payments";
 
+// Mirrors backend SubscriptionStatus (subscriptions/enums.py). Omitting the
+// rent/lease lifecycle states here made live rent contracts render as "Unknown".
 type SubscriptionStatus =
+  | "DRAFT"
+  | "REQUESTED"
+  | "PENDING_APPROVAL"
+  | "APPROVED"
   | "ACTIVE"
+  | "PENDING"
+  | "PAYMENT_PENDING"
+  | "DELIVERY_PENDING"
+  | "HANDED_OVER"
   | "WON"
+  | "RETURN_PENDING"
+  | "RETURNED"
   | "COMPLETED"
   | "DEFAULTED"
+  | "CANCELLED"
+  | "CLOSED"
   | "UNKNOWN";
+
+const KNOWN_SUBSCRIPTION_STATUSES: ReadonlySet<string> = new Set([
+  "DRAFT",
+  "REQUESTED",
+  "PENDING_APPROVAL",
+  "APPROVED",
+  "ACTIVE",
+  "PENDING",
+  "PAYMENT_PENDING",
+  "DELIVERY_PENDING",
+  "HANDED_OVER",
+  "WON",
+  "RETURN_PENDING",
+  "RETURNED",
+  "COMPLETED",
+  "DEFAULTED",
+  "CANCELLED",
+  "CLOSED",
+]);
 
 type PlanType = "EMI" | "RENT" | "LEASE" | "UNKNOWN";
 
@@ -284,16 +317,10 @@ function formatDateTime(value: string | null | undefined): string {
 }
 
 function normalizeSubscriptionStatus(value: unknown): SubscriptionStatus {
-  const status = String(value ?? "").toUpperCase();
-  if (
-    status === "ACTIVE" ||
-    status === "WON" ||
-    status === "COMPLETED" ||
-    status === "DEFAULTED"
-  ) {
-    return status;
-  }
-  return "UNKNOWN";
+  const status = String(value ?? "").trim().toUpperCase();
+  return KNOWN_SUBSCRIPTION_STATUSES.has(status)
+    ? (status as SubscriptionStatus)
+    : "UNKNOWN";
 }
 
 function normalizePlanType(value: unknown): PlanType {
@@ -1601,10 +1628,17 @@ export default function AdminSubscriptionDetailPage() {
 
                 <DetailPanel
                   title="Rental asset readiness"
-                  description="P3B read-only asset linkage and activation readiness. Reserve, hand-over, and return actions are deferred."
+                  description="Link the physical unit this contract hires out, then reserve, hand over, and take it back."
                   className="rounded-[28px]"
                 >
-                  <RentalAssetReadinessPanel subscriptionId={subscription.id} />
+                  <RentalAssetReadinessPanel
+                    subscriptionId={subscription.id}
+                    productId={subscription.product_id}
+                    productCode={subscription.product_code}
+                    canManageAssets={
+                      subscription.plan_type === "RENT" || subscription.plan_type === "LEASE"
+                    }
+                  />
                 </DetailPanel>
               </section>
             ) : null}
@@ -2085,6 +2119,7 @@ export default function AdminSubscriptionDetailPage() {
         {subscription ? (
           <GenerateRentLeaseLedgerModal
             subscriptionId={subscription.id}
+            currentStartDate={subscription.start_date}
             open={scheduleModalOpen}
             onOpenChange={setScheduleModalOpen}
           />

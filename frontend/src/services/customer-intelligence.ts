@@ -159,6 +159,68 @@ export async function fetchSubscriptionRentalAssetReadiness(
   );
 }
 
+export type RentalAssetRecord = {
+  id: number;
+  asset_code: string;
+  status: string;
+  condition_grade?: string | null;
+  product_id?: number | null;
+  product_name?: string | null;
+  inventory_item_id?: number | null;
+  current_subscription_id?: number | null;
+};
+
+/** Assets available to be linked, optionally narrowed to one product. */
+export async function listAvailableRentalAssets(
+  productId?: number | null
+): Promise<{ results: RentalAssetRecord[] }> {
+  const query = new URLSearchParams({ status: "AVAILABLE" });
+  if (productId) query.append("product", String(productId));
+  return apiFetch<{ results: RentalAssetRecord[] }>(
+    `/admin/rental-assets/?${query.toString()}`
+  );
+}
+
+/** Register a physical unit as a rental asset, ideally from its inventory item. */
+export async function createRentalAsset(payload: {
+  asset_code: string;
+  inventory_item?: number | null;
+  product?: number | null;
+  serial_no?: string;
+  purchase_cost?: string;
+}): Promise<RentalAssetRecord> {
+  return apiFetch<RentalAssetRecord>("/admin/rental-assets/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function reserveRentalAsset(
+  assetId: number,
+  subscriptionId: number
+): Promise<RentalAssetRecord> {
+  return apiFetch<RentalAssetRecord>(`/admin/rental-assets/${assetId}/reserve/`, {
+    method: "POST",
+    body: JSON.stringify({ subscription: subscriptionId }),
+  });
+}
+
+export async function handoverRentalAsset(
+  assetId: number,
+  subscriptionId: number
+): Promise<RentalAssetRecord> {
+  return apiFetch<RentalAssetRecord>(`/admin/rental-assets/${assetId}/handover/`, {
+    method: "POST",
+    body: JSON.stringify({ subscription: subscriptionId }),
+  });
+}
+
+export async function returnRentalAsset(assetId: number): Promise<RentalAssetRecord> {
+  return apiFetch<RentalAssetRecord>(`/admin/rental-assets/${assetId}/return/`, {
+    method: "POST",
+  });
+}
+
 // =====================================================
 // Existing — Customer Operational Summary
 // =====================================================

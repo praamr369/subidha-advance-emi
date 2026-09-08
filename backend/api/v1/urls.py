@@ -240,7 +240,7 @@ urlpatterns = [
     # these explicit aliases bridge the gap for endpoints the frontend expects under admin/.
     path("admin/inventory/items/", InventoryItemViewSet.as_view({"get": "list"})),
     path("admin/inventory/items/<int:pk>/", InventoryItemViewSet.as_view({"get": "retrieve", "patch": "partial_update", "put": "update"})),
-    path("admin/inventory/locations/", StockLocationViewSet.as_view({"get": "list"})),
+    path("admin/inventory/locations/", StockLocationViewSet.as_view({"get": "list", "post": "create"})),
     path("admin/inventory/locations/<int:pk>/", StockLocationViewSet.as_view({"get": "retrieve", "patch": "partial_update", "put": "update"})),
     path("admin/inventory/adjustments/", StockAdjustmentViewSet.as_view({"get": "list", "post": "create"})),
     path("admin/inventory/adjustments/<int:pk>/", StockAdjustmentViewSet.as_view({"get": "retrieve", "patch": "partial_update"})),

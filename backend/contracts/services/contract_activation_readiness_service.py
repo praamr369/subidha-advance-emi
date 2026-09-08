@@ -478,6 +478,20 @@ def _delivery_category(subscription) -> dict:
     )
 
 
+def _handover_already_completed(subscription) -> bool:
+    """True when the asset has physically gone out to the customer."""
+    from subscriptions.models import DeliveryStatus, FulfillmentStatus, SubscriptionDelivery
+
+    if getattr(subscription, "fulfillment_status", None) == FulfillmentStatus.DELIVERED:
+        return True
+    if subscription.status == SubscriptionStatus.HANDED_OVER:
+        return True
+    return SubscriptionDelivery.objects.filter(
+        subscription=subscription,
+        status=DeliveryStatus.DELIVERED,
+    ).exists()
+
+
 def _inventory_category(subscription) -> dict:
     try:
         inventory_item = subscription.product.inventory_profile
@@ -493,6 +507,20 @@ def _inventory_category(subscription) -> dict:
             ready=True,
             details={"applicable": False, "reason": "Delivery stock control is not enabled for this product."},
         )
+    # Once the asset is physically with the customer, "is there stock to hand
+    # over?" is no longer a live question — the handover consumed it. Without
+    # this, a completed handover keeps reporting STOCK_UNAVAILABLE forever,
+    # because the very movement that fulfilled it is what drove on-hand to zero.
+    if _handover_already_completed(subscription):
+        return _category(
+            required=False,
+            ready=True,
+            details={
+                "applicable": False,
+                "reason": "Asset handover is already complete; stock was consumed by that handover.",
+            },
+        )
+
     from inventory.services.stock_movement_service import check_stock_for_delivery
 
     stock = check_stock_for_delivery(inventory_item=inventory_item)

@@ -20,6 +20,8 @@ type Props<T extends GenericRecord> = {
   pageSize?: number;
   rowKey?: (row: T, index: number) => string | number;
   onRowClick?: (row: T) => void;
+  /** Extra classes per row (e.g. highlighting the selected record). */
+  rowClassName?: (row: T) => string | undefined;
   toolbar?: React.ReactNode;
   emptyTitle?: string;
   emptyDescription?: string;
@@ -47,6 +49,7 @@ export default function EnterpriseDataTable<T extends GenericRecord>({
   pageSize = DEFAULT_PAGE_SIZE,
   rowKey,
   onRowClick,
+  rowClassName,
   toolbar,
   emptyTitle = "No records found",
   emptyDescription = "Try changing the search or create a new record.",
@@ -146,7 +149,10 @@ export default function EnterpriseDataTable<T extends GenericRecord>({
                   {columns.map((column) => (
                     <th
                       key={String(column.key)}
-                      className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground"
+                      className={[
+                        "whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground",
+                        column.headerClassName ?? "",
+                      ].join(" ")}
                     >
                       {column.header}
                     </th>
@@ -171,12 +177,16 @@ export default function EnterpriseDataTable<T extends GenericRecord>({
                         clickableRows
                           ? "cursor-pointer hover:bg-muted/40"
                           : "hover:bg-muted/40",
+                        rowClassName?.(row) ?? "",
                       ].join(" ")}
                     >
                       {columns.map((column) => (
                         <td
                           key={String(column.key)}
-                          className="min-w-0 break-words px-4 py-3 text-sm leading-snug text-foreground"
+                          className={[
+                            "min-w-0 break-words px-4 py-3 text-sm leading-snug text-foreground",
+                            column.cellClassName ?? "",
+                          ].join(" ")}
                         >
                           {column.render
                             ? column.render(row)

@@ -147,7 +147,10 @@ export default function AdminInventoryPage() {
           getInventoryDashboard({ location_id: selectedLocationId || undefined }),
           listStockAdjustments(),
           listStockLocations(),
-          listInventoryMovements({ movement_type: "EMI_DELIVERY_OUT,EMI_RETURN_IN" }),
+          listInventoryMovements({
+            movement_type:
+              "EMI_DELIVERY_OUT,EMI_RETURN_IN,RENT_HANDOVER_OUT,RENT_RETURN_IN,LEASE_HANDOVER_OUT,LEASE_RETURN_IN",
+          }),
         ]);
         if (cancelled) return;
         setDashboard(dashboardPayload);
@@ -454,7 +457,7 @@ export default function AdminInventoryPage() {
                   { title: "On hand", desc: "Physical stock present at a location — opening stock + receipts − deliveries out + returns + adjustments.", icon: <Layers className="h-4 w-4" /> },
                   { title: "Available", desc: "On hand minus reserved quantity. Available for new delivery commitments.", icon: <Package className="h-4 w-4" /> },
                   { title: "Reserved", desc: "Stock committed to winners and confirmed orders pending delivery handover.", icon: <ClipboardCheck className="h-4 w-4" /> },
-                  { title: "Delivery out", desc: "Stock issued via completed delivery — EMI_DELIVERY_OUT movement reduces on-hand.", icon: <Truck className="h-4 w-4" /> },
+                  { title: "Delivery out", desc: "Stock issued via completed delivery — EMI_DELIVERY_OUT (sale) or RENT/LEASE_HANDOVER_OUT (on hire) reduces on-hand.", icon: <Truck className="h-4 w-4" /> },
                   { title: "Adjustment", desc: "Counted stock correction approved through the adjustment workflow.", icon: <ScrollText className="h-4 w-4" /> },
                   { title: "Purchase receipt", desc: "Stock-in from goods receipt. Source workflow is Purchases & Vendors.", icon: <Warehouse className="h-4 w-4" /> },
                 ].map(({ title, desc, icon }) => (

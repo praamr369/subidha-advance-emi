@@ -25,14 +25,47 @@ import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 25;
 
+// Mirrors backend SubscriptionStatus (subscriptions/enums.py). The rent/lease
+// lifecycle states must be listed here: anything missing is collapsed to
+// "UNKNOWN" by normalizeStatus and renders as an "Unknown" badge, which is how
+// live rent contracts ended up looking statusless in the register.
 type SubscriptionStatus =
+  | "DRAFT"
+  | "REQUESTED"
+  | "PENDING_APPROVAL"
+  | "APPROVED"
   | "ACTIVE"
   | "PENDING"
   | "WON"
   | "COMPLETED"
-  | "CANCELLED"
   | "DEFAULTED"
+  | "PAYMENT_PENDING"
+  | "DELIVERY_PENDING"
+  | "HANDED_OVER"
+  | "RETURN_PENDING"
+  | "RETURNED"
+  | "CANCELLED"
+  | "CLOSED"
   | "UNKNOWN";
+
+const KNOWN_SUBSCRIPTION_STATUSES: ReadonlySet<string> = new Set([
+  "DRAFT",
+  "REQUESTED",
+  "PENDING_APPROVAL",
+  "APPROVED",
+  "ACTIVE",
+  "PENDING",
+  "WON",
+  "COMPLETED",
+  "DEFAULTED",
+  "PAYMENT_PENDING",
+  "DELIVERY_PENDING",
+  "HANDED_OVER",
+  "RETURN_PENDING",
+  "RETURNED",
+  "CANCELLED",
+  "CLOSED",
+]);
 
 type SubscriptionRow = {
   id: number;
@@ -208,14 +241,12 @@ function parseIdFilter(value: string | null): string {
 }
 
 function normalizeStatus(raw: Record<string, unknown>): SubscriptionStatus {
-  const status = String(raw.status ?? raw.subscription_status ?? "UNKNOWN").toUpperCase();
-  if (status === "ACTIVE") return "ACTIVE";
-  if (status === "PENDING") return "PENDING";
-  if (status === "WON") return "WON";
-  if (status === "COMPLETED") return "COMPLETED";
-  if (status === "CANCELLED") return "CANCELLED";
-  if (status === "DEFAULTED") return "DEFAULTED";
-  return "UNKNOWN";
+  const status = String(raw.status ?? raw.subscription_status ?? "")
+    .trim()
+    .toUpperCase();
+  return KNOWN_SUBSCRIPTION_STATUSES.has(status)
+    ? (status as SubscriptionStatus)
+    : "UNKNOWN";
 }
 
 function normalizeSubscriptionRow(raw: Record<string, unknown>): SubscriptionRow {
@@ -955,12 +986,22 @@ export default function AdminSubscriptionsPage() {
                 className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
               >
                 <option value="">All</option>
+                <option value="DRAFT">Draft</option>
+                <option value="REQUESTED">Requested</option>
+                <option value="PENDING_APPROVAL">Pending Approval</option>
+                <option value="APPROVED">Approved</option>
                 <option value="ACTIVE">Active</option>
                 <option value="PENDING">Pending</option>
+                <option value="PAYMENT_PENDING">Payment Pending</option>
+                <option value="DELIVERY_PENDING">Delivery Pending</option>
+                <option value="HANDED_OVER">Handed Over</option>
                 <option value="WON">Won</option>
+                <option value="RETURN_PENDING">Return Pending</option>
+                <option value="RETURNED">Returned</option>
                 <option value="COMPLETED">Completed</option>
                 <option value="DEFAULTED">Defaulted</option>
                 <option value="CANCELLED">Cancelled</option>
+                <option value="CLOSED">Closed</option>
               </select>
             </div>
 
@@ -1366,7 +1407,7 @@ export default function AdminSubscriptionsPage() {
                           )}
 
                           <Link
-                            href={`/admin/deliveries/create?subscription=${row.id}`}
+                            href={`/admin/deliveries?subscription=${row.id}`}
                             className="inline-flex h-8 items-center rounded-md border border-input bg-background px-3 text-xs font-medium shadow-sm transition hover:bg-muted"
                           >
                             Record Handover

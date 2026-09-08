@@ -2262,17 +2262,116 @@ export async function postVendorPayment(id: number): Promise<{ updated: boolean;
   );
 }
 
-// OPENING STOCK / BILLING STUBS (implementations live in other pages)
+// OPENING STOCK
 // ============================================================================
-export async function applyAdminOpeningStockBulkCsv(_file: File, _opts: { dry_run: boolean; auto_post: boolean; default_effective_date: string }): Promise<OpeningStockBulkApplyResult> { return null as unknown as OpeningStockBulkApplyResult; }
-export async function correctionAdminOpeningStockEntry(_id: number, _payload: { reason: string; quantity_delta: string }): Promise<void> { return; }
-export async function createAdminOpeningStockEntry(_payload: OpeningStockEntryPayload): Promise<OpeningStockEntriesRow> { return null as unknown as OpeningStockEntriesRow; }
-export async function fetchOpeningStockCsvTemplateText(): Promise<string> { return ""; }
-export async function listAdminOpeningStockBatches(): Promise<OpeningStockBatchListResponse> { return { results: [] }; }
-export async function listAdminOpeningStockEntries(_params: { page?: number; page_size?: number; status?: string; search?: string }): Promise<OpeningStockEntriesPayload> { return null as unknown as OpeningStockEntriesPayload; }
-export async function patchAdminOpeningStockEntry(_id: number, _payload: Partial<OpeningStockEntryPayload>): Promise<OpeningStockEntriesRow> { return null as unknown as OpeningStockEntriesRow; }
-export async function postAdminOpeningStockEntry(_id: number): Promise<OpeningStockEntriesRow> { return null as unknown as OpeningStockEntriesRow; }
-export async function postOpeningStockImport(_file: File, _date: string): Promise<void> { return; }
-export async function previewAdminOpeningStockBulkCsv(_file: File, _defaultDate: string): Promise<OpeningStockBulkPreview> { return null as unknown as OpeningStockBulkPreview; }
-export async function previewOpeningStockImport(_file: File): Promise<OpeningStockPreview> { return null as unknown as OpeningStockPreview; }
+export async function listAdminOpeningStockEntries(params: {
+  page?: number;
+  page_size?: number;
+  status?: string;
+  search?: string;
+}): Promise<OpeningStockEntriesPayload> {
+  const query = new URLSearchParams();
+  if (params.page) query.append("page", String(params.page));
+  if (params.page_size) query.append("page_size", String(params.page_size));
+  if (params.status) query.append("status", params.status);
+  if (params.search) query.append("search", params.search);
+  const qs = query.toString();
+  return apiFetch<OpeningStockEntriesPayload>(
+    qs ? `/admin/inventory/opening-stock/?${qs}` : "/admin/inventory/opening-stock/",
+    { method: "GET" }
+  );
+}
+
+export async function createAdminOpeningStockEntry(
+  payload: OpeningStockEntryPayload
+): Promise<OpeningStockEntriesRow> {
+  return apiFetch<OpeningStockEntriesRow>("/admin/inventory/opening-stock/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function patchAdminOpeningStockEntry(
+  id: number,
+  payload: Partial<OpeningStockEntryPayload>
+): Promise<OpeningStockEntriesRow> {
+  return apiFetch<OpeningStockEntriesRow>(`/admin/inventory/opening-stock/${id}/`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function postAdminOpeningStockEntry(id: number): Promise<OpeningStockEntriesRow> {
+  return apiFetch<OpeningStockEntriesRow>(`/admin/inventory/opening-stock/${id}/post/`, {
+    method: "POST",
+  });
+}
+
+export async function correctionAdminOpeningStockEntry(
+  id: number,
+  payload: { reason: string; quantity_delta: string }
+): Promise<void> {
+  await apiFetch(`/admin/inventory/opening-stock/${id}/correction/`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function listAdminOpeningStockBatches(): Promise<OpeningStockBatchListResponse> {
+  return apiFetch<OpeningStockBatchListResponse>("/admin/inventory/opening-stock/batches/", {
+    method: "GET",
+  });
+}
+
+export async function fetchOpeningStockCsvTemplateText(): Promise<string> {
+  return apiFetch<string>("/admin/inventory/opening-stock/template/", { method: "GET" });
+}
+
+export async function previewAdminOpeningStockBulkCsv(
+  file: File,
+  defaultDate: string
+): Promise<OpeningStockBulkPreview> {
+  const form = new FormData();
+  form.append("file", file);
+  if (defaultDate) form.append("default_effective_date", defaultDate);
+  return apiFetch<OpeningStockBulkPreview>("/admin/inventory/opening-stock/import/preview/", {
+    method: "POST",
+    body: form,
+  });
+}
+
+export async function applyAdminOpeningStockBulkCsv(
+  file: File,
+  opts: { dry_run: boolean; auto_post: boolean; default_effective_date: string }
+): Promise<OpeningStockBulkApplyResult> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("dry_run", String(Boolean(opts.dry_run)));
+  form.append("auto_post", String(Boolean(opts.auto_post)));
+  if (opts.default_effective_date) {
+    form.append("default_effective_date", opts.default_effective_date);
+  }
+  return apiFetch<OpeningStockBulkApplyResult>("/admin/inventory/opening-stock/import/apply/", {
+    method: "POST",
+    body: form,
+  });
+}
+
+export async function previewOpeningStockImport(file: File): Promise<OpeningStockPreview> {
+  const form = new FormData();
+  form.append("file", file);
+  return apiFetch<OpeningStockPreview>("/inventory/opening-stock/preview/", {
+    method: "POST",
+    body: form,
+  });
+}
+
+export async function postOpeningStockImport(file: File, date: string): Promise<void> {
+  const form = new FormData();
+  form.append("file", file);
+  if (date) form.append("as_of_date", date);
+  await apiFetch("/inventory/opening-stock/post/", { method: "POST", body: form });
+}
+
+// ============================================================================
 export async function fetchBillingAccessoryOptions(...args: any[]): Promise<any> { return null; }

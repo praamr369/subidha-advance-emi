@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { Download } from "lucide-react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
@@ -55,6 +56,43 @@ function toFormState(item: InventoryItem): ItemFormState {
   };
 }
 
+type StockHealth = "OUT_OF_STOCK" | "LOW_STOCK" | "IN_STOCK" | "NOT_TRACKED";
+
+function toNum(value: unknown): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+/** Derived on the client from on-hand vs reorder level. Creates no stock movement. */
+function stockHealthOf(item: InventoryItem): StockHealth {
+  if (!item.stock_tracking_enabled) return "NOT_TRACKED";
+  const onHand = toNum(item.current_stock_qty);
+  const reorder = toNum(item.reorder_level_qty);
+  if (onHand <= 0) return "OUT_OF_STOCK";
+  if (reorder > 0 && onHand <= reorder) return "LOW_STOCK";
+  return "IN_STOCK";
+}
+
+function stockValueOf(item: InventoryItem): number {
+  return toNum(item.current_stock_qty) * toNum(item.standard_unit_cost);
+}
+
+const INR = new Intl.NumberFormat("en-IN", {
+  style: "currency",
+  currency: "INR",
+  maximumFractionDigits: 2,
+});
+
+const QTY = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 3 });
+
+const HEALTH_FILTERS: Array<{ value: string; label: string }> = [
+  { value: "", label: "All stock" },
+  { value: "OUT_OF_STOCK", label: "Out of stock" },
+  { value: "LOW_STOCK", label: "Below reorder" },
+  { value: "IN_STOCK", label: "In stock" },
+  { value: "NOT_TRACKED", label: "Not tracked" },
+];
+
 export default function InventoryItemsPage() {
   const [rows, setRows] = useState<InventoryItem[]>([]);
   const [locations, setLocations] = useState<StockLocation[]>([]);
@@ -65,6 +103,10 @@ export default function InventoryItemsPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [printItem, setPrintItem] = useState<QRLabelItem | null>(null);
+  const [healthFilter, setHealthFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
+  const [locationFilter, setLocationFilter] = useState("");
+  const [sortBy, setSortBy] = useState("attention");
 
   async function loadPage() {
     setLoading(true);
@@ -108,30 +150,224 @@ export default function InventoryItemsPage() {
     [rows, selectedItemId]
   );
 
-  const rawMaterialCount = rows.filter((row) => row.stock_item_type === "RAW_MATERIAL").length;
   const bridgeEnabledCount = rows.filter((row) => row.delivery_stock_bridge_enabled).length;
 
+  const healthByItemId = useMemo(() => {
+    const map = new Map<number, StockHealth>();
+    rows.forEach((row) => map.set(row.id, stockHealthOf(row)));
+    return map;
+  }, [rows]);
+
+  const outOfStockCount = useMemo(
+    () => rows.filter((row) => healthByItemId.get(row.id) === "OUT_OF_STOCK").length,
+    [rows, healthByItemId]
+  );
+  const lowStockCount = useMemo(
+    () => rows.filter((row) => healthByItemId.get(row.id) === "LOW_STOCK").length,
+    [rows, healthByItemId]
+  );
+  const totalStockValue = useMemo(
+    () => rows.reduce((sum, row) => sum + stockValueOf(row), 0),
+    [rows]
+  );
+
+  const visibleRows = useMemo(() => {
+    const filtered = rows.filter((row) => {
+      if (healthFilter && healthByItemId.get(row.id) !== healthFilter) return false;
+      if (typeFilter && row.stock_item_type !== typeFilter) return false;
+      if (locationFilter) {
+        if (locationFilter === "UNASSIGNED") {
+          if (row.default_stock_location) return false;
+        } else if (String(row.default_stock_location ?? "") !== locationFilter) {
+          return false;
+        }
+      }
+      return true;
+    });
+
+    const healthRank: Record<StockHealth, number> = {
+      OUT_OF_STOCK: 0,
+      LOW_STOCK: 1,
+      IN_STOCK: 2,
+      NOT_TRACKED: 3,
+    };
+
+    const sorted = [...filtered];
+    sorted.sort((a, b) => {
+      if (sortBy === "on_hand_asc") return toNum(a.current_stock_qty) - toNum(b.current_stock_qty);
+      if (sortBy === "on_hand_desc") return toNum(b.current_stock_qty) - toNum(a.current_stock_qty);
+      if (sortBy === "value_desc") return stockValueOf(b) - stockValueOf(a);
+      if (sortBy === "name") {
+        return (a.product_name || "").localeCompare(b.product_name || "");
+      }
+      // "attention" — worst stock health first, then lowest cover ratio.
+      const rankDelta =
+        healthRank[healthByItemId.get(a.id) ?? "NOT_TRACKED"] -
+        healthRank[healthByItemId.get(b.id) ?? "NOT_TRACKED"];
+      if (rankDelta !== 0) return rankDelta;
+      return toNum(a.current_stock_qty) - toNum(b.current_stock_qty);
+    });
+    return sorted;
+  }, [rows, healthFilter, typeFilter, locationFilter, sortBy, healthByItemId]);
+
+  function exportVisibleCsv() {
+    const header = [
+      "Product Code",
+      "Product",
+      "SKU",
+      "Stock Type",
+      "Default Location",
+      "On Hand",
+      "Unit",
+      "Reorder Level",
+      "Stock Health",
+      "Unit Cost",
+      "Stock Value",
+      "Delivery Bridge",
+    ];
+    const lines = visibleRows.map((row) =>
+      [
+        row.product_code ?? "",
+        row.product_name ?? "",
+        row.sku ?? "",
+        row.stock_item_type ?? "",
+        row.default_stock_location_name || "Unassigned",
+        toNum(row.current_stock_qty),
+        row.unit_of_measure ?? "",
+        toNum(row.reorder_level_qty),
+        healthByItemId.get(row.id) ?? "",
+        toNum(row.standard_unit_cost),
+        stockValueOf(row).toFixed(2),
+        row.delivery_stock_bridge_enabled ? "Enabled" : "Disabled",
+      ]
+        .map((cell) => `"${String(cell).replaceAll('"', '""')}"`)
+        .join(",")
+    );
+    const blob = new Blob([[header.join(","), ...lines].join("\r\n")], {
+      type: "text/csv;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `inventory-items-${new Date().toISOString().slice(0, 10)}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
   const columns: EnterpriseColumnDef<InventoryItem>[] = [
-    { key: "product_code", header: "Product Code" },
-    { key: "product_name", header: "Product" },
-    { key: "sku", header: "SKU" },
     {
-      key: "stock_item_type",
-      header: "Stock Type",
-      render: (row) => row.stock_item_type?.replaceAll("_", " ") ?? "—",
+      key: "product_name",
+      header: "Item",
+      searchable: true,
+      cellClassName: "min-w-[220px]",
+      render: (row) => (
+        <div className="leading-tight">
+          <div className="font-medium text-foreground">{row.product_name || "—"}</div>
+          <div className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+            {row.product_code || "—"}
+            {row.sku && row.sku !== row.product_code ? ` · ${row.sku}` : ""}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "current_stock_qty",
+      header: "Stock Position",
+      headerClassName: "text-right",
+      cellClassName: "text-right whitespace-nowrap",
+      render: (row) => {
+        const health = healthByItemId.get(row.id) ?? "NOT_TRACKED";
+        const onHand = toNum(row.current_stock_qty);
+        const reorder = toNum(row.reorder_level_qty);
+        const toneClass =
+          health === "OUT_OF_STOCK"
+            ? "text-destructive"
+            : health === "LOW_STOCK"
+              ? "text-amber-600"
+              : health === "NOT_TRACKED"
+                ? "text-muted-foreground"
+                : "text-foreground";
+        return (
+          <div className="leading-tight">
+            <div className={`text-base font-semibold tabular-nums ${toneClass}`}>
+              {health === "NOT_TRACKED" ? "—" : QTY.format(onHand)}
+              <span className="ml-1 text-[11px] font-normal text-muted-foreground">
+                {row.unit_of_measure || "PCS"}
+              </span>
+            </div>
+            <div className="mt-0.5 text-[11px] text-muted-foreground">
+              {reorder > 0 ? `reorder at ${QTY.format(reorder)}` : "no reorder level"}
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      key: "stock_health",
+      header: "Status",
+      render: (row) => {
+        const health = healthByItemId.get(row.id) ?? "NOT_TRACKED";
+        return <ERPStatusBadge status={health} />;
+      },
+    },
+    {
+      key: "stock_value",
+      header: "Stock Value",
+      headerClassName: "text-right",
+      cellClassName: "text-right whitespace-nowrap tabular-nums",
+      render: (row) => {
+        const cost = toNum(row.standard_unit_cost);
+        if (!cost) return <span className="text-muted-foreground">no cost set</span>;
+        return (
+          <div className="leading-tight">
+            <div className="font-medium text-foreground">{INR.format(stockValueOf(row))}</div>
+            <div className="mt-0.5 text-[11px] text-muted-foreground">
+              @ {INR.format(cost)}
+            </div>
+          </div>
+        );
+      },
     },
     {
       key: "default_stock_location_name",
-      header: "Default Location",
-      render: (row) => row.default_stock_location_name || "Unassigned",
+      header: "Location",
+      searchable: true,
+      render: (row) =>
+        row.default_stock_location_name ? (
+          <span className="text-foreground">{row.default_stock_location_name}</span>
+        ) : (
+          <span className="text-amber-600">Unassigned</span>
+        ),
     },
-    { key: "current_stock_qty", header: "On Hand" },
+    {
+      key: "stock_item_type",
+      header: "Type",
+      render: (row) => (
+        <span className="text-xs text-muted-foreground">
+          {row.stock_item_type?.replaceAll("_", " ") ?? "—"}
+        </span>
+      ),
+    },
     {
       key: "barcode",
       header: "Trace",
-      render: (row) => row.lot_tracking_enabled ? `Lots ${row.active_lot_count ?? 0} / Exp ${row.expiring_lot_count ?? 0}` : (row.barcode || row.qr_code || "Not tracked"),
+      searchable: true,
+      render: (row) =>
+        row.lot_tracking_enabled ? (
+          <span className="text-xs">
+            {`Lots ${row.active_lot_count ?? 0}`}
+            {toNum(row.expiring_lot_count) > 0 ? (
+              <span className="ml-1 text-amber-600">{`· ${row.expiring_lot_count} expiring`}</span>
+            ) : null}
+          </span>
+        ) : row.barcode || row.qr_code ? (
+          <span className="font-mono text-[11px] text-muted-foreground">
+            {row.barcode || row.qr_code}
+          </span>
+        ) : (
+          <span className="text-xs text-muted-foreground">Not tracked</span>
+        ),
     },
-    { key: "reorder_level_qty", header: "Reorder" },
     {
       key: "delivery_stock_bridge_enabled",
       header: "Delivery Bridge",
@@ -149,7 +385,8 @@ export default function InventoryItemsPage() {
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => {
+            onClick={(event) => {
+              event.stopPropagation();
               setSelectedItemId(row.id);
               setMessage(null);
               setError(null);
@@ -160,21 +397,23 @@ export default function InventoryItemsPage() {
           </button>
           <button
             type="button"
-            onClick={() =>
+            onClick={(event) => {
+              event.stopPropagation();
               setPrintItem({
                 productName: row.product_name ?? "—",
                 productCode: row.product_code ?? "",
                 sku: row.sku ?? undefined,
                 qrValue: row.qr_code?.trim() || row.sku || row.product_code || String(row.id),
                 unitOfMeasure: row.unit_of_measure ?? undefined,
-              })
-            }
+              });
+            }}
             className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-medium text-foreground transition hover:bg-muted"
           >
             Print QR
           </button>
           <Link
             href={`/admin/inventory/items/${row.id}`}
+            onClick={(event) => event.stopPropagation()}
             className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-medium text-foreground transition hover:bg-muted"
           >
             Open detail
@@ -230,7 +469,17 @@ export default function InventoryItemsPage() {
       ]}
       stats={[
         { label: "Tracked Items", value: rows.length, tone: "info" },
-        { label: "Raw-Material Ready", value: rawMaterialCount, tone: rawMaterialCount > 0 ? "warning" : "default" },
+        {
+          label: "Out of Stock",
+          value: outOfStockCount,
+          tone: outOfStockCount > 0 ? "danger" : "success",
+        },
+        {
+          label: "Below Reorder",
+          value: lowStockCount,
+          tone: lowStockCount > 0 ? "warning" : "success",
+        },
+        { label: "Stock Value", value: INR.format(totalStockValue), tone: "default" },
         { label: "Delivery Bridge Enabled", value: bridgeEnabledCount, tone: "success" },
       ]}
       statusBadge={{ label: "Profile Governance", tone: "info" }}
@@ -294,15 +543,110 @@ export default function InventoryItemsPage() {
 
       <ERPSectionShell
         title="Tracked Inventory Profiles"
-        description="Use the inventory workspace to govern stock-only fields such as location, reorder controls, and delivery bridge participation."
+        description="Stock health is derived from on-hand against each item's reorder level. Click any row to load it into the governance form below."
       >
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          {HEALTH_FILTERS.map((option) => {
+            const isActive = healthFilter === option.value;
+            const count =
+              option.value === ""
+                ? rows.length
+                : rows.filter((row) => healthByItemId.get(row.id) === option.value).length;
+            return (
+              <button
+                key={option.value || "all"}
+                type="button"
+                aria-pressed={isActive}
+                onClick={() => setHealthFilter(option.value)}
+                className={[
+                  "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition",
+                  isActive
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-background text-foreground hover:bg-muted",
+                ].join(" ")}
+              >
+                {option.label}
+                <span
+                  className={[
+                    "rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums",
+                    isActive ? "bg-primary-foreground/20" : "bg-muted text-muted-foreground",
+                  ].join(" ")}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
         <EnterpriseDataTable
-          data={rows}
+          data={visibleRows}
           columns={columns}
           loading={loading}
           error={error}
-          emptyTitle="No inventory items are configured"
-          emptyDescription="Prepare inventory profiles from the product workspace for stock-tracked products."
+          onRetry={() => void loadPage()}
+          pageSize={50}
+          globalFilterPlaceholder="Search name, code, SKU, barcode, location..."
+          onRowClick={(row) => {
+            setSelectedItemId(row.id);
+            setMessage(null);
+            setError(null);
+          }}
+          rowClassName={(row) =>
+            row.id === selectedItemId ? "bg-primary/5 ring-1 ring-inset ring-primary/30" : undefined
+          }
+          emptyTitle="No items match these filters"
+          emptyDescription="Clear the stock, type, or location filter to see the full inventory register."
+          toolbar={
+            <>
+              <select
+                aria-label="Filter by stock type"
+                value={typeFilter}
+                onChange={(event) => setTypeFilter(event.target.value)}
+                className="h-10 rounded-xl border border-border bg-background px-3 text-sm outline-none transition focus:border-ring"
+              >
+                <option value="">All types</option>
+                <option value="FINISHED_GOOD">Finished Good</option>
+                <option value="ACCESSORY">Accessory</option>
+                <option value="RAW_MATERIAL">Raw Material</option>
+              </select>
+              <select
+                aria-label="Filter by default location"
+                value={locationFilter}
+                onChange={(event) => setLocationFilter(event.target.value)}
+                className="h-10 rounded-xl border border-border bg-background px-3 text-sm outline-none transition focus:border-ring"
+              >
+                <option value="">All locations</option>
+                <option value="UNASSIGNED">Unassigned</option>
+                {locations.map((location) => (
+                  <option key={location.id} value={String(location.id)}>
+                    {location.code} — {location.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                aria-label="Sort records"
+                value={sortBy}
+                onChange={(event) => setSortBy(event.target.value)}
+                className="h-10 rounded-xl border border-border bg-background px-3 text-sm outline-none transition focus:border-ring"
+              >
+                <option value="attention">Sort: Needs attention first</option>
+                <option value="on_hand_asc">Sort: On hand (low → high)</option>
+                <option value="on_hand_desc">Sort: On hand (high → low)</option>
+                <option value="value_desc">Sort: Stock value (high → low)</option>
+                <option value="name">Sort: Product name (A → Z)</option>
+              </select>
+              <button
+                type="button"
+                onClick={exportVisibleCsv}
+                disabled={visibleRows.length === 0}
+                className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Download className="h-4 w-4" />
+                Export
+              </button>
+            </>
+          }
         />
       </ERPSectionShell>
 

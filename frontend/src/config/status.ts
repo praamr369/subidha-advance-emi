@@ -13,6 +13,7 @@ import {
   RefreshCw,
   Smartphone,
   Trophy,
+  Truck,
   Undo2,
   type LucideIcon,
 } from "lucide-react";
@@ -43,6 +44,69 @@ type StatusMetaEntry = {
 
 const STATUS_META: Record<string, StatusMetaEntry> = {
   ACTIVE: { label: "Active", tone: "success", icon: CheckCircle2 },
+  // Contract lifecycle states (SubscriptionStatus). These are the rent/lease
+  // path in particular — without them a live rent contract renders as "Unknown".
+  REQUESTED: {
+    label: "Requested",
+    tone: "info",
+    icon: Clock3,
+    hint: "Contract requested, not yet approved.",
+  },
+  PENDING_APPROVAL: {
+    label: "Pending Approval",
+    tone: "warning",
+    icon: Clock3,
+    hint: "Waiting for admin approval before activation.",
+  },
+  PAYMENT_PENDING: {
+    label: "Payment Pending",
+    tone: "warning",
+    icon: Clock3,
+    hint: "Awaiting payment before the contract can progress.",
+  },
+  DELIVERY_PENDING: {
+    label: "Delivery Pending",
+    tone: "warning",
+    icon: Truck,
+    hint: "Active contract awaiting asset handover.",
+  },
+  HANDED_OVER: {
+    label: "Handed Over",
+    tone: "success",
+    icon: Truck,
+    hint: "Asset is with the customer and the contract is running.",
+  },
+  RETURN_PENDING: {
+    label: "Return Pending",
+    tone: "warning",
+    icon: Undo2,
+    hint: "End of term — asset return is due back from the customer.",
+  },
+  // Stock health (derived on the client from on-hand vs reorder level; no backend field).
+  IN_STOCK: {
+    label: "In stock",
+    tone: "success",
+    icon: CheckCircle2,
+    hint: "On hand is above the reorder level.",
+  },
+  LOW_STOCK: {
+    label: "Below reorder",
+    tone: "warning",
+    icon: Clock3,
+    hint: "On hand has fallen to or below the reorder level. Reorder soon.",
+  },
+  OUT_OF_STOCK: {
+    label: "Out of stock",
+    tone: "danger",
+    icon: AlertTriangle,
+    hint: "Nothing on hand. Delivery from this item will fail.",
+  },
+  NOT_TRACKED: {
+    label: "Not tracked",
+    tone: "neutral",
+    icon: Circle,
+    hint: "Stock tracking is disabled for this item, so quantities are not maintained.",
+  },
   INACTIVE: { label: "Inactive", tone: "neutral", icon: Lock },
   PENDING: {
     label: "Pending",

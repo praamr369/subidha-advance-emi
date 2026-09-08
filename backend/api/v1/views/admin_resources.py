@@ -10,6 +10,7 @@ from urllib import request
 from django.conf import settings
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.http import FileResponse, Http404
 from django.db import models, transaction
 from django.db.models import Count, Prefetch, Q, Sum, Value, DecimalField, IntegerField, OuterRef, Subquery
@@ -3508,21 +3509,25 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
         subscription = self.get_object()
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        from contracts.services.rent_lease_billing_service import generate_monthly_demands_for_subscription
+        from contracts.services.rent_lease_billing_service import rebase_rent_lease_schedule
 
         if subscription.plan_type not in ("RENT", "LEASE"):
             return Response({"detail": "Only Rent and Lease contracts support ledger generation."}, status=status.HTTP_400_BAD_REQUEST)
 
         start_date = serializer.validated_data["start_date"]
-        subscription.start_date = start_date
-        subscription.save(update_fields=["start_date"])
 
+        # Rebase rather than plain generate: regenerating alone keys new rows by
+        # billing period and leaves the previous schedule in place, so changing
+        # the start date used to produce two overlapping schedules.
         try:
-            generate_monthly_demands_for_subscription(
+            rebase_rent_lease_schedule(
                 subscription=subscription,
-                generate_full_schedule=True,
-                performed_by=request.user
+                start_date=start_date,
+                performed_by=request.user,
             )
+        except DjangoValidationError as exc:
+            detail = exc.message_dict if hasattr(exc, "message_dict") else {"detail": exc.messages}
+            return Response(detail, status=status.HTTP_400_BAD_REQUEST)
         except Exception as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -4092,14 +4097,121 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
 # =====================================================
 
 class RentalAssetAdminViewSet(viewsets.ReadOnlyModelViewSet):
-    """Read-only admin view for RentalAsset lifecycle tracking.
+    """Admin view for RentalAsset lifecycle tracking.
 
-    Write operations (reserve, hand-over, return, retire) are performed via the
-    rental_asset_lifecycle_service and are not exposed as REST mutations in P3B.
-    The UI deferred to a future phase.
+    Reads plus the lifecycle mutations the rent/lease workspace needs:
+    register an asset from a product/inventory item, reserve it for a contract,
+    hand it over, and take it back. Every mutation delegates to
+    rental_asset_lifecycle_service so the state-machine rules and audit trail
+    stay in one place.
     """
 
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
+    http_method_names = ["get", "post", "head", "options"]
+
+    def create(self, request, *args, **kwargs):
+        """Register a rental asset, optionally straight from an inventory item."""
+        from django.core.exceptions import ValidationError as _ValidationError
+        from inventory.models import InventoryItem, StockLocation
+        from products_core.models import Product
+        from deliveries.services.rental_asset_lifecycle_service import (
+            create_rental_asset_from_inventory,
+        )
+
+        data = request.data
+        asset_code = str(data.get("asset_code") or "").strip()
+        if not asset_code:
+            return Response(
+                {"asset_code": "Asset code is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        inventory_item = None
+        product = None
+        if data.get("inventory_item"):
+            inventory_item = get_object_or_404(
+                InventoryItem.objects.select_related("product"),
+                pk=data.get("inventory_item"),
+            )
+            product = inventory_item.product
+        if data.get("product"):
+            product = get_object_or_404(Product, pk=data.get("product"))
+        if product is None:
+            return Response(
+                {"detail": "Provide either an inventory_item or a product."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        location = None
+        if data.get("current_location"):
+            location = get_object_or_404(StockLocation, pk=data.get("current_location"))
+        elif inventory_item is not None:
+            location = inventory_item.default_stock_location
+
+        try:
+            asset = create_rental_asset_from_inventory(
+                product=product,
+                asset_code=asset_code,
+                inventory_item=inventory_item,
+                serial_no=str(data.get("serial_no") or "").strip(),
+                purchase_cost=Decimal(str(data.get("purchase_cost") or "0")),
+                current_location=location,
+                performed_by=request.user,
+            )
+        except _ValidationError as exc:
+            detail = exc.message_dict if hasattr(exc, "message_dict") else {"detail": exc.messages}
+            return Response(detail, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(self._serialize_asset(asset), status=status.HTTP_201_CREATED)
+
+    def _lifecycle_action(self, request, pk, handler, *, needs_subscription: bool):
+        from django.core.exceptions import ValidationError as _ValidationError
+        from subscriptions.models import RentalAsset
+
+        asset = get_object_or_404(RentalAsset, pk=pk)
+        kwargs = {}
+        if needs_subscription:
+            subscription_id = request.data.get("subscription")
+            if not subscription_id:
+                return Response(
+                    {"subscription": "Subscription id is required."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            kwargs["subscription"] = get_object_or_404(Subscription, pk=subscription_id)
+        try:
+            asset = handler(asset, performed_by=request.user, **kwargs)
+        except _ValidationError as exc:
+            detail = exc.message_dict if hasattr(exc, "message_dict") else {"detail": exc.messages}
+            return Response(detail, status=status.HTTP_400_BAD_REQUEST)
+        refreshed = get_object_or_404(self.get_queryset(), pk=asset.pk)
+        return Response(self._serialize_asset(refreshed))
+
+    @action(detail=True, methods=["post"], url_path="reserve")
+    def reserve(self, request, pk=None):
+        """Link an AVAILABLE asset to a RENT/LEASE contract."""
+        from deliveries.services.rental_asset_lifecycle_service import (
+            reserve_asset_for_subscription,
+        )
+
+        return self._lifecycle_action(
+            request, pk, reserve_asset_for_subscription, needs_subscription=True
+        )
+
+    @action(detail=True, methods=["post"], url_path="handover")
+    def handover(self, request, pk=None):
+        from deliveries.services.rental_asset_lifecycle_service import mark_asset_handed_over
+
+        return self._lifecycle_action(
+            request, pk, mark_asset_handed_over, needs_subscription=True
+        )
+
+    @action(detail=True, methods=["post"], url_path="return")
+    def return_asset(self, request, pk=None):
+        from deliveries.services.rental_asset_lifecycle_service import mark_asset_returned
+
+        return self._lifecycle_action(
+            request, pk, mark_asset_returned, needs_subscription=False
+        )
 
     def get_queryset(self):
         from subscriptions.models import RentalAsset

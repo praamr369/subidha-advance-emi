@@ -582,6 +582,48 @@ export default function SubscriptionCreatePage({
     isLeasePlan,
   ]);
 
+  /**
+   * Every structural reason the submit buttons are disabled, in the same order
+   * the form asks for them. Without this the buttons just grey out silently and
+   * the operator has no way to tell which field is at fault.
+   */
+  const submitBlockers = useMemo(() => {
+    const blockers: string[] = [];
+    if (!planType) blockers.push("Choose a plan type.");
+    if (!customer) blockers.push("Select a customer.");
+    if (!product) {
+      blockers.push("Select a product.");
+    } else if (isRentPlan && !product.is_rent_enabled) {
+      blockers.push(
+        `"${product.name}" is not enabled for RENT. Turn on Rent for this product in the product master, or choose a rent-enabled product.`
+      );
+    } else if (isLeasePlan && !product.is_lease_enabled) {
+      blockers.push(
+        `"${product.name}" is not enabled for LEASE. Turn on Lease for this product in the product master, or choose a lease-enabled product.`
+      );
+    }
+    if (!startDate) blockers.push("Set a start date.");
+    if (!tenureMonths || tenureMonths <= 0) blockers.push("Tenure must be at least 1 month.");
+    if (isEmiPlan && !batch) blockers.push("Select an EMI batch.");
+    if (!isEmiPlan && (depositPercentNumber < 20 || depositPercentNumber > 30)) {
+      blockers.push(
+        `Security deposit must be between 20% and 30% (currently ${depositPercentNumber || 0}%).`
+      );
+    }
+    return blockers;
+  }, [
+    planType,
+    customer,
+    product,
+    startDate,
+    tenureMonths,
+    isEmiPlan,
+    isRentPlan,
+    isLeasePlan,
+    batch,
+    depositPercentNumber,
+  ]);
+
   // For RENT/LEASE, the activate path is gated on KYC readiness from the backend.
   // If gating is disabled server-side, readiness.can_activate will be true anyway.
   const canActivate = useMemo(() => {
@@ -844,13 +886,28 @@ export default function SubscriptionCreatePage({
             );
             if (!cancelled) {
               const normalized = normalizeProduct(payload);
-              setProduct(normalized);
-              setProductQuery(
-                normalized.product_code
-                  ? `${normalized.name} ${normalized.product_code}`
-                  : normalized.name
-              );
-              setProductResults([]);
+              // The search picker already filters by plan mode; the prefill path
+              // must apply the same rule or the form silently blocks every submit.
+              const modeOk = isEmiPlan
+                ? normalized.is_emi_enabled !== false
+                : isRentPlan
+                  ? Boolean(normalized.is_rent_enabled)
+                  : isLeasePlan
+                    ? Boolean(normalized.is_lease_enabled)
+                    : true;
+              if (!modeOk) {
+                messages.push(
+                  `"${normalized.name}" was not applied because it is not enabled for ${planType} contracts. Enable ${planType} on the product, or pick another product.`
+                );
+              } else {
+                setProduct(normalized);
+                setProductQuery(
+                  normalized.product_code
+                    ? `${normalized.name} ${normalized.product_code}`
+                    : normalized.name
+                );
+                setProductResults([]);
+              }
             }
           } catch {
             messages.push(
@@ -2173,6 +2230,27 @@ export default function SubscriptionCreatePage({
               title="Create contract"
               description="Submit only after verifying customer, product, plan structure, and financial preview."
             >
+              {submitBlockers.length > 0 ? (
+                <div
+                  data-testid="submit-blockers"
+                  className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+                >
+                  <div className="font-semibold">
+                    Complete these before the contract can be created:
+                  </div>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    {submitBlockers.map((reason) => (
+                      <li key={reason}>{reason}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : !isEmiPlan && kycReadiness && !kycReadiness.can_activate ? (
+                <div className="mb-4 rounded-xl border border-sky-300 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+                  Documents are still outstanding, so this contract cannot be activated yet.
+                  <strong> Save as Draft</strong> to register it now and upload the documents later.
+                </div>
+              ) : null}
+
               <div className={variant === "drawer" ? "popup-action-bar items-center" : "flex flex-wrap gap-3"}>
                 <button
                   type="button"

@@ -76,6 +76,8 @@ def post_movement(
         StockMovementType.SALE_OUT,
         StockMovementType.EMI_DELIVERY_OUT,
         StockMovementType.DELIVERY_OUT,
+        StockMovementType.RENT_HANDOVER_OUT,
+        StockMovementType.LEASE_HANDOVER_OUT,
         StockMovementType.PRODUCTION_ISSUE_OUT,
         StockMovementType.PRODUCTION_CONSUME,
         StockMovementType.PURCHASE_RETURN_OUT,

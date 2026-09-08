@@ -202,6 +202,82 @@ def ensure_security_deposit_demand(*, subscription: Subscription, performed_by=N
 
 
 @transaction.atomic
+def rebase_rent_lease_schedule(
+    *, subscription: Subscription, start_date: date, performed_by=None
+) -> dict:
+    """Move a rent/lease contract's whole schedule onto a new start date.
+
+    ``generate_monthly_demands_for_subscription`` keys rows by billing period,
+    so simply regenerating after changing the start date LEAVES THE OLD ROWS
+    BEHIND and adds a second, overlapping schedule. Rebasing clears the
+    uncollected rows first so the ledger matches the contract.
+
+    Rows that carry money are never moved or deleted: if anything has been
+    collected against a monthly demand, the schedule is frozen and the caller is
+    told why, because silently re-dating collected periods would break the
+    payment-to-period audit trail.
+    """
+    if subscription.plan_type not in (PlanType.RENT, PlanType.LEASE):
+        raise ValidationError("Only RENT/LEASE contracts have a rent schedule.")
+
+    monthly_type = _monthly_demand_type(subscription)
+    monthly_qs = RentLeaseBillingDemand.objects.filter(
+        subscription=subscription, demand_type=monthly_type
+    )
+    collected = monthly_qs.filter(collected_amount__gt=MONEY_ZERO)
+    if collected.exists():
+        raise ValidationError(
+            {
+                "start_date": (
+                    "This schedule already has collected rent, so its dates cannot be "
+                    f"moved ({collected.count()} collected row(s)). Reverse or refund "
+                    "those collections first if the start date is genuinely wrong."
+                )
+            }
+        )
+
+    removed = monthly_qs.count()
+    monthly_qs.delete()
+
+    previous_start = subscription.start_date
+    subscription.start_date = start_date
+    subscription.save(update_fields=["start_date"])
+
+    # The deposit is due at contract start; realign it too, but only while it is
+    # still uncollected.
+    deposit = RentLeaseBillingDemand.objects.filter(
+        subscription=subscription,
+        demand_type=RentLeaseDemandType.SECURITY_DEPOSIT,
+        collected_amount__lte=MONEY_ZERO,
+    ).first()
+    if deposit is not None and deposit.due_date != start_date:
+        deposit.due_date = start_date
+        deposit.save(update_fields=["due_date", "updated_at"])
+
+    result = generate_monthly_demands_for_subscription(
+        subscription=subscription,
+        generate_full_schedule=True,
+        performed_by=performed_by,
+    )
+
+    log_audit(
+        action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
+        instance=subscription,
+        performed_by=performed_by,
+        metadata={
+            "event": "RENT_LEASE_SCHEDULE_REBASED",
+            "previous_start_date": previous_start.isoformat() if previous_start else None,
+            "new_start_date": start_date.isoformat(),
+            "removed_demand_count": removed,
+            "created_demand_count": result.get("created_count", 0),
+        },
+    )
+    result["removed_count"] = removed
+    result["start_date"] = start_date.isoformat()
+    return result
+
+
+@transaction.atomic
 def generate_monthly_demands_for_subscription(
     *, subscription: Subscription, through_date: date | None = None, generate_full_schedule: bool = False, performed_by=None
 ) -> dict:

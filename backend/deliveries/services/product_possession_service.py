@@ -16,6 +16,40 @@ from subscriptions.models import (
 from subscriptions.services.audit_service import log_audit
 
 
+def _add_months(anchor, months: int):
+    """Same day-of-month arithmetic the rent schedule uses, clamped to 28."""
+    year = anchor.year + (anchor.month - 1 + months) // 12
+    month = (anchor.month - 1 + months) % 12 + 1
+    day = min(anchor.day, 28)
+    return anchor.replace(year=year, month=month, day=day)
+
+
+def derive_expected_return_date(subscription: Subscription):
+    """Contract end = start date + tenure. Pure arithmetic, no judgement.
+
+    Leaving this blank made every rent contract look like it had no end date,
+    so nothing could tell an operator a return was due.
+    """
+    start = getattr(subscription, "start_date", None)
+    tenure = int(getattr(subscription, "tenure_months", 0) or 0)
+    if start is None or tenure <= 0:
+        return None
+    return _add_months(start, tenure)
+
+
+def resolve_serial_number(subscription: Subscription) -> str:
+    """Serial of the rental asset linked to this contract, when there is one."""
+    from subscriptions.models import RentalAsset
+
+    asset = (
+        RentalAsset.objects.filter(current_subscription=subscription)
+        .exclude(serial_no="")
+        .order_by("id")
+        .first()
+    )
+    return asset.serial_no if asset else ""
+
+
 @transaction.atomic
 def create_possession_record(
     *,
@@ -33,13 +67,18 @@ def create_possession_record(
     if existing:
         return existing
 
+    # Derive rather than leave blank: the caller rarely passes these, and both
+    # are computable from the contract itself.
+    resolved_return_date = expected_return_date or derive_expected_return_date(subscription)
+    resolved_serial = (serial_number or "").strip() or resolve_serial_number(subscription)
+
     possession = ProductPossession.objects.create(
         subscription=subscription,
         product=subscription.product,
         customer=subscription.customer,
         status=PossessionStatus.PENDING_HANDOVER,
-        expected_return_date=expected_return_date,
-        serial_number=(serial_number or "").strip(),
+        expected_return_date=resolved_return_date,
+        serial_number=resolved_serial,
         handover_condition_notes=(handover_condition_notes or "").strip(),
     )
 
@@ -70,9 +109,27 @@ def record_handover(
     possession.handed_over_by = handed_over_by
     if handover_condition_notes:
         possession.handover_condition_notes = handover_condition_notes.strip()
-    possession.save(update_fields=[
+
+    updated = [
         "status", "handover_date", "handed_over_by", "handover_condition_notes", "updated_at",
-    ])
+    ]
+
+    # Backfill derived fields at handover time. The rental asset is usually
+    # linked between contract creation and handover, so the serial only becomes
+    # knowable now; the expected return date may also have moved if the contract
+    # start was rebased.
+    if not possession.serial_number:
+        serial = resolve_serial_number(possession.subscription)
+        if serial:
+            possession.serial_number = serial
+            updated.append("serial_number")
+    if not possession.expected_return_date:
+        derived = derive_expected_return_date(possession.subscription)
+        if derived:
+            possession.expected_return_date = derived
+            updated.append("expected_return_date")
+
+    possession.save(update_fields=updated)
 
     subscription = possession.subscription
     if subscription.status not in (

@@ -85,6 +85,15 @@ class StockMovementType(models.TextChoices):
     # Phase 2 alias: DELIVERY_OUT → EMI_DELIVERY_OUT (physical stock reduction)
     DELIVERY_OUT = "DELIVERY_OUT", "Delivery Out"
     EMI_RETURN_IN = "EMI_RETURN_IN", "EMI Return In"
+    # RENT / LEASE handover and return. These are NOT sales: the goods stay the
+    # company's asset while they are out on hire, and physically come back at
+    # end of term to be re-hired. Keeping them distinct from EMI_DELIVERY_OUT is
+    # what lets the accounting bridge reclassify (Inventory -> Rental Asset In
+    # Service) instead of expensing them as COGS.
+    RENT_HANDOVER_OUT = "RENT_HANDOVER_OUT", "Rent Handover Out"
+    RENT_RETURN_IN = "RENT_RETURN_IN", "Rent Return In"
+    LEASE_HANDOVER_OUT = "LEASE_HANDOVER_OUT", "Lease Handover Out"
+    LEASE_RETURN_IN = "LEASE_RETURN_IN", "Lease Return In"
     # Phase 2: CUSTOMER_RETURN → maps to customer-returned stock
     CUSTOMER_RETURN = "CUSTOMER_RETURN", "Customer Return"
     SALE_RETURN_IN = "SALE_RETURN_IN", "Sale Return In"
@@ -114,6 +123,36 @@ class StockMovementType(models.TextChoices):
     QUALITY_HOLD = "QUALITY_HOLD", "Quality Hold"
     QUALITY_RELEASE = "QUALITY_RELEASE", "Quality Release"
 
+
+# Plan-aware delivery/return movement types. Advance EMI transfers ownership on
+# completion, so its stock-out is a sale-like outflow; RENT and LEASE hand the
+# asset out on hire and expect it back. Every consumer that used to hardcode
+# EMI_DELIVERY_OUT / EMI_RETURN_IN should resolve through these maps instead.
+HANDOVER_OUT_MOVEMENT_TYPE_BY_PLAN: dict[str, str] = {
+    "EMI": StockMovementType.EMI_DELIVERY_OUT,
+    "RENT": StockMovementType.RENT_HANDOVER_OUT,
+    "LEASE": StockMovementType.LEASE_HANDOVER_OUT,
+}
+RETURN_IN_MOVEMENT_TYPE_BY_PLAN: dict[str, str] = {
+    "EMI": StockMovementType.EMI_RETURN_IN,
+    "RENT": StockMovementType.RENT_RETURN_IN,
+    "LEASE": StockMovementType.LEASE_RETURN_IN,
+}
+
+# Rent/lease movements: physical stock moves, but no revenue/COGS event occurs.
+RENT_LEASE_HANDOVER_OUT_TYPES: frozenset[str] = frozenset([
+    StockMovementType.RENT_HANDOVER_OUT,
+    StockMovementType.LEASE_HANDOVER_OUT,
+])
+RENT_LEASE_RETURN_IN_TYPES: frozenset[str] = frozenset([
+    StockMovementType.RENT_RETURN_IN,
+    StockMovementType.LEASE_RETURN_IN,
+])
+
+# Every movement type that takes stock out of the building for a customer.
+ALL_HANDOVER_OUT_TYPES: frozenset[str] = frozenset(
+    [StockMovementType.EMI_DELIVERY_OUT, StockMovementType.DELIVERY_OUT]
+) | RENT_LEASE_HANDOVER_OUT_TYPES
 
 # Movement types that are soft holds / releases and do NOT affect physical stock.
 # Used by StockMovementService and current_stock_quantity() to exclude reservation

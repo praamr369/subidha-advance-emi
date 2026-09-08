@@ -16,6 +16,11 @@ from billing.models import (
     PurchaseReturnStatus,
 )
 from inventory.models import (
+    ALL_HANDOVER_OUT_TYPES,
+    HANDOVER_OUT_MOVEMENT_TYPE_BY_PLAN,
+    RETURN_IN_MOVEMENT_TYPE_BY_PLAN,
+)
+from inventory.models import (
     GoodsReceipt,
     GoodsReceiptStatus,
     InventoryItem,
@@ -187,6 +192,11 @@ STOCK_LEDGER_REFERENCE_ALLOWLIST: dict[str, StockLedgerReferenceSpec] = {
                 StockMovementType.EMI_DELIVERY_OUT,
                 StockMovementType.EMI_RETURN_IN,
                 StockMovementType.DELIVERY_OUT,
+                # Rent/lease handovers and returns come through the same bridge.
+                StockMovementType.RENT_HANDOVER_OUT,
+                StockMovementType.RENT_RETURN_IN,
+                StockMovementType.LEASE_HANDOVER_OUT,
+                StockMovementType.LEASE_RETURN_IN,
             ]
         ),
         expected_direction="MIXED",
@@ -624,9 +634,18 @@ def run_inventory_stock_checks(*, run, totals: dict) -> dict:
         if not _allowlisted(expected_ref_model):
             continue
 
-        expected_movement_type = (
-            StockMovementType.EMI_DELIVERY_OUT if delivery.status == DeliveryStatus.DELIVERED else StockMovementType.EMI_RETURN_IN
-        )
+        # Must mirror delivery_bridge_service: the expected movement type is
+        # plan-specific, so a rent handover is not reported as missing drift
+        # just because it is not labelled EMI_DELIVERY_OUT.
+        plan_type = str(getattr(delivery.subscription, "plan_type", "") or "")
+        if delivery.status == DeliveryStatus.DELIVERED:
+            expected_movement_type = HANDOVER_OUT_MOVEMENT_TYPE_BY_PLAN.get(
+                plan_type, StockMovementType.EMI_DELIVERY_OUT
+            )
+        else:
+            expected_movement_type = RETURN_IN_MOVEMENT_TYPE_BY_PLAN.get(
+                plan_type, StockMovementType.EMI_RETURN_IN
+            )
         entry = (
             StockLedger.objects.filter(
                 inventory_item_id=inventory_item.id,
@@ -676,7 +695,7 @@ def run_inventory_stock_checks(*, run, totals: dict) -> dict:
             totals["high_risk"] += 1
             continue
 
-        actual_qty = _qty(entry.quantity_out if expected_movement_type == StockMovementType.EMI_DELIVERY_OUT else entry.quantity_in)
+        actual_qty = _qty(entry.quantity_out if expected_movement_type in ALL_HANDOVER_OUT_TYPES else entry.quantity_in)
         if _qty(expected_qty) != actual_qty:
             item = ReconciliationItem.objects.create(
                 run=run,

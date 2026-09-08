@@ -130,6 +130,12 @@ DEFAULT_MAPPINGS: list[tuple[str, str, str, bool]] = [
     ),
     (
         LEDGER_POSTING_PROFILES_FINANCE_ACCOUNT_NAME,
+        "Rental Assets In Service (On Hire)",
+        FinanceAccountMappingPurpose.RENTAL_ASSET_IN_SERVICE,
+        True,
+    ),
+    (
+        LEDGER_POSTING_PROFILES_FINANCE_ACCOUNT_NAME,
         "Delivery Expense",
         FinanceAccountMappingPurpose.DELIVERY_EXPENSE,
         True,
@@ -176,6 +182,7 @@ PURPOSE_EXPECTED_ACCOUNT_TYPES: dict[str, tuple[str, ...]] = {
     FinanceAccountMappingPurpose.DELIVERY_EXPENSE: (ChartOfAccountType.EXPENSE,),
     FinanceAccountMappingPurpose.SALARY_EXPENSE: (ChartOfAccountType.EXPENSE,),
     FinanceAccountMappingPurpose.INVENTORY_ASSET: (ChartOfAccountType.ASSET,),
+    FinanceAccountMappingPurpose.RENTAL_ASSET_IN_SERVICE: (ChartOfAccountType.ASSET,),
     FinanceAccountMappingPurpose.ADVANCE_FORFEITURE_INCOME: (ChartOfAccountType.INCOME,),
     FinanceAccountMappingPurpose.BAD_DEBT_EXPENSE: (ChartOfAccountType.EXPENSE,),
 }

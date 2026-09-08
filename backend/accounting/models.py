@@ -217,6 +217,9 @@ class FinanceAccountMappingPurpose(models.TextChoices):
     DELIVERY_EXPENSE = "DELIVERY_EXPENSE", "Delivery Expense"
     SALARY_EXPENSE = "SALARY_EXPENSE", "Salary Expense"
     INVENTORY_ASSET = "INVENTORY_ASSET", "Inventory Asset"
+    # Goods physically out on rent/lease. Still the company's asset — only
+    # reclassified out of inventory while on hire, never expensed as COGS.
+    RENTAL_ASSET_IN_SERVICE = "RENTAL_ASSET_IN_SERVICE", "Rental Assets In Service (On Hire)"
     ADVANCE_FORFEITURE_INCOME = "ADVANCE_FORFEITURE_INCOME", "Advance Forfeiture Income"
     BAD_DEBT_EXPENSE = "BAD_DEBT_EXPENSE", "Bad Debt Written Off"
 
@@ -1044,6 +1047,7 @@ class FinanceAccountCoaMapping(AccountingTimeStampedModel):
             FinanceAccountMappingPurpose.PAYMENT_GATEWAY_COLLECTION,
             FinanceAccountMappingPurpose.CUSTOMER_RECEIVABLE,
             FinanceAccountMappingPurpose.INVENTORY_ASSET,
+            FinanceAccountMappingPurpose.RENTAL_ASSET_IN_SERVICE,
         } and account_type != ChartOfAccountType.ASSET:
             errors["chart_account"] = "This purpose must map to an ASSET chart account."
         if self.purpose in {

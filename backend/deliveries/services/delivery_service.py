@@ -24,6 +24,7 @@ from subscriptions.services.audit_service import log_audit
 
 
 from subscriptions.models import EmiStatus, SubscriptionStatus
+from subscriptions.enums import PlanType
 
 ACTIVE_DELIVERY_STATUSES = tuple(SubscriptionDelivery.ACTIVE_STATUSES)
 TERMINAL_DELIVERY_STATUSES = tuple(SubscriptionDelivery.TERMINAL_STATUSES)
@@ -40,11 +41,90 @@ class DeliveryEligibility:
     paid_ratio: Decimal = Decimal("0")
     is_winner: bool = False
     is_completed: bool = False
+    # RENT / LEASE only — the security deposit is the gate, not EMI progress.
+    gate: str = "EMI_ADVANCE"
+    deposit_due: Decimal = MONEY_ZERO
+    deposit_collected: Decimal = MONEY_ZERO
+
+
+def _check_rent_lease_delivery_eligibility(
+    subscription: Subscription,
+) -> DeliveryEligibility:
+    """
+    RENT and LEASE hand the asset over at the START of the term, against a
+    security deposit — there is no advance-EMI build-up to wait for. The gate is
+    therefore: has the security deposit actually been collected?
+
+    Truth comes from the SECURITY_DEPOSIT billing demand's ``collected_amount``,
+    not from the contract's expected deposit figure, so an uncollected deposit
+    cannot release an asset.
+    """
+    from payments.models import RentLeaseBillingDemand
+    from subscriptions.enums import RentLeaseDemandType
+
+    deposit_rows = RentLeaseBillingDemand.objects.filter(
+        subscription=subscription,
+        demand_type=RentLeaseDemandType.SECURITY_DEPOSIT,
+    )
+    deposit_due = q2(sum((row.amount for row in deposit_rows), MONEY_ZERO))
+    deposit_collected = q2(sum((row.collected_amount for row in deposit_rows), MONEY_ZERO))
+
+    base = {
+        "gate": "SECURITY_DEPOSIT",
+        "deposit_due": deposit_due,
+        "deposit_collected": deposit_collected,
+    }
+
+    if not deposit_rows.exists():
+        return DeliveryEligibility(
+            eligible=False,
+            reason=(
+                "No security deposit demand has been raised for this contract. "
+                "Raise and collect the deposit before handover."
+            ),
+            **base,
+        )
+
+    if deposit_collected <= MONEY_ZERO:
+        return DeliveryEligibility(
+            eligible=False,
+            reason=(
+                f"Security deposit not collected (0 of {deposit_due} due). "
+                "Collect the deposit before handover."
+            ),
+            **base,
+        )
+
+    if deposit_collected < deposit_due:
+        return DeliveryEligibility(
+            eligible=False,
+            reason=(
+                f"Security deposit only part-collected ({deposit_collected} of {deposit_due}). "
+                "Collect the balance before handover."
+            ),
+            **base,
+        )
+
+    return DeliveryEligibility(
+        eligible=True,
+        reason=f"Security deposit collected ({deposit_collected} of {deposit_due}) — delivery eligible.",
+        **base,
+    )
 
 
 def check_delivery_eligibility(subscription: Subscription) -> DeliveryEligibility:
-    """Check if a subscription meets delivery window eligibility criteria."""
+    """Check if a subscription meets delivery window eligibility criteria.
+
+    The rule is plan-specific. EMI (Advance EMI / Lucky Plan) releases the asset
+    once enough of the plan is pre-paid or the customer wins the draw. RENT and
+    LEASE release it against a collected security deposit — applying the EMI
+    threshold there would block every rent contract forever, since rent
+    contracts raise no EMI rows at all.
+    """
     from payments.models import Emi
+
+    if subscription.plan_type in (PlanType.RENT, PlanType.LEASE):
+        return _check_rent_lease_delivery_eligibility(subscription)
 
     is_winner = subscription.status == SubscriptionStatus.WON
     is_completed = subscription.status == SubscriptionStatus.COMPLETED
@@ -679,6 +759,18 @@ def transition_subscription_delivery_status(
             delivery=delivery,
             performed_by=performed_by,
         )
+
+        # Keep the rental asset in step with the stock ledger: both describe the
+        # same physical unit, so a handover/return must move both or neither.
+        # Never fatal — asset bookkeeping must not block a delivery transition.
+        try:
+            from deliveries.services.rental_asset_lifecycle_service import (
+                sync_delivery_rental_asset,
+            )
+
+            sync_delivery_rental_asset(delivery=delivery, performed_by=performed_by)
+        except Exception:  # pragma: no cover - best-effort asset mirror
+            pass
 
     try:
         from billing.services.billing_sync_service import sync_delivery_into_billing

@@ -273,9 +273,13 @@ def create_stock_ledger_entry(
     posted_journal_entry=None,
 ) -> tuple[StockLedger, bool]:
     stock_location = stock_location or inventory_item.default_stock_location
+    # Rent/lease handovers take real stock out of the building, so they are
+    # guarded against overselling exactly like an EMI delivery.
     outbound_guard_types = {
         StockMovementType.EMI_DELIVERY_OUT,
         StockMovementType.DELIVERY_OUT,
+        StockMovementType.RENT_HANDOVER_OUT,
+        StockMovementType.LEASE_HANDOVER_OUT,
     }
     qty_out = _quantity(quantity_out)
     if movement_type in outbound_guard_types and qty_out > Decimal("0.000"):

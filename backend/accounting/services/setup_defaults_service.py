@@ -74,6 +74,7 @@ PURPOSE_TO_TARGET_CHART_KEY: dict[str, str] = {
     FinanceAccountMappingPurpose.DELIVERY_EXPENSE: "DELIVERY_EXPENSE",
     FinanceAccountMappingPurpose.SALARY_EXPENSE: "SALARY_EXPENSE",
     FinanceAccountMappingPurpose.INVENTORY_ASSET: "INVENTORY_ASSET",
+    FinanceAccountMappingPurpose.RENTAL_ASSET_IN_SERVICE: "RENTAL_ASSET_IN_SERVICE",
     FinanceAccountMappingPurpose.ADVANCE_FORFEITURE_INCOME: "ADVANCE_FORFEITURE_INCOME",
     FinanceAccountMappingPurpose.BAD_DEBT_EXPENSE: "BAD_DEBT_EXPENSE",
 }

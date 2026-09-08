@@ -14,6 +14,7 @@ from accounting.models import (
 )
 from billing.models import DirectSale, DirectSaleStatus
 from inventory.models import (
+    ALL_HANDOVER_OUT_TYPES,
     InventoryItem,
     OpeningStockEntry,
     OpeningStockEntryStatus,
@@ -328,7 +329,7 @@ def get_inventory_readiness_snapshot() -> dict[str, Any]:
     blocked_deliveries = SubscriptionDelivery.objects.filter(status=DeliveryStatus.BLOCKED_STOCK_UNAVAILABLE).count()
     delivered_stock_out_ids = _stock_ledger_reference_ids(
         reference_model="SubscriptionDelivery",
-        movement_types=[StockMovementType.EMI_DELIVERY_OUT, StockMovementType.DELIVERY_OUT],
+        movement_types=sorted(ALL_HANDOVER_OUT_TYPES),
     )
     delivered_without_stock_out = SubscriptionDelivery.objects.filter(status=DeliveryStatus.DELIVERED).exclude(id__in=delivered_stock_out_ids).count()
     _check(checks, key="direct_sales_delivery_pending", label="Direct sales requiring delivery but not delivered", status=WARNING if direct_sales_pending_delivery else READY, detail=f"{direct_sales_pending_delivery} direct sale row(s) require delivery and are not delivered or terminal.", count=direct_sales_pending_delivery, action_label="Open direct sale workspace", action_href="/admin/billing/direct-sale")

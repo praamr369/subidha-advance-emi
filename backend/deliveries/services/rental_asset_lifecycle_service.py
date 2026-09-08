@@ -31,6 +31,7 @@ from subscriptions.models import (
     AssetConditionSnapshot,
     AssetConditionSnapshotStage,
     Customer,
+    DeliveryStatus,
     PlanType,
     RentalAsset,
     RentalAssetStatus,
@@ -410,3 +411,69 @@ def retire_asset(
     )
 
     return asset
+
+
+@transaction.atomic
+def sync_delivery_rental_asset(*, delivery, performed_by=None) -> dict:
+    """Drive the linked rental asset from the delivery's own status.
+
+    The stock ledger and the rental asset are two records of the same physical
+    unit. Before this, only the ledger moved automatically: a delivery marked
+    RETURNED restocked inventory while its asset sat in HANDED_OVER forever, so
+    the two told different stories about the same bed.
+
+    Deliberately forgiving — a delivery must never fail because of asset
+    bookkeeping. Nothing linked, wrong plan type, or an illegal transition all
+    return a reason instead of raising.
+    """
+    subscription = getattr(delivery, "subscription", None)
+    if subscription is None:
+        return {"changed": False, "reason": "no_subscription"}
+    if subscription.plan_type not in (PlanType.RENT, PlanType.LEASE):
+        return {"changed": False, "reason": "not_rent_or_lease"}
+
+    asset = (
+        RentalAsset.objects.select_for_update()
+        .filter(current_subscription=subscription)
+        .exclude(status=RentalAssetStatus.RETIRED)
+        .order_by("id")
+        .first()
+    )
+    if asset is None:
+        return {"changed": False, "reason": "no_linked_asset"}
+
+    status = getattr(delivery, "status", "")
+    previous = asset.status
+
+    try:
+        if status == DeliveryStatus.DELIVERED:
+            if asset.status == RentalAssetStatus.HANDED_OVER:
+                return {"changed": False, "reason": "already_handed_over", "asset_id": asset.pk}
+            if asset.status == RentalAssetStatus.AVAILABLE:
+                # Linked but never formally reserved — reserve first so the
+                # state machine sees a legal RESERVED -> HANDED_OVER hop.
+                reserve_asset_for_subscription(asset, subscription, performed_by=performed_by)
+                asset.refresh_from_db()
+            asset = mark_asset_handed_over(asset, subscription, performed_by=performed_by)
+        elif status == DeliveryStatus.RETURNED:
+            if asset.status == RentalAssetStatus.RETURNED:
+                return {"changed": False, "reason": "already_returned", "asset_id": asset.pk}
+            asset = mark_asset_returned(asset, performed_by=performed_by)
+        else:
+            return {"changed": False, "reason": "status_not_asset_relevant"}
+    except ValidationError as exc:
+        # Surface it, do not abort the delivery.
+        return {
+            "changed": False,
+            "reason": "transition_rejected",
+            "asset_id": asset.pk,
+            "detail": "; ".join(exc.messages) if hasattr(exc, "messages") else str(exc),
+        }
+
+    return {
+        "changed": True,
+        "asset_id": asset.pk,
+        "asset_code": asset.asset_code,
+        "previous_status": previous,
+        "new_status": asset.status,
+    }

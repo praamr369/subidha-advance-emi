@@ -96,6 +96,12 @@ function SectionCard({
   );
 }
 
+const DEPOSIT_INR = new Intl.NumberFormat("en-IN", {
+  style: "currency",
+  currency: "INR",
+  maximumFractionDigits: 0,
+});
+
 export default function AdminDeliveriesPage() {
   const router = useRouter();
   const pathname = usePathname();
@@ -168,6 +174,10 @@ export default function AdminDeliveriesPage() {
     paid_ratio: string;
     is_winner: boolean;
     is_completed: boolean;
+    gate?: string;
+    plan_type?: string;
+    deposit_due?: string;
+    deposit_collected?: string;
   } | null>(null);
   const [eligibilityLoading, setEligibilityLoading] = useState(false);
   const [actingCaseId, setActingCaseId] = useState<number | null>(null);
@@ -1093,10 +1103,17 @@ export default function AdminDeliveriesPage() {
                             }`}>
                               {eligibility.eligible ? "Eligible" : "Not Eligible"}
                             </span>
-                            <span className="text-xs">
-                              {eligibility.paid_emi_count}/{eligibility.total_emi_count} EMIs paid
-                              ({Math.round(Number(eligibility.paid_ratio) * 100)}%)
-                            </span>
+                            {eligibility.gate === "SECURITY_DEPOSIT" ? (
+                              <span className="text-xs">
+                                Deposit {DEPOSIT_INR.format(Number(eligibility.deposit_collected ?? 0))} of{" "}
+                                {DEPOSIT_INR.format(Number(eligibility.deposit_due ?? 0))} collected
+                              </span>
+                            ) : (
+                              <span className="text-xs">
+                                {eligibility.paid_emi_count}/{eligibility.total_emi_count} EMIs paid
+                                ({Math.round(Number(eligibility.paid_ratio) * 100)}%)
+                              </span>
+                            )}
                             {eligibility.is_winner && (
                               <span className="inline-flex rounded-full bg-yellow-100 border border-yellow-300 px-2 py-0.5 text-xs font-bold text-yellow-800">
                                 Draw Winner
