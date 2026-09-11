@@ -201,3 +201,96 @@ class NotificationTemplate(ReminderTimeStampedModel):
             "body": rendered_body,
             "placeholders_used": sample,
         }
+
+
+class WhatsAppMessageStatus(models.TextChoices):
+    QUEUED = "QUEUED", "Queued"
+    OPENED = "OPENED", "Opened in WhatsApp"
+    SENT = "SENT", "Sent"
+    SKIPPED = "SKIPPED", "Skipped"
+
+
+class WhatsAppEventType(models.TextChoices):
+    PAYMENT_RECEIPT = "PAYMENT_RECEIPT", "Payment receipt"
+    DUE_REMINDER = "DUE_REMINDER", "EMI / rent due reminder"
+    DELIVERY_SCHEDULED = "DELIVERY_SCHEDULED", "Delivery scheduled"
+    OUT_FOR_DELIVERY = "OUT_FOR_DELIVERY", "Out for delivery"
+    DELIVERED = "DELIVERED", "Delivered / handed over"
+    HANDOVER_RETURNED = "HANDOVER_RETURNED", "Rental returned"
+    DRAW_WINNER = "DRAW_WINNER", "Lucky draw winner"
+    KYC_VERIFIED = "KYC_VERIFIED", "KYC verified"
+    KYC_REJECTED = "KYC_REJECTED", "KYC needs attention"
+    CONTRACT_ACTIVATED = "CONTRACT_ACTIVATED", "Contract activated"
+    CUSTOM = "CUSTOM", "Custom message"
+
+
+class WhatsAppMessage(ReminderTimeStampedModel):
+    """A customer message waiting to be sent from the business WhatsApp.
+
+    Delivery is click-to-send through wa.me: staff open the pre-filled message
+    in their own WhatsApp (phone app or WhatsApp Web) and tap Send. The row is
+    the audit trail of what was prepared, who opened it, and who confirmed it
+    was sent. ``provider`` exists so an automated Cloud API channel can be
+    switched on per event later without changing callers.
+    """
+
+    event_type = models.CharField(max_length=32, choices=WhatsAppEventType.choices, db_index=True)
+    customer = models.ForeignKey(
+        Customer,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="whatsapp_messages",
+    )
+    subscription = models.ForeignKey(
+        Subscription,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="whatsapp_messages",
+    )
+    phone = models.CharField(max_length=32, blank=True, default="")
+    phone_e164 = models.CharField(max_length=20, blank=True, default="", db_index=True)
+    body = models.TextField()
+    status = models.CharField(
+        max_length=16,
+        choices=WhatsAppMessageStatus.choices,
+        default=WhatsAppMessageStatus.QUEUED,
+        db_index=True,
+    )
+    provider = models.CharField(max_length=16, default="WA_ME")
+    opted_in_snapshot = models.BooleanField(
+        default=False,
+        help_text="Customer's WhatsApp opt-in at the moment the message was queued.",
+    )
+    source_model = models.CharField(max_length=60, blank=True, default="")
+    source_id = models.CharField(max_length=40, blank=True, default="")
+    dedupe_key = models.CharField(max_length=160, null=True, blank=True, unique=True)
+    opened_at = models.DateTimeField(null=True, blank=True)
+    opened_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="opened_whatsapp_messages",
+    )
+    sent_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    sent_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sent_whatsapp_messages",
+    )
+    skip_reason = models.CharField(max_length=240, blank=True, default="")
+
+    class Meta:
+        db_table = "whatsapp_messages"
+        ordering = ["-id"]
+        indexes = [
+            models.Index(fields=["status", "created_at"]),
+            models.Index(fields=["event_type", "status"]),
+        ]
+
+    def __str__(self):
+        return f"WA#{self.pk} [{self.event_type}] {self.status}"

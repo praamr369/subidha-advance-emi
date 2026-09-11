@@ -773,6 +773,18 @@ def record_emi_payment(
         }
         idem_row.save(update_fields=["status", "response_status", "response_body"])
 
+    # Prepare the customer's WhatsApp receipt once the collection commits, so a
+    # rolled-back payment never produces a receipt message. Best-effort.
+    def _queue_whatsapp_receipt(payment=payment):
+        try:
+            from reminders.services.whatsapp_outbox_service import queue_payment_receipt
+
+            queue_payment_receipt(payment)
+        except Exception:  # pragma: no cover - outbox must never affect collections
+            pass
+
+    transaction.on_commit(_queue_whatsapp_receipt)
+
     return {
         "payment": payment,
         "emi": emi,

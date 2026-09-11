@@ -639,6 +639,8 @@ class PublicWinnersView(PublicWinnerHistoryView):
     """
 
 
+from api.v1.views.whatsapp_catalog import WhatsAppCatalogFeedView  # noqa: E402
+
 urlpatterns = [
     path("stats/", PublicStatsView.as_view(), name="public-stats"),
     path("business-profile/", PublicBusinessProfileView.as_view(), name="public-business-profile"),
@@ -646,6 +648,11 @@ urlpatterns = [
     path("policies/<slug:slug>/", PublicPolicyPageDetailView.as_view(), name="public-policy-detail"),
     path("business-compliance/summary/", PublicBusinessComplianceSummaryView.as_view(), name="public-business-compliance-summary"),
     path("products/", PublicProductsView.as_view(), name="public-products"),
+    path(
+        "catalog/whatsapp-feed.csv",
+        WhatsAppCatalogFeedView.as_view(),
+        name="public-whatsapp-catalog-feed",
+    ),
     path("product-categories/", PublicProductCategoriesView.as_view(), name="public-product-categories"),
     path("products/<str:slug>/", PublicProductDetailView.as_view(), name="public-product-detail"),
     path("products/by-id/<int:id>/", PublicProductDetailView.as_view(), name="public-product-detail-by-id"),

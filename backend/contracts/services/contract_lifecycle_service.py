@@ -89,6 +89,13 @@ def activate_contract(*, subscription: Subscription, performed_by) -> Subscripti
         from contracts.services.rent_lease_billing_service import generate_monthly_demands_for_subscription
         generate_monthly_demands_for_subscription(subscription=subscription, performed_by=performed_by)
 
+    try:
+        from reminders.services.whatsapp_outbox_service import queue_contract_activated
+
+        queue_contract_activated(subscription)
+    except Exception:  # pragma: no cover - best-effort outbox
+        pass
+
     return subscription
 
 

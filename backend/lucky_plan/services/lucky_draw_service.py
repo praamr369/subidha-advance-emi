@@ -313,6 +313,13 @@ def reveal_and_execute_draw(draw_id: int, revealed_seed: str, performed_by=None)
         },
     )
 
+    try:
+        from reminders.services.whatsapp_outbox_service import queue_draw_winner
+
+        queue_draw_winner(subscription=winner_subscription, draw_month=draw.draw_month)
+    except Exception:  # pragma: no cover - best-effort outbox
+        pass
+
     if draw.draw_commit_id:
         from lucky_plan.services.batch_draw_coordination_service import (
             post_winner_operational_followup,

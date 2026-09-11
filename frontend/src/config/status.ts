@@ -107,6 +107,10 @@ const STATUS_META: Record<string, StatusMetaEntry> = {
     icon: Circle,
     hint: "Stock tracking is disabled for this item, so quantities are not maintained.",
   },
+  QUEUED: { label: "Queued", tone: "warning", icon: Clock3, hint: "Prepared and waiting to be sent from WhatsApp." },
+  OPENED: { label: "Opened", tone: "info", icon: Smartphone, hint: "Opened in WhatsApp. Confirm once you have tapped Send." },
+  SENT: { label: "Sent", tone: "success", icon: CheckCircle2 },
+  SKIPPED: { label: "Skipped", tone: "neutral", icon: Circle, hint: "Deliberately not sent." },
   INACTIVE: { label: "Inactive", tone: "neutral", icon: Lock },
   PENDING: {
     label: "Pending",

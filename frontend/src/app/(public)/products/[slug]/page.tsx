@@ -14,6 +14,7 @@ import PublicSeoJsonLd from "@/components/public/PublicSeoJsonLd";
 import { getPublicDictionary } from "@/lib/public-i18n";
 import { getPublicLocale } from "@/lib/public-i18n.server";
 import { getPublicProductDetail } from "@/lib/public-api";
+import { getResolvedPublicBusinessProfile } from "@/lib/public-profile";
 import { buildProductJsonLd, buildPublicMetadata } from "@/lib/public-seo";
 import { ROUTES } from "@/lib/routes";
 
@@ -91,6 +92,16 @@ export default async function ProductDetailPage({ params, searchParams }: Produc
 
   const locale = await getPublicLocale();
   const dictionary = getPublicDictionary(locale);
+  const businessProfile = await getResolvedPublicBusinessProfile();
+  const whatsappOrderHref = businessProfile.resolved_whatsapp_link
+    ? `${businessProfile.resolved_whatsapp_link}?text=${encodeURIComponent(
+        `Hello, I am interested in ${
+          product.name.includes(product.product_code)
+            ? product.name
+            : `${product.name} (code ${product.product_code})`
+        }. Please share price, EMI and rent options.`,
+      )}`
+    : null;
 
   const applyHref = buildProductEnquiryHref(product);
 
@@ -130,6 +141,17 @@ export default async function ProductDetailPage({ params, searchParams }: Produc
         <ArrowLeft className="h-4 w-4" />
         Back to catalogue
       </Link>
+
+      {whatsappOrderHref ? (
+        <a
+          href={whatsappOrderHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#25D366]/50 focus-visible:ring-offset-2"
+        >
+          Order on WhatsApp
+        </a>
+      ) : null}
 
       <PublicProductInteractiveDetail
         initialProduct={product}

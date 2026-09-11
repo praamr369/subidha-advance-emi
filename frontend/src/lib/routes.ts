@@ -240,6 +240,7 @@
     partnersCollectionRequests: "/admin/partners/collection-requests",
     reminders: "/admin/reminders",
     remindersPaymentReminders: "/admin/reminders/payment-reminders",
+    remindersWhatsApp: "/admin/reminders/whatsapp",
     notificationTemplates: "/admin/reminders/templates",
     luckyIds: "/admin/lucky-ids",
     luckyDraws: "/admin/lucky-draws",

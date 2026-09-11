@@ -772,6 +772,15 @@ def transition_subscription_delivery_status(
         except Exception:  # pragma: no cover - best-effort asset mirror
             pass
 
+    # Prepare the customer's WhatsApp update for this status (click-to-send).
+    # Never blocks the transition.
+    try:
+        from reminders.services.whatsapp_outbox_service import queue_delivery_update
+
+        queue_delivery_update(delivery)
+    except Exception:  # pragma: no cover - best-effort outbox
+        pass
+
     try:
         from billing.services.billing_sync_service import sync_delivery_into_billing
 

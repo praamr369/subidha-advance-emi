@@ -450,6 +450,13 @@ def approve_kyc(
         performed_by=performed_by,
         metadata={"old_status": old_status, "new_status": KycStatus.APPROVED},
     )
+    try:
+        from reminders.services.whatsapp_outbox_service import queue_kyc_decision
+
+        queue_kyc_decision(customer=customer, verified=True)
+    except Exception:  # pragma: no cover - best-effort outbox
+        pass
+
     return customer
 
 
@@ -492,6 +499,13 @@ def reject_kyc(
             "reason": customer.kyc_rejection_reason,
         },
     )
+    try:
+        from reminders.services.whatsapp_outbox_service import queue_kyc_decision
+
+        queue_kyc_decision(customer=customer, reason=customer.kyc_rejection_reason, verified=False)
+    except Exception:  # pragma: no cover - best-effort outbox
+        pass
+
     return customer
 
 

@@ -196,6 +196,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Collections & Cashier", "Reminders", ROUTES.admin.reminders, "Payment reminder configuration and queue.", {
     children: [
       item("Collections & Cashier", "Payment Reminders", ROUTES.admin.remindersPaymentReminders, "Automated payment reminder dispatch."),
+      item("Collections & Cashier", "WhatsApp Outbox", ROUTES.admin.remindersWhatsApp, "Click-to-send WhatsApp messages for receipts, deliveries, draws and reminders."),
       item("Collections & Cashier", "Reminder Templates", ROUTES.admin.remindersTemplates, "Reminder message templates."),
     ],
   }),
