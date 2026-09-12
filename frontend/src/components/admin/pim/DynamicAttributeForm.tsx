@@ -49,7 +49,7 @@ function isNumeric(attr: PimCategoryAttribute): boolean {
 }
 
 /** Values already saved on same-named attributes elsewhere, minus the ones this attribute has. */
-function templateValuesFor(attr: PimCategoryAttribute, templateAttributes: PimCategoryAttribute[] | undefined): string[] {
+export function templateValuesFor(attr: PimCategoryAttribute, templateAttributes: PimCategoryAttribute[] | undefined): string[] {
   const family = VALUE_FAMILY[attr.data_type];
   if (!family || !templateAttributes?.length) return [];
   const name = attr.name.trim().toLowerCase();

@@ -1325,6 +1325,8 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
             onRefresh={refreshVariants}
             lockedAttributes={lockedAttributes}
             parentAttrValues={attrValues}
+            onAddOption={handleQuickAddOption}
+            templateAttributes={allAttributes}
           />
         </section>
       )}

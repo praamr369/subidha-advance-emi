@@ -6,9 +6,10 @@ import {
   RefreshCw, Download, Database, Image as ImageIcon, Upload,
   ChevronDown, ChevronUp, Pencil, RefreshCcw, CheckCircle2, Layers, Lock, QrCode
 } from "lucide-react";
-import { pimService, type PimVariant, type PimCategoryAttribute } from "@/services/pim";
+import { pimService, type PimVariant, type PimCategoryAttribute, type PimAttributeOption } from "@/services/pim";
 import { patchVariantPublishControl } from "@/services/product-pim";
 import { type AttributeValues } from "./DynamicAttributeForm";
+import AttributeValuePicker from "./AttributeValuePicker";
 import { formatRupee } from "@/lib/utils/currency";
 import QRLabelPrintModal, { type QRLabelItem } from "@/components/inventory/QRLabelPrintModal";
 import RelatedProductsSection from "../products/RelatedProductsSection";
@@ -25,6 +26,10 @@ interface Props {
   lockedAttributes?: Set<number>;
   /** Parent product's saved attribute values — locked ones are shown read-only in variant editor */
   parentAttrValues?: AttributeValues;
+  /** Saves a value (preset) on an attribute from a SKU form; enables quick-add in the dropdowns. */
+  onAddOption?: (attr: PimCategoryAttribute, value: string) => Promise<PimAttributeOption>;
+  /** Every attribute in the catalogue — same-named attributes' values are offered as templates. */
+  templateAttributes?: PimCategoryAttribute[];
 }
 
 interface WorkbenchAttributeOption { id: number; value: string; display_name: string; extra_cost?: string | number; }
@@ -136,12 +141,16 @@ function VariantEditPanel({
   productId,
   onSave,
   onCancel,
+  onAddOption,
+  templateAttributes,
 }: {
   variant: PimVariant;
   allAttributes: PimCategoryAttribute[];
   lockedAttributes?: Set<number>;
   parentAttrValues?: AttributeValues;
   productId?: number;
+  onAddOption?: Props["onAddOption"];
+  templateAttributes?: PimCategoryAttribute[];
   onSave: (data: VariantEditState) => Promise<void>;
   onCancel: () => void;
 }) {
@@ -182,24 +191,10 @@ function VariantEditPanel({
     }
   };
 
-  function AttrInput({ attr }: { attr: PimCategoryAttribute }) {
+  // A plain render function, not a nested component: a component declared inside
+  // render is re-created on every keystroke, which dropped input focus.
+  function renderAttrInput(attr: PimCategoryAttribute) {
     const val = state.attrValues[attr.id] ?? "";
-    if (attr.data_type === "CHOICE" && attr.options.length > 0) {
-      return (
-        <select
-          className="mt-1 w-full rounded-lg border bg-background px-3 py-1.5 text-sm"
-          value={val}
-          onChange={(e) => setAttr(attr.id, e.target.value)}
-        >
-          <option value="">— Select —</option>
-          {attr.options.map((o) => {
-            const cost = Number(o.extra_cost ?? 0);
-            const label = cost > 0 ? `${o.display_name}  (+₹${cost.toLocaleString("en-IN")})` : o.display_name;
-            return <option key={o.id} value={o.value}>{label}</option>;
-          })}
-        </select>
-      );
-    }
     if (attr.data_type === "BOOLEAN") {
       return (
         <div className="flex gap-3 mt-1">
@@ -214,12 +209,12 @@ function VariantEditPanel({
       );
     }
     return (
-      <input
-        type={attr.data_type === "NUMBER" || attr.data_type === "DECIMAL" ? "number" : "text"}
-        className="mt-1 w-full rounded-lg border bg-background px-3 py-1.5 text-sm"
+      <AttributeValuePicker
+        attr={attr}
         value={val}
-        placeholder={`Enter ${attr.name}`}
-        onChange={(e) => setAttr(attr.id, e.target.value)}
+        onChange={(next) => setAttr(attr.id, next)}
+        onAddOption={onAddOption}
+        templateAttributes={templateAttributes}
       />
     );
   }
@@ -269,7 +264,7 @@ function VariantEditPanel({
             {variantDefining.map((attr) => (
               <div key={attr.id}>
                 <label className="text-xs font-medium text-foreground">{attr.name}</label>
-                <AttrInput attr={attr} />
+                {renderAttrInput(attr)}
               </div>
             ))}
           </div>
@@ -284,7 +279,7 @@ function VariantEditPanel({
             {nonDefining.map((attr) => (
               <div key={attr.id}>
                 <label className="text-xs font-medium text-foreground">{attr.name}</label>
-                <AttrInput attr={attr} />
+                {renderAttrInput(attr)}
               </div>
             ))}
           </div>
@@ -354,7 +349,7 @@ function VariantEditPanel({
   );
 }
 
-export default function VariantManager({ productId, productCode, productName, basePrice, variants, allAttributes, onRefresh, lockedAttributes, parentAttrValues }: Props) {
+export default function VariantManager({ productId, productCode, productName, basePrice, variants, allAttributes, onRefresh, lockedAttributes, parentAttrValues, onAddOption, templateAttributes }: Props) {
   const [wbAttributes, setWbAttributes] = useState<WorkbenchAttribute[]>([]);
   const [selectedAttrIds, setSelectedAttrIds] = useState<Set<number>>(new Set());
   const [activePanel, setActivePanel] = useState<ActivePanel>(null);
@@ -975,23 +970,13 @@ export default function VariantManager({ productId, productCode, productName, ba
                         {attr.name}
                         {attr.is_variant_defining && <Layers className="inline h-3 w-3 ml-1 text-primary" />}
                       </label>
-                      {attr.data_type === "CHOICE" ? (
-                        <select className="mt-1 w-full rounded-lg border px-3 py-1.5 text-sm bg-background"
-                          value={form.attrValues[attr.id] ?? ""}
-                          onChange={(e) => setForm({ ...form, attrValues: { ...form.attrValues, [attr.id]: e.target.value } })}>
-                          <option value="">-- Select --</option>
-                          {attr.options.map((opt) => {
-                            const cost = Number(opt.extra_cost ?? 0);
-                            const label = cost > 0 ? `${opt.display_name}  (+₹${cost.toLocaleString("en-IN")})` : opt.display_name;
-                            return <option key={opt.id} value={opt.value}>{label}</option>;
-                          })}
-                        </select>
-                      ) : (
-                        <input type="text" className="mt-1 w-full rounded-lg border px-3 py-1.5 text-sm bg-background"
-                          value={form.attrValues[attr.id] ?? ""}
-                          onChange={(e) => setForm({ ...form, attrValues: { ...form.attrValues, [attr.id]: e.target.value } })}
-                          placeholder={attr.name} />
-                      )}
+                      <AttributeValuePicker
+                        attr={attr}
+                        value={form.attrValues[attr.id] ?? ""}
+                        onChange={(next) => setForm((f) => ({ ...f, attrValues: { ...f.attrValues, [attr.id]: next } }))}
+                        onAddOption={onAddOption}
+                        templateAttributes={templateAttributes}
+                      />
                     </div>
                   );
                 })}
@@ -1141,6 +1126,8 @@ export default function VariantManager({ productId, productCode, productName, ba
                               productId={productId}
                               onSave={(state) => handleSaveVariantEdit(v.id, state)}
                               onCancel={() => setExpandedId(null)}
+                              onAddOption={onAddOption}
+                              templateAttributes={templateAttributes}
                             />
                           </td>
                         </tr>
