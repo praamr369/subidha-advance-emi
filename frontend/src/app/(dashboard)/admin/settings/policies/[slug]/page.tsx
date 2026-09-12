@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
-export default function RedirectPolicySlugPage({ params }: { params: { slug: string } }) {
-  redirect(`/admin/settings/compliance-policies/${params.slug}`);
+export default async function RedirectPolicySlugPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  redirect(`/admin/settings/compliance-policies/${slug}`);
 }
