@@ -62,6 +62,70 @@ export async function closeContract(subscriptionId: number): Promise<ContractLif
   });
 }
 
+// ---------- rent/lease settlement (deposit refund + close/cancel) ----------
+
+export type ContractSettleAction = "CLOSE" | "CANCEL";
+
+export type ContractSettlementPreview = {
+  applicable: boolean;
+  reason?: string;
+  status?: ContractStatus;
+  allowed_actions?: ContractSettleAction[];
+  recommended_action?: ContractSettleAction | null;
+  blockers?: string[];
+  goods_with_customer?: boolean;
+  goods_went_out?: boolean;
+  returned_on?: string | null;
+  months_to_cancel?: number;
+  months_to_cancel_amount?: string;
+  unpaid_rent_months?: Array<{
+    demand_id: number;
+    reference_key: string;
+    period_start: string | null;
+    amount: string;
+    collected: string;
+    balance: string;
+  }>;
+  unpaid_rent_amount?: string;
+  deposit_refundable?: string;
+  deposit_held?: string;
+};
+
+export type ContractSettleInput = {
+  action: ContractSettleAction;
+  reason?: string;
+  waive_unpaid_rent?: boolean;
+  deduction_amount?: string;
+  deduction_reason?: string;
+  finance_account_id?: number;
+  payment_method?: string;
+  payment_date?: string;
+  reference_no?: string;
+};
+
+export type ContractSettleResult = {
+  action: ContractSettleAction;
+  previous_status: ContractStatus;
+  status: ContractStatus;
+  cancelled_demand_ids: number[];
+  waived_demand_ids: number[];
+  waived_rent_amount: string;
+  deposit_deducted: string;
+  deposit_refunded: string;
+  refund_reference: string;
+};
+
+export async function getContractSettlementPreview(subscriptionId: number): Promise<ContractSettlementPreview> {
+  return apiFetch<ContractSettlementPreview>(`/admin/contracts/${subscriptionId}/settle/`, { cache: "no-store" });
+}
+
+export async function settleContract(subscriptionId: number, input: ContractSettleInput): Promise<ContractSettleResult> {
+  return apiFetch<ContractSettleResult>(`/admin/contracts/${subscriptionId}/settle/`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 // ---------- amendments ----------
 
 export type ContractAmendmentStatus = "REQUESTED" | "UNDER_REVIEW" | "APPROVED" | "REJECTED" | "IMPLEMENTED" | "CANCELLED" | "APPLIED";

@@ -23,6 +23,7 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import { CustomerRiskPanel } from "@/components/customer-intelligence/CustomerRiskPanel";
 import { CustomerTimelinePanel } from "@/components/customer-intelligence/CustomerTimelinePanel";
+import ReturnedAssetReleaseButton from "@/components/customer-intelligence/ReturnedAssetReleaseButton";
 import KycDocumentPanel from "@/components/kyc/KycDocumentPanel";
 import { DetailPanel, KpiCard, QuickActionGrid } from "@/components/ui/operations";
 import ERPPageShell from "@/components/erp/ERPPageShell";
@@ -37,6 +38,10 @@ import {
 import { apiFetch, toArray } from "@/lib/api";
 import { ROUTES } from "@/lib/routes";
 import { formatRupee } from "@/lib/utils/currency";
+import ProductPostureCard, {
+  normalizeProductPosture,
+  type ProductPosture,
+} from "@/components/customers/ProductPostureCard";
 import type { CollectionPrimaryAction } from "@/services/receivables";
 
 // =====================================================
@@ -58,6 +63,8 @@ type SubscriptionStatus =
   | "COMPLETED"
   | "CANCELLED"
   | "DEFAULTED"
+  | "RETURNED"
+  | "CLOSED"
   | "UNKNOWN";
 
 type CustomerDetailRecord = {
@@ -295,6 +302,7 @@ type CustomerOperationalProfile = {
     active_ledger_debits?: string;
     direct_sale_receivable_total: string;
   };
+  product_posture: ProductPosture | null;
   receipts_documents: {
     summary: {
       receipt_count: number;
@@ -446,6 +454,10 @@ function normalizeSubscriptionStatus(
   if (status === "COMPLETED") return "COMPLETED";
   if (status === "CANCELLED") return "CANCELLED";
   if (status === "DEFAULTED") return "DEFAULTED";
+  // Rent/lease contracts end RETURNED, then CLOSED once settled; the release
+  // button keys off both.
+  if (status === "RETURNED") return "RETURNED";
+  if (status === "CLOSED") return "CLOSED";
   return "UNKNOWN";
 }
 
@@ -681,6 +693,7 @@ function normalizeCustomerOperationalProfile(
         ledgerSummary.direct_sale_receivable_total
       ),
     },
+    product_posture: normalizeProductPosture(raw.product_posture),
     receipts_documents: {
       summary: {
         receipt_count: toNumber(receiptsSummary.receipt_count),
@@ -1141,6 +1154,11 @@ function SubscriptionsTable({ rows }: { rows: SubscriptionPreviewRow[] }) {
                       >
                         {isActiveContract ? "Payments" : "Payment History"}
                       </Link>
+                      {/* The unit that came back on this contract — hidden when nothing is waiting */}
+                      {(row.plan_type === "RENT" || row.plan_type === "LEASE") &&
+                      (row.status === "RETURNED" || row.status === "CLOSED") ? (
+                        <ReturnedAssetReleaseButton subscriptionId={Number(row.id)} compact />
+                      ) : null}
                     </div>
                   </td>
                 </tr>
@@ -2295,6 +2313,11 @@ export default function AdminCustomerDetailPage() {
                   title="Operational Finance Summary"
                   description="Unified customer view across subscription contracts, direct-sale receivables, receipts, and ledger-backed collections."
                 >
+                  {operationalProfile.product_posture ? (
+                    <div className="mb-5">
+                      <ProductPostureCard posture={operationalProfile.product_posture} />
+                    </div>
+                  ) : null}
                   <div className="grid gap-4 sm:grid-cols-2">
                     <DetailValue
                       label="Active subscription contracts"

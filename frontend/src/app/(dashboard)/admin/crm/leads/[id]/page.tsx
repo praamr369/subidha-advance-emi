@@ -10,6 +10,11 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { LeadQualificationPanel } from "@/components/lead/LeadQualification";
 import { ROUTES } from "@/lib/routes";
+import { apiFetch } from "@/lib/api";
+import ProductPostureCard, {
+  normalizeProductPosture,
+  type ProductPosture,
+} from "@/components/customers/ProductPostureCard";
 import {
   listAdminCustomerKycDocuments,
   uploadAdminCustomerKycDocument,
@@ -122,8 +127,31 @@ function OppRow({ opp, onStageChange }: {
   onStageChange: (id: number, stage: "OPEN" | "WON" | "LOST") => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
+  // An opportunity can be tied to an existing customer (even before the lead
+  // converts, or to a different customer), so it gets its own on-demand view
+  // of that customer's per-product position.
+  const [postureOpen, setPostureOpen] = useState(false);
+  const [posture, setPosture] = useState<ProductPosture | null>(null);
+  const [postureState, setPostureState] = useState<"idle" | "loading" | "error">("idle");
+
+  const togglePosture = () => {
+    const next = !postureOpen;
+    setPostureOpen(next);
+    if (!next || !opp.customer || posture || postureState === "loading") return;
+    setPostureState("loading");
+    apiFetch<unknown>(`/admin/customers/${opp.customer}/product-posture/`, { cache: "no-store" })
+      .then((data) => {
+        setPosture(normalizeProductPosture(data));
+        setPostureState("idle");
+      })
+      .catch(() => {
+        setPosture(null);
+        setPostureState("error");
+      });
+  };
 
   return (
+    <>
     <tr className="border-t border-border/60">
       <td className="px-4 py-3 text-sm font-medium text-foreground">{opp.title}</td>
       <td className="px-4 py-3 text-sm text-muted-foreground">₹{Number(opp.estimated_value).toLocaleString("en-IN")}</td>
@@ -152,8 +180,32 @@ function OppRow({ opp, onStageChange }: {
             ))}
           </div>
         ) : null}
+        {opp.customer ? (
+          <button
+            type="button"
+            onClick={togglePosture}
+            aria-expanded={postureOpen}
+            className="mt-2 rounded-lg border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted"
+          >
+            {postureOpen ? "Hide customer position" : "Customer position"}
+          </button>
+        ) : null}
       </td>
     </tr>
+    {postureOpen && opp.customer ? (
+      <tr className="border-t border-border/40 bg-muted/20">
+        <td colSpan={5} className="px-4 py-3">
+          {postureState === "loading" ? (
+            <p className="text-sm text-muted-foreground">Loading customer position…</p>
+          ) : postureState === "error" ? (
+            <p className="text-sm text-muted-foreground">Customer position is unavailable right now.</p>
+          ) : posture ? (
+            <ProductPostureCard posture={posture} title="Customer position by product" />
+          ) : null}
+        </td>
+      </tr>
+    ) : null}
+    </>
   );
 }
 
@@ -359,6 +411,35 @@ export default function AdminCrmLeadDetailPage() {
   };
 
   const linkedCustomerId = detail?.lead.converted_customer ?? null;
+
+  // Once converted, the lead's customer position across Advance EMI, rent/lease
+  // and direct sales — the same breakdown as the customer pages.
+  const [customerPosture, setCustomerPosture] = useState<ProductPosture | null>(null);
+  const [customerPostureState, setCustomerPostureState] = useState<"idle" | "loading" | "error">("idle");
+
+  useEffect(() => {
+    if (!linkedCustomerId) {
+      setCustomerPosture(null);
+      setCustomerPostureState("idle");
+      return;
+    }
+    let cancelled = false;
+    setCustomerPostureState("loading");
+    apiFetch<unknown>(`/admin/customers/${linkedCustomerId}/product-posture/`, { cache: "no-store" })
+      .then((data) => {
+        if (cancelled) return;
+        setCustomerPosture(normalizeProductPosture(data));
+        setCustomerPostureState("idle");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setCustomerPosture(null);
+        setCustomerPostureState("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [linkedCustomerId]);
 
   const loadKyc = useCallback(async (customerId: number) => {
     setKycError(null);
@@ -667,6 +748,22 @@ export default function AdminCrmLeadDetailPage() {
               </div>
             </div>
           </ERPSectionShell>
+
+          {/* ── Customer position (once converted) ──── */}
+          {linkedCustomerId ? (
+            <ERPSectionShell
+              title="Customer Position by Product"
+              description="This lead's customer — Advance EMI, rent/lease and direct-sale position, the same breakdown as the customer pages."
+            >
+              {customerPostureState === "loading" ? (
+                <p className="text-sm text-muted-foreground">Loading customer position…</p>
+              ) : customerPostureState === "error" ? (
+                <p className="text-sm text-muted-foreground">Customer position is unavailable right now.</p>
+              ) : customerPosture ? (
+                <ProductPostureCard posture={customerPosture} />
+              ) : null}
+            </ERPSectionShell>
+          ) : null}
 
           {/* ── KYC (during KYC_PENDING / READY_TO_CONVERT) ──── */}
           {(lead.stage === "KYC_PENDING" || lead.stage === "READY_TO_CONVERT") ? (

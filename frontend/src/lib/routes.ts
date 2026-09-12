@@ -204,6 +204,7 @@
     deliveryPODArchive: "/admin/deliveries/pod-archive",
     logisticsCockpit: "/admin/logistics",
     rentLease: "/admin/rent-lease",
+    rentLeaseAssets: "/admin/rent-lease/assets",
     subscriptions: "/admin/subscriptions",
     subscriptionsCreate: "/admin/subscriptions/create",
     subscriptionsAdvanceEmiCreate: "/admin/subscriptions/advance-emi/create",

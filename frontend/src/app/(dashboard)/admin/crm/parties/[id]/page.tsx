@@ -13,6 +13,7 @@ import { DetailItem, WorkspaceSection } from "@/components/ui/workspace";
 import {
   ProfileAlerts,
   ProfileFinancials,
+  ProfileProductPosture,
   ProfileModuleSections,
   UniversalQuickWidgets,
 } from "@/components/profile/Profile360";
@@ -295,6 +296,7 @@ export default function AdminCrmPartyDetailPage() {
             {/* Operational urgency + financial position (shared 360 components) */}
             <UniversalQuickWidgets payload={payload} />
             <ProfileAlerts alerts={payload.alerts} />
+            <ProfileProductPosture payload={payload} />
             <ProfileFinancials financials={payload.financials} />
 
             <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">

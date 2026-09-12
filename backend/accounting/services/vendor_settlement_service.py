@@ -17,6 +17,23 @@ def _money(value) -> Decimal:
     return Decimal(str(value or MONEY_ZERO)).quantize(Decimal("0.01"))
 
 
+def purchase_bill_outstanding(purchase_bill, *, exclude_settlement_id=None) -> Decimal:
+    """Bill total − posted payments against it − vendor advances applied to it."""
+    from accounting.models import VendorAdvanceAllocation
+
+    settled = VendorSettlement.objects.filter(
+        purchase_bill_id=purchase_bill.id, status=VendorSettlementStatus.POSTED
+    )
+    if exclude_settlement_id:
+        settled = settled.exclude(pk=exclude_settlement_id)
+    paid = settled.aggregate(total=Sum("amount"))["total"] or MONEY_ZERO
+    applied = (
+        VendorAdvanceAllocation.objects.filter(purchase_bill_id=purchase_bill.id).aggregate(total=Sum("amount"))["total"]
+        or MONEY_ZERO
+    )
+    return max(_money(purchase_bill.grand_total) - _money(paid) - _money(applied), MONEY_ZERO)
+
+
 @transaction.atomic
 def post_vendor_settlement(*, vendor_settlement_id: int, posted_by):
     settlement = (
@@ -41,27 +58,27 @@ def post_vendor_settlement(*, vendor_settlement_id: int, posted_by):
     if not settlement.finance_account.is_real_settlement_account:
         raise ValueError("Vendor settlements require a real cash, bank, UPI, or gateway finance account.")
 
+    if settlement.is_advance and settlement.purchase_bill_id:
+        raise ValueError("An advance payment cannot be tied to a purchase bill; apply it to bills afterwards.")
+
     if settlement.purchase_bill_id:
         purchase_bill = PurchaseBill.objects.select_for_update().get(pk=settlement.purchase_bill_id)
         if purchase_bill.vendor_id != settlement.vendor_id:
             raise ValueError("Selected purchase bill does not belong to the settlement vendor.")
         if purchase_bill.status != PurchaseBillStatus.POSTED:
             raise ValueError("Only posted purchase bills can be settled.")
-        already_settled = VendorSettlement.objects.filter(
-            purchase_bill_id=purchase_bill.id,
-            status=VendorSettlementStatus.POSTED,
-        ).exclude(pk=settlement.pk).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
-        bill_outstanding = _money(purchase_bill.grand_total) - _money(already_settled)
+        bill_outstanding = purchase_bill_outstanding(purchase_bill, exclude_settlement_id=settlement.pk)
         if _money(settlement.amount) > bill_outstanding:
             raise ValueError(
                 f"Settlement exceeds purchase bill outstanding amount ({bill_outstanding:.2f})."
             )
 
-    vendor_outstanding = _money(get_vendor_outstanding(settlement.vendor)["outstanding"])
-    if _money(settlement.amount) > vendor_outstanding:
-        raise ValueError(
-            f"Settlement exceeds vendor outstanding amount ({vendor_outstanding:.2f})."
-        )
+    if not settlement.is_advance:
+        vendor_outstanding = _money(get_vendor_outstanding(settlement.vendor)["outstanding"])
+        if _money(settlement.amount) > vendor_outstanding:
+            raise ValueError(
+                f"Settlement exceeds vendor outstanding amount ({vendor_outstanding:.2f})."
+            )
 
     accounts = ensure_phase3_system_accounts()
     payable_account = accounts["ACCOUNTS_PAYABLE"]

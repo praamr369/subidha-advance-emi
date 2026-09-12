@@ -174,6 +174,9 @@ class FGServiceLinkWriteSerializer(serializers.Serializer):
 
 def _inventory_item_summary(item: InventoryItem) -> dict:
     prod = item.product
+    physical_qty = getattr(item, "physical_qty", None)
+    if physical_qty is None:
+        physical_qty = item.current_stock_quantity()
     return {
         "id": item.id,
         "product_id": prod.id,
@@ -183,7 +186,7 @@ def _inventory_item_summary(item: InventoryItem) -> dict:
         "stock_item_type": item.stock_item_type,
         "unit_of_measure": item.unit_of_measure,
         "stock_tracking_enabled": item.stock_tracking_enabled,
-        "stock_tracking_status": item.stock_tracking_status,
+        "stock_tracking_status": InventoryItem.live_stock_tracking_status(item.stock_tracking_status, physical_qty),
         "standard_unit_cost": str(item.standard_unit_cost or "0.00"),
         "reorder_level_qty": str(item.reorder_level_qty),
         "valuation_method": item.valuation_method,
@@ -192,7 +195,7 @@ def _inventory_item_summary(item: InventoryItem) -> dict:
         "category": prod.category or (prod.category_master.name if prod.category_master_id else ""),
         "subcategory": prod.subcategory or (prod.subcategory_master.name if prod.subcategory_master_id else ""),
         "base_price": str(prod.base_price),
-        "physical_qty": str(getattr(item, "physical_qty", None) or "0.00"),
+        "physical_qty": str(physical_qty or "0.00"),
     }
 
 

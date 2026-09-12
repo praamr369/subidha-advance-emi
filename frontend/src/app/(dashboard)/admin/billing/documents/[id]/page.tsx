@@ -13,6 +13,11 @@ import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import BillingPrintDocument from "@/components/print/BillingPrintDocument";
 import PrintActionBanner from "@/components/print/PrintActionBanner";
 import InvoiceDeliveryPanel from "./InvoiceDeliveryPanel";
+import ProductPostureCard, {
+  normalizeProductPosture,
+  type ProductPosture,
+} from "@/components/customers/ProductPostureCard";
+import { apiFetch } from "@/lib/api";
 import ActionButton from "@/components/ui/ActionButton";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
@@ -60,6 +65,35 @@ export default function BillingDocumentDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [collectDrawerOpen, setCollectDrawerOpen] = useState(false);
+  // The invoice customer's position across Advance EMI, rent/lease and direct
+  // sales — the same breakdown as the customer pages.
+  const [customerPosture, setCustomerPosture] = useState<ProductPosture | null>(null);
+  const [customerPostureState, setCustomerPostureState] = useState<"idle" | "loading" | "error">("idle");
+  const invoiceCustomerId = invoice?.customer ?? null;
+
+  useEffect(() => {
+    if (!invoiceCustomerId) {
+      setCustomerPosture(null);
+      setCustomerPostureState("idle");
+      return;
+    }
+    let cancelled = false;
+    setCustomerPostureState("loading");
+    apiFetch<unknown>(`/admin/customers/${invoiceCustomerId}/product-posture/`, { cache: "no-store" })
+      .then((data) => {
+        if (cancelled) return;
+        setCustomerPosture(normalizeProductPosture(data));
+        setCustomerPostureState("idle");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setCustomerPosture(null);
+        setCustomerPostureState("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [invoiceCustomerId]);
 
   useEffect(() => {
     if (!documentId) {
@@ -301,6 +335,21 @@ export default function BillingDocumentDetailPage() {
                 value={isHistoryOnlyInvoice ? "History only (0 active)" : accountingMoney(invoice.balance_total)}
               />
             </div>
+
+            {invoice.customer ? (
+              <WorkspaceSection
+                title="Customer Position by Product"
+                description="This customer's Advance EMI, rent/lease and direct-sale position — the same breakdown as the customer pages."
+              >
+                {customerPostureState === "loading" ? (
+                  <p className="text-sm text-muted-foreground">Loading customer position…</p>
+                ) : customerPostureState === "error" ? (
+                  <p className="text-sm text-muted-foreground">Customer position is unavailable right now.</p>
+                ) : customerPosture ? (
+                  <ProductPostureCard posture={customerPosture} />
+                ) : null}
+              </WorkspaceSection>
+            ) : null}
 
             <WorkspaceSection
               title="Document Trace"

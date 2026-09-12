@@ -19,6 +19,11 @@ import {
 } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import { formatRupee } from "@/lib/utils/currency";
+import { apiFetch } from "@/lib/api";
+import ProductPostureCard, {
+  normalizeProductPosture,
+  type ProductPosture,
+} from "@/components/customers/ProductPostureCard";
 import {
   completeServiceDeskDeliveryReturn,
   getServiceDeskCase,
@@ -84,6 +89,37 @@ export default function AdminServiceDeskCaseDetailPage() {
   useEffect(() => {
     void loadPage();
   }, [loadPage]);
+
+  // The customer's position across Advance EMI, rent/lease and direct sales —
+  // the same breakdown as the customer pages — so a return/exchange decision
+  // is made with the customer's full dues in view.
+  const postureCustomerId = serviceCase?.customer_id ?? null;
+  const [customerPosture, setCustomerPosture] = useState<ProductPosture | null>(null);
+  const [customerPostureState, setCustomerPostureState] = useState<"idle" | "loading" | "error">("idle");
+
+  useEffect(() => {
+    if (!postureCustomerId) {
+      setCustomerPosture(null);
+      setCustomerPostureState("idle");
+      return;
+    }
+    let cancelled = false;
+    setCustomerPostureState("loading");
+    apiFetch<unknown>(`/admin/customers/${postureCustomerId}/product-posture/`, { cache: "no-store" })
+      .then((data) => {
+        if (cancelled) return;
+        setCustomerPosture(normalizeProductPosture(data));
+        setCustomerPostureState("idle");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setCustomerPosture(null);
+        setCustomerPostureState("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [postureCustomerId]);
 
   async function handleStatusUpdate() {
     if (!serviceCase) return;
@@ -290,6 +326,20 @@ export default function AdminServiceDeskCaseDetailPage() {
 
             {serviceCase ? (
               <div className="space-y-6">
+              {serviceCase.customer_id ? (
+                <ERPSectionShell
+                  title="Customer Position by Product"
+                  description="This customer's Advance EMI, rent/lease and direct-sale position — the same breakdown as the customer pages."
+                >
+                  {customerPostureState === "loading" ? (
+                    <p className="text-sm text-muted-foreground">Loading customer position…</p>
+                  ) : customerPostureState === "error" ? (
+                    <p className="text-sm text-muted-foreground">Customer position is unavailable right now.</p>
+                  ) : customerPosture ? (
+                    <ProductPostureCard posture={customerPosture} />
+                  ) : null}
+                </ERPSectionShell>
+              ) : null}
               <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
               <ERPSectionShell
                 title="Case Summary"

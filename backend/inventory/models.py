@@ -398,6 +398,29 @@ class InventoryItem(InventoryTimeStampedModel):
         total_out = Decimal(str(aggregate["total_out"] or QUANTITY_ZERO))
         return total_in - total_out + Decimal(str(self.opening_stock_qty or QUANTITY_ZERO))
 
+    @classmethod
+    def live_stock_tracking_status(cls, stored_status: str, physical_qty) -> str:
+        """Stock-derived status. Manual lifecycle states (inactive/archived/not
+        prepared) win; only the PREPARED_NO_STOCK <-> STOCK_ACTIVE pair follows
+        the physical balance."""
+        stock_states = (cls.StockTrackingStatus.PREPARED_NO_STOCK, cls.StockTrackingStatus.STOCK_ACTIVE)
+        if stored_status not in stock_states:
+            return stored_status
+        if Decimal(str(physical_qty or QUANTITY_ZERO)) > QUANTITY_ZERO:
+            return cls.StockTrackingStatus.STOCK_ACTIVE
+        return cls.StockTrackingStatus.PREPARED_NO_STOCK
+
+    @classmethod
+    def sync_stock_tracking_status(cls, item_id) -> None:
+        """Re-derive the stored status from the ledger so filters and KPI counts
+        that read the column stay in step with actual stock."""
+        item = cls.objects.filter(pk=item_id).first()
+        if item is None:
+            return
+        next_status = cls.live_stock_tracking_status(item.stock_tracking_status, item.current_stock_quantity())
+        if next_status != item.stock_tracking_status:
+            cls.objects.filter(pk=item_id).update(stock_tracking_status=next_status)
+
     def reserved_qty(self) -> Decimal:
         """
         Quantity currently soft-reserved via SALE_RESERVE minus SALE_RELEASE.
@@ -648,7 +671,10 @@ class StockLedger(InventoryTimeStampedModel):
         self.warehouse_name = (self.warehouse_name or "").strip()
         self.notes = (self.notes or "").strip()
         self.full_clean()
+        creating = self.pk is None
         super().save(*args, **kwargs)
+        if creating and self.movement_type not in SOFT_HOLD_MOVEMENT_TYPES:
+            InventoryItem.sync_stock_tracking_status(self.inventory_item_id)
 
     def __str__(self):
         return f"{self.inventory_item} {self.movement_type}"

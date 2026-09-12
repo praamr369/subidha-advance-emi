@@ -343,6 +343,28 @@ def mark_asset_returned(
 
 
 @transaction.atomic
+def mark_asset_available(asset: RentalAsset, *, performed_by=None) -> RentalAsset:
+    """Put a returned or repaired asset back in the rental pool."""
+    _check_transition(asset, RentalAssetStatus.AVAILABLE)
+
+    asset.status = RentalAssetStatus.AVAILABLE
+    asset.current_subscription = None
+    asset.current_customer = None
+    asset.updated_by = performed_by
+    asset.save(update_fields=[
+        "status", "current_subscription", "current_customer", "updated_by",
+    ])
+
+    log_audit(
+        action_type=AuditLog.ActionType.RENTAL_ASSET_RETURNED,
+        instance=asset,
+        performed_by=performed_by,
+        metadata={"asset_code": asset.asset_code, "event": "AVAILABLE"},
+    )
+    return asset
+
+
+@transaction.atomic
 def mark_asset_under_repair(
     asset: RentalAsset,
     *,

@@ -134,6 +134,362 @@ def get_customer_historical_subscription_contract_value(customer: Customer) -> D
     )
 
 
+def build_customer_product_posture(customer: Customer) -> dict[str, object]:
+    from subscriptions.models import Subscription
+
+    return build_product_posture(
+        subscriptions=Subscription.objects.filter(customer=customer),
+        direct_sales=DirectSale.objects.filter(customer=customer),
+    )
+
+
+def build_product_posture(*, subscriptions, direct_sales) -> dict[str, object]:
+    """One money summary per product line — Advance EMI, rent/lease, direct sale.
+
+    Rent/lease money lives on RentLeaseBillingDemand/RentLeaseCollection, never
+    on Payment/FinancialLedger, so each line reads its own source. Takes any
+    subscription/direct-sale querysets, so the same summary serves a customer
+    (admin page + portal) and a party 360 (e.g. a partner's referred contracts).
+    """
+    from django.db.models import F, Max, Min, DecimalField, ExpressionWrapper
+
+    from core.services.operational_visibility import (
+        ACTIVE_BATCH_SUBSCRIPTION_STATUSES,
+        LIVE_RENT_LEASE_SUBSCRIPTION_STATUSES,
+    )
+    from payments.models import RentLeaseBillingDemand, RentLeaseCollection
+    from subscriptions.models import Emi, LedgerEntryType, Subscription
+
+    today = timezone.localdate()
+    zero = Decimal("0.00")
+    outstanding = ExpressionWrapper(
+        F("amount") - F("collected_amount"),
+        output_field=DecimalField(max_digits=12, decimal_places=2),
+    )
+
+    # --- Advance EMI -------------------------------------------------------
+    emi_subs = subscriptions.filter(
+        plan_type=PlanType.EMI,
+        status__in=list(ACTIVE_BATCH_SUBSCRIPTION_STATUSES),
+    )
+    pending_emis = Emi.objects.filter(subscription__in=emi_subs, status=EmiStatus.PENDING)
+    emi_pending = pending_emis.aggregate(
+        due=Sum("amount"),
+        overdue=Sum("amount", filter=Q(due_date__lt=today)),
+        next_due=Min("due_date"),
+    )
+    ledger = FinancialLedger.objects.filter(emi__subscription__in=emi_subs).aggregate(
+        paid=Sum("amount", filter=Q(entry_type=LedgerEntryType.EMI_PAYMENT)),
+        reversed=Sum("amount", filter=Q(entry_type=LedgerEntryType.PAYMENT_REVERSAL)),
+    )
+    last_emi_payment = (
+        Payment.objects.filter(subscription__in=subscriptions.filter(plan_type=PlanType.EMI))
+        .exclude(allocation_metadata__reversal__is_reversed=True)
+        .aggregate(last=Max("payment_date"))["last"]
+    )
+    emi = {
+        "count": emi_subs.count(),
+        "value": _money(emi_subs.aggregate(total=Sum("total_amount"))["total"]),
+        "paid": _money((ledger["paid"] or zero) - (ledger["reversed"] or zero)),
+        "due": _money(emi_pending["due"]),
+        "overdue": _money(emi_pending["overdue"]),
+        "next_due_date": emi_pending["next_due"],
+        "last_collection_date": last_emi_payment,
+    }
+
+    # --- Rent / lease ------------------------------------------------------
+    rl_subs = subscriptions.filter(
+        plan_type__in=[PlanType.RENT, PlanType.LEASE],
+        status__in=list(LIVE_RENT_LEASE_SUBSCRIPTION_STATUSES),
+    )
+    rl_monthly = (
+        RentLeaseBillingDemand.objects.filter(subscription__in=rl_subs)
+        .exclude(demand_type="SECURITY_DEPOSIT")
+        .exclude(status="CANCELLED")
+    )
+    rl_open = rl_monthly.exclude(status__in=["WAIVED", "PAID"])
+    rl_open_totals = rl_open.aggregate(
+        due=Sum(outstanding),
+        overdue=Sum(outstanding, filter=Q(due_date__lt=today)),
+        next_due=Min("due_date"),
+    )
+    rent_lease = {
+        "count": rl_subs.count(),
+        "rent_count": rl_subs.filter(plan_type=PlanType.RENT).count(),
+        "lease_count": rl_subs.filter(plan_type=PlanType.LEASE).count(),
+        "value": _money(rl_subs.aggregate(total=Sum("total_amount"))["total"]),
+        "paid": _money(rl_monthly.aggregate(total=Sum("collected_amount"))["total"]),
+        "due": _money(rl_open_totals["due"]),
+        "overdue": _money(rl_open_totals["overdue"]),
+        "next_due_date": rl_open_totals["next_due"],
+        "deposit_held": _money(
+            RentLeaseBillingDemand.objects.filter(
+                subscription__in=rl_subs, demand_type="SECURITY_DEPOSIT"
+            ).aggregate(total=Sum("held_amount"))["total"]
+        ),
+        "last_collection_date": RentLeaseCollection.objects.filter(
+            subscription__in=subscriptions, status="ACTIVE"
+        ).aggregate(last=Max("payment_date"))["last"],
+    }
+
+    # --- Direct sale -------------------------------------------------------
+    active_direct_sales = direct_sales.filter(direct_sale_active_q())
+    ds_totals = active_direct_sales.aggregate(
+        value=Sum("grand_total"),
+        received=Sum("received_total"),
+        outstanding=Sum("balance_total"),
+    )
+    direct_sale = {
+        "count": active_direct_sales.count(),
+        "value": _money(ds_totals["value"]),
+        "paid": _money(ds_totals["received"]),
+        "due": _money(ds_totals["outstanding"]),
+        "overdue": _money(zero),  # direct sales carry no due date
+        "next_due_date": None,
+        "last_sale_date": direct_sales.aggregate(
+            last=Max("sale_date")
+        )["last"],
+        "last_collection_date": ReceiptDocument.objects.filter(direct_sale__in=direct_sales)
+        .filter(receipt_active_q())
+        .aggregate(last=Max("receipt_date"))["last"],
+    }
+
+    lines = (emi, rent_lease, direct_sale)
+    dates = [line["last_collection_date"] for line in lines if line["last_collection_date"]]
+    next_dates = [line["next_due_date"] for line in lines if line["next_due_date"]]
+    return {
+        "advance_emi": emi,
+        "rent_lease": rent_lease,
+        "direct_sale": direct_sale,
+        "totals": {
+            "active_count": emi["count"] + rent_lease["count"] + direct_sale["count"],
+            "value": _money(sum(Decimal(line["value"]) for line in lines)),
+            "paid": _money(sum(Decimal(line["paid"]) for line in lines)),
+            "due": _money(sum(Decimal(line["due"]) for line in lines)),
+            "overdue": _money(sum(Decimal(line["overdue"]) for line in lines)),
+            "next_due_date": min(next_dates) if next_dates else None,
+            "last_collection_date": max(dates) if dates else None,
+        },
+    }
+
+
+def build_catalog_product_posture(product_id) -> dict[str, object]:
+    """One catalog product across Advance EMI, rent/lease and direct sale.
+
+    Contracts are single-product (``Subscription.product``), so the EMI and
+    rent/lease lines reuse ``build_product_posture``. A direct sale can hold
+    several products, so its line is built from this product's own sale lines:
+    value = Σ its ``line_total``; paid/due are the sale's received/balance
+    allocated pro-rata by this product's share of the sale's grand total.
+    """
+    from django.db.models import Max
+
+    from subscriptions.models import Subscription
+    from billing.models import DirectSaleLine
+
+    posture = build_product_posture(
+        subscriptions=Subscription.objects.filter(product_id=product_id),
+        direct_sales=DirectSale.objects.none(),
+    )
+
+    active_sales = DirectSale.objects.filter(direct_sale_active_q())
+    per_sale = list(
+        DirectSaleLine.objects.filter(product_id=product_id, direct_sale__in=active_sales)
+        .values("direct_sale_id")
+        .annotate(product_total=Sum("line_total"), units=Sum("quantity"))
+    )
+    sale_ids = [row["direct_sale_id"] for row in per_sale]
+    sales = {
+        row["id"]: row
+        for row in DirectSale.objects.filter(id__in=sale_ids).values(
+            "id", "grand_total", "received_total", "balance_total", "sale_date"
+        )
+    }
+    value = paid = due = Decimal("0")
+    units = Decimal("0")
+    last_sale = None
+    for row in per_sale:
+        sale = sales.get(row["direct_sale_id"])
+        if not sale:
+            continue
+        product_total = Decimal(str(row["product_total"] or "0"))
+        grand_total = Decimal(str(sale["grand_total"] or "0"))
+        share = (product_total / grand_total) if grand_total > 0 else Decimal("0")
+        value += product_total
+        paid += Decimal(str(sale["received_total"] or "0")) * share
+        due += Decimal(str(sale["balance_total"] or "0")) * share
+        units += Decimal(str(row["units"] or "0"))
+        if sale["sale_date"] and (last_sale is None or sale["sale_date"] > last_sale):
+            last_sale = sale["sale_date"]
+    last_receipt = (
+        ReceiptDocument.objects.filter(direct_sale_id__in=sale_ids)
+        .filter(receipt_active_q())
+        .aggregate(last=Max("receipt_date"))["last"]
+        if sale_ids
+        else None
+    )
+    posture["direct_sale"] = {
+        "count": len(sales),
+        "value": _money(value),
+        "paid": _money(paid),
+        "due": _money(due),
+        "overdue": _money(0),  # direct sales carry no due date
+        "next_due_date": None,
+        "last_sale_date": last_sale,
+        "last_collection_date": last_receipt,
+        "units_sold": f"{units.normalize():f}" if units else "0",
+        "allocation": "PRO_RATA_BY_LINE_VALUE",
+    }
+
+    lines = (posture["advance_emi"], posture["rent_lease"], posture["direct_sale"])
+    dates = [line["last_collection_date"] for line in lines if line["last_collection_date"]]
+    next_dates = [line["next_due_date"] for line in lines if line["next_due_date"]]
+    posture["totals"] = {
+        "active_count": sum(int(line["count"]) for line in lines),
+        "value": _money(sum(Decimal(line["value"]) for line in lines)),
+        "paid": _money(sum(Decimal(line["paid"]) for line in lines)),
+        "due": _money(sum(Decimal(line["due"]) for line in lines)),
+        "overdue": _money(sum(Decimal(line["overdue"]) for line in lines)),
+        "next_due_date": min(next_dates) if next_dates else None,
+        "last_collection_date": max(dates) if dates else None,
+    }
+    return posture
+
+
+def build_vendor_payable_posture(vendor_ids) -> dict[str, object] | None:
+    """What we owe the given vendors, read from the vendor ledger.
+
+    Ledger convention (procurement_service): a posted bill is a debit and a
+    payment/settlement is a credit, so the payable balance is debit − credit.
+    Vendor bills carry no due date, so there is no overdue figure.
+    """
+    from django.db.models import Max
+
+    from accounting.models import VendorLedgerEntry
+
+    ids = [vendor_id for vendor_id in (vendor_ids or []) if vendor_id]
+    if not ids:
+        return None
+    # Aliases must not reuse the field names: Django would resolve the later
+    # Sum("debit", filter=...) against the "debit" aggregate and raise FieldError.
+    totals = VendorLedgerEntry.objects.filter(vendor_id__in=ids).aggregate(
+        debit_total=Sum("debit"),
+        credit_total=Sum("credit"),
+        billed=Sum("debit", filter=Q(entry_type="PURCHASE_BILL")),
+        paid=Sum("credit", filter=Q(entry_type="PAYMENT_TO_VENDOR")),
+        last_bill=Max("posted_at", filter=Q(entry_type="PURCHASE_BILL")),
+        last_payment=Max("posted_at", filter=Q(entry_type="PAYMENT_TO_VENDOR")),
+    )
+    balance = Decimal(str(totals["debit_total"] or "0")) - Decimal(str(totals["credit_total"] or "0"))
+
+    def _day(value):
+        return timezone.localtime(value).date() if value else None
+
+    return {
+        "vendor_count": len(ids),
+        "billed": _money(totals["billed"]),
+        "paid": _money(totals["paid"]),
+        "payable": _money(max(balance, Decimal("0"))),
+        "advance": _money(max(-balance, Decimal("0"))),
+        "last_bill_date": _day(totals["last_bill"]),
+        "last_payment_date": _day(totals["last_payment"]),
+    }
+
+
+def build_staff_money_posture(employee_ids) -> dict[str, object] | None:
+    """Money around staff: what they collected per product line, and the salary,
+    advances and expense claims owed to or by them.
+
+    Staff own no contracts, so this is the staff counterpart of the customer
+    product posture. Collections are attributed by login user (Payment.collected_by,
+    RentLeaseCollection/RentLeaseDepositTransaction.created_by,
+    DirectSale.confirmed_by) via the StaffIdentity employee↔user link.
+    """
+    from django.db.models import Count, Max
+
+    from accounting.models import EmployeeExpenseClaim, EmployeeProfile, SalarySheet, StaffAdvance
+    from accounts.models import StaffIdentity
+    from payments.models import RentLeaseCollection
+    from subscriptions.models import RentLeaseDepositTransaction
+
+    ids = [employee_id for employee_id in (employee_ids or []) if employee_id]
+    if not ids:
+        return None
+    user_ids = list(
+        StaffIdentity.objects.filter(employee_id__in=ids).values_list("user_id", flat=True)
+    )
+
+    def _line(queryset, amount_field: str, date_field: str) -> dict[str, object]:
+        agg = queryset.aggregate(total=Sum(amount_field), count=Count("id"), last=Max(date_field))
+        return {"count": agg["count"] or 0, "amount": _money(agg["total"]), "last_date": agg["last"]}
+
+    emi = _line(
+        Payment.objects.filter(collected_by_id__in=user_ids).exclude(
+            allocation_metadata__reversal__is_reversed=True
+        ),
+        "amount",
+        "payment_date",
+    )
+    rent_lease = _line(
+        RentLeaseCollection.objects.filter(created_by_id__in=user_ids, status="ACTIVE"),
+        "amount",
+        "payment_date",
+    )
+    deposit = _line(
+        RentLeaseDepositTransaction.objects.filter(
+            created_by_id__in=user_ids, transaction_type="DEPOSIT_RECEIPT", status="ACTIVE"
+        ),
+        "amount",
+        "transaction_date",
+    )
+    direct_sales = _line(
+        DirectSale.objects.filter(confirmed_by_id__in=user_ids).filter(direct_sale_active_q()),
+        "grand_total",
+        "sale_date",
+    )
+
+    sheets = SalarySheet.objects.filter(employee_id__in=ids)
+    salary = sheets.aggregate(
+        paid=Sum("net_amount", filter=Q(status="PAID")),
+        pending=Sum("net_amount", filter=Q(status__in=["APPROVED", "POSTED", "PAID_PARTIAL"])),
+    )
+    last_paid = sheets.filter(status="PAID").order_by("-year", "-month").values("year", "month").first()
+    advances = StaffAdvance.objects.filter(
+        employee_id__in=ids, status__in=["DISBURSED", "PARTIALLY_RECOVERED"]
+    ).aggregate(amount=Sum("amount"), recovered=Sum("recovered_amount"))
+    advance_outstanding = Decimal(str(advances["amount"] or "0")) - Decimal(
+        str(advances["recovered"] or "0")
+    )
+    claims_pending = EmployeeExpenseClaim.objects.filter(
+        employee_id__in=ids, status__in=["APPROVED", "POSTED", "PAID_PARTIAL"]
+    ).aggregate(total=Sum("approved_amount"))["total"]
+    base_salary = EmployeeProfile.objects.filter(id__in=ids).aggregate(total=Sum("base_salary"))["total"]
+
+    return {
+        "staff_count": len(ids),
+        "has_login": bool(user_ids),
+        "collections": {
+            "advance_emi": emi,
+            "rent_lease": rent_lease,
+            "deposit": deposit,
+            "total": _money(
+                sum(Decimal(line["amount"]) for line in (emi, rent_lease, deposit))
+            ),
+        },
+        "direct_sales_confirmed": direct_sales,
+        "payroll": {
+            "base_salary": _money(base_salary),
+            "salary_paid": _money(salary["paid"]),
+            "salary_pending": _money(salary["pending"]),
+            "last_paid_period": (
+                f"{last_paid['year']}-{last_paid['month']:02d}" if last_paid else None
+            ),
+            "advance_outstanding": _money(max(advance_outstanding, Decimal("0"))),
+            "expense_claims_pending": _money(claims_pending),
+        },
+    }
+
+
 def build_customer_operational_profile(customer: Customer) -> dict[str, object]:
     from accounting.models import CustomerOpeningOutstanding, LegacyReceivableCollection
 
@@ -615,6 +971,7 @@ def build_customer_operational_profile(customer: Customer) -> dict[str, object]:
             "quotation_estimate_count": (lead_totals["quotation_count"] or 0)
             + (lead_totals["estimate_count"] or 0),
         },
+        "product_posture": build_customer_product_posture(customer),
         "direct_sales": {
             "summary": {
                 "total_count": direct_sales_totals["total_count"] or 0,

@@ -34,6 +34,7 @@ import {
 } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import { formatRupee } from "@/lib/utils/currency";
+import { apiFetch } from "@/lib/api";
 import {
   getAdminPaymentRegister,
   type PaymentRegisterRow,
@@ -322,6 +323,37 @@ function PaymentsTable({ rows }: { rows: PaymentRegisterRow[] }) {
 
 const PAYMENTS_PAGE_SIZE = 25;
 
+// Rent/lease money never becomes a Payment row (those are Advance EMI only), so
+// the register lists it from its own source rows via the shared endpoint.
+type RentLeaseCollectionRow = {
+  key: string;
+  kind: string;
+  number: string;
+  amount: string;
+  payment_date: string | null;
+  payment_method: string;
+  status: string;
+  demand_due_date: string | null;
+  subscription_id: number | null;
+  subscription_number: string;
+  customer_name: string;
+};
+
+const RENT_LEASE_KIND_LABELS: Record<string, string> = {
+  RENT_MONTHLY: "Monthly rent",
+  LEASE_MONTHLY: "Monthly lease",
+  DEPOSIT_RECEIPT: "Security deposit received",
+  DEPOSIT_REFUND: "Security deposit refunded",
+};
+
+function formatShortDate(value: string | null | undefined): string {
+  if (!value) return "—";
+  const parsed = new Date(`${value}T00:00:00`);
+  return Number.isNaN(parsed.getTime())
+    ? value
+    : parsed.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
 export default function AdminPaymentsPage() {
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -368,6 +400,58 @@ export default function AdminPaymentsPage() {
   const [batchFilter, setBatchFilter] = useState(initialBatchFilter);
   const [partnerFilter, setPartnerFilter] = useState(initialPartnerFilter);
   const [emiFilter, setEmiFilter] = useState(initialEmiFilter);
+
+  const [rentLeaseRows, setRentLeaseRows] = useState<RentLeaseCollectionRow[]>([]);
+  const [rentLeaseLoading, setRentLeaseLoading] = useState(true);
+  const [rentLeaseError, setRentLeaseError] = useState<string | null>(null);
+  // These filters only describe Advance EMI payments; rent/lease rows follow the
+  // subscription and customer filters and are hidden while an EMI-only filter is on.
+  const emiOnlyFilterActive = Boolean(
+    query || method || reversalState || receiptState || dateFrom || dateTo || batchFilter || partnerFilter || emiFilter
+  );
+  const rentLeaseSubscription = String(subscriptionFilter || "");
+  const rentLeaseCustomer = String(customerFilter || "");
+
+  useEffect(() => {
+    if (emiOnlyFilterActive) {
+      setRentLeaseRows([]);
+      setRentLeaseLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setRentLeaseLoading(true);
+    const params = new URLSearchParams();
+    if (rentLeaseSubscription) params.set("subscription", rentLeaseSubscription);
+    if (rentLeaseCustomer) params.set("customer", rentLeaseCustomer);
+    apiFetch<{ results?: RentLeaseCollectionRow[] }>(
+      `/admin/subscriptions/rent-lease-receipts/?${params.toString()}`,
+      { cache: "no-store" }
+    )
+      .then((data) => {
+        if (cancelled) return;
+        setRentLeaseRows(Array.isArray(data?.results) ? data.results : []);
+        setRentLeaseError(null);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setRentLeaseRows([]);
+        setRentLeaseError(err instanceof Error && err.message ? err.message : "Unable to load rent/lease collections.");
+      })
+      .finally(() => {
+        if (!cancelled) setRentLeaseLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [emiOnlyFilterActive, rentLeaseSubscription, rentLeaseCustomer]);
+
+  const rentLeaseReceived = useMemo(
+    () =>
+      rentLeaseRows
+        .filter((row) => row.status === "ACTIVE" && row.kind !== "DEPOSIT_REFUND")
+        .reduce((sum, row) => sum + Number(row.amount || 0), 0),
+    [rentLeaseRows]
+  );
 
   const loadPayments = useCallback(
     async (mode: "initial" | "refresh" = "initial") => {
@@ -575,6 +659,11 @@ export default function AdminPaymentsPage() {
         { label: "Net Collected", value: loading ? "—" : formatRupee(summary.net_collected_amount), tone: "info" },
         { label: "Reversed", value: loading ? "—" : summary.reversed_payments, tone: !loading && summary.reversed_payments > 0 ? "warning" : "success" },
         { label: "Visible Total", value: loading ? "—" : summary.visible_payments, tone: "default" },
+        {
+          label: "Rent/Lease Received",
+          value: rentLeaseLoading ? "—" : formatRupee(rentLeaseReceived),
+          tone: "info",
+        },
       ]}
     >
       <AccountingBridgeReadinessIndicator
@@ -834,6 +923,74 @@ export default function AdminPaymentsPage() {
             ) : null}
           </ERPSectionShell>
         )}
+
+        {!emiOnlyFilterActive ? (
+          <ERPSectionShell
+            title="Rent / Lease Collections"
+            description="Monthly rent/lease collections and security-deposit receipts. They are recorded against the rent/lease contract, not as Advance EMI payments, so they are listed here from their source records."
+          >
+            {rentLeaseLoading ? (
+              <ERPLoadingState label="Loading rent/lease collections..." />
+            ) : rentLeaseError ? (
+              <ERPErrorState title="Unable to load rent/lease collections" description={rentLeaseError} />
+            ) : rentLeaseRows.length === 0 ? (
+              <ERPEmptyState
+                title="No rent/lease collections"
+                description="Rent/lease collections and deposit receipts appear here once they are recorded."
+              />
+            ) : (
+              <DataTableShell>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead className="text-left text-xs uppercase tracking-wide text-muted-foreground">
+                      <tr>
+                        <th className="border-b border-border px-3 py-2">Received</th>
+                        <th className="border-b border-border px-3 py-2">Reference</th>
+                        <th className="border-b border-border px-3 py-2">Type</th>
+                        <th className="border-b border-border px-3 py-2">Contract</th>
+                        <th className="border-b border-border px-3 py-2">Customer</th>
+                        <th className="border-b border-border px-3 py-2">Method</th>
+                        <th className="border-b border-border px-3 py-2 text-right">Amount</th>
+                        <th className="border-b border-border px-3 py-2">For Month Due</th>
+                        <th className="border-b border-border px-3 py-2">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rentLeaseRows.map((row) => (
+                        <tr key={row.key}>
+                          <td className="border-b border-border px-3 py-2">{formatShortDate(row.payment_date)}</td>
+                          <td className="border-b border-border px-3 py-2">{row.number || "—"}</td>
+                          <td className="border-b border-border px-3 py-2">
+                            {RENT_LEASE_KIND_LABELS[row.kind] ?? row.kind}
+                          </td>
+                          <td className="border-b border-border px-3 py-2">
+                            {row.subscription_id ? (
+                              <Link
+                                href={buildAdminSubscriptionRoute(row.subscription_id)}
+                                className="font-medium text-primary hover:underline"
+                              >
+                                {row.subscription_number || `#${row.subscription_id}`}
+                              </Link>
+                            ) : (
+                              "—"
+                            )}
+                          </td>
+                          <td className="border-b border-border px-3 py-2">{row.customer_name || "—"}</td>
+                          <td className="border-b border-border px-3 py-2">{row.payment_method || "—"}</td>
+                          <td className="border-b border-border px-3 py-2 text-right tabular-nums">
+                            {formatRupee(row.amount)}
+                          </td>
+                          <td className="border-b border-border px-3 py-2">{formatShortDate(row.demand_due_date)}</td>
+                          <td className="border-b border-border px-3 py-2">{row.status || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </DataTableShell>
+            )}
+          </ERPSectionShell>
+        ) : null}
           </>
         }
       />

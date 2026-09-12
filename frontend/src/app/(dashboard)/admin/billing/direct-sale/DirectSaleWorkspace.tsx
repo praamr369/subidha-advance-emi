@@ -19,6 +19,8 @@ import AdminCancellationDialog from "@/components/ui/AdminCancellationDialog";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import OperationalNextStepsPanel from "@/components/workflows/OperationalNextStepsPanel";
 import DirectSaleCollectDrawer from "@/features/direct-sale/components/DirectSaleCollectDrawer";
+import ProductPostureCard, { normalizeProductPosture } from "@/components/customers/ProductPostureCard";
+import { apiFetch } from "@/lib/api";
 import { listFinanceAccounts } from "@/services/accounting";
 import { createAdminDirectSaleOrchestrated } from "@/services/admin-sales";
 import {
@@ -347,6 +349,22 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
   const [customerLoading, setCustomerLoading] = useState(false);
   const [customerSearchError, setCustomerSearchError] = useState<string | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerRecord | null>(null);
+  // The picked customer's position across Advance EMI, rent/lease and direct
+  // sales — the same breakdown as the customer pages — so the biller sees
+  // what they already owe before raising another sale.
+  const selectedCustomerPostureQuery = useQuery({
+    queryKey: ["admin", "customer", selectedCustomer?.id, "product-posture"],
+    queryFn: () =>
+      apiFetch<unknown>(`/admin/customers/${selectedCustomer?.id}/product-posture/`, {
+        cache: "no-store",
+      }),
+    enabled: Boolean(selectedCustomer?.id),
+    staleTime: 30_000,
+  });
+  const selectedCustomerPosture = useMemo(
+    () => normalizeProductPosture(selectedCustomerPostureQuery.data),
+    [selectedCustomerPostureQuery.data]
+  );
   const [form, setForm] = useState<FormState>({
     sale_date: todayIso(),
     customer_mode: "EXISTING",
@@ -1564,6 +1582,18 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                           >
                             Change customer
                           </button>
+                        </div>
+                        <div className="mt-3 border-t border-border pt-3">
+                          {selectedCustomerPostureQuery.isLoading ? (
+                            <p>Loading customer position…</p>
+                          ) : selectedCustomerPostureQuery.isError ? (
+                            <p>Customer position is unavailable right now.</p>
+                          ) : selectedCustomerPosture ? (
+                            <ProductPostureCard
+                              posture={selectedCustomerPosture}
+                              title="Customer position by product"
+                            />
+                          ) : null}
                         </div>
                       </div>
                     ) : null}

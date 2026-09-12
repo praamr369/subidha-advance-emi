@@ -186,6 +186,57 @@ class FinanceAccountViewSet(AdminAccountingModelViewSet):
     ordering_fields = ["name", "kind", "created_at"]
     ordering = ["name", "id"]
 
+    @action(detail=True, methods=["get"], url_path="position")
+    def position(self, request, pk=None):
+        """One finance account's position for contra vouchers (money movements
+        between the business's own accounts): opening balance at the start of
+        this month, money in/out this month, balance now, and last movement
+        date. Reuses the finance-book logic (posted journal lines on the
+        account's mapped chart accounts; asset balance = debit − credit)."""
+        from datetime import timedelta
+        from decimal import Decimal
+
+        from django.utils import timezone
+
+        from accounting.services.reporting_service import build_finance_book
+
+        account = self.get_object()
+        month_start = timezone.localdate().replace(day=1)
+        before = build_finance_book(kinds=[account.kind], end_date=month_start - timedelta(days=1))
+        this_month = build_finance_book(kinds=[account.kind], start_date=month_start)
+
+        def _bucket(book):
+            return next(
+                (row for row in book["accounts"] if int(row["finance_account_id"]) == account.id),
+                None,
+            )
+
+        def _dec(value):
+            return Decimal(str(value or "0"))
+
+        opening = _dec((_bucket(before) or {}).get("net_balance"))
+        month = _bucket(this_month) or {}
+        inflow = _dec(month.get("total_debit"))
+        outflow = _dec(month.get("total_credit"))
+        dates = [
+            row["entry_date"]
+            for book in (before, this_month)
+            for row in book["rows"]
+            if int(row["finance_account_id"]) == account.id
+        ]
+        return Response(
+            {
+                "account_id": account.id,
+                "name": account.name,
+                "kind": account.kind,
+                "opening_balance": f"{opening:.2f}",
+                "inflow": f"{inflow:.2f}",
+                "outflow": f"{outflow:.2f}",
+                "closing_balance": f"{(opening + inflow - outflow):.2f}",
+                "last_movement_date": max(dates) if dates else None,
+            }
+        )
+
     def get_queryset(self):
         from accounting.services.finance_account_collection_guard import (
             filter_finance_accounts_for_payment_collection,
@@ -260,6 +311,15 @@ class JournalEntryViewSet(AdminAccountingModelViewSet):
     search_fields = ["entry_no", "memo", "source_model", "source_id"]
     ordering_fields = ["entry_date", "created_at", "entry_no"]
     ordering = ["-entry_date", "-created_at", "-id"]
+
+    @action(detail=True, methods=["get"], url_path="party")
+    def party(self, request, pk=None):
+        """The customer or vendor this journal's source record belongs to, so
+        the voucher page can show that party's money position. Kept off the
+        list serializer so the journal register pays no per-row lookup."""
+        from accounting.services.journal_party_service import resolve_journal_party
+
+        return Response(resolve_journal_party(self.get_object()))
 
     def get_queryset(self):
         queryset = super().get_queryset()

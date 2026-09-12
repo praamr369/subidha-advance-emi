@@ -15,6 +15,7 @@ from api.v1.views.admin_contracts import ContractCloseView
 from api.v1.views.admin_contracts import ContractHandoverView
 from api.v1.views.admin_contracts import ContractInitiateReturnView
 from api.v1.views.admin_contracts import ContractPossessionView
+from api.v1.views.admin_contracts import ContractSettleView
 from api.v1.views.admin_contracts import ContractReturnInspectionApproveView
 from api.v1.views.admin_contracts import ContractReturnInspectionRecordView
 from api.v1.views.admin_contracts import ContractReturnInspectionView
@@ -43,6 +44,7 @@ urlpatterns = [
     path("contracts/<int:pk>/activate/", ContractActivateView.as_view()),
     path("contracts/<int:pk>/cancel/", ContractCancelView.as_view()),
     path("contracts/<int:pk>/close/", ContractCloseView.as_view()),
+    path("contracts/<int:pk>/settle/", ContractSettleView.as_view()),
     # Phase 3: contract amendments
     path("contracts/<int:pk>/amendments/", ContractAmendmentListCreateView.as_view()),
     path("contracts/amendments/<int:amendment_id>/approve/", ContractAmendmentApproveView.as_view()),

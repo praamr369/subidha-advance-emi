@@ -7,6 +7,7 @@ import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import StockOnHandKPIStrip from "@/components/admin/inventory/StockOnHandKPIStrip";
+import RentalAssetsAwaitingRelease from "@/components/customer-intelligence/RentalAssetsAwaitingRelease";
 import { ROUTES } from "@/lib/routes";
 import {
   getStockOnHandSummary,
@@ -179,6 +180,11 @@ export default function StockOnHandPage() {
 
         {/* KPI Strip */}
         <StockOnHandKPIStrip summary={summary?.summary ?? null} isLoading={loading} />
+
+        {/* Rental units back from hire — hidden when none are waiting */}
+        <div className="rounded-lg border bg-card p-4 empty:hidden">
+          <RentalAssetsAwaitingRelease />
+        </div>
 
         {/* Action Buttons */}
         <div className="flex gap-3 justify-end">

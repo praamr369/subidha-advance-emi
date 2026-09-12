@@ -18,6 +18,7 @@ import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
+import VendorPayablesToggle from "@/components/vendors/VendorPayablesToggle";
 import type { InventoryItem, StockLocation } from "@/services/inventory";
 import { listInventoryItems, listStockLocations } from "@/services/inventory";
 import type {
@@ -328,6 +329,7 @@ export default function AccountingPurchaseBillsPage() {
 
         {notice ? <AccountingNotice message={notice} /> : null}
         {error ? <AccountingNotice tone="danger" message={error} /> : null}
+
         <WorkspaceDirectory
           title="Accounting control map"
           description="Jump between purchase bills, vendors, settlements, books, and statements from one accounting business-control workspace."
@@ -376,6 +378,14 @@ export default function AccountingPurchaseBillsPage() {
                   ))}
                 </select>
               </label>
+              {form.vendor ? (
+                // The chosen vendor's balance — billed, paid, what we owe — so a
+                // purchase bill is drafted with the vendor's position in view.
+                // Keyed by vendor so switching vendors never shows stale figures.
+                <div className="md:col-span-2 xl:col-span-3">
+                  <VendorPayablesToggle key={form.vendor} vendorId={Number(form.vendor)} />
+                </div>
+              ) : null}
               <label className="text-sm text-muted-foreground">
                 Tax mode
                 <select className={accountingFieldClassName()} value={form.tax_mode} onChange={(event) => setForm((current) => ({ ...current, tax_mode: event.target.value as "GST" | "NON_GST" }))}>

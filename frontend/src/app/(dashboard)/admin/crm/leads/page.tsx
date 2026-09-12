@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { Search, Plus, ArrowRight, Clock, CheckCircle, AlertCircle, ChevronRight, UserCheck } from "lucide-react";
 
 import ERPPageShell from "@/components/erp/ERPPageShell";
@@ -9,6 +9,7 @@ import { apiFetch } from "@/lib/api";
 import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import EmptyState from "@/components/feedback/EmptyState";
+import CustomerPostureToggle from "@/components/customers/CustomerPostureToggle";
 import {
   createInternalLead,
   getInternalCrmLeads,
@@ -63,8 +64,17 @@ type PublicLeadRow = {
   email?: string;
   status: string;
   source?: string;
+  // QUOTATION / ESTIMATE / DIRECT_SALE … — what the visitor asked for.
+  intent?: string;
+  // Set when the enquiry belongs to an existing customer.
+  converted_customer_id?: number | null;
   created_at: string;
   crm_pipeline_lead?: Array<{ id: number; stage: string }>;
+};
+
+const ENQUIRY_INTENT_LABELS: Record<string, string> = {
+  ESTIMATE: "Estimate",
+  QUOTATION: "Quotation",
 };
 
 type ActiveTab = "pipeline" | "enquiries";
@@ -516,7 +526,8 @@ export default function AdminCrmLeadRegisterPage() {
                       const promoted = (pl.crm_pipeline_lead?.length ?? 0) > 0;
                       const crmLead = pl.crm_pipeline_lead?.[0];
                       return (
-                        <tr key={pl.id} className="hover:bg-muted/30 transition-colors">
+                        <Fragment key={pl.id}>
+                        <tr className="hover:bg-muted/30 transition-colors">
                           <td className="px-6 py-4">
                             <div className="font-semibold text-foreground">{pl.name}</div>
                             <div className="text-xs text-muted-foreground mt-1 flex gap-2">
@@ -528,6 +539,11 @@ export default function AdminCrmLeadRegisterPage() {
                             <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-blue-50 text-blue-700 border border-blue-200">
                               {pl.source || "WEBSITE"}
                             </span>
+                            {pl.intent && ENQUIRY_INTENT_LABELS[pl.intent] ? (
+                              <span className="ml-1 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-violet-50 text-violet-700 border border-violet-200">
+                                {ENQUIRY_INTENT_LABELS[pl.intent]}
+                              </span>
+                            ) : null}
                             <div className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
                               <Clock className="w-3 h-3" />
                               {formatDt(pl.created_at)}
@@ -569,6 +585,16 @@ export default function AdminCrmLeadRegisterPage() {
                             )}
                           </td>
                         </tr>
+                        {pl.converted_customer_id ? (
+                          // Existing customer's estimate/quotation enquiry: their
+                          // per-product position, on demand, across the full row.
+                          <tr>
+                            <td colSpan={4} className="px-6 pb-4 pt-0">
+                              <CustomerPostureToggle customerId={pl.converted_customer_id} />
+                            </td>
+                          </tr>
+                        ) : null}
+                        </Fragment>
                       );
                     })}
                   </tbody>

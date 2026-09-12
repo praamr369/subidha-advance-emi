@@ -110,6 +110,27 @@ class AccountingBridgeSecurityDepositReceiptPhaseF17Tests(APITestCase):
         run_accounting_bridge_checks(run=run, totals=totals)
         return run
 
+    def test_approved_receipt_event_auto_posts_the_journal(self):
+        """Regression: auto-post read "postable" / "candidate_id", keys the
+        candidate never carries, so approved receipts were silently never journaled."""
+        from accounting.services.accounting_bridge_security_deposit_service import auto_post_deposit_transaction
+        from accounting.services.bridge_posting_approval_service import set_bridge_posting_approval
+
+        tx = self._deposit(plan_type=PlanType.RENT, suffix="AUTO")
+        self.assertEqual(auto_post_deposit_transaction(tx, actor=self.admin)["reason"], "posting_not_approved")
+
+        set_bridge_posting_approval(event_key="rent_security_deposit_receipt", approved=True, actor=self.admin)
+        result = auto_post_deposit_transaction(tx, actor=self.admin)
+
+        self.assertTrue(result.get("posted"), result)
+        self.assertTrue(
+            JournalEntry.objects.filter(
+                source_model="RentLeaseDepositTransaction",
+                source_id=str(tx.id),
+                status=JournalEntryStatus.POSTED,
+            ).exists()
+        )
+
     def test_concrete_rent_and_lease_deposit_receipt_candidate_generation(self):
         rent = self._deposit(plan_type=PlanType.RENT, suffix="RENT")
         lease = self._deposit(plan_type=PlanType.LEASE, suffix="LEASE")

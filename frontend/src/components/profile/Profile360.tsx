@@ -16,6 +16,7 @@ import {
 import { ROUTES } from "@/lib/routes";
 import { apiFetch } from "@/lib/api";
 import type { PartyDetailResponse } from "@/services/crm";
+import ProductPostureCard, { normalizeProductPosture } from "@/components/customers/ProductPostureCard";
 import { 
   ClipboardList, 
   ShieldAlert, 
@@ -267,6 +268,155 @@ export function ProfileFinancials({ financials }: { financials?: PartyDetailResp
             <div className="mt-1 text-2xl font-bold text-amber-700 dark:text-amber-400">{money(financials.legacy_outstanding)}</div>
           </div>
         )}
+      </div>
+    </WorkspaceSection>
+  );
+}
+
+/** Per-product contracts & money (Advance EMI / rent-lease / direct sale) plus
+ *  vendor payables — the same breakdown the customer pages show. For a partner
+ *  the contracts are the ones they referred. */
+export function ProfileProductPosture({ payload }: { payload: PartyDetailResponse }) {
+  const posture = normalizeProductPosture(payload.product_posture);
+  const vendor = payload.vendor_payables ?? null;
+  const staff = payload.staff_posture ?? null;
+  const roles = (payload.party?.role_types ?? []) as string[];
+  const isPartnerView = roles.includes("PARTNER") && !roles.includes("CUSTOMER");
+  const showPosture =
+    Boolean(posture) && ((posture?.totals.active_count ?? 0) > 0 || (!vendor && !staff));
+  if (!showPosture && !vendor && !staff) return null;
+
+  const staffLines: Array<{ label: string; line: { count: number; amount: string; last_date: string | null } }> =
+    staff
+      ? [
+          { label: "Advance EMI collected", line: staff.collections.advance_emi },
+          { label: "Rent / Lease collected", line: staff.collections.rent_lease },
+          { label: "Security deposits taken", line: staff.collections.deposit },
+          { label: "Direct sales confirmed", line: staff.direct_sales_confirmed },
+        ]
+      : [];
+
+  const shortDate = (value: string | null | undefined) => {
+    if (!value) return "—";
+    const parsed = new Date(`${value}T00:00:00`);
+    return Number.isNaN(parsed.getTime())
+      ? value
+      : parsed.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  };
+
+  return (
+    <WorkspaceSection
+      title="Contracts & Money by Product"
+      description={
+        isPartnerView
+          ? "Advance EMI, rent/lease and direct-sale position across the customers this partner referred."
+          : staff && !showPosture
+            ? "Collections this staff member handled per product line, plus salary, advances and expense claims."
+            : "Advance EMI, rent/lease and direct-sale position, plus vendor payables and staff position where linked."
+      }
+    >
+      <div className="space-y-5">
+        {showPosture && posture ? (
+          <ProductPostureCard
+            posture={posture}
+            title={isPartnerView ? "Referred contracts by product" : "Contracts & money by product"}
+          />
+        ) : null}
+        {vendor ? (
+          <div>
+            <div className="mb-2 text-sm font-semibold text-foreground">🏭 Vendor payables</div>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-xl border border-border bg-card p-4">
+                <div className="text-xs text-muted-foreground">Billed</div>
+                <div className="mt-1 text-xl font-bold">{money(vendor.billed)}</div>
+              </div>
+              <div className="rounded-xl border border-border bg-card p-4">
+                <div className="text-xs text-muted-foreground">Paid</div>
+                <div className="mt-1 text-xl font-bold text-emerald-600">{money(vendor.paid)}</div>
+              </div>
+              <div className="rounded-xl border border-border bg-card p-4">
+                <div className="text-xs text-muted-foreground">Payable (we owe)</div>
+                <div className={`mt-1 text-xl font-bold ${Number(vendor.payable) > 0 ? "text-red-600" : "text-foreground"}`}>
+                  {money(vendor.payable)}
+                </div>
+                {Number(vendor.advance) > 0 ? (
+                  <div className="mt-0.5 text-xs text-muted-foreground">Advance with vendor {money(vendor.advance)}</div>
+                ) : null}
+              </div>
+              <div className="rounded-xl border border-border bg-card p-4">
+                <div className="text-xs text-muted-foreground">Last bill / last payment</div>
+                <div className="mt-1 text-sm font-semibold">
+                  {shortDate(vendor.last_bill_date)} / {shortDate(vendor.last_payment_date)}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+        {staff ? (
+          <div className="space-y-4">
+            <div>
+              <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                <div className="text-sm font-semibold text-foreground">🧾 Collections handled</div>
+                <div className="text-xs text-muted-foreground">
+                  Total collected {money(staff.collections.total)}
+                </div>
+              </div>
+              {!staff.has_login ? (
+                <div className="mb-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                  No staff login is linked, and collections are credited to the login user, so none can be
+                  matched to this profile yet.
+                </div>
+              ) : null}
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                {staffLines.map(({ label, line }) => (
+                  <div key={label} className="rounded-xl border border-border bg-card p-4">
+                    <div className="text-xs text-muted-foreground">{label}</div>
+                    <div className="mt-1 text-xl font-bold">{money(line.amount)}</div>
+                    <div className="mt-0.5 text-xs text-muted-foreground">
+                      {line.count} record(s) · last {shortDate(line.last_date)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div className="mb-2 text-sm font-semibold text-foreground">💼 Payroll position</div>
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                <div className="rounded-xl border border-border bg-card p-4">
+                  <div className="text-xs text-muted-foreground">Base salary (monthly)</div>
+                  <div className="mt-1 text-xl font-bold">{money(staff.payroll.base_salary)}</div>
+                </div>
+                <div className="rounded-xl border border-border bg-card p-4">
+                  <div className="text-xs text-muted-foreground">Salary paid</div>
+                  <div className="mt-1 text-xl font-bold text-emerald-600">{money(staff.payroll.salary_paid)}</div>
+                  <div className="mt-0.5 text-xs text-muted-foreground">
+                    Last paid period {staff.payroll.last_paid_period ?? "—"}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-border bg-card p-4">
+                  <div className="text-xs text-muted-foreground">Salary pending</div>
+                  <div
+                    className={`mt-1 text-xl font-bold ${Number(staff.payroll.salary_pending) > 0 ? "text-amber-600" : "text-foreground"}`}
+                  >
+                    {money(staff.payroll.salary_pending)}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-border bg-card p-4">
+                  <div className="text-xs text-muted-foreground">Advance outstanding (to recover)</div>
+                  <div
+                    className={`mt-1 text-xl font-bold ${Number(staff.payroll.advance_outstanding) > 0 ? "text-red-600" : "text-foreground"}`}
+                  >
+                    {money(staff.payroll.advance_outstanding)}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-border bg-card p-4">
+                  <div className="text-xs text-muted-foreground">Expense claims pending</div>
+                  <div className="mt-1 text-xl font-bold">{money(staff.payroll.expense_claims_pending)}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </WorkspaceSection>
   );
@@ -570,6 +720,7 @@ export function Party360Embed({ role, sourceId }: { role: ProfileRole; sourceId:
       </div>
       <UniversalQuickWidgets payload={payload} />
       <ProfileAlerts alerts={payload.alerts} />
+      <ProfileProductPosture payload={payload} />
       <ProfileFinancials financials={payload.financials} />
       <ProfileModuleSections payload={payload} />
     </div>

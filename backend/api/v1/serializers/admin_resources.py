@@ -196,6 +196,26 @@ class CustomerAdminSerializer(serializers.ModelSerializer):
     active_subscription_due = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     active_direct_sale_outstanding = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     active_invoice_outstanding = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    active_emi_count = serializers.IntegerField(read_only=True)
+    active_rent_count = serializers.IntegerField(read_only=True)
+    active_lease_count = serializers.IntegerField(read_only=True)
+    active_direct_sale_count = serializers.IntegerField(read_only=True)
+    rent_lease_due = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    rent_lease_overdue = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    emi_overdue = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    deposit_held = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    last_emi_payment_date = serializers.DateField(read_only=True)
+    last_rent_lease_collection_date = serializers.DateField(read_only=True)
+    emi_value = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    emi_paid = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    next_emi_due_date = serializers.DateField(read_only=True)
+    rent_lease_value = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    rent_lease_received = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    next_rent_lease_due_date = serializers.DateField(read_only=True)
+    direct_sale_value = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    direct_sale_received = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    last_direct_sale_date = serializers.DateField(read_only=True)
+    last_direct_sale_receipt_date = serializers.DateField(read_only=True)
     active_delivery_count = serializers.IntegerField(read_only=True)
     open_service_ticket_count = serializers.IntegerField(read_only=True)
     address = serializers.CharField(required=False, allow_blank=True)
@@ -243,6 +263,26 @@ class CustomerAdminSerializer(serializers.ModelSerializer):
             "active_subscription_due",
             "active_direct_sale_outstanding",
             "active_invoice_outstanding",
+            "active_emi_count",
+            "active_rent_count",
+            "active_lease_count",
+            "active_direct_sale_count",
+            "rent_lease_due",
+            "rent_lease_overdue",
+            "emi_overdue",
+            "deposit_held",
+            "last_emi_payment_date",
+            "last_rent_lease_collection_date",
+            "emi_value",
+            "emi_paid",
+            "next_emi_due_date",
+            "rent_lease_value",
+            "rent_lease_received",
+            "next_rent_lease_due_date",
+            "direct_sale_value",
+            "direct_sale_received",
+            "last_direct_sale_date",
+            "last_direct_sale_receipt_date",
             "active_delivery_count",
             "open_service_ticket_count",
             "customer_source",
@@ -2331,6 +2371,7 @@ class SubscriptionAdminDetailSerializer(SubscriptionAdminSerializer):
     deliveries = serializers.SerializerMethodField()
     emis = serializers.SerializerMethodField()
     rent_lease_demands = serializers.SerializerMethodField()
+    rent_lease_collections = serializers.SerializerMethodField()
     activation_readiness = serializers.SerializerMethodField()
 
     class Meta(SubscriptionAdminSerializer.Meta):
@@ -2346,6 +2387,7 @@ class SubscriptionAdminDetailSerializer(SubscriptionAdminSerializer):
             "deliveries",
             "emis",
             "rent_lease_demands",
+            "rent_lease_collections",
             "activation_readiness",
         )
         read_only_fields = fields
@@ -2403,6 +2445,11 @@ class SubscriptionAdminDetailSerializer(SubscriptionAdminSerializer):
             "partner": snapshot["partner"],
         }
 
+    def _deposit_settlement(self, obj):
+        from contracts.services.rent_lease_billing_service import build_deposit_settlement
+
+        return build_deposit_settlement(obj)
+
     def get_rent_profile(self, obj):
         profile = getattr(obj, "rent_profile", None)
         if not profile:
@@ -2419,6 +2466,7 @@ class SubscriptionAdminDetailSerializer(SubscriptionAdminSerializer):
             "return_inspection_notes": profile.return_inspection_notes,
             "handover_notes": profile.handover_notes,
             "contract_terms_snapshot": profile.contract_terms_snapshot,
+            "deposit_settlement": self._deposit_settlement(obj),
             "created_at": profile.created_at,
             "updated_at": profile.updated_at,
         }
@@ -2441,6 +2489,7 @@ class SubscriptionAdminDetailSerializer(SubscriptionAdminSerializer):
             "return_inspection_notes": profile.return_inspection_notes,
             "handover_notes": profile.handover_notes,
             "contract_terms_snapshot": profile.contract_terms_snapshot,
+            "deposit_settlement": self._deposit_settlement(obj),
             "created_at": profile.created_at,
             "updated_at": profile.updated_at,
         }
@@ -2506,6 +2555,19 @@ class SubscriptionAdminDetailSerializer(SubscriptionAdminSerializer):
             }
             for demand in demands
         ]
+
+    def get_rent_lease_collections(self, obj):
+        """Rent/lease money received: monthly collections + deposit receipts/refunds.
+
+        Rent/lease never creates Payment rows (those are Advance EMI only), so the
+        detail page's payment panel needs these source rows to show anything.
+        """
+        if obj.plan_type not in ("RENT", "LEASE"):
+            return []
+        # Shared with the admin receipt register so both show identical rows.
+        from contracts.services.rent_lease_receipt_register_service import build_rent_lease_receipt_rows
+
+        return build_rent_lease_receipt_rows(subscription_ids=[obj.id])
 
     def get_delivery_summary(self, obj):
         return build_subscription_delivery_summary(obj)

@@ -12,6 +12,7 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { ROUTES } from "@/lib/routes";
+import CustomerPostureToggle from "@/components/customers/CustomerPostureToggle";
 import {
   acceptAdminVendorQuote,
   getAdminQuoteRequest,
@@ -111,6 +112,9 @@ export default function AdminVendorQuoteDetailPage() {
                 },
               ]}
             />
+            {/* When the RFQ came from a customer enquiry, show that customer's
+                per-product position (on demand) for context on the sale. */}
+            <CustomerPostureToggle customerId={detail.customer} />
           </ERPSectionShell>
 
           <ERPSectionShell title="Quote lines" description="Only QUOTED rows can be accepted/rejected.">

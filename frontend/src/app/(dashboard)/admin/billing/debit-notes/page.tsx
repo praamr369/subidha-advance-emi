@@ -11,6 +11,7 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import BillingPrintDocument from "@/components/print/BillingPrintDocument";
 import PrintActionBanner from "@/components/print/PrintActionBanner";
 import { ROUTES } from "@/lib/routes";
+import CustomerPostureToggle from "@/components/customers/CustomerPostureToggle";
 import { accountingDate, accountingErrorMessage, accountingMoney } from "@/components/accounting/shared";
 import type { BillingDebitNote } from "@/services/billing";
 import {
@@ -48,6 +49,13 @@ export default function BillingDebitNotesPage() {
     { key: "status", header: "Status" },
     { key: "stock_effect", header: "Stock", render: (row) => (row.stock_effect ? "Yes" : "No") },
     { key: "total_adjustment", header: "Adjustment", render: (row) => accountingMoney(row.total_adjustment) },
+    {
+      // The note's customer (via its original invoice) — per-product money
+      // position on demand, same breakdown as the customer pages.
+      key: "customer_position",
+      header: "Customer",
+      render: (row) => (row.customer_id ? <CustomerPostureToggle customerId={row.customer_id} /> : "—"),
+    },
     {
       key: "actions",
       header: "Actions",

@@ -17,6 +17,7 @@ import {
 } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import { formatRupee } from "@/lib/utils/currency";
+import FinanceAccountPositionToggle from "@/components/finance/FinanceAccountPositionToggle";
 import {
   createMoneyMovement,
   listMoneyMovements,
@@ -249,6 +250,12 @@ export default function AccountingBooksPage() {
                               <span className="text-xs font-medium text-emerald-700">Journal {movement.posted_journal_entry_no}</span>
                             ) : null}
                           </div>
+                          {/* Contra entry: both accounts' positions, on demand. */}
+                          <div className="px-4 pb-3">
+                            <FinanceAccountPositionToggle
+                              accountIds={[movement.from_finance_account, movement.to_finance_account]}
+                            />
+                          </div>
                         </div>
                       );
                     })}
@@ -266,6 +273,16 @@ export default function AccountingBooksPage() {
                     <label className="text-sm text-muted-foreground">Reference no<input className={fieldClassName()} value={movementForm.reference_no} onChange={(event) => setMovementForm((current) => ({ ...current, reference_no: event.target.value }))} /></label>
                     <label className="text-sm text-muted-foreground md:col-span-2">Notes<textarea className={fieldClassName()} value={movementForm.notes} onChange={(event) => setMovementForm((current) => ({ ...current, notes: event.target.value }))} rows={3} /></label>
                     {selectedFrom && selectedTo ? <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900 md:col-span-2">Preview: Dr {selectedTo.chart_account_code || selectedTo.name} / Cr {selectedFrom.chart_account_code || selectedFrom.name}. Journal is created only after explicit Post.</div> : null}
+                    {selectedFrom && selectedTo ? (
+                      // Both accounts' current positions before moving money —
+                      // keyed so changing either account never shows stale figures.
+                      <div className="md:col-span-2">
+                        <FinanceAccountPositionToggle
+                          key={`${selectedFrom.id}-${selectedTo.id}`}
+                          accountIds={[selectedFrom.id, selectedTo.id]}
+                        />
+                      </div>
+                    ) : null}
                     {formBlocker ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 md:col-span-2">{formBlocker}</div> : null}
                     <div className="md:col-span-2"><button type="submit" disabled={!canCreateMovement || hasReadinessBlocker} className="rounded-xl bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:bg-foreground/90 disabled:opacity-50">Create draft movement</button></div>
                   </form>

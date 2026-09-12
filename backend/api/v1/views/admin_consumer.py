@@ -397,6 +397,25 @@ def admin_repossession_action_view(request, repossession_id: int, action: str):
         updated += ["cancelled_at", "cancellation_reason"]
     item.save(update_fields=updated)
 
+    unit_return = None
+    if action == "complete":
+        # Completion means the unit is back: close the delivery, restock it and
+        # mark the rental asset returned so it can be released. If that fails,
+        # roll the status change back too — a "completed" case whose unit never
+        # came back is exactly the gap this closes.
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
+        from deliveries.services.repossession_service import complete_repossession_return
+
+        try:
+            unit_return = complete_repossession_return(item, performed_by=request.user)
+        except DjangoValidationError as exc:
+            transaction.set_rollback(True)
+            return Response(
+                {"detail": "; ".join(exc.messages)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
     AuditLog.objects.create(
         action_type=f"REPOSSESSION_{action.upper()}",
         performed_by=request.user,
@@ -407,6 +426,7 @@ def admin_repossession_action_view(request, repossession_id: int, action: str):
             "response_deadline": str(item.response_deadline)
             if item.response_deadline
             else None,
+            "unit_return": unit_return,
         },
     )
     return Response(_repossession_row(item))

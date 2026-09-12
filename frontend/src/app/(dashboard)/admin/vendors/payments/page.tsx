@@ -12,6 +12,7 @@ import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import ProcurementConfirmDialog from "@/components/procurement/ProcurementConfirmDialog";
 import { buildAdminVendorPaymentVoucherPrintRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
+import VendorPayablesToggle from "@/components/vendors/VendorPayablesToggle";
 import { listFinanceAccounts, type FinanceAccount } from "@/services/accounting";
 import {
   createVendorPayment,
@@ -134,6 +135,14 @@ function CreatePaymentForm({ vendors, bills, financeAccounts, onSaved, onCancel 
           </select>
           {errors.vendor && <p className="mt-0.5 text-[10px] text-red-600">{errors.vendor}</p>}
         </div>
+
+        {/* The chosen vendor's balance, so the payment is made with what we owe
+            in view. Keyed by vendor so switching never shows stale figures. */}
+        {vendorId ? (
+          <div className="col-span-2">
+            <VendorPayablesToggle key={vendorId} vendorId={Number(vendorId)} />
+          </div>
+        ) : null}
 
         {/* Payment date */}
         <div>
@@ -289,6 +298,10 @@ function PaymentDetailDrawer({ payment, onPosted, onClose }: DetailDrawerProps) 
               </div>
             )}
           </div>
+
+          {/* The vendor's overall position after this voucher — billed, paid,
+              what we still owe. */}
+          <VendorPayablesToggle vendorId={payment.vendor} />
 
           {payment.status === "POSTED" && (
             <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-xs text-green-800">

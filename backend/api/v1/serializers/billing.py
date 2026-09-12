@@ -1011,11 +1011,19 @@ class BillingCreditNoteSerializer(serializers.ModelSerializer):
     )
     original_invoice_no = serializers.CharField(source="original_invoice.document_no", read_only=True)
     posted_journal_entry_no = serializers.CharField(source="posted_journal_entry.entry_no", read_only=True)
+    # The note's customer, via its original invoice, so the credit-note register
+    # can show that customer's per-product money position.
+    customer_id = serializers.SerializerMethodField()
+
+    def get_customer_id(self, obj):
+        invoice = getattr(obj, "original_invoice", None)
+        return getattr(invoice, "customer_id", None) if invoice is not None else None
 
     class Meta:
         model = BillingCreditNote
         fields = [
             "id",
+            "customer_id",
             "note_no",
             "note_date",
             "doc_series",
@@ -1080,11 +1088,19 @@ class BillingDebitNoteSerializer(serializers.ModelSerializer):
     )
     original_invoice_no = serializers.CharField(source="original_invoice.document_no", read_only=True)
     posted_journal_entry_no = serializers.CharField(source="posted_journal_entry.entry_no", read_only=True)
+    # The note's customer, via its original invoice, so the debit-note register
+    # can show that customer's per-product money position.
+    customer_id = serializers.SerializerMethodField()
+
+    def get_customer_id(self, obj):
+        invoice = getattr(obj, "original_invoice", None)
+        return getattr(invoice, "customer_id", None) if invoice is not None else None
 
     class Meta:
         model = BillingDebitNote
         fields = [
             "id",
+            "customer_id",
             "note_no",
             "note_date",
             "doc_series",

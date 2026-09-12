@@ -366,6 +366,8 @@ export type BillingCreditNote = {
   note_date: string;
   original_invoice: number;
   original_invoice_no?: string | null;
+  // Customer via the original invoice (debit notes send it; credit notes may not yet).
+  customer_id?: number | null;
   reason?: string;
   stock_effect: boolean;
   taxable_adjustment: string;

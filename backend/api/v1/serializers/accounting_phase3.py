@@ -327,14 +327,11 @@ class VendorSettlementSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {"purchase_bill": "Only posted purchase bills can be settled."}
                 )
-            posted_total = VendorSettlement.objects.filter(
-                purchase_bill_id=purchase_bill.id,
-                status=VendorSettlementStatus.POSTED,
+            from accounting.services.vendor_settlement_service import purchase_bill_outstanding
+
+            outstanding = purchase_bill_outstanding(
+                purchase_bill, exclude_settlement_id=getattr(instance, "pk", None)
             )
-            if instance is not None:
-                posted_total = posted_total.exclude(pk=instance.pk)
-            already_settled = posted_total.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
-            outstanding = Decimal(str(purchase_bill.grand_total)) - Decimal(str(already_settled))
             if amount is not None and Decimal(str(amount)) > outstanding:
                 raise serializers.ValidationError(
                     {"amount": f"Amount exceeds purchase bill outstanding amount ({outstanding:.2f})."}

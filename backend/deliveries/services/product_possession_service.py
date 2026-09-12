@@ -172,13 +172,32 @@ def initiate_return(
         "status", "actual_return_date", "returned_to", "return_condition_notes", "updated_at",
     ])
 
+    # The product is back but not yet inspected, so the contract is
+    # RETURN_PENDING. It used to jump straight to RETURNED, which the state
+    # machine rejects from HANDED_OVER — the error was swallowed and the
+    # contract stayed HANDED_OVER. RETURNED is set when the inspection is
+    # approved (return_inspection_service.complete_inspected_return).
     subscription = possession.subscription
-    if subscription.status not in (SubscriptionStatus.RETURNED, SubscriptionStatus.CLOSED):
-        from subscriptions.services.state_machine import change_subscription_status
-        try:
-            change_subscription_status(subscription, SubscriptionStatus.RETURNED)
-        except ValidationError:
-            pass
+    from subscriptions.services.state_machine import ALLOWED_TRANSITIONS, change_subscription_status
+
+    if SubscriptionStatus.RETURN_PENDING in ALLOWED_TRANSITIONS.get(subscription.status, set()):
+        change_subscription_status(subscription, SubscriptionStatus.RETURN_PENDING)
+
+    # Queue the pickup on the delivery so the delivery desk sees it. Stock comes
+    # back in when that delivery is marked RETURNED.
+    from deliveries.services.delivery_service import (
+        get_current_subscription_delivery,
+        request_subscription_delivery_return,
+    )
+    from subscriptions.models import DeliveryStatus
+
+    delivery = get_current_subscription_delivery(subscription)
+    if delivery is not None and delivery.status == DeliveryStatus.DELIVERED:
+        request_subscription_delivery_return(
+            delivery=delivery,
+            performed_by=performed_by,
+            notes="Return initiated from contract lifecycle.",
+        )
 
     log_audit(
         action_type=AuditLog.ActionType.CONTRACT_POSSESSION_UPDATED,

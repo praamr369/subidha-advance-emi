@@ -12,6 +12,7 @@ import PaginationControls from "@/components/ui/PaginationControls";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
+import ReturnedAssetReleaseButton from "@/components/customer-intelligence/ReturnedAssetReleaseButton";
 import { DataTableShell, DetailPanel, FormSection, WorkflowCard } from "@/components/ui/operations";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { RegistryPageShell } from "@/components/layout/page-shells";
@@ -132,6 +133,12 @@ type SubscriptionKpis = {
   overdue_emis: number;
   today_collection: string;
   total_outstanding: string;
+  /** Running contracts only; closed/cancelled/returned/completed are history. */
+  live_count: number;
+  ended_count: number;
+  live_contract_value: string;
+  live_monthly_value: string;
+  ended_contract_value: string;
 };
 
 type BatchBreakdownRow = {
@@ -169,6 +176,21 @@ function normalizeKpis(payload: unknown): SubscriptionKpis {
     overdue_emis: toNumber(raw.overdue_emis),
     today_collection: toMoneyString(raw.today_collection),
     total_outstanding: toMoneyString(raw.total_outstanding),
+    live_count: toNumber(raw.live_count ?? raw.total_subscriptions),
+    ended_count: toNumber(raw.ended_count),
+    live_contract_value: toMoneyString(raw.live_contract_value ?? raw.total_contract_value),
+    live_monthly_value: toMoneyString(raw.live_monthly_value ?? raw.total_monthly_value),
+    ended_contract_value: toMoneyString(raw.ended_contract_value),
+  };
+}
+
+/** Headline contract value: the live book, or the ended total when the filter shows history only. */
+function contractValueCard(kpis: SubscriptionKpis) {
+  const historyOnly = kpis.live_count === 0 && kpis.ended_count > 0;
+  return {
+    label: historyOnly ? "Ended Contract Value" : "Live Contract Value",
+    value: formatRupee(historyOnly ? kpis.ended_contract_value : kpis.live_contract_value),
+    tone: "default" as const,
   };
 }
 
@@ -727,7 +749,7 @@ export default function AdminSubscriptionsPage() {
     if (activePlanType === "EMI") {
       return [
         { label: "EMI Subscriptions", value: kpis.emi_count, tone: "info" as const },
-        { label: "Contract Value", value: formatRupee(kpis.total_contract_value), tone: "default" as const },
+        contractValueCard(kpis),
         { label: "To Collect (Outstanding)", value: formatRupee(kpis.total_outstanding), tone: "warning" as const },
         { label: "Won (Draw)", value: kpis.won_subscriptions, tone: "success" as const },
         { label: "Overdue EMIs", value: kpis.overdue_emis, tone: kpis.overdue_emis > 0 ? ("danger" as const) : ("success" as const) },
@@ -737,9 +759,13 @@ export default function AdminSubscriptionsPage() {
     if (activePlanType === "RENT" || activePlanType === "LEASE") {
       const label = activePlanType === "RENT" ? "Rent" : "Lease";
       return [
-        { label: `${label} Contracts`, value: kpis.total_subscriptions, tone: "info" as const },
-        { label: "Contract Value", value: formatRupee(kpis.total_contract_value), tone: "default" as const },
-        { label: "Monthly Demand", value: formatRupee(kpis.total_monthly_value), tone: "default" as const },
+        {
+          label: `${label} Contracts (live / all)`,
+          value: `${kpis.live_count} / ${kpis.total_subscriptions}`,
+          tone: "info" as const,
+        },
+        contractValueCard(kpis),
+        { label: "Monthly Demand (live)", value: formatRupee(kpis.live_monthly_value), tone: "default" as const },
         { label: "To Collect (Outstanding)", value: formatRupee(kpis.total_outstanding), tone: "warning" as const },
       ];
     }
@@ -747,7 +773,7 @@ export default function AdminSubscriptionsPage() {
     // "All" view — headline totals plus the per-plan mix.
     return [
       { label: "Total Subscriptions", value: kpis.total_subscriptions, tone: "info" as const },
-      { label: "Contract Value", value: formatRupee(kpis.total_contract_value), tone: "default" as const },
+      contractValueCard(kpis),
       { label: "To Collect (Outstanding)", value: formatRupee(kpis.total_outstanding), tone: "warning" as const },
       { label: "Won (Draw)", value: kpis.won_subscriptions, tone: "success" as const },
       { label: "Mix (EMI / Rent / Lease)", value: `${kpis.emi_count} / ${kpis.rent_count} / ${kpis.lease_count}`, tone: "default" as const },
@@ -846,8 +872,16 @@ export default function AdminSubscriptionsPage() {
               {count} matching
               {kpis ? (
                 <>
-                  {" · Contract value "}
-                  <span className="tabular-nums text-foreground">{formatRupee(kpis.total_contract_value)}</span>
+                  {" · Live contract value "}
+                  <span className="tabular-nums text-foreground">{formatRupee(kpis.live_contract_value)}</span>
+                  {kpis.ended_count > 0 ? (
+                    <>
+                      {" · Closed/cancelled "}
+                      <span className="tabular-nums text-muted-foreground">
+                        {formatRupee(kpis.ended_contract_value)} ({kpis.ended_count})
+                      </span>
+                    </>
+                  ) : null}
                   {" · To collect "}
                   <span className="tabular-nums text-amber-600">{formatRupee(kpis.total_outstanding)}</span>
                   {activePlanType === "EMI" || activePlanType === "" ? (
@@ -1421,6 +1455,12 @@ export default function AdminSubscriptionsPage() {
                               Rent/Lease Mapping
                             </Link>
                           )}
+
+                          {/* The unit that came back on this contract — hidden when nothing is waiting */}
+                          {(row.plan_type === "RENT" || row.plan_type === "LEASE") &&
+                          (row.status === "RETURNED" || row.status === "CLOSED") ? (
+                            <ReturnedAssetReleaseButton subscriptionId={Number(row.id)} compact />
+                          ) : null}
 
                           <button
                             type="button"

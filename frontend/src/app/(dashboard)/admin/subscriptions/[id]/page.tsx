@@ -28,11 +28,14 @@ import {
   DetailMetricTile,
 } from "@/domains/subscriptions/detail/surfaces";
 import { apiFetch, toArray } from "@/lib/api";
+import DepositSettlementStatement from "@/components/finance/DepositSettlementStatement";
+import type { DepositSettlement } from "@/services/phase4-finance";
 import { formatPlanTypeLabel } from "@/lib/plan-labels";
 import { cn } from "@/lib/utils";
 import GuarantorSection from "@/components/subscriptions/GuarantorSection";
 import { SubscriptionDocumentUploadPanel } from "@/components/subscriptions/SubscriptionDocumentUploadPanel";
 import { GenerateRentLeaseLedgerModal } from "./GenerateRentLeaseLedgerModal";
+import { SettleRentLeaseContractModal } from "./SettleRentLeaseContractModal";
 import {
   normalizeDeliveryRecord,
   type DeliveryRecord,
@@ -190,6 +193,7 @@ type RentProfile = {
   return_inspection_notes: string;
   handover_notes: string;
   contract_terms_snapshot: string;
+  deposit_settlement: DepositSettlement | null;
   created_at: string | null;
   updated_at: string | null;
 };
@@ -251,10 +255,49 @@ type SubscriptionDetailRecord = {
   deliveries: DeliveryRecord[];
   emis: EmiRow[];
   rent_lease_demands: RentLeaseDemandRow[];
+  rent_lease_collections: RentLeaseReceiptRow[];
   rent_profile: RentProfile | null;
   lease_profile: LeaseProfile | null;
   documents: ContractDocument[];
   activation_readiness: ActivationReadiness | null;
+};
+
+// Rent/lease money received. These never become Payment rows (Advance EMI only),
+// so the detail payload carries them separately for the payments panel.
+type RentLeaseReceiptRow = {
+  key: string;
+  kind: string;
+  number: string;
+  amount: string;
+  payment_date: string | null;
+  payment_method: string;
+  status: string;
+  reference_no: string;
+  demand_due_date: string | null;
+  collected_by_username: string;
+};
+
+function normalizeRentLeaseReceiptRow(raw: Record<string, unknown>): RentLeaseReceiptRow {
+  const text = (value: unknown) => (typeof value === "string" ? value : "");
+  return {
+    key: text(raw.key),
+    kind: text(raw.kind),
+    number: text(raw.number),
+    amount: text(raw.amount) || "0.00",
+    payment_date: text(raw.payment_date) || null,
+    payment_method: text(raw.payment_method),
+    status: text(raw.status),
+    reference_no: text(raw.reference_no),
+    demand_due_date: text(raw.demand_due_date) || null,
+    collected_by_username: text(raw.collected_by_username),
+  };
+}
+
+const RENT_LEASE_RECEIPT_LABELS: Record<string, string> = {
+  RENT_MONTHLY: "Monthly rent",
+  LEASE_MONTHLY: "Monthly lease",
+  DEPOSIT_RECEIPT: "Security deposit received",
+  DEPOSIT_REFUND: "Security deposit refunded",
 };
 
 function toNumber(value: unknown, fallback = 0): number {
@@ -535,6 +578,10 @@ function normalizeRentProfile(raw: unknown): RentProfile | null {
     return_inspection_notes: toStringValue(value.return_inspection_notes),
     handover_notes: toStringValue(value.handover_notes),
     contract_terms_snapshot: toStringValue(value.contract_terms_snapshot),
+    deposit_settlement:
+      value.deposit_settlement && typeof value.deposit_settlement === "object"
+        ? (value.deposit_settlement as DepositSettlement)
+        : null,
     created_at: toNullableString(value.created_at),
     updated_at: toNullableString(value.updated_at),
   };
@@ -640,6 +687,9 @@ function normalizeSubscriptionDetail(
     ),
     emis: toArray<Record<string, unknown>>(raw.emis).map(normalizeEmiRow),
     rent_lease_demands: toArray<Record<string, unknown>>(raw.rent_lease_demands).map(normalizeRentLeaseDemandRow),
+    rent_lease_collections: toArray<Record<string, unknown>>(raw.rent_lease_collections).map(
+      normalizeRentLeaseReceiptRow
+    ),
     rent_profile: normalizeRentProfile(raw.rent_profile),
     lease_profile: normalizeLeaseProfile(raw.lease_profile),
     documents: toArray<Record<string, unknown>>(raw.documents).map(normalizeContractDocument),
@@ -709,6 +759,7 @@ export default function AdminSubscriptionDetailPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [settleModalOpen, setSettleModalOpen] = useState(false);
 
   const loadPage = useCallback(
     async (mode: "initial" | "refresh" = "initial") => {
@@ -1436,6 +1487,11 @@ export default function AdminSubscriptionDetailPage() {
                 >
                   {contractProfile ? (
                     <>
+                      {contractProfile.deposit_settlement ? (
+                        <div className="mb-4">
+                          <DepositSettlementStatement settlement={contractProfile.deposit_settlement} />
+                        </div>
+                      ) : null}
                       <div className="grid gap-4 sm:grid-cols-2">
                         <DetailValue
                           label="Security Deposit (%)"
@@ -1570,18 +1626,55 @@ export default function AdminSubscriptionDetailPage() {
                         >
                           Print Rent/Lease Contract
                         </Link>
-                        <Link
-                          href={`/admin/finance/collect?subscription=${subscription.id}&context=security_deposit`}
-                          className="inline-flex h-9 items-center justify-center rounded-md bg-sky-700 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-sky-800"
-                        >
-                          Collect Security Deposit
-                        </Link>
-                        <Link
-                          href={`/admin/delivery/create?subscription=${subscription.id}`}
-                          className="inline-flex h-9 items-center justify-center rounded-md border border-sky-200 bg-sky-50 text-sky-800 px-4 text-sm font-medium shadow-sm transition hover:bg-sky-100"
-                        >
-                          Ready for Delivery Handover
-                        </Link>
+                        {(() => {
+                          const contractStatus = String(subscription.status || "").toUpperCase();
+                          const ended = ["CANCELLED", "CLOSED"].includes(contractStatus);
+                          const goodsBackOrOut = ["HANDED_OVER", "RETURN_PENDING", "RETURNED", "COMPLETED"].includes(contractStatus);
+                          const depositReceived = Number(contractProfile.deposit_settlement?.received ?? 0);
+                          const depositDue = Number(contractProfile.security_deposit_amount ?? 0);
+                          const depositOpen = depositReceived + 0.005 < depositDue;
+                          const settleLabel = ["RETURNED", "COMPLETED"].includes(contractStatus)
+                            ? "Refund Deposit & Close Contract"
+                            : "Cancel / Close Contract";
+                          return (
+                            <>
+                              {!ended && !goodsBackOrOut && depositOpen ? (
+                                <Link
+                                  href={`/admin/finance/collect?subscription=${subscription.id}&context=security_deposit`}
+                                  className="inline-flex h-9 items-center justify-center rounded-md bg-sky-700 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-sky-800"
+                                >
+                                  Collect Security Deposit
+                                </Link>
+                              ) : null}
+                              {!ended && !goodsBackOrOut ? (
+                                <Link
+                                  href={`/admin/delivery/create?subscription=${subscription.id}`}
+                                  className="inline-flex h-9 items-center justify-center rounded-md border border-sky-200 bg-sky-50 text-sky-800 px-4 text-sm font-medium shadow-sm transition hover:bg-sky-100"
+                                >
+                                  Ready for Delivery Handover
+                                </Link>
+                              ) : null}
+                              {!ended ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setSettleModalOpen(true)}
+                                  className={cn(
+                                    "inline-flex h-9 items-center justify-center rounded-md px-4 text-sm font-medium shadow-sm transition",
+                                    ["RETURNED", "COMPLETED"].includes(contractStatus)
+                                      ? "bg-emerald-700 text-white hover:bg-emerald-800"
+                                      : "border border-rose-200 bg-rose-50 text-rose-800 hover:bg-rose-100"
+                                  )}
+                                >
+                                  {settleLabel}
+                                </button>
+                              ) : (
+                                <span className="text-sm text-muted-foreground">
+                                  Contract {contractStatus.toLowerCase()} — deposit settled, nothing to collect.
+                                </span>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
                     </>
                   ) : (
@@ -2027,13 +2120,40 @@ export default function AdminSubscriptionDetailPage() {
                 description="Operational payment visibility with reversed rows clearly marked."
                 className="rounded-[28px]"
               >
-                {payments.length === 0 ? (
+                {payments.length === 0 && subscription.rent_lease_collections.length === 0 ? (
                   <ERPEmptyState
                     title="No payments recorded"
                     description="No payment rows are currently visible for this subscription."
                   />
                 ) : (
                   <div className="space-y-3">
+                    {subscription.rent_lease_collections.slice(0, 10).map((receipt) => (
+                      <div key={receipt.key} className="rounded-xl border border-border bg-muted/40 p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <div className="text-sm font-medium text-foreground">
+                              {RENT_LEASE_RECEIPT_LABELS[receipt.kind] ?? receipt.kind} · {money(receipt.amount)}
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {receipt.payment_method || "—"} · Received {formatDate(receipt.payment_date)}
+                              {receipt.demand_due_date ? ` · For month due ${formatDate(receipt.demand_due_date)}` : ""}
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {receipt.number} · Ref: {receipt.reference_no || "—"} · Collected by:{" "}
+                              {receipt.collected_by_username || "—"}
+                            </div>
+                          </div>
+                          <span
+                            className={cn(
+                              "inline-flex rounded-full px-2.5 py-1 text-xs font-medium",
+                              receipt.status === "ACTIVE" ? "chip-tone-success" : "chip-tone-danger"
+                            )}
+                          >
+                            {receipt.status || "—"}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
                     {payments.slice(0, 10).map((payment) => (
                       <div
                         key={payment.id}
@@ -2122,6 +2242,15 @@ export default function AdminSubscriptionDetailPage() {
             currentStartDate={subscription.start_date}
             open={scheduleModalOpen}
             onOpenChange={setScheduleModalOpen}
+          />
+        ) : null}
+
+        {subscription && !isEmiSubscription ? (
+          <SettleRentLeaseContractModal
+            subscriptionId={subscription.id}
+            open={settleModalOpen}
+            onOpenChange={setSettleModalOpen}
+            onSettled={() => void loadPage("refresh")}
           />
         ) : null}
       </div>

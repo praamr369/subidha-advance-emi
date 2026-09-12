@@ -100,6 +100,20 @@ class AdminVendorProductsView(APIView):
         return Response(VendorProductSerializer(row).data, status=status.HTTP_201_CREATED)
 
 
+class AdminVendorPayablesView(APIView):
+    """One vendor's payable position — billed, paid, what we owe, advance, and
+    last bill/payment dates — read from the vendor ledger. Lightweight
+    counterpart of the party-360 payload for bill panels."""
+
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request, pk: int):
+        from customers.services.customer_account_service import build_vendor_payable_posture
+
+        vendor = get_object_or_404(Vendor, pk=pk)
+        return Response(build_vendor_payable_posture([vendor.id]))
+
+
 class AdminVendorLedgerView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 

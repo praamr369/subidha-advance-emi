@@ -7,6 +7,8 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ERPPageShell from "@/components/erp/ERPPageShell";
+import DepositSettlementStatement from "@/components/finance/DepositSettlementStatement";
+import ReturnedAssetReleaseButton from "@/components/customer-intelligence/ReturnedAssetReleaseButton";
 import StatusBadge from "@/components/ui/status-badge";
 import { DataTableShell, MobileSafeTable } from "@/components/ui/operations";
 import { WorkspaceSection } from "@/components/ui/workspace";
@@ -25,10 +27,10 @@ import {
   type AdminDepositRow,
 } from "@/services/phase4-finance";
 
-const SOURCE_NOTE = "Security deposits are recorded as concrete deposit source transactions. Mapping readiness is shown separately and bridge posting remains deferred.";
+const SOURCE_NOTE = "Collect, deduct and refund rent/lease security deposits. Every receipt, deduction and refund is kept as its own deposit transaction.";
 const HISTORY_NOTE = "Refund actions do not rewrite historical collection, receipt, journal, settlement, or reconciliation records.";
 const MAPPING_NOTE = "Premade setup creates the required COA, Finance Account, and active rent/lease mapping. Manual override remains available for admin control.";
-const READY_NOTE = "Operational source collection and mapping are ready. Accounting bridge posting remains audit-deferred until approval is enabled.";
+const READY_NOTE = "Checking rent/lease accounting setup…";
 const REQUIRED_MAPPING_TYPES: Record<string, string> = {
   monthly_income_account_id: "INCOME",
   deposit_liability_account_id: "LIABILITY",
@@ -89,6 +91,7 @@ export default function AdminFinanceDepositsPage() {
   const [mapping, setMapping] = useState<Record<string, unknown> | null>(null);
   const [mappingNote, setMappingNote] = useState(READY_NOTE);
   const [postingMode, setPostingMode] = useState("AUDIT_DEFERRED");
+  const [depositAutoPosting, setDepositAutoPosting] = useState<{ receipts: boolean; refunds: boolean } | null>(null);
   const [postingOperatorAction, setPostingOperatorAction] = useState<string | null>(null);
   const [mappingSetupError, setMappingSetupError] = useState<string | null>(null);
   const [backendMappingFieldErrors, setBackendMappingFieldErrors] = useState<Record<string, string[]>>({});
@@ -139,6 +142,7 @@ export default function AdminFinanceDepositsPage() {
         setMapping(mappingPayload.mapping ?? null);
         setMappingNote(mappingPayload.readiness?.message || mappingPayload.posting_boundary_note || READY_NOTE);
         setPostingMode(String(mappingPayload.readiness?.posting_mode ?? "AUDIT_DEFERRED"));
+        setDepositAutoPosting(mappingPayload.deposit_auto_posting ?? null);
         setPostingOperatorAction(mappingPayload.readiness?.operator_action ?? null);
         const readinessStatus = String(mappingPayload.readiness?.status ?? "").toUpperCase();
         const readinessReason = readinessStatus && readinessStatus !== "READY" ? mappingPayload.readiness?.reason : "";
@@ -498,6 +502,11 @@ export default function AdminFinanceDepositsPage() {
                 <div><dt className="text-muted-foreground">Method</dt><dd className="font-semibold">{selected.latest_transaction?.payment_method || "-"}</dd></div>
                 <div><dt className="text-muted-foreground">Finance account</dt><dd className="font-semibold">{selected.latest_transaction?.finance_account_name || selected.latest_transaction?.finance_account_id || "-"}</dd></div>
               </dl>
+              {selected.settlement ? <DepositSettlementStatement settlement={selected.settlement} /> : null}
+              {/* The unit that came back on this contract — hidden when nothing is waiting */}
+              {selected.subscription_id ? (
+                <ReturnedAssetReleaseButton subscriptionId={selected.subscription_id} />
+              ) : null}
             </div>
             <div className="rounded-xl border bg-card p-4">
               <div className="rounded-xl border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">{HISTORY_NOTE}</div>
@@ -534,8 +543,27 @@ export default function AdminFinanceDepositsPage() {
       <WorkspaceSection title="Accounting Mapping Panel" description={MAPPING_NOTE}>
         <div id="accounting-mapping" className="rounded-xl border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">{mappingNote}</div>
         <div className="mt-2 rounded-xl border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-          Posting mode: <span className="font-semibold text-foreground">{postingMode}</span>
+          Rent/lease posting:{" "}
+          <span className="font-semibold text-foreground">
+            {postingMode === "POSTING_ENABLED"
+              ? "Enabled"
+              : postingMode === "AUDIT_DEFERRED"
+                ? "Waiting for approval"
+                : postingMode.replace(/_/g, " ").toLowerCase()}
+          </span>
           {postingOperatorAction ? <span className="ml-2">Action: {postingOperatorAction}</span> : null}
+          {depositAutoPosting ? (
+            <div className="mt-1">
+              Deposit receipts:{" "}
+              <span className="font-semibold text-foreground">
+                {depositAutoPosting.receipts ? "post to the journal automatically" : "not posted until approved"}
+              </span>
+              {" · "}Deposit refunds:{" "}
+              <span className="font-semibold text-foreground">
+                {depositAutoPosting.refunds ? "post to the journal automatically" : "not posted until approved"}
+              </span>
+            </div>
+          ) : null}
         </div>
         {mappingSetupError ? <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">Repair required: {mappingSetupError}</div> : null}
         <div className="mt-3 flex flex-wrap items-center gap-2">

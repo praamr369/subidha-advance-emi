@@ -112,6 +112,37 @@ export type PartyDetailResponse = {
     legacy_outstanding_count?: number;
     unsettled_legacy_count?: number;
   };
+  // Per-product posture (EMI / rent-lease / direct sale) over the party's
+  // contracts — a customer's own, or the ones a partner referred. Normalized
+  // by normalizeProductPosture (components/customers/ProductPostureCard).
+  product_posture?: unknown;
+  vendor_payables?: {
+    vendor_count: number;
+    billed: string;
+    paid: string;
+    payable: string;
+    advance: string;
+    last_bill_date: string | null;
+    last_payment_date: string | null;
+  } | null;
+  // Staff counterpart: collections handled per product line + payroll position.
+  staff_posture?: {
+    staff_count: number;
+    has_login: boolean;
+    collections: Record<
+      "advance_emi" | "rent_lease" | "deposit",
+      { count: number; amount: string; last_date: string | null }
+    > & { total: string };
+    direct_sales_confirmed: { count: number; amount: string; last_date: string | null };
+    payroll: {
+      base_salary: string;
+      salary_paid: string;
+      salary_pending: string;
+      last_paid_period: string | null;
+      advance_outstanding: string;
+      expense_claims_pending: string;
+    };
+  } | null;
   financials?: {
     total_invoiced: string;
     total_received: string;

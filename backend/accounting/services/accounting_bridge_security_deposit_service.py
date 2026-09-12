@@ -576,9 +576,11 @@ def auto_post_deposit_transaction(transaction_row, *, actor=None) -> dict:
 
     if not BridgePostingApproval.objects.filter(event_key=event_key, is_approved=True).exists():
         return {"posted": False, "reason": "posting_not_approved"}
-    if not candidate.get("postable"):
-        return {"posted": False, "reason": "not_postable", "blocker": candidate.get("blocker")}
-    candidate_id = candidate.get("candidate_id")
+    # The candidate payload names these is_postable / bridge_candidate_id (id);
+    # reading "postable" / "candidate_id" silently skipped every auto-post.
+    if not candidate.get("is_postable"):
+        return {"posted": False, "reason": "not_postable", "blocker": candidate.get("blocker_code")}
+    candidate_id = candidate.get("bridge_candidate_id") or candidate.get("id")
     key = candidate.get("idempotency_key")
     if not candidate_id or not key:
         return {"posted": False, "reason": "missing_candidate_key"}

@@ -29,6 +29,19 @@ DRAW_ELIGIBLE_SUBSCRIPTION_STATUSES = {
     "ACTIVE",
 }
 
+# Rent/lease statuses in which the customer still holds (or is about to hold)
+# the asset and owes rent. HANDED_OVER/RETURN_PENDING are live for rent/lease
+# even though they sit outside the EMI batch-active set.
+LIVE_RENT_LEASE_SUBSCRIPTION_STATUSES = {
+    "APPROVED",
+    "ACTIVE",
+    "PAYMENT_PENDING",
+    "DELIVERY_PENDING",
+    "HANDED_OVER",
+    "RETURN_PENDING",
+    "DEFAULTED",
+}
+
 COLLECTIBLE_SUBSCRIPTION_STATUSES = {
     "ACTIVE",
     "DEFAULTED",

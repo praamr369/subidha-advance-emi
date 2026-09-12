@@ -155,6 +155,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
 
   // Rent / lease contract sub-section
   item("Sales & Contracts", "Rent/Lease Cockpit", ROUTES.admin.rentLease, "Rent and lease cockpit."),
+  item("Sales & Contracts", "Rental Assets", ROUTES.admin.rentLeaseAssets, "Every physical rental unit — on hire, back from hire, under repair — with release to available."),
   item("Sales & Contracts", "Rent Contracts", `${ROUTES.admin.subscriptions}?plan_type=RENT`, "Rent contract register."),
   item("Sales & Contracts", "Lease Contracts", `${ROUTES.admin.subscriptions}?plan_type=LEASE`, "Lease contract register."),
   item("Sales & Contracts", "Create Rent", ROUTES.admin.subscriptionsRentCreate, "Create a rent contract."),

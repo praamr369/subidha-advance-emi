@@ -364,6 +364,7 @@ def serialize_delivery_record(
         "customer_id": getattr(subscription, "customer_id", None),
         "customer_name": getattr(getattr(subscription, "customer", None), "name", None),
         "customer_phone": getattr(getattr(subscription, "customer", None), "phone", None),
+        "plan_type": getattr(subscription, "plan_type", None),
         "product_id": getattr(subscription, "product_id", None),
         "product_name": getattr(getattr(subscription, "product", None), "name", None),
         "product_code": getattr(getattr(subscription, "product", None), "product_code", None),

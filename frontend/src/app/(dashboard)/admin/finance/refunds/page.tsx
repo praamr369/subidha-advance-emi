@@ -10,6 +10,7 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
 import { listReversalCases, type ReversalCase } from "@/services/reversal-control";
 import { listAdminDepositRegister, type AdminDepositRow } from "@/services/phase4-finance";
+import ReturnedAssetReleaseButton from "@/components/customer-intelligence/ReturnedAssetReleaseButton";
 
 function formatDateTime(value?: string | null): string {
   if (!value) return "—";
@@ -271,6 +272,10 @@ export default function AdminFinanceRefundsPage() {
                             Pay in Cash Desk
                           </Link>
                         )}
+                        {/* The unit that came back on this contract — hidden when nothing is waiting */}
+                        {row.subscription_id ? (
+                          <ReturnedAssetReleaseButton subscriptionId={row.subscription_id} compact />
+                        ) : null}
                       </td>
                     </tr>
                   );

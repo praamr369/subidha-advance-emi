@@ -2,6 +2,7 @@
 
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import RefreshBar from "@/components/feedback/RefreshBar";
+import ReturnedAssetReleaseButton from "@/components/customer-intelligence/ReturnedAssetReleaseButton";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { useRefreshableList } from "@/hooks/useRefreshableList";
 import {
@@ -96,6 +97,10 @@ export default function RepossessionsPage() {
                           Mark complete
                         </button>
                       )}
+                      {/* The recovered unit — hidden when nothing is waiting for release */}
+                      {r.status === "COMPLETED" && r.subscription ? (
+                        <ReturnedAssetReleaseButton subscriptionId={r.subscription} compact />
+                      ) : null}
                     </td>
                   </tr>
                 ))}

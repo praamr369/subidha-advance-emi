@@ -151,9 +151,11 @@ class CustomerDashboard(APIView):
     permission_classes = [IsCustomer]
 
     def get(self, request):
-        _, error_response = _get_customer_or_404_response(request)
+        customer, error_response = _get_customer_or_404_response(request)
         if error_response is not None:
             return error_response
+
+        from customers.services.customer_account_service import build_customer_product_posture
 
         dashboard = get_dashboard_summary(CustomerScope(), request.user)
 
@@ -161,6 +163,8 @@ class CustomerDashboard(APIView):
             {
                 **dashboard.identity,
                 "summary": dashboard.summary,
+                # EMI + rent/lease + direct sale in one shape (same helper as admin).
+                "product_posture": build_customer_product_posture(customer),
                 "subscriptions": CustomerDashboardSubscriptionSerializer(
                     dashboard.subscriptions,
                     many=True,

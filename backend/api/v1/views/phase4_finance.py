@@ -336,9 +336,16 @@ def _serialize_rent_lease_mapping(mapping):
     }
 
 
+def _deposit_auto_posting() -> dict:
+    from accounting.services.bridge_posting_approval_service import deposit_auto_posting_status
+
+    return deposit_auto_posting_status()
+
+
 def _account_mapping_payload(mapping, *, setup_error: str | None = None):
     readiness = get_rent_lease_accounting_readiness(auto_create=False)
     return {
+        "deposit_auto_posting": _deposit_auto_posting(),
         "mapping": _serialize_rent_lease_mapping(mapping),
         "readiness": readiness,
         "chart_accounts": [

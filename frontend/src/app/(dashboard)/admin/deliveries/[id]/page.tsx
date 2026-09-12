@@ -9,6 +9,11 @@ import LoadingBlock from "@/components/feedback/LoadingBlock";
 import { DetailPageShell } from "@/components/layout/page-shells";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { apiFetch } from "@/lib/api";
+import ProductPostureCard, {
+  normalizeProductPosture,
+  type ProductPosture,
+} from "@/components/customers/ProductPostureCard";
+import ReturnedAssetReleaseButton from "@/components/customer-intelligence/ReturnedAssetReleaseButton";
 import { buildAdminBillingRegisterRoute } from "@/lib/route-builders";
 import {
   cancelAdminDelivery,
@@ -191,6 +196,37 @@ export default function AdminDeliveryDetailPage() {
   useEffect(() => {
     void loadPage("initial");
   }, [loadPage]);
+
+  // The customer's position across Advance EMI, rent/lease and direct sales —
+  // the same breakdown as the customer pages — so the delivery team sees what
+  // is owed before handing over.
+  const postureCustomerId = delivery?.customer_id ?? null;
+  const [customerPosture, setCustomerPosture] = useState<ProductPosture | null>(null);
+  const [customerPostureState, setCustomerPostureState] = useState<"idle" | "loading" | "error">("idle");
+
+  useEffect(() => {
+    if (!postureCustomerId) {
+      setCustomerPosture(null);
+      setCustomerPostureState("idle");
+      return;
+    }
+    let cancelled = false;
+    setCustomerPostureState("loading");
+    apiFetch<unknown>(`/admin/customers/${postureCustomerId}/product-posture/`, { cache: "no-store" })
+      .then((data) => {
+        if (cancelled) return;
+        setCustomerPosture(normalizeProductPosture(data));
+        setCustomerPostureState("idle");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setCustomerPosture(null);
+        setCustomerPostureState("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [postureCustomerId]);
 
   async function handleMetadataSave() {
     if (!delivery) return;
@@ -476,6 +512,32 @@ export default function AdminDeliveryDetailPage() {
                 <DetailValue label="Returned" value={formatDateTime(delivery.returned_at)} />
               </div>
             </SectionCard>
+
+            {delivery.status === "RETURNED" &&
+            delivery.subscription_id &&
+            (delivery.plan_type === "RENT" || delivery.plan_type === "LEASE") ? (
+              <SectionCard
+                title="Returned rental unit"
+                description="The unit came back on this return. Release it once it is repaired or checked; any maintenance hold from its return inspection is lifted too."
+              >
+                <ReturnedAssetReleaseButton subscriptionId={delivery.subscription_id} />
+              </SectionCard>
+            ) : null}
+
+            {delivery.customer_id ? (
+              <SectionCard
+                title="Customer Position by Product"
+                description="This customer's Advance EMI, rent/lease and direct-sale position — the same breakdown as the customer pages."
+              >
+                {customerPostureState === "loading" ? (
+                  <p className="text-sm text-muted-foreground">Loading customer position…</p>
+                ) : customerPostureState === "error" ? (
+                  <p className="text-sm text-muted-foreground">Customer position is unavailable right now.</p>
+                ) : customerPosture ? (
+                  <ProductPostureCard posture={customerPosture} />
+                ) : null}
+              </SectionCard>
+            ) : null}
 
             <SectionCard
               title="Metadata"

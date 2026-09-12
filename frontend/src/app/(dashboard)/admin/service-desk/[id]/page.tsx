@@ -12,6 +12,11 @@ import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { DetailPageShell } from "@/components/layout/page-shells";
 import ActionButton from "@/components/ui/ActionButton";
 import { ROUTES } from "@/lib/routes";
+import { apiFetch } from "@/lib/api";
+import ProductPostureCard, {
+  normalizeProductPosture,
+  type ProductPosture,
+} from "@/components/customers/ProductPostureCard";
 import {
   assignAdminSupportTicket,
   closeAdminSupportTicket,
@@ -67,6 +72,37 @@ export default function AdminServiceDeskTicketDetailPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // The customer's position across Advance EMI, rent/lease and direct sales —
+  // the same breakdown as the customer pages — so service decisions are made
+  // with the customer's full dues in view.
+  const postureCustomerId = Number(ticket?.customer) || null;
+  const [customerPosture, setCustomerPosture] = useState<ProductPosture | null>(null);
+  const [customerPostureState, setCustomerPostureState] = useState<"idle" | "loading" | "error">("idle");
+
+  useEffect(() => {
+    if (!postureCustomerId) {
+      setCustomerPosture(null);
+      setCustomerPostureState("idle");
+      return;
+    }
+    let cancelled = false;
+    setCustomerPostureState("loading");
+    apiFetch<unknown>(`/admin/customers/${postureCustomerId}/product-posture/`, { cache: "no-store" })
+      .then((data) => {
+        if (cancelled) return;
+        setCustomerPosture(normalizeProductPosture(data));
+        setCustomerPostureState("idle");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setCustomerPosture(null);
+        setCustomerPostureState("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [postureCustomerId]);
 
   async function run(fn: () => Promise<SupportTicketDetail>) {
     setBusy(true);
@@ -129,6 +165,17 @@ export default function AdminServiceDeskTicketDetailPage() {
       <DetailPageShell
         sections={
           <div className="space-y-6">
+            {postureCustomerId ? (
+              <ERPSectionShell title="Customer Position by Product">
+                {customerPostureState === "loading" ? (
+                  <p className="text-sm text-muted-foreground">Loading customer position…</p>
+                ) : customerPostureState === "error" ? (
+                  <p className="text-sm text-muted-foreground">Customer position is unavailable right now.</p>
+                ) : customerPosture ? (
+                  <ProductPostureCard posture={customerPosture} />
+                ) : null}
+              </ERPSectionShell>
+            ) : null}
             <ERPSectionShell title="Description">
               <p className="whitespace-pre-wrap text-sm">{ticket.description}</p>
             </ERPSectionShell>

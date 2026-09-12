@@ -8,6 +8,7 @@ import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import RentalAssetsAwaitingRelease from "@/components/customer-intelligence/RentalAssetsAwaitingRelease";
 import { ROUTES } from "@/lib/routes";
 import { generateCurrentAccountingPeriod } from "@/services/accounting-period-actions";
 import { seedSupportedAccountingMappings } from "@/services/accounting-mapping-remediation";
@@ -28,6 +29,7 @@ const workflowCards: CockpitCard[] = [
   { title: "Monthly Demands", purpose: "Review rent and lease demand rows through the existing EMI/demand register filters.", href: `${ROUTES.admin.emis}?plan_type=RENT`, icon: ReceiptText, status: "Read-only" },
   { title: "Full Mapping Audit", purpose: "Resolve rent/lease accounting blockers through the central mapping cockpit. No auto-posting.", href: MAPPING_AUDIT_HREF, icon: ShieldCheck, status: "Setup required" },
   { title: "Account Mapping / Deposit Mapping", purpose: "Configure rent/lease mapping for explicit posting bridge readiness. No auto-posting.", href: `${ROUTES.admin.financeDeposits}#accounting-mapping`, icon: ShieldCheck, status: "Setup required" },
+  { title: "Rental Assets", purpose: "Every physical unit you hire out: who has it, what is back, what is under repair. Release returned units to available.", href: ROUTES.admin.rentLeaseAssets, icon: PackageCheck, status: "Active" },
   { title: "Possession / Handover", purpose: "Open delivery handoff queues filtered to rent and lease source records.", href: `${ROUTES.admin.deliveries}?plan_type=RENT_LEASE`, icon: Truck, status: "Active" },
   { title: "Return Inspections", purpose: "Review rent/lease returns and inspection queues without creating fake refund actions.", href: `${ROUTES.admin.serviceDeskReturns}?plan_type=RENT_LEASE`, icon: RotateCcw, status: "Read-only" },
   { title: "Delivery Documents", purpose: "Review delivery and handover documents generated from real delivery cases.", href: ROUTES.admin.deliveries, icon: PackageCheck, status: "Read-only" },
@@ -92,6 +94,10 @@ export default function AdminRentLeaseCockpitPage() {
           <div className="mt-3 flex flex-wrap gap-2">{needsPeriod ? <button type="button" onClick={() => void handleGeneratePeriod()} disabled={Boolean(actionBusy)} className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-950">{actionBusy === "period" ? "Generating..." : "Generate Current Period"}</button> : null}<button type="button" onClick={() => void handleSeedMappings()} disabled={Boolean(actionBusy)} className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-950">{actionBusy === "seed" ? "Seeding..." : "Seed Rent/Lease Mappings"}</button><Link href={MAPPING_AUDIT_HREF} className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground">Open Mapping Audit</Link><Link href={ROUTES.admin.accountingPeriods} className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground">Open Accounting Periods</Link></div>
           <div className="mt-3 grid gap-3 sm:grid-cols-3"><div className="rounded-xl border bg-background/70 px-3 py-2">Monthly collected sources: {valueOf(summary.monthly_collected_sources)}</div><div className="rounded-xl border bg-background/70 px-3 py-2">Deposit collected sources: {valueOf(summary.deposit_collected_sources)}</div><div className="rounded-xl border bg-background/70 px-3 py-2">Posted bridge entries: {valueOf(summary.posting_bridge?.posted ?? 0)}</div></div>
         </div> : null}
+        {/* Rental units back from hire — hidden when none are waiting */}
+        <div className="rounded-xl border border-border bg-card p-4 empty:hidden">
+          <RentalAssetsAwaitingRelease />
+        </div>
         <ERPSectionShell title="Rent / lease workflows" description="Detailed child routes live here instead of the admin sidebar. Every card links to an existing route."><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">{workflowCards.map((card) => {
           const isMappingCard = card.title === "Full Mapping Audit" || card.title === "Account Mapping / Deposit Mapping";
           const resolved: CockpitCard = isMappingCard

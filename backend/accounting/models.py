@@ -3488,6 +3488,35 @@ class MoneyMovement(AccountingTimeStampedModel):
         return self.movement_no
 
 
+class VendorAdvanceAllocation(AccountingTimeStampedModel):
+    """Part of a vendor advance used against a posted purchase bill.
+
+    The advance already debited Accounts Payable when it was paid, so applying
+    it moves no money and posts no journal — it only marks which bill the
+    advance was used for, reducing that bill's outstanding.
+    """
+
+    vendor = models.ForeignKey(Vendor, on_delete=models.PROTECT, related_name="advance_allocations")
+    advance = models.ForeignKey(
+        "accounting.VendorSettlement",
+        on_delete=models.PROTECT,
+        related_name="advance_allocations",
+    )
+    purchase_bill = models.ForeignKey(
+        "inventory.PurchaseBill",
+        on_delete=models.PROTECT,
+        related_name="vendor_advance_allocations",
+    )
+    amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(MONEY_ZERO)])
+    allocation_date = models.DateField(db_index=True)
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "accounting_vendor_advance_allocations"
+        ordering = ["-allocation_date", "-id"]
+        indexes = [models.Index(fields=["vendor", "allocation_date"])]
+
+
 class VendorSettlement(AccountingTimeStampedModel):
     settlement_no = models.CharField(
         max_length=40,
@@ -3527,6 +3556,9 @@ class VendorSettlement(AccountingTimeStampedModel):
         blank=True,
         related_name="vendor_settlements",
     )
+    # Paid ahead of any bill (future purchases). Not capped by outstanding;
+    # leaves the vendor with a debit (advance) balance until applied to bills.
+    is_advance = models.BooleanField(default=False, db_index=True)
     status = models.CharField(
         max_length=12,
         choices=VendorSettlementStatus.choices,

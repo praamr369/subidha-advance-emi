@@ -537,9 +537,9 @@ class PurchaseBillSerializer(serializers.ModelSerializer):
         return f"{Decimal(str(total)).quantize(Decimal('0.01')):.2f}"
 
     def get_outstanding_amount(self, obj):
-        settled = Decimal(self.get_posted_settled_amount(obj))
-        outstanding = Decimal(str(obj.grand_total or "0.00")) - settled
-        return f"{max(outstanding, Decimal('0.00')).quantize(Decimal('0.01')):.2f}"
+        from accounting.services.vendor_settlement_service import purchase_bill_outstanding
+
+        return f"{purchase_bill_outstanding(obj):.2f}"
 
     def validate(self, attrs):
         attrs = super().validate(attrs)

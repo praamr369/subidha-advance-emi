@@ -314,6 +314,9 @@ export type BrochureQuotation = BrochureQuotationTotals & {
   quotation_no: string;
   enquiry_id: number | null;
   brochure_id: number | null;
+  // Existing customer this quotation is for, resolved server-side from the
+  // linked CRM lead (once converted) or CRM party; null for a new prospect.
+  customer_id?: number | null;
   customer_name: string;
   phone: string;
   email: string;

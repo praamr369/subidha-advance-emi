@@ -48,6 +48,18 @@ def _deposit_event_keys() -> list[str]:
     return sorted(EVENT_KEYS)
 
 
+def deposit_auto_posting_status() -> dict:
+    """Whether deposit receipts / refunds journal automatically: every rent,
+    lease and generic event key in the group must be approved."""
+    from accounting.services.accounting_bridge_security_deposit_service import (
+        RECEIPT_EVENT_KEYS,
+        REFUND_EVENT_KEYS,
+    )
+
+    approved = set(BridgePostingApproval.objects.filter(is_approved=True).values_list("event_key", flat=True))
+    return {"receipts": RECEIPT_EVENT_KEYS <= approved, "refunds": REFUND_EVENT_KEYS <= approved}
+
+
 @transaction.atomic
 def approve_deposit_posting_events(*, actor=None, reason: str = "Solopreneur: security deposits post to ledger automatically.") -> dict:
     """Approve every security-deposit receipt/refund event for auto-posting."""

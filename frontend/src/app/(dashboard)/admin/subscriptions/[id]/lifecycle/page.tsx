@@ -10,6 +10,7 @@ import ActionButton from "@/components/ui/ActionButton";
 import DownloadPdfButton from "@/components/documents/DownloadPdfButton";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
+import ReturnedAssetReleaseButton from "@/components/customer-intelligence/ReturnedAssetReleaseButton";
 import { DetailPanel, FormSection } from "@/components/ui/operations";
 import { getSubscription, type SubscriptionRecord } from "@/services/subscriptions";
 import {
@@ -331,7 +332,7 @@ export default function ContractLifecyclePage() {
       setShowReturnForm(false);
       setReturnNotes("");
       setReturnDate("");
-    }, "Return initiated. Product is now UNDER_INSPECTION.");
+    }, "Return initiated. Contract is RETURN_PENDING and the pickup is queued on the delivery desk.");
   }
 
   // inspection actions
@@ -361,7 +362,7 @@ export default function ContractLifecyclePage() {
     void runAction(async () => {
       const insp = await approveReturnInspection(subscriptionId);
       setInspection(insp);
-    }, "Inspection approved. Stock routed. Deposit refund approved.");
+    }, "Inspection approved. Unit back in stock and routed by outcome; contract RETURNED; deposit refund approved.");
   }
 
   if (loading) return <ERPLoadingState label="Loading contract lifecycle..." />;
@@ -874,6 +875,17 @@ export default function ContractLifecyclePage() {
                     <ActionButton variant="primary" loading={actionBusy} onClick={handleApproveInspection}>
                       Approve Inspection &amp; Route Stock
                     </ActionButton>
+                  </div>
+                )}
+
+                {/* After approval the unit is back and routed; releasing it is the next step. */}
+                {inspection.status === "APPROVED" && (
+                  <div className="space-y-2 border-t border-border pt-3">
+                    <p className="text-sm text-muted-foreground">
+                      Release the returned unit once it is repaired or checked. A maintenance hold from this
+                      inspection is lifted at the same time.
+                    </p>
+                    <ReturnedAssetReleaseButton subscriptionId={subscriptionId} />
                   </div>
                 )}
               </div>

@@ -38,6 +38,7 @@ from api.v1.views.vendor_ops import AdminFinanceOpeningBalanceView
 from api.v1.views.vendor_ops import AdminVendorAccountLinkView
 from api.v1.views.vendor_ops import AdminVendorCategoryListCreateView
 from api.v1.views.vendor_ops import AdminVendorLedgerView
+from api.v1.views.vendor_ops import AdminVendorPayablesView
 from api.v1.views.vendor_ops import AdminCustomerOutstandingSyncView
 from api.v1.views.vendor_ops import AdminVendorOpeningBalanceListView
 from api.v1.views.vendor_ops import AdminVendorOpeningBalanceView
@@ -52,6 +53,10 @@ from api.v1.views.vendor_ops import AdminVendorQuoteRequestDetailView
 from api.v1.views.vendor_ops import AdminVendorQuoteRequestListCreateView
 from api.v1.views.vendor_ops import AdminVendorSourcingRequestQuotesView
 from api.v1.views.vendor_ops import AdminVendorSourcingSuggestView
+from api.v1.views.vendor_payment_desk import AdminVendorAdvancePaymentView
+from api.v1.views.vendor_payment_desk import AdminVendorApplyAdvanceView
+from api.v1.views.vendor_payment_desk import AdminVendorPayBillsView
+from api.v1.views.vendor_payment_desk import AdminVendorPaymentDeskView
 
 urlpatterns = [
     path("finance/reversal-control/", AdminReversalControlDashboardView.as_view()),
@@ -88,7 +93,12 @@ urlpatterns = [
     path("purchases/<int:pk>/returns/", AdminPurchaseReturnCreateView.as_view()),
     path("purchases/returns/<int:pk>/post/", AdminPurchaseReturnPostView.as_view()),
     path("vendors/<int:pk>/ledger/", AdminVendorLedgerView.as_view()),
+    path("vendors/<int:pk>/payables/", AdminVendorPayablesView.as_view()),
     path("vendors/<int:pk>/outstanding/", AdminVendorOutstandingView.as_view()),
+    path("vendors/<int:pk>/payment-desk/", AdminVendorPaymentDeskView.as_view()),
+    path("vendors/<int:pk>/payment-desk/pay-bills/", AdminVendorPayBillsView.as_view()),
+    path("vendors/<int:pk>/payment-desk/advance/", AdminVendorAdvancePaymentView.as_view()),
+    path("vendors/<int:pk>/payment-desk/apply-advance/", AdminVendorApplyAdvanceView.as_view()),
     path("opening-balances/customers/", AdminCustomerOpeningOutstandingView.as_view()),
     path("opening-balances/customers/<int:pk>/", AdminCustomerOpeningOutstandingDetailView.as_view()),
     path("opening-balances/customers/sync/", AdminCustomerOutstandingSyncView.as_view()),

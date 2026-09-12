@@ -19,10 +19,23 @@ from api.v1.services.warranty_service import (
 )
 
 
+def _warranty_claim_customer_id(claim: WarrantyClaim):
+    """The claim's customer: via its contract when it has one, else via the
+    service-desk case every claim hangs off."""
+    if claim.subscription_id:
+        customer_id = getattr(claim.subscription, "customer_id", None)
+        if customer_id:
+            return customer_id
+    from api.v1.serializers.service_desk import resolve_service_case_customer_id
+
+    return resolve_service_case_customer_id(getattr(claim, "service_case", None))
+
+
 def _warranty_claim_row(claim: WarrantyClaim) -> dict:
     """Format warranty claim for API response"""
     return {
         "id": claim.id,
+        "customer_id": _warranty_claim_customer_id(claim),
         "service_case_id": claim.service_case_id,
         "product_id": claim.product_id,
         "product_name": claim.product.name,
@@ -45,7 +58,8 @@ def _warranty_claim_row(claim: WarrantyClaim) -> dict:
 @permission_classes([IsAuthenticated, IsAdmin])
 def warranty_claims_list_view(request):
     """List warranty claims with filters"""
-    qs = WarrantyClaim.objects.select_related("product", "subscription").all()
+    # service_case is joined so the customer fallback is not a query per row.
+    qs = WarrantyClaim.objects.select_related("product", "subscription", "service_case").all()
 
     # Filters
     status_filter = request.query_params.get("status")

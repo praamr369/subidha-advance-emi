@@ -109,6 +109,7 @@ export default function AdminVendorCategoriesPage() {
       <div className="space-y-4">
         {notice ? <AccountingNotice message={notice} /> : null}
         {error && drawerOpen ? <AccountingNotice tone="danger" message={error} /> : null}
+
         <ERPSectionShell
           title="Category register"
           description="Create reusable vendor categories; duplicate names and codes are rejected by the backend."

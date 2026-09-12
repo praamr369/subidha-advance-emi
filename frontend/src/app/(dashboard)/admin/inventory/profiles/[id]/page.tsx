@@ -13,6 +13,12 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { ROUTES } from "@/lib/routes";
+import { apiFetch } from "@/lib/api";
+import ProductPostureCard, {
+  normalizeProductPosture,
+  type ProductPosture,
+} from "@/components/customers/ProductPostureCard";
+import RentalAssetsAwaitingRelease from "@/components/customer-intelligence/RentalAssetsAwaitingRelease";
 import {
   getInventoryProfile,
   type InventoryProfileDetail,
@@ -50,6 +56,36 @@ export default function InventoryProfileDetailPage() {
       }
     })();
   }, [id]);
+
+  // This product across Advance EMI, rent/lease and direct sale — the product
+  // counterpart of the customer pages' per-product money breakdown.
+  const postureProductId = profile?.product ?? null;
+  const [productPosture, setProductPosture] = useState<ProductPosture | null>(null);
+  const [productPostureState, setProductPostureState] = useState<"idle" | "loading" | "error">("idle");
+
+  useEffect(() => {
+    if (!postureProductId) {
+      setProductPosture(null);
+      setProductPostureState("idle");
+      return;
+    }
+    let cancelled = false;
+    setProductPostureState("loading");
+    apiFetch<unknown>(`/admin/products/${postureProductId}/posture/`, { cache: "no-store" })
+      .then((data) => {
+        if (cancelled) return;
+        setProductPosture(normalizeProductPosture(data));
+        setProductPostureState("idle");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setProductPosture(null);
+        setProductPostureState("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [postureProductId]);
 
   return (
     <ERPPageShell
@@ -118,6 +154,25 @@ export default function InventoryProfileDetailPage() {
               ]}
             />
           </ERPSectionShell>
+
+          <ERPSectionShell
+            title="Product by Plan"
+            description="This product across Advance EMI, rent/lease and direct sale. Direct-sale paid/due are allocated pro-rata by this product's share of each sale."
+          >
+            {productPostureState === "loading" ? (
+              <p className="text-sm text-muted-foreground">Loading product position…</p>
+            ) : productPostureState === "error" ? (
+              <p className="text-sm text-muted-foreground">Product position is unavailable right now.</p>
+            ) : productPosture ? (
+              <ProductPostureCard posture={productPosture} title="Contracts & sales for this product" />
+            ) : null}
+          </ERPSectionShell>
+
+          {postureProductId ? (
+            <div className="rounded-xl border border-border bg-card p-4 empty:hidden">
+              <RentalAssetsAwaitingRelease productId={postureProductId} />
+            </div>
+          ) : null}
 
           <ERPSectionShell title="Manufacturing Cost (Estimate)" description="Read-only cost basis for manufacturing reporting.">
             <ERPDetailGrid

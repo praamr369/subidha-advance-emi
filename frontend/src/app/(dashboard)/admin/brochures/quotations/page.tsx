@@ -9,6 +9,7 @@ import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import Modal from "@/components/ui/modal";
+import CustomerPostureToggle from "@/components/customers/CustomerPostureToggle";
 import {
   acceptBrochureQuotation,
   cancelBrochureQuotation,
@@ -251,6 +252,8 @@ export default function BrochureQuotationsPage() {
             <label className="space-y-1 text-sm"><span>Delivery charge</span><input disabled={selected.status !== "DRAFT"} type="number" min="0" step="0.01" value={selected.delivery_charge} onChange={(event) => setSelected({ ...selected, delivery_charge: event.target.value })} className="h-10 w-full rounded-xl border border-border px-3" /></label>
             <label className="space-y-1 text-sm"><span>Quotation discount</span><input disabled={selected.status !== "DRAFT"} type="number" min="0" step="0.01" value={selected.discount_amount} onChange={(event) => setSelected({ ...selected, discount_amount: event.target.value })} className="h-10 w-full rounded-xl border border-border px-3" /></label>
           </div>
+          {/* Existing customer only — a new prospect has no dues to show. */}
+          <CustomerPostureToggle customerId={selected.customer_id} />
           {lines.map((line, index) => <LineEditor key={index} line={line} disabled={selected.status !== "DRAFT"} onChange={(changes) => updateLine(index, changes)} onRemove={selected.status === "DRAFT" && lines.length > 1 ? () => setLines(lines.filter((_, current) => current !== index)) : undefined} />)}
           {selected.status === "DRAFT" ? <button type="button" onClick={() => setLines([...lines, writableLine()])} className="rounded-xl border border-border px-4 py-2 text-sm font-semibold">Add line</button> : null}
           <div className="grid gap-3 rounded-xl border border-border p-4 md:grid-cols-3">

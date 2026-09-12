@@ -413,6 +413,7 @@ def _post_bridge_journal(
     performed_by=None,
     source_reference: str,
     memo: str,
+    entry_date=None,
 ) -> SyncResult:
     amount_q = _money(amount)
     bridge_state = get_rent_lease_posting_bridge_state(readiness={"status": "READY", "mapping_ready": True})
@@ -457,7 +458,7 @@ def _post_bridge_journal(
         )
 
     journal = create_journal_entry(
-        entry_date=timezone.localdate(),
+        entry_date=entry_date or timezone.localdate(),
         entry_type=JournalEntryType.SYSTEM_BRIDGE,
         memo=memo,
         source_model="Subscription",
@@ -507,12 +508,20 @@ def _log_sync_result(*, subscription: Subscription, amount, performed_by, result
     return asdict(result)
 
 
-def sync_rent_lease_monthly_income(*, subscription: Subscription, amount, performed_by=None) -> dict:
+def sync_rent_lease_monthly_income(*, subscription: Subscription, amount, performed_by=None, collection=None) -> dict:
     mapping = ensure_premade_rent_lease_accounting_setup(performed_by=performed_by)
     settlement_chart = mapping.settlement_finance_account.chart_account
     income_account = _chart("LEASE_INCOME") if subscription.plan_type == PlanType.LEASE else mapping.monthly_income_account
     amount_q = _money(amount)
-    source_reference = f"RENT_LEASE:MONTHLY_PAYMENT:SUB:{subscription.id}:{timezone.localdate().isoformat()}:{amount_q}"
+    # Key each journal to its own collection. The old (sub, today, amount) key
+    # made every same-amount collection on one day look like a duplicate, so
+    # collecting several months in advance posted only the first month.
+    if collection is not None:
+        source_reference = f"RENT_LEASE:MONTHLY_PAYMENT:COLLECTION:{collection.id}"
+        entry_date = collection.payment_date
+    else:
+        source_reference = f"RENT_LEASE:MONTHLY_PAYMENT:SUB:{subscription.id}:{timezone.localdate().isoformat()}:{amount_q}"
+        entry_date = None
     result = _post_bridge_journal(
         subscription=subscription,
         event="RENT_LEASE_MONTHLY_PAYMENT",
@@ -522,6 +531,7 @@ def sync_rent_lease_monthly_income(*, subscription: Subscription, amount, perfor
         performed_by=performed_by,
         source_reference=source_reference,
         memo=f"Rent/lease monthly collection for {subscription.subscription_number or subscription.id}",
+        entry_date=entry_date,
     )
     return _log_sync_result(subscription=subscription, amount=amount_q, performed_by=performed_by, result=result, mapping=mapping)
 

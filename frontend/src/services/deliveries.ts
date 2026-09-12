@@ -23,6 +23,7 @@ export type DeliveryRecord = {
   subscription?: number | null;
   subscription_id?: number | null;
   subscription_number?: string | null;
+  plan_type?: "EMI" | "RENT" | "LEASE" | null;
   customer_id?: number | null;
   customer_name?: string | null;
   customer_phone?: string | null;
@@ -303,6 +304,10 @@ export function normalizeDeliveryRecord(payload: unknown): DeliveryRecord {
     subscription_id:
       toNullableNumber(row.subscription_id) ?? toNullableNumber(row.subscription),
     subscription_number: toStringOrNull(row.subscription_number),
+    plan_type:
+      row.plan_type === "EMI" || row.plan_type === "RENT" || row.plan_type === "LEASE"
+        ? row.plan_type
+        : null,
     customer_id: toNullableNumber(row.customer_id),
     customer_name: toStringOrNull(row.customer_name),
     customer_phone: toStringOrNull(row.customer_phone),

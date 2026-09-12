@@ -26,6 +26,10 @@ import {
   DownloadPdfButton,
 } from "@/components/documents";
 import PaymentReceiptDocument from "@/components/receipts/PaymentReceiptDocument";
+import ProductPostureCard, {
+  normalizeProductPosture,
+  type ProductPosture,
+} from "@/components/customers/ProductPostureCard";
 import {
   DetailPanel,
   FormSection,
@@ -423,6 +427,36 @@ export default function AdminPaymentDetailRoutePage() {
   const isReversed = Boolean(timelineData?.flags?.is_reversed);
   const reversalMetadata = timelineData?.reversal ?? {};
   const reversalLines = metadataLines(reversalMetadata);
+
+  // The payer's position across Advance EMI, rent/lease and direct sales — the
+  // same breakdown as the customer pages.
+  const postureCustomerId = resolvedPayment?.customer ?? null;
+  const [customerPosture, setCustomerPosture] = useState<ProductPosture | null>(null);
+  const [customerPostureState, setCustomerPostureState] = useState<"idle" | "loading" | "error">("idle");
+
+  useEffect(() => {
+    if (!postureCustomerId) {
+      setCustomerPosture(null);
+      setCustomerPostureState("idle");
+      return;
+    }
+    let cancelled = false;
+    setCustomerPostureState("loading");
+    apiFetch<unknown>(`/admin/customers/${postureCustomerId}/product-posture/`, { cache: "no-store" })
+      .then((data) => {
+        if (cancelled) return;
+        setCustomerPosture(normalizeProductPosture(data));
+        setCustomerPostureState("idle");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setCustomerPosture(null);
+        setCustomerPostureState("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [postureCustomerId]);
   const statusLabel = isReversed ? "REVERSED" : "ACTIVE";
   const statusToneClassName = isReversed
     ? "border-red-200 bg-red-50 text-red-700"
@@ -938,6 +972,21 @@ export default function AdminPaymentDetailRoutePage() {
                 </div>
               </DetailPanel>
             </section>
+
+            {resolvedPayment.customer ? (
+              <DetailPanel
+                title="Customer Position by Product"
+                description="This customer's Advance EMI, rent/lease and direct-sale position — the same breakdown as the customer pages."
+              >
+                {customerPostureState === "loading" ? (
+                  <p className="text-sm text-muted-foreground">Loading customer position…</p>
+                ) : customerPostureState === "error" ? (
+                  <p className="text-sm text-muted-foreground">Customer position is unavailable right now.</p>
+                ) : customerPosture ? (
+                  <ProductPostureCard posture={customerPosture} />
+                ) : null}
+              </DetailPanel>
+            ) : null}
 
             <FormSection
               className="receipt-print-hide"

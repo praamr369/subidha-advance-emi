@@ -53,6 +53,7 @@ import {
   normalizeDashboardSummary,
 } from "@/services/dashboards";
 import type { DashboardWindowPreset } from "@/services/dashboard-types";
+import ProductPostureCard, { normalizeProductPosture } from "@/components/customers/ProductPostureCard";
 
 type LegacyDashboardResponse = Awaited<ReturnType<typeof getCustomerDashboard>>;
 type LegacyDashboardData = NonNullable<LegacyDashboardResponse>;
@@ -133,6 +134,11 @@ export default function CustomerDashboardPage() {
     queryKey: ["customer", "dashboard", "core"],
     queryFn: getCustomerDashboard,
   });
+  // EMI + rent/lease + direct sale in one shape — same helper as the admin page.
+  const productPosture = useMemo(
+    () => normalizeProductPosture(coreQuery.data?.product_posture),
+    [coreQuery.data?.product_posture]
+  );
   const canonicalQuery = useQuery({
     queryKey: ["customer", "dashboard", "summary", dashboardQuery],
     queryFn: () => getDashboardSummaryV2(dashboardQuery),
@@ -686,6 +692,12 @@ export default function CustomerDashboardPage() {
               <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-700">
                 {settlementPosture?.description}
               </p>
+
+              {productPosture ? (
+                <div className="mt-5 rounded-[1.3rem] border border-white/80 bg-white/80 p-4">
+                  <ProductPostureCard posture={productPosture} title="Your contracts & payments" />
+                </div>
+              ) : null}
 
               <div className="mt-5 grid gap-3 sm:grid-cols-3">
                 <div className="rounded-[1.3rem] border border-white/80 bg-white/80 p-4">

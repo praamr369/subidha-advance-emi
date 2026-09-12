@@ -734,6 +734,9 @@ class BrochureQuotationAdminSerializer(serializers.ModelSerializer):
     enquiry_summary = serializers.SerializerMethodField()
     brochure_summary = serializers.SerializerMethodField()
     crm_summary = serializers.SerializerMethodField()
+    # Existing customer the quotation is for (null for a new prospect), so the
+    # admin panel can show that customer's per-product money position.
+    customer_id = serializers.SerializerMethodField()
     totals = serializers.SerializerMethodField()
 
     class Meta:
@@ -772,6 +775,7 @@ class BrochureQuotationAdminSerializer(serializers.ModelSerializer):
             "enquiry_summary",
             "brochure_summary",
             "crm_summary",
+            "customer_id",
             "pdf_url",
             "public_url",
             "whatsapp_message",
@@ -813,6 +817,32 @@ class BrochureQuotationAdminSerializer(serializers.ModelSerializer):
             "party_id": obj.crm_party_id,
             "lead_id": obj.crm_lead_id,
         }
+
+    def get_customer_id(self, obj):
+        """Resolve only through explicit links — a converted CRM lead, or a CRM
+        party that is also a customer. No phone matching: a guessed match would
+        show one person's dues on another person's quotation."""
+        if obj.crm_lead_id:
+            from crm.models import Lead
+
+            customer_id = (
+                Lead.objects.filter(pk=obj.crm_lead_id)
+                .values_list("converted_customer_id", flat=True)
+                .first()
+            )
+            if customer_id:
+                return customer_id
+        if obj.crm_party_id:
+            from crm.models import PartyLink, PartyLinkRole
+
+            customer_id = (
+                PartyLink.objects.filter(party_id=obj.crm_party_id, role_type=PartyLinkRole.CUSTOMER)
+                .values_list("source_pk", flat=True)
+                .first()
+            )
+            if customer_id:
+                return customer_id
+        return None
 
     def get_totals(self, obj):
         return {

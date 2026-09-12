@@ -13,6 +13,7 @@ import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import ProcurementConfirmDialog from "@/components/procurement/ProcurementConfirmDialog";
 import { buildAdminPurchaseBillPrintRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
+import VendorPayablesToggle from "@/components/vendors/VendorPayablesToggle";
 import {
   createVendorBill,
   listGoodsReceipts,
@@ -248,6 +249,10 @@ function BillDetailDrawer({ bill, onPosted, onClose }: DetailDrawerProps) {
             {bill.posted_journal_entry_no ? <div className="col-span-2"><p className="text-[10px] text-muted-foreground">Journal Entry</p><p>{bill.posted_journal_entry_no}</p></div> : null}
             {bill.notes ? <div className="col-span-2"><p className="text-[10px] text-muted-foreground">Notes</p><p className="whitespace-pre-wrap">{bill.notes}</p></div> : null}
           </div>
+
+          {/* The vendor's overall position — billed, paid, what we owe — so a
+              bill is posted/paid with the vendor's full balance in view. */}
+          <VendorPayablesToggle vendorId={bill.vendor} />
 
           <div>
             <p className="mb-2 text-xs font-semibold text-foreground">Bill Lines</p>

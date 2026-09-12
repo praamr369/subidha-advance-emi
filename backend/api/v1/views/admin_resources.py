@@ -13,7 +13,7 @@ from django.core.exceptions import ValidationError
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.http import FileResponse, Http404
 from django.db import models, transaction
-from django.db.models import Count, Prefetch, Q, Sum, Value, DecimalField, IntegerField, OuterRef, Subquery
+from django.db.models import Count, F, Prefetch, Q, Sum, Value, DecimalField, IntegerField, OuterRef, Subquery
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -105,7 +105,11 @@ from payments.services.payment_service import (
     reverse_payment_for_admin,
 )
 from subscriptions.services.audit_service import log_audit, log_customer_kyc_decision
-from customers.services.customer_account_service import build_customer_operational_profile
+from customers.services.customer_account_service import (
+    build_catalog_product_posture,
+    build_customer_operational_profile,
+    build_customer_product_posture,
+)
 from lucky_plan.services.batch_draw_coordination_service import (
     build_control_center,
     commit_batch_draw,
@@ -623,6 +627,10 @@ class BatchAdminViewSet(AdminOnlyModelViewSet):
 # CUSTOMER
 # =====================================================
 
+from core.services.operational_visibility import (  # noqa: E402
+    LIVE_RENT_LEASE_SUBSCRIPTION_STATUSES as LIVE_RENT_LEASE_STATUSES,
+)
+
 # backend/api/v1/views/admin_resources.py
 
 # already imported, but ensure it's there
@@ -644,10 +652,15 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
         zero_count = Value(0, output_field=IntegerField())
 
         subscription_base = Subscription.objects.filter(customer_id=OuterRef("pk"))
-        active_subscription_base = subscription_base.filter(subscription_batch_active_q())
-        historical_subscription_base = subscription_base.exclude(
-            subscription_batch_active_q()
+        # A rent/lease contract stays live while the customer holds the asset
+        # (HANDED_OVER / RETURN_PENDING), which the EMI batch-active statuses
+        # don't cover — without this every rented customer read as "historical".
+        live_contract_q = subscription_batch_active_q() | Q(
+            plan_type__in=[PlanType.RENT, PlanType.LEASE],
+            status__in=list(LIVE_RENT_LEASE_STATUSES),
         )
+        active_subscription_base = subscription_base.filter(live_contract_q)
+        historical_subscription_base = subscription_base.exclude(live_contract_q)
         cancelled_subscription_base = subscription_base.filter(
             status=SubscriptionStatus.CANCELLED
         )
@@ -742,6 +755,215 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
                     .values("total")[:1]
                 ),
                 zero_money,
+            ),
+        )
+
+        # Universal contract posture: per-plan counts and rent/lease money, so
+        # the customer row reflects every product line, not just Advance EMI.
+        from billing.models import DirectSale as _DirectSale
+        from payments.models import RentLeaseBillingDemand, RentLeaseCollection
+
+        today = timezone.localdate()
+
+        def _plan_count(plan_type):
+            return Coalesce(
+                Subquery(
+                    active_subscription_base.filter(plan_type=plan_type)
+                    .values("customer_id")
+                    .annotate(total=Count("id"))
+                    .values("total")[:1]
+                ),
+                zero_count,
+            )
+
+        rent_lease_open_demands = (
+            RentLeaseBillingDemand.objects.filter(subscription__customer_id=OuterRef("pk"))
+            .filter(
+                subscription__plan_type__in=[PlanType.RENT, PlanType.LEASE],
+                subscription__status__in=list(LIVE_RENT_LEASE_STATUSES),
+            )
+            .exclude(demand_type="SECURITY_DEPOSIT")
+            .exclude(status__in=["CANCELLED", "WAIVED", "PAID"])
+        )
+        outstanding_expr = Sum(
+            F("amount") - F("collected_amount"),
+            output_field=DecimalField(max_digits=12, decimal_places=2),
+        )
+
+        queryset = queryset.annotate(
+            active_emi_count=_plan_count(PlanType.EMI),
+            active_rent_count=_plan_count(PlanType.RENT),
+            active_lease_count=_plan_count(PlanType.LEASE),
+            active_direct_sale_count=Coalesce(
+                Subquery(
+                    _DirectSale.objects.filter(customer_id=OuterRef("pk"))
+                    .filter(direct_sale_active_q())
+                    .values("customer_id")
+                    .annotate(total=Count("id"))
+                    .values("total")[:1]
+                ),
+                zero_count,
+            ),
+            rent_lease_due=Coalesce(
+                Subquery(
+                    rent_lease_open_demands.values("subscription__customer_id")
+                    .annotate(total=outstanding_expr)
+                    .values("total")[:1]
+                ),
+                zero_money,
+            ),
+            rent_lease_overdue=Coalesce(
+                Subquery(
+                    rent_lease_open_demands.filter(due_date__lt=today)
+                    .values("subscription__customer_id")
+                    .annotate(total=outstanding_expr)
+                    .values("total")[:1]
+                ),
+                zero_money,
+            ),
+            emi_overdue=Coalesce(
+                Subquery(
+                    active_due_base.filter(due_date__lt=today)
+                    .values("subscription__customer_id")
+                    .annotate(total=Sum("amount"))
+                    .values("total")[:1]
+                ),
+                zero_money,
+            ),
+            deposit_held=Coalesce(
+                Subquery(
+                    RentLeaseBillingDemand.objects.filter(
+                        subscription__customer_id=OuterRef("pk"),
+                        demand_type="SECURITY_DEPOSIT",
+                        subscription__status__in=list(LIVE_RENT_LEASE_STATUSES),
+                    )
+                    .values("subscription__customer_id")
+                    .annotate(total=Sum("held_amount"))
+                    .values("total")[:1]
+                ),
+                zero_money,
+            ),
+            last_emi_payment_date=Subquery(
+                Payment.objects.filter(customer_id=OuterRef("pk"))
+                .exclude(allocation_metadata__reversal__is_reversed=True)
+                .order_by("-payment_date", "-id")
+                .values("payment_date")[:1]
+            ),
+            last_rent_lease_collection_date=Subquery(
+                RentLeaseCollection.objects.filter(customer_id=OuterRef("pk"), status="ACTIVE")
+                .order_by("-payment_date", "-id")
+                .values("payment_date")[:1]
+            ),
+        )
+
+        # Advance EMI posture: contract value, net paid (payments − reversals) and
+        # next pending EMI due date, mirroring the rent/lease and direct lines.
+        emi_ledger_base = FinancialLedger.objects.filter(
+            emi__subscription__customer_id=OuterRef("pk"),
+            emi__subscription__plan_type=PlanType.EMI,
+        ).filter(subscription_batch_active_q("emi__subscription__"))
+
+        def _emi_ledger_total(entry_type):
+            return Coalesce(
+                Subquery(
+                    emi_ledger_base.filter(entry_type=entry_type)
+                    .values("emi__subscription__customer_id")
+                    .annotate(total=Sum("amount"))
+                    .values("total")[:1]
+                ),
+                zero_money,
+            )
+
+        queryset = queryset.annotate(
+            emi_value=Coalesce(
+                Subquery(
+                    active_subscription_base.filter(plan_type=PlanType.EMI)
+                    .values("customer_id")
+                    .annotate(total=Sum("total_amount"))
+                    .values("total")[:1]
+                ),
+                zero_money,
+            ),
+            emi_paid=_emi_ledger_total(LedgerEntryType.EMI_PAYMENT)
+            - _emi_ledger_total(LedgerEntryType.PAYMENT_REVERSAL),
+            next_emi_due_date=Subquery(
+                active_due_base.order_by("due_date", "id").values("due_date")[:1]
+            ),
+        )
+
+        # Rent/lease posture: contract value, rent received and next due date, so
+        # a rent/lease customer row carries the same summary as a direct sale.
+        live_rent_lease_subs = subscription_base.filter(
+            plan_type__in=[PlanType.RENT, PlanType.LEASE],
+            status__in=list(LIVE_RENT_LEASE_STATUSES),
+        )
+        queryset = queryset.annotate(
+            rent_lease_value=Coalesce(
+                Subquery(
+                    live_rent_lease_subs.values("customer_id")
+                    .annotate(total=Sum("total_amount"))
+                    .values("total")[:1]
+                ),
+                zero_money,
+            ),
+            rent_lease_received=Coalesce(
+                Subquery(
+                    RentLeaseBillingDemand.objects.filter(subscription__customer_id=OuterRef("pk"))
+                    .filter(
+                        subscription__plan_type__in=[PlanType.RENT, PlanType.LEASE],
+                        subscription__status__in=list(LIVE_RENT_LEASE_STATUSES),
+                    )
+                    .exclude(demand_type="SECURITY_DEPOSIT")
+                    .exclude(status="CANCELLED")
+                    .values("subscription__customer_id")
+                    .annotate(total=Sum("collected_amount"))
+                    .values("total")[:1]
+                ),
+                zero_money,
+            ),
+            next_rent_lease_due_date=Subquery(
+                rent_lease_open_demands.order_by("due_date", "id").values("due_date")[:1]
+            ),
+        )
+
+        # Direct-sale posture: value, received, last sale and last receipt date,
+        # so a walk-in / direct-sale-only customer row carries the same detail
+        # as a contract customer. Direct sales carry no due date → no overdue.
+        from billing.models import ReceiptDocument as _ReceiptDocument
+        from core.services.operational_visibility import receipt_active_q
+
+        active_direct_sales = _DirectSale.objects.filter(customer_id=OuterRef("pk")).filter(
+            direct_sale_active_q()
+        )
+        queryset = queryset.annotate(
+            direct_sale_value=Coalesce(
+                Subquery(
+                    active_direct_sales.values("customer_id")
+                    .annotate(total=Sum("grand_total"))
+                    .values("total")[:1]
+                ),
+                zero_money,
+            ),
+            direct_sale_received=Coalesce(
+                Subquery(
+                    active_direct_sales.values("customer_id")
+                    .annotate(total=Sum("received_total"))
+                    .values("total")[:1]
+                ),
+                zero_money,
+            ),
+            last_direct_sale_date=Subquery(
+                _DirectSale.objects.filter(customer_id=OuterRef("pk"))
+                .order_by("-sale_date", "-id")
+                .values("sale_date")[:1]
+            ),
+            last_direct_sale_receipt_date=Subquery(
+                _ReceiptDocument.objects.filter(
+                    direct_sale__customer_id=OuterRef("pk"),
+                )
+                .filter(receipt_active_q())
+                .order_by("-receipt_date", "-id")
+                .values("receipt_date")[:1]
             ),
         )
 
@@ -953,6 +1175,15 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
             build_customer_operational_profile(customer),
             status=status.HTTP_200_OK,
         )
+
+    @action(detail=True, methods=["get"], url_path="product-posture")
+    def product_posture(self, request, pk=None):
+        """Lightweight per-product money summary (Advance EMI / rent-lease /
+        direct sale) for surfaces that only need this block — e.g. the direct
+        sale workspace's selected-customer panel — without the full, much
+        heavier operational profile."""
+        customer = self.get_object()
+        return Response(build_customer_product_posture(customer), status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["get"], url_path="kyc-documents")
     def kyc_documents(self, request, pk=None):
@@ -2834,6 +3065,14 @@ class ProductAdminViewSet(AdminOnlyModelViewSet):
     # Multipart required for image/video file uploads
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
+    @action(detail=True, methods=["get"], url_path="posture")
+    def posture(self, request, pk=None):
+        """This product across Advance EMI, rent/lease and direct sale — the
+        product counterpart of the customer per-product money breakdown.
+        Direct-sale paid/due are allocated pro-rata by line value."""
+        product = self.get_object()
+        return Response(build_catalog_product_posture(product.id), status=status.HTTP_200_OK)
+
     def get_queryset(self):
         queryset = super().get_queryset()
         q = self.request.query_params.get("q", "").strip()
@@ -3445,6 +3684,7 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
             "emis__ledger_entries",
             "payments",
             "documents",
+            "rent_lease_demands",
             get_subscription_delivery_prefetch(),
         )
         .all()
@@ -3503,6 +3743,28 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
 
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
+
+    @action(detail=False, methods=["get"], url_path="rent-lease-receipts")
+    def rent_lease_receipts(self, request):
+        """Cross-contract rent/lease receipt register.
+
+        Rent/lease collections and deposit receipts never become ReceiptDocument
+        rows, so the billing receipt register lists them from here. Optional
+        filters: ``subscription``, ``customer`` (ids). Capped at 200 rows.
+        """
+        from contracts.services.rent_lease_receipt_register_service import build_rent_lease_receipt_rows
+
+        def _int_param(name: str):
+            raw = (request.query_params.get(name) or "").strip()
+            return int(raw) if raw.isdigit() else None
+
+        subscription_id = _int_param("subscription")
+        rows = build_rent_lease_receipt_rows(
+            subscription_ids=[subscription_id] if subscription_id else None,
+            customer_id=_int_param("customer"),
+            limit=200,
+        )
+        return Response({"count": len(rows), "results": rows})
 
     @action(detail=True, methods=["post"], url_path="generate-rent-lease-ledger")
     def generate_rent_lease_ledger(self, request, pk=None):
@@ -3741,6 +4003,19 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
             total_waived_value=Sum("waived_amount"),
         )
         total_contract_value = aggregates["total_contract_value"] or MONEY_ZERO
+        # Ended contracts (closed, cancelled, returned, completed) are history:
+        # the headline contract value / monthly demand show only the live book.
+        ended_statuses = [
+            SubscriptionStatus.CLOSED,
+            SubscriptionStatus.CANCELLED,
+            SubscriptionStatus.RETURNED,
+            SubscriptionStatus.COMPLETED,
+        ]
+        live_queryset = queryset.exclude(status__in=ended_statuses)
+        live_aggregates = live_queryset.aggregate(
+            value=Sum("total_amount"), monthly=Sum("monthly_amount")
+        )
+        live_count = live_queryset.count()
         total_waived_value = aggregates["total_waived_value"] or MONEY_ZERO
 
         pending_emis = Emi.objects.filter(
@@ -3775,14 +4050,52 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
             or MONEY_ZERO
         )
 
-        total_outstanding = (
-            total_contract_value
+        from payments.models import RentLeaseBillingDemand
+        from subscriptions.services.subscription_financial_service import CLOSED_RENT_LEASE_STATUSES
+
+        # Rent/lease is owed per contract the same way the detail page reads it:
+        # open contracts owe contract value − rent collected; returned, closed or
+        # cancelled ones owe only billed rent still unpaid (unused months are
+        # cancelled). Counting closed contracts at full value showed a returned
+        # contract as ₹14,000 to collect.
+        rent_lease_plans = [PlanType.RENT, PlanType.LEASE]
+        emi_side = queryset.exclude(plan_type__in=rent_lease_plans).aggregate(
+            value=Sum("total_amount"), waived=Sum("waived_amount")
+        )
+        emi_outstanding = max(
+            (emi_side["value"] or MONEY_ZERO)
             - ledger_payments
             + ledger_reversals
-            - total_waived_value
+            - (emi_side["waived"] or MONEY_ZERO),
+            MONEY_ZERO,
         )
-        if total_outstanding < MONEY_ZERO:
-            total_outstanding = MONEY_ZERO
+        open_rent_lease = queryset.filter(plan_type__in=rent_lease_plans).exclude(
+            status__in=CLOSED_RENT_LEASE_STATUSES
+        )
+        open_side = open_rent_lease.aggregate(value=Sum("total_amount"), waived=Sum("waived_amount"))
+        open_collected = (
+            RentLeaseBillingDemand.objects.filter(subscription__in=open_rent_lease)
+            .exclude(demand_type="SECURITY_DEPOSIT")
+            .exclude(status="CANCELLED")
+            .aggregate(total=Sum("collected_amount"))["total"]
+            or MONEY_ZERO
+        )
+        open_outstanding = max(
+            (open_side["value"] or MONEY_ZERO) - open_collected - (open_side["waived"] or MONEY_ZERO),
+            MONEY_ZERO,
+        )
+        closed_unpaid = (
+            RentLeaseBillingDemand.objects.filter(
+                subscription__in=queryset.filter(
+                    plan_type__in=rent_lease_plans, status__in=CLOSED_RENT_LEASE_STATUSES
+                ),
+                status__in=["PENDING", "OVERDUE", "PARTIAL", "DRY_RUN"],
+            )
+            .exclude(demand_type="SECURITY_DEPOSIT")
+            .aggregate(total=Sum(F("amount") - F("collected_amount")))["total"]
+            or MONEY_ZERO
+        )
+        total_outstanding = emi_outstanding + open_outstanding + max(closed_unpaid, MONEY_ZERO)
 
         reconciliation_attention = build_reconciliation_attention_payload(queryset)
 
@@ -3804,6 +4117,13 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
                 ),
                 "total_waived_value": str(
                     total_waived_value
+                ),
+                "live_count": live_count,
+                "ended_count": total - live_count,
+                "live_contract_value": str(live_aggregates["value"] or MONEY_ZERO),
+                "live_monthly_value": str(live_aggregates["monthly"] or MONEY_ZERO),
+                "ended_contract_value": str(
+                    total_contract_value - (live_aggregates["value"] or MONEY_ZERO)
                 ),
                 "pending_emis": pending_emis_count,
                 "overdue_emis": overdue_emis_count,
@@ -4213,6 +4533,15 @@ class RentalAssetAdminViewSet(viewsets.ReadOnlyModelViewSet):
             request, pk, mark_asset_returned, needs_subscription=False
         )
 
+    @action(detail=True, methods=["post"], url_path="release")
+    def release(self, request, pk=None):
+        """Put a RETURNED / UNDER_REPAIR unit back in the rental pool."""
+        from deliveries.services.return_inspection_service import release_returned_asset
+
+        return self._lifecycle_action(
+            request, pk, release_returned_asset, needs_subscription=False
+        )
+
     def get_queryset(self):
         from subscriptions.models import RentalAsset
         qs = (
@@ -4236,6 +4565,18 @@ class RentalAssetAdminViewSet(viewsets.ReadOnlyModelViewSet):
         customer_id = self.request.query_params.get("customer")
         if customer_id:
             qs = qs.filter(current_customer_id=customer_id)
+        returned_from = str(self.request.query_params.get("returned_from_subscription") or "")
+        if returned_from:
+            from deliveries.services.return_inspection_service import (
+                returned_asset_id_for_subscription,
+            )
+
+            asset_id = (
+                returned_asset_id_for_subscription(int(returned_from))
+                if returned_from.isdigit()
+                else None
+            )
+            qs = qs.filter(pk=asset_id) if asset_id else qs.none()
         return qs
 
     def list(self, request, *args, **kwargs):
@@ -4294,7 +4635,15 @@ class RentalAssetAdminViewSet(viewsets.ReadOnlyModelViewSet):
             "product_name": asset.product.name if asset.product_id else None,
             "inventory_item_id": asset.inventory_item_id,
             "current_customer_id": asset.current_customer_id,
+            "current_customer_name": (
+                asset.current_customer.name if asset.current_customer_id else None
+            ),
             "current_subscription_id": asset.current_subscription_id,
+            "current_subscription_number": (
+                asset.current_subscription.subscription_number
+                if asset.current_subscription_id
+                else None
+            ),
             "current_location_id": asset.current_location_id,
             "current_location_code": (
                 asset.current_location.code if asset.current_location_id else None

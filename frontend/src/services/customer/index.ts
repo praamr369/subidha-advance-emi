@@ -87,6 +87,9 @@ export type CustomerSubscription = {
 };
 
 export type CustomerDashboardResponse = {
+  // Raw per-product posture (EMI / rent-lease / direct sale); normalized by
+  // normalizeProductPosture in components/customers/ProductPostureCard.
+  product_posture?: unknown;
   customer: {
     id: number;
     name: string;
@@ -688,6 +691,7 @@ function normalizeDashboardResponse(payload: unknown): CustomerDashboardResponse
   const rawSummary = ((root.summary ?? {}) as Record<string, unknown>) || {};
 
   return {
+    product_posture: root.product_posture,
     customer: {
       id: toNumber(rawCustomer.id),
       name: toStringOrUndefined(rawCustomer.name) ?? "",

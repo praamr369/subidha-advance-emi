@@ -252,6 +252,55 @@ class ContractCloseView(APIView):
         return Response(SubscriptionAdminDetailSerializer(refreshed, context={"request": request}).data)
 
 
+class ContractSettleView(APIView):
+    """GET/POST /api/v1/admin/contracts/<id>/settle/
+
+    Rent/lease only. GET previews the settlement; POST refunds the deposit,
+    cancels unused months (optionally waives earned unpaid rent) and closes or
+    cancels the contract in one transaction.
+    """
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get(self, request, pk):
+        sub = Subscription.objects.filter(pk=pk).first()
+        if sub is None:
+            return Response({"detail": "Contract not found."}, status=status.HTTP_404_NOT_FOUND)
+        from contracts.services.rent_lease_settlement_service import build_settlement_preview
+
+        return Response(build_settlement_preview(sub))
+
+    def post(self, request, pk):
+        if not Subscription.objects.filter(pk=pk).exists():
+            return Response({"detail": "Contract not found."}, status=status.HTTP_404_NOT_FOUND)
+        from django.core.exceptions import ValidationError
+        from contracts.services.rent_lease_settlement_service import settle_rent_lease_contract
+
+        data = request.data
+        finance_account_id = data.get("finance_account_id")
+        try:
+            result = settle_rent_lease_contract(
+                subscription_id=pk,
+                action=data.get("action") or "",
+                performed_by=request.user,
+                reason=data.get("reason") or "",
+                waive_unpaid_rent=str(data.get("waive_unpaid_rent", "")).lower() in {"true", "1", "yes"},
+                deduction_amount=data.get("deduction_amount") or None,
+                deduction_reason=data.get("deduction_reason") or "",
+                finance_account_id=int(finance_account_id) if str(finance_account_id or "").isdigit() else None,
+                payment_method=(data.get("payment_method") or "CASH").strip().upper(),
+                payment_date=data.get("payment_date") or None,
+                reference_no=(data.get("reference_no") or "").strip(),
+            )
+        except PermissionError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except ValidationError as exc:
+            return Response(
+                exc.message_dict if hasattr(exc, "message_dict") else {"detail": " ".join(exc.messages)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(result)
+
+
 # ─── Contract Amendments ──────────────────────────────────────────────────────
 
 class _AmendmentSerializer(serializers.ModelSerializer):

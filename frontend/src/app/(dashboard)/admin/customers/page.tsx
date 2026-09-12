@@ -72,6 +72,26 @@ type CustomerRow = {
   active_subscription_due?: string;
   active_direct_sale_outstanding?: string;
   active_invoice_outstanding?: string;
+  active_emi_count?: number;
+  active_rent_count?: number;
+  active_lease_count?: number;
+  active_direct_sale_count?: number;
+  rent_lease_due?: string;
+  rent_lease_overdue?: string;
+  emi_overdue?: string;
+  deposit_held?: string;
+  last_emi_payment_date?: string | null;
+  last_rent_lease_collection_date?: string | null;
+  emi_value?: string;
+  emi_paid?: string;
+  next_emi_due_date?: string | null;
+  rent_lease_value?: string;
+  rent_lease_received?: string;
+  next_rent_lease_due_date?: string | null;
+  direct_sale_value?: string;
+  direct_sale_received?: string;
+  last_direct_sale_date?: string | null;
+  last_direct_sale_receipt_date?: string | null;
 };
 
 type CustomerOperationalSummary = {
@@ -220,7 +240,38 @@ function normalizeCustomerRow(raw: Record<string, unknown>): CustomerRow {
     active_subscription_due: toMoneyString(raw.active_subscription_due),
     active_direct_sale_outstanding: toMoneyString(raw.active_direct_sale_outstanding),
     active_invoice_outstanding: toMoneyString(raw.active_invoice_outstanding),
+    active_emi_count: toOptionalNumber(raw.active_emi_count) ?? 0,
+    active_rent_count: toOptionalNumber(raw.active_rent_count) ?? 0,
+    active_lease_count: toOptionalNumber(raw.active_lease_count) ?? 0,
+    active_direct_sale_count: toOptionalNumber(raw.active_direct_sale_count) ?? 0,
+    rent_lease_due: toMoneyString(raw.rent_lease_due),
+    rent_lease_overdue: toMoneyString(raw.rent_lease_overdue),
+    emi_overdue: toMoneyString(raw.emi_overdue),
+    deposit_held: toMoneyString(raw.deposit_held),
+    last_emi_payment_date: typeof raw.last_emi_payment_date === "string" ? raw.last_emi_payment_date : null,
+    last_rent_lease_collection_date:
+      typeof raw.last_rent_lease_collection_date === "string" ? raw.last_rent_lease_collection_date : null,
+    emi_value: toMoneyString(raw.emi_value),
+    emi_paid: toMoneyString(raw.emi_paid),
+    next_emi_due_date: typeof raw.next_emi_due_date === "string" ? raw.next_emi_due_date : null,
+    rent_lease_value: toMoneyString(raw.rent_lease_value),
+    rent_lease_received: toMoneyString(raw.rent_lease_received),
+    next_rent_lease_due_date:
+      typeof raw.next_rent_lease_due_date === "string" ? raw.next_rent_lease_due_date : null,
+    direct_sale_value: toMoneyString(raw.direct_sale_value),
+    direct_sale_received: toMoneyString(raw.direct_sale_received),
+    last_direct_sale_date: typeof raw.last_direct_sale_date === "string" ? raw.last_direct_sale_date : null,
+    last_direct_sale_receipt_date:
+      typeof raw.last_direct_sale_receipt_date === "string" ? raw.last_direct_sale_receipt_date : null,
   };
+}
+
+function formatShortDate(value: string | null | undefined): string {
+  if (!value) return "—";
+  const parsed = new Date(`${value}T00:00:00`);
+  return Number.isNaN(parsed.getTime())
+    ? value
+    : parsed.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 const CUSTOMERS_PAGE_SIZE = 25;
@@ -502,6 +553,26 @@ export default function AdminCustomersPage() {
         active_subscription_due: row.active_subscription_due ?? "0.00",
         active_direct_sale_outstanding: row.active_direct_sale_outstanding ?? "0.00",
         active_invoice_outstanding: row.active_invoice_outstanding ?? "0.00",
+        active_emi_count: row.active_emi_count ?? 0,
+        active_rent_count: row.active_rent_count ?? 0,
+        active_lease_count: row.active_lease_count ?? 0,
+        active_direct_sale_count: row.active_direct_sale_count ?? 0,
+        rent_lease_due: row.rent_lease_due ?? "0.00",
+        rent_lease_overdue: row.rent_lease_overdue ?? "0.00",
+        emi_overdue: row.emi_overdue ?? "0.00",
+        deposit_held: row.deposit_held ?? "0.00",
+        last_emi_payment_date: row.last_emi_payment_date ?? "",
+        last_rent_lease_collection_date: row.last_rent_lease_collection_date ?? "",
+        emi_value: row.emi_value ?? "0.00",
+        emi_paid: row.emi_paid ?? "0.00",
+        next_emi_due_date: row.next_emi_due_date ?? "",
+        rent_lease_value: row.rent_lease_value ?? "0.00",
+        rent_lease_received: row.rent_lease_received ?? "0.00",
+        next_rent_lease_due_date: row.next_rent_lease_due_date ?? "",
+        direct_sale_value: row.direct_sale_value ?? "0.00",
+        direct_sale_received: row.direct_sale_received ?? "0.00",
+        last_direct_sale_date: row.last_direct_sale_date ?? "",
+        last_direct_sale_receipt_date: row.last_direct_sale_receipt_date ?? "",
         historical_subscription_count: row.historical_subscription_count ?? 0,
         cancelled_subscription_count: row.cancelled_subscription_count ?? 0,
         total_subscription_value: row.total_subscription_value ?? "0.00",
@@ -578,9 +649,31 @@ export default function AdminCustomersPage() {
         sortable: true,
         render: (row) => {
           const subDue = Number(row.active_subscription_due || 0);
+          const rentLeaseDue = Number(row.rent_lease_due || 0);
           const directDue = Number(row.active_direct_sale_outstanding || 0);
           const invDue = Number(row.active_invoice_outstanding || 0);
-          const totalDue = subDue + directDue + invDue;
+          const totalDue = subDue + rentLeaseDue + directDue + invDue;
+          const overdue = Number(row.emi_overdue || 0) + Number(row.rent_lease_overdue || 0);
+          const depositHeld = Number(row.deposit_held || 0);
+          const directValue = Number(row.direct_sale_value || 0);
+          const directReceived = Number(row.direct_sale_received || 0);
+          const directCount = row.active_direct_sale_count ?? 0;
+          const rentLeaseCount = (row.active_rent_count ?? 0) + (row.active_lease_count ?? 0);
+          const totalValue = Number(row.active_contract_value || 0) + directValue;
+          const lastCollection = [
+            row.last_emi_payment_date,
+            row.last_rent_lease_collection_date,
+            row.last_direct_sale_receipt_date,
+          ]
+            .filter((value): value is string => Boolean(value))
+            .sort()
+            .pop();
+          const planChips = [
+            { label: "EMI", count: row.active_emi_count ?? 0 },
+            { label: "Rent", count: row.active_rent_count ?? 0 },
+            { label: "Lease", count: row.active_lease_count ?? 0 },
+            { label: "Direct", count: row.active_direct_sale_count ?? 0 },
+          ].filter((chip) => chip.count > 0);
           return (
             <div className="space-y-1.5 text-right">
               <div className="flex items-center justify-end gap-1.5 flex-wrap">
@@ -598,14 +691,54 @@ export default function AdminCustomersPage() {
                 )}
               </div>
               <div className="text-xs font-medium text-foreground">
-                Total Value: <span className="text-primary">{formatRupee(row.active_contract_value)}</span>
+                Total Value: <span className="text-primary">{formatRupee(totalValue)}</span>
               </div>
-              <div className="text-[11px] text-muted-foreground bg-muted/60 rounded px-1.5 py-1 inline-block border border-border/60">
-                <div className="flex items-center justify-end gap-2">
-                  <span>EMI Due: <strong className="text-foreground">{formatRupee(subDue)}</strong></span>
-                  <span>·</span>
-                  <span>Direct: <strong className="text-foreground">{formatRupee(directDue)}</strong></span>
+              {(row.active_emi_count ?? 0) > 0 ? (
+                <div className="text-[11px] text-muted-foreground">
+                  💳 Advance EMI {formatRupee(row.emi_value)} · Paid {formatRupee(row.emi_paid)}
+                  {row.next_emi_due_date ? ` · Next due ${formatShortDate(row.next_emi_due_date)}` : ""}
                 </div>
+              ) : null}
+              {rentLeaseCount > 0 ? (
+                <div className="text-[11px] text-muted-foreground">
+                  🏠 Rent/Lease {formatRupee(row.rent_lease_value)} · Received {formatRupee(row.rent_lease_received)}
+                  {row.next_rent_lease_due_date ? ` · Next due ${formatShortDate(row.next_rent_lease_due_date)}` : ""}
+                </div>
+              ) : null}
+              {directCount > 0 || directValue > 0 ? (
+                <div className="text-[11px] text-muted-foreground">
+                  🛒 Direct sales {formatRupee(directValue)} · Received {formatRupee(directReceived)}
+                  {row.last_direct_sale_date ? ` · Last sale ${formatShortDate(row.last_direct_sale_date)}` : ""}
+                </div>
+              ) : null}
+              {planChips.length > 0 ? (
+                <div className="flex items-center justify-end gap-1 flex-wrap">
+                  {planChips.map((chip) => (
+                    <span
+                      key={chip.label}
+                      className="inline-flex items-center rounded border border-border bg-background px-1.5 py-0.5 text-[10px] font-semibold text-foreground"
+                    >
+                      {chip.label} × {chip.count}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+              <div className="text-[11px] text-muted-foreground bg-muted/60 rounded px-1.5 py-1 inline-block border border-border/60">
+                <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-left">
+                  <span>EMI: <strong className="text-foreground">{formatRupee(subDue)}</strong></span>
+                  <span>Rent/Lease: <strong className="text-foreground">{formatRupee(rentLeaseDue)}</strong></span>
+                  <span>Direct: <strong className="text-foreground">{formatRupee(directDue)}</strong></span>
+                  <span>Invoice: <strong className="text-foreground">{formatRupee(invDue)}</strong></span>
+                </div>
+              </div>
+              {overdue > 0 ? (
+                <div className="text-[11px] font-semibold text-rose-600">
+                  ⏰ Overdue: {formatRupee(overdue)}
+                </div>
+              ) : null}
+              <div className="text-[11px] text-muted-foreground">
+                {depositHeld > 0 ? <>Deposit held {formatRupee(depositHeld)} · </> : null}
+                Last collection {formatShortDate(lastCollection)}
               </div>
               {(row.cancelled_subscription_count || 0) > 0 ? (
                 <div className="text-[11px] text-rose-600 font-semibold">

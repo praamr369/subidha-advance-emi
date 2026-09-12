@@ -19,9 +19,13 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { DataTableShell } from "@/components/ui/operations";
-import { toArray } from "@/lib/api";
+import { apiFetch, toArray } from "@/lib/api";
 import { shouldBypassNextImageOptimization } from "@/lib/media";
 import { getProduct, type ProductRecord } from "@/services/products";
+import ProductPostureCard, {
+  normalizeProductPosture,
+  type ProductPosture,
+} from "@/components/customers/ProductPostureCard";
 import { pimService, type PimProduct } from "@/services/pim";
 import { request } from "@/services/api";
 
@@ -202,6 +206,36 @@ export default function AdminProductDetailPage() {
   }, [productId]);
 
   useEffect(() => { void loadPage("initial"); }, [loadPage]);
+
+  // This product across Advance EMI, rent/lease and direct sale — the same
+  // per-plan money breakdown as the inventory profile.
+  const postureProductId = product?.id ?? null;
+  const [productPosture, setProductPosture] = useState<ProductPosture | null>(null);
+  const [productPostureState, setProductPostureState] = useState<"idle" | "loading" | "error">("idle");
+
+  useEffect(() => {
+    if (!postureProductId) {
+      setProductPosture(null);
+      setProductPostureState("idle");
+      return;
+    }
+    let cancelled = false;
+    setProductPostureState("loading");
+    apiFetch<unknown>(`/admin/products/${postureProductId}/posture/`, { cache: "no-store" })
+      .then((data) => {
+        if (cancelled) return;
+        setProductPosture(normalizeProductPosture(data));
+        setProductPostureState("idle");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setProductPosture(null);
+        setProductPostureState("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [postureProductId]);
 
   const state = product ? readiness(product) : null;
   const activeSubscriptions = useMemo(() => subscriptions.filter((r) => r.status === "ACTIVE").length, [subscriptions]);
@@ -582,6 +616,18 @@ export default function AdminProductDetailPage() {
           {/* ── TAB: CONTRACTS & USAGE ── */}
           {activeTab === "contracts" && (
             <div className="space-y-6">
+              <ERPSectionShell
+                title="Product by Plan"
+                description="This product across Advance EMI, rent/lease and direct sale. Direct-sale paid/due are allocated pro-rata by this product's share of each sale."
+              >
+                {productPostureState === "loading" ? (
+                  <p className="text-sm text-muted-foreground">Loading product position…</p>
+                ) : productPostureState === "error" ? (
+                  <p className="text-sm text-muted-foreground">Product position is unavailable right now.</p>
+                ) : productPosture ? (
+                  <ProductPostureCard posture={productPosture} title="Contracts & sales for this product" />
+                ) : null}
+              </ERPSectionShell>
               <ERPSectionShell title={`Linked subscriptions (${subscriptions.length})`} description="Historical and active usage. Product master edits do not recalculate saved contract amounts.">
                 {subscriptions.length === 0 ? (
                   <ERPEmptyState

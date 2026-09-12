@@ -62,6 +62,9 @@ export type ServiceDeskCase = {
   party?: number | null;
   party_no?: string | null;
   party_display_name?: string | null;
+  // Customer resolved from the case's linked support request / sale /
+  // subscription / delivery / invoice (backend ServiceDeskCaseSerializer).
+  customer_id?: number | null;
   support_request?: number | null;
   support_request_status?: string | null;
   direct_sale?: number | null;

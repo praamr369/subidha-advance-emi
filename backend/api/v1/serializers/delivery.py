@@ -68,6 +68,9 @@ class AdminSubscriptionDeliveryReadSerializer(_BaseSubscriptionDeliveryReadSeria
         source="admin_override_by.username", read_only=True, default=None,
     )
     admin_override_at = serializers.DateTimeField(read_only=True)
+    # Lets the deliveries pages tell a rent/lease return (a unit to release)
+    # from an Advance EMI one.
+    plan_type = serializers.CharField(source="subscription.plan_type", read_only=True, default=None)
 
     class Meta:
         model = SubscriptionDelivery
@@ -76,6 +79,7 @@ class AdminSubscriptionDeliveryReadSerializer(_BaseSubscriptionDeliveryReadSeria
             "subscription",
             "subscription_id",
             "subscription_number",
+            "plan_type",
             "customer_id",
             "customer_name",
             "customer_phone",

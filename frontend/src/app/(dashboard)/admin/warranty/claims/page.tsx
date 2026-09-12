@@ -5,9 +5,11 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { apiFetch } from "@/lib/api";
 import { apiPaths } from "@/lib/api-paths";
+import CustomerPostureToggle from "@/components/customers/CustomerPostureToggle";
 
 type Claim = {
   id: number;
+  customer_id?: number | null;
   customer_name: string;
   product_name: string;
   defect_type: string;
@@ -113,6 +115,7 @@ export default function WarrantyClaimsPage() {
                 <span>{new Date(c.created_at).toLocaleDateString("en-IN")}</span>
                 {c.preferred_date && <span>Preferred: {new Date(c.preferred_date).toLocaleDateString("en-IN")}</span>}
               </div>
+              <CustomerPostureToggle customerId={c.customer_id} />
 
               {c.status === "FILED" && (
                 <button onClick={() => handleApprove(c.id)}

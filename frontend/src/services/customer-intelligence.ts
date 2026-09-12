@@ -168,7 +168,39 @@ export type RentalAssetRecord = {
   product_name?: string | null;
   inventory_item_id?: number | null;
   current_subscription_id?: number | null;
+  serial_no?: string | null;
+  current_customer_name?: string | null;
+  current_subscription_number?: string | null;
+  current_location_code?: string | null;
 };
+
+export type RentalAssetPage = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: RentalAssetRecord[];
+};
+
+/** Rental asset register, optionally filtered by status / product. */
+export async function listRentalAssets(params: {
+  status?: string;
+  productId?: number | null;
+  /** The unit brought back from this contract (it is unlinked once returned). */
+  returnedFromSubscription?: number | null;
+  page?: number;
+} = {}): Promise<RentalAssetPage> {
+  const query = new URLSearchParams();
+  if (params.status) query.append("status", params.status);
+  if (params.productId) query.append("product", String(params.productId));
+  if (params.returnedFromSubscription) {
+    query.append("returned_from_subscription", String(params.returnedFromSubscription));
+  }
+  if (params.page && params.page > 1) query.append("page", String(params.page));
+  const suffix = query.toString();
+  return apiFetch<RentalAssetPage>(`/admin/rental-assets/${suffix ? `?${suffix}` : ""}`, {
+    cache: "no-store",
+  });
+}
 
 /** Assets available to be linked, optionally narrowed to one product. */
 export async function listAvailableRentalAssets(
@@ -217,6 +249,29 @@ export async function handoverRentalAsset(
 
 export async function returnRentalAsset(assetId: number): Promise<RentalAssetRecord> {
   return apiFetch<RentalAssetRecord>(`/admin/rental-assets/${assetId}/return/`, {
+    method: "POST",
+  });
+}
+
+/** Units back from hire (RETURNED or UNDER_REPAIR), optionally for one product. */
+export async function listRentalAssetsAwaitingRelease(
+  productId?: number | null
+): Promise<RentalAssetRecord[]> {
+  const pages = await Promise.all(
+    ["RETURNED", "UNDER_REPAIR"].map((status) => {
+      const query = new URLSearchParams({ status });
+      if (productId) query.append("product", String(productId));
+      return apiFetch<{ results: RentalAssetRecord[] }>(
+        `/admin/rental-assets/?${query.toString()}`
+      );
+    })
+  );
+  return pages.flatMap((page) => (Array.isArray(page.results) ? page.results : []));
+}
+
+/** Put a returned / repaired unit back in the rental pool (lifts its maintenance hold). */
+export async function releaseRentalAsset(assetId: number): Promise<RentalAssetRecord> {
+  return apiFetch<RentalAssetRecord>(`/admin/rental-assets/${assetId}/release/`, {
     method: "POST",
   });
 }

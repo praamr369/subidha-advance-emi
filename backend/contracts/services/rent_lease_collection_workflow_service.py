@@ -68,7 +68,18 @@ def _normal_method(value: str | None) -> str:
 
 
 def _payment_date(value):
-    return value or timezone.localdate()
+    today = timezone.localdate()
+    resolved = value or today
+    if isinstance(resolved, str):
+        from datetime import date as _date_cls
+
+        resolved = _date_cls.fromisoformat(resolved)
+    # The payment date is when the money was received, not the demand's due
+    # date. Collecting a future month in advance is fine, but it is received
+    # today — a future-dated receipt drops out of every "as of today" ledger.
+    if resolved > today:
+        raise ValidationError({"payment_date": "Payment date cannot be in the future. Advance rent is received today; the demand keeps its own due date."})
+    return resolved
 
 
 def _collection_metadata(
@@ -553,7 +564,10 @@ def collect_rent_lease_monthly_demand(
             **metadata,
         },
     )
-    sync_rent_lease_monthly_income(subscription=subscription, amount=amount_q, performed_by=performed_by)
+    if created:
+        sync_rent_lease_monthly_income(
+            subscription=subscription, amount=amount_q, performed_by=performed_by, collection=collection
+        )
     setattr(demand, "_rent_lease_collection", collection)
     setattr(demand, "_rent_lease_collection_created", created)
     return demand

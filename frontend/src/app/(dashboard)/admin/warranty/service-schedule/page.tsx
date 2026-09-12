@@ -5,6 +5,7 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { apiFetch } from "@/lib/api";
 import { apiPaths } from "@/lib/api-paths";
+import CustomerPostureToggle from "@/components/customers/CustomerPostureToggle";
 
 type ServiceJob = {
   id: number;
@@ -18,6 +19,7 @@ type ServiceJob = {
   technician_name: string | null;
   status: string;
   address: string;
+  customer_id?: number | null;
 };
 
 export default function ServiceSchedulePage() {
@@ -100,6 +102,7 @@ export default function ServiceSchedulePage() {
                     )}
                   </div>
                 </div>
+                <CustomerPostureToggle customerId={job.customer_id} />
                 {editing === job.id ? (
                   <div className="mt-3 flex gap-2 items-end flex-wrap">
                     <input type="date" className="border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-800"
@@ -135,6 +138,7 @@ export default function ServiceSchedulePage() {
                 <div className="text-sm text-gray-500">{job.customer_name} · {job.customer_phone}</div>
                 <div className="text-sm text-gray-500">{job.address}</div>
                 {job.technician_name && <div className="text-xs text-blue-600 mt-1">Technician: {job.technician_name}</div>}
+                <CustomerPostureToggle customerId={job.customer_id} />
               </div>
               {job.status !== "RESOLVED" && (
                 <button onClick={() => handleComplete(job.id)}

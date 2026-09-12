@@ -77,6 +77,7 @@ export default function BillingInvoicesPage() {
     { key: "billing_channel", header: "Channel" },
     { key: "status", header: "Status" },
     { key: "grand_total", header: "Grand Total", render: (row) => accountingMoney(row.grand_total) },
+    { key: "received_total", header: "Received", render: (row) => accountingMoney(row.received_total) },
     {
       key: "active_balance",
       header: "Active Balance",

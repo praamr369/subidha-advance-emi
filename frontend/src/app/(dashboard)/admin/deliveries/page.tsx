@@ -8,6 +8,7 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
+import ReturnedAssetReleaseButton from "@/components/customer-intelligence/ReturnedAssetReleaseButton";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { RegistryPageShell } from "@/components/layout/page-shells";
 import {
@@ -1431,6 +1432,11 @@ export default function AdminDeliveriesPage() {
                                 >
                                   Billing Docs
                                 </Link>
+                              ) : null}
+                              {row.status === "RETURNED" &&
+                              row.subscription_id &&
+                              (row.plan_type === "RENT" || row.plan_type === "LEASE") ? (
+                                <ReturnedAssetReleaseButton subscriptionId={row.subscription_id} compact />
                               ) : null}
                             </>
                           )}

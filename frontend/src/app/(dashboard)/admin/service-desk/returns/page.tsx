@@ -8,6 +8,8 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import { ApprovalQueuePageShell } from "@/components/layout/page-shells";
 import ERPPageShell from "@/components/erp/ERPPageShell";
+import RentalAssetsAwaitingRelease from "@/components/customer-intelligence/RentalAssetsAwaitingRelease";
+import ReturnedAssetReleaseButton from "@/components/customer-intelligence/ReturnedAssetReleaseButton";
 import { buildAdminServiceDeskCaseRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -173,6 +175,17 @@ export default function AdminServiceDeskReturnsPage() {
       { key: "status", title: "Case Status" },
       { key: "finance_status", title: "Finance" },
       { key: "stock_status", title: "Stock" },
+      {
+        key: "rental_unit",
+        title: "Rental unit",
+        render: (row: ServiceDeskCase) =>
+          row.subscription ? (
+            // Rows open the case on click; keep the release click on the button.
+            <div onClick={(event) => event.stopPropagation()}>
+              <ReturnedAssetReleaseButton subscriptionId={row.subscription} compact />
+            </div>
+          ) : null,
+      },
     ],
     []
   );
@@ -251,6 +264,9 @@ export default function AdminServiceDeskReturnsPage() {
         }
         queueList={
           <>
+            <div className="mb-4 rounded-xl border border-border bg-card p-4 empty:hidden">
+              <RentalAssetsAwaitingRelease />
+            </div>
             {loading ? <LoadingBlock label="Loading return register..." /> : null}
             {!loading && error ? (
               <ErrorState title="Return register unavailable" description={error} onRetry={() => void loadPage()} />

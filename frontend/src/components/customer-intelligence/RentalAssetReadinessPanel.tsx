@@ -13,6 +13,7 @@ import {
   type RentalAssetRecord,
   type RentalAssetSummary,
 } from "@/services/customer-intelligence";
+import RentalAssetsAwaitingRelease from "@/components/customer-intelligence/RentalAssetsAwaitingRelease";
 
 type Props = {
   subscriptionId: number;
@@ -246,7 +247,9 @@ export function RentalAssetReadinessPanel({
                 onReturn={
                   canManageAssets
                     ? (assetId) =>
-                        void runAction("Asset marked returned and back in stock.", () =>
+                        void runAction(
+                          "Asset marked returned. Mark the delivery RETURNED to bring it back into stock.",
+                          () =>
                           returnRentalAsset(assetId)
                         )
                     : undefined
@@ -351,6 +354,13 @@ export function RentalAssetReadinessPanel({
               One rental asset is one physical unit you can hire out and take back.
               Registering here links it to this product inventory item.
             </p>
+          </div>
+
+          <div className="border-t border-border pt-3 empty:hidden">
+            <RentalAssetsAwaitingRelease
+              productId={productId}
+              onReleased={() => void loadAvailable()}
+            />
           </div>
 
           {actionError ? (

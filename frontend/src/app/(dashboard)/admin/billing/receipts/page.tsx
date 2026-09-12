@@ -18,12 +18,120 @@ import { ROUTES } from "@/lib/routes";
 import { accountingDate, accountingErrorMessage, accountingMoney } from "@/components/accounting/shared";
 import type { ReceiptDocument } from "@/services/billing";
 import { listReceiptDocuments, voidReceiptDocument } from "@/services/billing";
+import { apiFetch } from "@/lib/api";
+import CustomerPostureToggle from "@/components/customers/CustomerPostureToggle";
+
+// Rent/lease money never becomes a ReceiptDocument (those are retail / Advance
+// EMI only), so it is listed from its own source rows: monthly collections and
+// security-deposit receipts/refunds.
+type RentLeaseReceiptRow = {
+  key: string;
+  kind: string;
+  number: string;
+  amount: string;
+  payment_date: string | null;
+  payment_method: string;
+  status: string;
+  reference_no: string;
+  demand_due_date: string | null;
+  collected_by_username: string;
+  subscription_id: number | null;
+  subscription_number: string;
+  customer_id: number | null;
+  customer_name: string;
+};
+
+const RENT_LEASE_RECEIPT_LABELS: Record<string, string> = {
+  RENT_MONTHLY: "Monthly rent",
+  LEASE_MONTHLY: "Monthly lease",
+  DEPOSIT_RECEIPT: "Security deposit received",
+  DEPOSIT_REFUND: "Security deposit refunded",
+};
 
 export default function BillingReceiptsPage() {
   const searchParams = useSearchParams();
   const [rows, setRows] = useState<ReceiptDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [rentLeaseRows, setRentLeaseRows] = useState<RentLeaseReceiptRow[]>([]);
+  const [rentLeaseLoading, setRentLeaseLoading] = useState(true);
+  const [rentLeaseError, setRentLeaseError] = useState<string | null>(null);
+  // Payment / invoice / direct-sale / source-type filters only apply to receipt
+  // documents; rent/lease rows follow the subscription and customer filters.
+  const documentOnlyFilter = Boolean(
+    searchParams.get("payment") ||
+      searchParams.get("billing_invoice") ||
+      searchParams.get("direct_sale") ||
+      searchParams.get("source_type")
+  );
+  const rentLeaseSubscription = searchParams.get("subscription") || "";
+  const rentLeaseCustomer = searchParams.get("customer") || "";
+
+  useEffect(() => {
+    if (documentOnlyFilter) {
+      setRentLeaseRows([]);
+      setRentLeaseLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setRentLeaseLoading(true);
+    const query = new URLSearchParams();
+    if (rentLeaseSubscription) query.set("subscription", rentLeaseSubscription);
+    if (rentLeaseCustomer) query.set("customer", rentLeaseCustomer);
+    apiFetch<{ results?: RentLeaseReceiptRow[] }>(
+      `/admin/subscriptions/rent-lease-receipts/?${query.toString()}`,
+      { cache: "no-store" }
+    )
+      .then((data) => {
+        if (cancelled) return;
+        setRentLeaseRows(Array.isArray(data?.results) ? data.results : []);
+        setRentLeaseError(null);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setRentLeaseRows([]);
+        setRentLeaseError(accountingErrorMessage(err, "Failed to load rent/lease receipts."));
+      })
+      .finally(() => {
+        if (!cancelled) setRentLeaseLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [documentOnlyFilter, rentLeaseSubscription, rentLeaseCustomer]);
+
+  const rentLeaseReceived = useMemo(
+    () =>
+      rentLeaseRows
+        .filter((row) => row.status === "ACTIVE" && row.kind !== "DEPOSIT_REFUND")
+        .reduce((sum, row) => sum + Number(row.amount || 0), 0),
+    [rentLeaseRows]
+  );
+
+  const rentLeaseColumns: EnterpriseColumnDef<RentLeaseReceiptRow>[] = [
+    { key: "payment_date", header: "Received", render: (row) => accountingDate(row.payment_date) },
+    { key: "number", header: "Reference" },
+    { key: "kind", header: "Type", render: (row) => RENT_LEASE_RECEIPT_LABELS[row.kind] ?? row.kind },
+    { key: "subscription_number", header: "Contract", render: (row) => row.subscription_number || "—" },
+    {
+      key: "customer_name",
+      header: "Customer",
+      render: (row) => (
+        <div>
+          <div>{row.customer_name || "—"}</div>
+          <CustomerPostureToggle customerId={row.customer_id} />
+        </div>
+      ),
+    },
+    { key: "payment_method", header: "Method", render: (row) => row.payment_method || "—" },
+    { key: "amount", header: "Amount", render: (row) => accountingMoney(row.amount) },
+    {
+      key: "demand_due_date",
+      header: "For Month Due",
+      render: (row) => (row.demand_due_date ? accountingDate(row.demand_due_date) : "—"),
+    },
+    { key: "status", header: "Status" },
+  ];
 
   const loadPage = useCallback(async () => {
     setLoading(true);
@@ -60,7 +168,17 @@ export default function BillingReceiptsPage() {
     { key: "receipt_date", header: "Date", render: (row) => accountingDate(row.receipt_date) },
     { key: "receipt_no", header: "Receipt" },
     { key: "receipt_type", header: "Type" },
-    { key: "customer_name_snapshot", header: "Customer" },
+    {
+      key: "customer_name_snapshot",
+      header: "Customer",
+      // Name plus the customer's per-product money position, on demand.
+      render: (row) => (
+        <div>
+          <div>{row.customer_name_snapshot || "—"}</div>
+          <CustomerPostureToggle customerId={row.customer} />
+        </div>
+      ),
+    },
     { key: "finance_account_name", header: "Finance Account" },
     { key: "amount", header: "Amount", render: (row) => accountingMoney(row.amount) },
     { key: "posted_journal_entry_no", header: "Journal" },
@@ -129,6 +247,11 @@ export default function BillingReceiptsPage() {
         { label: "Posted", value: loading ? "—" : receiptStats.posted, tone: "success" },
         { label: "Posted Amount", value: loading ? "—" : accountingMoney(receiptStats.postedAmount), tone: "default" },
         { label: "Voided", value: loading ? "—" : receiptStats.voided, tone: !loading && receiptStats.voided > 0 ? "warning" : "success" },
+        {
+          label: "Rent/Lease Received",
+          value: rentLeaseLoading ? "—" : accountingMoney(rentLeaseReceived),
+          tone: "default",
+        },
       ]}
     >
       <ERPSectionShell
@@ -157,6 +280,23 @@ export default function BillingReceiptsPage() {
           emptyDescription="Generate retail or EMI receipts after the underlying operational event exists."
         />
       </ERPSectionShell>
+
+      {!documentOnlyFilter ? (
+        <ERPSectionShell
+          title="Rent / lease receipts"
+          description="Monthly rent/lease collections and security-deposit receipts. These are recorded against the rent/lease contract, not as receipt documents, so they are listed here from their source records."
+          className="receipt-print-hide"
+        >
+          <EnterpriseDataTable
+            data={rentLeaseRows}
+            columns={rentLeaseColumns}
+            loading={rentLeaseLoading}
+            error={rentLeaseError}
+            emptyTitle="No rent/lease receipts found"
+            emptyDescription="Rent/lease collections and deposit receipts appear here once they are recorded."
+          />
+        </ERPSectionShell>
+      ) : null}
 
       <PrintActionBanner
         className="mb-4"

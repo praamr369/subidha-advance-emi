@@ -32,6 +32,7 @@ import {
 } from "@/services/vendor-ops";
 import { getVendor, type Vendor } from "@/services/vendors";
 import { changeVendorAccount, getVendorAccountLink, linkVendorAccount, unlinkVendorAccount, type AccountLink } from "@/services/vendor-account-links";
+import { VendorPaymentDeskPanel } from "./VendorPaymentDeskPanel";
 
 // ── page ─────────────────────────────────────────────────────────────────────
 
@@ -203,6 +204,16 @@ export default function AdminVendorDetailPage() {
                   <DetailValue label="Outstanding" value={outstanding} />
                 </div>
               </SectionCard>
+
+              <VendorPaymentDeskPanel
+                vendorId={id}
+                onChanged={() => {
+                  void Promise.all([getAdminVendorOutstanding(id), listAdminVendorLedger(id)]).then(([o, l]) => {
+                    setOutstanding(String(o.outstanding ?? "0.00"));
+                    setLedger(l.results ?? []);
+                  });
+                }}
+              />
 
               <div className="grid gap-6 lg:grid-cols-2">
                 <SectionCard title="Purchases" description="Counts are sourced from the vendor purchase summary endpoints.">

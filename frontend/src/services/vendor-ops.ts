@@ -70,6 +70,82 @@ export async function getAdminVendorOutstanding(id: number): Promise<VendorOutst
   return apiFetch(`/admin/vendors/${id}/outstanding/`);
 }
 
+// ── vendor payment desk (pay bills / advance / apply advance) ────────────────
+
+export type VendorOpenBill = {
+  id: number;
+  bill_no: string;
+  bill_date: string | null;
+  grand_total: string;
+  outstanding: string;
+};
+
+export type VendorDeskPayment = {
+  id: number;
+  settlement_no: string;
+  settlement_date: string;
+  amount: string;
+  is_advance: boolean;
+  purchase_bill_no: string | null;
+  finance_account_name: string | null;
+  status: string;
+  journal_entry_no: string | null;
+  reference_no: string;
+};
+
+export type VendorPaymentDesk = {
+  vendor_id: number;
+  net_outstanding: string;
+  payable_now: string;
+  advance_balance: string;
+  open_bills_total: string;
+  open_bills: VendorOpenBill[];
+  finance_accounts: Array<{ id: number; name: string; kind: string }>;
+  recent_payments: VendorDeskPayment[];
+};
+
+export type VendorBillAllocation = { purchase_bill_id: number; amount: string };
+
+export async function getVendorPaymentDesk(id: number): Promise<VendorPaymentDesk> {
+  return apiFetch(`/admin/vendors/${id}/payment-desk/`, { cache: "no-store" });
+}
+
+export async function payVendorBills(
+  id: number,
+  input: {
+    allocations: VendorBillAllocation[];
+    finance_account_id: number;
+    payment_date?: string;
+    reference_no?: string;
+    notes?: string;
+  }
+): Promise<{ paid_total: string; desk: VendorPaymentDesk }> {
+  return apiFetch(`/admin/vendors/${id}/payment-desk/pay-bills/`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function payVendorAdvance(
+  id: number,
+  input: { amount: string; finance_account_id: number; payment_date?: string; reference_no?: string; notes?: string }
+): Promise<{ settlement_no: string; amount: string; desk: VendorPaymentDesk }> {
+  return apiFetch(`/admin/vendors/${id}/payment-desk/advance/`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function applyVendorAdvance(
+  id: number,
+  input: { allocations: VendorBillAllocation[]; notes?: string }
+): Promise<{ applied_total: string; desk: VendorPaymentDesk }> {
+  return apiFetch(`/admin/vendors/${id}/payment-desk/apply-advance/`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 
 
 export interface PurchaseSummaryRow {

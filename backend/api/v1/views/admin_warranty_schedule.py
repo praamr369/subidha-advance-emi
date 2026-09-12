@@ -30,6 +30,16 @@ from subscriptions.models import AuditLog
 SCHEDULABLE_CLAIM_STATUSES = ("APPROVED",)
 
 
+def _schedule_customer_id(claim: WarrantyClaim, customer):
+    """Customer via the claim's contract, else via its service-desk case."""
+    customer_id = getattr(customer, "id", None)
+    if customer_id:
+        return customer_id
+    from api.v1.serializers.service_desk import resolve_service_case_customer_id
+
+    return resolve_service_case_customer_id(getattr(claim, "service_case", None))
+
+
 def _schedule_row(claim: WarrantyClaim) -> dict:
     """Shape the service-schedule page was written against.
 
@@ -61,6 +71,8 @@ def _schedule_row(claim: WarrantyClaim) -> dict:
         # The address the engineer travels to is the customer's, which the
         # claim reaches only through the subscription.
         "address": getattr(customer, "address", "") or "",
+        # Lets the board open the customer's per-product money position.
+        "customer_id": _schedule_customer_id(claim, customer),
         "service_center": claim.authorized_service_center,
         "service_completed_at": claim.service_completed_at,
     }
@@ -76,7 +88,7 @@ def warranty_service_schedule_view(request):
     """
     claims = (
         WarrantyClaim.objects.filter(claim_status__in=SCHEDULABLE_CLAIM_STATUSES)
-        .select_related("product", "subscription", "subscription__customer")
+        .select_related("product", "subscription", "subscription__customer", "service_case")
         .order_by("scheduled_date", "claim_submitted_at")
     )
     return Response([_schedule_row(claim) for claim in claims])

@@ -507,6 +507,22 @@ def build_party_detail_payload(party: PartyMaster) -> dict[str, Any]:
             "amount": None,
         })
 
+    # Per-product money posture over this party's contracts (a customer's own,
+    # or a partner's referred ones) + vendor payables. Local import: customers
+    # services import crm-adjacent modules at load time.
+    from customers.services.customer_account_service import (
+        build_product_posture,
+        build_staff_money_posture,
+        build_vendor_payable_posture,
+    )
+
+    product_posture = build_product_posture(
+        subscriptions=Subscription.objects.filter(id__in=subscription_ids),
+        direct_sales=DirectSale.objects.filter(id__in=direct_sale_ids),
+    )
+    vendor_payables = build_vendor_payable_posture([vendor.id for vendor in vendors])
+    staff_posture = build_staff_money_posture([member.id for member in staff])
+
     _alert_rank = {"high": 0, "medium": 1, "info": 2}
     alerts.sort(key=lambda a: _alert_rank.get(a["level"], 3))
 
@@ -536,6 +552,9 @@ def build_party_detail_payload(party: PartyMaster) -> dict[str, Any]:
             }
             for link in links
         ],
+        "product_posture": product_posture,
+        "vendor_payables": vendor_payables,
+        "staff_posture": staff_posture,
         "summary": {
             "lead_count": len(leads),
             "open_lead_count": len([l for l in leads if getattr(l, "status", "") in ("NEW", "IN_PROGRESS", "CONTACTED")]),

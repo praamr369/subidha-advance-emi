@@ -136,9 +136,12 @@ class AdminRentLeaseAccountMappingBridgeView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def get(self, request):
+        from accounting.services.bridge_posting_approval_service import deposit_auto_posting_status
+
         return Response({
             "mapping": _mapping_payload(),
             "readiness": bridge.get_rent_lease_accounting_readiness(),
+            "deposit_auto_posting": deposit_auto_posting_status(),
             "chart_accounts": [
                 {"id": row.id, "code": row.code, "name": row.name, "account_type": row.account_type, "system_code": row.system_code}
                 for row in ChartOfAccount.objects.filter(is_active=True).order_by("code")[:500]

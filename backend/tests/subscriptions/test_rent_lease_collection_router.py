@@ -79,15 +79,24 @@ class RentLeaseUnifiedCollectionRouterTests(APITestCase):
             end_date=date(2027, 3, 31),
             is_active=True,
         )
-        AccountingPeriod.objects.create(
-            code="FY2026-27-SEP",
-            label="September 2026",
-            name="September 2026",
-            financial_year=self.financial_year,
-            start_date=date(2026, 9, 1),
-            end_date=date(2026, 9, 30),
-            status=AccountingPeriodStatus.OPEN,
-        )
+        # Rent/lease journals are dated on the collection's payment date (not
+        # today), so the months these tests collect in (June 2026 onwards)
+        # need open periods of their own.
+        for code, label, start, end in (
+            ("FY2026-27-JUN", "June 2026", date(2026, 6, 1), date(2026, 6, 30)),
+            ("FY2026-27-JUL", "July 2026", date(2026, 7, 1), date(2026, 7, 31)),
+            ("FY2026-27-AUG", "August 2026", date(2026, 8, 1), date(2026, 8, 31)),
+            ("FY2026-27-SEP", "September 2026", date(2026, 9, 1), date(2026, 9, 30)),
+        ):
+            AccountingPeriod.objects.create(
+                code=code,
+                label=label,
+                name=label,
+                financial_year=self.financial_year,
+                start_date=start,
+                end_date=end,
+                status=AccountingPeriodStatus.OPEN,
+            )
         DocumentSequence.objects.create(
             series_code="JE-2026-27",
             document_type="JOURNAL_ENTRY",
@@ -198,6 +207,91 @@ class RentLeaseUnifiedCollectionRouterTests(APITestCase):
                 metadata__event="RENT_LEASE_MONTHLY_DEMAND_COLLECTED",
             ).exists()
         )
+
+    def test_advance_rent_months_collected_same_day_each_post_a_journal(self):
+        # Regression: the journal key was (subscription, today, amount), so
+        # collecting several equal months in advance on one day posted only
+        # the first month and silently dropped the rest from the ledger.
+        subscription = create_rent_contract(
+            customer=self.customer,
+            product=self.rent_product,
+            tenure_months=6,
+            start_date=date(2026, 6, 1),
+            security_deposit_percent=Decimal("20.00"),
+            performed_by=self.admin,
+        )
+        collect_security_deposit(
+            subscription=subscription,
+            amount=Decimal("2400.00"),
+            performed_by=self.admin,
+            reference_no="RL-ADV-DEP",
+        )
+        generate_monthly_demands_for_subscription(
+            subscription=subscription,
+            through_date=date(2026, 8, 1),
+            performed_by=self.admin,
+        )
+        demands = list(
+            RentLeaseBillingDemand.objects.filter(
+                subscription=subscription, demand_type=RentLeaseDemandType.RENT_MONTHLY
+            ).order_by("due_date")
+        )
+        self.assertGreaterEqual(len(demands), 3)
+
+        for index, demand in enumerate(demands[:3], start=1):
+            response = self._collect(subscription, amount=str(demand.amount), reference_no=f"RL-ADV-{index}")
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED, msg=str(response.data))
+
+        journals = JournalEntry.objects.filter(
+            source_model="Subscription",
+            source_id=str(subscription.id),
+            source_type="RENT_LEASE_MONTHLY_PAYMENT",
+        )
+        self.assertEqual(journals.count(), 3)
+        self.assertEqual(len({row.source_reference for row in journals}), 3)
+        self.assertTrue(all(row.entry_date == date(2026, 6, 1) for row in journals))
+
+    def test_future_payment_date_is_rejected_for_rent_collection(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        subscription = create_rent_contract(
+            customer=self.customer,
+            product=self.rent_product,
+            tenure_months=6,
+            start_date=date(2026, 6, 1),
+            security_deposit_percent=Decimal("20.00"),
+            performed_by=self.admin,
+        )
+        collect_security_deposit(
+            subscription=subscription,
+            amount=Decimal("2400.00"),
+            performed_by=self.admin,
+            reference_no="RL-FUT-DEP",
+        )
+        generate_monthly_demands_for_subscription(
+            subscription=subscription,
+            through_date=date(2026, 6, 1),
+            performed_by=self.admin,
+        )
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.post(
+            "/api/v1/admin/receivables/collect/",
+            {
+                "source_type": subscription.plan_type,
+                "source_id": subscription.id,
+                "amount": "1000.00",
+                "payment_method": "CASH",
+                "finance_account_id": self.finance_account.id,
+                "reference_no": "RL-FUT-001",
+                "payment_date": (timezone.localdate() + timedelta(days=30)).isoformat(),
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, msg=str(response.data))
+        self.assertFalse(apps.get_model("payments", "RentLeaseCollection").objects.filter(subscription=subscription).exists())
 
     def test_admin_can_collect_monthly_lease_after_deposit_is_paid(self):
         subscription = create_lease_contract(

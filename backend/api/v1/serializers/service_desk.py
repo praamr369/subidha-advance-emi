@@ -51,6 +51,41 @@ class ServiceDeskCaseLineSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "updated_at"]
 
 
+def resolve_service_case_customer_id(case):
+    """The customer a service-desk case belongs to, or None.
+
+    Cases carry no customer column, so it is resolved from whichever source the
+    case is linked to. Only touches a relation when its FK is set, so list rows
+    with sparse links do not pay a query per empty relation. Shared by the case
+    serializer and the warranty rows (whose claims hang off a case).
+    """
+    if case is None:
+        return None
+    if case.support_request_id:
+        customer_id = getattr(case.support_request, "customer_id", None)
+        if customer_id:
+            return customer_id
+    if case.direct_sale_id:
+        customer_id = getattr(case.direct_sale, "customer_id", None)
+        if customer_id:
+            return customer_id
+    if case.subscription_id:
+        customer_id = getattr(case.subscription, "customer_id", None)
+        if customer_id:
+            return customer_id
+    if case.delivery_id:
+        customer_id = getattr(getattr(case.delivery, "subscription", None), "customer_id", None)
+        if customer_id:
+            return customer_id
+    if case.billing_invoice_id:
+        customer_id = getattr(case.billing_invoice, "customer_id", None)
+        if customer_id:
+            return customer_id
+    if case.replacement_direct_sale_id:
+        return getattr(case.replacement_direct_sale, "customer_id", None)
+    return None
+
+
 class ServiceDeskCaseSerializer(serializers.ModelSerializer):
     lines = ServiceDeskCaseLineSerializer(many=True, required=False)
     branch_id = serializers.SerializerMethodField()
@@ -72,6 +107,9 @@ class ServiceDeskCaseSerializer(serializers.ModelSerializer):
     authorized_by_username = serializers.CharField(source="authorized_by.username", read_only=True)
     resolved_by_username = serializers.CharField(source="resolved_by.username", read_only=True)
     closed_by_username = serializers.CharField(source="closed_by.username", read_only=True)
+    # The case's customer, resolved from whichever source it is linked to, so
+    # the case page can show the customer's per-product money position.
+    customer_id = serializers.SerializerMethodField()
 
     class Meta:
         model = ServiceDeskCase
@@ -131,6 +169,7 @@ class ServiceDeskCaseSerializer(serializers.ModelSerializer):
             "resolved_by_username",
             "closed_by",
             "closed_by_username",
+            "customer_id",
             "lines",
             "created_at",
             "updated_at",
@@ -165,6 +204,7 @@ class ServiceDeskCaseSerializer(serializers.ModelSerializer):
             "resolved_by_username",
             "closed_by",
             "closed_by_username",
+            "customer_id",
             "created_at",
             "updated_at",
         ]
@@ -190,6 +230,9 @@ class ServiceDeskCaseSerializer(serializers.ModelSerializer):
 
     def get_branch_name(self, obj):
         return self._branch_payload(obj)["branch_name"]
+
+    def get_customer_id(self, obj):
+        return resolve_service_case_customer_id(obj)
 
     def create(self, validated_data):
         return create_service_desk_case(

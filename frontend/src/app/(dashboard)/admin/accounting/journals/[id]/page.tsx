@@ -12,6 +12,8 @@ import { buildAdminJournalEntryPrintRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import { formatRupee } from "@/lib/utils/currency";
 import { apiFetch } from "@/lib/api";
+import CustomerPostureToggle from "@/components/customers/CustomerPostureToggle";
+import VendorPayablesToggle from "@/components/vendors/VendorPayablesToggle";
 import {
   postJournalEntry,
   voidJournalEntry,
@@ -51,6 +53,32 @@ export default function AccountingJournalDetailPage() {
   const params = useParams<{ id: string }>();
   const id = useMemo(() => Number(params.id), [params.id]);
   const [journal, setJournal] = useState<JournalEntry | null>(null);
+
+  // The party behind this voucher's source record (customer or vendor), so the
+  // page can show that party's money position on demand.
+  const journalId = journal?.id ?? null;
+  const [party, setParty] = useState<{ customer_id: number | null; vendor_id: number | null } | null>(null);
+
+  useEffect(() => {
+    if (!journalId) {
+      setParty(null);
+      return;
+    }
+    let cancelled = false;
+    apiFetch<{ customer_id: number | null; vendor_id: number | null }>(
+      `/accounting/journal-entries/${journalId}/party/`,
+      { cache: "no-store" }
+    )
+      .then((data) => {
+        if (!cancelled) setParty(data);
+      })
+      .catch(() => {
+        if (!cancelled) setParty(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [journalId]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -172,6 +200,8 @@ export default function AccountingJournalDetailPage() {
                     <div>Voucher type: {journal.voucher_type || "—"}</div>
                     <div>Source type: {journal.source_type || journal.source_model || "Manual"}</div>
                     <div>Source reference: {journal.source_reference || journal.source_id || "—"}</div>
+                    {party?.customer_id ? <CustomerPostureToggle customerId={party.customer_id} /> : null}
+                    {party?.vendor_id ? <VendorPayablesToggle vendorId={party.vendor_id} /> : null}
                     <div>Posted by: {journal.posted_by_username || "—"}</div>
                     <div>Posted at: {journal.posted_at ? formatDate(journal.posted_at) : "—"}</div>
                   </div>

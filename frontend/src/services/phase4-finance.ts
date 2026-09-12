@@ -176,6 +176,19 @@ export type AdminDepositRow = AdminDepositActionPosture & {
   status: string;
   due_date: string;
   latest_transaction?: AdminDepositLatestTransaction | null;
+  settlement?: DepositSettlement | null;
+};
+
+/** Plain deposit statement: received − deductions = refund due; paid; still payable. */
+export type DepositSettlement = {
+  received: Money;
+  deducted: Money;
+  deductions: Array<{ transaction_number: string; amount: Money; reason: string; date: string | null }>;
+  refund_due: Money;
+  refund_approved: Money;
+  refund_paid: Money;
+  refund_balance: Money;
+  status: "NOT_COLLECTED" | "HELD" | "REFUND_PENDING" | "SETTLED" | string;
 };
 
 export async function listAdminDepositRegister(subscriptionId?: number | string) {
@@ -246,6 +259,8 @@ export type AdminRentLeaseAccountMappingPayload = {
   posting_boundary_note?: string;
   premade_setup_enabled?: boolean;
   setup_error?: string | null;
+  /** True when every receipt / refund event is approved to journal automatically. */
+  deposit_auto_posting?: { receipts: boolean; refunds: boolean };
 };
 
 export async function getAdminRentLeaseAccountMapping() {

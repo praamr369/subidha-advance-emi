@@ -504,6 +504,38 @@ def record_damage_deduction(
     return demand
 
 
+def approvable_deposit_refund_amount(*, subscription: Subscription) -> Decimal:
+    """Refundable deposit not already covered by an open refund approval.
+
+    REFUND_APPROVED is a non-cash marker: it does not reduce refundable_amount,
+    only the actual payout does. Checking against refundable_amount alone let
+    the same deposit be approved twice — once by the return inspection and
+    again from the deposits page.
+    """
+    from subscriptions.models import RentLeaseDepositTransactionStatus
+
+    demand = RentLeaseBillingDemand.objects.filter(
+        subscription=subscription,
+        demand_type=RentLeaseDemandType.SECURITY_DEPOSIT,
+    ).first()
+    if demand is None:
+        return MONEY_ZERO
+    live = RentLeaseDepositTransaction.objects.filter(subscription=subscription).exclude(
+        status__in=[RentLeaseDepositTransactionStatus.VOIDED, RentLeaseDepositTransactionStatus.REVERSED]
+    )
+    approved = live.filter(
+        transaction_type=RentLeaseDepositTransactionType.REFUND_APPROVED
+    ).aggregate(total=Sum("amount"))["total"] or MONEY_ZERO
+    paid = live.filter(
+        transaction_type__in=[
+            RentLeaseDepositTransactionType.REFUNDED,
+            RentLeaseDepositTransactionType.DEPOSIT_REFUND,
+        ]
+    ).aggregate(total=Sum("amount"))["total"] or MONEY_ZERO
+    open_approvals = max(q2(approved - paid), MONEY_ZERO)
+    return max(q2(demand.refundable_amount - open_approvals), MONEY_ZERO)
+
+
 @transaction.atomic
 def approve_deposit_refund(
     *, subscription: Subscription, amount: Decimal, approved_by=None, inspection=None
@@ -514,6 +546,16 @@ def approve_deposit_refund(
         raise ValidationError({"amount": "Refund amount must be greater than zero."})
     if amount_q > demand.refundable_amount:
         raise ValidationError({"amount": "Refund cannot exceed refundable deposit."})
+    approvable = approvable_deposit_refund_amount(subscription=subscription)
+    if amount_q > approvable:
+        raise ValidationError(
+            {
+                "amount": (
+                    "Refund is already approved for this deposit. "
+                    f"Only ₹{approvable:.2f} is left to approve; record the payout of the existing approval instead."
+                )
+            }
+        )
     tx = RentLeaseDepositTransaction.objects.create(
         subscription=subscription,
         demand=demand,
@@ -723,6 +765,76 @@ def _compute_deposit_posture(row: RentLeaseBillingDemand) -> dict:
     }
 
 
+_REFUND_PAID_TYPES = (
+    RentLeaseDepositTransactionType.REFUNDED,
+    RentLeaseDepositTransactionType.DEPOSIT_REFUND,
+)
+
+
+def _settlement_status(*, received: Decimal, balance: Decimal, approved: Decimal, paid: Decimal) -> str:
+    if received <= MONEY_ZERO:
+        return "NOT_COLLECTED"
+    if paid > MONEY_ZERO and balance <= MONEY_ZERO:
+        return "SETTLED"
+    if approved > paid:
+        return "REFUND_PENDING"
+    return "HELD"
+
+
+def _deposit_settlements_by_demand(demands) -> dict[int, dict]:
+    """Plain deposit statement per SECURITY_DEPOSIT demand: received, less each
+    deduction (with its reason), refund due, approved, paid, still payable.
+    One transaction query for the whole batch."""
+    from subscriptions.models import RentLeaseDepositTransactionStatus
+
+    txs_by_demand: dict[int, list] = {}
+    for tx in RentLeaseDepositTransaction.objects.filter(
+        demand_id__in=[d.id for d in demands],
+        status=RentLeaseDepositTransactionStatus.ACTIVE,
+    ).order_by("created_at", "id"):
+        txs_by_demand.setdefault(tx.demand_id, []).append(tx)
+
+    settlements = {}
+    for demand in demands:
+        txs = txs_by_demand.get(demand.id, [])
+        received = q2(demand.collected_amount or MONEY_ZERO)
+        deducted = q2(demand.deducted_amount or MONEY_ZERO)
+        approved = q2(sum((tx.amount for tx in txs if tx.transaction_type == RentLeaseDepositTransactionType.REFUND_APPROVED), MONEY_ZERO))
+        paid = q2(sum((tx.amount for tx in txs if tx.transaction_type in _REFUND_PAID_TYPES), MONEY_ZERO))
+        refund_due = q2(max(received - deducted, MONEY_ZERO))
+        balance = q2(max(refund_due - paid, MONEY_ZERO))
+        settlements[demand.id] = {
+            "received": f"{received:.2f}",
+            "deducted": f"{deducted:.2f}",
+            "deductions": [
+                {
+                    "transaction_number": tx.transaction_number,
+                    "amount": f"{q2(tx.amount):.2f}",
+                    "reason": (tx.reason or "").strip(),
+                    "date": (tx.transaction_date or timezone.localdate(tx.created_at)).isoformat(),
+                }
+                for tx in txs
+                if tx.transaction_type == RentLeaseDepositTransactionType.DEDUCTION
+            ],
+            "refund_due": f"{refund_due:.2f}",
+            "refund_approved": f"{approved:.2f}",
+            "refund_paid": f"{paid:.2f}",
+            "refund_balance": f"{balance:.2f}",
+            "status": _settlement_status(received=received, balance=balance, approved=approved, paid=paid),
+        }
+    return settlements
+
+
+def build_deposit_settlement(subscription: Subscription) -> dict | None:
+    demand = RentLeaseBillingDemand.objects.filter(
+        subscription=subscription,
+        demand_type=RentLeaseDemandType.SECURITY_DEPOSIT,
+    ).first()
+    if demand is None:
+        return None
+    return _deposit_settlements_by_demand([demand])[demand.id]
+
+
 def list_admin_deposit_register(*, subscription_id: int | None = None, limit: int = 200) -> dict:
     qs = RentLeaseBillingDemand.objects.filter(
         demand_type=RentLeaseDemandType.SECURITY_DEPOSIT
@@ -758,6 +870,7 @@ def list_admin_deposit_register(*, subscription_id: int | None = None, limit: in
             status=JournalEntryStatus.POSTED,
         ).values("source_id", "id"):
             posted_tx_journal.setdefault(str(je["source_id"]), je["id"])
+    settlements = _deposit_settlements_by_demand(rows)
     return {
         "count": qs.count(),
         "results": [
@@ -796,6 +909,7 @@ def list_admin_deposit_register(*, subscription_id: int | None = None, limit: in
                     if row.id in latest_sources
                     else None
                 ),
+                "settlement": settlements[row.id],
                 **_compute_deposit_posture(row),
             }
             for row in rows

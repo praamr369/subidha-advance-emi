@@ -26,6 +26,8 @@ from lucky_plan.services.winner_state_service import get_subscription_winner_evi
 
 
 CONSISTENCY_TOLERANCE = Decimal("0.01")
+# Rent/lease contracts that are over: outstanding is billed-but-unpaid rent only.
+CLOSED_RENT_LEASE_STATUSES = frozenset({"RETURNED", "CLOSED", "COMPLETED", "CANCELLED", "TERMINATED"})
 
 
 def _decimal(value: Decimal | str | int | None) -> Decimal:
@@ -82,6 +84,7 @@ def get_subscription_detail_queryset():
                 "-created_at", "-id"
             ),
         ),
+        "rent_lease_demands",
         get_subscription_delivery_prefetch(),
     )
 
@@ -221,10 +224,27 @@ def build_subscription_financial_snapshot(subscription: Subscription) -> dict:
             }
         )
 
+    open_demand_balance = MONEY_ZERO
+    if not is_emi_plan and not emis:
+        # Rent/lease has no EMI rows: its collections live on the monthly
+        # demands. The security deposit is a refundable liability, not part
+        # of the contract value, so it is not counted as paid.
+        for demand in _related_rows(subscription, "rent_lease_demands", ("due_date", "id")):
+            if demand.demand_type == "SECURITY_DEPOSIT" or demand.status == "CANCELLED":
+                continue
+            collected = _decimal(demand.collected_amount)
+            paid_amount = q2(paid_amount + collected)
+            if demand.status != "WAIVED":
+                open_demand_balance = q2(open_demand_balance + max(_decimal(demand.amount) - collected, MONEY_ZERO))
+
     remaining_amount = q2(max(total_amount - paid_amount - waived_amount, MONEY_ZERO))
 
     if not is_emi_plan and not emis:
         total_emi_amount = total_amount
+        if subscription.status in CLOSED_RENT_LEASE_STATUSES:
+            # Once the goods are back (or the contract ended), the unused
+            # contract value is not owed — only rent billed and still unpaid.
+            remaining_amount = open_demand_balance
         pending_amount = remaining_amount
 
     if is_emi_plan and not _is_close(total_amount, total_emi_amount):
