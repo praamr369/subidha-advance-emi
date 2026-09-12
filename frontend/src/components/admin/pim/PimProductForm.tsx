@@ -590,6 +590,31 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
     setAttrValues((prev) => { const n = { ...prev }; delete n[attrId]; return n; });
   }, []);
 
+  // Every attribute in the catalogue: same-named attributes' values are offered as
+  // templates in the value dropdowns. Loaded once the product has attributes.
+  useEffect(() => {
+    if (attributes.length === 0 || allAttributes.length > 0) return;
+    pimService.getAllAttributes().then(setAllAttributes).catch(() => {});
+  }, [attributes.length, allAttributes.length]);
+
+  // Quick-add a value from an attribute's dropdown. An existing value (any case)
+  // is reused instead of creating a duplicate.
+  const handleQuickAddOption = useCallback(async (attr: PimCategoryAttribute, rawValue: string) => {
+    const value = rawValue.trim();
+    const existing = attr.options.find((o) => o.value.trim().toLowerCase() === value.toLowerCase());
+    if (existing) return existing;
+    const created = await pimService.createAttributeOption(attr.id, {
+      value,
+      display_name: value,
+      display_order: attr.options.length,
+    });
+    const withOption = (list: PimCategoryAttribute[]) =>
+      list.map((a) => (a.id === attr.id ? { ...a, options: [...a.options, created] } : a));
+    setAttributes(withOption);
+    setAllAttributes(withOption);
+    return created;
+  }, []);
+
   const handleAddExistingAttribute = (attr: PimCategoryAttribute) => {
     if (attributes.some((a) => a.id === attr.id)) return;
     setAttributes((prev) => [...prev, attr]);
@@ -1030,6 +1055,8 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
             lockedAttributes={lockedAttributes}
             onToggleLock={handleToggleLock}
             onRemove={handleRemoveAttribute}
+            onAddOption={handleQuickAddOption}
+            templateAttributes={allAttributes}
           />
 
           {/* Inline attribute panel */}
