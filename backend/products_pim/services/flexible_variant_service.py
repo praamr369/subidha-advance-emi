@@ -3,12 +3,23 @@ from itertools import product as itertools_product
 from decimal import Decimal
 from typing import Dict, List, Tuple, Optional
 from django.db import transaction
+from django.db.models import Q
 
 from products_pim.models import (
     ProductVariant, VariantAttributeValue,
     CategoryAttribute, AttributeOption, PimProduct
 )
 from products_pim.services.sync_service import PIMSyncService
+
+
+def applicable_attributes(pim_product: PimProduct):
+    """Active attributes that apply to a product: its subcategory's own plus the
+    category-level ones (no subcategory) — the same set the product form shows."""
+    return CategoryAttribute.objects.filter(
+        Q(subcategory=pim_product.subcategory) | Q(subcategory__isnull=True),
+        category=pim_product.category,
+        is_active=True,
+    )
 
 
 class VariantPreviewResult:
@@ -64,12 +75,8 @@ class FlexibleVariantService:
         Returns:
             VariantPreviewResult with combinations and pricing
         """
-        variant_attrs_qs = CategoryAttribute.objects.filter(
-            category=pim_product.category,
-            subcategory=pim_product.subcategory,
-            is_active=True
-        )
-        
+        variant_attrs_qs = applicable_attributes(pim_product)
+
         if attribute_ids is not None:
             variant_attrs = variant_attrs_qs.filter(id__in=attribute_ids).order_by("display_order")
         else:
@@ -143,11 +150,7 @@ class FlexibleVariantService:
         """
         with transaction.atomic():
             # Get variant attributes
-            variant_attrs_qs = CategoryAttribute.objects.filter(
-                category=pim_product.category,
-                subcategory=pim_product.subcategory,
-                is_active=True
-            )
+            variant_attrs_qs = applicable_attributes(pim_product)
             
             if attribute_ids is not None:
                 variant_attrs = variant_attrs_qs.filter(id__in=attribute_ids).order_by("display_order")

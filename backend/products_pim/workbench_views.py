@@ -5,11 +5,11 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from api.v1.permissions import IsAdmin
 
-from products_pim.models import PimProduct, ProductVariant, CategoryAttribute, AttributeOption
+from products_pim.models import PimProduct, ProductVariant, AttributeOption
 from products_pim.serializers import (
     PimProductDetailSerializer, ProductVariantSerializer
 )
-from products_pim.services.flexible_variant_service import FlexibleVariantService
+from products_pim.services.flexible_variant_service import FlexibleVariantService, applicable_attributes
 
 
 class PimProductWorkbenchViewSet(viewsets.ModelViewSet):
@@ -134,12 +134,8 @@ class PimProductWorkbenchViewSet(viewsets.ModelViewSet):
         """Get all attributes for this product's category"""
         product = self.get_object()
 
-        # Get ALL active attributes for the product category
-        all_attrs = CategoryAttribute.objects.filter(
-            category=product.category,
-            subcategory=product.subcategory,
-            is_active=True
-        ).order_by('display_order')
+        # Subcategory attributes plus category-level ones, as on the product form.
+        all_attrs = applicable_attributes(product).order_by('display_order')
 
         # Which ones did the user save for variant generation?
         saved_attr_ids = list(product.variant_generating_attributes.values_list('id', flat=True))
