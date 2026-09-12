@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { pimService, type PimVariant, type PimCategoryAttribute, type PimAttributeOption } from "@/services/pim";
 import { patchVariantPublishControl } from "@/services/product-pim";
-import { type AttributeValues } from "./DynamicAttributeForm";
+import { type AttributeValues, templateValuesFor } from "./DynamicAttributeForm";
 import AttributeValuePicker from "./AttributeValuePicker";
 import { formatRupee } from "@/lib/utils/currency";
 import QRLabelPrintModal, { type QRLabelItem } from "@/components/inventory/QRLabelPrintModal";
@@ -374,6 +374,67 @@ export default function VariantManager({ productId, productCode, productName, ba
     const next = new Set(selectedAttrIds);
     if (next.has(id)) next.delete(id); else next.add(id);
     setSelectedAttrIds(next);
+  };
+
+  // Quick-add in the Auto-Generate panel. Generation combines each ticked
+  // attribute's saved values, so a value (typed, or borrowed from a same-named
+  // attribute in another category) is saved on the attribute first.
+  const [wbDraft, setWbDraft] = useState<Record<number, string>>({});
+  const [wbBusyId, setWbBusyId] = useState<number | null>(null);
+  const [wbErrors, setWbErrors] = useState<Record<number, string>>({});
+
+  // Workbench attributes carry a lighter shape; the quick-add helpers take a full attribute.
+  const asCategoryAttribute = useCallback(
+    (wb: WorkbenchAttribute): PimCategoryAttribute =>
+      allAttributes.find((a) => a.id === wb.id) ?? {
+        id: wb.id,
+        name: wb.name,
+        slug: wb.slug,
+        data_type: wb.data_type as PimCategoryAttribute["data_type"],
+        is_required: false,
+        is_variant_defining: wb.is_variant_defining,
+        min_value: null,
+        max_value: null,
+        display_order: 0,
+        options: wb.options.map((o, i) => ({
+          id: o.id,
+          value: o.value,
+          display_name: o.display_name,
+          display_order: i,
+          extra_cost: o.extra_cost ?? 0,
+        })),
+      },
+    [allAttributes],
+  );
+
+  const addWorkbenchValue = async (wb: WorkbenchAttribute, raw: string) => {
+    const value = raw.trim();
+    if (!value || !onAddOption) return;
+    setWbBusyId(wb.id);
+    setWbErrors((prev) => ({ ...prev, [wb.id]: "" }));
+    try {
+      const option = await onAddOption(asCategoryAttribute(wb), value);
+      setWbAttributes((prev) =>
+        prev.map((a) =>
+          a.id !== wb.id || a.options.some((o) => o.id === option.id)
+            ? a
+            : {
+                ...a,
+                option_count: a.option_count + 1,
+                options: [
+                  ...a.options,
+                  { id: option.id, value: option.value, display_name: option.display_name, extra_cost: option.extra_cost },
+                ],
+              },
+        ),
+      );
+      setWbDraft((prev) => ({ ...prev, [wb.id]: "" }));
+      setPreviewData(null); // a new value changes the combinations
+    } catch (err: unknown) {
+      setWbErrors((prev) => ({ ...prev, [wb.id]: (err as { message?: string })?.message ?? "Could not add value." }));
+    } finally {
+      setWbBusyId(null);
+    }
   };
 
   // Table state
@@ -790,7 +851,7 @@ export default function VariantManager({ productId, productCode, productName, ba
                             <span className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{attr.data_type}</span>
                           </div>
                           <div className="text-xs text-muted-foreground bg-background border rounded-md px-2 py-1 truncate">
-                            {attr.option_count > 0 ? optPreview : "No options"}
+                            {attr.option_count > 0 ? optPreview : "No values yet: tick it, then add values in step 2"}
                           </div>
                         </div>
                       </label>
@@ -800,32 +861,85 @@ export default function VariantManager({ productId, productCode, productName, ba
               </div>
               <div className="space-y-3 mb-4">
                 <h5 className="text-sm font-medium flex items-center gap-2">
-                  2. Set Pricing Rules (Optional add-ons)
+                  2. Values &amp; pricing (add-ons optional)
                   {basePrice && <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-md">Base: ₹{Number(basePrice).toLocaleString("en-IN")}</span>}
                 </h5>
-                {wbAttributes.filter((a) => selectedAttrIds.has(a.id)).map((attr) => (
-                  <div key={attr.id} className="bg-background rounded-lg border p-3">
-                    <div className="text-sm font-medium mb-2">{attr.name} <span className="text-xs text-muted-foreground">({attr.options.length} options)</span></div>
-                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-                      {attr.options.map((opt) => {
-                        const ruleKey = `${attr.slug}::${opt.value}`;
-                        return (
-                          <div key={opt.id} className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-1.5">
-                            <span className="text-xs flex-1 truncate">{opt.display_name}</span>
-                            <div className="flex items-center">
-                              <span className="text-xs text-muted-foreground mr-1">+₹</span>
-                              <input type="number" step="100" placeholder="0"
-                                className="w-16 rounded border px-1.5 py-0.5 text-xs text-right bg-background"
-                                value={pricingRules[ruleKey] ?? ""}
-                                onChange={(e) => setPricingRules({ ...pricingRules, [ruleKey]: e.target.value })}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
+                {wbAttributes.filter((a) => selectedAttrIds.has(a.id)).map((attr) => {
+                  const templates = onAddOption ? templateValuesFor(asCategoryAttribute(attr), templateAttributes) : [];
+                  const busy = wbBusyId === attr.id;
+                  const draft = wbDraft[attr.id] ?? "";
+                  return (
+                    <div key={attr.id} className="bg-background rounded-lg border p-3">
+                      <div className="text-sm font-medium mb-2">{attr.name} <span className="text-xs text-muted-foreground">({attr.options.length} values)</span></div>
+                      {attr.options.length === 0 && (
+                        <p className="mb-2 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+                          No values yet, so this attribute would generate 0 SKUs. Add values below{templates.length > 0 ? " or pick from other categories" : ""}.
+                        </p>
+                      )}
+                      {attr.options.length > 0 && (
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                          {attr.options.map((opt) => {
+                            const ruleKey = `${attr.slug}::${opt.value}`;
+                            return (
+                              <div key={opt.id} className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-1.5">
+                                <span className="text-xs flex-1 truncate">{opt.display_name}</span>
+                                <div className="flex items-center">
+                                  <span className="text-xs text-muted-foreground mr-1">+₹</span>
+                                  <input type="number" step="100" placeholder="0"
+                                    className="w-16 rounded border px-1.5 py-0.5 text-xs text-right bg-background"
+                                    value={pricingRules[ruleKey] ?? ""}
+                                    onChange={(e) => setPricingRules({ ...pricingRules, [ruleKey]: e.target.value })}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                      {onAddOption && (
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          {templates.map((t) => (
+                            <button
+                              key={t}
+                              type="button"
+                              disabled={busy}
+                              title="From another category: adds it to this attribute"
+                              onClick={() => void addWorkbenchValue(attr, t)}
+                              className="inline-flex items-center gap-1 rounded-md border border-dashed px-2 py-1 text-xs text-muted-foreground hover:bg-muted disabled:opacity-50"
+                            >
+                              <Plus className="h-3 w-3" /> {t}
+                            </button>
+                          ))}
+                          <input
+                            type="text"
+                            aria-label={`New ${attr.name} value`}
+                            placeholder={`Add ${attr.name} value`}
+                            value={draft}
+                            disabled={busy}
+                            onChange={(e) => setWbDraft((prev) => ({ ...prev, [attr.id]: e.target.value }))}
+                            onKeyDown={(e) => {
+                              // Enter would otherwise submit the surrounding product form.
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                void addWorkbenchValue(attr, draft);
+                              }
+                            }}
+                            className="w-40 rounded-md border bg-background px-2 py-1 text-xs"
+                          />
+                          <button
+                            type="button"
+                            disabled={busy || !draft.trim()}
+                            onClick={() => void addWorkbenchValue(attr, draft)}
+                            className="inline-flex items-center gap-1 rounded-md border border-primary/40 bg-primary/5 px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/10 disabled:opacity-50"
+                          >
+                            <Plus className="h-3 w-3" /> Add
+                          </button>
+                        </div>
+                      )}
+                      {wbErrors[attr.id] ? <p role="alert" className="mt-1 text-xs text-destructive">{wbErrors[attr.id]}</p> : null}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <button type="button" onClick={handlePreview} className="inline-flex items-center gap-1.5 rounded-lg border px-4 py-2 text-sm hover:bg-muted">
