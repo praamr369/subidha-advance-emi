@@ -35,11 +35,26 @@ GIF = (
     b"\xf9\x04\x01\x00\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02D\x01\x00;"
 )
 
-TEMP_MEDIA = tempfile.mkdtemp(prefix="ar-test-media-")
+class TempMediaMixin:
+    """Each test class gets its own MEDIA_ROOT, removed when the class finishes.
 
+    Class-scoped on purpose: the parallel test runner keeps a class inside one
+    worker but spreads a module's classes across workers, so a module-level
+    directory removed in tearDownModule vanished under another worker mid-save.
+    """
 
-def tearDownModule():
-    shutil.rmtree(TEMP_MEDIA, ignore_errors=True)
+    @classmethod
+    def setUpClass(cls):
+        cls._media_root = tempfile.mkdtemp(prefix="ar-test-media-")
+        cls._media_override = override_settings(MEDIA_ROOT=cls._media_root)
+        cls._media_override.enable()
+        super().setUpClass()
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        cls._media_override.disable()
+        shutil.rmtree(cls._media_root, ignore_errors=True)
 
 
 def _file(name, content, content_type="application/octet-stream"):
@@ -61,8 +76,7 @@ def _box_extent(gltf):
     return tuple(max(m[i] for m in maxes) for i in range(3))
 
 
-@override_settings(MEDIA_ROOT=TEMP_MEDIA)
-class ArModelUploadTests(APITestCase):
+class ArModelUploadTests(TempMediaMixin, APITestCase):
     """Admin upload of 3D models into the PIM media gallery."""
 
     def setUp(self):
@@ -147,8 +161,7 @@ class ArModelUploadTests(APITestCase):
         self.assertTrue(ProductMediaItem.objects.get(pk=model_id).is_hero)
 
 
-@override_settings(MEDIA_ROOT=TEMP_MEDIA)
-class PublicArModelTests(APITestCase):
+class PublicArModelTests(TempMediaMixin, APITestCase):
     """The public product page's `ar_model`: uploaded model, else auto size preview."""
 
     def setUp(self):
@@ -329,7 +342,7 @@ class SuggestArSizeTests(APITestCase):
         self.assertIsNone(suggest_ar_size(self.pim))
 
 
-class ArAdminActionTests(APITestCase):
+class ArAdminActionTests(TempMediaMixin, APITestCase):
     def setUp(self):
         super().setUp()
         self.client.force_authenticate(user=create_admin_user(username="ar_admin2", phone="9364000872"))
@@ -366,7 +379,6 @@ class ArAdminActionTests(APITestCase):
         self.assertEqual(blank.ar_width_cm, Decimal("91.4"))
         self.assertEqual(manual.ar_width_cm, Decimal("190.0"), "a saved size must never be overwritten")
 
-    @override_settings(MEDIA_ROOT=TEMP_MEDIA)
     def test_coverage_counts(self):
         with_model = self._pim("AR-M")
         ProductMediaItem.objects.create(product=with_model, kind=MediaKind.MODEL_3D, file=_file("m.glb", GLB))
