@@ -10,9 +10,12 @@ import PolicyMarkdown from "@/components/public/PolicyMarkdown";
 import { getPublicPolicyBySlug } from "@/lib/public-api";
 import { getPublicBannerWithFallback } from "@/lib/public-page-banners";
 import { ROUTES } from "@/lib/routes";
+import type { PublicPolicyPage } from "@/services/public";
 
 type PolicyPublicPageProps = {
   slug: string;
+  /** Already-loaded policy (null = none published); omit to fetch it here. */
+  policy?: PublicPolicyPage | null;
   pageTitle: string;
   heroTitle: string;
   heroSubtitle: string;
@@ -20,6 +23,7 @@ type PolicyPublicPageProps = {
 
 export default async function PolicyPublicPage({
   slug,
+  policy: preloadedPolicy,
   pageTitle,
   heroTitle,
   heroSubtitle,
@@ -27,7 +31,7 @@ export default async function PolicyPublicPage({
   const locale = await getPublicLocale();
   const dict = getPublicDictionary(locale);
 
-  const policy = await getPublicPolicyBySlug(slug);
+  const policy = preloadedPolicy !== undefined ? preloadedPolicy : await getPublicPolicyBySlug(slug);
   const policyBanner = getPublicBannerWithFallback("policies");
 
   return (

@@ -57,7 +57,8 @@ export async function generateMetadata({
     return buildPublicMetadata({
       title,
       description,
-      path: `/products/${slug}`,
+      // Canonical is the product code (as in the JSON-LD), even when the page was opened by numeric id.
+      path: `/products/${product.product_code || slug}`,
       imagePath: product.image || undefined,
     });
   } catch {

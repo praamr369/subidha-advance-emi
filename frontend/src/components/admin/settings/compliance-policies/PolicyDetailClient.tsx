@@ -231,7 +231,14 @@ function MarkdownRenderer({ text }: { text: string }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function PolicyDetailClient({ slug }: { slug: string }) {
+export function PolicyDetailClient({
+  slug,
+  onPolicyLoaded,
+}: {
+  slug: string;
+  /** Called with the policy after every load or save, e.g. to show its title in the page header. */
+  onPolicyLoaded?: (policy: AdminPolicyPage) => void;
+}) {
   const [policy, setPolicy] = useState<AdminPolicyPage | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -260,6 +267,7 @@ export function PolicyDetailClient({ slug }: { slug: string }) {
     setEditSummary(data.raw_summary ?? data.summary);
     setEditContent(data.raw_content ?? data.content);
     setDirty(false);
+    onPolicyLoaded?.(data);
   }
 
   async function loadPolicy() {
