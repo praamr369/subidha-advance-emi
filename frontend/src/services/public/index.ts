@@ -412,18 +412,25 @@ function normalizePublicLuckyDraw(row: PublicLuckyDrawSummary): PublicLuckyDrawS
   };
 }
 
-export async function getPublicStats(): Promise<PublicStats> {
+/** Opt-in short-lived Data Cache for server renders that can tolerate slightly stale public data. */
+type PublicCacheOptions = { revalidate?: number };
+
+function publicCacheInit(cache?: PublicCacheOptions): FetchPublicOptions {
+  return cache?.revalidate ? { next: { revalidate: cache.revalidate } } : { cache: "no-store" };
+}
+
+export async function getPublicStats(cache?: PublicCacheOptions): Promise<PublicStats> {
   return fetchPublic<PublicStats>(
     "/public/stats/",
-    { cache: "no-store" },
+    publicCacheInit(cache),
     "Unable to load live business stats right now."
   );
 }
 
-export async function getPublicLatestWinner(): Promise<PublicLatestWinnerResponse> {
+export async function getPublicLatestWinner(cache?: PublicCacheOptions): Promise<PublicLatestWinnerResponse> {
   const payload = await fetchPublic<PublicLatestWinnerResponse>(
     "/public/latest-winner/",
-    { cache: "no-store" },
+    publicCacheInit(cache),
     "Unable to load the latest winner right now."
   );
   return {
@@ -541,6 +548,8 @@ export async function listPublicProducts(options?: {
   min_price?: number;
   max_price?: number;
   include_variants?: boolean;
+  /** Server renders only: cache the response for this many seconds. */
+  revalidate?: number;
 }): Promise<{
   products: PublicProduct[];
   count: number;
@@ -560,7 +569,7 @@ export async function listPublicProducts(options?: {
   const qs = params.toString() ? `?${params.toString()}` : "";
   const payload = await fetchPublic<PublicProductsResponse>(
     `/public/products/${qs}`,
-    { cache: "no-store" },
+    publicCacheInit(options),
     "Unable to load products right now."
   );
 

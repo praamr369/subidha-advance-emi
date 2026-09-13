@@ -7,6 +7,7 @@ import { ArrowUpRight, Search, SlidersHorizontal, Sparkles, X, Loader2 } from "l
 import PublicProductMedia from "@/components/public/PublicProductMedia";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import ProductCard3D from "@/components/public/ui/ProductCard3D";
+import { buildProductSlides } from "@/components/public/ui/product-slides";
 import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/format";
@@ -328,6 +329,7 @@ export default function ProductGrid({
                 hideMonthly={monthly == null}
                 originalPrice={originalPrice}
                 imageUrl={product.image || ""}
+                media={buildProductSlides(product)}
                 href={`/products/${product.product_code}`}
               />
             );

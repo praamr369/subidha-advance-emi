@@ -143,9 +143,9 @@ export const publicContent = {
       bn: "স্পষ্ট মাসিক পরিকল্পনায় ফার্নিচার ও অ্যাপ্লায়েন্স — আর স্বচ্ছ লাকি প্ল্যান নিয়ম",
     },
     subtitle: {
-      en: "Browse the live catalogue, apply with product context, and work with the branch on tenure and EMI comfort. Draws are conducted fairly; holding a Lucky ID does not guarantee a win, and winner benefits apply only to future EMI as published.",
-      hi: "लाइव कैटलॉग देखें, उत्पाद संदर्भ के साथ आवेदन करें, और शाखा से किश्त अवधि व राशि तय करें। ड्रॉ निष्पक्ष होते हैं; लकी ID रखने का मतलब जीत की गारंटी नहीं, और लाभ केवल प्रकाशित नियमों के अनुसार भविष्य की EMI पर लागू होता है।",
-      bn: "লাইভ ক্যাটালগ দেখুন, পণ্য প্রসঙ্গে আবেদন করুন, আর শাখার সঙ্গে কিস্তির মেয়াদ ও সামর্থ্য ঠিক করুন। ড্রয় ন্যায্য; লাকি ID থাকা জেতার গ্যারান্টি নয়, আর সুবিধা শুধু প্রকাশিত নিয়ম অনুযায়ী ভবিষ্যৎ EMI-তে প্রযোজ্য।",
+      en: "Choose sofas, beds, wardrobes, dining sets and home appliances — then own them on a Lucky Plan EMI, use them on rent or lease, or buy outright. Every payment is receipted and every draw is published for anyone to verify.",
+      hi: "सोफ़ा, बेड, वार्डरोब, डाइनिंग सेट और घरेलू उपकरण चुनें — फिर लकी प्लान EMI से अपना बनाएं, किराये या लीज़ पर लें, या सीधे खरीदें। हर भुगतान की रसीद मिलती है और हर ड्रॉ सबके सत्यापन के लिए प्रकाशित होता है।",
+      bn: "সোফা, খাট, আলমারি, ডাইনিং সেট ও গৃহস্থালির যন্ত্রপাতি বেছে নিন — তারপর লাকি প্ল্যান EMI-তে নিজের করুন, ভাড়া বা লিজে নিন, অথবা সরাসরি কিনুন। প্রতিটি পেমেন্টের রসিদ পাবেন, আর প্রতিটি ড্রয় সবার যাচাইয়ের জন্য প্রকাশিত হয়।",
     },
   },
   supportStrip: {

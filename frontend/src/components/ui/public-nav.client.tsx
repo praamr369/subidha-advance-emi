@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X, MessageCircle } from "lucide-react";
 import { useMemo, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 
 import BrandLockup from "@/components/public/BrandLockup";
 import GlobalSearch from "@/components/public/GlobalSearch";
@@ -168,15 +167,10 @@ export default function PublicNavClient({
           {trustBadge}
         </div>
 
-        <AnimatePresence>
-          {mobileOpen && (
-            <motion.div
+        {mobileOpen ? (
+            <div
               id={MOBILE_MENU_ID}
-              initial={{ opacity: 0, y: -20, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -20, scale: 0.95 }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
-              className="grid max-h-[calc(100dvh-5.5rem)] gap-3 overflow-y-auto overscroll-contain rounded-[1.4rem] border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_82%,transparent)] p-2 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.68)] backdrop-blur lg:hidden origin-top"
+              className="grid max-h-[calc(100dvh-5.5rem)] gap-3 overflow-y-auto overscroll-contain rounded-[1.4rem] border border-[var(--border)] bg-[var(--surface-card-elevated)] p-2 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.68)] lg:hidden"
             >
               <div className="rounded-xl border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_88%,transparent)] p-3">
                 <LanguageSwitcher value={language} />
@@ -187,15 +181,9 @@ export default function PublicNavClient({
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                   {dictionary.navigate}
                 </div>
-                    <motion.div
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      transition={{ duration: 0.2 }}
-                      className="mt-2 mb-4 px-1"
-                    >
+                    <div className="mt-2 mb-4 px-1">
                       <GlobalSearch />
-                    </motion.div>
+                    </div>
 
                     <div className="grid gap-1">
                       {links.map((link) => {
@@ -250,9 +238,8 @@ export default function PublicNavClient({
                   </Link>
                 ))}
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            </div>
+        ) : null}
       </div>
     </nav>
   );
