@@ -1,3 +1,4 @@
+from django.utils.text import slugify
 from rest_framework import serializers
 from .models import (
     ProductCategory,
@@ -12,6 +13,21 @@ from .models import (
     ProductMediaItem,
     MediaKind,
 )
+
+
+def _auto_slug(name, fallback):
+    # Mirrors the models' save(): slug derived from name when not given.
+    return slugify(name or "")[:100] or fallback
+
+
+def _reject_taken_slug(queryset, *, instance, slug, label):
+    """400 instead of the unique-constraint IntegrityError (500) save() would hit."""
+    if instance is not None:
+        queryset = queryset.exclude(pk=instance.pk)
+    if queryset.filter(slug=slug).exists():
+        raise serializers.ValidationError(
+            {"name": f'A {label} with this name already exists here (slug "{slug}"). Use a different name.'}
+        )
 
 
 class AttributeOptionSerializer(serializers.ModelSerializer):
@@ -38,6 +54,18 @@ class CategoryAttributeSerializer(serializers.ModelSerializer):
             "subcategory": {"required": False, "allow_null": True},
         }
 
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        instance = self.instance
+        category = attrs.get("category", getattr(instance, "category", None))
+        subcategory = attrs["subcategory"] if "subcategory" in attrs else getattr(instance, "subcategory", None)
+        slug = instance.slug if instance is not None else _auto_slug(attrs.get("name"), "attribute")
+        # unique_together (category, subcategory, slug); NULL subcategory = category-level attribute.
+        scope = CategoryAttribute.objects.filter(category=category)
+        scope = scope.filter(subcategory=subcategory) if subcategory is not None else scope.filter(subcategory__isnull=True)
+        _reject_taken_slug(scope, instance=instance, slug=slug, label="attribute")
+        return attrs
+
 
 class ProductSubcategorySerializer(serializers.ModelSerializer):
     attributes = serializers.SerializerMethodField()
@@ -52,6 +80,16 @@ class ProductSubcategorySerializer(serializers.ModelSerializer):
         fields = ["id", "category", "name", "slug", "display_order", "attributes"]
         extra_kwargs = {"slug": {"read_only": True}}
 
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        instance = self.instance
+        category = attrs.get("category", getattr(instance, "category", None))
+        slug = instance.slug if instance is not None else _auto_slug(attrs.get("name"), "subcategory")
+        _reject_taken_slug(
+            ProductSubcategory.objects.filter(category=category), instance=instance, slug=slug, label="subcategory"
+        )
+        return attrs
+
     def get_attributes(self, obj):
         attrs = CategoryAttribute.objects.filter(subcategory=obj, is_active=True).prefetch_related("options")
         return CategoryAttributeSerializer(attrs, many=True).data
@@ -65,6 +103,18 @@ class ProductCategorySerializer(serializers.ModelSerializer):
         model = ProductCategory
         fields = ["id", "name", "slug", "icon", "display_order", "subcategories", "attributes"]
         extra_kwargs = {"slug": {"required": False, "allow_blank": True}}
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        instance = self.instance
+        if attrs.get("slug"):
+            slug = attrs["slug"]
+        elif instance is not None and "slug" not in attrs:
+            return attrs  # slug unchanged; renaming never re-derives it
+        else:
+            slug = _auto_slug(attrs.get("name", getattr(instance, "name", "")), "category")
+        _reject_taken_slug(ProductCategory.objects.all(), instance=instance, slug=slug, label="category")
+        return attrs
 
     def get_attributes(self, obj):
         attrs = CategoryAttribute.objects.filter(category=obj, subcategory__isnull=True, is_active=True).prefetch_related("options")
