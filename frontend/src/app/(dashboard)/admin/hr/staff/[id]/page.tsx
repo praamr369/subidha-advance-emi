@@ -801,7 +801,7 @@ export default function AdminHrStaffProfilePage() {
   const pendingExpenses = expenses.filter((e) => e.status === "PENDING");
   const pendingAdvances = advances.filter((a) => a.status === "DRAFT");
   const outstandingAdv  = advances.filter((a) => ["DISBURSED", "PARTIALLY_RECOVERED"].includes(a.status));
-  const avatarBg        = staff.is_active ? "bg-primary" : "bg-muted";
+  const avatarBg        = staff.is_active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground";
 
   return (
     <ERPPageShell
@@ -821,7 +821,7 @@ export default function AdminHrStaffProfilePage() {
       <div className="rounded-xl border border-border bg-card p-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-5">
           {/* Avatar */}
-          <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-full ${avatarBg} text-2xl font-bold text-primary-foreground`}>
+          <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-full ${avatarBg} text-2xl font-bold`}>
             {initials(staff.name)}
           </div>
 
