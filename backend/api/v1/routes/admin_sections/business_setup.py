@@ -37,6 +37,8 @@ from api.v1.views.admin_policy_site import AdminPolicyPageListCreateView
 from api.v1.views.admin_policy_site import AdminPolicyPagePublishView
 from api.v1.views.admin_policy_site import AdminPolicySeedDefaultsView
 from api.v1.views.admin_public_site import AdminPublicBusinessProfileView
+from api.v1.views.admin_server_backups import AdminServerBackupDownloadView
+from api.v1.views.admin_server_backups import AdminServerBackupsView
 
 urlpatterns = [
 
@@ -75,6 +77,11 @@ urlpatterns = [
     path("business-setup/backups/", BusinessSetupBackupJobsView.as_view()),
     path("business-setup/backups/<int:pk>/", BusinessSetupBackupJobDetailView.as_view()),
     path("business-setup/backups/<int:pk>/download/", BusinessSetupBackupJobDownloadView.as_view()),
+    path("business-setup/server-backups/", AdminServerBackupsView.as_view()),
+    path(
+        "business-setup/server-backups/<str:name>/download/<str:filename>/",
+        AdminServerBackupDownloadView.as_view(),
+    ),
     path("business-setup/restore/preview/", BusinessSetupRestorePreviewView.as_view()),
     path("business-setup/restore/", BusinessSetupRestoreExecuteView.as_view()),
     path("business-setup/restore-jobs/", BusinessSetupRestoreJobsView.as_view()),

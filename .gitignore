@@ -130,6 +130,7 @@ docs/_build/
 
 # Private backup/export artifacts
 backend/private_backups/
+backend/backups/
 *.backup
 *.dump
 *.sql

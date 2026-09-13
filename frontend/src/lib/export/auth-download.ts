@@ -82,10 +82,7 @@ async function resolveError(response: Response): Promise<Error> {
   return new Error(body || `Download failed (${response.status})`);
 }
 
-export async function downloadAuthenticatedFile(
-  path: string,
-  fallbackFilename: string
-): Promise<void> {
+async function fetchAuthorized(path: string): Promise<Response> {
   let response = await fetchDownload(path, getAccessToken());
 
   if (response.status === 401) {
@@ -99,7 +96,63 @@ export async function downloadAuthenticatedFile(
   if (!response.ok) {
     throw await resolveError(response);
   }
+  return response;
+}
 
+type SaveFilePicker = (options?: { suggestedName?: string }) => Promise<FileSystemFileHandle>;
+
+function saveFilePicker(): SaveFilePicker | null {
+  if (typeof window === "undefined") return null;
+  const picker = (window as unknown as { showSaveFilePicker?: SaveFilePicker }).showSaveFilePicker;
+  return typeof picker === "function" ? picker.bind(window) : null;
+}
+
+/** True when the browser can ask where to save (Chrome / Edge on desktop). */
+export function canChooseSaveLocation(): boolean {
+  return saveFilePicker() !== null;
+}
+
+/**
+ * Ask the user where to save (e.g. an external hard disk), then stream the
+ * authenticated download straight into that file so large backups never sit
+ * in browser memory. Falls back to a normal browser download when the
+ * browser has no save picker. Must be called directly from a click handler:
+ * the picker opens before any network await so the user gesture still counts.
+ */
+export async function saveAuthenticatedFileAs(
+  path: string,
+  suggestedName: string
+): Promise<"saved" | "cancelled"> {
+  const picker = saveFilePicker();
+  if (!picker) {
+    await downloadAuthenticatedFile(path, suggestedName);
+    return "saved";
+  }
+
+  let handle: FileSystemFileHandle;
+  try {
+    handle = await picker({ suggestedName });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") return "cancelled";
+    throw error;
+  }
+
+  const response = await fetchAuthorized(path);
+  const writable = await handle.createWritable();
+  if (response.body) {
+    await response.body.pipeTo(writable);
+  } else {
+    await writable.write(await response.blob());
+    await writable.close();
+  }
+  return "saved";
+}
+
+export async function downloadAuthenticatedFile(
+  path: string,
+  fallbackFilename: string
+): Promise<void> {
+  const response = await fetchAuthorized(path);
   const blob = await response.blob();
   const filename = resolveFilename(
     response.headers.get("content-disposition"),
