@@ -2,7 +2,7 @@
 
 import { Globe } from "lucide-react";
 
-import { PUBLIC_LANGUAGES, PUBLIC_LANGUAGE_LABELS, type PublicLanguage } from "@/lib/public-i18n";
+import { PUBLIC_LANG_COOKIE, PUBLIC_LANGUAGES, PUBLIC_LANGUAGE_LABELS, type PublicLanguage } from "@/lib/public-i18n";
 import { cn } from "@/lib/utils";
 
 type LanguageSwitcherProps = {
@@ -10,16 +10,24 @@ type LanguageSwitcherProps = {
   className?: string;
 };
 
+const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
+
+/**
+ * Remember the visitor's language in the cookie the server pages read on every
+ * request (lib/public-i18n.server.ts). Written in the browser, not via a Next /api
+ * route: in production nginx sends every /api/* request to Django, so such a route
+ * 404s and the choice was silently lost.
+ */
+function persistLanguage(language: PublicLanguage) {
+  const secure = window.location.protocol === "https:" ? "; secure" : "";
+  document.cookie = `${PUBLIC_LANG_COOKIE}=${language}; path=/; max-age=${ONE_YEAR_SECONDS}; samesite=lax${secure}`;
+}
+
 export default function LanguageSwitcher({ value, className }: LanguageSwitcherProps) {
   function setLanguage(nextLanguage: PublicLanguage) {
     if (nextLanguage === value) return;
-    void fetch("/api/public/language", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ language: nextLanguage }),
-    }).finally(() => {
-      window.location.reload();
-    });
+    persistLanguage(nextLanguage);
+    window.location.reload();
   }
 
   return (
