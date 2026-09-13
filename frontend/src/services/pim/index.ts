@@ -201,6 +201,13 @@ export interface PimMediaItem {
   created_at: string;
 }
 
+export interface PimTreeSummary {
+  blueprints: number;
+  variant_skus: number;
+  published: number;
+  draft: number;
+}
+
 export interface PimArSizeSuggestion {
   width_cm: number;
   depth_cm: number;
@@ -278,6 +285,10 @@ export const pimService = {
     is_published?: boolean;
     page?: number;
     page_size?: number;
+    /** Blueprints only (no variant SKUs); search then also matches their SKUs. */
+    roots_only?: boolean;
+    /** Only the variant SKUs of these blueprints. */
+    parent?: number[];
   }): Promise<{ results: PimProduct[]; count: number }> => {
     const params = new URLSearchParams();
     params.set("page_size", filters?.page_size ? String(filters.page_size) : "50");
@@ -286,10 +297,20 @@ export const pimService = {
     if (filters?.subcategory) params.set("subcategory", String(filters.subcategory));
     if (filters?.search) params.set("search", filters.search);
     if (filters?.is_published !== undefined) params.set("is_published", String(filters.is_published));
+    if (filters?.roots_only) params.set("roots_only", "true");
+    if (filters?.parent?.length) params.set("parent", filters.parent.join(","));
     return request<PaginatedOrArray<PimProduct>>(`${BASE}/products/?${params}`).then((raw) => {
       if (Array.isArray(raw)) return { results: raw, count: raw.length };
       return { results: raw.results ?? [], count: raw.count ?? (raw.results?.length ?? 0) };
     });
+  },
+
+  /** Blueprint / variant-SKU counts for the PIM tree view under the same filters. */
+  getTreeSummary: (filters?: { category?: string | number; search?: string }): Promise<PimTreeSummary> => {
+    const params = new URLSearchParams();
+    if (filters?.category) params.set("category", String(filters.category));
+    if (filters?.search) params.set("search", filters.search);
+    return request<PimTreeSummary>(`${BASE}/products/tree_summary/?${params}`);
   },
 
   getProduct: (id: number): Promise<PimProduct> =>

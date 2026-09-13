@@ -4,6 +4,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from api.v1.pagination import AdminListPagination
 from api.v1.permissions import IsAdmin
 
 from .models import (
@@ -82,6 +83,9 @@ class CategoryAttributeViewSet(viewsets.ModelViewSet):
 
 class PimProductViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsAdmin]
+    # The project default paginator ignores ?page_size (always 20 rows), which made
+    # the admin PIM tree show only 20 blueprints and broke its page maths.
+    pagination_class = AdminListPagination
 
     def get_queryset(self):
         qs = PimProduct.objects.select_related("category", "subcategory", "parent__category", "parent__subcategory").prefetch_related(
@@ -93,6 +97,17 @@ class PimProductViewSet(viewsets.ModelViewSet):
         subcategory_id = self.request.query_params.get("subcategory")
         search = self.request.query_params.get("search")
         is_published = self.request.query_params.get("is_published")
+        # Tree view: page through blueprints only (?roots_only=true), then load their
+        # variant SKUs with ?parent=<id>,<id>,… so every blueprint is reachable page by page.
+        roots_only = (
+            self.request.query_params.get("roots_only", "").lower() == "true"
+            or self.action == "tree_summary"
+        )
+        parent_ids = [p for p in (self.request.query_params.get("parent") or "").split(",") if p.isdigit()]
+        if roots_only:
+            qs = qs.filter(parent__isnull=True)
+        if parent_ids:
+            qs = qs.filter(parent_id__in=parent_ids)
         if category_id:
             category_ids = [c for c in category_id.split(",") if c]
             if category_ids:
@@ -106,7 +121,13 @@ class PimProductViewSet(viewsets.ModelViewSet):
                 Q(subcategory_id=subcategory_id) | Q(parent__subcategory_id=subcategory_id)
             )
         if search:
-            qs = qs.filter(Q(name__icontains=search) | Q(code__icontains=search))
+            match = Q(name__icontains=search) | Q(code__icontains=search)
+            if roots_only:
+                # A blueprint is also found through any of its variant SKUs.
+                match |= Q(child_pim_products__name__icontains=search) | Q(child_pim_products__code__icontains=search)
+            qs = qs.filter(match)
+            if roots_only:
+                qs = qs.distinct()
         if is_published is not None:
             qs = qs.filter(is_published=is_published.lower() == "true")
         return qs
@@ -615,6 +636,17 @@ class PimProductViewSet(viewsets.ModelViewSet):
             "repaired": repaired,
             "count": len(repaired),
             "message": f"Repaired {len(repaired)} variant(s) to match parent category.",
+        })
+
+    @action(detail=False, methods=["get"])
+    def tree_summary(self, request):
+        """Counts for the PIM tree view — blueprints and their variant SKUs — under its filters."""
+        blueprints = self.get_queryset()
+        return Response({
+            "blueprints": blueprints.count(),
+            "published": blueprints.filter(is_published=True).count(),
+            "draft": blueprints.filter(is_published=False).count(),
+            "variant_skus": PimProduct.objects.filter(parent_id__in=blueprints.values("pk")).count(),
         })
 
     # ── "View in your room" AR ───────────────────────────────────────────────

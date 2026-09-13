@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Download, RefreshCw, Search, SlidersHorizontal, X, Layers, ExternalLink, ChevronRight, ChevronDown, GitBranch, CheckCircle2, AlertCircle, Star, Package2 } from "lucide-react";
-import { pimService, type PimProduct, type PimCategory } from "@/services/pim";
+import { pimService, type PimProduct, type PimCategory, type PimTreeSummary } from "@/services/pim";
 
 import ProductQuickActions from "@/components/admin/products/ProductQuickActions";
 import ERPDataToolbar from "@/components/erp/ERPDataToolbar";
@@ -311,28 +311,114 @@ function PimProductRow({
   );
 }
 
+const PIM_PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
+const PIM_CHILD_PAGE_SIZE = 200;
+
+/** Every variant SKU of the given blueprints, following pages until all are loaded. */
+async function fetchVariantSkus(parentIds: number[]): Promise<PimProduct[]> {
+  if (parentIds.length === 0) return [];
+  const all: PimProduct[] = [];
+  for (let page = 1; ; page += 1) {
+    const { results, count } = await pimService.getProducts({ parent: parentIds, page, page_size: PIM_CHILD_PAGE_SIZE });
+    all.push(...results);
+    if (results.length === 0 || all.length >= count) return all;
+  }
+}
+
+function PimPager({
+  page,
+  numPages,
+  pageSize,
+  rangeText,
+  loading,
+  onPage,
+  onPageSize,
+}: {
+  page: number;
+  numPages: number;
+  pageSize: number;
+  rangeText: string;
+  loading: boolean;
+  onPage: (page: number) => void;
+  onPageSize: (size: number) => void;
+}) {
+  const btn = "rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground disabled:opacity-50 hover:bg-muted";
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-2.5 text-sm text-muted-foreground">
+      <span>{rangeText}</span>
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="flex items-center gap-1.5 text-xs">
+          Per page
+          <select
+            value={pageSize}
+            onChange={(e) => onPageSize(Number(e.target.value))}
+            className="rounded-lg border border-border bg-background px-2 py-1 text-sm text-foreground"
+          >
+            {PIM_PAGE_SIZE_OPTIONS.map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </label>
+        <button type="button" className={btn} disabled={loading || page <= 1} onClick={() => onPage(1)}>First</button>
+        <button type="button" className={btn} disabled={loading || page <= 1} onClick={() => onPage(page - 1)}>Previous</button>
+        <span className="px-2 tabular-nums">Page {page} of {numPages}</span>
+        <button type="button" className={btn} disabled={loading || page >= numPages} onClick={() => onPage(page + 1)}>Next</button>
+        <button type="button" className={btn} disabled={loading || page >= numPages} onClick={() => onPage(numPages)}>Last</button>
+      </div>
+    </div>
+  );
+}
+
 function PimPanel() {
   const [pimProducts, setPimProducts] = useState<PimProduct[]>([]);
   const [pimCategories, setPimCategories] = useState<PimCategory[]>([]);
   const [pimLoading, setPimLoading] = useState(true);
+  const [pimError, setPimError] = useState<string | null>(null);
+  const [pimSearchInput, setPimSearchInput] = useState("");
   const [pimSearch, setPimSearch] = useState("");
   const [pimCat, setPimCat] = useState<number | "">("");
+  const [pimPage, setPimPage] = useState(1);
+  const [pimPageSize, setPimPageSize] = useState(PIM_PAGE_SIZE_OPTIONS[1]);
+  const [blueprintTotal, setBlueprintTotal] = useState(0);
+  const [treeSummary, setTreeSummary] = useState<PimTreeSummary | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [relinking, setRelinking] = useState(false);
   const [relinkResult, setRelinkResult] = useState<string | null>(null);
+  const tableTopRef = useRef<HTMLDivElement>(null);
 
-  const loadPimProducts = useCallback(() => {
+  useEffect(() => {
+    pimService.getCategories().then((cats) => setPimCategories(Array.isArray(cats) ? cats : []), () => {});
+  }, []);
+
+  // Wait for a pause in typing before searching, and restart from page 1.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setPimSearch(pimSearchInput.trim());
+      setPimPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [pimSearchInput]);
+
+  // One server page of blueprints, plus every variant SKU of those blueprints.
+  const loadPimProducts = useCallback(async () => {
     setPimLoading(true);
-    Promise.all([
-      pimService.getProducts({ search: pimSearch || undefined, category: pimCat || undefined, page_size: 200 }).then(r => r.results),
-      pimService.getCategories(),
-    ]).then(([prods, cats]) => {
-      setPimProducts(Array.isArray(prods) ? prods : []);
-      setPimCategories(Array.isArray(cats) ? cats : []);
-    }).catch(() => {}).finally(() => setPimLoading(false));
-  }, [pimSearch, pimCat]);
+    setPimError(null);
+    const filters = { search: pimSearch || undefined, category: pimCat || undefined };
+    try {
+      const [blueprintPage, summary] = await Promise.all([
+        pimService.getProducts({ ...filters, roots_only: true, page: pimPage, page_size: pimPageSize }),
+        pimService.getTreeSummary(filters),
+      ]);
+      const skus = await fetchVariantSkus(blueprintPage.results.map((p) => p.id));
+      setPimProducts([...blueprintPage.results, ...skus]);
+      setBlueprintTotal(blueprintPage.count);
+      setTreeSummary(summary);
+    } catch {
+      setPimError("Could not load PIM products. Try again.");
+    } finally {
+      setPimLoading(false);
+    }
+  }, [pimSearch, pimCat, pimPage, pimPageSize]);
 
-  useEffect(() => { loadPimProducts(); }, [loadPimProducts]);
+  useEffect(() => { void loadPimProducts(); }, [loadPimProducts]);
 
   const handleRelink = useCallback(async () => {
     setRelinking(true);
@@ -363,8 +449,27 @@ function PimPanel() {
     });
   }, []);
 
-  const baseCount = roots.length;
-  const variantSkuCount = pimProducts.filter((p) => !!p.parent_id).length;
+  const pimNumPages = Math.max(1, Math.ceil(blueprintTotal / pimPageSize));
+  const rangeText = blueprintTotal
+    ? `Blueprints ${(pimPage - 1) * pimPageSize + 1}–${Math.min(pimPage * pimPageSize, blueprintTotal)} of ${blueprintTotal}`
+    : "No blueprints";
+  const goToPage = (next: number) => {
+    setPimPage(Math.min(Math.max(next, 1), pimNumPages));
+    tableTopRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+  };
+  const changePimPageSize = (size: number) => {
+    setPimPageSize(size);
+    setPimPage(1);
+  };
+  const pagerProps = {
+    page: pimPage,
+    numPages: pimNumPages,
+    pageSize: pimPageSize,
+    rangeText,
+    loading: pimLoading,
+    onPage: goToPage,
+    onPageSize: changePimPageSize,
+  };
 
   return (
     <div className="space-y-4">
@@ -372,10 +477,10 @@ function PimPanel() {
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div className="flex gap-4 flex-wrap">
           {[
-            { label: "Blueprints", value: baseCount },
-            { label: "Variant SKUs", value: variantSkuCount },
-            { label: "Published", value: pimProducts.filter((p) => p.is_published && !p.parent_id).length },
-            { label: "Draft", value: pimProducts.filter((p) => !p.is_published && !p.parent_id).length },
+            { label: "Blueprints", value: treeSummary?.blueprints ?? 0 },
+            { label: "Variant SKUs", value: treeSummary?.variant_skus ?? 0 },
+            { label: "Published", value: treeSummary?.published ?? 0 },
+            { label: "Draft", value: treeSummary?.draft ?? 0 },
           ].map((m) => (
             <div key={m.label} className="rounded-xl border bg-background px-4 py-2.5 min-w-[90px]">
               <div className="text-lg font-bold tabular-nums">{m.value}</div>
@@ -411,24 +516,33 @@ function PimPanel() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
             className="w-full pl-9 pr-3 py-2 text-sm border rounded-xl bg-background"
-            placeholder="Search PIM products…"
-            value={pimSearch}
-            onChange={(e) => setPimSearch(e.target.value)}
+            placeholder="Search blueprints or SKU codes…"
+            value={pimSearchInput}
+            onChange={(e) => setPimSearchInput(e.target.value)}
           />
         </div>
         <select
           className="px-3 py-2 text-sm border rounded-xl bg-background"
           value={pimCat}
-          onChange={(e) => setPimCat(e.target.value ? Number(e.target.value) : "")}
+          onChange={(e) => {
+            setPimCat(e.target.value ? Number(e.target.value) : "");
+            setPimPage(1);
+          }}
         >
           <option value="">All Categories</option>
           {pimCategories.map((c) => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
         </select>
       </div>
 
+      <div ref={tableTopRef} className="scroll-mt-24">
+        <PimPager {...pagerProps} />
+      </div>
+
       {/* PIM product hierarchical table */}
       <div className="rounded-xl border overflow-x-auto">
-        {pimLoading ? (
+        {pimError ? (
+          <div className="p-8 text-center text-sm text-red-600">{pimError}</div>
+        ) : pimLoading ? (
           <div className="p-8 text-center text-sm text-muted-foreground">Loading PIM products…</div>
         ) : pimProducts.length === 0 ? (
           <div className="p-8 text-center text-sm text-muted-foreground">
@@ -472,6 +586,8 @@ function PimPanel() {
           </table>
         )}
       </div>
+
+      <PimPager {...pagerProps} />
 
       <div className="rounded-xl border border-blue-200 bg-blue-50 dark:bg-blue-900/10 dark:border-blue-800 px-4 py-3 text-xs text-blue-700 dark:text-blue-300 flex items-start gap-3">
         <Layers className="h-4 w-4 shrink-0 mt-0.5" />
