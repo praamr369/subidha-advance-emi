@@ -120,6 +120,26 @@ export type PublicLanguage = (typeof PUBLIC_LANGUAGES)[number];
 
 export const PUBLIC_LANG_COOKIE = "subidha_public_lang";
 
+/**
+ * Top-level app areas whose UI is English-only: the public-site language never
+ * applies there and their `<html lang>` stays "en". Keep in step with the route
+ * groups under src/app — (dashboard), (auth), (website) and the top-level folders.
+ * Matched per path segment, so public "/customers" and "/partners" are unaffected.
+ */
+export const NON_PUBLIC_PATH_PREFIXES = [
+  "/admin", "/cashier", "/customer", "/partner", "/staff", "/vendor",
+  "/login", "/logout", "/register", "/forgot-password", "/reset-password",
+  "/forms", "/profile", "/settings", "/unauthorized", "/api",
+] as const;
+
+/**
+ * Runs in `<head>` before the body is parsed (root layout, beforeInteractive):
+ * on public pages it sets `<html lang>` from the language cookie, so Hindi and
+ * Bengali pages are declared as such from first paint while the root layout
+ * stays static. Client-side navigation is handled by components/public/DocumentLang.
+ */
+export const PUBLIC_LANG_BOOTSTRAP_SCRIPT = `(function(){try{var p=location.pathname,s=${JSON.stringify(NON_PUBLIC_PATH_PREFIXES)};for(var i=0;i<s.length;i++){if(p===s[i]||p.indexOf(s[i]+"/")===0)return}var m=document.cookie.match(/(?:^|;\\s*)${PUBLIC_LANG_COOKIE}=(${PUBLIC_LANGUAGES.join("|")})(?:;|$)/);if(m)document.documentElement.lang=m[1]}catch(e){}})();`;
+
 export const PUBLIC_LANGUAGE_LABELS: Record<PublicLanguage, string> = {
   en: "English",
   hi: "हिन्दी",

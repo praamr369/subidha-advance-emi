@@ -25,6 +25,7 @@ import PublicFooter from "@/components/ui/public-footer";
 import PublicNav from "@/components/ui/public-nav";
 import PublicBottomNav from "@/components/ui/public-bottom-nav";
 import { I18nProvider } from "@/components/i18n/I18nProvider";
+import DocumentLang from "@/components/public/DocumentLang";
 
 export default async function PublicLayout({ children }: { children: ReactNode }) {
   const locale = await getPublicLocale();
@@ -32,6 +33,7 @@ export default async function PublicLayout({ children }: { children: ReactNode }
 
   return (
     <I18nProvider locale={locale} dictionary={dict}>
+      <DocumentLang locale={locale} />
       <div className="public-app flex min-h-screen flex-col pb-16 lg:pb-0">
         <PublicStructuredData />
         <a
