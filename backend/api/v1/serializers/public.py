@@ -37,6 +37,8 @@ class PublicProductSerializer(serializers.ModelSerializer):
     # PIM media gallery — images and videos from ProductMediaItem
     gallery_images = serializers.SerializerMethodField()
     gallery_videos = serializers.SerializerMethodField()
+    # Real-scale 3D model for "View in your room" AR — null when none uploaded.
+    ar_model = serializers.SerializerMethodField()
     # Scheme pricing: cash/EMI/rent/lease with live offer discounts applied.
     scheme_pricing = serializers.SerializerMethodField()
 
@@ -56,6 +58,7 @@ class PublicProductSerializer(serializers.ModelSerializer):
             "video",
             "gallery_images",
             "gallery_videos",
+            "ar_model",
             "description",
             "pim_description",
             "pim_attributes",
@@ -150,7 +153,15 @@ class PublicProductSerializer(serializers.ModelSerializer):
 
         Base product page  → ALL_VARIANTS items only.
         Variant page       → ALL_VARIANTS items + VARIANT items for this specific variant.
+
+        Memoised per product: images, videos and the AR model all read this list.
         """
+        cache = self.__dict__.setdefault("_pim_media_cache", {})
+        if obj.pk not in cache:
+            cache[obj.pk] = self._load_pim_media(obj)
+        return cache[obj.pk]
+
+    def _load_pim_media(self, obj):
         try:
             from products_pim.models import ProductMediaItem
         except ImportError:
@@ -183,6 +194,15 @@ class PublicProductSerializer(serializers.ModelSerializer):
         req = self.context.get("request")
         items = self._get_pim_media(obj)
         return [serialize_media_url(req, i.file) for i in items if i.kind == "VIDEO" and i.file]
+
+    def get_ar_model(self, obj):
+        """Uploaded 3D model, else an auto-built real-size preview when the product has an AR size."""
+        from products_pim.services.ar_service import resolve_ar_model
+
+        try:
+            return resolve_ar_model(obj, self.context.get("request"), media_items=self._get_pim_media(obj))
+        except Exception:  # noqa: BLE001 - AR must never take the catalogue down
+            return None
 
     # ── category ─────────────────────────────────────────────────────────────
 

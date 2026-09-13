@@ -153,8 +153,19 @@ def serialize_catalog_product_detail(product: Product, request=None) -> dict:
         "warranty_months_extended_max": product.warranty_months_extended_max,
         "extended_warranty_cost_percentage": str(product.extended_warranty_cost_percentage),
         "sku": product.sku or "",
+        "ar_model": _ar_model(product, request),
     })
     return base
+
+
+def _ar_model(product: Product, request) -> dict | None:
+    """"View in your room" model for the portal PDP; fail-soft so AR never breaks the page."""
+    from products_pim.services.ar_service import resolve_ar_model
+
+    try:
+        return resolve_ar_model(product, request)
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def catalog_categories(queryset: QuerySet[Product]) -> list[dict]:

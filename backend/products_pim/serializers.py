@@ -10,6 +10,7 @@ from .models import (
     VariantAttributeValue,
     AttributeDataType,
     ProductMediaItem,
+    MediaKind,
 )
 
 
@@ -198,6 +199,7 @@ class PimProductDetailSerializer(serializers.ModelSerializer):
             "id", "code", "brand", "name", "description", "category", "category_name",
             "subcategory", "subcategory_name", "base_price", "cost_price",
             "is_active", "is_published", "product_type", "locked_attributes",
+            "ar_width_cm", "ar_depth_cm", "ar_height_cm",
             "parent_id", "parent_code", "parent_name",
             "created_at", "updated_at",
             "attributes", "variants", "variant_count",
@@ -264,6 +266,7 @@ class PimProductCreateUpdateSerializer(serializers.ModelSerializer):
             "id", "code", "brand", "name", "description", "category",
             "subcategory", "base_price", "cost_price",
             "is_active", "is_published", "product_type", "locked_attributes", "attributes", "remove_attributes",
+            "ar_width_cm", "ar_depth_cm", "ar_height_cm",
         ]
 
     def _save_attributes(self, product, attrs_data):
@@ -402,20 +405,59 @@ class PimProductRelationshipSerializer(serializers.ModelSerializer):
 
 
 
+AR_MODEL_MAX_BYTES = 25 * 1024 * 1024  # matches nginx client_max_body_size
+
+
+def _check_model_file(upload, *, suffix, magic, label):
+    """Extension + magic-byte check so a renamed JPG/ZIP can't pose as a 3D model."""
+    if not upload.name.lower().endswith(suffix):
+        raise serializers.ValidationError(f"{label} must be a {suffix} file.")
+    if upload.size > AR_MODEL_MAX_BYTES:
+        raise serializers.ValidationError(f"{label} must be under 25 MB.")
+    upload.seek(0)
+    head = upload.read(len(magic))
+    upload.seek(0)
+    if head != magic:
+        raise serializers.ValidationError(f"This does not look like a valid {suffix} file.")
+
+
 class ProductMediaItemSerializer(serializers.ModelSerializer):
     file_url = serializers.SerializerMethodField()
+    ios_file_url = serializers.SerializerMethodField()
     variant_sku = serializers.CharField(source="variant.sku", read_only=True, allow_null=True)
 
     class Meta:
         model = ProductMediaItem
         fields = [
             "id", "product", "variant", "variant_sku", "kind", "scope",
-            "file", "file_url", "title", "is_hero", "display_order", "created_at",
+            "file", "file_url", "ios_file", "ios_file_url",
+            "title", "is_hero", "display_order", "created_at",
         ]
-        read_only_fields = ["id", "created_at", "file_url", "variant_sku"]
+        read_only_fields = ["id", "created_at", "file_url", "ios_file_url", "variant_sku"]
+        extra_kwargs = {"ios_file": {"required": False, "allow_null": True}}
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        kind = attrs.get("kind", getattr(self.instance, "kind", MediaKind.IMAGE))
+        if kind == MediaKind.MODEL_3D:
+            if attrs.get("file"):
+                # glTF binary header: ASCII "glTF"
+                _check_model_file(attrs["file"], suffix=".glb", magic=b"glTF", label="3D model")
+            if attrs.get("ios_file"):
+                # USDZ is an uncompressed zip: local-file header "PK\x03\x04"
+                _check_model_file(attrs["ios_file"], suffix=".usdz", magic=b"PK\x03\x04", label="iPhone model")
+        elif attrs.get("ios_file"):
+            raise serializers.ValidationError({"ios_file": "Only 3D models take an iPhone (.usdz) file."})
+        return attrs
+
+    def _absolute(self, field_file):
+        request = self.context.get("request")
+        if field_file and request:
+            return request.build_absolute_uri(field_file.url)
+        return str(field_file) if field_file else None
 
     def get_file_url(self, obj):
-        request = self.context.get("request")
-        if obj.file and request:
-            return request.build_absolute_uri(obj.file.url)
-        return str(obj.file) if obj.file else None
+        return self._absolute(obj.file)
+
+    def get_ios_file_url(self, obj):
+        return self._absolute(obj.ios_file)

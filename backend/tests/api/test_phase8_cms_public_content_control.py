@@ -54,6 +54,9 @@ class Phase8CmsPublicContentControlTests(APITestCase):
             "video",
             "gallery_images",
             "gallery_videos",
+            # "View in your room" AR: a public media URL plus the product's outer
+            # size — nothing internal (no cost, stock or allocation).
+            "ar_model",
             "description",
             "pim_description",
             "pim_attributes",

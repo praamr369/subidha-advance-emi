@@ -1,5 +1,6 @@
 import { API_BASE_URL } from "@/lib/constants";
 import { resolveApiMediaUrl } from "@/lib/media";
+import type { ArModel } from "@/lib/model-viewer";
 
 export type PublicStats = {
   total_batches: number;
@@ -157,6 +158,8 @@ export type PublicProduct = {
   gallery_images?: string[] | null;
   /** PIM gallery video URLs */
   gallery_videos?: string[] | null;
+  /** "View in your room" AR: uploaded model or auto size preview; null when neither exists. */
+  ar_model?: ArModel | null;
   description?: string | null;
   pim_description?: string | null;
   stock_status?: "IN_STOCK" | "MAKE_TO_ORDER";
@@ -394,6 +397,12 @@ function normalizePublicProduct(product: PublicProduct): PublicProduct {
     next.gallery_images = product.gallery_images
       .map((url) => resolveApiMediaUrl(url))
       .filter((url): url is string => Boolean(url));
+  }
+  if (product.ar_model) {
+    const src = resolveApiMediaUrl(product.ar_model.src);
+    next.ar_model = src
+      ? { ...product.ar_model, src, ios_src: resolveApiMediaUrl(product.ar_model.ios_src) }
+      : null;
   }
   return next;
 }

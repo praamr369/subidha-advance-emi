@@ -447,6 +447,36 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
   const [publishResult, setPublishResult] = useState<{ child_pim_published: number; variants_activated: number; total_variants: number } | null>(null);
   const [publishError, setPublishError] = useState<string | null>(null);
 
+  // "View in your room" AR size (cm)
+  const [arWidth, setArWidth] = useState("");
+  const [arDepth, setArDepth] = useState("");
+  const [arHeight, setArHeight] = useState("");
+  const [arSuggesting, setArSuggesting] = useState(false);
+  const [arHint, setArHint] = useState<string | null>(null);
+
+  const handleSuggestArSize = async () => {
+    if (!productId) return;
+    setArSuggesting(true);
+    setArHint(null);
+    try {
+      const { suggestion } = await pimService.getArSizeSuggestion(productId);
+      if (!suggestion) {
+        setArHint("No size found in this product's attributes. Enter it by hand.");
+        return;
+      }
+      setArWidth(String(suggestion.width_cm));
+      setArDepth(String(suggestion.depth_cm));
+      setArHeight(suggestion.height_cm == null ? "" : String(suggestion.height_cm));
+      setArHint(
+        `Filled from ${suggestion.source}. Check it against the real product (bed sizes are mattress sizes; the frame is larger), then save.`,
+      );
+    } catch {
+      setArHint("Could not read the attributes.");
+    } finally {
+      setArSuggesting(false);
+    }
+  };
+
   useEffect(() => {
     pimService.getCategories().then(setCategories).catch(() => {});
   }, []);
@@ -484,6 +514,9 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
         setSubcategoryId(p.subcategory ?? "");
         setBasePrice(p.base_price);
         setCostPrice(p.cost_price ?? "");
+        setArWidth(p.ar_width_cm ?? "");
+        setArDepth(p.ar_depth_cm ?? "");
+        setArHeight(p.ar_height_cm ?? "");
         setIsPublished(p.is_published);
         setVariants(p.variants ?? []);
         // Restore operator-locked attributes from backend — only keep IDs
@@ -638,6 +671,9 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
         subcategory: subcategoryId ? Number(subcategoryId) : null,
         base_price: basePrice || "0",
         cost_price: costPrice || undefined,
+        ar_width_cm: arWidth || null,
+        ar_depth_cm: arDepth || null,
+        ar_height_cm: arHeight || null,
         locked_attributes: Array.from(lockedAttributes),
         attributes: buildAttrPayload(attributes, attrValues),
         ...(removedAttrIds.size > 0 ? { remove_attributes: Array.from(removedAttrIds) } : {}),
@@ -987,6 +1023,61 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
             </div>
           </div>
         </div>
+      </section>
+
+      {/* Room view (AR) size */}
+      <section className="rounded-lg border p-5 space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="max-w-2xl">
+            <h3 className="font-semibold">Room view (AR) size</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Outer size in centimetres. With width and depth set, customers can place this product in their room at
+              true size, even before a 3D model is uploaded (they see a block of this size with the product photo).
+              Leave height blank to show only the floor space.
+              {product?.parent_id ? " Leave all blank to use the base product's size." : ""}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void handleSuggestArSize()}
+            disabled={!productId || arSuggesting}
+            title={productId ? "Read the size from this product's attributes" : "Save the product first"}
+            className="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
+          >
+            {arSuggesting ? "Reading…" : "Fill from attributes"}
+          </button>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {(
+            [
+              ["f-ar-width", "Width", "side to side", arWidth, setArWidth],
+              ["f-ar-depth", "Depth", "front to back", arDepth, setArDepth],
+              ["f-ar-height", "Height", "optional", arHeight, setArHeight],
+            ] as const
+          ).map(([id, label, hint, value, setValue]) => (
+            <div key={id}>
+              <label htmlFor={id} className="block text-sm font-medium mb-1">
+                {label}
+                <span className="ml-1.5 text-xs font-normal text-muted-foreground">{hint}</span>
+              </label>
+              <div className="relative">
+                <input
+                  id={id}
+                  type="number"
+                  min="1"
+                  max="500"
+                  step="0.1"
+                  className="w-full rounded-md border px-3 py-2 pr-10 text-sm bg-background"
+                  value={value}
+                  onChange={(e) => setValue(e.target.value)}
+                  placeholder="—"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">cm</span>
+              </div>
+            </div>
+          ))}
+        </div>
+        {arHint && <p className="text-xs text-muted-foreground">{arHint}</p>}
       </section>
 
       {/* Dynamic Attributes */}

@@ -55,6 +55,33 @@ export function resolveApiMediaUrl(value?: string | null): string | null {
   }
 }
 
+function isLocalHostname(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  return host === "localhost" || host === "0.0.0.0" || host === "::1" || isPrivateIpv4Hostname(host);
+}
+
+/**
+ * A media URL the visitor's browser (and phone AR apps like Scene Viewer) can reach.
+ * Server renders may build media links against the internal API host
+ * (127.0.0.1:8000); on a public site the same /media/ path is served by the
+ * page's own origin, so re-root it there. Leaves local development untouched.
+ */
+export function toBrowserReachableMediaUrl(value?: string | null): string | null {
+  const resolved = resolveApiMediaUrl(value);
+  if (!resolved || typeof window === "undefined") {
+    return resolved;
+  }
+  try {
+    const url = new URL(resolved);
+    if (isLocalHostname(url.hostname) && !isLocalHostname(window.location.hostname)) {
+      return `${window.location.origin}${url.pathname}${url.search}`;
+    }
+    return resolved;
+  } catch {
+    return resolved;
+  }
+}
+
 export function shouldBypassNextImageOptimization(
   value?: string | null
 ): boolean {

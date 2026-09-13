@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
+import ArCoverageCard from "@/components/admin/pim/ArCoverageCard";
 import { apiFetch } from "@/lib/api";
 import { pimService } from "@/services/pim";
 import { cn } from "@/lib/utils";
@@ -179,6 +180,10 @@ export default function ProductPhotographyPage() {
           <div className="h-full bg-primary transition-all" style={{ width: `${pct}%` }} />
         </div>
         <p className="mt-2 text-xs text-muted-foreground">{pct}% of the catalogue is photographed.</p>
+      </div>
+
+      <div className="mb-8">
+        <ArCoverageCard />
       </div>
 
       {/* Drop zone */}

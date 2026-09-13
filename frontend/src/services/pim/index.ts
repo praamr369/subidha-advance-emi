@@ -97,6 +97,10 @@ export interface PimProduct {
   is_published: boolean;
   product_type?: "FINISHED_GOOD" | "RAW_MATERIAL" | "ACCESSORY" | "SERVICE";
   locked_attributes?: number[];
+  /** "View in your room" AR size in cm; height null = footprint only. Variants inherit the base's. */
+  ar_width_cm?: string | null;
+  ar_depth_cm?: string | null;
+  ar_height_cm?: string | null;
   variant_count?: number;
   /** Set when this PIM product is a variant SKU under a base product */
   parent_id?: number | null;
@@ -128,6 +132,9 @@ export interface PimProductCreatePayload {
   product_type?: "FINISHED_GOOD" | "RAW_MATERIAL" | "ACCESSORY" | "SERVICE";
   locked_attributes?: number[];
   remove_attributes?: number[];
+  ar_width_cm?: string | null;
+  ar_depth_cm?: string | null;
+  ar_height_cm?: string | null;
   attributes?: {
     attribute: number;
     value_text?: string;
@@ -181,17 +188,36 @@ export interface PimMediaItem {
   product: number;
   variant: number | null;
   variant_sku: string | null;
-  kind: "IMAGE" | "VIDEO";
+  kind: "IMAGE" | "VIDEO" | "MODEL_3D";
   scope: "ALL_VARIANTS" | "VARIANT";
   file: string;
   file_url: string | null;
+  /** MODEL_3D only: optional hand-made .usdz for iPhone Quick Look. */
+  ios_file: string | null;
+  ios_file_url: string | null;
   title: string;
   is_hero: boolean;
   display_order: number;
   created_at: string;
 }
 
-type PaginatedOrArray<T> = { results?: T[]; count?: number } | T[];
+export interface PimArSizeSuggestion {
+  width_cm: number;
+  depth_cm: number;
+  height_cm: number | null;
+  /** The attribute values the size was read from, e.g. "Size: King (6x7)". */
+  source: string;
+}
+
+export interface PimArCoverage {
+  total: number;
+  with_model: number;
+  size_preview_only: number;
+  not_ready: number;
+  missing: { id: number; code: string; name: string; is_published: boolean }[];
+}
+
+type PaginatedOrArray<T> ={ results?: T[]; count?: number } | T[];
 function unwrap<T>(raw: PaginatedOrArray<T>): T[] {
   if (Array.isArray(raw)) return raw;
   return raw.results ?? [];
@@ -535,6 +561,20 @@ export const pimService = {
       method: "POST",
       body: formData,
     }),
+
+  getArSizeSuggestion: (productId: number): Promise<{ suggestion: PimArSizeSuggestion | null }> =>
+    request(`${BASE}/products/${productId}/ar_size_suggestion/`),
+
+  fillArSizes: (): Promise<{ filled: number; products: (PimArSizeSuggestion & { id: number; code: string; name: string })[] }> =>
+    request(`${BASE}/products/fill_ar_sizes/`, { method: "POST" }),
+
+  getArCoverage: (): Promise<PimArCoverage> => request(`${BASE}/products/ar_coverage/`),
+
+  attachIosModel: (id: number, usdz: File): Promise<PimMediaItem> => {
+    const formData = new FormData();
+    formData.append("ios_file", usdz);
+    return request<PimMediaItem>(`${BASE}/media/${id}/`, { method: "PATCH", body: formData });
+  },
 
   updateMedia: (id: number, data: Partial<Pick<PimMediaItem, "title" | "display_order" | "is_hero">>): Promise<PimMediaItem> =>
     request<PimMediaItem>(`${BASE}/media/${id}/`, {

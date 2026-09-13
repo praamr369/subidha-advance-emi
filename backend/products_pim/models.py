@@ -1,5 +1,5 @@
 from django.db import models
-from django.core.validators import MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.utils.text import slugify
 import uuid
 
@@ -169,6 +169,22 @@ class PimProduct(models.Model):
         default="FINISHED_GOOD",
         db_index=True,
     )
+    # Real outer size for the customer "View in your room" AR, in centimetres
+    # (width = side to side, depth = front to back). With width+depth set, the
+    # product gets an auto-built size preview even without an uploaded 3D model;
+    # height blank = floor footprint only. Variants inherit the base's size.
+    ar_width_cm = models.DecimalField(
+        max_digits=5, decimal_places=1, null=True, blank=True,
+        validators=[MinValueValidator(1), MaxValueValidator(500)],
+    )
+    ar_depth_cm = models.DecimalField(
+        max_digits=5, decimal_places=1, null=True, blank=True,
+        validators=[MinValueValidator(1), MaxValueValidator(500)],
+    )
+    ar_height_cm = models.DecimalField(
+        max_digits=5, decimal_places=1, null=True, blank=True,
+        validators=[MinValueValidator(1), MaxValueValidator(500)],
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -301,6 +317,8 @@ class ProductAsset(models.Model):
 class MediaKind(models.TextChoices):
     IMAGE = "IMAGE", "Image"
     VIDEO = "VIDEO", "Video"
+    # Real-scale .glb model (metres) for the customer "View in your room" AR.
+    MODEL_3D = "MODEL_3D", "3D model (AR)"
 
 
 class MediaScope(models.TextChoices):
@@ -317,6 +335,9 @@ class ProductMediaItem(models.Model):
     kind = models.CharField(max_length=10, choices=MediaKind.choices, default=MediaKind.IMAGE)
     scope = models.CharField(max_length=20, choices=MediaScope.choices, default=MediaScope.ALL_VARIANTS)
     file = models.FileField(upload_to="pim/gallery/")
+    # MODEL_3D only: optional hand-made .usdz for iPhone Quick Look. Without it the
+    # viewer converts the .glb on the device, which works but can lose material detail.
+    ios_file = models.FileField(upload_to="pim/models/ios/", null=True, blank=True)
     title = models.CharField(max_length=200, blank=True)
     is_hero = models.BooleanField(default=False, help_text="Hero image shown as primary in catalog")
     display_order = models.PositiveIntegerField(default=0)

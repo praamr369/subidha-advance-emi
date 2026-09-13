@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowLeft, Box, CheckCircle2, ShieldCheck, Tag } from "lucide-react";
 import { getCatalogProduct, type CatalogRole } from "@/services/catalog";
 import { resolveApiMediaUrl } from "@/lib/media";
+import ProductARViewer from "@/components/public/ProductARViewer";
 
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
@@ -65,6 +66,11 @@ export default function CatalogProductDetailPage({
                 </div>
               )}
             </div>
+            {product.ar_model && (
+              <div className="mt-4">
+                <ProductARViewer model={product.ar_model} productName={product.name} poster={imgUrl} />
+              </div>
+            )}
           </div>
 
           <div className="flex-1 flex flex-col space-y-5">

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, ChevronRight } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 import PublicProductDetailMedia from "./PublicProductDetailMedia";
+import ProductARViewer from "./ProductARViewer";
 import PublicProductVariantSelector from "./PublicProductVariantSelector";
 import ProductEnquiryHandoffPanel from "./ProductEnquiryHandoffPanel";
 import PublicProductDescriptionAndSpecs from "./PublicProductDescriptionAndSpecs";
@@ -154,6 +155,14 @@ export default function PublicProductInteractiveDetail({
               prevLabel={dict.common.mediaCarousel.previousSlide}
               nextLabel={dict.common.mediaCarousel.nextSlide}
             />
+
+            {initialProduct.ar_model && (
+              <ProductARViewer
+                model={initialProduct.ar_model}
+                productName={initialProduct.name}
+                poster={displayProduct.image}
+              />
+            )}
 
             {/* Base product: variant attribute selector */}
             {!isVariantPage && hasVariants && (

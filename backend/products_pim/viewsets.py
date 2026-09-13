@@ -617,6 +617,74 @@ class PimProductViewSet(viewsets.ModelViewSet):
             "message": f"Repaired {len(repaired)} variant(s) to match parent category.",
         })
 
+    # ── "View in your room" AR ───────────────────────────────────────────────
+
+    @action(detail=True, methods=["get"])
+    def ar_size_suggestion(self, request, pk=None):
+        """AR size (cm) read from this product's attributes — for the admin to confirm, never auto-saved."""
+        from .services.ar_service import suggest_ar_size
+
+        return Response({"suggestion": suggest_ar_size(self.get_object())})
+
+    @action(detail=False, methods=["post"])
+    def fill_ar_sizes(self, request):
+        """Fill *blank* AR sizes from attributes on every active finished good. Never overwrites."""
+        from decimal import Decimal
+
+        from .models import PimProduct
+        from .services.ar_service import suggest_ar_size
+
+        def dec(value):
+            return None if value is None else Decimal(str(value))
+
+        filled = []
+        blank = PimProduct.objects.filter(
+            is_active=True, product_type="FINISHED_GOOD", ar_width_cm__isnull=True
+        ).select_related("parent")
+        for pim in blank:
+            suggestion = suggest_ar_size(pim)
+            if not suggestion:
+                continue
+            pim.ar_width_cm = dec(suggestion["width_cm"])
+            pim.ar_depth_cm = dec(suggestion["depth_cm"])
+            pim.ar_height_cm = dec(suggestion["height_cm"])
+            pim.save(update_fields=["ar_width_cm", "ar_depth_cm", "ar_height_cm", "updated_at"])
+            filled.append({"id": pim.id, "code": pim.code, "name": pim.name, **suggestion})
+        return Response({"filled": len(filled), "products": filled[:200]})
+
+    @action(detail=False, methods=["get"])
+    def ar_coverage(self, request):
+        """How many finished goods customers can place in their room, and which still can't."""
+        from django.db.models import Exists, OuterRef, Q
+
+        from .models import MediaKind, PimProduct, ProductMediaItem
+
+        qs = PimProduct.objects.filter(is_active=True, product_type="FINISHED_GOOD")
+        if request.query_params.get("published_only", "true").lower() != "false":
+            qs = qs.filter(is_published=True)
+        qs = qs.annotate(
+            has_model=Exists(
+                ProductMediaItem.objects.filter(kind=MediaKind.MODEL_3D).filter(
+                    Q(product_id=OuterRef("pk")) | Q(product_id=OuterRef("parent_id"))
+                )
+            )
+        )
+        sized = Q(ar_width_cm__isnull=False, ar_depth_cm__isnull=False) | Q(
+            parent__ar_width_cm__isnull=False, parent__ar_depth_cm__isnull=False
+        )
+        ready = Q(has_model=True) | sized
+        missing = qs.exclude(ready).order_by("name")
+        return Response({
+            "total": qs.count(),
+            "with_model": qs.filter(has_model=True).count(),
+            "size_preview_only": qs.filter(sized, has_model=False).count(),
+            "not_ready": missing.count(),
+            "missing": [
+                {"id": p.id, "code": p.code, "name": p.name, "is_published": p.is_published}
+                for p in missing[:200]
+            ],
+        })
+
     @action(detail=False, methods=["get"])
     def summary(self, request):
         total = PimProduct.objects.count()
@@ -807,10 +875,13 @@ class ProductMediaItemViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def set_hero(self, request, pk=None):
-        """Mark this item as the hero image; clears hero on all others for the same product."""
+        """Mark this item as the hero of its kind; clears hero on the product's other items of that kind.
+
+        Kind-scoped so choosing the primary 3D model never un-stars the hero photo.
+        """
         from .models import ProductMediaItem
         item = self.get_object()
-        ProductMediaItem.objects.filter(product=item.product, is_hero=True).update(is_hero=False)
+        ProductMediaItem.objects.filter(product=item.product, kind=item.kind, is_hero=True).update(is_hero=False)
         item.is_hero = True
         item.save(update_fields=["is_hero"])
         from .serializers import ProductMediaItemSerializer

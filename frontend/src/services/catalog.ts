@@ -1,5 +1,6 @@
 import { request } from "@/services/api";
 import { toResultsArray } from "@/services/api/list";
+import type { ArModel } from "@/lib/model-viewer";
 
 export type CatalogInputType = "SELECT" | "MULTI_SELECT" | "NUMBER" | "TEXT" | "BOOLEAN";
 
@@ -64,6 +65,8 @@ export type CatalogProduct = {
   extended_warranty_cost_percentage?: string;
   purposes: { key: CatalogPurposeKey; label: string }[];
   flags?: Record<string, boolean>;
+  /** "View in your room" AR (detail endpoint only). */
+  ar_model?: ArModel | null;
   [key: string]: unknown;
 };
 
