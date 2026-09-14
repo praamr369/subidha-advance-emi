@@ -79,6 +79,16 @@ NODE_OPTIONS='--max-old-space-size=6144' npm run build > /tmp/next-build-deploy.
   || { echo "!!! Frontend build FAILED:"; tail -20 /tmp/next-build-deploy.log; git -C "$APP_DIR" checkout -q "$OLD_COMMIT"; exit 1; }
 
 echo "==> [6/7] Restarting services"
+# When the app runs as the non-root 'subidha' account (systemd drop-ins set
+# User=subidha), the freshly rebuilt .next and the media tree must be owned by
+# it: next-server writes .next/cache (image/ISR cache) at runtime and Django
+# writes uploads under MEDIA_ROOT. The build/collectstatic above ran as root, so
+# .next is re-created root-owned every release and must be handed back. No-op
+# until the service user exists, so this stays safe on a root-run host.
+if id subidha >/dev/null 2>&1; then
+  echo "    non-root app: chowning .next + media to subidha"
+  chown -R subidha:subidha "$APP_DIR/frontend/.next" "${MEDIA_ROOT:-/var/www/subidha/media}" 2>/dev/null || true
+fi
 systemctl restart "$SERVICE"
 systemctl restart "$FRONTEND_SERVICE"
 
