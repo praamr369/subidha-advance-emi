@@ -29,7 +29,7 @@ export default function PublicProductMedia({
   imageClassName,
   sizes,
   priority = false,
-  quality = 74,
+  quality = 75,
   fallbackLabel = "Photography coming soon",
   badge,
   category,

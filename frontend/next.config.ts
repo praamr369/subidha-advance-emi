@@ -201,7 +201,7 @@ const nextConfig: NextConfig = {
   },
   images: {
     dangerouslyAllowLocalIP: true,
-    qualities: [75, 78, 80, 90],
+    qualities: [70, 75, 78, 80, 90],
     remotePatterns: buildRemotePatterns(),
     minimumCacheTTL: ONE_HOUR,
   },
