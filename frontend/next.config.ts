@@ -159,6 +159,21 @@ const ONE_HOUR = 60 * 60;
 // base-uri, frame-ancestors, form-action) are the high-value, low-breakage ones.
 function securityCspHeaders(): Array<{ key: string; value: string }> {
   if (process.env.NODE_ENV !== "production") return [];
+  // The browser calls the API (XHR + SSE) at NEXT_PUBLIC_API_BASE_URL. In
+  // production that is same-origin, but under the Playwright smoke the app is
+  // served on one port and the API on another, so connect-src must include the
+  // configured API/site origin or every data fetch is blocked. Same-origin
+  // values are harmlessly redundant with 'self'.
+  const connectSrc = new Set<string>(["'self'"]);
+  for (const key of ["NEXT_PUBLIC_API_BASE_URL", "NEXT_PUBLIC_SITE_URL"]) {
+    const raw = process.env[key];
+    if (!raw) continue;
+    try {
+      connectSrc.add(new URL(raw).origin);
+    } catch {
+      // ignore a malformed env value; 'self' still applies.
+    }
+  }
   const csp = [
     "default-src 'self'",
     "base-uri 'self'",
@@ -169,7 +184,7 @@ function securityCspHeaders(): Array<{ key: string; value: string }> {
     "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
     "style-src 'self' 'unsafe-inline'",
     "font-src 'self' data:",
-    "connect-src 'self'",
+    `connect-src ${Array.from(connectSrc).join(" ")}`,
     "frame-src 'self' blob: data:",
     "worker-src 'self' blob:",
   ].join("; ");
