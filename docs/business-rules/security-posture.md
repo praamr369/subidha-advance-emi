@@ -103,6 +103,20 @@ scanner installed.
   confirmed absent for each.
 - **app↔DB TLS** (`sslmode=require`) and **field-level PII encryption at rest**
   remain the open items — tracked in `docs/DATA_ENCRYPTION_AND_HARDENING.md`.
+- **Backups: restore verified 2026-09-14** (round-trips to a throwaway DB); still
+  to do: encrypt the artifacts + move them off-box (needs a destination).
+
+## Production config the owner must complete (not code)
+
+- **OTP delivery is not configured.** `check_production_readiness` fails on
+  "OTP delivery backend must be explicitly set". `OTP_DELIVERY_BACKEND` is unset
+  (defaults to `auto`) and no SMTP credential is present (no `EMAIL_HOST_PASSWORD`,
+  and the `EmailSMTPSettings` row has no app password). Password-reset OTP
+  therefore degrades to "temporarily unavailable" rather than sending. **Before
+  onboarding customers who use password reset:** the owner sets the Gmail app
+  password (admin → Email SMTP Settings page — now stored under
+  `FIELD_ENCRYPTION_KEYS`) and sets `OTP_DELIVERY_BACKEND=email` in backend.env.
+  A credential the owner must supply — not something automation should fabricate.
 
 ## Rules for future changes
 

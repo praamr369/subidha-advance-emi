@@ -146,7 +146,7 @@ The point of the above is that **one person can safely own the whole app**:
 - [ ] Sensitive PII columns encrypted at rest; lookups via blind index, not plaintext.
 - [x] Client↔app TLS, HSTS, secure cookies, CSP on (2026-09-14). [ ] app↔DB TLS (`sslmode=require`) still to enforce.
 - [ ] `check_production_readiness` passes with production settings.
-- [ ] Encrypted, off-box backups with a **verified** restore.
+- [~] Restore **verified 2026-09-14** — `pg_restore` of the latest backup round-trips cleanly to a throwaway DB (366/366 public tables, `media.tar.gz` intact), confirming DR works after the backup-perms + `postgres`-group changes. Still pending: **encrypting** the artifacts and moving them **off-box** (needs a destination + key custody).
 - [x] Redis cache backend (not LocMemCache) in prod (`CACHE_REDIS_URL` set).
 - [x] Key-rotation runbook written (below) + `manage.py rotate_field_secrets` command shipped; rehearse once in prod.
 - [ ] No secret or key present anywhere in the git repo.
