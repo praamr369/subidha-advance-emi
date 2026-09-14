@@ -14,12 +14,22 @@ LABEL="${1:-scheduled}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 DEST="$BACKUP_ROOT/$LABEL-$STAMP"
 mkdir -p "$DEST"
-# Backups contain the full database dump (customer PII, KYC, financials) and all
-# uploaded media. Keep them readable only by root — pg_dump/mv would otherwise
-# leave db.dump group/world-readable (0664) on a host where several service
-# users exist. Tighten the parent too, in case it was created world-readable.
-chmod 700 "$BACKUP_ROOT" 2>/dev/null || true
-chmod 700 "$DEST"
+# Backups hold the full database dump (customer PII, KYC, financials) and all
+# uploaded media. pg_dump/mv would otherwise leave db.dump group/world-readable
+# (0664) on a host with several service users. Restrict to root plus the app
+# service account only: when the "subidha" service user exists (the app runs as
+# it, non-root), own the tree root:subidha 0750/0640 so the in-app backup and
+# download feature keeps working while postgres/www-data/other users are shut
+# out. Before that migration, or on any host without the user, fall back to
+# strict root-only 0700/0600.
+BACKUP_OWNER_GROUP="${BACKUP_OWNER_GROUP:-subidha}"
+if getent group "$BACKUP_OWNER_GROUP" >/dev/null 2>&1; then
+  chgrp "$BACKUP_OWNER_GROUP" "$BACKUP_ROOT" "$DEST" 2>/dev/null || true
+  chmod 750 "$BACKUP_ROOT" "$DEST" 2>/dev/null || true
+else
+  chmod 700 "$BACKUP_ROOT" 2>/dev/null || true
+  chmod 700 "$DEST"
+fi
 
 echo "==> Backing up database '$DB_NAME' ..."
 sudo -u postgres pg_dump -Fc -d "$DB_NAME" -f "/tmp/db-$STAMP.dump"
@@ -36,8 +46,15 @@ git -C "$APP_DIR" rev-parse HEAD > "$DEST/deployed-commit.txt" 2>/dev/null || tr
 (cd "$APP_DIR/backend" && set -a && . /etc/subidha/backend.env && set +a && ./.venv/bin/python manage.py showmigrations --plan | tail -n 40 > "$DEST/migration-state.txt") 2>/dev/null || true
 
 sha256sum "$DEST"/* > "$DEST/checksums.txt"
-# Restrict every artifact to root-only, regardless of the umask pg_dump/tar ran with.
-chmod 600 "$DEST"/* 2>/dev/null || true
+# Restrict every artifact regardless of the umask pg_dump/tar ran with. Group
+# read (0640) when the service group exists so the non-root app can serve
+# downloads; strict owner-only (0600) otherwise. Never group/world writable.
+if getent group "$BACKUP_OWNER_GROUP" >/dev/null 2>&1; then
+  chgrp "$BACKUP_OWNER_GROUP" "$DEST"/* 2>/dev/null || true
+  chmod 640 "$DEST"/* 2>/dev/null || true
+else
+  chmod 600 "$DEST"/* 2>/dev/null || true
+fi
 du -sh "$DEST"
 echo "==> Backup complete: $DEST"
 
