@@ -31,6 +31,15 @@ app runs non-root as `subidha`, SSH key-only.
   (`default-src 'none'; sandbox; style-src 'unsafe-inline'`), so an uploaded
   HTML/SVG/JS body is inert even on our own origin. This is the belt behind the
   content validation above.
+- **KYC/PII documents are not publicly reachable.** nginx denies direct access to
+  `/media/(customers|partners|vendors|staff)/kyc/` (403, verified against a real
+  file). Those files are served **only** through authenticated Django download
+  endpoints (`/api/v1/.../kyc-documents/{id}/download/`, `FileResponse` streamed
+  from disk with a permission check), so admin/self review still works while an
+  unauthenticated URL cannot fetch them. Profile photos, POD, the document vault,
+  HR employee documents, and product media stay served (distinct paths). **Rule:**
+  a new PII document path is served through an authenticated endpoint and denied
+  under `/media`, never linked as a raw `/media` URL.
 - **The API map is not public.** `/api/schema/`, `/api/docs/`, `/api/redoc/` are
   admin-only (`IsAdmin`) and return 401 to anonymous callers. **Rule:** do not
   re-open the schema/docs to anonymous users.
@@ -79,12 +88,15 @@ scanner installed.
 
 ## Open / deferred
 
-- **Auth-gated KYC & media downloads.** `/media` is public: the sandbox CSP
-  neutralises XSS, but KYC/PII files remain reachable by URL without login
-  (unguessable 12-hex tokens, and ~0 customer uploads in production, so residual
-  risk is low). **Planned fix:** serve KYC/PII media through an authenticated
-  Django download view and deny direct `/media` access for those paths. Needs
-  frontend coordination.
+- **Auth-gated KYC & media downloads — CLOSED 2026-09-14.** KYC subpaths are now
+  denied at nginx and served only through authenticated endpoints (see above). No
+  frontend change was needed — nothing linked the raw URLs. A wider tightening
+  (denying `subscriptions/` contract/receipt docs and `data_requests/` exports)
+  is a possible future step, but those already expose no raw `/media` URL and are
+  downloaded through endpoints; leave them served until a raw-URL consumer is
+  confirmed absent for each.
+- **app↔DB TLS** (`sslmode=require`) and **field-level PII encryption at rest**
+  remain the open items — tracked in `docs/DATA_ENCRYPTION_AND_HARDENING.md`.
 
 ## Rules for future changes
 

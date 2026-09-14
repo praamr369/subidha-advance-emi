@@ -755,5 +755,5 @@ read the code.
 
 **Rules going forward:** never weaken a control above to pass a test/feature; never build a public/prod feature on a Next `/api/*` route (prod nginx routes all `/api/*` to Django); OTP/tokens use `secrets`; new upload paths go through `validate_upload`.
 
-**Open item (deferred):** auth-gated KYC/media downloads — `/media` is public; XSS is neutralised but PII files are still URL-reachable (unguessable tokens, ~0 prod uploads). Planned: serve PII media via an authenticated Django view and deny direct `/media` for those paths.
+**KYC/media (closed 2026-09-14):** nginx denies `/media/(customers|partners|vendors|staff)/kyc/` (403, verified against a real file); those files are served only via authenticated `/api/v1/.../kyc-documents/{id}/download/` (`FileResponse`). No frontend change was needed. Remaining hardening (app↔DB TLS, field-level PII encryption at rest) is tracked in `docs/DATA_ENCRYPTION_AND_HARDENING.md`.
 
