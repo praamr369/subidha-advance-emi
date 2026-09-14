@@ -109,27 +109,58 @@ export default function SearchableItemSelect({
               {search ? "❌ No items found" : "🔍 Start typing to search"}
             </div>
           ) : (
-            <ul className="divide-y divide-border">
-              {filteredItems.map((item) => (
-                <li key={item.id}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onChange(String(item.id));
-                      setIsOpen(false);
-                      setSearch("");
-                    }}
-                    className={`w-full px-3 py-2.5 text-left text-sm hover:bg-primary/10 transition-colors ${
-                      String(item.id) === String(value) ? "bg-primary/20 border-l-2 border-l-primary" : ""
-                    }`}
-                  >
-                    <div className="font-medium text-foreground">{item.product_code}</div>
-                    <div className="text-xs text-foreground/70 mt-0.5">
-                      {item.product_name} {item.sku ? `(${item.sku})` : ""}
-                    </div>
-                  </button>
-                </li>
-              ))}
+            <ul className="divide-y-2 divide-border">
+              {filteredItems.map((item) => {
+                const code = item.product_code || item.sku || `#${item.id}`;
+                const name = item.product_name || item.name || code;
+                const t = item.stock_item_type;
+                const typeLabel =
+                  t === "ACCESSORY" ? "Accessory" : t === "RAW_MATERIAL" ? "Raw Material" : t === "FINISHED_GOOD" ? "Finished Good" : (t || "Item");
+                const typeColor =
+                  t === "ACCESSORY"
+                    ? "border-purple-300 bg-purple-50 text-purple-700 dark:border-purple-700 dark:bg-purple-900/40 dark:text-purple-300"
+                    : t === "RAW_MATERIAL"
+                      ? "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                      : "border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-700 dark:bg-sky-900/40 dark:text-sky-300";
+                const stockQty = item.physical_qty ?? item.available_qty ?? item.current_stock_qty;
+                return (
+                  <li key={item.id}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onChange(String(item.id));
+                        setIsOpen(false);
+                        setSearch("");
+                      }}
+                      className={`w-full px-4 py-3 text-left transition-colors hover:bg-blue-50 dark:hover:bg-blue-950/40 ${
+                        String(item.id) === String(value) ? "bg-blue-50 dark:bg-blue-950/40" : ""
+                      }`}
+                    >
+                      <div className="mb-1 flex flex-wrap items-center gap-2">
+                        <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-bold ${typeColor}`}>{typeLabel}</span>
+                        <span className="shrink-0 rounded border border-slate-300 bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] font-bold text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">{code}</span>
+                        <span className="min-w-0 flex-1 text-[13px] font-bold leading-snug text-slate-900 dark:text-slate-100">{name}</span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 pl-0.5 text-[12px]">
+                        {item.standard_unit_cost ? (
+                          <span className="font-bold text-slate-900 dark:text-white">₹{Number(item.standard_unit_cost).toLocaleString("en-IN")}<span className="font-normal text-slate-400">/unit</span></span>
+                        ) : null}
+                        {stockQty != null ? (
+                          <span className="text-slate-500 dark:text-slate-400">Stock: <strong className="text-slate-800 dark:text-slate-200">{stockQty}</strong> {item.unit_of_measure || "PCS"}</span>
+                        ) : item.unit_of_measure ? (
+                          <span className="text-slate-500 dark:text-slate-400">Unit: {item.unit_of_measure}</span>
+                        ) : null}
+                        {item.category ? (
+                          <span className="text-slate-400 dark:text-slate-500">{item.category}{item.subcategory ? ` › ${item.subcategory}` : ""}</span>
+                        ) : null}
+                        {item.sku && code !== item.sku ? (
+                          <span className="font-mono text-slate-400 dark:text-slate-500">SKU {item.sku}</span>
+                        ) : null}
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

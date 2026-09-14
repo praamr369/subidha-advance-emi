@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, X, ChevronDown, Package, Tag } from "lucide-react";
+import { Search, X, ChevronDown, Package } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
@@ -75,6 +75,7 @@ export default function ProductPickerCombobox({
         category: cat || undefined,
         subcategory: subcat || undefined,
         stock_item_type: type || undefined,
+        include_locations: true,
       });
       setResults(res.results);
       setActiveIndex(-1);
@@ -287,55 +288,77 @@ export default function ProductPickerCombobox({
               </li>
             ) : null}
 
-            {results.map((item, idx) => (
-              <li
-                key={item.id}
-                role="option"
-                aria-selected={activeIndex === idx}
-                onMouseEnter={() => setActiveIndex(idx)}
-                onMouseDown={(e) => { e.preventDefault(); selectItem(item); }}
-                className={`cursor-pointer px-3 py-2.5 transition ${
-                  activeIndex === idx ? "bg-muted" : "hover:bg-muted/60"
-                }`}
-              >
-                <div className="flex items-start gap-2.5">
-                  <div className="mt-0.5 flex-shrink-0">
-                    <Package className="h-4 w-4 text-muted-foreground" />
+            {results.map((item, idx) => {
+              const code = item.product_code || item.sku || `#${item.inventory_item_id}`;
+              const locs = item.available_by_location ?? [];
+              const totalAvail = locs.reduce((s, l) => s + Number(l.available_quantity ?? 0), 0);
+              const hasLocData = locs.length > 0;
+              const inStock = totalAvail > 0;
+              const typeLabel = ITEM_TYPE_LABELS[item.stock_item_type] ?? item.stock_item_type ?? "Item";
+              const typeColor =
+                item.stock_item_type === "ACCESSORY"
+                  ? "border-purple-300 bg-purple-50 text-purple-700 dark:border-purple-700 dark:bg-purple-900/40 dark:text-purple-300"
+                  : item.stock_item_type === "RAW_MATERIAL"
+                    ? "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                    : "border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-700 dark:bg-sky-900/40 dark:text-sky-300";
+              return (
+                <li
+                  key={item.id}
+                  role="option"
+                  aria-selected={activeIndex === idx}
+                  onMouseEnter={() => setActiveIndex(idx)}
+                  onMouseDown={(e) => { e.preventDefault(); selectItem(item); }}
+                  className={`cursor-pointer px-4 py-3 transition ${
+                    activeIndex === idx ? "bg-blue-50 dark:bg-blue-950/40" : "hover:bg-blue-50/60 dark:hover:bg-blue-950/30"
+                  }`}
+                >
+                  {/* Row 1: type badge + code + name + stock pill */}
+                  <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                    <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-bold ${typeColor}`}>{typeLabel}</span>
+                    <span className="shrink-0 rounded border border-slate-300 bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] font-bold text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">{code}</span>
+                    <span className="min-w-0 flex-1 text-[13px] font-bold leading-snug text-slate-900 dark:text-slate-100">{item.product_name}</span>
+                    {hasLocData ? (
+                      <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold ${
+                        inStock
+                          ? "border-green-400 bg-green-100 text-green-800 dark:border-green-600 dark:bg-green-900 dark:text-green-200"
+                          : "border-red-400 bg-red-100 text-red-800 dark:border-red-600 dark:bg-red-900 dark:text-red-200"
+                      }`}>
+                        {inStock ? "✓ In Stock" : "✗ Out of Stock"}
+                      </span>
+                    ) : null}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-baseline gap-2">
-                      <span className="font-semibold text-sm text-foreground truncate">{item.product_name}</span>
-                      {item.sku ? (
-                        <span className="rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-mono font-semibold text-sky-800">{item.sku}</span>
-                      ) : null}
-                      {item.product_code ? (
-                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">{item.product_code}</span>
-                      ) : null}
-                    </div>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-                      {item.category ? (
-                        <span className="flex items-center gap-1">
-                          <Tag className="h-3 w-3" />
-                          {item.category}{item.subcategory ? ` › ${item.subcategory}` : ""}
+
+                  {/* Row 2: cost · stock qty · unit · category · barcode */}
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 pl-0.5 text-[12px]">
+                    {item.standard_unit_cost ? (
+                      <span className="font-bold text-slate-900 dark:text-white">₹{Number(item.standard_unit_cost).toLocaleString("en-IN")}<span className="font-normal text-slate-400">/unit</span></span>
+                    ) : null}
+                    {hasLocData ? (
+                      <span className="text-slate-500 dark:text-slate-400">Stock: <strong className="text-slate-800 dark:text-slate-200">{totalAvail}</strong> {item.unit_of_measure || "PCS"}</span>
+                    ) : item.unit_of_measure ? (
+                      <span className="text-slate-500 dark:text-slate-400">Unit: {item.unit_of_measure}</span>
+                    ) : null}
+                    {item.category ? (
+                      <span className="text-slate-400 dark:text-slate-500">{item.category}{item.subcategory ? ` › ${item.subcategory}` : ""}</span>
+                    ) : null}
+                    {item.barcode ? (
+                      <span className="font-mono text-slate-500 dark:text-slate-400">#{item.barcode}</span>
+                    ) : null}
+                  </div>
+
+                  {/* Row 3: per-location availability chips */}
+                  {hasLocData ? (
+                    <div className="mt-1.5 flex flex-wrap gap-1 pl-0.5">
+                      {locs.slice(0, 6).map((l) => (
+                        <span key={l.stock_location_id} className="rounded border border-slate-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                          <span className="font-normal text-slate-400 dark:text-slate-500">{l.stock_location_code || l.stock_location_name}: </span>{l.available_quantity}
                         </span>
-                      ) : null}
-                      {item.stock_item_type ? (
-                        <span>{ITEM_TYPE_LABELS[item.stock_item_type] ?? item.stock_item_type}</span>
-                      ) : null}
-                      {item.unit_of_measure ? (
-                        <span>Unit: {item.unit_of_measure}</span>
-                      ) : null}
-                      {item.standard_unit_cost ? (
-                        <span className="font-semibold text-foreground">₹{Number(item.standard_unit_cost).toLocaleString("en-IN")}/unit</span>
-                      ) : null}
-                      {item.barcode ? (
-                        <span className="font-mono">#{item.barcode}</span>
-                      ) : null}
+                      ))}
                     </div>
-                  </div>
-                </div>
-              </li>
-            ))}
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
 
           {/* Footer hint */}
