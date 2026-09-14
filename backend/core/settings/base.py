@@ -597,6 +597,13 @@ REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
+    # Throttle identity trusts exactly ONE proxy hop (nginx). Without this DRF
+    # joins the whole X-Forwarded-For header, so a client-supplied XFF gives a
+    # fresh anon-throttle bucket per request and defeats the login / OTP / lead
+    # rate limits. With NUM_PROXIES=1 DRF takes the address nginx appended (the
+    # real remote peer); the nginx /api/ block also overwrites X-Forwarded-For
+    # with $remote_addr as defence in depth. Tune if a second proxy is added.
+    "NUM_PROXIES": 1,
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     "DEFAULT_FILTER_BACKENDS": [
         "django_filters.rest_framework.DjangoFilterBackend",

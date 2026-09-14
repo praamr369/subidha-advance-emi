@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.capabilities import require_capability
+from core.upload_security import UploadValidationError, validate_upload
 from api.v1.permissions import IsAdmin
 from api.v1.serializers.business_setup import (
     BackupJobCreateSerializer,
@@ -674,23 +675,27 @@ class AdminBusinessLogoUploadView(APIView):
         if not file:
             return Response({"detail": "File is required. Send as 'file'."}, status=status.HTTP_400_BAD_REQUEST)
 
-        allowed_types = {"image/jpeg", "image/png", "image/svg+xml", "image/webp"}
-        if file.content_type not in allowed_types:
-            return Response({"detail": "Only JPEG, PNG, SVG, or WebP images are accepted."}, status=status.HTTP_400_BAD_REQUEST)
-
-        max_size = 5 * 1024 * 1024
-        if file.size > max_size:
-            return Response({"detail": "File must be smaller than 5 MB."}, status=status.HTTP_400_BAD_REQUEST)
+        # Validate by real content signature, not the client Content-Type.
+        # SVG is intentionally NOT accepted: it is XML that can carry inline
+        # <script>, so a logo upload would otherwise be a stored-XSS vector.
+        try:
+            validate_upload(
+                file,
+                allowed_kinds={"jpeg", "png", "webp"},
+                max_bytes=5 * 1024 * 1024,
+                label="image",
+            )
+        except UploadValidationError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         from django.core.files.storage import default_storage
         import os
         import uuid
 
-        ext = os.path.splitext(file.name)[1].lower()
-        if not ext and file.content_type == "image/svg+xml":
-            ext = ".svg"
+        # validate_upload() has already rewritten file.name to a safe extension.
+        ext = os.path.splitext(file.name)[1].lower() or ".img"
         filename = f"business/logos/logo_{uuid.uuid4().hex[:12]}{ext}"
-        
+
         path = default_storage.save(filename, file)
         url = request.build_absolute_uri(default_storage.url(path))
         

@@ -148,6 +148,34 @@ const ADMIN_PERMANENT_REDIRECTS: Array<{ source: string; destination: string }> 
 
 const ONE_HOUR = 60 * 60;
 
+// Content-Security-Policy for production only. In development it is omitted so
+// Next's HMR / React Refresh (which need 'unsafe-eval') keep working.
+// Allowances reflect what the app actually loads: Unsplash for a couple of CSS
+// background images, jsDelivr for the QR-code script used by the print popup,
+// and same-origin XHR/SSE for the API. script/style keep 'unsafe-inline'
+// because Next injects inline bootstrap scripts and we don't emit per-request
+// nonces; the real upload -> stored-XSS fix lives in the backend upload
+// validation and the nginx /media sandbox. The locked directives (object-src,
+// base-uri, frame-ancestors, form-action) are the high-value, low-breakage ones.
+function securityCspHeaders(): Array<{ key: string; value: string }> {
+  if (process.env.NODE_ENV !== "production") return [];
+  const csp = [
+    "default-src 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "form-action 'self'",
+    "img-src 'self' data: blob: https:",
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+    "style-src 'self' 'unsafe-inline'",
+    "font-src 'self' data:",
+    "connect-src 'self'",
+    "frame-src 'self' blob: data:",
+    "worker-src 'self' blob:",
+  ].join("; ");
+  return [{ key: "Content-Security-Policy", value: csp }];
+}
+
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1"],
   compress: true,
@@ -194,6 +222,11 @@ const nextConfig: NextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "X-Frame-Options", value: "SAMEORIGIN" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=(), interest-cohort=()",
+          },
+          ...securityCspHeaders(),
         ],
       },
     ];

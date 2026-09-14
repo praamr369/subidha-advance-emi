@@ -5,6 +5,7 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from core.upload_security import UploadValidationError, validate_upload
 from api.v1.permissions import IsCustomer
 from api.v1.serializers.customer_profile import CustomerProfileSerializer
 from api.v1.serializers.customers import (
@@ -505,19 +506,18 @@ class CustomerPhotoUploadView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        allowed_types = {"image/jpeg", "image/png", "image/webp"}
-        if photo.content_type not in allowed_types:
-            return Response(
-                {"detail": "Only JPEG, PNG, or WebP images are accepted."},
-                status=status.HTTP_400_BAD_REQUEST,
+        # Validate by real content signature (not the client Content-Type) and
+        # rewrite to a safe extension. Blocks an HTML/SVG payload disguised as an
+        # image — see core.upload_security.
+        try:
+            validate_upload(
+                photo,
+                allowed_kinds={"jpeg", "png", "webp"},
+                max_bytes=5 * 1024 * 1024,
+                label="image",
             )
-
-        max_size = 5 * 1024 * 1024  # 5 MB
-        if photo.size > max_size:
-            return Response(
-                {"detail": "Photo must be smaller than 5 MB."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        except UploadValidationError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         # Delete old photo file if it exists to avoid orphaned files
         old_photo = customer.profile_photo

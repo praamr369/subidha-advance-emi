@@ -10,6 +10,7 @@ from __future__ import annotations
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
+from core.upload_security import IMAGE_PDF_KINDS, UploadValidationError, validate_upload
 from subscriptions.models import (
     Customer,
     CustomerKycDocument,
@@ -125,16 +126,18 @@ class CustomerKycDocumentUploadSerializer(serializers.Serializer):
     notes = serializers.CharField(required=False, allow_blank=True, default="")
 
     def validate_file(self, value):
-        max_size = 5 * 1024 * 1024
-        allowed = {"image/jpeg", "image/png", "application/pdf"}
-        content_type = (getattr(value, "content_type", "") or "").lower()
-        if not content_type or content_type not in allowed:
-            raise serializers.ValidationError("Unsupported file type. Allowed: JPG, PNG, PDF.")
-        file_size = int(getattr(value, "size", 0) or 0)
-        if file_size <= 0:
-            raise serializers.ValidationError("Uploaded file is empty.")
-        if file_size > max_size:
-            raise serializers.ValidationError("File must be 5MB or smaller.")
+        # Validate by real magic-byte signature, not the client Content-Type,
+        # and rewrite the stored name to a safe extension. See
+        # core.upload_security for why this blocks upload -> stored-XSS.
+        try:
+            validate_upload(
+                value,
+                allowed_kinds=IMAGE_PDF_KINDS,
+                max_bytes=5 * 1024 * 1024,
+                label="document",
+            )
+        except UploadValidationError as exc:
+            raise serializers.ValidationError(str(exc))
         return value
 
 

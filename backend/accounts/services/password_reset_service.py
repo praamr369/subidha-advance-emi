@@ -1,4 +1,4 @@
-import random
+import secrets
 import logging
 from datetime import timedelta
 
@@ -50,7 +50,9 @@ class PasswordResetServiceError(Exception):
 
 
 def generate_numeric_otp(length: int = 6) -> str:
-    return "".join(str(random.randint(0, 9)) for _ in range(length))
+    # Use the CSPRNG: a password-reset OTP is a security credential, so it must
+    # not come from the predictable, non-cryptographic random module.
+    return "".join(str(secrets.randbelow(10)) for _ in range(length))
 
 
 def resolve_user_by_identifier(identifier: str):

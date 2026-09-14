@@ -14,6 +14,12 @@ LABEL="${1:-scheduled}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 DEST="$BACKUP_ROOT/$LABEL-$STAMP"
 mkdir -p "$DEST"
+# Backups contain the full database dump (customer PII, KYC, financials) and all
+# uploaded media. Keep them readable only by root — pg_dump/mv would otherwise
+# leave db.dump group/world-readable (0664) on a host where several service
+# users exist. Tighten the parent too, in case it was created world-readable.
+chmod 700 "$BACKUP_ROOT" 2>/dev/null || true
+chmod 700 "$DEST"
 
 echo "==> Backing up database '$DB_NAME' ..."
 sudo -u postgres pg_dump -Fc -d "$DB_NAME" -f "/tmp/db-$STAMP.dump"
@@ -30,6 +36,8 @@ git -C "$APP_DIR" rev-parse HEAD > "$DEST/deployed-commit.txt" 2>/dev/null || tr
 (cd "$APP_DIR/backend" && set -a && . /etc/subidha/backend.env && set +a && ./.venv/bin/python manage.py showmigrations --plan | tail -n 40 > "$DEST/migration-state.txt") 2>/dev/null || true
 
 sha256sum "$DEST"/* > "$DEST/checksums.txt"
+# Restrict every artifact to root-only, regardless of the umask pg_dump/tar ran with.
+chmod 600 "$DEST"/* 2>/dev/null || true
 du -sh "$DEST"
 echo "==> Backup complete: $DEST"
 

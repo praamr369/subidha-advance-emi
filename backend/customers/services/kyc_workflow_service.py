@@ -21,6 +21,7 @@ from django.db.models import Count, Q
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 
+from core.upload_security import IMAGE_PDF_KINDS, validate_upload
 from customers.models import KycOwnerType, KycReviewActionType, KycUploadSource, PartnerKycDocumentStatus
 from customers.models import KycReviewAction, PartnerKycDocument
 
@@ -33,15 +34,19 @@ MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB
 
 
 def _validate_file(file):
-    """Raise ValueError for disallowed type or size."""
-    ct = (getattr(file, "content_type", "") or "").lower()
-    if ct not in ALLOWED_CONTENT_TYPES:
-        raise ValueError("Unsupported file type. Allowed: JPG, PNG, PDF.")
-    size = int(getattr(file, "size", 0) or 0)
-    if size <= 0:
-        raise ValueError("Uploaded file is empty.")
-    if size > MAX_FILE_SIZE_BYTES:
-        raise ValueError("File must be 5 MB or smaller.")
+    """Validate a KYC upload by real content, not the claimed Content-Type.
+
+    Verifies size and the file's magic-byte signature (JPG/PNG/PDF only) and
+    rewrites the stored filename to a safe extension. Raises ``ValueError`` for
+    anything else — an HTML/SVG/exe payload sent as ``image/png`` is refused
+    here before it can ever be written under /media. See core.upload_security.
+    """
+    validate_upload(
+        file,
+        allowed_kinds=IMAGE_PDF_KINDS,
+        max_bytes=MAX_FILE_SIZE_BYTES,
+        label="document",
+    )
 
 
 def admin_upload_is_auto_accepted(upload_source: str, force_review: bool) -> bool:
