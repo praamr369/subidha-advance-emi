@@ -4,6 +4,8 @@
 
 This is the canonical engineering and business workflow rulebook for **SUBIDHA CORE – Lucky Plan EMI System**. A developer must read this file before changing backend logic, frontend pages, API contracts, financial workflows, schemas, tests, deployment configuration, or operational documents.
 
+> **Companion reference:** an interactive **Rules & Workflow Playbook** consolidates this rulebook and every `docs/business-rules/*` doc per module — rules, workflow steps, roles, money invariants, and the pages/endpoints that carry them. Security rules are in [`docs/business-rules/security-posture.md`](business-rules/security-posture.md) and summarised in §41 below.
+
 This file separates:
 
 - **Confirmed from code**: rules, models, services, routes, scripts, and UI structure found in the repository.
@@ -729,4 +731,29 @@ Every change must answer:
 ### Pages
 - `/admin/opening-balances/customers` — admin list with verify toggle, sync button, collect action, migration batch source.
 - Customer profile Financials tab — legacy receivable rows with badges + collection history table with journal entries.
+
+## 41. Security posture (added 2026-09-14)
+
+Full detail and the rules for future changes live in
+[`docs/business-rules/security-posture.md`](business-rules/security-posture.md).
+Production reference: commit `25dea40c`, kernel `6.8.0-139`, app runs non-root as
+`subidha`, SSH key-only. The GitHub repo is **public** — assume an attacker can
+read the code.
+
+**Enforced in the app (deployed):**
+- Throttle identity from the single trusted proxy hop only: `REST_FRAMEWORK["NUM_PROXIES"] = 1` + nginx `X-Forwarded-For $remote_addr`. A spoofed forwarded header can no longer reset login/OTP/lead throttles.
+- All uploads validated by real magic-byte signature and stored with a safe extension via `core/upload_security.validate_upload` (KYC self+admin, profile photo, business logo); SVG rejected. Never trust `content_type`.
+- `/api/schema`, `/api/docs`, `/api/redoc` are admin-only (401 to anon).
+- Password-reset OTP uses `secrets`, not `random`.
+- Pages send a production CSP + `Permissions-Policy`; nginx adds HSTS everywhere, `server_tokens off`, and serves `/media` with `nosniff` + a sandbox CSP.
+- Dependencies patched (Django 5.2.16, Pillow 12.3.0, DRF 3.17.2, PyJWT 2.13, cryptography 50, sqlparse 0.6, +tooling).
+
+**Enforced on the server:**
+- gunicorn / next / celery / celery-beat run as non-root `subidha` (systemd drop-ins); `media`, `.next`, `/var/lib/subidha` are `subidha`-owned; `deploy.sh` re-chowns after each build.
+- SSH is key-only (`sshd_config.d/00-hardening.conf`); firewall is 22/80/443 only.
+- DR cron backups (`/var/backups/subidha`) are root/`subidha` `0640` and app-untamperable; the in-app backup feature uses a separate `subidha`-owned dir.
+
+**Rules going forward:** never weaken a control above to pass a test/feature; never build a public/prod feature on a Next `/api/*` route (prod nginx routes all `/api/*` to Django); OTP/tokens use `secrets`; new upload paths go through `validate_upload`.
+
+**Open item (deferred):** auth-gated KYC/media downloads — `/media` is public; XSS is neutralised but PII files are still URL-reachable (unguessable tokens, ~0 prod uploads). Planned: serve PII media via an authenticated Django view and deny direct `/media` for those paths.
 

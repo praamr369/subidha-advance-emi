@@ -27,6 +27,27 @@ who must be able to run and reason about it alone.
 **Access control:** role + capability matrix (server-enforced), role-aware
 throttling, and an append-only-style `audit.AuditLog` on mutating actions.
 
+## 1.1 Hardening shipped 2026-09-14
+
+A production security pass landed the transport/perimeter items below. Full detail
+and the rules are in [`business-rules/security-posture.md`](business-rules/security-posture.md).
+
+- **Transport (was §3.4):** production CSP + `Permissions-Policy` on pages; HSTS on
+  every response; `SECURE_SSL_REDIRECT`, `SESSION_COOKIE_SECURE`,
+  `CSRF_COOKIE_SECURE`, `SECURE_PROXY_SSL_HEADER` all on; `server_tokens off`.
+- **Throttle integrity:** `NUM_PROXIES=1` + nginx `X-Forwarded-For $remote_addr`
+  — a spoofed forwarded header can no longer bypass login/OTP/lead rate limits.
+- **Upload safety:** `core/upload_security.validate_upload` (magic-byte check +
+  safe stored extension, SVG rejected); `/media` served `nosniff` + sandbox CSP.
+- **Exposure:** OpenAPI schema/docs are admin-only; OTP uses `secrets`.
+- **Perimeter:** app runs non-root (`subidha`); SSH key-only; firewall 22/80/443;
+  DR backups root/`subidha` `0640` and app-untamperable; deps patched
+  (Django 5.2.16, Pillow 12.3.0, DRF 3.17.2, PyJWT 2.13, cryptography 50).
+
+Still outstanding from the target posture below: **field-level PII encryption at
+rest (R3 / §3.2), `FIELD_ENCRYPTION_KEYS` split (R1/R2 / §3.1), encrypted off-box
+backups (R4 / §3.5), and auth-gated KYC/media downloads.** Those remain the plan.
+
 ## 2. Risks / gaps to close
 
 | # | Risk | Why it matters |
@@ -110,7 +131,7 @@ The point of the above is that **one person can safely own the whole app**:
 
 - [ ] `FIELD_ENCRYPTION_KEYS` set (separate from `SECRET_KEY`); `secret_crypto` is `MultiFernet`.
 - [ ] Sensitive PII columns encrypted at rest; lookups via blind index, not plaintext.
-- [ ] TLS enforced end-to-end (client↔app, app↔DB); HSTS + secure cookies on.
+- [x] Client↔app TLS, HSTS, secure cookies, CSP on (2026-09-14). [ ] app↔DB TLS (`sslmode=require`) still to enforce.
 - [ ] `check_production_readiness` passes with production settings.
 - [ ] Encrypted, off-box backups with a **verified** restore.
 - [ ] Redis cache backend (not LocMemCache) in prod.

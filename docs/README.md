@@ -3,6 +3,16 @@
 Professional developer + operator documentation for the Subidha Advance-EMI ERP.
 Start here.
 
+## Rules & workflows
+- **[SUBIDHA_CORE_PROJECT_RULEBOOK.md](SUBIDHA_CORE_PROJECT_RULEBOOK.md)** — the
+  canonical engineering + business rulebook (invariants, per-domain rules, roles,
+  workflows). Read before changing money/contract/API logic.
+- **[business-rules/](business-rules/)** — per-module rule docs (EMI, draw,
+  rent/lease, direct sale, delivery, inventory, KYC, vendors, security, …). The
+  interactive **Rules & Workflow Playbook** consolidates all of these per module.
+- **[business-rules/security-posture.md](business-rules/security-posture.md)** —
+  what the 2026-09-14 hardening enforces in production, and the rules for keeping it.
+
 ## Guides
 - **[DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)** — architecture, app map, the
   non-negotiable conventions, auth/capabilities, request/page shape, how to run
