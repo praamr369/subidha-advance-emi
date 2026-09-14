@@ -421,6 +421,13 @@ ENVIRONMENT_NAME = _get_environment_name()
 DEBUG = _parse_bool(os.getenv("DJANGO_DEBUG"), default=_is_local_dev_mode())
 SECRET_KEY = _get_secret_key()
 JWT_SIGNING_KEY = _get_jwt_signing_key(SECRET_KEY)
+# At-rest secret encryption keys (Fernet, urlsafe-base64, newest first),
+# independent of SECRET_KEY so it can be rotated without breaking stored secrets.
+# When empty, subscriptions.services.secret_crypto falls back to the legacy
+# SECRET_KEY-derived key (unchanged behaviour). See DATA_ENCRYPTION_AND_HARDENING.
+FIELD_ENCRYPTION_KEYS = [
+    k.strip() for k in (os.getenv("FIELD_ENCRYPTION_KEYS") or "").split(",") if k.strip()
+]
 ALLOWED_HOSTS = _get_allowed_hosts()
 CORS_ALLOWED_ORIGINS = _get_cors_allowed_origins()
 CSRF_TRUSTED_ORIGINS = _get_csrf_trusted_origins(CORS_ALLOWED_ORIGINS)

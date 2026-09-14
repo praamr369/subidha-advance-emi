@@ -14,9 +14,10 @@ class EmailSMTPSettings(BusinessSetupTimeStampedModel):
     waiver, reconciliation, stock, journal posting, settlement, commission,
     payout, or audit truth.
 
-    The app password is stored encrypted at rest (Fernet, key derived from
-    Django SECRET_KEY) and is never returned in plain text or ciphertext by
-    the API.
+    The app password is stored encrypted at rest (Fernet via
+    subscriptions.services.secret_crypto, keyed by FIELD_ENCRYPTION_KEYS with a
+    legacy SECRET_KEY-derived fallback) and is never returned in plain text or
+    ciphertext by the API. Rotate keys with `manage.py rotate_field_secrets`.
     """
 
     smtp_host = models.CharField(max_length=255, blank=True, default="smtp.gmail.com")

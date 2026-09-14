@@ -54,6 +54,12 @@ app runs non-root as `subidha`, SSH key-only.
   The CSP is production-only so dev HMR keeps its `eval`.
 - **Dependencies patched** to OSV-reported fixes: Django 5.2.16, Pillow 12.3.0,
   DRF 3.17.2, PyJWT 2.13, cryptography 50, sqlparse 0.6, plus tooling.
+- **At-rest secret encryption key is rotatable.** `secret_crypto` is a
+  `MultiFernet` keyed by a dedicated `FIELD_ENCRYPTION_KEYS` env (newest first),
+  with the legacy `SECRET_KEY`-derived key kept only as a decrypt fallback — so
+  rotating `SECRET_KEY` no longer breaks stored secrets, and keys rotate with zero
+  downtime via `manage.py rotate_field_secrets`. **Rule:** at-rest secrets go
+  through `secret_crypto`; keys live in the env, never in the repo.
 
 ## Server / infrastructure
 

@@ -43,10 +43,23 @@ and the rules are in [`business-rules/security-posture.md`](business-rules/secur
 - **Perimeter:** app runs non-root (`subidha`); SSH key-only; firewall 22/80/443;
   DR backups root/`subidha` `0640` and app-untamperable; deps patched
   (Django 5.2.16, Pillow 12.3.0, DRF 3.17.2, PyJWT 2.13, cryptography 50).
+- **Encryption key separation (R1/R2 / §3.1 — done):** `secret_crypto` is now a
+  `MultiFernet` keyed by a dedicated `FIELD_ENCRYPTION_KEYS` env (newest first),
+  with the legacy `SECRET_KEY`-derived key kept only as a decrypt fallback.
+  Rotating `SECRET_KEY` no longer breaks stored secrets, and keys rotate with zero
+  downtime via `manage.py rotate_field_secrets`. Backward compatible: unset →
+  legacy behaviour. Regression test: `backend/tests/test_secret_crypto.py`.
+- **Auth-gated KYC/media (done):** nginx denies the four `/media/.../kyc/` paths;
+  KYC docs served only via authenticated `FileResponse` endpoints.
+- **Cache:** production uses Redis (`CACHE_REDIS_URL` set), not LocMemCache.
 
 Still outstanding from the target posture below: **field-level PII encryption at
-rest (R3 / §3.2), `FIELD_ENCRYPTION_KEYS` split (R1/R2 / §3.1), encrypted off-box
-backups (R4 / §3.5), and auth-gated KYC/media downloads.** Those remain the plan.
+rest (R3 / §3.2)** and **encrypted off-box backups (R4 / §3.5)** — both real work
+requiring a maintenance window and verified restore, tracked as the plan.
+**app↔DB TLS** is deliberately deferred: the app talks to Postgres over loopback
+only (`127.0.0.1` via pgbouncer), so TLS there guards against an already-root
+local attacker — low value against the risk of a pooler-TLS misconfiguration
+taking down every DB connection. Revisit if the DB ever moves off-box.
 
 ## 2. Risks / gaps to close
 
@@ -129,11 +142,33 @@ The point of the above is that **one person can safely own the whole app**:
 
 ## 5. Definition of "safe to go live" (encryption/security)
 
-- [ ] `FIELD_ENCRYPTION_KEYS` set (separate from `SECRET_KEY`); `secret_crypto` is `MultiFernet`.
+- [x] `secret_crypto` is `MultiFernet` with a dedicated `FIELD_ENCRYPTION_KEYS` (legacy `SECRET_KEY` fallback). **Ops step:** set a real `FIELD_ENCRYPTION_KEYS` in prod `backend.env` and run `manage.py rotate_field_secrets` to migrate existing secrets off the legacy key.
 - [ ] Sensitive PII columns encrypted at rest; lookups via blind index, not plaintext.
 - [x] Client↔app TLS, HSTS, secure cookies, CSP on (2026-09-14). [ ] app↔DB TLS (`sslmode=require`) still to enforce.
 - [ ] `check_production_readiness` passes with production settings.
 - [ ] Encrypted, off-box backups with a **verified** restore.
-- [ ] Redis cache backend (not LocMemCache) in prod.
-- [ ] Key-rotation runbook written and rehearsed once.
+- [x] Redis cache backend (not LocMemCache) in prod (`CACHE_REDIS_URL` set).
+- [x] Key-rotation runbook written (below) + `manage.py rotate_field_secrets` command shipped; rehearse once in prod.
 - [ ] No secret or key present anywhere in the git repo.
+
+## 6. Key-rotation runbook (at-rest secrets)
+
+Zero-downtime rotation of `FIELD_ENCRYPTION_KEYS`, using the shipped
+`MultiFernet` + `rotate_field_secrets` command. Safe and reversible; a value that
+cannot be decrypted is left untouched, never destroyed.
+
+1. **Generate** a new key locally:
+   `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`
+2. **Prepend** it to `FIELD_ENCRYPTION_KEYS` in `/etc/subidha/backend.env`
+   (comma-separated, newest first — keep the current key(s) after it), then deploy
+   / restart so both old and new keys are loaded.
+3. **Re-encrypt** existing secrets under the new primary key:
+   `sudo -u subidha /var/www/subidha/app/backend/.venv/bin/python manage.py rotate_field_secrets`
+   (add `--dry-run` first to see the count).
+4. **Verify** the app still reads its secrets (e.g. send a test email from the
+   SMTP settings page).
+5. **Drop** the old key from `FIELD_ENCRYPTION_KEYS`, deploy again. Rotation done.
+
+First-time adoption (moving off the legacy `SECRET_KEY`-derived key): set a real
+`FIELD_ENCRYPTION_KEYS` (step 2) and run step 3 — existing secrets decrypt via the
+legacy fallback and are rewritten under the new key.

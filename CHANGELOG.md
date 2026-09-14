@@ -11,6 +11,8 @@ All notable changes to this project will be documented here.
 - Password-reset OTP now uses `secrets`; production CSP + `Permissions-Policy` + HSTS added.
 - Dependency patches: Django 5.2.16, Pillow 12.3.0, DRF 3.17.2, PyJWT 2.13, cryptography 50, sqlparse 0.6, + tooling.
 - Server: app runs non-root as `subidha` (gunicorn/next/celery/beat); SSH key-only; firewall 22/80/443; DR backups root/`subidha`-only; OS patched, rebooted to kernel 6.8.0-139.
+- KYC/PII media auth-gated: nginx denies `/media/.../kyc/`; served only via authenticated download endpoints.
+- At-rest secret encryption key separation: `secret_crypto` is now `MultiFernet` keyed by `FIELD_ENCRYPTION_KEYS` (legacy `SECRET_KEY` fallback), rotatable via `manage.py rotate_field_secrets`. Fixes the "rotating SECRET_KEY breaks stored secrets" gap. Regression test added.
 
 ### Docs
 - New interactive **Rules & Workflow Playbook** consolidating the rulebook + `docs/business-rules/*` per module.

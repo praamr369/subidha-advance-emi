@@ -747,6 +747,7 @@ read the code.
 - Password-reset OTP uses `secrets`, not `random`.
 - Pages send a production CSP + `Permissions-Policy`; nginx adds HSTS everywhere, `server_tokens off`, and serves `/media` with `nosniff` + a sandbox CSP.
 - Dependencies patched (Django 5.2.16, Pillow 12.3.0, DRF 3.17.2, PyJWT 2.13, cryptography 50, sqlparse 0.6, +tooling).
+- At-rest secret encryption uses a rotatable, `SECRET_KEY`-independent key: `secret_crypto` is a `MultiFernet` keyed by `FIELD_ENCRYPTION_KEYS` (legacy `SECRET_KEY` fallback); rotate via `manage.py rotate_field_secrets`.
 
 **Enforced on the server:**
 - gunicorn / next / celery / celery-beat run as non-root `subidha` (systemd drop-ins); `media`, `.next`, `/var/lib/subidha` are `subidha`-owned; `deploy.sh` re-chowns after each build.
