@@ -50,6 +50,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("inventory", "0030_fix_desynced_item_types"),
+        ("products_core", "0006_productrelationship_parent_variant_sku_and_more"),
     ]
 
     operations = [
