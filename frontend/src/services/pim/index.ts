@@ -606,9 +606,8 @@ export const pimService = {
   deleteMedia: (id: number): Promise<void> =>
     request<void>(`${BASE}/media/${id}/`, { method: "DELETE" }),
 
-  async setHeroMedia(itemId: number): Promise<void> {
-    return request<any>(`${BASE}/media/${itemId}/set_hero/`, { method: "POST" });
-  },
+  setHeroMedia: (itemId: number): Promise<PimMediaItem> =>
+    request<PimMediaItem>(`${BASE}/media/${itemId}/set_hero/`, { method: "POST" }),
 
   // --- Accessories Native to PIM ---
   async listAccessories(productId: number): Promise<any[]> {
