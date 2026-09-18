@@ -76,7 +76,13 @@ def sync_product_relationship_to_fg_accessory(sender, instance, created, **kwarg
     if not instance.related_product:
         return
         
-    acc_item = InventoryItem.objects.filter(product=instance.related_product).first()
+    acc_item = None
+    if instance.related_variant_sku:
+        acc_item = InventoryItem.objects.filter(sku=instance.related_variant_sku).first()
+        
+    if not acc_item:
+        acc_item = InventoryItem.objects.filter(product=instance.related_product).first()
+        
     if not acc_item:
         return
         
@@ -112,7 +118,13 @@ def sync_delete_product_relationship_from_fg(sender, instance, **kwargs):
     if not instance.related_product:
         return
         
-    acc_item = InventoryItem.objects.filter(product=instance.related_product).first()
+    acc_item = None
+    if instance.related_variant_sku:
+        acc_item = InventoryItem.objects.filter(sku=instance.related_variant_sku).first()
+        
+    if not acc_item:
+        acc_item = InventoryItem.objects.filter(product=instance.related_product).first()
+        
     if not acc_item:
         return
         
