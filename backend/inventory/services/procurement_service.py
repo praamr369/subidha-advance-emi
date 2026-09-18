@@ -487,23 +487,44 @@ def build_purchase_pipeline_summary(*, branch_id: int | None = None) -> dict:
 
     # --- Vendor bills ------------------------------------------------------
     vb_qs = VendorBill.objects.all()
+    from inventory.models import PurchaseBill
+    from accounting.models import VendorSettlement
+    
+    pb_qs = PurchaseBill.objects.all()
+
     if branch_id:
         vb_qs = vb_qs.filter(
             Q(purchase_order__branch_id=branch_id) | Q(goods_receipt__branch_id=branch_id)
         )
-    bills_draft = vb_qs.filter(status=VendorBillStatus.DRAFT).count()
-    posted_bills = vb_qs.filter(status=VendorBillStatus.POSTED)
-    bills_posted_count = posted_bills.count()
-    bills_posted_value = posted_bills.aggregate(total=Sum("grand_total"))["total"] or ZERO
+        pb_qs = pb_qs.filter(branch_id=branch_id)
+        
+    bills_draft = vb_qs.filter(status=VendorBillStatus.DRAFT).count() + pb_qs.filter(status="DRAFT").count()
+    
+    posted_vbs = vb_qs.filter(status=VendorBillStatus.POSTED)
+    posted_pbs = pb_qs.filter(status="POSTED")
+    
+    bills_posted_count = posted_vbs.count() + posted_pbs.count()
+    
+    vb_val = posted_vbs.aggregate(total=Sum("grand_total"))["total"] or ZERO
+    pb_val = posted_pbs.aggregate(total=Sum("grand_total"))["total"] or ZERO
+    bills_posted_value = vb_val + pb_val
 
     # --- Vendor payments (outstanding payable) -----------------------------
-    payments_posted_value = (
+    vp_val = (
         VendorPayment.objects.filter(
             status=VendorPaymentStatus.POSTED,
-            vendor_bill__in=posted_bills,
+            vendor_bill__in=posted_vbs,
         ).aggregate(total=Sum("amount"))["total"]
         or ZERO
     )
+    
+    vs_qs = VendorSettlement.objects.filter(status="POSTED")
+    if branch_id:
+        vs_qs = vs_qs.filter(branch_id=branch_id)
+    vs_val = vs_qs.aggregate(total=Sum("amount"))["total"] or ZERO
+    
+    payments_posted_value = vp_val + vs_val
+    
     outstanding_payable = bills_posted_value - payments_posted_value
     if outstanding_payable < ZERO:
         outstanding_payable = ZERO
