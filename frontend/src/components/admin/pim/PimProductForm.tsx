@@ -439,6 +439,7 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
   const [newAttrOptions, setNewAttrOptions] = useState<{ value: string; display_name: string; extra_cost: string }[]>([]);
   const [creatingAttr, setCreatingAttr] = useState(false);
   const [createAttrError, setCreateAttrError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -682,6 +683,9 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
       if (isEdit && productId) {
         await pimService.updateProduct(productId, payload);
         setRemovedAttrIds(new Set());
+        setSuccessMsg("Product saved successfully.");
+        setTimeout(() => setSuccessMsg(null), 3000);
+        return;
       } else {
         const created = await pimService.createProduct(payload);
         const typeSlug = defaultProductType === "ACCESSORY" ? "accessories"
@@ -690,7 +694,6 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
         router.push(`/admin/pim/products/${typeSlug}/${created.id}/edit`);
         return;
       }
-      router.push("/admin/pim/products");
     } catch (err: unknown) {
       const apiErr = err as { message?: string };
       setError(apiErr?.message ?? "Save failed");
@@ -1497,8 +1500,17 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
           disabled={saving}
           className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
         >
-          <Save className="h-4 w-4" />
-          {saving ? "Saving…" : isEdit ? "Save Changes" : "Create Product"}
+          {successMsg ? (
+            <>
+              <CheckCircle2 className="h-4 w-4" />
+              Saved
+            </>
+          ) : (
+            <>
+              <Save className="h-4 w-4" />
+              {saving ? "Saving…" : isEdit ? "Save Changes" : "Create Product"}
+            </>
+          )}
         </button>
         <button
           type="button"
