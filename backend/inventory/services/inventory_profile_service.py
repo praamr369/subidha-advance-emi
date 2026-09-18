@@ -53,7 +53,7 @@ def prepare_inventory_profile_for_product(*, product_id: int, actor=None, stock_
             sku=sku,
             unit_of_measure=product.unit_of_measure or "PCS",
             stock_tracking_enabled=requested_tracking,
-            stock_item_type=InventoryItemType.FINISHED_GOOD,
+            stock_item_type=product.item_type or InventoryItemType.FINISHED_GOOD,
             delivery_stock_bridge_enabled=bool(product.is_emi_enabled or product.is_direct_sale_enabled),
             stock_tracking_status=InventoryItem.StockTrackingStatus.PREPARED_NO_STOCK,
             is_active=product.is_active,
@@ -70,6 +70,9 @@ def prepare_inventory_profile_for_product(*, product_id: int, actor=None, stock_
         if item.unit_of_measure != (product.unit_of_measure or "PCS"):
             item.unit_of_measure = product.unit_of_measure or "PCS"
             update_fields.append("unit_of_measure")
+        if getattr(item, "stock_item_type", None) != product.item_type:
+            item.stock_item_type = product.item_type or InventoryItemType.FINISHED_GOOD
+            update_fields.append("stock_item_type")
         if item.stock_tracking_enabled != requested_tracking:
             item.stock_tracking_enabled = requested_tracking
             update_fields.append("stock_tracking_enabled")
