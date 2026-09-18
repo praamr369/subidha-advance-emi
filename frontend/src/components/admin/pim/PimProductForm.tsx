@@ -876,7 +876,7 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
           </div>
           <div className="sm:col-span-2">
             <div className="flex items-center justify-between mb-1">
-              <label htmlFor="f-description-isedit-variants-length-0-set" className="block text-sm font-medium">Description</label>
+              <label htmlFor="f-description" className="block text-sm font-medium">Description</label>
               {isEdit && variants.length > 0 && (
                 <button
                   type="button"
@@ -947,7 +947,7 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="block text-sm font-medium mb-1">Category *</label>
-            <select id="f-description-isedit-variants-length-0-set"
+            <select id="f-category"
               required
               className="w-full rounded-md border px-3 py-2 text-sm bg-background"
               value={categoryId}

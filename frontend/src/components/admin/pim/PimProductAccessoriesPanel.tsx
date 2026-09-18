@@ -1,12 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { Plus, Trash2, Search, Link2 } from "lucide-react";
-import {
-  listPimProductAccessories,
-  addPimProductAccessory,
-  removePimProductAccessory,
-  type PimProductAccessory,
-} from "@/services/product-pim";
+import type { PimProductAccessory } from "@/services/product-pim";
 import { pimService, type PimProduct } from "@/services/pim";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 
@@ -30,7 +25,7 @@ export default function PimProductAccessoriesPanel({ productId }: Props) {
     try {
       setLoading(true);
       setError(null);
-      const data = await listPimProductAccessories(productId);
+      const data = await pimService.listAccessories(productId);
       setAccessories(data);
     } catch (err: any) {
       if (err.message && err.message.includes("not published")) {
@@ -71,7 +66,7 @@ export default function PimProductAccessoriesPanel({ productId }: Props) {
     if (!selectedProduct) return;
     setAdding(true);
     try {
-      await addPimProductAccessory(productId, selectedProduct.id);
+      await pimService.addAccessory(productId, selectedProduct.id);
       setSelectedProduct(null);
       setSearchQuery("");
       await loadAccessories();
@@ -85,7 +80,7 @@ export default function PimProductAccessoriesPanel({ productId }: Props) {
   const handleRemove = async (id: number) => {
     if (!confirm("Remove this accessory link?")) return;
     try {
-      await removePimProductAccessory(productId, id);
+      await pimService.removeAccessory(productId, id);
       await loadAccessories();
     } catch (err: any) {
       alert(err.message || "Failed to remove accessory");

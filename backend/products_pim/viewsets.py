@@ -97,6 +97,7 @@ class PimProductViewSet(viewsets.ModelViewSet):
         subcategory_id = self.request.query_params.get("subcategory")
         search = self.request.query_params.get("search")
         is_published = self.request.query_params.get("is_published")
+        product_type = self.request.query_params.get("type")
         # Tree view: page through blueprints only (?roots_only=true), then load their
         # variant SKUs with ?parent=<id>,<id>,… so every blueprint is reachable page by page.
         roots_only = (
@@ -104,6 +105,9 @@ class PimProductViewSet(viewsets.ModelViewSet):
             or self.action == "tree_summary"
         )
         parent_ids = [p for p in (self.request.query_params.get("parent") or "").split(",") if p.isdigit()]
+        if product_type:
+            # Variants inherit product_type from base blueprint, but checking parent__product_type is safe too
+            qs = qs.filter(Q(product_type=product_type) | Q(parent__product_type=product_type))
         if roots_only:
             qs = qs.filter(parent__isnull=True)
         if parent_ids:
