@@ -571,8 +571,8 @@ class PimProductViewSet(viewsets.ModelViewSet):
         """
         # Strategy 1: exact SKU match
         sku_to_parent = {
-            v.sku: v.product_id
-            for v in ProductVariant.objects.values_list("sku", "product_id").iterator()
+            sku: product_id
+            for sku, product_id in ProductVariant.objects.values_list("sku", "product_id").iterator()
         }
         # Strategy 2: build prefix map from all base PIM products sorted longest-first
         all_codes = list(PimProduct.objects.values_list("code", "id"))
