@@ -2,6 +2,7 @@ import { apiFetch } from "@/lib/api";
 
 type ApiObject = Record<string, unknown>;
 type ApiListResponse = { results?: ApiObject[]; [key: string]: unknown };
+export type PaginatedResponse<T> = { count: number; results: T[] };
 
 export async function listAdminVendors(): Promise<ApiListResponse> {
   return apiFetch("/admin/vendors/?page_size=200");
@@ -214,18 +215,42 @@ export type AdminVendorPurchaseReturn = {
   posted_at?: string | null;
 };
 
-export async function listAdminVendorPurchaseReturnRegister(params: {
+export async function listAdminVendorPurchaseReturnRegister(params?: {
   vendor?: number;
   status?: string;
-  date_from?: string;
-  date_to?: string;
-} = {}): Promise<{ count: number; results: AdminVendorPurchaseReturn[] }> {
+}): Promise<PaginatedResponse<AdminVendorPurchaseReturn>> {
   const query = new URLSearchParams();
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== "") query.set(key, String(value));
-  });
+  if (params?.vendor) query.set("vendor", String(params.vendor));
+  if (params?.status) query.set("status", params.status);
   const suffix = query.toString() ? `?${query.toString()}` : "";
   return apiFetch(`/admin/vendor-purchase-returns/${suffix}`);
+}
+
+export type PurchaseReturnCreatePayload = {
+  reason: string;
+  stock_location_id?: number | null;
+  lines: Array<{
+    purchase_bill_line_id: number;
+    quantity: number;
+  }>;
+};
+
+export async function createAdminPurchaseReturn(
+  purchaseBillId: number,
+  payload: PurchaseReturnCreatePayload
+): Promise<{ id: number; return_no: string; status: string }> {
+  return apiFetch(`/admin/purchases/${purchaseBillId}/returns/`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function postAdminPurchaseReturn(
+  returnId: number
+): Promise<{ id: number; status: string; updated: boolean }> {
+  return apiFetch(`/admin/purchases/returns/${returnId}/post/`, {
+    method: "POST",
+  });
 }
 
 export interface VendorProduct {

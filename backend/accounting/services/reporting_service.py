@@ -649,7 +649,8 @@ def build_purchase_book(*, start_date: date | None = None, end_date: date | None
     
     if branch_id is not None:
         pb_queryset = pb_queryset.filter(branch_id=branch_id)
-        vb_queryset = vb_queryset.filter(branch_id=branch_id)
+        from django.db.models import Q
+        vb_queryset = vb_queryset.filter(Q(purchase_order__branch_id=branch_id) | Q(goods_receipt__branch_id=branch_id))
     if start_date:
         pb_queryset = pb_queryset.filter(bill_date__gte=start_date)
         vb_queryset = vb_queryset.filter(bill_date__gte=start_date)
@@ -674,13 +675,20 @@ def build_purchase_book(*, start_date: date | None = None, end_date: date | None
         })
         
     for bill in vb_queryset:
+        # Determine branch_id from relation
+        b_id = None
+        if bill.purchase_order_id:
+            b_id = bill.purchase_order.branch_id
+        elif bill.goods_receipt_id:
+            b_id = bill.goods_receipt.branch_id
+            
         rows.append({
-            "purchase_bill_id": bill.id,  # Shared concept in frontend
+            "purchase_bill_id": bill.id,
             "bill_no": bill.bill_no,
             "bill_date": bill.bill_date.isoformat(),
-            "branch_id": bill.branch_id,
+            "branch_id": b_id,
             "vendor_name": bill.vendor.name,
-            "tax_mode": bill.tax_mode,
+            "tax_mode": "GST_REGISTERED", # Default for legacy Vendor Bills
             "grand_total": _money_string(bill.grand_total),
             "tax_total": _money_string(bill.tax_total),
             "journal_entry_id": bill.posted_journal_entry_id,
