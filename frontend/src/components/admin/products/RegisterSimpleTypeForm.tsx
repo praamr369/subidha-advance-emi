@@ -13,6 +13,7 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import { apiFetch } from "@/lib/api";
 import { ROUTES } from "@/lib/routes";
+import { getProductCatalogOptions, type ProductCatalogOptions } from "@/services/products";
 import { z } from "zod";
 
 type ProductType = "RAW_MATERIAL" | "ACCESSORY" | "SERVICE";
@@ -102,6 +103,8 @@ interface RegisterProduct {
   is_active?: boolean;
   item_type?: string;
   stock_type?: string;
+  category?: string;
+  subcategory?: string;
 }
 
 interface Props {
@@ -139,11 +142,12 @@ export default function RegisterSimpleTypeForm({ productType, productId }: Props
   const [toast, setToast] = useState<{ type: "success" | "error"; msg: string } | null>(null);
 
   // Core fields
+  const [catalogOptions, setCatalogOptions] = useState<ProductCatalogOptions>({ categories: [], subcategories: [], unit_of_measure_masters: [], unit_of_measure_options: ["PCS"], item_type_choices: [], stock_type_choices: [] });
   const [form, setForm] = useState<{
     product_code: string; name: string; description: string;
     base_price: string; cost_price: string; sku: string;
     unit_of_measure: string; hsn_sac_code: string; gst_rate: string;
-    is_active: boolean; stock_type: string;
+    is_active: boolean; stock_type: string; category: string; subcategory: string;
   }>({
     product_code: "",
     name: "",
@@ -156,6 +160,8 @@ export default function RegisterSimpleTypeForm({ productType, productId }: Props
     gst_rate: "18",
     is_active: true,
     stock_type: "STOCK_ITEM",
+    category: "",
+    subcategory: "",
   });
 
   // Raw material extra fields
@@ -179,6 +185,7 @@ export default function RegisterSimpleTypeForm({ productType, productId }: Props
     : productType === "SERVICE" ? "services" : "accessories";
 
   useEffect(() => {
+    getProductCatalogOptions().then(setCatalogOptions).catch(() => {});
     if (isEdit && productId) {
       apiFetch<RegisterProduct>(`/api/v1/admin/products/${productId}/`)
         .then((p) => {
@@ -194,10 +201,14 @@ export default function RegisterSimpleTypeForm({ productType, productId }: Props
             gst_rate: p.gst_rate || "18",
             is_active: p.is_active !== false,
             stock_type: p.stock_type || "STOCK_ITEM",
+            category: p.category || "",
+            subcategory: p.subcategory || "",
           });
         })
         .catch(() => {})
         .finally(() => setLoading(false));
+    } else {
+      setLoading(false);
     }
   }, [isEdit, productId, meta.unitOptions]);
 
@@ -222,6 +233,8 @@ export default function RegisterSimpleTypeForm({ productType, productId }: Props
         description: form.description,
         base_price: form.base_price || "0",
         unit_of_measure: form.unit_of_measure,
+        category: form.category,
+        subcategory: form.subcategory,
         hsn_sac_code: form.hsn_sac_code,
         gst_rate: form.gst_rate,
         is_active: form.is_active,
@@ -350,6 +363,35 @@ export default function RegisterSimpleTypeForm({ productType, productId }: Props
               >
                 {meta.unitOptions.map((u) => <option key={u}>{u}</option>)}
               </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="f-category" className="block text-sm font-medium mb-1">Category</label>
+              <input id="f-category"
+                value={form.category}
+                onChange={(e) => set("category", e.target.value)}
+                list="category-options"
+                placeholder="Optional catalog category"
+                className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+              />
+              <datalist id="category-options">
+                {catalogOptions.categories.map((item) => <option key={item.id} value={item.name} />)}
+              </datalist>
+            </div>
+            <div>
+              <label htmlFor="f-subcategory" className="block text-sm font-medium mb-1">Subcategory</label>
+              <input id="f-subcategory"
+                value={form.subcategory}
+                onChange={(e) => set("subcategory", e.target.value)}
+                list="subcategory-options"
+                placeholder="Optional catalog subcategory"
+                className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+              />
+              <datalist id="subcategory-options">
+                {catalogOptions.subcategories.map((item) => <option key={item.id} value={item.name} />)}
+              </datalist>
             </div>
           </div>
 
