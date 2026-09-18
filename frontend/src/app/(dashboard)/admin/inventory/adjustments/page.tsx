@@ -476,7 +476,20 @@ export default function InventoryAdjustmentsPage() {
               >
                 <SearchableItemSelect
                   value={line.inventory_item}
-                  onChange={(value) => updateLine(index, "inventory_item", value)}
+                  onChange={(value, item) => {
+                    setForm((current) => ({
+                      ...current,
+                      lines: current.lines.map((l, lineIndex) => {
+                        if (lineIndex !== index) return l;
+                        const cost = item?.purchase_unit_cost || item?.standard_unit_cost || l.unit_cost_snapshot;
+                        return { 
+                          ...l, 
+                          inventory_item: value,
+                          unit_cost_snapshot: cost ? parseFloat(cost).toFixed(2) : l.unit_cost_snapshot
+                        };
+                      }),
+                    }));
+                  }}
                   onLoadItems={async (q) => (await searchInventoryItems(q)).results}
                   allItems={items}
                   disabled={saving}

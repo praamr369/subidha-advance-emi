@@ -7,7 +7,7 @@ import type { InventoryItem } from "@/services/inventory";
 
 interface SearchableItemSelectProps {
   value: string | number;
-  onChange: (value: string) => void;
+  onChange: (value: string, item?: InventoryItem) => void;
   onLoadItems?: (search: string) => Promise<InventoryItem[]>;
   allItems?: InventoryItem[];
   disabled?: boolean;
@@ -128,7 +128,7 @@ export default function SearchableItemSelect({
                     <button
                       type="button"
                       onClick={() => {
-                        onChange(String(item.id));
+                        onChange(String(item.id), item);
                         setIsOpen(false);
                         setSearch("");
                       }}

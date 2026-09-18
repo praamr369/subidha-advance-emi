@@ -324,6 +324,10 @@ def create_stock_ledger_entry(
             posted_by=posted_by,
             posted_journal_entry=posted_journal_entry,
         )
+        # Sync stock tracking status after any ledger movement
+        from inventory.models import InventoryItem
+        InventoryItem.sync_stock_tracking_status(inventory_item.id)
+        
         return entry, True
     except (IntegrityError, ValidationError):
         existing = StockLedger.objects.filter(**lookup).first()
