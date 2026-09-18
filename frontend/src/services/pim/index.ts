@@ -606,24 +606,24 @@ export const pimService = {
   deleteMedia: (id: number): Promise<void> =>
     request<void>(`${BASE}/media/${id}/`, { method: "DELETE" }),
 
-  async setHeroMediaItem(itemId: number): Promise<void> {
-    return apiFetch(`${BASE}/media/${itemId}/set_hero/`, { method: "POST" });
+  async setHeroMedia(itemId: number): Promise<void> {
+    return request<any>(`${BASE}/media/${itemId}/set_hero/`, { method: "POST" });
   },
 
   // --- Accessories Native to PIM ---
   async listAccessories(productId: number): Promise<any[]> {
-    return apiFetch(`${BASE}/products/${productId}/accessories/`);
+    return request<any>(`${BASE}/products/${productId}/accessories/`);
   },
 
   async addAccessory(productId: number, relatedPimId: number): Promise<any> {
-    return apiFetch(`${BASE}/products/${productId}/accessories/`, {
+    return request<any>(`${BASE}/products/${productId}/accessories/`, {
       method: "POST",
       body: JSON.stringify({ related_pim_id: relatedPimId }),
     });
   },
 
   async removeAccessory(productId: number, accessoryId: number): Promise<void> {
-    return apiFetch(`${BASE}/products/${productId}/accessories/${accessoryId}/`, {
+    return request<any>(`${BASE}/products/${productId}/accessories/${accessoryId}/`, {
       method: "DELETE",
     });
   }
