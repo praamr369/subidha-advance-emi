@@ -236,12 +236,7 @@ class ProductPimVariantPublishControlView(APIView):
             "is_published": pim.is_published,
         }
 
-    def _propagate_base(self, pim):
-        """If any child is published, the base must be published too."""
-        any_published = pim.child_pim_products.filter(is_published=True).exists()
-        if any_published and not pim.is_published:
-            pim.is_published = True
-            pim.save(update_fields=["is_published"])
+
 
     def get(self, request, product_id):
         pim, err = self._pim_or_404(product_id)
@@ -298,13 +293,8 @@ class ProductPimVariantPublishControlView(APIView):
                 if flag:
                     any_published_now = True
 
-            # Auto-publish base when any child is published
-            if any_published_now and not pim.is_published:
-                pim.is_published = True
-                pim.save(update_fields=["is_published"])
-            else:
-                # Re-read base state in case it changed
-                pim.refresh_from_db(fields=["is_published"])
+            # Re-read base state in case it changed
+            pim.refresh_from_db(fields=["is_published"])
 
         return Response({
             "base": self._base_response(pim, product_id),
