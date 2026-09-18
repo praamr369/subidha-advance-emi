@@ -2299,6 +2299,33 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
                 )
             Emi.objects.bulk_create(emis_to_create)
 
+        try:
+            from inventory.services.purchase_need_service import upsert_subscription_demand_purchase_need
+            request = self.context.get("request")
+            user = request.user if request and hasattr(request, "user") else None
+            
+            # Finished Good
+            upsert_subscription_demand_purchase_need(
+                subscription_id=subscription.id,
+                product_id=subscription.product_id,
+                required_quantity=Decimal("1.000"),
+                customer_id=subscription.customer_id,
+                created_by=user,
+            )
+            
+            # Accessories
+            for acc_link in subscription.product.accessory_links.all():
+                if acc_link.is_default_included:
+                    upsert_subscription_demand_purchase_need(
+                        subscription_id=subscription.id,
+                        product_id=acc_link.accessory_product_id,
+                        required_quantity=Decimal(str(acc_link.quantity)),
+                        customer_id=subscription.customer_id,
+                        created_by=user,
+                    )
+        except Exception:
+            pass
+
         return subscription
 
     @transaction.atomic

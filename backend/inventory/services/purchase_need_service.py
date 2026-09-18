@@ -81,3 +81,47 @@ def upsert_direct_sale_purchase_need(*, signal: StockNeedSignal, created_by=None
         },
     )
     return need, created
+
+
+def upsert_subscription_demand_purchase_need(*, subscription_id: int, product_id: int, required_quantity: Decimal, customer_id: int | None = None, created_by=None) -> tuple[PurchaseNeed | None, bool]:
+    warehouse = ensure_primary_warehouse()
+
+    pname = ""
+    try:
+        pname = (Product.objects.filter(pk=product_id).values_list("name", flat=True).first() or "")[:255]
+    except Exception:
+        pname = ""
+
+    from inventory.models import InventoryItem
+    inventory = InventoryItem.objects.filter(product_id=product_id).first()
+    if not inventory or not inventory.stock_tracking_enabled:
+        return None, False
+
+    available = inventory.available_qty()
+    shortage = max(QUANTITY_ZERO, required_quantity - available)
+    if shortage <= QUANTITY_ZERO:
+        return None, False
+
+    need, created = PurchaseNeed.objects.update_or_create(
+        product_id=product_id,
+        warehouse=warehouse,
+        status=PurchaseNeedStatus.OPEN,
+        source_module=PurchaseNeed.SourceModule.SUBSCRIPTION_DEMAND,
+        source_object_id=str(subscription_id),
+        defaults={
+            "required_quantity": required_quantity,
+            "available_quantity": available,
+            "shortage_quantity": shortage,
+            "customer_id": customer_id,
+            "priority": PurchaseNeed.Priority.MEDIUM,
+            "created_by": getattr(created_by, "pk", None) if created_by else None,
+            "note": "Auto-flagged from contract creation",
+            "product_name_snapshot": pname,
+            "demand_snapshot": {
+                "required_quantity": f"{required_quantity:.3f}",
+                "available_quantity": f"{available:.3f}",
+                "shortage_quantity": f"{shortage:.3f}",
+            },
+        },
+    )
+    return need, created

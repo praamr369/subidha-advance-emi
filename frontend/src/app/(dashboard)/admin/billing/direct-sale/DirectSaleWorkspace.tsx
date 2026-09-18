@@ -990,45 +990,46 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
   function handleAccessoryConfirm(result: AccessorySelectionResult) {
     if (!accessoryPanel) return;
     setAccessoryPanel(null);
-    // Add each selected chargeable accessory/service as an additional draft line
+    // Add each selected accessory/service as an additional draft line
     for (const acc of result.accessories) {
-      if (acc.chargeMode === "CHARGEABLE") {
-        setLines((prev) => [
-          ...prev,
-          {
-            ...makeLine(),
-            product_id: String(acc.productId),
-            description: acc.variantLabel || acc.productName,
-            unit_price: Number(acc.salePrice || 0).toFixed(2),
-            product_search: `${acc.productCode} - ${acc.productName}`,
-            product_loading: false,
-            product_results: [],
-            product_error: null,
-            selected_product: null,
-            requirement_quantity: "1.000",
-          },
-        ]);
-      }
+      setLines((prev) => [
+        ...prev,
+        {
+          ...makeLine(),
+          product_id: String(acc.productId),
+          inventory_item_id: String(acc.inventoryItemId || ""),
+          description: acc.variantLabel || acc.productName,
+          unit_price: acc.chargeMode === "CHARGEABLE" ? Number(acc.salePrice || 0).toFixed(2) : "0.00",
+          product_search: `${acc.productCode} - ${acc.productName}`,
+          product_loading: false,
+          product_results: [],
+          product_error: null,
+          selected_product: null,
+          // Auto flag for requirement if free accessory since we don't have full inventory status here yet
+          create_requirement: true,
+          requirement_quantity: "1.000",
+          requirement_note: "Auto-flagged from accessory panel",
+        },
+      ]);
     }
     for (const svc of result.services) {
-      if (svc.chargeMode === "CHARGEABLE") {
-        setLines((prev) => [
-          ...prev,
-          {
-            ...makeLine(),
-            product_id: "",
-            description: svc.serviceName,
-            unit_price: Number(svc.salePrice || 0).toFixed(2),
-            gst_rate: svc.taxRatePercent || "0",
-            product_search: `${svc.serviceCode} - ${svc.serviceName}`,
-            product_loading: false,
-            product_results: [],
-            product_error: null,
-            selected_product: null,
-            requirement_quantity: "1.000",
-          },
-        ]);
-      }
+      setLines((prev) => [
+        ...prev,
+        {
+          ...makeLine(),
+          product_id: "",
+          description: svc.serviceName,
+          unit_price: svc.chargeMode === "CHARGEABLE" ? Number(svc.salePrice || 0).toFixed(2) : "0.00",
+          gst_rate: svc.taxRatePercent || "0",
+          product_search: `${svc.serviceCode} - ${svc.serviceName}`,
+          product_loading: false,
+          product_results: [],
+          product_error: null,
+          selected_product: null,
+          create_requirement: false,
+          requirement_quantity: "1.000",
+        },
+      ]);
     }
   }
 
