@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, useRef, type FormEvent } from "react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
@@ -99,6 +99,130 @@ function toLineForm(line: AccountingPurchaseBillLine): PurchaseLineForm {
     unit_cost: line.unit_cost,
     tax_amount: line.tax_amount ?? "0.00",
   };
+}
+
+// ── Searchable Item Combobox ──────────────────────────────────────────────────
+interface ItemComboboxProps {
+  items: InventoryItem[];
+  value: string;
+  onChange: (itemId: string, item: InventoryItem | null) => void;
+  required?: boolean;
+}
+
+function ItemCombobox({ items, value, onChange, required }: ItemComboboxProps) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  const selectedItem = items.find((it) => String(it.id) === value) ?? null;
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return items.slice(0, 80);
+    return items
+      .filter(
+        (it) =>
+          (it.sku ?? "").toLowerCase().includes(q) ||
+          (it.product_name ?? "").toLowerCase().includes(q) ||
+          (it.product_code ?? "").toLowerCase().includes(q) ||
+          (it.stock_item_type ?? "").toLowerCase().includes(q)
+      )
+      .slice(0, 60);
+  }, [items, query]);
+
+  function handleSelect(item: InventoryItem) {
+    onChange(String(item.id), item);
+    setOpen(false);
+    setQuery("");
+  }
+
+  function handleInputFocus() {
+    setOpen(true);
+    setQuery("");
+  }
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (
+        listRef.current &&
+        !listRef.current.contains(e.target as Node) &&
+        inputRef.current &&
+        !inputRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+        setQuery("");
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const displayValue = open
+    ? query
+    : selectedItem
+    ? `${selectedItem.sku ?? selectedItem.product_code} · ${selectedItem.product_name ?? "—"}`
+    : "";
+
+  return (
+    <div className="relative">
+      <input
+        ref={inputRef}
+        type="text"
+        autoComplete="off"
+        placeholder={selectedItem ? undefined : "Search by SKU, name, or type…"}
+        className={accountingFieldClassName()}
+        value={displayValue}
+        onFocus={handleInputFocus}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setOpen(true);
+        }}
+      />
+      {required && (
+        <input
+          type="text"
+          className="sr-only"
+          tabIndex={-1}
+          value={value}
+          required
+          readOnly
+          aria-hidden="true"
+        />
+      )}
+      {open && (
+        <div
+          ref={listRef}
+          className="absolute z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-border bg-background shadow-lg"
+        >
+          {filtered.length === 0 ? (
+            <p className="px-4 py-3 text-xs text-muted-foreground">No items found.</p>
+          ) : (
+            filtered.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onMouseDown={() => handleSelect(item)}
+                className="flex w-full flex-col px-4 py-2.5 text-left hover:bg-muted/60 focus:bg-muted/60"
+              >
+                <span className="text-xs font-semibold text-foreground">
+                  {item.sku ?? item.product_code} · {item.product_name}
+                </span>
+                <span className="text-[10px] text-muted-foreground">
+                  {item.stock_item_type ?? "—"}
+                  {item.purchase_unit_cost
+                    ? ` · Last price: ${accountingMoney(item.purchase_unit_cost)}`
+                    : item.standard_unit_cost
+                    ? ` · Std cost: ${accountingMoney(item.standard_unit_cost)}`
+                    : ""}
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function AccountingPurchaseBillsPage() {
@@ -441,34 +565,45 @@ export default function AccountingPurchaseBillsPage() {
               {form.lines.map((line, index) => {
                 const selectedItem =
                   inventoryItems.find((item) => String(item.id) === line.inventory_item) ?? null;
+                const lastCost = selectedItem?.purchase_unit_cost ?? selectedItem?.standard_unit_cost ?? null;
                 return (
                   <div key={`${index}-${line.inventory_item}`} className="rounded-[1.2rem] border border-border bg-background p-4">
                     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-                      <label className="text-sm text-muted-foreground xl:col-span-2">
-                        Inventory item
-                        <select
-                          className={accountingFieldClassName()}
+                      <div className="text-sm text-muted-foreground xl:col-span-2">
+                        <span className="mb-1 block">Inventory item</span>
+                        <ItemCombobox
+                          items={inventoryItems}
                           value={line.inventory_item}
-                          onChange={(event) =>
+                          onChange={(itemId, item) => {
                             setForm((current) => ({
                               ...current,
                               lines: current.lines.map((entry, entryIndex) =>
                                 entryIndex === index
-                                  ? { ...entry, inventory_item: event.target.value }
+                                  ? {
+                                      ...entry,
+                                      inventory_item: itemId,
+                                      // Auto-fill cost from last purchase cost or standard cost
+                                      unit_cost: item?.purchase_unit_cost
+                                        ? parseFloat(item.purchase_unit_cost).toFixed(2)
+                                        : item?.standard_unit_cost
+                                          ? parseFloat(item.standard_unit_cost).toFixed(2)
+                                          : entry.unit_cost,
+                                    }
                                   : entry
                               ),
-                            }))
-                          }
+                            }));
+                          }}
                           required
-                        >
-                          <option value="">Select item</option>
-                          {inventoryItems.map((item) => (
-                            <option key={item.id} value={item.id}>
-                              {item.sku || item.product_code} · {item.product_name} · {item.stock_item_type}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
+                        />
+                        {selectedItem && lastCost ? (
+                          <p className="mt-1 text-[10px] text-emerald-700">
+                            ✓ Last purchase price: {accountingMoney(lastCost)}
+                            {selectedItem.purchase_unit_cost ? " (auto-filled)" : " (std cost, editable)"}
+                          </p>
+                        ) : selectedItem ? (
+                          <p className="mt-1 text-[10px] text-muted-foreground">No previous purchase cost — enter manually.</p>
+                        ) : null}
+                      </div>
                       <label className="text-sm text-muted-foreground">
                         Quantity
                         <input
@@ -531,6 +666,9 @@ export default function AccountingPurchaseBillsPage() {
                           }
                           disabled={form.tax_mode === "NON_GST"}
                         />
+                        {form.tax_mode === "NON_GST" ? (
+                          <span className="mt-0.5 block text-[10px] text-muted-foreground">Disabled (Non-GST mode)</span>
+                        ) : null}
                       </label>
                       <label className="text-sm text-muted-foreground xl:col-span-4">
                         Description
@@ -575,6 +713,16 @@ export default function AccountingPurchaseBillsPage() {
                   </div>
                 );
               })}
+
+              {/* Grand total preview */}
+              <div className="flex justify-end">
+                <div className="rounded-xl border border-primary/20 bg-primary/5 px-5 py-3 text-right">
+                  <p className="text-xs text-muted-foreground">Bill grand total (preview)</p>
+                  <p className="text-lg font-bold text-primary">
+                    {accountingMoney(form.lines.reduce((sum, line) => sum + lineTotal(line, form.tax_mode), 0))}
+                  </p>
+                </div>
+              </div>
             </div>
 
             <div className="flex flex-wrap gap-3">

@@ -786,6 +786,19 @@ def post_purchase_bill(*, purchase_bill_id: int, posted_by):
         )
         created_count += 1 if created else 0
         existing_count += 0 if created else 1
+        # Update last purchase cost and refresh stock status on the inventory item
+        item = line.inventory_item
+        item_update_fields = []
+        if line.unit_cost is not None:
+            item.purchase_unit_cost = Decimal(str(line.unit_cost))
+            item_update_fields.append("purchase_unit_cost")
+        # Refresh stock tracking status: now that we have stock in, mark STOCK_ACTIVE
+        if item.stock_tracking_status != InventoryItem.StockTrackingStatus.STOCK_ACTIVE:
+            item.stock_tracking_status = InventoryItem.StockTrackingStatus.STOCK_ACTIVE
+            item_update_fields.append("stock_tracking_status")
+        if item_update_fields:
+            item_update_fields.append("updated_at")
+            item.save(update_fields=item_update_fields)
 
     credit_account = (
         purchase_bill.finance_account.chart_account

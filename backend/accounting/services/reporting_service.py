@@ -636,18 +636,31 @@ def build_sales_book(*, start_date: date | None = None, end_date: date | None = 
 
 
 def build_purchase_book(*, start_date: date | None = None, end_date: date | None = None, branch_id: int | None = None) -> dict:
-    queryset = PurchaseBill.objects.select_related("vendor", "posted_journal_entry").filter(
+    from inventory.models import PurchaseBill, VendorBill
+    
+    pb_queryset = PurchaseBill.objects.select_related("vendor", "posted_journal_entry").filter(
         status="POSTED",
         posted_journal_entry__isnull=False,
     )
+    vb_queryset = VendorBill.objects.select_related("vendor", "posted_journal_entry").filter(
+        status="POSTED",
+        posted_journal_entry__isnull=False,
+    )
+    
     if branch_id is not None:
-        queryset = queryset.filter(branch_id=branch_id)
+        pb_queryset = pb_queryset.filter(branch_id=branch_id)
+        vb_queryset = vb_queryset.filter(branch_id=branch_id)
     if start_date:
-        queryset = queryset.filter(bill_date__gte=start_date)
+        pb_queryset = pb_queryset.filter(bill_date__gte=start_date)
+        vb_queryset = vb_queryset.filter(bill_date__gte=start_date)
     if end_date:
-        queryset = queryset.filter(bill_date__lte=end_date)
-    rows = [
-        {
+        pb_queryset = pb_queryset.filter(bill_date__lte=end_date)
+        vb_queryset = vb_queryset.filter(bill_date__lte=end_date)
+        
+    rows = []
+    
+    for bill in pb_queryset:
+        rows.append({
             "purchase_bill_id": bill.id,
             "bill_no": bill.bill_no,
             "bill_date": bill.bill_date.isoformat(),
@@ -658,9 +671,24 @@ def build_purchase_book(*, start_date: date | None = None, end_date: date | None
             "tax_total": _money_string(bill.tax_total),
             "journal_entry_id": bill.posted_journal_entry_id,
             "journal_entry_no": bill.posted_journal_entry.entry_no,
-        }
-        for bill in queryset.order_by("-bill_date", "-id")
-    ]
+        })
+        
+    for bill in vb_queryset:
+        rows.append({
+            "purchase_bill_id": bill.id,  # Shared concept in frontend
+            "bill_no": bill.bill_no,
+            "bill_date": bill.bill_date.isoformat(),
+            "branch_id": bill.branch_id,
+            "vendor_name": bill.vendor.name,
+            "tax_mode": bill.tax_mode,
+            "grand_total": _money_string(bill.grand_total),
+            "tax_total": _money_string(bill.tax_total),
+            "journal_entry_id": bill.posted_journal_entry_id,
+            "journal_entry_no": bill.posted_journal_entry.entry_no,
+        })
+        
+    rows.sort(key=lambda x: (x["bill_date"], x["purchase_bill_id"]), reverse=True)
+    
     return {
         "start_date": start_date.isoformat() if start_date else None,
         "end_date": end_date.isoformat() if end_date else None,

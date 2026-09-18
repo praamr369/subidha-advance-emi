@@ -71,11 +71,13 @@ class InventoryItemSerializer(serializers.ModelSerializer):
             "default_stock_location_name",
             "stock_tracking_enabled",
             "stock_item_type",
+            "stock_tracking_status",
             "delivery_stock_bridge_enabled",
             "opening_stock_qty",
             "reorder_level_qty",
             "valuation_method",
             "standard_unit_cost",
+            "purchase_unit_cost",
             "barcode",
             "qr_code",
             "lot_tracking_enabled",
@@ -87,7 +89,7 @@ class InventoryItemSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "current_stock_qty", "active_lot_count", "expiring_lot_count", "created_at", "updated_at"]
+        read_only_fields = ["id", "stock_tracking_status", "current_stock_qty", "active_lot_count", "expiring_lot_count", "created_at", "updated_at"]
 
     def get_current_stock_qty(self, obj):
         return f"{obj.current_stock_quantity():.3f}"

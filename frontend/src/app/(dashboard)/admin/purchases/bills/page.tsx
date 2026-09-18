@@ -378,6 +378,27 @@ export default function AdminPurchaseBillsPage() {
         { label: "Posted Value", value: loading ? "—" : `₹${rows.filter(r => r.status === "POSTED").reduce((s, r) => s + Number(r.grand_total || 0), 0).toLocaleString("en-IN")}`, tone: "default" },
       ]}
     >
+      <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50/50 p-4">
+        <div className="flex items-start">
+          <div className="flex-shrink-0">
+            <svg className="h-5 w-5 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <div className="ml-3">
+            <h3 className="text-sm font-semibold text-blue-800">Looking for full purchase stock workflow?</h3>
+            <div className="mt-1 text-sm text-blue-700">
+              <p>Vendor Bills only post accounting journals for existing receipts. To create a purchase bill that automatically moves stock into inventory and creates the journal entry together, use the Accounting Purchase Bills workflow.</p>
+            </div>
+            <div className="mt-3">
+              <Link href={ROUTES.admin.accountingPurchaseBills} className="text-sm font-bold text-blue-800 hover:text-blue-900 underline">
+                Go to Accounting Purchase Bills →
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <ERPSectionShell
         title="Vendor Bills"
         description="Posting uses system account mappings. Finance blockers returned by the backend are shown in the detail drawer."

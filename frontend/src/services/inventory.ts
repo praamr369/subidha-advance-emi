@@ -545,7 +545,9 @@ export type InventoryItem = {
   category?: string;
   subcategory?: string;
   base_price?: string;
-  standard_unit_cost?: string;
+  standard_unit_cost?: string | null;
+  purchase_unit_cost?: string | null;
+  stock_tracking_status?: string | null;
   unit_of_measure?: string;
   stock_item_type?: string;
 };
