@@ -475,10 +475,13 @@ class AccountingPurchaseBillViewSet(AdminAccountingPhase3ViewSet):
     def post_bill(self, request, pk=None):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        purchase_bill, updated = post_purchase_bill_from_accounting(
-            purchase_bill_id=int(pk),
-            posted_by=request.user,
-        )
+        try:
+            purchase_bill, updated = post_purchase_bill_from_accounting(
+                purchase_bill_id=int(pk),
+                posted_by=request.user,
+            )
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
         payload = PurchaseBillSerializer(purchase_bill, context=self.get_serializer_context())
         return Response({"updated": updated, "purchase_bill": payload.data})
 
@@ -486,11 +489,14 @@ class AccountingPurchaseBillViewSet(AdminAccountingPhase3ViewSet):
     def cancel(self, request, pk=None):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        purchase_bill, updated = cancel_purchase_bill(
-            purchase_bill_id=int(pk),
-            performed_by=request.user,
-            reason=serializer.validated_data.get("reason", ""),
-        )
+        try:
+            purchase_bill, updated = cancel_purchase_bill(
+                purchase_bill_id=int(pk),
+                performed_by=request.user,
+                reason=serializer.validated_data.get("reason", ""),
+            )
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
         payload = PurchaseBillSerializer(purchase_bill, context=self.get_serializer_context())
         return Response({"updated": updated, "purchase_bill": payload.data})
 
