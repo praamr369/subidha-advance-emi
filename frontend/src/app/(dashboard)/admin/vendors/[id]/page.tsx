@@ -216,17 +216,41 @@ export default function AdminVendorDetailPage() {
               />
 
               <div className="grid gap-6 lg:grid-cols-2">
-                <SectionCard title="Purchases" description="Counts are sourced from the vendor purchase summary endpoints.">
+                <SectionCard 
+                  title="Purchases" 
+                  description="Counts are sourced from the vendor purchase summary endpoints."
+                  action={
+                    <div className="flex gap-3 text-sm font-medium">
+                      <Link className="text-primary hover:underline" href={`${ROUTES.admin.purchaseOrders}?search=${encodeURIComponent(vendorName)}`}>Orders</Link>
+                      <Link className="text-primary hover:underline" href={`${ROUTES.admin.purchaseBills}?search=${encodeURIComponent(vendorName)}`}>Bills</Link>
+                      <Link className="text-primary hover:underline" href={`${ROUTES.admin.purchaseVendorPayments}?search=${encodeURIComponent(vendorName)}`}>Payments</Link>
+                    </div>
+                  }
+                >
                   <div className="grid gap-4 sm:grid-cols-3">
-                    <DetailValue label="Purchase orders" value={purchases?.purchase_orders_count ?? 0} />
-                    <DetailValue label="Purchase bills" value={purchases?.purchase_bills_count ?? 0} />
-                    <DetailValue label="Vendor payments" value={purchases?.vendor_payments_count ?? 0} />
+                    <Link href={`${ROUTES.admin.purchaseOrders}?search=${encodeURIComponent(vendorName)}`} className="hover:opacity-80 transition-opacity">
+                      <DetailValue label="Purchase orders" value={<span className="text-primary">{purchases?.purchase_orders_count ?? 0}</span>} />
+                    </Link>
+                    <Link href={`${ROUTES.admin.purchaseBills}?search=${encodeURIComponent(vendorName)}`} className="hover:opacity-80 transition-opacity">
+                      <DetailValue label="Purchase bills" value={<span className="text-primary">{purchases?.purchase_bills_count ?? 0}</span>} />
+                    </Link>
+                    <Link href={`${ROUTES.admin.purchaseVendorPayments}?search=${encodeURIComponent(vendorName)}`} className="hover:opacity-80 transition-opacity">
+                      <DetailValue label="Vendor payments" value={<span className="text-primary">{purchases?.vendor_payments_count ?? 0}</span>} />
+                    </Link>
                   </div>
                 </SectionCard>
 
-                <SectionCard title="Purchase returns" description="Posted totals remain audit-safe and traceable to return documents.">
+                <SectionCard 
+                  title="Purchase returns" 
+                  description="Posted totals remain audit-safe and traceable to return documents."
+                  action={
+                    <Link className="text-sm font-medium text-primary hover:underline" href={`${ROUTES.admin.purchaseVendorReturns}?vendor_id=${id}`}>View returns</Link>
+                  }
+                >
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <DetailValue label="Returns count" value={purchaseReturns?.count ?? 0} />
+                    <Link href={`${ROUTES.admin.purchaseVendorReturns}?vendor_id=${id}`} className="hover:opacity-80 transition-opacity">
+                      <DetailValue label="Returns count" value={<span className="text-primary">{purchaseReturns?.count ?? 0}</span>} />
+                    </Link>
                     <DetailValue label="Posted total" value={purchaseReturns?.summary.posted_total ?? "0.00"} />
                   </div>
                 </SectionCard>

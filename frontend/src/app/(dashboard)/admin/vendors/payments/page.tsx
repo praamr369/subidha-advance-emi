@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { accountingErrorMessage } from "@/components/accounting/shared";
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
@@ -13,7 +14,7 @@ import ProcurementConfirmDialog from "@/components/procurement/ProcurementConfir
 import { buildAdminVendorPaymentVoucherPrintRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import VendorPayablesToggle from "@/components/vendors/VendorPayablesToggle";
-import { listFinanceAccounts, type FinanceAccount } from "@/services/accounting";
+import { listFinanceAccounts, listVendorSettlements, type FinanceAccount } from "@/services/accounting";
 import {
   createVendorPayment,
   listVendorBills,
@@ -256,7 +257,8 @@ function PaymentDetailDrawer({ payment, onPosted, onClose }: DetailDrawerProps) 
     }
   }
 
-  const canPost = payment.status === "DRAFT";
+  const isSettlement = (payment as any)._isSettlement;
+  const canPost = payment.status === "DRAFT" && !isSettlement;
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end">
@@ -265,7 +267,7 @@ function PaymentDetailDrawer({ payment, onPosted, onClose }: DetailDrawerProps) 
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <div>
-            <p className="text-xs text-muted-foreground">Vendor Payment</p>
+            <p className="text-xs text-muted-foreground">{isSettlement ? "Vendor Settlement" : "Vendor Payment"}</p>
             <h2 className="text-lg font-semibold text-foreground">{payment.payment_no}</h2>
           </div>
           <button onClick={onClose} className="h-8 w-8 rounded-lg border border-border hover:bg-muted">✕</button>
@@ -320,12 +322,14 @@ function PaymentDetailDrawer({ payment, onPosted, onClose }: DetailDrawerProps) 
 
         {/* Footer */}
         <div className="border-t border-border px-5 py-4 flex flex-wrap items-center gap-3">
-          <Link
-            href={buildAdminVendorPaymentVoucherPrintRoute(payment.id)}
-            className="h-9 rounded-xl border border-amber-300 bg-amber-50 px-4 text-sm font-medium text-amber-900 hover:bg-amber-100"
-          >
-            PDF / Print
-          </Link>
+          {!isSettlement && (
+            <Link
+              href={buildAdminVendorPaymentVoucherPrintRoute(payment.id)}
+              className="h-9 rounded-xl border border-amber-300 bg-amber-50 px-4 text-sm font-medium text-amber-900 hover:bg-amber-100"
+            >
+              PDF / Print
+            </Link>
+          )}
           {canPost && (
             <button
               onClick={() => setPostConfirm(true)}
@@ -359,6 +363,7 @@ function PaymentDetailDrawer({ payment, onPosted, onClose }: DetailDrawerProps) 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function AdminVendorPaymentsPage() {
+  const searchParams = useSearchParams();
   const [rows, setRows] = useState<VendorPayment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -372,21 +377,50 @@ export default function AdminVendorPaymentsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [pmtRes, vendorRes, billRes, faRes] = await Promise.allSettled([
-        listVendorPayments({ page_size: 200 }),
+      const search = searchParams.get("search") || undefined;
+      const [pmtRes, vendorRes, billRes, faRes, stlRes] = await Promise.allSettled([
+        listVendorPayments(search ? { search } : undefined),
         listVendorsLite({ page_size: 200, is_active: true }),
         listVendorBills({ status: "POSTED", page_size: 200 }),
         listFinanceAccounts({ is_active: "true", page_size: 100 }),
+        listVendorSettlements(search ? { search } : undefined),
       ]);
-      if (pmtRes.status === "fulfilled") setRows(pmtRes.value.results);
-      else setError("Failed to load vendor payments.");
+      
+      let allPayments: any[] = [];
+      if (pmtRes.status === "fulfilled") {
+        allPayments = [...pmtRes.value.results];
+      } else {
+        setError("Failed to load vendor payments.");
+      }
+      
+      if (stlRes.status === "fulfilled") {
+        const settlementsAsPayments = stlRes.value.results.map((s: any) => ({
+          id: s.id,
+          payment_no: s.settlement_no,
+          payment_date: s.settlement_date,
+          vendor: s.vendor,
+          vendor_name: s.vendor_name,
+          vendor_bill: null,
+          amount: s.amount,
+          finance_account: s.finance_account,
+          status: s.status,
+          posted_journal_entry: s.posted_journal_entry,
+          notes: "Vendor Settlement",
+          _isSettlement: true
+        }));
+        allPayments = [...allPayments, ...settlementsAsPayments];
+      }
+      
+      // Sort by date desc
+      allPayments.sort((a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime());
+      setRows(allPayments);
       if (vendorRes.status === "fulfilled") setVendors(vendorRes.value.results);
       if (billRes.status === "fulfilled") setBills(billRes.value.results);
       if (faRes.status === "fulfilled") setFinanceAccounts(faRes.value.results);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [searchParams]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -495,12 +529,14 @@ export default function AdminVendorPaymentsPage() {
                     <td className="px-4 py-3 font-semibold">{rupees(pmt.amount)}</td>
                     <td className="px-4 py-3">{statusBadge(pmt.status)}</td>
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                      <Link
-                        href={buildAdminVendorPaymentVoucherPrintRoute(pmt.id)}
-                        className="inline-flex h-7 items-center rounded-lg border border-amber-300 bg-amber-50 px-3 text-[11px] font-semibold text-amber-950 hover:bg-amber-100"
-                      >
-                        PDF / Print
-                      </Link>
+                      {!(pmt as any)._isSettlement && (
+                        <Link
+                          href={buildAdminVendorPaymentVoucherPrintRoute(pmt.id)}
+                          className="inline-flex h-7 items-center rounded-lg border border-amber-300 bg-amber-50 px-3 text-[11px] font-semibold text-amber-950 hover:bg-amber-100"
+                        >
+                          PDF / Print
+                        </Link>
+                      )}
                     </td>
                   </tr>
                 ))}

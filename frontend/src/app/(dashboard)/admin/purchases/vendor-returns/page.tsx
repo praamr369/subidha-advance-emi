@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { useSearchParams } from "next/navigation";
 import { accountingDate, accountingErrorMessage, accountingMoney, accountingFieldClassName } from "@/components/accounting/shared";
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
@@ -22,9 +23,10 @@ import { listPurchaseBills, type AccountingPurchaseBill, type AccountingPurchase
 import { listVendorBills, listStockLocations, type StockLocation, type VendorBill, type VendorBillLine } from "@/services/inventory";
 
 export default function AdminVendorReturnsPage() {
+  const searchParams = useSearchParams();
   const [rows, setRows] = useState<AdminVendorPurchaseReturn[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
-  const [vendorId, setVendorId] = useState("");
+  const [vendorId, setVendorId] = useState(searchParams.get("vendor_id") || "");
   const [status, setStatus] = useState("");
   
   const [loading, setLoading] = useState(true);

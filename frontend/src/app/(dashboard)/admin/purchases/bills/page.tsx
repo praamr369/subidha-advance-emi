@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { z } from "zod";
 
 import { accountingErrorMessage } from "@/components/accounting/shared";
@@ -340,6 +341,9 @@ function BillDetailDrawer({ bill, onPosted, onClose }: DetailDrawerProps) {
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function AdminPurchaseBillsPage() {
+  const searchParams = useSearchParams();
+  const initialSearch = searchParams.get("search") || "";
+  
   const [rows, setRows] = useState<VendorBill[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -349,13 +353,14 @@ export default function AdminPurchaseBillsPage() {
   const [locations, setLocations] = useState<StockLocation[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [selected, setSelected] = useState<VendorBill | null>(null);
+  const [search, setSearch] = useState(initialSearch);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const [billRes, vendorRes, grRes, itemRes, locRes] = await Promise.allSettled([
-        listVendorBills(),
+        listVendorBills(search ? { search } : undefined),
         listVendorsLite({ page_size: 200, is_active: true }),
         listGoodsReceipts({ status: "RECEIVED", page_size: 200 }),
         listInventoryItems({ is_active: true, page_size: 500 }),
@@ -370,7 +375,7 @@ export default function AdminPurchaseBillsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [search]);
 
   useEffect(() => { void load(); }, [load]);
 

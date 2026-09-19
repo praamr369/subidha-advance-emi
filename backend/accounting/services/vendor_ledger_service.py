@@ -106,6 +106,13 @@ def get_vendor_outstanding(vendor: Vendor) -> dict:
         ),
         source_types=["PURCHASE_BILL", "ACCOUNTING_PURCHASE_BILL"],
         amount_field="grand_total",
+    ) + _unledgered_source_total(
+        __import__("inventory.models", fromlist=["VendorBill"]).VendorBill.objects.filter(
+            vendor=vendor,
+            status__in=["POSTED"],
+        ),
+        source_types=["VENDOR_BILL"],
+        amount_field="grand_total",
     )
     vendor_payments = payment_entry_reduction + _unledgered_source_total(
         VendorPayment.objects.filter(vendor=vendor, status=VendorPaymentStatus.POSTED),
@@ -142,33 +149,47 @@ def get_vendor_outstanding(vendor: Vendor) -> dict:
 
 def get_vendor_purchase_summary(vendor: Vendor) -> dict:
     bills = PurchaseBill.objects.filter(vendor=vendor).order_by("-bill_date", "-id")
-    summary = bills.aggregate(
+    VendorBill = __import__("inventory.models", fromlist=["VendorBill"]).VendorBill
+    legacy_bills = VendorBill.objects.filter(vendor=vendor).order_by("-bill_date", "-id")
+
+    summary_pb = bills.aggregate(
         draft=Sum("grand_total", filter=Q(status=PurchaseBillStatus.DRAFT)),
         approved=Sum("grand_total", filter=Q(status=PurchaseBillStatus.APPROVED)),
         posted=Sum("grand_total", filter=Q(status=PurchaseBillStatus.POSTED)),
     )
+    summary_vb = legacy_bills.aggregate(
+        draft=Sum("grand_total", filter=Q(status="DRAFT")),
+        posted=Sum("grand_total", filter=Q(status="POSTED")),
+    )
+
+    draft_total = (summary_pb.get("draft") or Decimal("0.00")) + (summary_vb.get("draft") or Decimal("0.00"))
+    approved_total = summary_pb.get("approved") or Decimal("0.00")
+    posted_total = (summary_pb.get("posted") or Decimal("0.00")) + (summary_vb.get("posted") or Decimal("0.00"))
+
+    # Merge lists
+    pb_list = list(bills.values("id", "bill_no", "bill_date", "status", "grand_total", "tax_mode")[:200])
+    vb_list = list(legacy_bills.values("id", "bill_no", "bill_date", "status", "grand_total")[:200])
+    
+    # Standardize legacy list
+    for vb in vb_list:
+        vb["tax_mode"] = "GST" # legacy assumption or null
+        vb["is_legacy"] = True
+
+    merged_bills = sorted(pb_list + vb_list, key=lambda x: x["bill_date"] or "", reverse=True)[:200]
+
     payments = VendorPayment.objects.filter(vendor=vendor).order_by("-payment_date", "-id")
     purchase_orders = PurchaseOrder.objects.filter(vendor=vendor).exclude(status=PurchaseOrderStatus.CANCELLED).order_by("-po_date", "-id")
     return {
-        "purchase_bills_count": bills.count(),
-        "purchase_bills": list(
-            bills.values(
-                "id",
-                "bill_no",
-                "bill_date",
-                "status",
-                "grand_total",
-                "tax_mode",
-            )[:200]
-        ),
+        "purchase_bills_count": bills.count() + legacy_bills.count(),
+        "purchase_bills": merged_bills,
         "purchase_orders_count": purchase_orders.count(),
         "purchase_orders": list(purchase_orders.values("id", "po_no", "po_date", "status", "expected_date")[:200]),
         "vendor_payments_count": payments.count(),
         "vendor_payments": list(payments.values("id", "payment_no", "payment_date", "status", "amount", "reference_no")[:200]),
         "summary": {
-            "draft_total": str(summary.get("draft") or Decimal("0.00")),
-            "approved_total": str(summary.get("approved") or Decimal("0.00")),
-            "posted_total": str(summary.get("posted") or Decimal("0.00")),
+            "draft_total": str(draft_total),
+            "approved_total": str(approved_total),
+            "posted_total": str(posted_total),
         },
     }
 

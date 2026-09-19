@@ -345,8 +345,9 @@ export default function AdminPurchaseOrdersPage() {
     setLoading(true);
     setError(null);
     try {
+      const search = searchParams.get("search") || undefined;
       const [poRes, vendorRes, itemRes] = await Promise.allSettled([
-        listPurchaseOrders(),
+        listPurchaseOrders(search ? { search } : undefined),
         listVendorsLite(),
         listInventoryItems({ is_active: true, page_size: 500 }),
       ]);
@@ -357,7 +358,7 @@ export default function AdminPurchaseOrdersPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [searchParams]);
 
   useEffect(() => { void load(); }, [load]);
 

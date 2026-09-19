@@ -861,6 +861,20 @@ def post_purchase_bill(*, purchase_bill_id: int, posted_by):
     purchase_bill.status = PurchaseBillStatus.POSTED
     purchase_bill.tax_profile_snapshot = build_purchase_tax_snapshot(purchase_bill=purchase_bill)
     purchase_bill.save(update_fields=["posted_journal_entry", "status", "tax_profile_snapshot", "updated_at"])
+
+    from accounting.services.vendor_ledger_service import append_vendor_ledger_entry
+    append_vendor_ledger_entry(
+        vendor_id=purchase_bill.vendor_id,
+        entry_type="PURCHASE_BILL",
+        source_type="ACCOUNTING_PURCHASE_BILL",
+        source_id=purchase_bill.id,
+        source_reference=purchase_bill.bill_no,
+        debit=purchase_bill.grand_total,
+        credit=Decimal("0.00"),
+        created_by=posted_by,
+        notes=f"Purchase bill {purchase_bill.bill_no}",
+    )
+
     _log_accounting_event(
         event="INVENTORY_PURCHASE_BILL_POSTED",
         instance=purchase_bill,
