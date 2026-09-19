@@ -19,8 +19,8 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import VendorPayablesToggle from "@/components/vendors/VendorPayablesToggle";
-import type { InventoryItem, StockLocation } from "@/services/inventory";
-import { listInventoryItems, listStockLocations } from "@/services/inventory";
+import type { InventoryItem, StockLocation, VendorBill } from "@/services/inventory";
+import { listInventoryItems, listStockLocations, listVendorBills } from "@/services/inventory";
 import type {
   AccountingPurchaseBill,
   AccountingPurchaseBillLine,
@@ -231,6 +231,7 @@ export default function AccountingPurchaseBillsPage() {
   const [financeAccounts, setFinanceAccounts] = useState<FinanceAccount[]>([]);
   const [locations, setLocations] = useState<StockLocation[]>([]);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  const [legacyBills, setLegacyBills] = useState<VendorBill[]>([]);
   const [selectedBillId, setSelectedBillId] = useState<number | null>(null);
   const [form, setForm] = useState<PurchaseBillForm>(emptyForm());
   const [loading, setLoading] = useState(true);
@@ -245,7 +246,7 @@ export default function AccountingPurchaseBillsPage() {
     else setRefreshing(true);
 
     try {
-      const [purchasePayload, vendorPayload, financePayload, locationPayload, itemPayload, compliancePayload] =
+      const [purchasePayload, vendorPayload, financePayload, locationPayload, itemPayload, compliancePayload, legacyBillsPayload] =
         await Promise.all([
           listPurchaseBills(),
           listVendors({ is_active: 1 }),
@@ -259,6 +260,7 @@ export default function AccountingPurchaseBillsPage() {
       setFinanceAccounts(financePayload.results);
       setLocations(locationPayload.results);
       setInventoryItems(itemPayload.results);
+        setLegacyBills(legacyBillsPayload.results);
       setActiveTaxMode(compliancePayload.active.mode);
       setError(null);
     } catch (err) {
@@ -289,6 +291,30 @@ export default function AccountingPurchaseBillsPage() {
   const rawMaterialReadyCount = inventoryItems.filter(
     (item) => item.stock_item_type === "RAW_MATERIAL"
   ).length;
+
+  function handleImportLegacy(idString: string) {
+    if (!idString) return;
+    const legacy = legacyBills.find((b) => String(b.id) === idString);
+    if (!legacy) return;
+    
+    const isGst = Number(legacy.tax_total || 0) > 0;
+    
+    setForm((current) => ({
+      ...current,
+      bill_no: legacy.bill_no,
+      bill_date: legacy.bill_date,
+      vendor: legacy.vendor ? String(legacy.vendor) : current.vendor,
+      tax_mode: isGst ? "GST" : "NON_GST",
+      notes: legacy.notes || current.notes,
+      lines: legacy.lines.map((line) => ({
+        inventory_item: String(line.inventory_item),
+        description: line.description || "",
+        quantity: String(line.quantity || "1.000"),
+        unit_cost: String(line.unit_cost || "0.00"),
+        tax_amount: String(line.tax_amount || "0.00"),
+      })),
+    }));
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -464,6 +490,24 @@ export default function AccountingPurchaseBillsPage() {
           title={selectedBill ? "Edit Draft Purchase Bill" : "Create Draft Purchase Bill"}
           description="Draft purchase bills stay editable until approval. Posting later performs stock inward and accounting recognition together."
         >
+          {!selectedBill && (
+            <div className="mb-4 rounded-xl border border-primary/20 bg-primary/5 p-4">
+              <label className="mb-2 block text-sm font-semibold text-primary">Import Data from Legacy Vendor Bill</label>
+              <select 
+                className={accountingFieldClassName()} 
+                onChange={(e) => { handleImportLegacy(e.target.value); e.target.value = ""; }}
+                defaultValue=""
+              >
+                <option value="">-- Select a legacy bill to auto-fill this form --</option>
+                {legacyBills.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.bill_no} ({b.vendor_name || 'No Vendor'}) - {b.bill_date}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-2 text-xs text-muted-foreground">Select a legacy Vendor Bill to instantly populate the supplier, dates, taxes, and product lines below.</p>
+            </div>
+          )}
           <div className="mb-4 rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm">
             <p>
               Current tax mode:{" "}
