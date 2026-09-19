@@ -327,29 +327,56 @@ def post_vendor_bill(*, vendor_bill_id: int, posted_by=None):
     bill.status = VendorBillStatus.POSTED
     bill.save(update_fields=["posted_journal_entry", "status", "updated_at"])
 
-    # Feature: Auto-create stock movements for standalone Vendor Bills (no GR)
-    if not bill.goods_receipt_id:
-        created_any_stock = False
+    # Feature: Auto-generate PO and GR for legacy Vendor Bills to maintain accurate pipeline
+    if not bill.purchase_order_id and not bill.goods_receipt_id:
+        from inventory.models import PurchaseOrder, PurchaseOrderStatus, PurchaseOrderLine, GoodsReceipt, GoodsReceiptStatus, GoodsReceiptLine
+        # 1. Create Purchase Order
+        po = PurchaseOrder.objects.create(
+            po_no=f"PO-AUTO-{bill.bill_no}",
+            po_date=bill.bill_date,
+            vendor=bill.vendor,
+            status=PurchaseOrderStatus.BILLED,
+            expected_date=bill.bill_date,
+            notes=f"Auto-generated from standalone vendor bill {bill.bill_no}"
+        )
         for line in bill.lines.all():
-            if not line.inventory_item.stock_tracking_enabled or not line.quantity or line.quantity <= 0:
-                continue
-            create_stock_ledger_entry(
+            PurchaseOrderLine.objects.create(
+                purchase_order=po,
                 inventory_item=line.inventory_item,
-                movement_type=StockMovementType.PURCHASE_IN,
-                movement_date=bill.bill_date,
-                stock_location=line.inventory_item.default_stock_location,
-                quantity_in=line.quantity,
-                reference_model="VendorBillLine",
-                reference_id=f"{bill.id}:{line.id}",
-                notes=f"Direct standalone vendor bill {bill.bill_no}",
-                posted_by=posted_by,
+                description=line.description,
+                quantity=line.quantity,
+                unit_cost=line.unit_cost,
+                tax_amount=line.tax_amount
             )
-            created_any_stock = True
-        if created_any_stock:
-            reconcile_direct_sale_needs_after_inventory_in(
-                product_ids={line.inventory_item.product_id for line in bill.lines.all() if line.inventory_item.product_id},
-                actor=posted_by
+        # 2. Create Goods Receipt
+        gr = GoodsReceipt.objects.create(
+            receipt_no=f"GR-AUTO-{bill.bill_no}",
+            receipt_date=bill.bill_date,
+            purchase_order=po,
+            status=GoodsReceiptStatus.RECEIVED,
+            notes=f"Auto-generated from standalone vendor bill {bill.bill_no}",
+            posted_at=timezone.now(),
+            posted_by=posted_by,
+            allow_over_receive=True
+        )
+        for line in po.lines.all():
+            GoodsReceiptLine.objects.create(
+                goods_receipt=gr,
+                purchase_order_line=line,
+                inventory_item=line.inventory_item,
+                quantity_received=line.quantity,
+                unit_cost=line.unit_cost
             )
+        # 3. Post Goods Receipt to correctly record physical stock and reconcile
+        # We manually call post_goods_receipt but first set GR status to DRAFT so it runs, then we set it to RECEIVED
+        gr.status = GoodsReceiptStatus.DRAFT
+        gr.save(update_fields=["status"])
+        post_goods_receipt(goods_receipt_id=gr.id, posted_by=posted_by)
+        
+        # 4. Link PO and GR to the Vendor Bill
+        bill.purchase_order = po
+        bill.goods_receipt = gr
+        bill.save(update_fields=["purchase_order", "goods_receipt"])
 
     if bill.purchase_order_id:
         bill.purchase_order.status = PurchaseOrderStatus.BILLED
