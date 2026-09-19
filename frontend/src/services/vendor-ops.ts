@@ -237,9 +237,11 @@ export type PurchaseReturnCreatePayload = {
 
 export async function createAdminPurchaseReturn(
   purchaseBillId: number,
-  payload: PurchaseReturnCreatePayload
+  payload: PurchaseReturnCreatePayload,
+  isVendorBill: boolean = false
 ): Promise<{ id: number; return_no: string; status: string }> {
-  return apiFetch(`/admin/purchases/${purchaseBillId}/returns/`, {
+  const url = `/admin/purchases/${purchaseBillId}/returns/${isVendorBill ? "?bill_type=vendor" : ""}`;
+  return apiFetch(url, {
     method: "POST",
     body: JSON.stringify(payload),
   });

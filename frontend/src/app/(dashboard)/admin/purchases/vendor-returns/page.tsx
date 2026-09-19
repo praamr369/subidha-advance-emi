@@ -19,6 +19,7 @@ import {
 } from "@/services/vendor-ops";
 import { listVendors, type Vendor } from "@/services/vendors";
 import { listPurchaseBills, type AccountingPurchaseBill, type AccountingPurchaseBillLine } from "@/services/accounting";
+import { listVendorBills, type VendorBill, type VendorBillLine } from "@/services/inventory";
 
 export default function AdminVendorReturnsPage() {
   const [rows, setRows] = useState<AdminVendorPurchaseReturn[]>([]);
@@ -31,7 +32,7 @@ export default function AdminVendorReturnsPage() {
 
   // New return state
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [purchaseBills, setPurchaseBills] = useState<AccountingPurchaseBill[]>([]);
+  const [purchaseBills, setPurchaseBills] = useState<any[]>([]);
   const [selectedBillId, setSelectedBillId] = useState<string>("");
   const [returnReason, setReturnReason] = useState("");
   const [returnLines, setReturnLines] = useState<Record<number, string>>({}); // lineId -> quantity string
@@ -41,19 +42,25 @@ export default function AdminVendorReturnsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [returnPayload, vendorPayload, billsPayload] = await Promise.all([
+      const [returnPayload, vendorPayload, billsPayload, vbPayload] = await Promise.all([
         listAdminVendorPurchaseReturnRegister({
           vendor: vendorId ? Number(vendorId) : undefined,
           status: status || undefined,
         }),
         listVendors({ page_size: 200 }),
-        listPurchaseBills({ status: "POSTED" })
+        listPurchaseBills({ status: "POSTED" }),
+        listVendorBills({ status: "POSTED" })
       ]);
       setRows(returnPayload.results);
       setVendors(Array.isArray(vendorPayload) ? vendorPayload : vendorPayload.results);
       
       const pbills = Array.isArray(billsPayload) ? billsPayload : billsPayload.results;
-      setPurchaseBills(pbills || []);
+      const vbills = Array.isArray(vbPayload) ? vbPayload : (vbPayload as any)?.results;
+      const combined = [
+        ...(pbills || []).map((b: any) => ({ ...b, _isVendor: false, _id: `pb_${b.id}`, lines: b.lines?.map((l: any) => ({ ...l, _item_name: l.item_name, _id: `pb_${l.id}` })) })),
+        ...(vbills || []).map((b: any) => ({ ...b, _isVendor: true, _id: `vb_${b.id}`, lines: b.lines?.map((l: any) => ({ ...l, _item_name: l.inventory_item_product_name || l.description, _id: `vb_${l.id}` })) }))
+      ];
+      setPurchaseBills(combined);
       setError(null);
     } catch (err) {
       setRows([]);
@@ -74,11 +81,13 @@ export default function AdminVendorReturnsPage() {
     
     try {
       const validLines = Object.entries(returnLines)
-        .map(([id, qty]) => ({
-          purchase_bill_line_id: Number(id),
-          quantity: Number(qty)
-        }))
-        .filter((l) => l.quantity > 0);
+      .map(([id, qty]) => {
+        const payload = { quantity: Number(qty) } as any;
+        if (selectedBill._isVendor) payload.vendor_bill_line_id = Number(id);
+        else payload.purchase_bill_line_id = Number(id);
+        return payload;
+      })
+      .filter((l) => l.quantity > 0) as any;
         
       if (validLines.length === 0) {
         throw new Error("Please enter return quantity for at least one item.");
@@ -88,10 +97,10 @@ export default function AdminVendorReturnsPage() {
         throw new Error("Return reason is required.");
       }
 
-      await createAdminPurchaseReturn(Number(selectedBillId), {
+      await createAdminPurchaseReturn(Number(selectedBill._id.split('_')[1]), {
         reason: returnReason,
         lines: validLines
-      });
+      }, selectedBill._isVendor);
       setDrawerOpen(false);
       setSelectedBillId("");
       setReturnReason("");
@@ -119,7 +128,7 @@ export default function AdminVendorReturnsPage() {
   );
   
   const selectedBill = useMemo(() => {
-    return purchaseBills.find(b => String(b.id) === selectedBillId);
+    return purchaseBills.find(b => b._id === selectedBillId);
   }, [purchaseBills, selectedBillId]);
 
   const columns: EnterpriseColumnDef<AdminVendorPurchaseReturn>[] = [
@@ -237,7 +246,7 @@ export default function AdminVendorReturnsPage() {
              >
                <option value="">-- Choose a bill --</option>
                {purchaseBills.map(b => (
-                 <option key={b.id} value={b.id}>{b.bill_no} - {b.vendor_name} ({accountingDate(b.bill_date)})</option>
+                 <option key={b._id} value={b._id}>{b.bill_no} - {b.vendor_name} ({accountingDate(b.bill_date)})</option>
                ))}
              </select>
           </div>
@@ -246,7 +255,7 @@ export default function AdminVendorReturnsPage() {
             <div className="space-y-4 rounded-xl border border-border p-4">
               <h4 className="text-sm font-semibold">Return Quantities</h4>
               {selectedBill.lines.map((line: AccountingPurchaseBillLine) => (
-                <div key={line.id} className="flex items-center justify-between gap-4 border-b border-border pb-3 last:border-0 last:pb-0">
+                <div key={(line as any)._id} className="flex items-center justify-between gap-4 border-b border-border pb-3 last:border-0 last:pb-0">
                   <div className="flex-1">
                     <div className="text-sm font-medium">{line.inventory_item_product_name || `Item #${line.inventory_item}`}</div>
                     <div className="text-xs text-muted-foreground">Original Qty: {line.quantity} | Unit Cost: {accountingMoney(line.unit_cost)}</div>

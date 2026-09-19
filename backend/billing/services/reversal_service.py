@@ -1271,44 +1271,60 @@ def pay_customer_refund(*, refund_id: int, paid_by):
 
 
 @transaction.atomic
-def create_purchase_return(*, purchase_bill_id: int, lines: list[dict], reason: str, performed_by, stock_location_id: int | None = None):
+def create_purchase_return(*, purchase_bill_id: int | None = None, vendor_bill_id: int | None = None, lines: list[dict], reason: str, performed_by, stock_location_id: int | None = None):
     reason = _require_reason(reason)
     if not lines:
         raise ValueError("At least one purchase return line is required.")
 
-    bill = PurchaseBill.objects.select_for_update(of=("self",)).prefetch_related("lines").get(pk=purchase_bill_id)
-    if bill.status != PurchaseBillStatus.POSTED:
-        raise ValueError("Purchase return requires posted purchase bill.")
+    if purchase_bill_id:
+        bill = PurchaseBill.objects.select_for_update(of=("self",)).prefetch_related("lines").get(pk=purchase_bill_id)
+        if bill.status != PurchaseBillStatus.POSTED:
+            raise ValueError("Purchase return requires posted purchase bill.")
+    elif vendor_bill_id:
+        bill = VendorBill.objects.select_for_update(of=("self",)).prefetch_related("lines").get(pk=vendor_bill_id)
+        if bill.status != VendorBillStatus.POSTED:
+            raise ValueError("Purchase return requires posted vendor bill.")
+    else:
+        raise ValueError("Must provide either purchase_bill_id or vendor_bill_id.")
 
     by_line = {line.id: line for line in bill.lines.all()}
     returned_by_bill_line: dict[int, Decimal] = defaultdict(lambda: Decimal("0.000"))
-    existing = PurchaseReturnLine.objects.filter(
-        purchase_bill_line_id__in=list(by_line.keys()),
-        purchase_return__status=PurchaseReturnStatus.POSTED,
-    ).values("purchase_bill_line_id").annotate(total=Sum("quantity"))
-    for row in existing:
-        returned_by_bill_line[int(row["purchase_bill_line_id"])] = _qty(row["total"])
+    if purchase_bill_id:
+        existing = PurchaseReturnLine.objects.filter(
+            purchase_bill_line_id__in=list(by_line.keys()),
+            purchase_return__status=PurchaseReturnStatus.POSTED,
+        ).values("purchase_bill_line_id").annotate(total=Sum("quantity"))
+        for row in existing:
+            returned_by_bill_line[int(row["purchase_bill_line_id"])] = _qty(row["total"])
+    else:
+        existing = PurchaseReturnLine.objects.filter(
+            vendor_bill_line_id__in=list(by_line.keys()),
+            purchase_return__status=PurchaseReturnStatus.POSTED,
+        ).values("vendor_bill_line_id").annotate(total=Sum("quantity"))
+        for row in existing:
+            returned_by_bill_line[int(row["vendor_bill_line_id"])] = _qty(row["total"])
 
     seq = _fy_sequence("BILL_PR", "PR", timezone.localdate())
     purchase_return = PurchaseReturn.objects.create(
         return_no=_issue_series_number(seq, prefix_fallback=f"PR-{bill.id}"),
-        purchase_bill=bill,
+        purchase_bill=bill if purchase_bill_id else None,
+        vendor_bill=bill if vendor_bill_id else None,
         vendor=bill.vendor,
         reason=reason,
-        metadata={"stock_location_id": stock_location_id or bill.stock_location_id},
+        metadata={"stock_location_id": stock_location_id or getattr(bill, "stock_location_id", None)},
     )
 
     subtotal = Decimal("0.00")
     tax_total = Decimal("0.00")
     grand_total = Decimal("0.00")
     for row in lines:
-        pb_line_id = int(row.get("purchase_bill_line_id") or 0)
+        pb_line_id = int(row.get("purchase_bill_line_id") or row.get("vendor_bill_line_id") or 0)
         quantity = _qty(row.get("quantity"))
         if pb_line_id <= 0 or quantity <= Decimal("0.000"):
-            raise ValueError("Each line needs purchase_bill_line_id and positive quantity.")
+            raise ValueError("Each line needs a bill line ID and positive quantity.")
         pb_line = by_line.get(pb_line_id)
         if pb_line is None:
-            raise ValueError(f"Purchase bill line {pb_line_id} not found.")
+            raise ValueError(f"Bill line {pb_line_id} not found.")
         sold = _qty(pb_line.quantity)
         already = returned_by_bill_line[pb_line.id]
         remaining = sold - already
@@ -1320,9 +1336,10 @@ def create_purchase_return(*, purchase_bill_id: int, lines: list[dict], reason: 
         line_total = _money(taxable_value + tax_amount)
         PurchaseReturnLine.objects.create(
             purchase_return=purchase_return,
-            purchase_bill_line=pb_line,
+            purchase_bill_line=pb_line if purchase_bill_id else None,
+            vendor_bill_line=pb_line if vendor_bill_id else None,
             inventory_item=pb_line.inventory_item,
-            description=pb_line.description,
+            description=pb_line.description if hasattr(pb_line, "description") else "",
             quantity=quantity,
             unit_cost=pb_line.unit_cost,
             taxable_value=taxable_value,

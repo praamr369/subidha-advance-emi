@@ -1304,7 +1304,8 @@ class CustomerRefund(BillingTimeStampedModel):
 
 class PurchaseReturn(BillingTimeStampedModel):
     return_no = models.CharField(max_length=48, unique=True, db_index=True)
-    purchase_bill = models.ForeignKey("inventory.PurchaseBill", on_delete=models.PROTECT, related_name="purchase_returns")
+    purchase_bill = models.ForeignKey("inventory.PurchaseBill", on_delete=models.PROTECT, related_name="purchase_returns", null=True, blank=True)
+    vendor_bill = models.ForeignKey("inventory.VendorBill", on_delete=models.PROTECT, related_name="purchase_returns", null=True, blank=True)
     vendor = models.ForeignKey("accounting.Vendor", on_delete=models.PROTECT, related_name="purchase_returns")
     status = models.CharField(max_length=16, choices=PurchaseReturnStatus.choices, default=PurchaseReturnStatus.DRAFT, db_index=True)
     return_date = models.DateField(default=timezone.localdate, db_index=True)
@@ -1325,7 +1326,8 @@ class PurchaseReturn(BillingTimeStampedModel):
 
 class PurchaseReturnLine(BillingTimeStampedModel):
     purchase_return = models.ForeignKey(PurchaseReturn, on_delete=models.CASCADE, related_name="lines")
-    purchase_bill_line = models.ForeignKey("inventory.PurchaseBillLine", on_delete=models.PROTECT, related_name="purchase_return_lines")
+    purchase_bill_line = models.ForeignKey("inventory.PurchaseBillLine", on_delete=models.PROTECT, related_name="purchase_return_lines", null=True, blank=True)
+    vendor_bill_line = models.ForeignKey("inventory.VendorBillLine", on_delete=models.PROTECT, related_name="purchase_return_lines", null=True, blank=True)
     inventory_item = models.ForeignKey(InventoryItem, on_delete=models.PROTECT, related_name="purchase_return_lines")
     description = models.CharField(max_length=255, blank=True, default="")
     quantity = models.DecimalField(max_digits=12, decimal_places=3, validators=[MinValueValidator(Decimal("0.001"))])

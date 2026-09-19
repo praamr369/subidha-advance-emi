@@ -1,33 +1,46 @@
-import sys
-import re
-
-with open("frontend/src/app/(dashboard)/admin/legacy-dashboard.tsx", "r", encoding="utf-8") as f:
+with open('frontend/src/app/(dashboard)/admin/purchases/vendor-returns/page.tsx', 'r') as f:
     text = f.read()
 
-# 1. Insert import at the top
-import_str = 'import { OperationalCalendar } from "@/components/dashboard/calendar/OperationalCalendar";\n'
-if "import { OperationalCalendar" not in text:
-    text = import_str + text
+text = text.replace('const [purchaseBills, setPurchaseBills] = useState<AccountingPurchaseBill[]>([]);', 'const [purchaseBills, setPurchaseBills] = useState<any[]>([]);')
+text = text.replace("listPurchaseBills({ status: 'POSTED' })", "listPurchaseBills({ status: 'POSTED' }),\n          listVendorBills({ status: 'POSTED' })")
+text = text.replace('const [returnPayload, vendorPayload, billsPayload] = await Promise.all', 'const [returnPayload, vendorPayload, billsPayload, vbPayload] = await Promise.all')
 
-# 2. Find the start of the layout wrapper
-target_start = '    >\n      <div className="space-y-6">\n        <div className="flex flex-col gap-6 md:flex-row">'
-replace_start = '    >\n      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">\n        <div className="lg:col-span-3 space-y-6">\n        <div className="flex flex-col gap-6 md:flex-row">'
+merge_code = """const pbills = Array.isArray(billsPayload) ? billsPayload : billsPayload.results;
+      const vbills = Array.isArray(vbPayload) ? vbPayload : vbPayload.results;
+      const combined = [
+        ...(pbills || []).map((b: any) => ({ ...b, _isVendor: false, _id: f"pb_{b.id}", lines: b.lines?.map((l: any) => ({ ...l, _item_name: l.item_name, _id: f"pb_{l.id}" })) })),
+        ...(vbills || []).map((b: any) => ({ ...b, _isVendor: true, _id: f"vb_{b.id}", lines: b.lines?.map((l: any) => ({ ...l, _item_name: l.inventory_item_product_name || l.description, _id: f"vb_{l.id}" })) }))
+      ];
+      setPurchaseBills(combined);"""
+merge_code = merge_code.replace('f"pb_{b.id}"', '`pb_${b.id}`').replace('f"pb_{l.id}"', '`pb_${l.id}`').replace('f"vb_{b.id}"', '`vb_${b.id}`').replace('f"vb_{l.id}"', '`vb_${l.id}`')
 
-if target_start in text:
-    text = text.replace(target_start, replace_start)
-else:
-    print("WARNING: Could not find target_start")
+text = text.replace('const pbills = Array.isArray(billsPayload) ? billsPayload : billsPayload.results;\n      setPurchaseBills(pbills || []);', merge_code)
 
-# 3. Find the end of the layout wrapper
-target_end = '        ) : null}\n      </div>\n    </ERPPageShell>'
-replace_end = '        ) : null}\n        </div>\n        <div className="lg:col-span-1 space-y-6">\n          <OperationalCalendar />\n        </div>\n      </div>\n    </ERPPageShell>'
+text = text.replace('const selectedBill = purchaseBills.find((b) => String(b.id) === selectedBillId);', 'const selectedBill = purchaseBills.find((b) => b._id === selectedBillId);')
 
-if target_end in text:
-    text = text.replace(target_end, replace_end)
-else:
-    print("WARNING: Could not find target_end")
+payload_code = """const validLines = Object.entries(returnLines)
+        .map(([id, qty]) => ({
+          [selectedBill._isVendor ? "vendor_bill_line_id" : "purchase_bill_line_id"]: Number(id),
+          quantity: Number(qty)
+        }))
+        .filter((l) => l.quantity > 0);"""
 
-with open("frontend/src/app/(dashboard)/admin/legacy-dashboard.tsx", "w", encoding="utf-8") as f:
+text = text.replace("""const validLines = Object.entries(returnLines)
+        .map(([id, qty]) => ({
+          purchase_bill_line_id: Number(id),
+          quantity: Number(qty)
+        }))
+        .filter((l) => l.quantity > 0);""", payload_code)
+
+text = text.replace('await createAdminPurchaseReturn(Number(selectedBillId), {', 'await createAdminPurchaseReturn(selectedBill._isVendor ? undefined : Number(selectedBill.id), selectedBill._isVendor ? Number(selectedBill.id) : undefined, {')
+
+text = text.replace('value={b.id}', 'value={b._id}')
+text = text.replace('key={b.id}', 'key={b._id}')
+
+text = text.replace('key={line.id}', 'key={line._id}')
+text = text.replace('{line.item_name}', '{line._item_name}')
+text = text.replace('returnLines[line.id]', "returnLines[line.id || line._id?.split('_')[1]]")
+text = text.replace('onChange={(e) => setReturnLines({ ...returnLines, [line.id]: e.target.value })}', "onChange={(e) => setReturnLines({ ...returnLines, [line.id || line._id?.split('_')[1]]: e.target.value })}")
+
+with open('frontend/src/app/(dashboard)/admin/purchases/vendor-returns/page.tsx', 'w') as f:
     f.write(text)
-
-print("SUCCESS")

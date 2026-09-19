@@ -478,9 +478,11 @@ class AdminPurchaseReturnCreateView(_AdminBase):
     def post(self, request, pk: int):
         serializer = PurchaseReturnCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        is_vendor_bill = request.query_params.get("bill_type") == "vendor"
         try:
             purchase_return = create_purchase_return(
-                purchase_bill_id=pk,
+                purchase_bill_id=None if is_vendor_bill else pk,
+                vendor_bill_id=pk if is_vendor_bill else None,
                 lines=serializer.validated_data["lines"],
                 reason=serializer.validated_data["reason"],
                 performed_by=request.user,
