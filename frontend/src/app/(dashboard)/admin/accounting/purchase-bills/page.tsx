@@ -247,14 +247,15 @@ export default function AccountingPurchaseBillsPage() {
 
     try {
       const [purchasePayload, vendorPayload, financePayload, locationPayload, itemPayload, compliancePayload, legacyBillsPayload] =
-        await Promise.all([
-          listPurchaseBills(),
-          listVendors({ is_active: 1 }),
-          listFinanceAccounts({ is_active: 1 }),
-          listStockLocations({ is_active: 1 }),
-          listInventoryItems({ is_active: 1, stock_tracking_enabled: 1 }),
-          getComplianceTaxProfile(),
-        ]);
+                  await Promise.all([
+            listPurchaseBills(),
+            listVendors({ is_active: 1 }),
+            listFinanceAccounts({ is_active: 1 }),
+            listStockLocations({ is_active: 1 }),
+            listInventoryItems({ is_active: 1, stock_tracking_enabled: 1 }),
+            getComplianceTaxProfile(),
+            listVendorBills({ page_size: 100 }),
+          ]);
       setRows(purchasePayload.results);
       setVendors(vendorPayload.results);
       setFinanceAccounts(financePayload.results);
