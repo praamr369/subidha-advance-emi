@@ -798,6 +798,7 @@ class PurchaseOrderLineSerializer(serializers.ModelSerializer):
 
 
 class PurchaseOrderSerializer(serializers.ModelSerializer):
+    po_no = serializers.CharField(required=False, allow_blank=True)
     vendor_name = serializers.CharField(source="vendor.name", read_only=True)
     stock_location_name = serializers.CharField(source="stock_location.name", read_only=True)
     lines = PurchaseOrderLineSerializer(many=True)

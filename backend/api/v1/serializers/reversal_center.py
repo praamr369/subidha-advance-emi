@@ -64,8 +64,14 @@ class CustomerRefundCreateSerializer(serializers.Serializer):
 
 
 class PurchaseReturnCreateLineSerializer(serializers.Serializer):
-    purchase_bill_line_id = serializers.IntegerField(min_value=1)
+    purchase_bill_line_id = serializers.IntegerField(min_value=1, required=False, allow_null=True)
+    vendor_bill_line_id = serializers.IntegerField(min_value=1, required=False, allow_null=True)
     quantity = serializers.DecimalField(max_digits=12, decimal_places=3, min_value=Decimal("0.001"))
+    
+    def validate(self, data):
+        if not data.get('purchase_bill_line_id') and not data.get('vendor_bill_line_id'):
+            raise serializers.ValidationError("Either purchase_bill_line_id or vendor_bill_line_id is required.")
+        return data
 
 
 class PurchaseReturnCreateSerializer(serializers.Serializer):
