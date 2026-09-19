@@ -1216,6 +1216,7 @@ class VendorBill(InventoryTimeStampedModel):
     bill_no = models.CharField(max_length=60, unique=True, db_index=True)
     bill_date = models.DateField(db_index=True)
     vendor = models.ForeignKey(Vendor, on_delete=models.PROTECT, related_name="vendor_bills")
+    stock_location = models.ForeignKey(StockLocation, on_delete=models.PROTECT, null=True, blank=True, related_name="legacy_vendor_bills")
     purchase_order = models.ForeignKey(PurchaseOrder, on_delete=models.PROTECT, related_name="vendor_bills", null=True, blank=True)
     goods_receipt = models.ForeignKey(GoodsReceipt, on_delete=models.PROTECT, related_name="vendor_bills", null=True, blank=True)
     finance_account = models.ForeignKey(FinanceAccount, on_delete=models.PROTECT, null=True, blank=True, related_name="vendor_bills")

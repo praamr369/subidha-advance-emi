@@ -230,8 +230,9 @@ export type PurchaseReturnCreatePayload = {
   reason: string;
   stock_location_id?: number | null;
   lines: Array<{
-    purchase_bill_line_id: number;
-    quantity: number;
+    purchase_bill_line_id?: number;
+    vendor_bill_line_id?: number;
+    quantity: number | string;
   }>;
 };
 

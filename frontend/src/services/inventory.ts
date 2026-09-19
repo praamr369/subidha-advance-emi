@@ -2130,6 +2130,7 @@ export interface VendorBillCreatePayload {
   bill_no?: string;
   bill_date: string;
   vendor: number;
+  stock_location?: number | null;
   goods_receipt?: number | null;
   notes?: string;
   lines: {

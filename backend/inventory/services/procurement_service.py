@@ -357,7 +357,8 @@ def post_vendor_bill(*, vendor_bill_id: int, posted_by=None):
             notes=f"Auto-generated from standalone vendor bill {bill.bill_no}",
             posted_at=timezone.now(),
             posted_by=posted_by,
-            allow_over_receive=True
+            allow_over_receive=True,
+            stock_location=bill.stock_location
         )
         for line in po.lines.all():
             GoodsReceiptLine.objects.create(

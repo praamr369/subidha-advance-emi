@@ -1067,6 +1067,7 @@ class VendorBillSerializer(serializers.ModelSerializer):
             "purchase_order_no",
             "goods_receipt",
             "goods_receipt_no",
+            "stock_location",
             "finance_account",
             "finance_account_name",
             "status",

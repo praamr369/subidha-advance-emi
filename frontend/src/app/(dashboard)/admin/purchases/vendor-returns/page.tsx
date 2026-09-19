@@ -19,7 +19,7 @@ import {
 } from "@/services/vendor-ops";
 import { listVendors, type Vendor } from "@/services/vendors";
 import { listPurchaseBills, type AccountingPurchaseBill, type AccountingPurchaseBillLine } from "@/services/accounting";
-import { listVendorBills, type VendorBill, type VendorBillLine } from "@/services/inventory";
+import { listVendorBills, listStockLocations, type StockLocation, type VendorBill, type VendorBillLine } from "@/services/inventory";
 
 export default function AdminVendorReturnsPage() {
   const [rows, setRows] = useState<AdminVendorPurchaseReturn[]>([]);

@@ -20,12 +20,14 @@ import {
   listInventoryItems,
   listVendorBills,
   listVendorsLite,
+  listStockLocations,
   postVendorBill,
   type GoodsReceipt,
   type InventoryItem,
   type VendorBill,
   type VendorBillLine,
   type VendorLite,
+  type StockLocation,
 } from "@/services/inventory";
 
 function statusBadge(s: VendorBill["status"]) {
@@ -52,6 +54,7 @@ interface CreateBillFormProps {
   vendors: VendorLite[];
   receipts: GoodsReceipt[];
   items: InventoryItem[];
+  locations: StockLocation[];
   onSaved: (bill: VendorBill) => void;
   onCancel: () => void;
 }
@@ -68,12 +71,13 @@ function EmptyLine(): VendorBillLine {
   return { inventory_item: 0, quantity: "1", unit_cost: "0" };
 }
 
-function CreateBillForm({ vendors, receipts, items, onSaved, onCancel }: CreateBillFormProps) {
+function CreateBillForm({ vendors, receipts, items, locations, onSaved, onCancel }: CreateBillFormProps) {
   const today = new Date().toISOString().slice(0, 10);
   const [vendorId, setVendorId] = useState("");
   const [billNo, setBillNo] = useState("");
   const [billDate, setBillDate] = useState(today);
   const [grId, setGrId] = useState("");
+  const [stockLocationId, setStockLocationId] = useState("");
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<VendorBillLine[]>([EmptyLine()]);
   const [busy, setBusy] = useState(false);
@@ -341,6 +345,7 @@ export default function AdminPurchaseBillsPage() {
   const [vendors, setVendors] = useState<VendorLite[]>([]);
   const [receipts, setReceipts] = useState<GoodsReceipt[]>([]);
   const [items, setItems] = useState<InventoryItem[]>([]);
+  const [locations, setLocations] = useState<StockLocation[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [selected, setSelected] = useState<VendorBill | null>(null);
 
@@ -348,17 +353,19 @@ export default function AdminPurchaseBillsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [billRes, vendorRes, grRes, itemRes] = await Promise.allSettled([
+      const [billRes, vendorRes, grRes, itemRes, locRes] = await Promise.allSettled([
         listVendorBills(),
         listVendorsLite({ page_size: 200, is_active: true }),
         listGoodsReceipts({ status: "RECEIVED", page_size: 200 }),
         listInventoryItems({ is_active: true, page_size: 500 }),
+        listStockLocations({ is_active: 1, page_size: 100 }),
       ]);
       if (billRes.status === "fulfilled") setRows(billRes.value.results);
       else setError("Failed to load vendor bills.");
       if (vendorRes.status === "fulfilled") setVendors(vendorRes.value.results);
       if (grRes.status === "fulfilled") setReceipts(grRes.value.results);
       if (itemRes.status === "fulfilled") setItems(itemRes.value.results);
+      if (locRes.status === "fulfilled") setLocations(locRes.value.results);
     } finally {
       setLoading(false);
     }
@@ -426,7 +433,7 @@ export default function AdminPurchaseBillsPage() {
         {showCreate ? (
           <div className="mb-6 rounded-xl border border-border bg-card p-5">
             <h3 className="mb-4 text-sm font-semibold text-foreground">New Vendor Bill</h3>
-            <CreateBillForm vendors={vendors} receipts={receipts} items={items} onSaved={handleSaved} onCancel={() => setShowCreate(false)} />
+            <CreateBillForm vendors={vendors} receipts={receipts} items={items} locations={locations} onSaved={handleSaved} onCancel={() => setShowCreate(false)} />
           </div>
         ) : null}
 
