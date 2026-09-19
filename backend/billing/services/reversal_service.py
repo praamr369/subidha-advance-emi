@@ -43,6 +43,8 @@ from inventory.models import (
     InventoryItem,
     PurchaseBill,
     PurchaseBillStatus,
+    VendorBill,
+    VendorBillStatus,
     SOFT_HOLD_MOVEMENT_TYPES,
     StockLedger,
     StockLocation,
