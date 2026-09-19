@@ -1387,24 +1387,26 @@ def post_purchase_return(*, purchase_return_id: int, posted_by):
     bill = purchase_return.purchase_bill or purchase_return.vendor_bill
     stock_location_id = (purchase_return.metadata or {}).get("stock_location_id") or _derive_stock_location(bill)
     stock_location = StockLocation.objects.filter(pk=stock_location_id).first() if stock_location_id else None
-    if stock_location is None:
-        raise ValueError("Purchase return requires a valid source stock location.")
     for line in purchase_return.lines.all():
-        available = _location_quantity(inventory_item=line.inventory_item, stock_location=stock_location)
+        loc = stock_location or line.inventory_item.default_stock_location
+        if loc is None:
+            raise ValueError(f"Purchase return requires a valid source stock location. Item {line.inventory_item.sku} has no default location.")
+            
+        available = _location_quantity(inventory_item=line.inventory_item, stock_location=loc)
         if available < line.quantity:
             raise ValueError(
-                f"Insufficient stock at {stock_location.name} for purchase return line {line.id}. Available: {available}, Requested: {line.quantity}."
+                f"Insufficient stock at {loc.name} for purchase return line {line.id}. Available: {available}, Requested: {line.quantity}."
             )
         post_movement(
             inventory_item=line.inventory_item,
             movement_type=StockMovementType.PURCHASE_RETURN_OUT,
             quantity=line.quantity,
             movement_date=purchase_return.return_date,
-            stock_location=stock_location,
+            stock_location=loc,
             reference_model="PurchaseReturnLine",
             reference_id=f"{purchase_return.id}:{line.id}",
             posted_by=posted_by,
-            notes=f"Purchase return {purchase_return.return_no} from {stock_location.name}",
+            notes=f"Purchase return {purchase_return.return_no} from {loc.name}",
         )
 
     accounts = ensure_phase3_system_accounts()
