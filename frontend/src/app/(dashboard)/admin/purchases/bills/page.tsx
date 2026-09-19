@@ -97,7 +97,7 @@ function CreateBillForm({ vendors, receipts, items, locations, onSaved, onCancel
       inventory_item: Number(grLine.inventory_item),
       quantity: grLine.quantity_received,
       unit_cost: grLine.unit_cost || "0",
-      tax_amount: "",
+      tax_amount: "0.00",
     }));
     
     setLines(newLines);
@@ -130,13 +130,14 @@ function CreateBillForm({ vendors, receipts, items, locations, onSaved, onCancel
         bill_no: billNo || undefined,
         bill_date: billDate,
         vendor: Number(vendorId),
-        goods_receipt: grId ? Number(grId) : null,
+          stock_location: stockLocationId ? Number(stockLocationId) : undefined,
+          goods_receipt: grId ? Number(grId) : null,
         notes,
         lines: validLines.map((l) => ({
           inventory_item: Number(l.inventory_item),
           quantity: l.quantity,
           unit_cost: l.unit_cost,
-          tax_amount: l.tax_amount ?? undefined,
+          tax_amount: l.tax_amount || "0.00",
         })),
       });
       onSaved(bill);
@@ -484,3 +485,4 @@ export default function AdminPurchaseBillsPage() {
     </ERPPageShell>
   );
 }
+
