@@ -83,6 +83,22 @@ function CreateBillForm({ vendors, receipts, items, onSaved, onCancel }: CreateB
     (r) => !vendorId || String(r.vendor_name) === vendors.find((v) => String(v.id) === vendorId)?.name
   );
 
+  useEffect(() => {
+    if (!grId) return;
+    const selectedGr = receipts.find((r) => String(r.id) === grId);
+    if (!selectedGr || !selectedGr.lines || selectedGr.lines.length === 0) return;
+    
+    // Auto-fill lines from GR
+    const newLines = selectedGr.lines.map(grLine => ({
+      inventory_item: Number(grLine.inventory_item),
+      quantity: grLine.quantity_received,
+      unit_cost: grLine.unit_cost || "0",
+      tax_amount: "",
+    }));
+    
+    setLines(newLines);
+  }, [grId, receipts]);
+
   function setLine(i: number, patch: Partial<VendorBillLine>) {
     setLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
   }

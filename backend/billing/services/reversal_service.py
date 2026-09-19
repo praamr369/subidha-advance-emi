@@ -56,6 +56,18 @@ from subscriptions.models import AuditLog
 from subscriptions.services.audit_service import log_audit
 
 
+
+def _derive_stock_location(bill) -> int | None:
+    if not bill:
+        return None
+    if getattr(bill, "stock_location_id", None):
+        return bill.stock_location_id
+    if hasattr(bill, "goods_receipt") and bill.goods_receipt:
+        return bill.goods_receipt.stock_location_id
+    if hasattr(bill, "purchase_order") and bill.purchase_order:
+        return bill.purchase_order.stock_location_id
+    return None
+
 def _mask_phone(phone: str | None) -> str:
     raw = "".join(ch for ch in str(phone or "") if ch.isdigit())
     if len(raw) < 4:
@@ -1313,7 +1325,7 @@ def create_purchase_return(*, purchase_bill_id: int | None = None, vendor_bill_i
         vendor_bill=bill if vendor_bill_id else None,
         vendor=bill.vendor,
         reason=reason,
-        metadata={"stock_location_id": stock_location_id or getattr(bill, "stock_location_id", None)},
+        metadata={"stock_location_id": stock_location_id or _derive_stock_location(bill)},
     )
 
     subtotal = Decimal("0.00")
@@ -1373,7 +1385,7 @@ def post_purchase_return(*, purchase_return_id: int, posted_by):
         raise ValueError("Only draft purchase return can be posted.")
 
     bill = purchase_return.purchase_bill or purchase_return.vendor_bill
-    stock_location_id = (purchase_return.metadata or {}).get("stock_location_id") or getattr(bill, "stock_location_id", None)
+    stock_location_id = (purchase_return.metadata or {}).get("stock_location_id") or _derive_stock_location(bill)
     stock_location = StockLocation.objects.filter(pk=stock_location_id).first() if stock_location_id else None
     if stock_location is None:
         raise ValueError("Purchase return requires a valid source stock location.")
