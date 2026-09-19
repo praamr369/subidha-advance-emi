@@ -38,21 +38,25 @@ export default function AdminVendorReturnsPage() {
   const [returnLines, setReturnLines] = useState<Record<number, string>>({}); // lineId -> quantity string
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [locations, setLocations] = useState<StockLocation[]>([]);
+  const [stockLocationId, setStockLocationId] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [returnPayload, vendorPayload, billsPayload, vbPayload] = await Promise.all([
+      const [returnPayload, vendorPayload, billsPayload, vbPayload, locPayload] = await Promise.all([
         listAdminVendorPurchaseReturnRegister({
           vendor: vendorId ? Number(vendorId) : undefined,
           status: status || undefined,
         }),
         listVendors({ page_size: 200 }),
         listPurchaseBills({ status: "POSTED" }),
-        listVendorBills({ status: "POSTED" })
+        listVendorBills({ status: "POSTED" }),
+        listStockLocations({ is_active: 1, page_size: 100 })
       ]);
       setRows(returnPayload.results);
       setVendors(Array.isArray(vendorPayload) ? vendorPayload : vendorPayload.results);
+      setLocations(Array.isArray(locPayload) ? locPayload : locPayload.results);
       
       const pbills = Array.isArray(billsPayload) ? billsPayload : billsPayload.results;
       const vbills = Array.isArray(vbPayload) ? vbPayload : (vbPayload as any)?.results;
@@ -103,6 +107,7 @@ export default function AdminVendorReturnsPage() {
 
       await createAdminPurchaseReturn(Number(selectedBill._id.split('_')[1]), {
         reason: returnReason,
+        stock_location_id: Number(stockLocationId),
         lines: validLines
       }, selectedBill._isVendor);
       setDrawerOpen(false);
@@ -283,16 +288,31 @@ export default function AdminVendorReturnsPage() {
           )}
           
           {selectedBill && (
-             <div className="space-y-3">
-                <label className="text-sm font-semibold">Reason for Return</label>
-                <textarea 
-                  className={accountingFieldClassName()} 
-                  value={returnReason}
-                  onChange={(e) => setReturnReason(e.target.value)}
-                  rows={3}
-                  disabled={creating}
-                  placeholder="E.g. Damaged during transit"
-                />
+             <div className="space-y-4">
+               <div className="space-y-3">
+                 <label className="text-sm font-semibold">Stock Location <span className="text-destructive">*</span></label>
+                 <select 
+                   className={accountingFieldClassName()} 
+                   value={stockLocationId}
+                   onChange={(e) => setStockLocationId(e.target.value)}
+                   disabled={creating}
+                 >
+                   <option value="" disabled>-- Select Stock Location --</option>
+                   {locations.map((loc) => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
+                 </select>
+               </div>
+               
+               <div className="space-y-3">
+                  <label className="text-sm font-semibold">Reason for Return</label>
+                  <textarea 
+                    className={accountingFieldClassName()} 
+                    value={returnReason}
+                    onChange={(e) => setReturnReason(e.target.value)}
+                    rows={3}
+                    disabled={creating}
+                    placeholder="E.g. Damaged during transit"
+                  />
+               </div>
              </div>
           )}
           

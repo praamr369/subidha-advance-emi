@@ -758,7 +758,7 @@ def post_stock_adjustment(*, stock_adjustment_id: int, posted_by):
 @transaction.atomic
 def post_purchase_bill(*, purchase_bill_id: int, posted_by):
     purchase_bill = (
-        PurchaseBill.objects.select_for_update()
+        PurchaseBill.objects.select_for_update(of=("self",))
         .select_related("vendor", "finance_account", "finance_account__chart_account")
         .prefetch_related("lines", "lines__inventory_item")
         .get(pk=purchase_bill_id)
