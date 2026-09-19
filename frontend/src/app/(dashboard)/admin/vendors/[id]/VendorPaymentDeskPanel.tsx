@@ -62,7 +62,11 @@ export function VendorPaymentDeskPanel({ vendorId, onChanged }: { vendorId: numb
     () =>
       bills
         .filter((bill) => cents(amounts[bill.id] ?? 0) > 0)
-        .map((bill) => ({ purchase_bill_id: bill.id, amount: Number(amounts[bill.id]).toFixed(2) })),
+        .map((bill) => ({ 
+          purchase_bill_id: bill.id, 
+          amount: Number(amounts[bill.id]).toFixed(2),
+          type: bill.type,
+        })),
     [bills, amounts]
   );
   const selectedCents = allocations.reduce((sum, row) => sum + cents(row.amount), 0);

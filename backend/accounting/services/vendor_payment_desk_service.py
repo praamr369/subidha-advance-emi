@@ -75,8 +75,29 @@ def build_vendor_payment_desk(vendor: Vendor) -> dict:
                 "bill_date": bill.bill_date.isoformat() if bill.bill_date else None,
                 "grand_total": f"{_money(bill.grand_total):.2f}",
                 "outstanding": f"{outstanding:.2f}",
+                "type": "modern",
             }
         )
+    # Fetch legacy vendor bills
+    VendorBill = __import__("inventory.models", fromlist=["VendorBill"]).VendorBill
+    VendorPayment = __import__("inventory.models", fromlist=["VendorPayment"]).VendorPayment
+    for bill in VendorBill.objects.filter(vendor=vendor, status="POSTED").order_by("bill_date", "id"):
+        paid = VendorPayment.objects.filter(vendor_bill_id=bill.id, status="POSTED").aggregate(total=Sum("amount"))["total"] or MONEY_ZERO
+        outstanding = max(_money(bill.grand_total) - _money(paid), MONEY_ZERO)
+        if outstanding <= MONEY_ZERO:
+            continue
+        bills.append(
+            {
+                "id": bill.id,
+                "bill_no": bill.bill_no,
+                "bill_date": bill.bill_date.isoformat() if bill.bill_date else None,
+                "grand_total": f"{_money(bill.grand_total):.2f}",
+                "outstanding": f"{outstanding:.2f}",
+                "type": "legacy",
+            }
+        )
+    bills.sort(key=lambda b: b["bill_date"] or "", reverse=True)
+
     net = _net_outstanding(vendor)
     recent = (
         VendorSettlement.objects.filter(vendor=vendor)
@@ -132,28 +153,41 @@ def _date(value):
         raise ValidationError({"payment_date": "Use a YYYY-MM-DD date."})
 
 
-def _clean_allocations(vendor: Vendor, allocations) -> list[tuple[PurchaseBill, Decimal]]:
+def _clean_allocations(vendor: Vendor, allocations) -> list[tuple[object, Decimal, bool]]:
     rows = []
     seen = set()
+    VendorBill = __import__("inventory.models", fromlist=["VendorBill"]).VendorBill
+    VendorPayment = __import__("inventory.models", fromlist=["VendorPayment"]).VendorPayment
     for raw in allocations or []:
         amount = _money((raw or {}).get("amount"))
         if amount <= MONEY_ZERO:
             continue
         bill_id = int((raw or {}).get("purchase_bill_id") or (raw or {}).get("bill_id") or 0)
-        if bill_id in seen:
+        is_legacy = (raw or {}).get("type") == "legacy"
+        key = (bill_id, is_legacy)
+        if key in seen:
             raise ValidationError({"allocations": "Each bill can appear once."})
-        seen.add(bill_id)
-        bill = PurchaseBill.objects.select_for_update().filter(pk=bill_id, vendor=vendor).first()
+        seen.add(key)
+        if is_legacy:
+            bill = VendorBill.objects.select_for_update().filter(pk=bill_id, vendor=vendor).first()
+        else:
+            bill = PurchaseBill.objects.select_for_update().filter(pk=bill_id, vendor=vendor).first()
         if bill is None:
             raise ValidationError({"allocations": f"Bill {bill_id} does not belong to this vendor."})
-        if bill.status != PurchaseBillStatus.POSTED:
+        if bill.status != "POSTED":
             raise ValidationError({"allocations": f"Bill {bill.bill_no} is not posted yet."})
-        outstanding = purchase_bill_outstanding(bill)
+        
+        if is_legacy:
+            paid = VendorPayment.objects.filter(vendor_bill_id=bill.id, status="POSTED").aggregate(total=Sum("amount"))["total"] or MONEY_ZERO
+            outstanding = max(_money(bill.grand_total) - _money(paid), MONEY_ZERO)
+        else:
+            outstanding = purchase_bill_outstanding(bill)
+            
         if amount > outstanding:
             raise ValidationError(
                 {"allocations": f"₹{amount:.2f} is more than bill {bill.bill_no}'s outstanding ₹{outstanding:.2f}."}
             )
-        rows.append((bill, amount))
+        rows.append((bill, amount, is_legacy))
     if not rows:
         raise ValidationError({"allocations": "Enter an amount for at least one bill."})
     return rows
@@ -174,7 +208,7 @@ def pay_vendor_bills(
     vendor = Vendor.objects.select_for_update().get(pk=vendor_id)
     account = _finance_account(finance_account_id)
     rows = _clean_allocations(vendor, allocations)
-    total = sum((amount for _, amount in rows), MONEY_ZERO)
+    total = sum((amount for _, amount, _ in rows), MONEY_ZERO)
     payable = max(_net_outstanding(vendor), MONEY_ZERO)
     if total > payable:
         advance = advance_balance(vendor)
@@ -184,25 +218,48 @@ def pay_vendor_bills(
         )
     when = _date(payment_date)
     posted = []
-    for bill, amount in rows:
-        settlement = VendorSettlement.objects.create(
-            vendor=vendor,
-            purchase_bill=bill,
-            settlement_date=when,
-            amount=amount,
-            finance_account=account,
-            branch_id=account.branch_id,
-            reference_no=(reference_no or "").strip() or None,
-            notes=(notes or "").strip() or f"Paid from vendor page against {bill.bill_no}.",
-        )
-        posted.append(_post(settlement, posted_by))
+    VendorPayment = __import__("inventory.models", fromlist=["VendorPayment"]).VendorPayment
+    post_vendor_payment = __import__("inventory.services.procurement_service", fromlist=["post_vendor_payment"]).post_vendor_payment
+
+    for bill, amount, is_legacy in rows:
+        if is_legacy:
+            payment = VendorPayment.objects.create(
+                vendor=vendor,
+                vendor_bill=bill,
+                payment_date=when,
+                amount=amount,
+                finance_account=account,
+                reference_no=(reference_no or "").strip() or None,
+                notes=(notes or "").strip() or f"Paid from vendor page against {bill.bill_no}.",
+            )
+            payment, _ = post_vendor_payment(vendor_payment_id=payment.id, posted_by=posted_by)
+            posted.append({
+                "id": payment.id, 
+                "settlement_no": payment.payment_no, 
+                "amount": f"{_money(payment.amount):.2f}",
+                "journal_entry_no": getattr(payment.posted_journal_entry, "entry_no", None)
+            })
+        else:
+            settlement = VendorSettlement.objects.create(
+                vendor=vendor,
+                purchase_bill=bill,
+                settlement_date=when,
+                amount=amount,
+                finance_account=account,
+                branch_id=account.branch_id,
+                reference_no=(reference_no or "").strip() or None,
+                notes=(notes or "").strip() or f"Paid from vendor page against {bill.bill_no}.",
+            )
+            settlement = _post(settlement, posted_by)
+            posted.append({
+                "id": settlement.id, 
+                "settlement_no": settlement.settlement_no, 
+                "amount": f"{_money(settlement.amount):.2f}",
+                "journal_entry_no": getattr(settlement.posted_journal_entry, "entry_no", None)
+            })
     return {
         "paid_total": f"{total:.2f}",
-        "settlements": [
-            {"id": s.id, "settlement_no": s.settlement_no, "amount": f"{_money(s.amount):.2f}",
-             "journal_entry_no": getattr(s.posted_journal_entry, "entry_no", None)}
-            for s in posted
-        ],
+        "settlements": posted,
         "desk": build_vendor_payment_desk(vendor),
     }
 
@@ -239,10 +296,14 @@ def pay_vendor_advance(
 def apply_vendor_advance(*, vendor_id: int, allocations, performed_by, notes: str = "") -> dict:
     vendor = Vendor.objects.select_for_update().get(pk=vendor_id)
     rows = _clean_allocations(vendor, allocations)
-    total = sum((amount for _, amount in rows), MONEY_ZERO)
+    total = sum((amount for _, amount, _ in rows), MONEY_ZERO)
     available = advance_balance(vendor)
     if total > available:
         raise ValidationError({"allocations": f"₹{total:.2f} is more than the ₹{available:.2f} advance available."})
+
+    for _, _, is_legacy in rows:
+        if is_legacy:
+            raise ValidationError({"allocations": "Applying advance to legacy Vendor Bills is not supported."})
 
     # Oldest advances are used first.
     pools = []
@@ -256,7 +317,7 @@ def apply_vendor_advance(*, vendor_id: int, allocations, performed_by, notes: st
 
     today = timezone.localdate()
     created = []
-    for bill, amount in rows:
+    for bill, amount, _ in rows:
         remaining = amount
         for pool in pools:
             if remaining <= MONEY_ZERO:
@@ -284,7 +345,7 @@ def apply_vendor_advance(*, vendor_id: int, allocations, performed_by, notes: st
             "vendor_id": vendor.id,
             "total": f"{total:.2f}",
             "allocation_ids": [a.id for a in created],
-            "bills": [bill.bill_no for bill, _ in rows],
+            "bills": [bill.bill_no for bill, _, _ in rows],
         },
     )
     return {"applied_total": f"{total:.2f}", "desk": build_vendor_payment_desk(vendor)}

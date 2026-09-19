@@ -79,6 +79,7 @@ export type VendorOpenBill = {
   bill_date: string | null;
   grand_total: string;
   outstanding: string;
+  type?: "legacy" | "modern";
 };
 
 export type VendorDeskPayment = {
