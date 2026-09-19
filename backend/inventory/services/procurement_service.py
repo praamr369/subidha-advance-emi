@@ -246,6 +246,38 @@ def post_goods_receipt(*, goods_receipt_id: int, posted_by=None):
         product_ids={line.inventory_item.product_id for line in receipt.lines.all()},
         actor=posted_by,
     )
+    
+    # Auto-generate a Draft Vendor Bill if this GR wasn't auto-generated from one, 
+    # ensuring the vendor ledger workflow continues.
+    if "Auto-generated from standalone vendor bill" not in (receipt.notes or "") and not receipt.vendor_bills.exists():
+        from inventory.models import VendorBill, VendorBillStatus, VendorBillLine
+        bill_no = f"VBILL-AUTO-{receipt.receipt_no}"
+        if not VendorBill.objects.filter(bill_no=bill_no).exists():
+            subtotal = sum((line.quantity_received * _money(line.unit_cost)) for line in receipt.lines.all())
+            vb = VendorBill.objects.create(
+                bill_no=bill_no,
+                bill_date=receipt.receipt_date,
+                vendor=receipt.purchase_order.vendor,
+                purchase_order=receipt.purchase_order,
+                goods_receipt=receipt,
+                status=VendorBillStatus.DRAFT,
+                subtotal=subtotal,
+                grand_total=subtotal,
+                notes=f"Auto-generated from goods receipt {receipt.receipt_no}",
+                stock_location=receipt.stock_location
+            )
+            for line in receipt.lines.all():
+                qty = line.quantity_received
+                cost = _money(line.unit_cost)
+                VendorBillLine.objects.create(
+                    vendor_bill=vb,
+                    inventory_item=line.inventory_item,
+                    quantity=qty,
+                    unit_cost=cost,
+                    taxable_value=qty * cost,
+                    line_total=qty * cost
+                )
+
     return receipt, True
 
 
