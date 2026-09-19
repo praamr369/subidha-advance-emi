@@ -874,6 +874,7 @@ class GoodsReceiptLineSerializer(serializers.ModelSerializer):
 
 
 class GoodsReceiptSerializer(serializers.ModelSerializer):
+    receipt_no = serializers.CharField(required=False, allow_blank=True)
     purchase_order_no = serializers.CharField(source="purchase_order.po_no", read_only=True)
     vendor_name = serializers.CharField(source="purchase_order.vendor.name", read_only=True)
     stock_location_name = serializers.CharField(source="stock_location.name", read_only=True)
