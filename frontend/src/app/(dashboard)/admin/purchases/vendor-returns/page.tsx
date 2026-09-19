@@ -76,6 +76,10 @@ export default function AdminVendorReturnsPage() {
 
   const handleCreateReturn = async () => {
     if (!selectedBillId) return;
+    if (!stockLocationId) {
+      setCreateError("Please select a source stock location.");
+      return;
+    }
     setCreating(true);
     setCreateError(null);
     
@@ -313,3 +317,4 @@ export default function AdminVendorReturnsPage() {
     </ERPPageShell>
   );
 }
+
