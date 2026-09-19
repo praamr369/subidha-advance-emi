@@ -227,7 +227,7 @@ class AdminVendorPurchaseReturnListView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def get(self, request):
-        queryset = PurchaseReturn.objects.select_related("vendor", "purchase_bill").order_by(
+        queryset = PurchaseReturn.objects.select_related("vendor", "purchase_bill", "vendor_bill").order_by(
             "-return_date", "-created_at", "-id"
         )
         vendor_id = request.query_params.get("vendor")
@@ -252,8 +252,8 @@ class AdminVendorPurchaseReturnListView(APIView):
                 "status": row.status,
                 "vendor": row.vendor_id,
                 "vendor_name": row.vendor.name,
-                "purchase_bill": row.purchase_bill_id,
-                "purchase_bill_no": row.purchase_bill.bill_no,
+                "purchase_bill": row.purchase_bill_id or row.vendor_bill_id,
+                "purchase_bill_no": row.purchase_bill.bill_no if row.purchase_bill else (row.vendor_bill.bill_no if row.vendor_bill else ""),
                 "reason": row.reason,
                 "subtotal": str(row.subtotal),
                 "tax_total": str(row.tax_total),
