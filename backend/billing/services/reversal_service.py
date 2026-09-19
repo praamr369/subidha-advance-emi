@@ -1363,7 +1363,7 @@ def create_purchase_return(*, purchase_bill_id: int | None = None, vendor_bill_i
 def post_purchase_return(*, purchase_return_id: int, posted_by):
     purchase_return = (
         PurchaseReturn.objects.select_for_update(of=("self",))
-        .select_related("purchase_bill", "purchase_bill__finance_account")
+        .select_related("purchase_bill", "vendor_bill", "purchase_bill__finance_account")
         .prefetch_related("lines", "lines__inventory_item")
         .get(pk=purchase_return_id)
     )
@@ -1372,7 +1372,8 @@ def post_purchase_return(*, purchase_return_id: int, posted_by):
     if purchase_return.status != PurchaseReturnStatus.DRAFT:
         raise ValueError("Only draft purchase return can be posted.")
 
-    stock_location_id = (purchase_return.metadata or {}).get("stock_location_id") or purchase_return.purchase_bill.stock_location_id
+    bill = purchase_return.purchase_bill or purchase_return.vendor_bill
+    stock_location_id = (purchase_return.metadata or {}).get("stock_location_id") or getattr(bill, "stock_location_id", None)
     stock_location = StockLocation.objects.filter(pk=stock_location_id).first() if stock_location_id else None
     if stock_location is None:
         raise ValueError("Purchase return requires a valid source stock location.")
@@ -1421,7 +1422,7 @@ def post_purchase_return(*, purchase_return_id: int, posted_by):
         source_reference=purchase_return.return_no,
         source_document_no=purchase_return.return_no,
         source_event_date=purchase_return.return_date,
-        trace_metadata={"purchase_return_id": purchase_return.id, "purchase_bill_id": purchase_return.purchase_bill_id},
+        trace_metadata={"purchase_return_id": purchase_return.id, "purchase_bill_id": purchase_return.purchase_bill_id, "vendor_bill_id": purchase_return.vendor_bill_id},
         posted_by=posted_by,
     )
 
