@@ -326,6 +326,31 @@ def post_vendor_bill(*, vendor_bill_id: int, posted_by=None):
     bill.posted_journal_entry = journal_entry
     bill.status = VendorBillStatus.POSTED
     bill.save(update_fields=["posted_journal_entry", "status", "updated_at"])
+
+    # Feature: Auto-create stock movements for standalone Vendor Bills (no GR)
+    if not bill.goods_receipt_id:
+        created_any_stock = False
+        for line in bill.lines.all():
+            if not line.inventory_item.stock_tracking_enabled or not line.quantity or line.quantity <= 0:
+                continue
+            create_stock_ledger_entry(
+                inventory_item=line.inventory_item,
+                movement_type=StockMovementType.PURCHASE_IN,
+                movement_date=bill.bill_date,
+                stock_location=line.inventory_item.default_stock_location,
+                quantity_in=line.quantity,
+                reference_model="VendorBillLine",
+                reference_id=f"{bill.id}:{line.id}",
+                notes=f"Direct standalone vendor bill {bill.bill_no}",
+                posted_by=posted_by,
+            )
+            created_any_stock = True
+        if created_any_stock:
+            reconcile_direct_sale_needs_after_inventory_in(
+                product_ids={line.inventory_item.product_id for line in bill.lines.all() if line.inventory_item.product_id},
+                actor=posted_by
+            )
+
     if bill.purchase_order_id:
         bill.purchase_order.status = PurchaseOrderStatus.BILLED
         bill.purchase_order.save(update_fields=["status", "updated_at"])
