@@ -175,7 +175,7 @@ def get_vendor_purchase_summary(vendor: Vendor) -> dict:
         vb["tax_mode"] = "GST" # legacy assumption or null
         vb["is_legacy"] = True
 
-    merged_bills = sorted(pb_list + vb_list, key=lambda x: x["bill_date"] or "", reverse=True)[:200]
+    merged_bills = sorted(pb_list + vb_list, key=lambda x: str(x["bill_date"] or ""), reverse=True)[:200]
 
     payments = VendorPayment.objects.filter(vendor=vendor).order_by("-payment_date", "-id")
     purchase_orders = PurchaseOrder.objects.filter(vendor=vendor).exclude(status=PurchaseOrderStatus.CANCELLED).order_by("-po_date", "-id")

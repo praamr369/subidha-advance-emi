@@ -96,7 +96,7 @@ def build_vendor_payment_desk(vendor: Vendor) -> dict:
                 "type": "legacy",
             }
         )
-    bills.sort(key=lambda b: b["bill_date"] or "", reverse=True)
+    bills.sort(key=lambda b: str(b["bill_date"] or ""), reverse=True)
 
     net = _net_outstanding(vendor)
     recent = (
