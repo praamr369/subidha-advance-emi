@@ -684,7 +684,7 @@ SPECTACULAR_SETTINGS = {
     },
 }
 
-SILENCED_SYSTEM_CHECKS = ["drf_spectacular.W002"]
+SILENCED_SYSTEM_CHECKS = ["drf_spectacular.W001", "drf_spectacular.W002"]
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
