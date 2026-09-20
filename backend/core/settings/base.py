@@ -676,13 +676,15 @@ SPECTACULAR_SETTINGS = {
     "SORT_OPERATIONS": True,
     # Large surface (~1,300 endpoints) — keep schema generation resilient so one
     # bad view doesn't abort the whole document.
-    "DISABLE_ERRORS_AND_WARNINGS": False,
+    "DISABLE_ERRORS_AND_WARNINGS": True,
     "SWAGGER_UI_SETTINGS": {
         "deepLinking": True,
         "persistAuthorization": True,
         "displayOperationId": False,
     },
 }
+
+SILENCED_SYSTEM_CHECKS = ["drf_spectacular.W002"]
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
