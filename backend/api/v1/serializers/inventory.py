@@ -50,7 +50,7 @@ class EmptyInventoryActionSerializer(serializers.Serializer):
 
 class InventoryItemSerializer(serializers.ModelSerializer):
     product_code = serializers.CharField(source="product.product_code", read_only=True)
-    product_name = serializers.CharField(source="product.name", read_only=True)
+    product_name = serializers.SerializerMethodField()
     current_stock_qty = serializers.SerializerMethodField()
     active_lot_count = serializers.SerializerMethodField()
     expiring_lot_count = serializers.SerializerMethodField()
@@ -90,6 +90,24 @@ class InventoryItemSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "stock_tracking_status", "current_stock_qty", "active_lot_count", "expiring_lot_count", "created_at", "updated_at"]
+
+    def get_product_name(self, obj):
+        name = obj.product.name if obj.product else ""
+        if hasattr(obj.product, "pim_variant") and obj.product.pim_variant:
+            # We want to format it as "Name (Attr1, Attr2)"
+            attrs = []
+            for attr_val in obj.product.pim_variant.attribute_values.all():
+                if attr_val.attribute.data_type == "BOOLEAN":
+                    val = "Yes" if attr_val.value_boolean else "No"
+                elif attr_val.attribute.data_type in ("NUMBER", "DECIMAL"):
+                    val = float(attr_val.value_number) if attr_val.value_number is not None else None
+                else:
+                    val = attr_val.value_text
+                if val:
+                    attrs.append(str(val))
+            if attrs:
+                return f"{name} ({', '.join(attrs)})"
+        return name
 
     def get_current_stock_qty(self, obj):
         return f"{obj.current_stock_quantity():.3f}"

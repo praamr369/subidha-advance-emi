@@ -43,6 +43,8 @@ def _base_qs():
         "inventory_item",
         "inventory_item__product",
         "stock_location",
+    ).prefetch_related(
+        "inventory_item__product__pim_variant__attribute_values__attribute"
     )
 
 
@@ -99,11 +101,31 @@ def build_stock_ledger_list(
     for row in page_qs:
         item = row.inventory_item
         product = item.product if item else None
+        
+        product_name = ""
+        if product:
+            product_name = product.name
+            if hasattr(product, "pim_variant") and product.pim_variant:
+                attrs = []
+                for attr_val in product.pim_variant.attribute_values.all():
+                    if attr_val.attribute.data_type == "BOOLEAN":
+                        val = "Yes" if attr_val.value_boolean else "No"
+                    elif attr_val.attribute.data_type in ("NUMBER", "DECIMAL"):
+                        val = float(attr_val.value_number) if attr_val.value_number is not None else None
+                    else:
+                        val = attr_val.value_text
+                    if val:
+                        attrs.append(str(val))
+                if attrs:
+                    product_name = f"{product.name} ({', '.join(attrs)})"
+        elif item:
+            product_name = item.inventory_code
+
         results.append(
             {
                 "id": row.id,
                 "product_id": product.id if product else None,
-                "product_name": product.name if product else (item.inventory_code if item else ""),
+                "product_name": product_name,
                 "product_code": product.product_code if product else "",
                 "sku": item.sku if item else "",
                 "barcode": item.barcode if item else "",
@@ -172,11 +194,31 @@ def export_ledger_csv(
     for row in qs.order_by("-movement_date", "-id"):
         item = row.inventory_item
         product = item.product if item else None
+        
+        product_name = ""
+        if product:
+            product_name = product.name
+            if hasattr(product, "pim_variant") and product.pim_variant:
+                attrs = []
+                for attr_val in product.pim_variant.attribute_values.all():
+                    if attr_val.attribute.data_type == "BOOLEAN":
+                        val = "Yes" if attr_val.value_boolean else "No"
+                    elif attr_val.attribute.data_type in ("NUMBER", "DECIMAL"):
+                        val = float(attr_val.value_number) if attr_val.value_number is not None else None
+                    else:
+                        val = attr_val.value_text
+                    if val:
+                        attrs.append(str(val))
+                if attrs:
+                    product_name = f"{product.name} ({', '.join(attrs)})"
+        elif item:
+            product_name = item.inventory_code
+
         rows.append(
             {
                 "Date": row.movement_date.isoformat() if row.movement_date else "",
                 "Product Code": product.product_code if product else "",
-                "Product Name": product.name if product else (item.inventory_code if item else ""),
+                "Product Name": product_name,
                 "SKU": item.sku if item else "",
                 "Movement Type": row.movement_type,
                 "Qty In": str(row.quantity_in or ""),

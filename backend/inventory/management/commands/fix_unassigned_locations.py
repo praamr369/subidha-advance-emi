@@ -20,7 +20,8 @@ class Command(BaseCommand):
                     updates.append("default_stock_location")
                     loc_count += 1
                 
-                if item.standard_unit_cost is None and first_posted.unit_cost_snapshot is not None:
+                # Check for None OR 0.00
+                if (not item.standard_unit_cost or item.standard_unit_cost == 0) and first_posted.unit_cost_snapshot is not None:
                     item.standard_unit_cost = first_posted.unit_cost_snapshot
                     updates.append("standard_unit_cost")
                     cost_count += 1
