@@ -54,10 +54,14 @@ def build_stock_ledger_list(
     reference_model_filter: str = "",
     date_from: str = "",
     date_to: str = "",
+    inventory_item_id: str = "",
     page: int = 1,
     page_size: int = 50,
 ):
     qs = _base_qs()
+
+    if inventory_item_id:
+        qs = qs.filter(inventory_item_id=inventory_item_id)
 
     if search_query:
         qs = qs.filter(
@@ -172,8 +176,12 @@ def export_ledger_csv(
     reference_model_filter: str = "",
     date_from: str = "",
     date_to: str = "",
+    inventory_item_id: str = "",
 ):
     qs = _base_qs()
+
+    if inventory_item_id:
+        qs = qs.filter(inventory_item_id=inventory_item_id)
 
     if search_query:
         qs = qs.filter(

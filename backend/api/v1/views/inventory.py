@@ -1335,6 +1335,7 @@ class AdminStockLedgerListView(APIView):
         reference_model = (request.query_params.get("reference_model") or "").strip()
         date_from = (request.query_params.get("start_date") or request.query_params.get("date_from") or "").strip()
         date_to = (request.query_params.get("end_date") or request.query_params.get("date_to") or "").strip()
+        inventory_item_id = (request.query_params.get("inventory_item_id") or "").strip()
 
         if export_format == "csv":
             import csv
@@ -1347,6 +1348,7 @@ class AdminStockLedgerListView(APIView):
                 reference_model_filter=reference_model,
                 date_from=date_from,
                 date_to=date_to,
+                inventory_item_id=inventory_item_id,
             )
             output = io.StringIO()
             if rows:
@@ -1374,6 +1376,7 @@ class AdminStockLedgerListView(APIView):
             reference_model_filter=reference_model,
             date_from=date_from,
             date_to=date_to,
+            inventory_item_id=inventory_item_id,
             page=page,
             page_size=page_size,
         )

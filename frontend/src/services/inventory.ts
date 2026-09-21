@@ -249,6 +249,7 @@ export interface ListLedgerParams {
   reference_model?: string;
   start_date?: string;
   end_date?: string;
+  inventory_item_id?: number | string;
   page?: number;
   page_size?: number;
 }
@@ -265,6 +266,7 @@ export function listStockLedger(params: ListLedgerParams = {}): Promise<StockLed
   if (params.reference_model) queryParams.append("reference_model", params.reference_model);
   if (params.start_date) queryParams.append("start_date", params.start_date);
   if (params.end_date) queryParams.append("end_date", params.end_date);
+  if (params.inventory_item_id) queryParams.append("inventory_item_id", String(params.inventory_item_id));
   if (params.page) queryParams.append("page", String(params.page));
   if (params.page_size) queryParams.append("page_size", String(params.page_size));
 
@@ -286,6 +288,7 @@ export function exportStockLedgerCSV(params: ListLedgerParams = {}): Promise<Blo
   if (params.reference_model) queryParams.append("reference_model", params.reference_model);
   if (params.start_date) queryParams.append("start_date", params.start_date);
   if (params.end_date) queryParams.append("end_date", params.end_date);
+  if (params.inventory_item_id) queryParams.append("inventory_item_id", String(params.inventory_item_id));
   queryParams.append("format", "csv");
 
   return fetch(`/admin/inventory/ledger/?${queryParams.toString()}`, { method: "GET" })

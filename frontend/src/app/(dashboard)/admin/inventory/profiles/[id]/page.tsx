@@ -19,6 +19,7 @@ import ProductPostureCard, {
   type ProductPosture,
 } from "@/components/customers/ProductPostureCard";
 import RentalAssetsAwaitingRelease from "@/components/customer-intelligence/RentalAssetsAwaitingRelease";
+import StockLedgerPanel from "@/components/inventory/StockLedgerPanel";
 import {
   getInventoryProfile,
   type InventoryProfileDetail,
@@ -173,6 +174,10 @@ export default function InventoryProfileDetailPage() {
               <RentalAssetsAwaitingRelease productId={postureProductId} />
             </div>
           ) : null}
+
+          <ERPSectionShell title="Stock Ledger History" description="Historical movements, purchases, and sales for this item.">
+            <StockLedgerPanel productId={postureProductId} />
+          </ERPSectionShell>
 
           <ERPSectionShell title="Manufacturing Cost (Estimate)" description="Read-only cost basis for manufacturing reporting.">
             <ERPDetailGrid
