@@ -23,6 +23,8 @@ def weighted_average_unit_cost(item: InventoryItem, *, as_of_date: date | None =
     standard unit cost when no purchase history exists."""
     total_cost = Decimal("0.00")
     total_quantity = Decimal("0.000")
+    
+    # 1. Purchase Bill Lines
     lines = item.purchase_bill_lines.all()
     if as_of_date is not None:
         lines = lines.select_related("purchase_bill").filter(purchase_bill__bill_date__lte=as_of_date)
@@ -30,6 +32,16 @@ def weighted_average_unit_cost(item: InventoryItem, *, as_of_date: date | None =
         quantity = Decimal(str(line.quantity or "0.000"))
         total_quantity += quantity
         total_cost += quantity * Decimal(str(line.unit_cost or "0.00"))
+
+    # 2. Opening Stock Entries
+    opening_entries = item.opening_stock_entries.filter(status="POSTED")
+    if as_of_date is not None:
+        opening_entries = opening_entries.filter(effective_date__lte=as_of_date)
+    for entry in opening_entries:
+        quantity = Decimal(str(entry.quantity or "0.000"))
+        total_quantity += quantity
+        total_cost += quantity * Decimal(str(entry.unit_cost_snapshot or "0.00"))
+
     if total_quantity <= 0:
         return _decimal(item.standard_unit_cost)
     return (total_cost / total_quantity).quantize(Decimal("0.01"))
