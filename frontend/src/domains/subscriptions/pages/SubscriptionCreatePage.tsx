@@ -404,8 +404,9 @@ export default function SubscriptionCreatePage({
   const [handoverNotes, setHandoverNotes] = useState("");
   const [contractTermsSnapshot, setContractTermsSnapshot] = useState("");
 
-  const [kycFiles, setKycFiles] = useState<File[]>([]);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [signatureFile, setSignatureFile] = useState<File | null>(null);
+
   const [docUploadBusy, setDocUploadBusy] = useState(false);
   const [docUploadError, setDocUploadError] = useState<string | null>(null);
 
@@ -578,8 +579,6 @@ export default function SubscriptionCreatePage({
     isEmiPlan,
     batch,
     depositPercentNumber,
-    isRentPlan,
-    isLeasePlan,
   ]);
 
   /**
@@ -610,6 +609,12 @@ export default function SubscriptionCreatePage({
         `Security deposit must be between 20% and 30% (currently ${depositPercentNumber || 0}%).`
       );
     }
+    if (!photoFile) blockers.push("Customer photo is required.");
+    if (!signatureFile) blockers.push("Customer signature is required.");
+    
+    if ((isRentPlan || isLeasePlan) && customer?.kyc_status !== "VERIFIED") {
+      blockers.push("Customer KYC must be VERIFIED before creating a Rent or Lease contract.");
+    }
     return blockers;
   }, [
     planType,
@@ -618,10 +623,12 @@ export default function SubscriptionCreatePage({
     startDate,
     tenureMonths,
     isEmiPlan,
-    isRentPlan,
-    isLeasePlan,
     batch,
     depositPercentNumber,
+    photoFile,
+    signatureFile,
+    isRentPlan,
+    isLeasePlan,
   ]);
 
   // For RENT/LEASE, the activate path is gated on KYC readiness from the backend.
@@ -649,8 +656,6 @@ export default function SubscriptionCreatePage({
     startDate,
     tenureMonths,
     depositPercentNumber,
-    isRentPlan,
-    isLeasePlan,
   ]);
 
   function nextLuckyRequestToken(): number {
@@ -1235,11 +1240,11 @@ export default function SubscriptionCreatePage({
 
       let finalSuccess = created;
 
-      if (kycFiles.length > 0 || signatureFile) {
+      if (!!photoFile || signatureFile) {
         try {
           setGlobalLoadingLabel("Uploading documents...");
-          for (const file of kycFiles) {
-            await uploadDocument(created.id, "CUSTOMER_KYC_ID", file, "Customer KYC ID");
+          if (photoFile) {
+            await uploadDocument(created.id, "CUSTOMER_PHOTO", photoFile, "Customer Photo");
           }
           if (signatureFile) {
             await uploadDocument(created.id, "CUSTOMER_SIGNATURE", signatureFile, "Customer signature");
@@ -1248,7 +1253,7 @@ export default function SubscriptionCreatePage({
             cache: "no-store",
           });
           finalSuccess = refreshed;
-          setKycFiles([]);
+          setPhotoFile(null);
           setSignatureFile(null);
         } catch (docErr) {
           setDocUploadError(toErrorMessage(docErr));
@@ -1298,7 +1303,7 @@ export default function SubscriptionCreatePage({
     if (!success?.id) return;
     setDocUploadError(null);
 
-    if (kycFiles.length === 0) {
+    if (!photoFile) {
       setDocUploadError("Select at least one KYC document file.");
       return;
     }
@@ -1310,12 +1315,14 @@ export default function SubscriptionCreatePage({
 
     setDocUploadBusy(true);
     try {
-      for (const file of kycFiles) {
-        await uploadDocument(success.id, "CUSTOMER_KYC_ID", file, "Customer KYC ID");
+      if (photoFile) {
+        await uploadDocument(success.id, "CUSTOMER_PHOTO", photoFile, "Customer Photo");
       }
-      await uploadDocument(success.id, "CUSTOMER_SIGNATURE", signatureFile, "Customer signature");
+      if (signatureFile) {
+        await uploadDocument(success.id, "CUSTOMER_SIGNATURE", signatureFile, "Customer signature");
+      }
       await refreshSuccess(success.id);
-      setKycFiles([]);
+      setPhotoFile(null);
       setSignatureFile(null);
     } catch (err) {
       setDocUploadError(toErrorMessage(err));
@@ -2045,25 +2052,25 @@ export default function SubscriptionCreatePage({
                 </div>
               ) : null}
 
-              {(kycFiles.length > 0 || signatureFile || docUploadError) && (!Array.isArray(success.documents) || success.documents.length === 0) ? (
+              {(!!photoFile || signatureFile || docUploadError) && (!Array.isArray(success.documents) || success.documents.length === 0) ? (
                 <div className="mb-6 border-b border-border pb-6">
                   <div className="text-sm font-semibold text-foreground mb-4">Retry KYC and Signature Uploads</div>
                   <div className="grid gap-4 md:grid-cols-2">
                     <div>
-                      <label htmlFor="retry-kyc-id-files" className="text-xs font-medium text-muted-foreground">Customer KYC ID files</label>
+                      <label htmlFor="retry-photo-file" className="text-xs font-medium text-muted-foreground">Customer photo</label>
                       <input
-                        id="retry-kyc-id-files"
+                        id="retry-photo-file"
                         type="file"
-                        multiple
+                        accept="image/*"
                         onChange={(event) => {
-                          const files = Array.from(event.target.files ?? []);
-                          setKycFiles(files);
+                          const file = (event.target.files ?? [])[0] ?? null;
+                          setPhotoFile(file);
                           setDocUploadError(null);
                         }}
                         className="mt-2 block w-full text-sm"
                       />
                       <div className="mt-2 text-xs text-muted-foreground">
-                        {kycFiles.length > 0 ? `${kycFiles.length} file(s) selected` : "No files selected"}
+                        {photoFile ? photoFile.name : "No file selected"}
                       </div>
                     </div>
 
@@ -2185,25 +2192,25 @@ export default function SubscriptionCreatePage({
         {success ? null : (
           <>
             <SectionCard
-              title="Step 3 · KYC Documents (Optional)"
-              description="Upload customer KYC and signature documents to complete the contract onboarding."
+              title="Step 3 · Identity Documents"
+              description="Upload customer photo and signature to complete contract onboarding."
             >
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <label htmlFor="kyc-id-files" className="text-xs font-medium text-muted-foreground">Customer KYC ID files</label>
+                  <label htmlFor="photo-file" className="text-xs font-medium text-muted-foreground">Customer photo</label>
                   <input
-                    id="kyc-id-files"
+                    id="photo-file"
                     type="file"
-                    multiple
+                    accept="image/*"
                     onChange={(event) => {
-                      const files = Array.from(event.target.files ?? []);
-                      setKycFiles(files);
+                      const file = (event.target.files ?? [])[0] ?? null;
+                      setPhotoFile(file);
                       setDocUploadError(null);
                     }}
                     className="mt-2 block w-full text-sm"
                   />
                   <div className="mt-2 text-xs text-muted-foreground">
-                    {kycFiles.length > 0 ? `${kycFiles.length} file(s) selected` : "No files selected"}
+                    {photoFile ? photoFile.name : "No file selected"}
                   </div>
                 </div>
 

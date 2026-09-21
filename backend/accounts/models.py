@@ -33,6 +33,8 @@ class User(AbstractUser):
         help_text="Commission percentage for partner users.",
     )
 
+    REQUIRED_FIELDS = ["email", "phone"]
+
     class Meta:
         db_table = "users"
         ordering = ["id"]

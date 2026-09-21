@@ -296,6 +296,7 @@ class ContractRefundStatus(models.TextChoices):
 
 class SubscriptionDocumentType(models.TextChoices):
     CUSTOMER_KYC_ID = "CUSTOMER_KYC_ID", "Customer KYC ID"
+    CUSTOMER_PHOTO = "CUSTOMER_PHOTO", "Customer Photo"
     CUSTOMER_SIGNATURE = "CUSTOMER_SIGNATURE", "Customer Signature"
     ADMIN_SIGNATURE = "ADMIN_SIGNATURE", "Admin / Company Signature"
     RENT_CONTRACT_PDF = "RENT_CONTRACT_PDF", "Rent Contract PDF"
