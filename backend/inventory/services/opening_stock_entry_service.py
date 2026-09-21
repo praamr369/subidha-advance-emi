@@ -223,6 +223,10 @@ def post_opening_stock_entry(*, entry_id: int, posted_by=None) -> tuple[OpeningS
         save_fields.insert(0, "unit_cost_snapshot")
     entry.save(update_fields=save_fields)
 
+    if entry.inventory_item.default_stock_location is None and entry.stock_location:
+        entry.inventory_item.default_stock_location = entry.stock_location
+        entry.inventory_item.save(update_fields=["default_stock_location", "updated_at"])
+
     _, created = create_stock_ledger_entry(
         inventory_item=entry.inventory_item,
         movement_type=StockMovementType.OPENING_BALANCE_IN,
