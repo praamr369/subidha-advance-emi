@@ -874,6 +874,8 @@ class AdminInventoryItemSearchView(APIView):
 
         queryset = InventoryItem.objects.select_related(
             "product", "default_stock_location"
+        ).prefetch_related(
+            "product__related_products__related_product"
         ).filter(is_active=True)
 
         if term:
@@ -900,6 +902,15 @@ class AdminInventoryItemSearchView(APIView):
 
         rows = []
         for item in queryset:
+            accessories = []
+            for rel in item.product.related_products.all():
+                if rel.related_product:
+                    accessories.append({
+                        "name": rel.related_product.name,
+                        "qty": float(rel.quantity) if rel.quantity else 1,
+                        "type": rel.relationship_type,
+                    })
+
             row = {
                 "id": item.id,
                 "inventory_item_id": item.id,
@@ -915,6 +926,8 @@ class AdminInventoryItemSearchView(APIView):
                 "barcode": item.barcode or "",
                 "default_stock_location_id": item.default_stock_location_id,
                 "default_stock_location_code": item.default_stock_location.code if item.default_stock_location else None,
+                "attributes": item.product.base_specs if isinstance(item.product.base_specs, dict) else {},
+                "accessories": accessories,
             }
             if include_locations:
                 by_location = []

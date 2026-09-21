@@ -1089,6 +1089,8 @@ export type AdminInventoryItemSearchRow = {
   barcode: string;
   default_stock_location_id: number | null;
   default_stock_location_code: string | null;
+  attributes?: Record<string, string | number | boolean>;
+  accessories?: Array<{ name: string; qty: number; type: string }>;
   available_by_location?: Array<{
     stock_location_id: number;
     stock_location_name: string;
