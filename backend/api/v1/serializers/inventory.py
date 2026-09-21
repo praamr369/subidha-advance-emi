@@ -616,6 +616,9 @@ class StockLocationSerializer(serializers.ModelSerializer):
             "location_type",
             "is_active",
             "notes",
+            "address",
+            "phone",
+            "is_default_receiving_location",
             "created_at",
             "updated_at",
         ]
