@@ -1965,9 +1965,57 @@ export interface OpeningStockEntryPayload {
 // ============================================================================
 // BILLING OPTION TYPES (stubs — used by billing pages)
 // ============================================================================
-export type BillingAccessoryOption = Record<string, unknown>;
-export type BillingAccessoryOptionsResponse = Record<string, unknown>;
-export type BillingServiceOption = Record<string, unknown>;
+export type BillingAccessoryVariant = {
+  id: number;
+  product_id: number;
+  product_name: string;
+  product_code: string;
+  variant_label: string;
+  sku: string;
+  unit_of_measure: string;
+  base_price: string;
+  standard_unit_cost: string;
+};
+
+export type BillingAccessoryOption = {
+  link_id: number;
+  link_type: "group" | "single";
+  group_id: number | null;
+  group_name: string | null;
+  group_code: string | null;
+  group_category: string;
+  group_subcategory: string;
+  is_required: boolean;
+  charge_mode: "FREE" | "CHARGEABLE";
+  sale_price: string;
+  is_default_included: boolean;
+  notes: string;
+  sort_order: number;
+  variants: BillingAccessoryVariant[];
+  selected_variant_id: number | null;
+};
+
+export type BillingServiceOption = {
+  link_id: number;
+  service_id: number;
+  service_code: string;
+  service_name: string;
+  service_category: string;
+  charge_mode: "FREE" | "CHARGEABLE";
+  sale_price: string;
+  standard_price: string;
+  tax_rate_percent: string;
+  hsn_sac_code: string;
+  is_default_included: boolean;
+  notes: string;
+  sort_order: number;
+};
+
+export type BillingAccessoryOptionsResponse = {
+  accessory_options: BillingAccessoryOption[];
+  service_options: BillingServiceOption[];
+  has_options: boolean;
+};
 
 // ============================================================================
 // VENDOR FUNCTIONS
@@ -2382,4 +2430,6 @@ export async function postOpeningStockImport(file: File, date: string): Promise<
 }
 
 // ============================================================================
-export async function fetchBillingAccessoryOptions(...args: any[]): Promise<any> { return null; }
+export async function fetchBillingAccessoryOptions(productId: number): Promise<BillingAccessoryOptionsResponse> {
+  return apiFetch<BillingAccessoryOptionsResponse>(`/admin/inventory/finished-goods/${productId}/billing-accessories/`, { method: "GET" });
+}
