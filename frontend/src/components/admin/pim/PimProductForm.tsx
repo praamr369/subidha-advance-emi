@@ -399,6 +399,7 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
   const [product, setProduct] = useState<PimProduct | null>(null);
 
   const [code, setCode] = useState("");
+  const [brand, setBrand] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [categoryId, setCategoryId] = useState<number | "">("");
@@ -406,6 +407,14 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
   const [basePrice, setBasePrice] = useState("");
   const [costPrice, setCostPrice] = useState("");
   const [isPublished, setIsPublished] = useState(false);
+  
+  // Warranty State
+  const [warrantyEnabled, setWarrantyEnabled] = useState(true);
+  const [warrantyMonthsManufacturing, setWarrantyMonthsManufacturing] = useState<number>(12);
+  const [warrantyMonthsStructural, setWarrantyMonthsStructural] = useState<number>(36);
+  const [warrantyMonthsExtendedMax, setWarrantyMonthsExtendedMax] = useState<number>(12);
+  const [extendedWarrantyCostPercentage, setExtendedWarrantyCostPercentage] = useState<string>("7.5");
+
   const [attrValues, setAttrValues] = useState<AttributeValues>({});
   const [variants, setVariants] = useState(product?.variants ?? []);
 
@@ -509,6 +518,7 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
         if (stale) return;
         setProduct(p);
         setCode(p.code);
+        setBrand(p.brand ?? "");
         setName(p.name);
         setDescription(p.description ?? "");
         setCategoryId(p.category);
@@ -519,6 +529,11 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
         setArDepth(p.ar_depth_cm ?? "");
         setArHeight(p.ar_height_cm ?? "");
         setIsPublished(p.is_published);
+        setWarrantyEnabled(p.warranty_enabled ?? true);
+        setWarrantyMonthsManufacturing(p.warranty_months_manufacturing ?? 12);
+        setWarrantyMonthsStructural(p.warranty_months_structural ?? 36);
+        setWarrantyMonthsExtendedMax(p.warranty_months_extended_max ?? 12);
+        setExtendedWarrantyCostPercentage(p.extended_warranty_cost_percentage?.toString() ?? "7.5");
         setVariants(p.variants ?? []);
         // Restore operator-locked attributes from backend — only keep IDs
         // that actually have a saved value (backend also enforces this on save,
@@ -670,6 +685,12 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
         description,
         category: Number(categoryId),
         subcategory: subcategoryId ? Number(subcategoryId) : null,
+        brand,
+        warranty_enabled: warrantyEnabled,
+        warranty_months_manufacturing: warrantyMonthsManufacturing,
+        warranty_months_structural: warrantyMonthsStructural,
+        warranty_months_extended_max: warrantyMonthsExtendedMax,
+        extended_warranty_cost_percentage: extendedWarrantyCostPercentage,
         base_price: basePrice || "0",
         cost_price: costPrice || undefined,
         ar_width_cm: arWidth || null,
@@ -875,6 +896,15 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
             />
           </div>
           <div className="sm:col-span-2">
+            <label htmlFor="f-product-brand" className="block text-sm font-medium mb-1">Brand</label>
+            <input id="f-product-brand"
+              className="w-full rounded-md border px-3 py-2 text-sm bg-background"
+              value={brand}
+              onChange={(e) => setBrand(e.target.value)}
+              placeholder="e.g. Subidha Furniture"
+            />
+          </div>
+          <div className="sm:col-span-2">
             <div className="flex items-center justify-between mb-1">
               <label htmlFor="f-description" className="block text-sm font-medium">Description</label>
               {isEdit && variants.length > 0 && (
@@ -939,6 +969,68 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
             )}
           </div>
         </div>
+      </section>
+
+      {/* Warranty Information */}
+      <section className="rounded-lg border p-5 space-y-4 bg-muted/20">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold">Warranty Information</h3>
+          <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+            <input 
+              type="checkbox" 
+              checked={warrantyEnabled} 
+              onChange={(e) => setWarrantyEnabled(e.target.checked)} 
+              className="accent-primary h-4 w-4 rounded" 
+            />
+            Enable Warranty
+          </label>
+        </div>
+        
+        {warrantyEnabled && (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4 pt-2">
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">Manufacturing (Months)</label>
+              <input
+                type="number"
+                min="0"
+                className="w-full rounded-md border px-3 py-2 text-sm bg-background"
+                value={warrantyMonthsManufacturing}
+                onChange={(e) => setWarrantyMonthsManufacturing(Number(e.target.value))}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">Structural (Months)</label>
+              <input
+                type="number"
+                min="0"
+                className="w-full rounded-md border px-3 py-2 text-sm bg-background"
+                value={warrantyMonthsStructural}
+                onChange={(e) => setWarrantyMonthsStructural(Number(e.target.value))}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">Extended Max (Months)</label>
+              <input
+                type="number"
+                min="0"
+                className="w-full rounded-md border px-3 py-2 text-sm bg-background"
+                value={warrantyMonthsExtendedMax}
+                onChange={(e) => setWarrantyMonthsExtendedMax(Number(e.target.value))}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">Extended Cost (%)</label>
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                className="w-full rounded-md border px-3 py-2 text-sm bg-background"
+                value={extendedWarrantyCostPercentage}
+                onChange={(e) => setExtendedWarrantyCostPercentage(e.target.value)}
+              />
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Category */}

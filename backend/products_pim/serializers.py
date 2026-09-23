@@ -250,6 +250,8 @@ class PimProductDetailSerializer(serializers.ModelSerializer):
             "subcategory", "subcategory_name", "base_price", "cost_price",
             "is_active", "is_published", "product_type", "locked_attributes",
             "ar_width_cm", "ar_depth_cm", "ar_height_cm",
+            "warranty_enabled", "warranty_months_manufacturing", "warranty_months_structural",
+            "warranty_months_extended_max", "extended_warranty_cost_percentage",
             "parent_id", "parent_code", "parent_name",
             "created_at", "updated_at",
             "attributes", "variants", "variant_count",
@@ -317,6 +319,8 @@ class PimProductCreateUpdateSerializer(serializers.ModelSerializer):
             "subcategory", "base_price", "cost_price",
             "is_active", "is_published", "product_type", "locked_attributes", "attributes", "remove_attributes",
             "ar_width_cm", "ar_depth_cm", "ar_height_cm", "parent",
+            "warranty_enabled", "warranty_months_manufacturing", "warranty_months_structural",
+            "warranty_months_extended_max", "extended_warranty_cost_percentage",
         ]
 
     def _save_attributes(self, product, attrs_data):

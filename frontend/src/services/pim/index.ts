@@ -86,6 +86,7 @@ export interface PimProduct {
   code: string;
   brand?: string;
   name: string;
+  full_name?: string;
   description: string;
   category: number;
   category_name: string;
@@ -117,6 +118,11 @@ export interface PimProduct {
   variant_attribute_values?: PimVariantAttributeValue[];
   created_at?: string;
   updated_at?: string;
+  warranty_enabled?: boolean;
+  warranty_months_manufacturing?: number;
+  warranty_months_structural?: number;
+  warranty_months_extended_max?: number;
+  extended_warranty_cost_percentage?: string | number;
 }
 
 export interface PimProductCreatePayload {
@@ -136,6 +142,12 @@ export interface PimProductCreatePayload {
   ar_width_cm?: string | null;
   ar_depth_cm?: string | null;
   ar_height_cm?: string | null;
+  brand?: string;
+  warranty_enabled?: boolean;
+  warranty_months_manufacturing?: number;
+  warranty_months_structural?: number;
+  warranty_months_extended_max?: number;
+  extended_warranty_cost_percentage?: string | number;
   attributes?: {
     attribute: number;
     value_text?: string;

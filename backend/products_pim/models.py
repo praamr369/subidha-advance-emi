@@ -115,6 +115,13 @@ class PimProduct(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, db_index=True)
     code = models.CharField(max_length=100, unique=True)
     brand = models.CharField(max_length=150, blank=True)
+    
+    # Warranty config
+    warranty_enabled = models.BooleanField(default=True, help_text="Enable warranty coverage for this product")
+    warranty_months_manufacturing = models.PositiveIntegerField(default=12, help_text="Manufacturing defect warranty (months)")
+    warranty_months_structural = models.PositiveIntegerField(default=36, help_text="Structural warranty for furniture (months, 0 = none)")
+    warranty_months_extended_max = models.PositiveIntegerField(default=12, help_text="Max months for extended warranty plan")
+    extended_warranty_cost_percentage = models.DecimalField(max_digits=4, decimal_places=2, default=7.5, help_text="Extended warranty cost as % of product price")
     # Link to the operational product master (subscriptions.Product). This makes the
     # PIM record the rich-editing layer of a single operational product, so editing
     # attributes/variants here reflects on the product used for inventory,

@@ -36,6 +36,14 @@ class PIMSyncService:
         core_product.is_active = variant.is_active
         if variant.image:
             core_product.image = variant.image
+            
+        # Sync brand and warranty from PIM Base Product
+        core_product.brand = pim_product.brand
+        core_product.warranty_enabled = pim_product.warranty_enabled
+        core_product.warranty_months_manufacturing = pim_product.warranty_months_manufacturing
+        core_product.warranty_months_structural = pim_product.warranty_months_structural
+        core_product.warranty_months_extended_max = pim_product.warranty_months_extended_max
+        core_product.extended_warranty_cost_percentage = pim_product.extended_warranty_cost_percentage
 
         
         # Try to sync category if names match, this is best-effort since models are separate
