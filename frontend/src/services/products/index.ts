@@ -22,6 +22,8 @@ export const STOCK_TYPE_LABELS: Record<ProductStockType, string> = {
 export type ProductRecord = {
   id: number;
   name: string;
+  full_name?: string;
+  seo_name?: string;
   product_code?: string;
   base_price?: string;
   sku?: string | null;

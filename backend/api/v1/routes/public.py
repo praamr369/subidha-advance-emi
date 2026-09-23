@@ -435,8 +435,12 @@ class PublicProductsView(generics.ListAPIView):
             queryset = queryset.filter(
                 Q(name__icontains=search_query) |
                 Q(product_code__icontains=search_query) |
-                Q(category_master__name__icontains=search_query)
-            )
+                Q(category_master__name__icontains=search_query) |
+                Q(pim_variant__attribute_values__value_string__icontains=search_query) |
+                Q(pim_variant__attribute_values__value_text__icontains=search_query) |
+                Q(pim__variants__attribute_values__value_string__icontains=search_query) |
+                Q(pim__variants__attribute_values__value_text__icontains=search_query)
+            ).distinct()
             
         if category:
             queryset = queryset.filter(category_master__name__iexact=category)

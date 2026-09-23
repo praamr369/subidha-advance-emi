@@ -125,6 +125,7 @@ export interface PimProductCreatePayload {
   description?: string;
   category: number;
   subcategory?: number | null;
+  parent?: number | null;
   base_price: string;
   cost_price?: string;
   is_active?: boolean;

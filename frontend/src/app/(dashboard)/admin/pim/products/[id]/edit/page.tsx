@@ -118,10 +118,29 @@ export default function PimEditProductPage() {
             </div>
           </div>
 
-          <p className="text-xs text-muted-foreground">
-            To detach this product from its parent, contact your ERP administrator.
-            Variant SKUs share the base product&apos;s category, attribute schema, and description by default.
-          </p>
+          <div className="rounded-xl border border-red-200 bg-red-50 dark:bg-red-900/10 dark:border-red-800 px-5 py-4 mt-6">
+            <h3 className="text-sm font-semibold text-red-800 dark:text-red-400 mb-2">Danger Zone</h3>
+            <p className="text-xs text-red-700/80 dark:text-red-300 mb-4">
+              If this SKU was incorrectly linked as a variant or is an orphan, you can detach it to convert it back into a Base Product.
+            </p>
+            <button
+              type="button"
+              onClick={async () => {
+                if (!confirm("Are you sure you want to detach this product from its parent? It will become a standalone base product.")) return;
+                try {
+                  setLoading(true);
+                  await pimService.updateProduct(Number(params.id), { parent: null });
+                  window.location.reload();
+                } catch (err) {
+                  alert("Failed to detach product.");
+                  setLoading(false);
+                }
+              }}
+              className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 dark:bg-transparent dark:border-red-800/50 dark:text-red-400 dark:hover:bg-red-900/20"
+            >
+              Detach from Base Product
+            </button>
+          </div>
         </div>
       </ERPPageShell>
     );

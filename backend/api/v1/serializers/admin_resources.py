@@ -1551,6 +1551,8 @@ class ProductAdminSerializer(serializers.ModelSerializer):
             "id",
             "product_code",
             "name",
+            "full_name",
+            "seo_name",
             "base_price",
             "category_master",
             "category_master_name",

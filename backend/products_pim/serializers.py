@@ -316,7 +316,7 @@ class PimProductCreateUpdateSerializer(serializers.ModelSerializer):
             "id", "code", "brand", "name", "description", "category",
             "subcategory", "base_price", "cost_price",
             "is_active", "is_published", "product_type", "locked_attributes", "attributes", "remove_attributes",
-            "ar_width_cm", "ar_depth_cm", "ar_height_cm",
+            "ar_width_cm", "ar_depth_cm", "ar_height_cm", "parent",
         ]
 
     def _save_attributes(self, product, attrs_data):

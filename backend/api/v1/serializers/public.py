@@ -350,6 +350,7 @@ class PublicProductSerializer(serializers.ModelSerializer):
 
         if pim.parent_id:
             # Variant product — pull from its own ProductVariant
+            base_name = pim.parent.product.name or base_name
             own_v = self._own_variant(obj)
             if own_v:
                 attr_map = _variant_attr_map(own_v)

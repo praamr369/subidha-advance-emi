@@ -327,6 +327,37 @@ class Product(TimeStampedModel):
         super().save(*args, **kwargs)
         sync_inventory_product_master_fields(self)
 
+    @property
+    def full_name(self):
+        """Returns the product name appended with its PIM variant attributes."""
+        base_name = self.name
+        try:
+            if hasattr(self, 'pim_product') and self.pim_product and self.pim_product.parent_id:
+                base_name = self.pim_product.parent.product.name
+            
+            if hasattr(self, 'pim_variant') and self.pim_variant:
+                attrs = []
+                for attr_val in self.pim_variant.attribute_values.all():
+                    if attr_val.attribute.data_type == "BOOLEAN":
+                        val = "Yes" if attr_val.value_boolean else "No"
+                    elif attr_val.attribute.data_type in ("NUMBER", "DECIMAL"):
+                        val = str(attr_val.value_number) if attr_val.value_number is not None else ""
+                        if val.endswith('.00'):
+                            val = val[:-3]
+                    else:
+                        val = attr_val.value_string or attr_val.value_text or ""
+                    if val:
+                        attrs.append(str(val))
+                if attrs:
+                    return f"{base_name} ({', '.join(attrs)})"
+        except Exception:
+            pass
+        return base_name
+
+    @property
+    def seo_name(self):
+        return self.full_name
+
     def __str__(self):
         return f"{self.product_code} - {self.name}"
 
