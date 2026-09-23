@@ -35,8 +35,8 @@ def fix_opening_stock_costs(apps, schema_editor):
                 changed = True
                 
             if not item.standard_unit_cost or item.standard_unit_cost == Decimal("0.00"):
-                if first_posted.unit_cost and first_posted.unit_cost > 0:
-                    item.standard_unit_cost = first_posted.unit_cost
+                if first_posted.unit_cost_snapshot and first_posted.unit_cost_snapshot > 0:
+                    item.standard_unit_cost = first_posted.unit_cost_snapshot
                     fixed_costs += 1
                     changed = True
             

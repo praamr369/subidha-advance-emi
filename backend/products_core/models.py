@@ -329,15 +329,26 @@ class Product(TimeStampedModel):
 
     @property
     def full_name(self):
-        """Returns the product name appended with its PIM variant attributes."""
+        """Returns the product name appended with its PIM variant attributes.
+
+        Uses the parent blueprint's name as base when the product is a variant SKU,
+        then appends the variant's attribute values in parentheses.
+        """
         base_name = self.name
         try:
-            if hasattr(self, 'pim_product') and self.pim_product and self.pim_product.parent_id:
-                base_name = self.pim_product.parent.product.name
-            
-            if hasattr(self, 'pim_variant') and self.pim_variant:
+            # pim_variant is a OneToOneField reverse (ProductVariant.operational_product)
+            pim_variant = getattr(self, 'pim_variant', None)
+            if pim_variant:
+                # If this variant belongs to a parent blueprint, use the parent's
+                # operational product name for a cleaner display
+                pim_product = pim_variant.product  # PimProduct that owns this variant
+                if pim_product and pim_product.parent_id and pim_product.parent:
+                    parent_op = pim_product.parent.source_product
+                    if parent_op:
+                        base_name = parent_op.name
+
                 attrs = []
-                for attr_val in self.pim_variant.attribute_values.all():
+                for attr_val in pim_variant.attribute_values.select_related('attribute').all():
                     if attr_val.attribute.data_type == "BOOLEAN":
                         val = "Yes" if attr_val.value_boolean else "No"
                     elif attr_val.attribute.data_type in ("NUMBER", "DECIMAL"):

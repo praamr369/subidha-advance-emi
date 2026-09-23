@@ -1544,6 +1544,8 @@ class ProductAdminSerializer(serializers.ModelSerializer):
     inventory_ready = serializers.SerializerMethodField()
     inventory_stock_tracking_enabled = serializers.SerializerMethodField()
     inventory_delivery_stock_bridge_enabled = serializers.SerializerMethodField()
+    full_name = serializers.CharField(read_only=True)
+    seo_name = serializers.CharField(read_only=True)
 
     class Meta:
         model = Product
