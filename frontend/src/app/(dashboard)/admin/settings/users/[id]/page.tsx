@@ -63,6 +63,97 @@ function InfoRow({
   );
 }
 
+
+import { useAuth } from "@/providers/AuthProvider";
+import { API_BASE_URL } from "@/lib/constants";
+
+function UserSessionsSection({ userId }: { userId: string }) {
+  const { user } = useAuth();
+  const accessToken = user?.accessToken;
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchSessions = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await fetch(`${API_BASE_URL.replace(/\/api\/v1\/?$/, "")}/api/v1/auth/sessions/?user_id=${userId}`, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      if (res.ok) {
+        setSessions(await res.json());
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [accessToken, userId]);
+
+  useEffect(() => {
+    if (accessToken) fetchSessions();
+  }, [fetchSessions, accessToken]);
+
+  const revokeAll = async () => {
+    if (!window.confirm("Force logout all devices?")) return;
+    await fetch(`${API_BASE_URL.replace(/\/api\/v1\/?$/, "")}/api/v1/auth/sessions/revoke-all/`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: userId })
+    });
+    fetchSessions();
+  };
+
+  const revokeSession = async (id: number) => {
+    if (!window.confirm("Force logout this device?")) return;
+    await fetch(`${API_BASE_URL.replace(/\/api\/v1\/?$/, "")}/api/v1/auth/sessions/${id}/revoke/`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    fetchSessions();
+  };
+
+  if (loading) return <LoadingBlock label="Loading active sessions..." />;
+
+  return (
+    <section className="rounded-xl border border-border bg-card p-5 shadow-sm mt-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-foreground">Active Sessions</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Manage active logins for this user.</p>
+        </div>
+        <button onClick={revokeAll} className="inline-flex items-center rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-100">
+          Force Logout of All Devices
+        </button>
+      </div>
+      <div className="mt-4 overflow-x-auto rounded-xl border border-border">
+        <table className="min-w-full divide-y divide-border">
+          <thead className="bg-muted/40">
+            <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
+              <th className="px-4 py-3 font-medium">Device</th>
+              <th className="px-4 py-3 font-medium">IP Address</th>
+              <th className="px-4 py-3 font-medium">Last Active</th>
+              <th className="px-4 py-3 font-medium">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border text-sm">
+            {sessions.map(s => (
+              <tr key={s.id}>
+                <td className="px-4 py-3">{s.device_name || "Unknown"}</td>
+                <td className="px-4 py-3">{s.ip_address || "—"}</td>
+                <td className="px-4 py-3">{new Date(s.last_active_at).toLocaleString()}</td>
+                <td className="px-4 py-3">
+                  <button onClick={() => revokeSession(s.id)} className="text-red-600 hover:underline">Revoke</button>
+                </td>
+              </tr>
+            ))}
+            {sessions.length === 0 && (
+              <tr><td colSpan={4} className="px-4 py-3 text-center text-muted-foreground">No active sessions</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 export default function AdminInternalUserDetailPage() {
   const params = useParams<{ id: string }>();
   const userId = params?.id;
@@ -404,6 +495,7 @@ export default function AdminInternalUserDetailPage() {
           </section>
         </>
       ) : null}
+      <UserSessionsSection userId={userId} />
     </ERPPageShell>
   );
 }

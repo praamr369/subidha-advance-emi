@@ -5158,3 +5158,21 @@ class OwnerLoanRepayment(AccountingTimeStampedModel):
 
     def __str__(self):
         return f"Repayment ₹{self.amount} for Injection #{self.injection_id}"
+
+class PartnerProfile(AccountingTimeStampedModel):
+    name = models.CharField(max_length=120)
+    partner_code = models.CharField(max_length=40, blank=True, default="", db_index=True)
+    phone = models.CharField(max_length=20, blank=True, default="")
+    email = models.EmailField(blank=True, default="")
+    address = models.TextField(blank=True, default="")
+    gstin = models.CharField(max_length=20, null=True, blank=True, db_index=True)
+    pan = models.CharField(max_length=20, blank=True, default="")
+    is_active = models.BooleanField(default=True)
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "accounting_partner_profiles"
+        ordering = ["name"]
+
+    def __str__(self):
+        return f"{self.name} ({self.partner_code})"

@@ -457,3 +457,87 @@ class UsernameChangeAudit(models.Model):
 
     def __str__(self):
         return f"{self.user_id}:{self.old_username}->{self.new_username}"
+
+class LoginAudit(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="login_audits")
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True, default="")
+    status = models.CharField(max_length=20, choices=[("SUCCESS", "Success"), ("FAILED", "Failed")], default="SUCCESS")
+    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        db_table = "login_audits"
+        ordering = ["-timestamp"]
+
+    def __str__(self):
+        return f"{self.user_id} - {self.status} at {self.timestamp}"
+
+
+class VendorIdentity(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="vendor_identity")
+    vendor = models.OneToOneField("accounting.Vendor", on_delete=models.PROTECT, related_name="vendor_identity")
+    login_enabled = models.BooleanField(default=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "vendor_identities"
+
+    def clean(self):
+        if self.user_id and getattr(self.user, "role", None) != UserRole.VENDOR:
+            raise ValidationError({"user": "Vendor identity must link to a VENDOR user."})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
+class PartnerIdentity(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="partner_identity")
+    partner = models.OneToOneField("accounting.PartnerProfile", on_delete=models.PROTECT, related_name="partner_identity")
+    login_enabled = models.BooleanField(default=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "partner_identities"
+
+    def clean(self):
+        if self.user_id and getattr(self.user, "role", None) != UserRole.PARTNER:
+            raise ValidationError({"user": "Partner identity must link to a PARTNER user."})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
+class UserSession(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="sessions")
+    session_token = models.CharField(max_length=255, unique=True, db_index=True)
+    device_name = models.CharField(max_length=255, blank=True, default="")
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True, default="")
+    is_active = models.BooleanField(default=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    last_active_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "user_sessions"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.user_id} - {self.device_name}"
+
+
+class TOTPDevice(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="totp_device")
+    secret_key = models.CharField(max_length=100)
+    is_verified = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "totp_devices"
+
+    def __str__(self):
+        return f"TOTP Device for {self.user_id}"

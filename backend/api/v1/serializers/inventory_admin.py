@@ -163,6 +163,8 @@ class AdminInventoryProfileDetailSerializer(serializers.ModelSerializer):
     product_base_price = serializers.DecimalField(source="product.base_price", max_digits=12, decimal_places=2, read_only=True)
     stock_tracking_status = serializers.SerializerMethodField()
     margin_preview = serializers.SerializerMethodField()
+    included_accessories_cost = serializers.SerializerMethodField()
+    total_cost = serializers.SerializerMethodField()
 
     class Meta:
         model = InventoryItem
@@ -191,38 +193,50 @@ class AdminInventoryProfileDetailSerializer(serializers.ModelSerializer):
             "manufacturing_overhead_cost",
             "manufacturing_finished_goods_output_qty",
             "margin_preview",
+            "included_accessories_cost",
+            "total_cost",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "product", "created_at", "updated_at", "stock_tracking_status", "margin_preview"]
+        read_only_fields = ["id", "product", "created_at", "updated_at", "stock_tracking_status", "margin_preview", "included_accessories_cost", "total_cost"]
 
     def get_stock_tracking_status(self, obj):
         return get_inventory_profile_status(obj)
 
-    def get_margin_preview(self, obj):
+    def _get_cost_breakdown(self, obj):
         base_price = obj.product.base_price or Decimal("0.00")
         base_cost = obj.standard_unit_cost or Decimal("0.00")
         
-        # Calculate extra costs from included accessories and services
         included_cost = Decimal("0.00")
         if hasattr(obj.product, 'related_products'):
             for rel in obj.product.related_products.filter(is_price_included_in_parent=True):
-                # We need the cost of the related product. It's usually in its inventory profile.
                 related_inv = getattr(rel.related_product, 'inventory_profile', None)
                 rel_cost = related_inv.standard_unit_cost if related_inv else Decimal("0.00")
                 if rel_cost:
                     included_cost += (rel_cost * (rel.quantity or Decimal("1.00")))
         
         total_cost = base_cost + included_cost
+        margin = base_price - total_cost
         
         if obj.standard_unit_cost is None and included_cost == Decimal("0.00"):
-            # If no costs are known at all, maybe return None or just margin from 0 cost.
-            # We'll return the margin assuming 0 base cost if included_cost exists, 
-            # otherwise if both are missing, maybe return None?
-            if not obj.standard_unit_cost:
-                pass # previous logic returned None if standard_unit_cost was None
+            pass
             
-        return str(base_price - total_cost)
+        return {
+            "base_price": base_price,
+            "base_cost": base_cost,
+            "included_cost": included_cost,
+            "total_cost": total_cost,
+            "margin": margin
+        }
+
+    def get_margin_preview(self, obj):
+        return str(self._get_cost_breakdown(obj)["margin"])
+
+    def get_included_accessories_cost(self, obj):
+        return str(self._get_cost_breakdown(obj)["included_cost"])
+
+    def get_total_cost(self, obj):
+        return str(self._get_cost_breakdown(obj)["total_cost"])
 
 
 class AdminInventoryProfileUpdateSerializer(serializers.ModelSerializer):
