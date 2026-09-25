@@ -126,7 +126,9 @@ export default function InventoryProfileDetailPage() {
                 { label: "Product Code", value: profile.product_code || "—" },
                 { label: "Base/Sale Price Ref", value: profile.product_base_price || "—" },
                 { label: "Purchase Cost", value: profile.purchase_unit_cost || "—" },
-                { label: "Standard Cost", value: profile.standard_unit_cost || "—" },
+                { label: "Standard Cost (Base)", value: profile.standard_unit_cost || "—" },
+                { label: "Accessories/Services Cost", value: profile.included_accessories_cost || "0.00" },
+                { label: "Total Cost", value: profile.total_cost || "—" },
                 { label: "Margin Preview", value: profile.margin_preview || "—" },
               ]}
             />

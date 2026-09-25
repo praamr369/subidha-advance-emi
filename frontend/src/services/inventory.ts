@@ -1525,6 +1525,8 @@ export type InventoryProfileDetail = {
   manufacturing_overhead_cost: string;
   manufacturing_finished_goods_output_qty: string;
   margin_preview: string | null;
+  included_accessories_cost: string | null;
+  total_cost: string | null;
   created_at: string;
   updated_at: string;
 };
