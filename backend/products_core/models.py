@@ -356,7 +356,7 @@ class Product(TimeStampedModel):
                         if val.endswith('.00'):
                             val = val[:-3]
                     else:
-                        val = attr_val.value_string or attr_val.value_text or ""
+                        val = attr_val.value_text or ""
                     if val:
                         attrs.append(str(val))
                 if attrs:
