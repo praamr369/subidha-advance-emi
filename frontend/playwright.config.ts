@@ -120,7 +120,7 @@ export default defineConfig({
       url: `${backendRootUrl}/healthz/`,
       reuseExistingServer: !process.env.CI,
       // Backend bootstrap may create/install a dedicated playwright venv on first run.
-      timeout: 900_000,
+      timeout: 1800_000,
       cwd: ".",
       // Surface backend stdout/stderr to the CI log so migration or startup
       // failures are visible when the health check times out. Default is
