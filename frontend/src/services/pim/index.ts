@@ -27,6 +27,7 @@ export interface PimCategoryAttribute {
   is_variant_defining: boolean;
   min_value: string | null;
   max_value: string | null;
+  regex_validation?: string;
   display_order: number;
   options: PimAttributeOption[];
 }
