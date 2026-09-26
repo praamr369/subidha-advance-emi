@@ -104,10 +104,10 @@ export default function BusinessSetupWorkflowBanner({
         data-testid="business-setup-readiness-banner"
       >
         <div className="text-sm font-semibold">Counter pre-flight reminder</div>
-        <p className="mt-1 text-sm leading-6">
-          If counter collection or receipt workflows look incomplete, pause live posting and ask admin to verify the
-          business setup checklist before continuing operations.
-        </p>
+        <div className="mt-1 flex flex-col gap-1 text-sm leading-6">
+          <p>If counter collection or receipt workflows look incomplete,</p>
+          <p>pause live posting and ask admin to verify the business setup checklist before continuing operations.</p>
+        </div>
       </section>
     );
   }
@@ -157,10 +157,10 @@ export default function BusinessSetupWorkflowBanner({
       data-testid="business-setup-readiness-banner"
     >
       <div className="text-sm font-semibold">Setup incomplete for live operations</div>
-      <p className="mt-1 text-sm leading-6">
-        {adminScope.label} is available, but required first-run setup is still incomplete. Proceed carefully for review,
-        and complete blockers before live financial posting.
-      </p>
+      <div className="mt-1 flex flex-col gap-1 text-sm leading-6">
+        <p>{adminScope.label} is available, but required first-run setup is still incomplete.</p>
+        <p>Proceed carefully for review, and complete blockers before live financial posting.</p>
+      </div>
 
       {topMissingItems.length > 0 ? (
         <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
