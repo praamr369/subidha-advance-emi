@@ -1067,6 +1067,7 @@ function SidebarContent({
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--sidebar-item-muted)] opacity-80" />
               <input
                 id="sidebar-module-search"
+                name="sidebar-module-search"
                 type="search"
                 value={navQuery}
                 onChange={(event) => setNavQuery(event.target.value)}

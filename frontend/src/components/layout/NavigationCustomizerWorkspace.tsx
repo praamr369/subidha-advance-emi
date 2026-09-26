@@ -182,8 +182,11 @@ export default function NavigationCustomizerWorkspace({ onClose }: NavigationCus
       {/* Search bar */}
       <div className="shrink-0 border-b border-border bg-muted/30 px-6 py-3">
         <div className="relative">
+          <label htmlFor="customizerSearch" className="sr-only">Search modules and pages</label>
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
+            id="customizerSearch"
+            name="customizerSearch"
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -278,7 +281,10 @@ export default function NavigationCustomizerWorkspace({ onClose }: NavigationCus
 
                   {isEditing ? (
                     <div className="flex max-w-xs flex-1 items-center gap-1.5">
+                      <label htmlFor={`customNameInput-${group.title}`} className="sr-only">Rename group</label>
                       <input
+                        id={`customNameInput-${group.title}`}
+                        name={`customNameInput-${group.title}`}
                         type="text"
                         value={customNameInput}
                         onChange={(e) => setCustomNameInput(e.target.value)}
