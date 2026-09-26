@@ -464,6 +464,10 @@ AR_MODEL_MAX_BYTES = 25 * 1024 * 1024  # matches nginx client_max_body_size
 
 def _check_model_file(upload, *, suffix, magic, label):
     """Extension + magic-byte check so a renamed JPG/ZIP can't pose as a 3D model."""
+    if isinstance(upload, str):
+        if not upload.lower().endswith(suffix):
+            raise serializers.ValidationError(f"{label} URL must end in {suffix}")
+        return
     if not upload.name.lower().endswith(suffix):
         raise serializers.ValidationError(f"{label} must be a {suffix} file.")
     if upload.size > AR_MODEL_MAX_BYTES:
@@ -507,7 +511,7 @@ class ProductMediaItemSerializer(serializers.ModelSerializer):
     def _absolute(self, field_file):
         request = self.context.get("request")
         if field_file and request:
-            return request.build_absolute_uri(field_file.url)
+            return request.build_absolute_uri(field_file) if isinstance(field_file, str) else request.build_absolute_uri(field_file.url)
         return str(field_file) if field_file else None
 
     def get_file_url(self, obj):
