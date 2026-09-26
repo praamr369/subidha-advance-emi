@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/providers/AuthProvider";
-import { API_BASE_URL } from "@/lib/constants";
+import { apiFetch } from "@/lib/api";
 
 export default function MFASetupPage() {
   const { user } = useAuth();
@@ -17,13 +17,7 @@ export default function MFASetupPage() {
     async function loadMfa() {
       if (!accessToken) return;
       try {
-        const res = await fetch(`${API_BASE_URL.replace(/\/api\/v1\/?$/, "")}/api/v1/auth/mfa/setup/`, {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        });
-        if (!res.ok) throw new Error("Failed to load MFA details.");
-        const data = await res.json();
+        const data = await apiFetch<any>("/api/v1/auth/mfa/setup/");
         setQrCode(data.qr_code);
         setIsVerified(data.is_verified);
       } catch (err) {
@@ -37,16 +31,10 @@ export default function MFASetupPage() {
     setError(null);
     setSuccess(null);
     try {
-      const res = await fetch(`${API_BASE_URL.replace(/\/api\/v1\/?$/, "")}/api/v1/auth/mfa/setup/`, {
+      const data = await apiFetch<any>("/api/v1/auth/mfa/setup/", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ mfa_code: mfaCode }),
+        body: { mfa_code: mfaCode },
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "Failed to verify MFA.");
       setSuccess("MFA verified successfully!");
       setIsVerified(true);
     } catch (err) {

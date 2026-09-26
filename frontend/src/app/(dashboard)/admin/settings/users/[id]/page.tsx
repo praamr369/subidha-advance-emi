@@ -65,7 +65,7 @@ function InfoRow({
 
 
 import { useAuth } from "@/providers/AuthProvider";
-import { API_BASE_URL } from "@/lib/constants";
+import { apiFetch } from "@/lib/api";
 
 function UserSessionsSection({ userId }: { userId: string }) {
   const { user } = useAuth();
@@ -76,16 +76,14 @@ function UserSessionsSection({ userId }: { userId: string }) {
   const fetchSessions = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_BASE_URL.replace(/\/api\/v1\/?$/, "")}/api/v1/auth/sessions/?user_id=${userId}`, {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      });
-      if (res.ok) {
-        setSessions(await res.json());
-      }
+      const data = await apiFetch<any[]>(`/api/v1/auth/sessions/?user_id=${userId}`);
+      setSessions(data);
+    } catch (e) {
+      console.error(e);
     } finally {
       setLoading(false);
     }
-  }, [accessToken, userId]);
+  }, [userId]);
 
   useEffect(() => {
     if (accessToken) fetchSessions();
@@ -93,21 +91,27 @@ function UserSessionsSection({ userId }: { userId: string }) {
 
   const revokeAll = async () => {
     if (!window.confirm("Force logout all devices?")) return;
-    await fetch(`${API_BASE_URL.replace(/\/api\/v1\/?$/, "")}/api/v1/auth/sessions/revoke-all/`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id: userId })
-    });
-    fetchSessions();
+    try {
+      await apiFetch("/api/v1/auth/sessions/revoke-all/", {
+        method: "POST",
+        body: { user_id: userId }
+      });
+      fetchSessions();
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const revokeSession = async (id: number) => {
     if (!window.confirm("Force logout this device?")) return;
-    await fetch(`${API_BASE_URL.replace(/\/api\/v1\/?$/, "")}/api/v1/auth/sessions/${id}/revoke/`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${accessToken}` }
-    });
-    fetchSessions();
+    try {
+      await apiFetch(`/api/v1/auth/sessions/${id}/revoke/`, {
+        method: "POST",
+      });
+      fetchSessions();
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   if (loading) return <LoadingBlock label="Loading active sessions..." />;
