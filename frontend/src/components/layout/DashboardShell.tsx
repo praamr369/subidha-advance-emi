@@ -15,7 +15,7 @@ import {
   Fragment,
   type CSSProperties,
   type ReactNode,
-} from "react";
+, useId } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
   BarChart3,
@@ -564,6 +564,7 @@ function SidebarContent({
 }) {
   const isMobile = typeof onClose === "function";
   const searchParams = useSearchParams();
+  const moduleSearchId = useId();
   const [isNavCustomizerOpen, setIsNavCustomizerOpen] = useState(false);
   const customNavLayout = useSyncExternalStore(subscribeNavLayout, readNavLayout, readNavLayoutServer);
   const navGroups = useMemo(() => {
@@ -1058,7 +1059,7 @@ function SidebarContent({
 
           <div>
             <label
-              htmlFor="sidebar-module-search"
+              htmlFor={moduleSearchId}
               className="mb-1 block text-xs font-semibold uppercase tracking-[0.1em] text-[var(--sidebar-section-label)]"
             >
               Modules
@@ -1066,7 +1067,7 @@ function SidebarContent({
             <div className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--sidebar-item-muted)] opacity-80" />
               <input
-                id="sidebar-module-search"
+                id={moduleSearchId}
                 name="sidebar-module-search"
                 type="search"
                 value={navQuery}

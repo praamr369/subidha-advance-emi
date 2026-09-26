@@ -1,3 +1,4 @@
+import { useId } from "react";
 "use client";
 
 import Link from "next/link";
@@ -83,6 +84,7 @@ export default function AdminSidebarNav({
   onClose,
   onOpenCustomizer,
 }: AdminSidebarNavProps) {
+  const searchId = useId();
   const searching = navQuery.trim().length > 0;
 
   const groupMeta = useMemo(
@@ -242,10 +244,10 @@ export default function AdminSidebarNav({
       {/* Command bar / search */}
       <div className="shrink-0 px-3 pb-2.5">
         <div className="relative">
-          <label htmlFor="sidebarSearch" className="sr-only">Search modules</label>
+          <label htmlFor={searchId} className="sr-only">Search modules</label>
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--sidebar-item-muted)]" />
           <input
-            id="sidebarSearch"
+            id={searchId}
             name="sidebarSearch"
             type="search"
             value={navQuery}
