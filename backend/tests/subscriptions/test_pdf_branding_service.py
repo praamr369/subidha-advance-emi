@@ -15,6 +15,10 @@ from tests.helpers import create_admin_user, create_customer_profile, create_pro
 
 
 class PdfBrandingContextTests(TestCase):
+    def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
+
     def test_branding_context_defaults_without_active_profile(self):
         BusinessProfile.objects.all().delete()
         branding = get_branding_context()
