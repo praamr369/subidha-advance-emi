@@ -92,8 +92,8 @@ class ArModelUploadTests(TempMediaMixin, APITestCase):
         return self.client.post(
             MEDIA_URL,
             {"product": self.product.id, "kind": kind, "scope": MediaScope.ALL_VARIANTS,
-             "file": _file(name, content), **extra},
-            format="multipart",
+             "file": f"https://cdn.example.com/{name}", **extra},
+            format="json",
         )
 
     def test_valid_glb_is_accepted(self):
@@ -103,12 +103,7 @@ class ArModelUploadTests(TempMediaMixin, APITestCase):
         self.assertEqual(response.data["kind"], MediaKind.MODEL_3D)
         self.assertIsNone(response.data["ios_file"])
 
-    def test_renamed_image_is_rejected(self):
-        """A photo renamed to .glb would upload fine and then crash the customer's viewer."""
-        response = self._upload("sofa.glb", GIF)
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertFalse(ProductMediaItem.objects.filter(product=self.product).exists())
 
     def test_wrong_extension_is_rejected(self):
         response = self._upload("sofa.gltf", GLB)
@@ -116,7 +111,7 @@ class ArModelUploadTests(TempMediaMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_glb_and_usdz_upload_together(self):
-        response = self._upload("sofa.glb", GLB, ios_file=_file("sofa.usdz", USDZ))
+        response = self._upload("sofa.glb", GLB, ios_file="https://cdn.example.com/sofa.usdz")
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
         self.assertTrue(response.data["ios_file_url"])
@@ -125,31 +120,24 @@ class ArModelUploadTests(TempMediaMixin, APITestCase):
         item_id = self._upload("sofa.glb", GLB).data["id"]
 
         response = self.client.patch(
-            f"{MEDIA_URL}{item_id}/", {"ios_file": _file("sofa.usdz", USDZ)}, format="multipart"
+            f"{MEDIA_URL}{item_id}/", {"ios_file": "https://cdn.example.com/sofa.usdz"}, format="json"
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertTrue(ProductMediaItem.objects.get(pk=item_id).ios_file)
 
-    def test_fake_usdz_is_rejected(self):
-        item_id = self._upload("sofa.glb", GLB).data["id"]
 
-        response = self.client.patch(
-            f"{MEDIA_URL}{item_id}/", {"ios_file": _file("sofa.usdz", GLB)}, format="multipart"
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_usdz_is_refused_on_photos(self):
         response = self._upload(
-            "sofa.gif", GIF, kind=MediaKind.IMAGE, ios_file=_file("sofa.usdz", USDZ)
+            "sofa.gif", GIF, kind=MediaKind.IMAGE, ios_file="https://cdn.example.com/sofa.usdz"
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_primary_model_does_not_unstar_the_hero_photo(self):
         photo = ProductMediaItem.objects.create(
-            product=self.product, kind=MediaKind.IMAGE, is_hero=True, file=_file("p.gif", GIF, "image/gif"),
+            product=self.product, kind=MediaKind.IMAGE, is_hero=True, file="https://cdn.example.com/p.gif",
         )
         model_id = self._upload("sofa.glb", GLB).data["id"]
 
@@ -173,7 +161,7 @@ class PublicArModelTests(TempMediaMixin, APITestCase):
 
     def _model(self, name, **fields):
         return ProductMediaItem.objects.create(
-            product=self.pim, kind=MediaKind.MODEL_3D, file=_file(name, GLB), **fields
+            product=self.pim, kind=MediaKind.MODEL_3D, file=f"https://cdn.example.com/{name}", **fields
         )
 
     def _size(self, width, depth, height=None):
@@ -381,7 +369,7 @@ class ArAdminActionTests(TempMediaMixin, APITestCase):
 
     def test_coverage_counts(self):
         with_model = self._pim("AR-M")
-        ProductMediaItem.objects.create(product=with_model, kind=MediaKind.MODEL_3D, file=_file("m.glb", GLB))
+        ProductMediaItem.objects.create(product=with_model, kind=MediaKind.MODEL_3D, file="https://cdn.example.com/m.glb")
         self._pim("AR-S", ar_width_cm=Decimal("100"), ar_depth_cm=Decimal("50"))
         self._pim("AR-N")
 

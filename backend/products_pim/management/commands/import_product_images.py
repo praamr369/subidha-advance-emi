@@ -265,8 +265,7 @@ class Command(BaseCommand):
                 is_hero=make_hero,
                 display_order=order,
             )
-            with path.open("rb") as fh:
-                item.file.save(path.name, File(fh), save=False)
+            item.file = f"https://cdn.subidha.com/pim/gallery/{path.name}"
             item.save()
             written += 1
 
