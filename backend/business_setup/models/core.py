@@ -128,16 +128,6 @@ class BusinessProfile(BusinessSetupTimeStampedModel):
         db_table = "business_profiles"
         ordering = ["-created_at", "-id"]
 
-    @classmethod
-    def get_current(cls):
-        from django.core.cache import cache
-        bp = cache.get("public_business_profile_singleton")
-        if bp is None:
-            bp = cls.objects.filter(is_active=True).first()
-            if bp:
-                cache.set("public_business_profile_singleton", bp, timeout=86400)
-        return bp
-
     def clean(self):
         errors = {}
         if not (self.legal_name or "").strip():
@@ -300,16 +290,6 @@ class BusinessRulePolicy(BusinessSetupTimeStampedModel):
     gst_documents_require_hsn_sac = models.BooleanField(default=True)
     non_gst_document_labels = models.JSONField(default=default_non_gst_document_labels, blank=True)
 
-    @classmethod
-    def get_current(cls):
-        from django.core.cache import cache
-        bp = cache.get("public_business_profile_singleton")
-        if bp is None:
-            bp = cls.objects.filter(is_active=True).first()
-            if bp:
-                cache.set("public_business_profile_singleton", bp, timeout=86400)
-        return bp
-
     def clean(self):
         errors = {}
         if self.is_active and BusinessRulePolicy.objects.filter(is_active=True).exclude(pk=self.pk).exists():
@@ -367,16 +347,6 @@ class BusinessRulePolicy(BusinessSetupTimeStampedModel):
             models.Index(fields=["plan_type", "risk_status"], name="business_ru_plan_ty_1b933e_idx"),
         ]
 
-    @classmethod
-    def get_current(cls):
-        from django.core.cache import cache
-        bp = cache.get("public_business_profile_singleton")
-        if bp is None:
-            bp = cls.objects.filter(is_active=True).first()
-            if bp:
-                cache.set("public_business_profile_singleton", bp, timeout=86400)
-        return bp
-
     def clean(self):
         errors = {}
         self.name = (self.name or "").strip() or "Default legal controls"
@@ -413,6 +383,16 @@ class PublicBusinessProfile(BusinessSetupTimeStampedModel):
     depend on internal-only fields (GSTIN, PAN, document prefixes, etc).
     """
 
+    @classmethod
+    def get_current(cls):
+        from django.core.cache import cache
+        bp = cache.get("public_business_profile_singleton")
+        if bp is None:
+            bp = cls.objects.filter(is_active=True).first()
+            if bp:
+                cache.set("public_business_profile_singleton", bp, timeout=86400)
+        return bp
+
     display_name = models.CharField(max_length=255, blank=True, default="")
     tagline = models.CharField(max_length=255, blank=True, default="")
     hero_title = models.CharField(max_length=255, blank=True, default="")
@@ -438,16 +418,6 @@ class PublicBusinessProfile(BusinessSetupTimeStampedModel):
     class Meta:
         db_table = "public_business_profiles"
         ordering = ["-created_at", "-id"]
-
-    @classmethod
-    def get_current(cls):
-        from django.core.cache import cache
-        bp = cache.get("public_business_profile_singleton")
-        if bp is None:
-            bp = cls.objects.filter(is_active=True).first()
-            if bp:
-                cache.set("public_business_profile_singleton", bp, timeout=86400)
-        return bp
 
     def clean(self):
         errors = {}
@@ -562,16 +532,6 @@ class PolicyPage(BusinessSetupTimeStampedModel):
             models.Index(fields=["category", "status"]),
         ]
 
-    @classmethod
-    def get_current(cls):
-        from django.core.cache import cache
-        bp = cache.get("public_business_profile_singleton")
-        if bp is None:
-            bp = cls.objects.filter(is_active=True).first()
-            if bp:
-                cache.set("public_business_profile_singleton", bp, timeout=86400)
-        return bp
-
     def clean(self):
         errors = {}
         self.slug = (self.slug or "").strip().lower()
@@ -676,16 +636,6 @@ class BusinessComplianceDocument(BusinessSetupTimeStampedModel):
             models.Index(fields=["document_type", "verification_status"]),
             models.Index(fields=["public_visibility", "verification_status"]),
         ]
-
-    @classmethod
-    def get_current(cls):
-        from django.core.cache import cache
-        bp = cache.get("public_business_profile_singleton")
-        if bp is None:
-            bp = cls.objects.filter(is_active=True).first()
-            if bp:
-                cache.set("public_business_profile_singleton", bp, timeout=86400)
-        return bp
 
     def clean(self):
         errors = {}
