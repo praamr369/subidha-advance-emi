@@ -100,7 +100,7 @@ export default function BusinessSetupWorkflowBanner({
   if (showCashierBanner) {
     return (
       <section
-        className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900"
+        className="fixed bottom-4 right-4 z-50 w-[calc(100%-2rem)] max-w-sm rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900 shadow-xl"
         data-testid="business-setup-readiness-banner"
       >
         <div className="text-sm font-semibold">Counter pre-flight reminder</div>
@@ -117,21 +117,13 @@ export default function BusinessSetupWorkflowBanner({
   }
 
   if (loading) {
-    return (
-      <section
-        className="mb-4 rounded-xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground"
-        aria-busy="true"
-        aria-label="Checking business setup readiness"
-      >
-        Checking setup readiness for this workflow...
-      </section>
-    );
+    return null;
   }
 
   if (error) {
     return (
       <section
-        className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900"
+        className="fixed bottom-4 right-4 z-50 w-[calc(100%-2rem)] max-w-sm rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900 shadow-xl"
         data-testid="business-setup-readiness-banner"
       >
         <div className="text-sm font-semibold">Setup readiness could not be verified</div>
@@ -161,7 +153,7 @@ export default function BusinessSetupWorkflowBanner({
 
   return (
     <section
-      className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900"
+      className="fixed bottom-4 right-4 z-50 w-[calc(100%-2rem)] max-w-md rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900 shadow-xl"
       data-testid="business-setup-readiness-banner"
     >
       <div className="text-sm font-semibold">Setup incomplete for live operations</div>
