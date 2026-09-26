@@ -21,6 +21,7 @@ import {
   listReminders,
   retryReminder,
   runPaymentReminders,
+  runAutomatedDunning,
   scheduleReminder,
   sendReminder,
 } from "@/services/reminders";
@@ -134,6 +135,24 @@ export default function AdminRemindersPage() {
     } catch (err) {
       setNotice(null);
       setError(accountingErrorMessage(err, "Failed to run reminder generation."));
+    }
+  }
+
+  async function handleRunAutomatedDunning() {
+    if (!confirm("Are you sure you want to run Automated Dunning? This will generate reminders and dispatch them via WhatsApp Cloud API.")) return;
+    try {
+      await runAutomatedDunning();
+      setNotice("Automated dunning run completed.");
+      try {
+        await loadPage();
+        setTimeout(() => setNotice(null), 5000);
+      } catch (loadErr) {
+        setNotice(null);
+        setError(accountingErrorMessage(loadErr, "Failed to load updated reminders."));
+      }
+    } catch (err) {
+      setNotice(null);
+      setError(accountingErrorMessage(err, "Failed to run automated dunning."));
     }
   }
 
@@ -295,9 +314,14 @@ export default function AdminRemindersPage() {
             </div>
           }
           right={
-            <ActionButton variant="primary" disabled={loading} onClick={() => void handleRunGeneration()}>
-              Run Reminder Generation
-            </ActionButton>
+            <div className="flex gap-2">
+              <ActionButton variant="secondary" disabled={loading} onClick={() => void handleRunAutomatedDunning()}>
+                Run WhatsApp Dunning
+              </ActionButton>
+              <ActionButton variant="primary" disabled={loading} onClick={() => void handleRunGeneration()}>
+                Run Reminder Generation
+              </ActionButton>
+            </div>
           }
         />
 

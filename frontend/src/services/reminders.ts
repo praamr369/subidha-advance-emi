@@ -185,3 +185,10 @@ export function runPaymentReminders(payload: {
     body: JSON.stringify(payload),
   });
 }
+
+export function runAutomatedDunning(payload?: { dry_run?: boolean }) {
+  return apiFetch<{ output: string }>("/reminders/run-automated-dunning/", {
+    method: "POST",
+    body: JSON.stringify(payload || {}),
+  });
+}
