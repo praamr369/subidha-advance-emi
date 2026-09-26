@@ -63,12 +63,15 @@ export default function MFASetupPage() {
           )}
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">Verification Code</label>
+            <label htmlFor="mfaCode" className="text-sm font-medium">Verification Code</label>
             <input
+              id="mfaCode"
+              name="mfaCode"
               type="text"
               value={mfaCode}
               onChange={(e) => setMfaCode(e.target.value)}
               placeholder="6-digit code"
+              autoComplete="one-time-code"
               className="w-full h-10 px-3 border rounded-md"
             />
           </div>
