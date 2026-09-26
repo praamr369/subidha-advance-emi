@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useState } from "react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
@@ -244,7 +244,11 @@ export default function WhatsAppOutboxPage() {
               key={tab.value || "all"}
               type="button"
               aria-pressed={statusFilter === tab.value}
-              onClick={() => setStatusFilter(tab.value)}
+              onClick={() => {
+                startTransition(() => {
+                  setStatusFilter(tab.value);
+                });
+              }}
               className={[
                 "rounded-full border px-3 py-1.5 text-xs font-medium transition",
                 statusFilter === tab.value
@@ -255,10 +259,17 @@ export default function WhatsAppOutboxPage() {
               {tab.label}
             </button>
           ))}
+          <label htmlFor="event-filter" className="sr-only">Filter by event</label>
           <select
-            aria-label="Filter by event"
+            id="event-filter"
+            name="event-filter"
             value={eventFilter}
-            onChange={(event) => setEventFilter(event.target.value)}
+            onChange={(event) => {
+              const val = event.target.value;
+              startTransition(() => {
+                setEventFilter(val);
+              });
+            }}
             className="h-9 rounded-lg border border-border bg-background px-3 text-sm"
           >
             <option value="">All events</option>
@@ -286,24 +297,38 @@ export default function WhatsAppOutboxPage() {
       <div className="grid gap-5 xl:grid-cols-2">
         <ERPSectionShell title="Send a custom message" description="For any customer interaction without a ready-made template.">
           <div className="grid gap-3">
-            <label className="grid gap-1 text-sm">
-              <span className="font-medium">Customer ID</span>
+            <div className="grid gap-1 text-sm">
+              <label htmlFor="compose-customer" className="font-medium">Customer ID</label>
               <input
+                id="compose-customer"
+                name="compose-customer"
                 value={composeCustomer}
-                onChange={(event) => setComposeCustomer(event.target.value.replace(/\D/g, ""))}
+                onChange={(event) => {
+                  const val = event.target.value.replace(/\D/g, "");
+                  startTransition(() => {
+                    setComposeCustomer(val);
+                  });
+                }}
                 placeholder="e.g. 12"
                 className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
               />
-            </label>
-            <label className="grid gap-1 text-sm">
-              <span className="font-medium">Message</span>
+            </div>
+            <div className="grid gap-1 text-sm">
+              <label htmlFor="compose-text" className="font-medium">Message</label>
               <textarea
+                id="compose-text"
+                name="compose-text"
                 value={composeText}
-                onChange={(event) => setComposeText(event.target.value)}
+                onChange={(event) => {
+                  const val = event.target.value;
+                  startTransition(() => {
+                    setComposeText(val);
+                  });
+                }}
                 rows={4}
                 className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
               />
-            </label>
+            </div>
             <div>
               <button type="button" onClick={() => void handleCompose()} className={BUTTON}>
                 Queue message

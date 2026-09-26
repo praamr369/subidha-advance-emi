@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeferredValue, useMemo, useState } from "react";
+import { startTransition, useDeferredValue, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 
 import EmptyState from "@/components/feedback/EmptyState";
@@ -95,13 +95,18 @@ export default function EnterpriseDataTable<T extends GenericRecord>({
 
           <div className="flex w-full flex-col gap-3 sm:flex-row lg:w-auto">
             <div className="relative min-w-0 sm:w-72">
+              <label htmlFor="global-search-input" className="sr-only">Search</label>
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
+                id="global-search-input"
                 className="h-10 w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] pl-10 pr-3 text-sm text-foreground outline-none placeholder:text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] focus:border-border focus:ring-2 focus:ring-[var(--ring)]/35"
                 value={globalFilterInput}
                 onChange={(e) => {
-                  setGlobalFilterInput(e.target.value);
-                  setPageIndex(0);
+                  const val = e.target.value;
+                  startTransition(() => {
+                    setGlobalFilterInput(val);
+                    setPageIndex(0);
+                  });
                 }}
                 placeholder={globalFilterPlaceholder}
               />
