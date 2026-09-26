@@ -31,7 +31,7 @@ def _subscription_number(subscription: Subscription) -> str:
 
 
 def _business_header_lines() -> list[str]:
-    profile = BusinessProfile.objects.filter(is_active=True).order_by("-created_at", "-id").first()
+    profile = BusinessProfile.get_current()
     if not profile:
         return ["Subidha Furniture", "Lucky Plan EMI System"]
 

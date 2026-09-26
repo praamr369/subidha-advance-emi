@@ -68,7 +68,7 @@ class AdminPublicBusinessProfileApiTests(APITestCase):
         response = self.client.patch("/api/v1/admin/public-site/profile/", payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK, msg=response.data)
 
-        saved = PublicBusinessProfile.objects.filter(is_active=True).first()
+        saved = PublicBusinessProfile.get_current()
         self.assertIsNotNone(saved)
         self.assertEqual(saved.whatsapp_phone, "9101000001")
 

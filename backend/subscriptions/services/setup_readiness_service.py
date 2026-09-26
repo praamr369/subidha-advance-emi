@@ -593,7 +593,7 @@ def _crm_section() -> dict[str, Any]:
 def get_setup_readiness() -> dict[str, Any]:
     """Return an admin-only, read-only business setup readiness payload."""
     User = get_user_model()
-    active_business_profile = BusinessProfile.objects.filter(is_active=True).first()
+    active_business_profile = BusinessProfile.get_current()
     active_print_settings = DocumentPrintSettings.objects.filter(is_active=True).first()
     active_tax_profile = BusinessTaxProfile.objects.filter(is_active=True).order_by("-effective_from", "-id").first()
     required_coa_missing = AccountingSetupService.missing_required_coa_codes()

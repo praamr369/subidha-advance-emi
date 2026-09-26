@@ -15,7 +15,7 @@ from subscriptions.models_business_setup import (
 
 
 def get_or_create_active_business_rule_policy() -> BusinessRulePolicy:
-    active = BusinessRulePolicy.objects.filter(is_active=True).order_by("-created_at", "-id").first()
+    active = BusinessRulePolicy.get_current()
     if active is not None:
         return active
     return BusinessRulePolicy.objects.create(
@@ -121,7 +121,7 @@ def business_rule_policy_payload(policy: BusinessRulePolicy | None = None) -> di
 
 def is_waiver_launch_permitted() -> bool:
     """Return True only when the active policy has advocate/CA approval for public draw."""
-    policy = BusinessRulePolicy.objects.filter(is_active=True).order_by("-created_at", "-id").first()
+    policy = BusinessRulePolicy.get_current()
     if policy is None:
         return False
     return policy.risk_status == LegalRiskStatus.APPROVED_FOR_PUBLIC_LAUNCH
@@ -130,7 +130,7 @@ def is_waiver_launch_permitted() -> bool:
 def assert_waiver_launch_permitted() -> None:
     """Raise ValidationError if waiver public launch is not yet approved."""
     if not is_waiver_launch_permitted():
-        policy = BusinessRulePolicy.objects.filter(is_active=True).order_by("-created_at", "-id").first()
+        policy = BusinessRulePolicy.get_current()
         status = policy.risk_status if policy else "NONE"
         raise ValidationError(
             f"Lucky Plan waiver public launch is blocked (current status: {status}). "
@@ -142,7 +142,7 @@ def assert_waiver_launch_permitted() -> None:
 
 def is_late_payment_charge_active() -> bool:
     """Return True when both configured and enabled flags are set on the active policy."""
-    policy = BusinessRulePolicy.objects.filter(is_active=True).order_by("-created_at", "-id").first()
+    policy = BusinessRulePolicy.get_current()
     if policy is None:
         return False
     return bool(policy.late_payment_charge_configured and policy.late_payment_charge_enabled)
@@ -150,7 +150,7 @@ def is_late_payment_charge_active() -> bool:
 
 def get_late_payment_charge_label() -> str:
     """Return the approved charge label from the active policy (default: 'Late Payment Charge')."""
-    policy = BusinessRulePolicy.objects.filter(is_active=True).order_by("-created_at", "-id").first()
+    policy = BusinessRulePolicy.get_current()
     if policy is None:
         return "Late Payment Charge"
     return (policy.late_payment_charge_label or "Late Payment Charge").strip()
@@ -158,9 +158,19 @@ def get_late_payment_charge_label() -> str:
 
 @transaction.atomic
 def update_active_business_rule_policy(*, payload: dict[str, Any], performed_by=None) -> BusinessRulePolicy:
-    policy = BusinessRulePolicy.objects.select_for_update().filter(is_active=True).order_by("-created_at", "-id").first()
-    if policy is None:
-        policy = BusinessRulePolicy(name="Default legal controls", is_active=True)
+    now = timezone.now()
+    old_policy = BusinessRulePolicy.objects.select_for_update().filter(is_active=True).order_by("-effective_from", "-id").first()
+    
+    if old_policy:
+        old_policy.is_active = False
+        old_policy.effective_to = now
+        old_policy.save()
+
+    new_policy = BusinessRulePolicy(name="Default legal controls", is_active=True, effective_from=now)
+    if old_policy:
+        # copy fields
+        for field in [f.name for f in BusinessRulePolicy._meta.get_fields() if f.concrete and not f.auto_created and f.name not in ["id", "is_active", "effective_from", "effective_to", "created_at", "updated_at", "created_by", "updated_by"]]:
+            setattr(new_policy, field, getattr(old_policy, field))
 
     editable_fields = {
         "name",
@@ -182,8 +192,9 @@ def update_active_business_rule_policy(*, payload: dict[str, Any], performed_by=
     }
     for field in editable_fields:
         if field in payload:
-            setattr(policy, field, payload[field])
-    policy.updated_by = performed_by
-    policy.is_active = True
-    policy.save()
-    return policy
+            setattr(new_policy, field, payload[field])
+            
+    new_policy.updated_by = performed_by
+    new_policy.created_by = performed_by
+    new_policy.save()
+    return new_policy

@@ -165,7 +165,7 @@ class AdminFreshStartSetupView(APIView):
             return {"skipped": True, "reason": str(exc), "note": "Configure a financial year to enable document numbering."}
 
     def _ensure_business_profile(self, user, *, dry_run: bool) -> dict:
-        existing = BusinessProfile.objects.filter(is_active=True).order_by("id").first()
+        existing = BusinessProfile.get_current()
         if existing:
             return {"status": "EXISTS", "id": existing.id, "legal_name": existing.legal_name, "trade_name": existing.trade_name}
         payload = {

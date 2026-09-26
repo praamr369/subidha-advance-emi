@@ -60,8 +60,8 @@ def _build_business_address(profile: BusinessProfile | None, public_profile: Pub
 
 
 def get_public_business_compliance_summary() -> dict[str, Any]:
-    business_profile = BusinessProfile.objects.filter(is_active=True).order_by("-created_at", "-id").first()
-    public_profile = PublicBusinessProfile.objects.filter(is_active=True).order_by("-created_at", "-id").first()
+    business_profile = BusinessProfile.get_current()
+    public_profile = PublicBusinessProfile.get_current()
     website = _clean_text(getattr(business_profile, "website_url", "")) or "subidhafurnitureasansol.com"
     phone = _clean_text(getattr(public_profile, "support_phone", "")) or _clean_text(getattr(business_profile, "primary_phone", "")) or "Not provided"
     email = _clean_text(getattr(public_profile, "support_email", "")) or _clean_text(getattr(business_profile, "primary_email", "")) or "Not provided"

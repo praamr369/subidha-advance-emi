@@ -35,7 +35,7 @@ def _first_branding_value(profile, candidate_fields: tuple[str, ...]) -> str:
 
 
 def get_branding_context() -> PdfBrandingContext:
-    profile = BusinessProfile.objects.filter(is_active=True).order_by("-created_at", "-id").first()
+    profile = BusinessProfile.get_current()
     if not profile:
         return PdfBrandingContext(
             business_name="Subidha Furniture",

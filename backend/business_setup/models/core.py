@@ -132,12 +132,24 @@ class BusinessProfile(BusinessSetupTimeStampedModel):
         errors = {}
         if not (self.legal_name or "").strip():
             errors["legal_name"] = "Legal name is required."
-        if self.is_active and BusinessProfile.objects.filter(is_active=True).exclude(pk=self.pk).exists():
-            errors["is_active"] = "Only one active business profile is allowed."
+        if self.pk != 1 and BusinessProfile.objects.exists():
+            errors["id"] = "Only one BusinessProfile can exist (id must be 1)."
         if errors:
             raise ValidationError(errors)
 
+    @classmethod
+    def get_current(cls):
+        from django.core.cache import cache
+        bp = cache.get("business_profile_singleton")
+        if bp is None:
+            bp = cls.objects.order_by("id").first()
+            if bp:
+                cache.set("business_profile_singleton", bp, timeout=86400)
+        return bp
+
     def save(self, *args, **kwargs):
+        if not self.pk and BusinessProfile.objects.exists():
+            self.pk = 1
         self.legal_name = (self.legal_name or "").strip()
         self.trade_name = (self.trade_name or "").strip()
         self.business_code = (self.business_code or "").strip().upper()
@@ -169,6 +181,13 @@ class BusinessProfile(BusinessSetupTimeStampedModel):
         self.timezone_name = (self.timezone_name or "").strip() or "Asia/Kolkata"
         self.full_clean()
         super().save(*args, **kwargs)
+        from django.core.cache import cache
+        cache.delete("business_profile_singleton")
+
+    def delete(self, *args, **kwargs):
+        super().delete(*args, **kwargs)
+        from django.core.cache import cache
+        cache.delete("business_profile_singleton")
 
     def __str__(self):
         return self.trade_name or self.legal_name
@@ -232,6 +251,8 @@ class BusinessRulePolicy(BusinessSetupTimeStampedModel):
 
     name = models.CharField(max_length=120, default="Default legal controls")
     is_active = models.BooleanField(default=True, db_index=True)
+    effective_from = models.DateTimeField(default=timezone.now, db_index=True)
+    effective_to = models.DateTimeField(null=True, blank=True, db_index=True)
     plan_type = models.CharField(
         max_length=40,
         choices=PlanLegalClassification.choices,
@@ -268,6 +289,36 @@ class BusinessRulePolicy(BusinessSetupTimeStampedModel):
     deposit_refund_requires_inspection = models.BooleanField(default=True)
     gst_documents_require_hsn_sac = models.BooleanField(default=True)
     non_gst_document_labels = models.JSONField(default=default_non_gst_document_labels, blank=True)
+
+    def clean(self):
+        errors = {}
+        if self.is_active and BusinessRulePolicy.objects.filter(is_active=True).exclude(pk=self.pk).exists():
+            errors["is_active"] = "Only one active business rule policy is allowed at a time."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+        from django.core.cache import cache
+        if self.is_active:
+            cache.delete("active_business_rule_policy")
+
+    def delete(self, *args, **kwargs):
+        super().delete(*args, **kwargs)
+        from django.core.cache import cache
+        if self.is_active:
+            cache.delete("active_business_rule_policy")
+
+    @classmethod
+    def get_current(cls):
+        from django.core.cache import cache
+        policy = cache.get("active_business_rule_policy")
+        if policy is None:
+            policy = cls.objects.filter(is_active=True).order_by("-effective_from", "-id").first()
+            if policy:
+                cache.set("active_business_rule_policy", policy, timeout=86400)
+        return policy
     notes = models.TextField(blank=True, default="")
     updated_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
