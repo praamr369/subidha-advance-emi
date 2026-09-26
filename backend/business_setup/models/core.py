@@ -804,3 +804,22 @@ class BusinessDataRestoreJob(BusinessSetupTimeStampedModel):
     class Meta:
         db_table = "business_data_restore_jobs"
         ordering = ["-created_at", "-id"]
+
+class FreshStartActionLog(BusinessSetupTimeStampedModel):
+    class Mode(models.TextChoices):
+        DRY_RUN = "DRY_RUN", "Dry Run"
+        EXECUTED = "EXECUTED", "Executed"
+
+    performed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="fresh_start_action_logs",
+    )
+    mode = models.CharField(max_length=20, choices=Mode.choices, db_index=True)
+    before_snapshot = models.JSONField(default=dict, blank=True)
+    after_snapshot = models.JSONField(default=dict, blank=True)
+    summary = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        db_table = "fresh_start_action_logs"
+        ordering = ["-created_at", "-id"]

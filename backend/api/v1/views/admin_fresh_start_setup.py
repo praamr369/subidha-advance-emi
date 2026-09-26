@@ -107,6 +107,33 @@ class AdminFreshStartSetupView(APIView):
         compliance_payload = self._ensure_compliance_rows(request.user, dry_run=dry_run)
         policy_payload = self._ensure_policy_governance(request.user, dry_run=dry_run)
         after = get_setup_readiness() if not dry_run else before
+        
+        summary = {
+            "created_financial_records": 0,
+            "journal_entries_created": 0,
+            "document_numbers_allocated": 0,
+            "stock_ledger_created": 0,
+            "reconciliation_items_created": 0,
+            "accounting_defaults": accounting_result,
+            "document_numbering": numbering_result,
+            "print_branding_settings_id": getattr(print_settings, "id", None),
+            "business_profile": business_profile_payload,
+            "branch": branch_payload,
+            "cash_counter": counter_payload,
+            "starter_catalog": starter_catalog_payload,
+            "compliance_rows": compliance_payload,
+            "policy_governance": policy_payload,
+        }
+        
+        from business_setup.models.core import FreshStartActionLog
+        FreshStartActionLog.objects.create(
+            performed_by=request.user,
+            mode=FreshStartActionLog.Mode.DRY_RUN if dry_run else FreshStartActionLog.Mode.EXECUTED,
+            before_snapshot=before,
+            after_snapshot=after,
+            summary=summary,
+        )
+
         return Response(
             {
                 "mode": "dry_run" if dry_run else "executed",
