@@ -247,8 +247,8 @@ class ProductVariant(models.Model):
     barcode = models.CharField(max_length=100, unique=True, null=True, blank=True)
     price = models.DecimalField(max_digits=14, decimal_places=2, validators=[MinValueValidator(0)])
     cost_price = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
-    image = models.ImageField(upload_to="pim/variants/", null=True, blank=True)
-    video = models.FileField(upload_to="pim/variants/videos/", null=True, blank=True)
+    image = models.URLField(max_length=500, null=True, blank=True, help_text="CDN URL to image")
+    video = models.URLField(max_length=500, null=True, blank=True, help_text="CDN URL to video")
     quantity_on_hand = models.IntegerField(default=0)
     reorder_level = models.IntegerField(default=0)
     is_active = models.BooleanField(default=True)
@@ -341,10 +341,10 @@ class ProductMediaItem(models.Model):
     )
     kind = models.CharField(max_length=10, choices=MediaKind.choices, default=MediaKind.IMAGE)
     scope = models.CharField(max_length=20, choices=MediaScope.choices, default=MediaScope.ALL_VARIANTS)
-    file = models.FileField(upload_to="pim/gallery/")
+    file = models.URLField(max_length=500, help_text="CDN URL to the asset", default="", blank=True)
     # MODEL_3D only: optional hand-made .usdz for iPhone Quick Look. Without it the
     # viewer converts the .glb on the device, which works but can lose material detail.
-    ios_file = models.FileField(upload_to="pim/models/ios/", null=True, blank=True)
+    ios_file = models.URLField(max_length=500, null=True, blank=True, help_text="CDN URL to iOS specific asset")
     title = models.CharField(max_length=200, blank=True)
     is_hero = models.BooleanField(default=False, help_text="Hero image shown as primary in catalog")
     display_order = models.PositiveIntegerField(default=0)

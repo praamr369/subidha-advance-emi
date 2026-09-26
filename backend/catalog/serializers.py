@@ -10,7 +10,7 @@ class CatalogCategorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CatalogCategory
-        fields = ["id", "name", "slug", "parent", "path", "is_active", "sort_order", "children_count", "created_at", "updated_at"]
+        fields = ["id", "name", "slug", "parent", "path", "is_active", "sort_order", "google_taxonomy_id", "children_count", "created_at", "updated_at"]
         read_only_fields = ["id", "path", "children_count", "created_at", "updated_at"]
         extra_kwargs = {"slug": {"required": False}}
 
@@ -27,7 +27,7 @@ class AttributeDefinitionSerializer(serializers.ModelSerializer):
         fields = [
             "id", "category", "name", "code", "input_type", "options", "unit",
             "is_variant_attribute", "is_spec_attribute", "is_required", "sort_order",
-            "min_value", "max_value", "sku_code_map", "is_active", "created_at", "updated_at",
+            "min_value", "max_value", "regex_validation", "sku_code_map", "is_active", "created_at", "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 

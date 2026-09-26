@@ -7,7 +7,7 @@ import { pimService, type PimCategory, type PimSubcategory, type PimCategoryAttr
 
 // Legacy type alias kept so callers don't need to change
 export type CatalogCategory = { id: number; name: string; slug: string; path: string; parent: number | null; is_active: boolean };
-export type AttributeDefinition = { id: number; category: number; name: string; code: string; input_type: string; options: string[]; unit: string; is_variant_attribute: boolean; is_spec_attribute: boolean; is_required: boolean; sort_order: number; min_value: string | null; max_value: string | null; is_active: boolean };
+export type AttributeDefinition = { id: number; category: number; name: string; code: string; input_type: string; options: string[]; unit: string; is_variant_attribute: boolean; is_spec_attribute: boolean; is_required: boolean; sort_order: number; min_value: string | null; max_value: string | null; regex_validation?: string; is_active: boolean };
 
 type Props = {
   categoryId: number | null;
@@ -218,7 +218,7 @@ export default function CatalogSpecificationFields({ categoryId, values, onCateg
             return (
               <label key={attr.id} className="text-sm text-muted-foreground">
                 {labelEl}
-                <input className={common} value={typeof val === "string" ? val : ""} disabled={disabled} onChange={(e) => setVal(attr.slug, e.target.value)} />
+                <input className={common} value={typeof val === "string" ? val : ""} disabled={disabled} pattern={attr.regex_validation || undefined} title={attr.regex_validation ? "Must match required format" : undefined} onChange={(e) => setVal(attr.slug, e.target.value)} />
               </label>
             );
           })}

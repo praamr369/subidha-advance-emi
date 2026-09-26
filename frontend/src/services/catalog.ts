@@ -11,6 +11,7 @@ export type CatalogCategory = {
   path: string;
   parent: number | null;
   is_active: boolean;
+  google_taxonomy_id?: string;
 };
 
 export type AttributeDefinition = {
@@ -27,6 +28,7 @@ export type AttributeDefinition = {
   sort_order: number;
   min_value: string | null;
   max_value: string | null;
+  regex_validation?: string;
   is_active: boolean;
 };
 
