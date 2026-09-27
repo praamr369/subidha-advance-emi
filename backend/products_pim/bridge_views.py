@@ -212,8 +212,9 @@ class ProductPimVariantPublishControlView(APIView):
 
     def _variant_rows(self, pim):
         rows = []
-        for child in pim.child_pim_products.prefetch_related("variants").order_by("code"):
-            variant = child.variants.first()
+        variants_by_sku = {v.sku: v for v in pim.variants.all()}
+        for child in pim.child_pim_products.order_by("code"):
+            variant = variants_by_sku.get(child.code)
             rows.append({
                 "id": child.id,
                 "variant_id": variant.id if variant else None,
