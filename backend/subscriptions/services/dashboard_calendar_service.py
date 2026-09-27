@@ -47,103 +47,138 @@ def fetch_dashboard_calendar_events(start_date: datetime.date, end_date: datetim
         ))
 
     # 2. Subscription EMIs (Due)
-    from subscriptions.models import Emi, EmiStatus
-    emis = Emi.objects.filter(
-        due_date__range=dr,
-        status__in=[EmiStatus.PENDING, EmiStatus.OVERDUE]
-    ).select_related('subscription', 'subscription__customer')
-    for emi in emis:
-        events.append(_ev(
-            f"emi-{emi.id}", emi.due_date.isoformat(),
-            f"EMI {emi.month_no} - {emi.subscription.subscription_no}",
-            "SUBSCRIPTION_EMI", f"/admin/customers/subscriptions/{emi.subscription.id}",
-            False, "red",
-            emi.subscription.customer.name if emi.subscription.customer else None,
-        ))
-
-    # 3. Direct Sales (Outstanding)
-    from billing.models import DirectSale
-    ds = DirectSale.objects.filter(
-        sale_date__range=dr, balance_total__gt=0
-    ).exclude(status__in=["CANCELLED", "RETURNED", "ARCHIVED", "EXCHANGED_CLOSED"]).select_related('customer')
-    for sale in ds:
-        events.append(_ev(
-            f"ds-{sale.id}", sale.sale_date.isoformat(),
-            f"Direct Sale {sale.sale_no}", "DIRECT_SALE",
-            f"/admin/billing/direct-sale/{sale.id}", False, "orange",
-            sale.customer.name if sale.customer else None,
-        ))
-
-    # 4. Purchase Orders (Expected Delivery)
-    from inventory.models import PurchaseOrder
-    pos = PurchaseOrder.objects.filter(
-        expected_date__range=dr
-    ).exclude(status__in=["CANCELLED", "CLOSED"]).select_related('vendor')
-    for po in pos:
-        if po.expected_date:
+    try:
+        from subscriptions.models import Emi, EmiStatus
+        emis = Emi.objects.filter(
+            due_date__range=dr,
+            status__in=[EmiStatus.PENDING, EmiStatus.OVERDUE]
+        ).select_related('subscription', 'subscription__customer')
+        for emi in emis:
             events.append(_ev(
-                f"po-{po.id}", po.expected_date.isoformat(),
-                f"PO {po.po_no}", "PURCHASE_ORDER",
-                f"/admin/inventory/po/{po.id}", po.status == "RECEIVED", "blue",
-                po.vendor.name if po.vendor else None,
+                f"emi-{emi.id}", emi.due_date.isoformat(),
+                f"EMI {emi.month_no} - {emi.subscription.subscription_no}",
+                "SUBSCRIPTION_EMI", f"/admin/customers/subscriptions/{emi.subscription.id}",
+                False, "red",
+                emi.subscription.customer.name if emi.subscription.customer else None,
             ))
 
+
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning('Calendar events error in section %s: %s', '# 2. Subscription EMIs (Due)', str(e))
+    # 3. Direct Sales (Outstanding)
+    try:
+        from billing.models import DirectSale
+        ds = DirectSale.objects.filter(
+            sale_date__range=dr, balance_total__gt=0
+        ).exclude(status__in=["CANCELLED", "RETURNED", "ARCHIVED", "EXCHANGED_CLOSED"]).select_related('customer')
+        for sale in ds:
+            events.append(_ev(
+                f"ds-{sale.id}", sale.sale_date.isoformat(),
+                f"Direct Sale {sale.sale_no}", "DIRECT_SALE",
+                f"/admin/billing/direct-sale/{sale.id}", False, "orange",
+                sale.customer.name if sale.customer else None,
+            ))
+
+
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning('Calendar events error in section %s: %s', '# 3. Direct Sales (Outstanding)', str(e))
+    # 4. Purchase Orders (Expected Delivery)
+    try:
+        from inventory.models import PurchaseOrder
+        pos = PurchaseOrder.objects.filter(
+            expected_date__range=dr
+        ).exclude(status__in=["CANCELLED", "CLOSED"]).select_related('vendor')
+        for po in pos:
+            if po.expected_date:
+                events.append(_ev(
+                    f"po-{po.id}", po.expected_date.isoformat(),
+                    f"PO {po.po_no}", "PURCHASE_ORDER",
+                    f"/admin/inventory/po/{po.id}", po.status == "RECEIVED", "blue",
+                    po.vendor.name if po.vendor else None,
+                ))
+
+
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning('Calendar events error in section %s: %s', '# 4. Purchase Orders (Expected Delivery)', str(e))
     # 5. CRM Leads (Follow-up Date)
-    from crm.models import Lead, LeadStage
-    leads = Lead.objects.filter(
-        next_follow_up_at__date__range=dr
-    ).exclude(stage__in=[LeadStage.CONVERTED, LeadStage.LOST])
-    for lead in leads:
-        events.append(_ev(
-            f"lead-{lead.id}", lead.next_follow_up_at.date().isoformat() if lead.next_follow_up_at else "",
-            f"Follow-up: {lead.name}", "CRM_LEAD",
-            f"/admin/crm/leads/{lead.id}", False, "emerald", lead.name,
-        ))
+    try:
+        from crm.models import Lead, LeadStage
+        leads = Lead.objects.filter(
+            next_follow_up_at__date__range=dr
+        ).exclude(stage__in=[LeadStage.CONVERTED, LeadStage.LOST])
+        for lead in leads:
+            events.append(_ev(
+                f"lead-{lead.id}", lead.next_follow_up_at.date().isoformat() if lead.next_follow_up_at else "",
+                f"Follow-up: {lead.name}", "CRM_LEAD",
+                f"/admin/crm/leads/{lead.id}", False, "emerald", lead.name,
+            ))
 
+
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning('Calendar events error in section %s: %s', '# 5. CRM Leads (Follow-up Date)', str(e))
     # 6. Deliveries (Scheduled)
-    from deliveries.models import Delivery
-    deliveries = Delivery.objects.filter(
-        scheduled_date__range=dr
-    ).exclude(status__in=["DELIVERED", "CANCELLED"]).select_related('subscription', 'subscription__customer')
-    for d in deliveries:
-        cust = d.subscription.customer if d.subscription and d.subscription.customer_id else None
-        events.append(_ev(
-            f"del-{d.id}", d.scheduled_date.isoformat(),
-            f"Delivery - {d.subscription.subscription_no if d.subscription else d.id}",
-            "DELIVERY", f"/admin/deliveries/{d.id}", False, "orange",
-            cust.name if cust else None,
-        ))
+    try:
+        from deliveries.models import Delivery
+        deliveries = Delivery.objects.filter(
+            scheduled_date__range=dr
+        ).exclude(status__in=["DELIVERED", "CANCELLED"]).select_related('subscription', 'subscription__customer')
+        for d in deliveries:
+            cust = d.subscription.customer if d.subscription and d.subscription.customer_id else None
+            events.append(_ev(
+                f"del-{d.id}", d.scheduled_date.isoformat(),
+                f"Delivery - {d.subscription.subscription_no if d.subscription else d.id}",
+                "DELIVERY", f"/admin/deliveries/{d.id}", False, "orange",
+                cust.name if cust else None,
+            ))
 
+
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning('Calendar events error in section %s: %s', '# 6. Deliveries (Scheduled)', str(e))
     # 7. Rent/Lease Billing Demands (Due)
-    from payments.models import RentLeaseBillingDemand
-    from subscriptions.enums import RentLeaseDemandStatus
-    demands = RentLeaseBillingDemand.objects.filter(
-        due_date__range=dr,
-        status__in=[RentLeaseDemandStatus.PENDING, RentLeaseDemandStatus.PARTIAL, RentLeaseDemandStatus.OVERDUE],
-    ).select_related('subscription', 'subscription__customer')
-    for dem in demands:
-        cust = dem.subscription.customer if dem.subscription and dem.subscription.customer_id else None
-        events.append(_ev(
-            f"rld-{dem.id}", dem.due_date.isoformat(),
-            f"Rent/Lease Due - {dem.demand_type}",
-            "RENT_LEASE_DEMAND", f"/admin/rent-lease", False, "red",
-            cust.name if cust else None,
-        ))
+    try:
+        from payments.models import RentLeaseBillingDemand
+        from subscriptions.enums import RentLeaseDemandStatus
+        demands = RentLeaseBillingDemand.objects.filter(
+            due_date__range=dr,
+            status__in=[RentLeaseDemandStatus.PENDING, RentLeaseDemandStatus.PARTIAL, RentLeaseDemandStatus.OVERDUE],
+        ).select_related('subscription', 'subscription__customer')
+        for dem in demands:
+            cust = dem.subscription.customer if dem.subscription and dem.subscription.customer_id else None
+            events.append(_ev(
+                f"rld-{dem.id}", dem.due_date.isoformat(),
+                f"Rent/Lease Due - {dem.demand_type}",
+                "RENT_LEASE_DEMAND", f"/admin/rent-lease", False, "red",
+                cust.name if cust else None,
+            ))
 
+
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning('Calendar events error in section %s: %s', '# 7. Rent/Lease Billing Demands (Due)', str(e))
     # 8. Vendor Bills (Due/Draft)
-    from inventory.models import VendorBill, VendorBillStatus
-    vbills = VendorBill.objects.filter(
-        bill_date__range=dr,
-        status__in=[VendorBillStatus.DRAFT, VendorBillStatus.POSTED],
-    ).select_related('vendor')
-    for vb in vbills:
-        events.append(_ev(
-            f"vb-{vb.id}", vb.bill_date.isoformat(),
-            f"Vendor Bill {vb.bill_no}", "VENDOR_BILL",
-            f"/admin/inventory/vendor-bills/{vb.id}", False, "orange",
-            vb.vendor.name if vb.vendor else None,
-        ))
+    try:
+        from inventory.models import VendorBill, VendorBillStatus
+        vbills = VendorBill.objects.filter(
+            bill_date__range=dr,
+            status__in=[VendorBillStatus.DRAFT, VendorBillStatus.POSTED],
+        ).select_related('vendor')
+        for vb in vbills:
+            events.append(_ev(
+                f"vb-{vb.id}", vb.bill_date.isoformat(),
+                f"Vendor Bill {vb.bill_no}", "VENDOR_BILL",
+                f"/admin/inventory/vendor-bills/{vb.id}", False, "orange",
+                vb.vendor.name if vb.vendor else None,
+            ))
 
+
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning('Calendar events error in section %s: %s', '# 8. Vendor Bills (Due/Draft)', str(e))
     # 9. Salary Sheets (by period month/year)
     try:
         from accounting.models import SalarySheet, SalarySheetStatus

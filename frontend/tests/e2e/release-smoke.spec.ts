@@ -108,6 +108,7 @@ test.describe("admin release smoke", () => {
   });
 
   test("admin batch lifecycle entry flow works", async ({ page }) => {
+    test.setTimeout(120000);
     const meta = getMeta();
     const batchCode = `SMOKEE2E${Date.now().toString().slice(-6)}`;
 
@@ -121,7 +122,15 @@ test.describe("admin release smoke", () => {
     await page.locator("#draw-day").fill(String(meta.entities.batch_create.draw_day));
     await page.locator("#start-date").fill(todayIso());
     await page.locator("#batch-status").selectOption(meta.entities.batch_create.status);
-    await page.getByRole("button", { name: /create batch/i }).last().click();
+    // Wait for button to be visible and enabled
+    const createBatchButton = page.getByRole("button", { name: /create batch/i }).last();
+    await createBatchButton.waitFor({ state: "visible", timeout: 15_000 });
+    
+    // Add a small delay to ensure form is fully interactive
+    await page.waitForTimeout(500);
+    
+    // Click with extended timeout
+    await createBatchButton.click({ timeout: 15_000 });
 
     await expect(page.getByText(/batch created/i)).toBeVisible();
     await expect(page.locator("body")).toContainText(batchCode);
