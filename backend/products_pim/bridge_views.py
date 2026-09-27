@@ -275,12 +275,12 @@ class ProductPimVariantPublishControlView(APIView):
         variant_updates = data.get("variants", [])
         if variant_updates:
             child_ids = set(pim.child_pim_products.values_list("id", flat=True))
-            # Build ProductVariant.id → child PimProduct.id mapping for fallback
-            variant_to_child = {
-                v_id: pim_id
-                for pim_id, v_id in pim.child_pim_products.values_list("id", "variants__id")
-                if v_id is not None
-            }
+            # Map by SKU because ProductVariant records are linked to the base PimProduct
+            variants_by_sku = {v.sku: v.id for v in pim.variants.all()}
+            variant_to_child = {}
+            for child in pim.child_pim_products.all():
+                if child.code in variants_by_sku:
+                    variant_to_child[variants_by_sku[child.code]] = child.id
             any_published_now = False
             for row in variant_updates:
                 vid = row.get("id")
