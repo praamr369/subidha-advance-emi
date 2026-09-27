@@ -93,7 +93,7 @@ jobs:
         working-directory: backend
         env:
           DJANGO_SETTINGS_MODULE: core.settings.playwright
-          PLAYWRIGHT_DB_PATH: /tmp/subidha-playwright-smoke.sqlite3
+          PLAYWRIGHT_DB_PATH: /dev/shm/subidha-playwright-smoke.sqlite3
           PLAYWRIGHT_SMOKE_META_PATH: /tmp/subidha-playwright-smoke-meta.json
           PLAYWRIGHT_SMOKE_MANIFEST_PATH: ${{ github.workspace }}/frontend/tests/e2e/.generated/smoke-manifest.json
         run: |
@@ -111,7 +111,7 @@ jobs:
           # and re-runs the full migrate chain inside Playwright's 420s
           # webServer window — routinely too slow on CI, hits timeout.
           PLAYWRIGHT_SKIP_BOOTSTRAP: "1"
-          PLAYWRIGHT_DB_PATH: /tmp/subidha-playwright-smoke.sqlite3
+          PLAYWRIGHT_DB_PATH: /dev/shm/subidha-playwright-smoke.sqlite3
           PLAYWRIGHT_SMOKE_META_PATH: /tmp/subidha-playwright-smoke-meta.json
           PLAYWRIGHT_SMOKE_MANIFEST_PATH: ${{ github.workspace }}/frontend/tests/e2e/.generated/smoke-manifest.json
         run: npm run test:e2e:release-smoke
@@ -165,11 +165,28 @@ jobs:
         working-directory: frontend
         run: npx playwright install --with-deps chromium
 
+      - name: Boot Playwright backend (dry-run health check)
+        working-directory: backend
+        env:
+          DJANGO_SETTINGS_MODULE: core.settings.playwright
+          PLAYWRIGHT_DB_PATH: /dev/shm/subidha-playwright-smoke.sqlite3
+          PLAYWRIGHT_SMOKE_META_PATH: /tmp/subidha-playwright-smoke-meta.json
+          PLAYWRIGHT_SMOKE_MANIFEST_PATH: ${{ github.workspace }}/frontend/tests/e2e/.generated/smoke-manifest.json
+        run: |
+          rm -f "$PLAYWRIGHT_DB_PATH" "$PLAYWRIGHT_SMOKE_META_PATH"
+          mkdir -p "$(dirname "$PLAYWRIGHT_SMOKE_MANIFEST_PATH")"
+          python manage.py migrate --noinput
+          python manage.py seed_playwright_smoke
+
       - name: Route-load smoke (all static pages x role)
         continue-on-error: true
         working-directory: frontend
         env:
           PLAYWRIGHT_PYTHON: python
+          PLAYWRIGHT_SKIP_BOOTSTRAP: "1"
+          PLAYWRIGHT_DB_PATH: /dev/shm/subidha-playwright-smoke.sqlite3
+          PLAYWRIGHT_SMOKE_META_PATH: /tmp/subidha-playwright-smoke-meta.json
+          PLAYWRIGHT_SMOKE_MANIFEST_PATH: ${{ github.workspace }}/frontend/tests/e2e/.generated/smoke-manifest.json
         run: npm run test:e2e:route-smoke
 
       - name: Upload route-load smoke artifacts
