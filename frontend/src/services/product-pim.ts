@@ -126,7 +126,7 @@ export type PimVariantPublishControl = {
 };
 
 export function getVariantPublishControl(productId: number | string) {
-  return apiFetch<PimVariantPublishControl>(`${BASE}/${productId}/variants/publish-control/`);
+  return apiFetch<PimVariantPublishControl>(`/pim/products/${productId}/variants_publish_control/`);
 }
 
 export function patchVariantPublishControl(
@@ -135,7 +135,7 @@ export function patchVariantPublishControl(
     | { all: boolean }
     | { base_published?: boolean; variants?: Array<{ id: number; is_published: boolean }> }
 ) {
-  return apiFetch<PimVariantPublishControl>(`${BASE}/${productId}/variants/publish-control/`, {
+  return apiFetch<PimVariantPublishControl>(`/pim/products/${productId}/variants_publish_control/`, {
     method: "PATCH",
     body: JSON.stringify(body),
   });

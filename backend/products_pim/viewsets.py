@@ -189,6 +189,69 @@ class PimProductViewSet(viewsets.ModelViewSet):
             "child_pim_unpublished": child_count,
         })
 
+
+    @action(detail=True, methods=["get", "patch"], url_path="variants_publish_control")
+    def variants_publish_control(self, request, pk=None):
+        pim = self.get_object()
+        
+        # If this is a variant, redirect logic to its base product
+        if pim.parent_id:
+            pim = pim.parent
+
+        if request.method == "GET":
+            from .bridge_views import ProductPimVariantPublishControlView
+            view = ProductPimVariantPublishControlView()
+            return Response({
+                "base": view._base_response(pim, pim.source_product_id),
+                "variants": view._variant_rows(pim),
+            })
+            
+        elif request.method == "PATCH":
+            data = request.data
+            from .bridge_views import ProductPimVariantPublishControlView
+            view = ProductPimVariantPublishControlView()
+
+            # Bulk toggle all
+            if "all" in data:
+                flag = bool(data["all"])
+                pim.is_published = flag
+                pim.save(update_fields=["is_published"])
+                pim.child_pim_products.all().update(is_published=flag)
+                return Response({
+                    "base": view._base_response(pim, pim.source_product_id),
+                    "variants": view._variant_rows(pim),
+                })
+
+            # Toggle base
+            if "base_published" in data:
+                pim.is_published = bool(data["base_published"])
+                pim.save(update_fields=["is_published"])
+
+            # Per-variant toggles
+            from products_pim.models import PimProduct
+            variant_updates = data.get("variants", [])
+            if variant_updates:
+                child_ids = set(pim.child_pim_products.values_list("id", flat=True))
+                variant_to_child = {
+                    v_id: pim_id
+                    for pim_id, v_id in pim.child_pim_products.values_list("id", "variants__id")
+                    if v_id is not None
+                }
+                for row in variant_updates:
+                    vid = row.get("id")
+                    flag = bool(row.get("is_published", False))
+                    if vid in child_ids:
+                        PimProduct.objects.filter(pk=vid).update(is_published=flag)
+                    elif vid in variant_to_child:
+                        PimProduct.objects.filter(pk=variant_to_child[vid]).update(is_published=flag)
+
+                pim.refresh_from_db(fields=["is_published"])
+
+            return Response({
+                "base": view._base_response(pim, pim.source_product_id),
+                "variants": view._variant_rows(pim),
+            })
+
     @action(detail=True, methods=["post"])
     def auto_bom(self, request, pk=None):
         """
