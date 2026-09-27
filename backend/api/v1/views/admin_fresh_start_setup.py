@@ -183,7 +183,7 @@ class AdminFreshStartSetupView(APIView):
         }
         if dry_run:
             return {"status": "WOULD_CREATE", **payload}
-        profile = BusinessProfile.objects.create(**payload)
+        profile, _ = BusinessProfile.objects.update_or_create(id=1, defaults=payload)
         return {"status": "CREATED", "id": profile.id, "legal_name": profile.legal_name, "trade_name": profile.trade_name}
 
     def _ensure_default_branch(self, *, dry_run: bool) -> dict:

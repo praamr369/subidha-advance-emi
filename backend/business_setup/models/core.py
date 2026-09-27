@@ -148,7 +148,13 @@ class BusinessProfile(BusinessSetupTimeStampedModel):
         return bp
 
     def save(self, *args, **kwargs):
-        if self.pk != 1 and BusinessProfile.objects.exists():
+        if self.pk is None:
+            if BusinessProfile.objects.exists():
+                from django.core.exceptions import ValidationError
+                raise ValidationError("There can be only one active BusinessProfile. Update the existing one instead of creating a new one.")
+            self.id = 1
+            self.pk = 1
+        elif self.pk != 1:
             from django.core.exceptions import ValidationError
             raise ValidationError("There can be only one active BusinessProfile. Update the existing one instead of creating a new one.")
         self.legal_name = (self.legal_name or "").strip()

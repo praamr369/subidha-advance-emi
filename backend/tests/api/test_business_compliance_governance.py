@@ -192,6 +192,7 @@ class BusinessComplianceGovernanceTests(APITestCase):
         self.assertFalse(approved.data["is_publicly_downloadable"])
 
     def test_readiness_blocked_until_required_evidence_approved(self):
+        BusinessProfile.objects.all().delete()
         BusinessProfile.objects.create(
             legal_name="Subidha Furniture",
             trade_name="Subidha Furniture",

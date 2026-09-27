@@ -11,6 +11,7 @@ class PublicBusinessProfileApiTests(APITestCase):
         self.assertIsNone(response.data.get("profile"))
 
     def test_public_profile_returns_safe_fields(self):
+        PublicBusinessProfile.objects.all().delete()
         PublicBusinessProfile.objects.create(
             display_name="Subidha Furniture",
             tagline="Designed for the way you live",

@@ -30,6 +30,7 @@ class PdfBrandingContextTests(TestCase):
         # The model exposes ``pan_number`` (not ``pan``). Branding must map it
         # without raising AttributeError on the missing ``pan`` attribute.
         self.assertFalse(hasattr(BusinessProfile(), "pan"))
+        BusinessProfile.objects.all().delete()
         BusinessProfile.objects.create(
             legal_name="Subidha Furniture Pvt Ltd",
             trade_name="Subidha Furniture",
@@ -47,6 +48,7 @@ class PdfBrandingContextTests(TestCase):
 
     def test_branding_context_handles_missing_optional_branding_fields(self):
         # Only the required legal name is present; PAN/GST/phone/email blank.
+        BusinessProfile.objects.all().delete()
         BusinessProfile.objects.create(
             legal_name="Minimal Business",
             is_active=True,
@@ -83,6 +85,7 @@ class RentContractPdfWithBrandingTests(TestCase):
 
     def test_rent_contract_pdf_generates_when_profile_has_no_pan_attribute(self):
         # Active profile with no PAN value set must not crash PDF generation.
+        BusinessProfile.objects.all().delete()
         BusinessProfile.objects.create(
             legal_name="Subidha Furniture Pvt Ltd",
             trade_name="Subidha Furniture",
@@ -99,6 +102,7 @@ class RentContractPdfWithBrandingTests(TestCase):
         self.assertTrue(document.file.name)
 
     def test_rent_contract_pdf_generates_with_full_branding(self):
+        BusinessProfile.objects.all().delete()
         BusinessProfile.objects.create(
             legal_name="Subidha Furniture Pvt Ltd",
             trade_name="Subidha Furniture",
