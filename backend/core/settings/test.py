@@ -45,5 +45,5 @@ import sys
 # This prevents Django from running all the migrations sequentially (which is
 # painfully slow on SQLite) and instead just creates all tables directly from
 # the current state of the models (syncdb).
-if "test" in ["test"] or "migrate" in ["test"]:
+if len(sys.argv) > 1 and sys.argv[1] in ["test", "migrate", "seed_playwright_smoke"]:
     MIGRATION_MODULES = {app.split(".")[-1]: None for app in INSTALLED_APPS}

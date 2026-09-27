@@ -69,3 +69,6 @@ AUTHENTICATION_BACKENDS = (
 PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.MD5PasswordHasher",
 ]
+import sys
+if "test_playwright_seed.py" in ["test"] or "manage.py" in ["test"]:
+    MIGRATION_MODULES = {app.split('.')[-1]: None for app in INSTALLED_APPS}
