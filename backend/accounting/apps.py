@@ -58,6 +58,19 @@ def create_raw_sql_tables(sender, **kwargs):
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
         ''')
+        
+    try:
+        from branch_control.models import Branch
+        if not Branch.objects.filter(is_primary=True).exists():
+            Branch.objects.create(
+                code="MAIN",
+                name="Main Branch",
+                status="ACTIVE",
+                is_primary=True,
+                notes="Auto-created during syncdb for testing.",
+            )
+    except Exception:
+        pass
 
 class AccountingConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"

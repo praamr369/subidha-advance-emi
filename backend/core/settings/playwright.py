@@ -70,6 +70,4 @@ PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.MD5PasswordHasher",
 ]
 import sys
-is_makemigrations = any(arg in ["makemigrations", "check_model_field_drift"] for arg in sys.argv)
-if not is_makemigrations:
-    MIGRATION_MODULES = {app.split('.')[-1]: None for app in INSTALLED_APPS}
+
