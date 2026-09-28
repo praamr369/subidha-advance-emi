@@ -120,10 +120,14 @@ test.describe("admin release smoke", () => {
     await page.locator("#total-slots").fill(String(meta.entities.batch_create.total_slots));
     await page.locator("#duration-months").fill(String(meta.entities.batch_create.duration_months));
     await page.locator("#draw-day").fill(String(meta.entities.batch_create.draw_day));
-    await page.locator("#start-date").fill(todayIso());
+    await page.locator("#start-date").evaluate((node: HTMLInputElement, value) => {
+      node.value = value;
+      node.dispatchEvent(new Event("input", { bubbles: true }));
+      node.dispatchEvent(new Event("change", { bubbles: true }));
+    }, todayIso());
     await page.locator("#batch-status").selectOption(meta.entities.batch_create.status);
     // Wait for button to be visible and enabled
-    const createBatchButton = page.getByRole("button", { name: /create batch/i }).last();
+    const createBatchButton = page.locator('button[type="submit"]', { hasText: /create batch/i });
     await createBatchButton.waitFor({ state: "visible", timeout: 15_000 });
     
     // Add a small delay to ensure form is fully interactive
