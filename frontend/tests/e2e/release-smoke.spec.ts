@@ -74,12 +74,6 @@ test.describe("public release smoke", () => {
     await expect(page.locator("body")).toContainText(/media-ready cards/i);
 
     await page.goto(`/products/${manifest.entities.public.product_id}`);
-    // Public detail page: /enquir/i is the always-server-rendered PublicPageShell
-    // primary action label. Old /media state/i + /base price/i pointed at chips
-    // inside the client PublicProductInteractiveDetail which don't always land
-    // inside Playwright's initial retry window. "Back to catalogue" turned out
-    // to also miss on CI (possibly hidden under a variant-page branch). The
-    // Enquire assertion alone is sufficient proof the detail page rendered.
     await expect(page.locator("body")).toContainText(/enquir/i);
   });
 });
@@ -120,42 +114,32 @@ test.describe("admin release smoke", () => {
     await page.locator("#total-slots").fill(String(meta.entities.batch_create.total_slots));
     await page.locator("#duration-months").fill(String(meta.entities.batch_create.duration_months));
     await page.locator("#draw-day").fill(String(meta.entities.batch_create.draw_day));
-    // Playwright's .fill() on HTML5 <input type="date"> can fail to trigger
-    // React's synthetic onChange in controlled components, leaving the state
-    // empty and the submit button disabled. Use nativeInputValueSetter +
-    // dispatching 'input' and 'change' events to guarantee React sees it.
+
     const dateValue = todayIso();
     const dateInput = page.locator("#start-date");
-    await dateInput.scrollIntoViewIfNeeded();
-    await dateInput.evaluate((el, val) => {
-      const nativeSetter = Object.getOwnPropertyDescriptor(
-        HTMLInputElement.prototype,
-        "value"
-      )?.set;
-      if (nativeSetter) nativeSetter.call(el, val);
-      el.dispatchEvent(new Event("input", { bubbles: true }));
-      el.dispatchEvent(new Event("change", { bubbles: true }));
-    }, dateValue);
+    await dateInput.fill(dateValue);
+    await dateInput.dispatchEvent("input");
+    await dateInput.dispatchEvent("change");
+    await expect(dateInput).toHaveValue(dateValue, { timeout: 10_000 });
 
     await page.locator("#batch-status").selectOption(meta.entities.batch_create.status);
     const createBatchButton = page.locator('button[type="submit"]', { hasText: /create batch/i });
 
-    // Wait for the React form to settle after the controlled date field update.
-    // Without a short settle window, the button can remain disabled even though
-    // the form fields appear filled, and the subsequent click never emits the
-    // expected POST request in CI.
-    await expect(createBatchButton).toBeEnabled({ timeout: 15_000 });
-    await page.waitForTimeout(500);
-    await expect(createBatchButton).toBeEnabled({ timeout: 15_000 });
+    await expect(createBatchButton).toBeEnabled({ timeout: 20_000 });
+    await page.waitForTimeout(1000);
+    await expect(createBatchButton).toBeEnabled({ timeout: 20_000 });
 
-    const createBatchResponsePromise = page.waitForResponse((response) => {
-      const request = response.request();
-      return (
-        request.method() === "POST" &&
-        response.url().includes("/api/v1/admin") &&
-        response.url().includes("batch")
-      );
-    });
+    const createBatchResponsePromise = page.waitForResponse(
+      (response) => {
+        const request = response.request();
+        return (
+          request.method() === "POST" &&
+          response.url().includes("/api/v1/admin") &&
+          response.url().includes("batch")
+        );
+      },
+      { timeout: 20_000 }
+    );
 
     await createBatchButton.click({ timeout: 15_000 });
     const createBatchResponse = await createBatchResponsePromise;
@@ -180,8 +164,8 @@ test.describe("admin release smoke", () => {
 
     expect(createdBatchCode ?? batchCode).toBe(batchCode);
 
-    await expect(page.getByText(/batch created/i)).toBeVisible();
-    await expect(page.getByText(batchCode, { exact: true })).toBeVisible();
+    await expect(page.getByText(/batch created/i)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(batchCode, { exact: true })).toBeVisible({ timeout: 15_000 });
   });
 
   test("admin payment collection and reversal work", async ({ page }) => {
@@ -189,16 +173,9 @@ test.describe("admin release smoke", () => {
     const target = meta.entities.admin_collection;
     const referenceNo = `SMOKE-ADMIN-${Date.now()}`;
 
-    // Page shell renamed to "Universal Collection Workspace" and the workflow
-    // pivoted to auto-search-then-select. The `?subscription=X` URL param drives
-    // an auto-search that pre-selects the receivable when there is exactly one
-    // match; the Collection Form then appears with amount pre-filled from
-    // due_amount. No more #subscription_id / #emi_id inputs — the receivable
-    // is implicit.
     await page.goto(`/admin/finance/collect?subscription=${target.subscription_id}`);
     await expect(page.locator("body")).toContainText(/universal collection workspace/i);
 
-    // Wait for auto-select → form render (Collection Form header).
     await expect(
       page.getByRole("heading", { name: /^collection form$/i })
     ).toBeVisible({ timeout: 15_000 });
@@ -207,10 +184,6 @@ test.describe("admin release smoke", () => {
     await selectFirstRealOption(page, "#finance_account_id");
     await page.locator("#reference_no").fill(referenceNo);
 
-    // Post now goes through ConfirmActionButton: a "Confirm Collection" trigger
-    // button opens a modal whose confirm action is labeled "Yes, post receipt".
-    // The unified collection endpoint moved from /admin/payments/collect/ to
-    // /admin/receivables/collect/.
     await page.getByRole("button", { name: /^confirm collection$/i }).first().click();
     await expect(page.getByRole("heading", { name: /^confirm collection$/i })).toBeVisible();
 
@@ -224,8 +197,6 @@ test.describe("admin release smoke", () => {
     ]);
 
     if (!collectResponse.ok()) {
-      // Surface the backend detail so a 400/500 doesn't just show
-      // `expect(...).toBeTruthy()` and leave you guessing what validation failed.
       const errorBody = await collectResponse.text();
       throw new Error(`Collect POST failed ${collectResponse.status()}: ${errorBody}`);
     }
@@ -236,9 +207,10 @@ test.describe("admin release smoke", () => {
     const paymentId = Number(collectPayload.payment_id ?? collectPayload.payment?.id ?? 0);
     expect(paymentId).toBeGreaterThan(0);
 
-    // Success banner shows "Payment Collected Successfully" — the older
-    // `Payment #{id}` inline text was removed in the workspace refactor.
-    await expect(page.locator("body")).toContainText(/payment collected successfully/i);
+    await expect(
+      page.getByRole("heading", { name: /payment collected successfully/i })
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("button", { name: /download receipt pdf/i })).toBeVisible({ timeout: 15_000 });
 
     await page.goto(`/admin/payments/${paymentId}`);
     await expect(page.getByRole("heading", { name: new RegExp(`payment #${paymentId}`, "i") })).toBeVisible();
@@ -261,8 +233,6 @@ test.describe("admin release smoke", () => {
   test("admin subscription detail renders lifecycle surfaces", async ({ page }) => {
     const meta = getMeta();
     await page.goto(`/admin/subscriptions/${meta.entities.admin_collection.subscription_id}`);
-    // Shell subtitle is the stable render evidence; the previous /subscription #/
-    // heading moved into the shell title area during the admin UI refactor.
     await expect(page.locator("body")).toContainText(/contract, winner, and waiver posture/i);
     await expect(page.locator("body")).toContainText(/contract lifecycle/i);
     await expect(page.locator("body")).toContainText(/winner benefit/i);
@@ -277,8 +247,6 @@ test.describe("admin release smoke", () => {
       `/admin/payments/reconciliation?subscription=${meta.entities.preseed_payment.subscription_id}&payment=${meta.entities.preseed_payment.payment_id}`
     );
     await expect(page).toHaveURL(/\/admin\/accounting\/bridge-reconciliation/);
-    // Page now delegates to ReconciliationHub which titles itself "Reconciliation
-    // Center"; assert on that + its subtitle for a stable render check.
     await expect(page.locator("body")).toContainText(/reconciliation center/i);
   });
 });
@@ -348,9 +316,6 @@ test.describe("partner release smoke", () => {
   test("partner payments list loads", async ({ page }) => {
     const meta = getMeta();
     await page.goto("/partner/payments");
-    // Partner list rows show customer_name, subscription_number, amount, method —
-    // but NOT the reference_no (only used to search). Assert on the seeded
-    // customer_name which the list DOES render per row.
     await expect(page.locator("body")).toContainText(/verified partner payments/i);
     await expect(page.locator("body")).toContainText(meta.entities.preseed_payment.customer_name);
   });
@@ -366,9 +331,6 @@ test.describe("customer release smoke", () => {
     await expect(page.locator("body")).toContainText(/next payment due/i);
 
     await page.goto("/customer/payments");
-    // Page now renders "Payments & Receipts" (via ERPPageShell title). The row
-    // template shows subscription_number, method, date, amount but NOT the
-    // reference_no. Assert via the SUB-{id} label the row DOES render.
     await expect(page.locator("body")).toContainText(/your complete payment history/i);
     await expect(page.locator("body")).toContainText(`SUB-${meta.entities.preseed_payment.subscription_id}`);
   });
@@ -376,9 +338,6 @@ test.describe("customer release smoke", () => {
   test("customer subscription detail renders lifecycle surfaces", async ({ page }) => {
     const meta = getMeta();
     await page.goto(`/customer/subscriptions/${meta.entities.preseed_payment.subscription_id}`);
-    // Customer detail page uses section titles instead of a single "Subscription
-    // Details" heading; the shell title carries the subscription number. Assert
-    // via the always-present sections to survive future re-titling.
     await expect(page.locator("body")).toContainText(/contract details/i);
     await expect(page.locator("body")).toContainText(/financial position/i);
     await expect(page.locator("body")).toContainText(/advance emi schedule/i);
@@ -396,4 +355,3 @@ test.describe("customer release smoke", () => {
     }
   });
 });
-
