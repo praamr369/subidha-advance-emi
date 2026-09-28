@@ -168,7 +168,7 @@ test.describe("admin release smoke", () => {
     expect(createdBatchCode ?? batchCode).toBe(batchCode);
 
     await expect(page.getByText(/batch created/i)).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText(batchCode, { exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(batchCode, { exact: true }).first()).toBeVisible({ timeout: 15_000 });
   });
 
   test("admin payment collection and reversal work", async ({ page }) => {
