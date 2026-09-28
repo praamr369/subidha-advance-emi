@@ -4,7 +4,7 @@ from typing import Any, Dict, List
 from django.contrib.auth import get_user_model
 from django.db.models import QuerySet
 
-from subscriptions.models import DashboardMemo
+from system_jobs.models import DashboardMemo
 
 
 def _ev(id, date, title, source_type, href, is_completed, color, customer_name=None):
