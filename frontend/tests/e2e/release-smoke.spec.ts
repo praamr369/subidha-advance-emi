@@ -140,8 +140,12 @@ test.describe("admin release smoke", () => {
     await page.locator("#batch-status").selectOption(meta.entities.batch_create.status);
     const createBatchButton = page.locator('button[type="submit"]', { hasText: /create batch/i });
 
-    // Wait for button to become enabled (not just visible) — canSave must be
-    // true, which requires all fields including start-date to be non-empty.
+    // Wait for the React form to settle after the controlled date field update.
+    // Without a short settle window, the button can remain disabled even though
+    // the form fields appear filled, and the subsequent click never emits the
+    // expected POST request in CI.
+    await expect(createBatchButton).toBeEnabled({ timeout: 15_000 });
+    await page.waitForTimeout(500);
     await expect(createBatchButton).toBeEnabled({ timeout: 15_000 });
 
     const createBatchResponsePromise = page.waitForResponse((response) => {
