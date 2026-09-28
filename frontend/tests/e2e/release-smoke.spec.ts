@@ -120,12 +120,29 @@ test.describe("admin release smoke", () => {
     await page.locator("#total-slots").fill(String(meta.entities.batch_create.total_slots));
     await page.locator("#duration-months").fill(String(meta.entities.batch_create.duration_months));
     await page.locator("#draw-day").fill(String(meta.entities.batch_create.draw_day));
-    await page.locator("#start-date").fill(todayIso());
+    // Playwright's .fill() on HTML5 <input type="date"> can fail to trigger
+    // React's synthetic onChange in controlled components, leaving the state
+    // empty and the submit button disabled. Use nativeInputValueSetter +
+    // dispatching 'input' and 'change' events to guarantee React sees it.
+    const dateValue = todayIso();
+    const dateInput = page.locator("#start-date");
+    await dateInput.scrollIntoViewIfNeeded();
+    await dateInput.evaluate((el, val) => {
+      const nativeSetter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value"
+      )?.set;
+      if (nativeSetter) nativeSetter.call(el, val);
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+    }, dateValue);
+
     await page.locator("#batch-status").selectOption(meta.entities.batch_create.status);
     const createBatchButton = page.locator('button[type="submit"]', { hasText: /create batch/i });
-    await createBatchButton.waitFor({ state: "visible", timeout: 15_000 });
 
-    await page.waitForTimeout(500);
+    // Wait for button to become enabled (not just visible) — canSave must be
+    // true, which requires all fields including start-date to be non-empty.
+    await expect(createBatchButton).toBeEnabled({ timeout: 15_000 });
 
     const createBatchResponsePromise = page.waitForResponse((response) => {
       const request = response.request();
