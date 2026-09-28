@@ -296,7 +296,7 @@ class MilestoneReadinessComputationTests(TestCase):
             customer=self.customer,
             product=self.product,
             tenure_months=12,
-            start_date=date.today() + timedelta(days=1),
+            start_date=date.today() + timedelta(days=35),
             security_deposit_percent=Decimal("20.00"),
             performed_by=self.admin,
         )
