@@ -3,8 +3,8 @@ asttokens==3.0.1
 black==26.3.1
 celery==5.4.0
 redis==5.2.1
-cffi==2.0.0
-click==8.3.3
+cffi==1.16.0
+click==8.5.0
 cryptography==50.0.0
 decorator==5.2.1
 Django==5.2.16
@@ -55,4 +55,4 @@ wheel==0.46.3
 drf-spectacular==0.30.0
 pyotp==2.9.0
 qrcode==7.4.2
-django-mptt==0.16.0
+django-mppt==0.16.0
