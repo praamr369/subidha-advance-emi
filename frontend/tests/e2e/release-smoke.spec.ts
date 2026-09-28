@@ -120,11 +120,7 @@ test.describe("admin release smoke", () => {
     await page.locator("#total-slots").fill(String(meta.entities.batch_create.total_slots));
     await page.locator("#duration-months").fill(String(meta.entities.batch_create.duration_months));
     await page.locator("#draw-day").fill(String(meta.entities.batch_create.draw_day));
-    await page.locator("#start-date").evaluate((node: HTMLInputElement, value) => {
-      node.value = value;
-      node.dispatchEvent(new Event("input", { bubbles: true }));
-      node.dispatchEvent(new Event("change", { bubbles: true }));
-    }, todayIso());
+    await page.locator("#start-date").fill(todayIso());
     await page.locator("#batch-status").selectOption(meta.entities.batch_create.status);
     const createBatchButton = page.locator('button[type="submit"]', { hasText: /create batch/i });
     await createBatchButton.waitFor({ state: "visible", timeout: 15_000 });
@@ -136,13 +132,13 @@ test.describe("admin release smoke", () => {
       return (
         request.method() === "POST" &&
         response.url().includes("/api/v1/admin") &&
-        response.url().includes("batch") &&
-        response.ok()
+        response.url().includes("batch")
       );
     });
 
     await createBatchButton.click({ timeout: 15_000 });
     const createBatchResponse = await createBatchResponsePromise;
+    expect(createBatchResponse.ok(), `API failed: ${createBatchResponse.status()} ${createBatchResponse.statusText()}`).toBeTruthy();
 
     const payload = (await createBatchResponse.json()) as {
       id?: number;
