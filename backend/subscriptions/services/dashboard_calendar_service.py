@@ -1,42 +1,27 @@
-import datetime
-from dataclasses import dataclass
-from typing import Any, List, Dict
-from django.db.models import Q
-from system_jobs.models import DashboardMemo
+from datetime import date
+from typing import Any, Dict, List
 
-@dataclass
-class CalendarEventPayload:
-    id: str
-    date: str
-    title: str
-    source_type: str
-    href: str
-    is_completed: bool
-    color: str
-    customer_name: str | None = None
+from django.contrib.auth import get_user_model
+from django.db.models import QuerySet
 
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "date": self.date,
-            "title": self.title,
-            "source_type": self.source_type,
-            "href": self.href,
-            "is_completed": self.is_completed,
-            "color": self.color,
-            "customer_name": self.customer_name,
-        }
+from subscriptions.models import DashboardMemo
+
 
 def _ev(id, date, title, source_type, href, is_completed, color, customer_name=None):
-    return CalendarEventPayload(
-        id=id, date=date, title=title, source_type=source_type,
-        href=href, is_completed=is_completed, color=color,
-        customer_name=customer_name,
-    ).to_dict()
+    return {
+        "id": id,
+        "date": date,
+        "title": title,
+        "source_type": source_type,
+        "href": href,
+        "is_completed": is_completed,
+        "color": color,
+        "customer_name": customer_name,
+    }
 
 
-def fetch_dashboard_calendar_events(start_date: datetime.date, end_date: datetime.date, user) -> List[Dict[str, Any]]:
-    events = []
+def fetch_dashboard_calendar_events(start_date: date, end_date: date, user) -> List[Dict[str, Any]]:
+    events: List[Dict[str, Any]] = []
     dr = [start_date, end_date]
 
     # 1. Custom Memos
@@ -56,16 +41,15 @@ def fetch_dashboard_calendar_events(start_date: datetime.date, end_date: datetim
         for emi in emis:
             events.append(_ev(
                 f"emi-{emi.id}", emi.due_date.isoformat(),
-                f"EMI {emi.month_no} - {emi.subscription.subscription_no}",
+                f"EMI {emi.month_no} - {emi.subscription.subscription_number}",
                 "SUBSCRIPTION_EMI", f"/admin/customers/subscriptions/{emi.subscription.id}",
                 False, "red",
                 emi.subscription.customer.name if emi.subscription.customer else None,
             ))
-
-
     except Exception as e:
         import logging
         logging.getLogger(__name__).warning('Calendar events error in section %s: %s', '# 2. Subscription EMIs (Due)', str(e))
+
     # 3. Direct Sales (Outstanding)
     try:
         from billing.models import DirectSale
@@ -79,185 +63,9 @@ def fetch_dashboard_calendar_events(start_date: datetime.date, end_date: datetim
                 f"/admin/billing/direct-sale/{sale.id}", False, "orange",
                 sale.customer.name if sale.customer else None,
             ))
-
-
     except Exception as e:
         import logging
         logging.getLogger(__name__).warning('Calendar events error in section %s: %s', '# 3. Direct Sales (Outstanding)', str(e))
-    # 4. Purchase Orders (Expected Delivery)
-    try:
-        from inventory.models import PurchaseOrder
-        pos = PurchaseOrder.objects.filter(
-            expected_date__range=dr
-        ).exclude(status__in=["CANCELLED", "CLOSED"]).select_related('vendor')
-        for po in pos:
-            if po.expected_date:
-                events.append(_ev(
-                    f"po-{po.id}", po.expected_date.isoformat(),
-                    f"PO {po.po_no}", "PURCHASE_ORDER",
-                    f"/admin/inventory/po/{po.id}", po.status == "RECEIVED", "blue",
-                    po.vendor.name if po.vendor else None,
-                ))
 
-
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning('Calendar events error in section %s: %s', '# 4. Purchase Orders (Expected Delivery)', str(e))
-    # 5. CRM Leads (Follow-up Date)
-    try:
-        from crm.models import Lead, LeadStage
-        leads = Lead.objects.filter(
-            next_follow_up_at__date__range=dr
-        ).exclude(stage__in=[LeadStage.CONVERTED, LeadStage.LOST])
-        for lead in leads:
-            events.append(_ev(
-                f"lead-{lead.id}", lead.next_follow_up_at.date().isoformat() if lead.next_follow_up_at else "",
-                f"Follow-up: {lead.name}", "CRM_LEAD",
-                f"/admin/crm/leads/{lead.id}", False, "emerald", lead.name,
-            ))
-
-
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning('Calendar events error in section %s: %s', '# 5. CRM Leads (Follow-up Date)', str(e))
-    # 6. Deliveries (Scheduled)
-    try:
-        from deliveries.models import Delivery
-        deliveries = Delivery.objects.filter(
-            scheduled_date__range=dr
-        ).exclude(status__in=["DELIVERED", "CANCELLED"]).select_related('subscription', 'subscription__customer')
-        for d in deliveries:
-            cust = d.subscription.customer if d.subscription and d.subscription.customer_id else None
-            events.append(_ev(
-                f"del-{d.id}", d.scheduled_date.isoformat(),
-                f"Delivery - {d.subscription.subscription_no if d.subscription else d.id}",
-                "DELIVERY", f"/admin/deliveries/{d.id}", False, "orange",
-                cust.name if cust else None,
-            ))
-
-
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning('Calendar events error in section %s: %s', '# 6. Deliveries (Scheduled)', str(e))
-    # 7. Rent/Lease Billing Demands (Due)
-    try:
-        from payments.models import RentLeaseBillingDemand
-        from subscriptions.enums import RentLeaseDemandStatus
-        demands = RentLeaseBillingDemand.objects.filter(
-            due_date__range=dr,
-            status__in=[RentLeaseDemandStatus.PENDING, RentLeaseDemandStatus.PARTIAL, RentLeaseDemandStatus.OVERDUE],
-        ).select_related('subscription', 'subscription__customer')
-        for dem in demands:
-            cust = dem.subscription.customer if dem.subscription and dem.subscription.customer_id else None
-            events.append(_ev(
-                f"rld-{dem.id}", dem.due_date.isoformat(),
-                f"Rent/Lease Due - {dem.demand_type}",
-                "RENT_LEASE_DEMAND", f"/admin/rent-lease", False, "red",
-                cust.name if cust else None,
-            ))
-
-
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning('Calendar events error in section %s: %s', '# 7. Rent/Lease Billing Demands (Due)', str(e))
-    # 8. Vendor Bills (Due/Draft)
-    try:
-        from inventory.models import VendorBill, VendorBillStatus
-        vbills = VendorBill.objects.filter(
-            bill_date__range=dr,
-            status__in=[VendorBillStatus.DRAFT, VendorBillStatus.POSTED],
-        ).select_related('vendor')
-        for vb in vbills:
-            events.append(_ev(
-                f"vb-{vb.id}", vb.bill_date.isoformat(),
-                f"Vendor Bill {vb.bill_no}", "VENDOR_BILL",
-                f"/admin/inventory/vendor-bills/{vb.id}", False, "orange",
-                vb.vendor.name if vb.vendor else None,
-            ))
-
-
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning('Calendar events error in section %s: %s', '# 8. Vendor Bills (Due/Draft)', str(e))
-    # 9. Salary Sheets (by period month/year)
-    try:
-        from accounting.models import SalarySheet, SalarySheetStatus
-        sheets = SalarySheet.objects.filter(
-            year__gte=start_date.year, year__lte=end_date.year,
-            status__in=[SalarySheetStatus.DRAFT, SalarySheetStatus.APPROVED, SalarySheetStatus.POSTED],
-        )
-        for ss in sheets:
-            sheet_date = datetime.date(ss.year, ss.month, 1)
-            if start_date <= sheet_date <= end_date:
-                events.append(_ev(
-                    f"sal-{ss.id}", sheet_date.isoformat(),
-                    f"Payroll - {ss.employee.name if ss.employee else ss.id} ({ss.month}/{ss.year})",
-                    "SALARY", "/admin/hr/payroll", False, "blue",
-                ))
-    except Exception:
-        pass
-
-    # 10. Commissions (Pending)
-    try:
-        from subscriptions.models import Commission, CommissionStatus
-        comms = Commission.objects.filter(
-            status=CommissionStatus.PENDING,
-            created_at__date__range=dr,
-        ).select_related('partner')
-        for c in comms:
-            events.append(_ev(
-                f"com-{c.id}", c.created_at.date().isoformat(),
-                f"Commission Pending", "COMMISSION",
-                f"/admin/finance/commissions", False, "emerald",
-                c.partner.name if hasattr(c, 'partner') and c.partner else None,
-            ))
-    except Exception:
-        pass
-
-    # 11. Warranty Claims (Expiring)
-    try:
-        from service_desk.models import WarrantyClaim
-        wclaims = WarrantyClaim.objects.filter(
-            warranty_end_date__range=dr,
-        )
-        for wc in wclaims:
-            events.append(_ev(
-                f"wty-{wc.id}", wc.warranty_end_date.isoformat(),
-                f"Warranty Expiry - {wc.product.name if wc.product_id else wc.id}",
-                "WARRANTY", f"/admin/service-desk/warranty/{wc.id}", False, "red",
-            ))
-    except Exception:
-        pass
-
-    # 12. Production Jobs
-    try:
-        from manufacturing.models import ProductionJob, ProductionJobStatus
-        jobs = ProductionJob.objects.filter(
-            job_date__range=dr,
-        ).exclude(status__in=[ProductionJobStatus.COMPLETED, ProductionJobStatus.CANCELLED])
-        for j in jobs:
-            events.append(_ev(
-                f"pj-{j.id}", j.job_date.isoformat(),
-                f"Production - {j.job_no}", "PRODUCTION",
-                f"/admin/manufacturing/jobs/{j.id}", False, "blue",
-            ))
-    except Exception:
-        pass
-
-    # 13. Product Return Window Expiry
-    try:
-        from deliveries.models import ReturnEligibility
-        returns = ReturnEligibility.objects.filter(
-            delivery_date__range=dr,
-        )
-        for r in returns:
-            events.append(_ev(
-                f"ret-{r.id}", r.delivery_date.isoformat(),
-                f"Return Window - {r.id}", "PRODUCT_RETURN",
-                f"/admin/deliveries", False, "orange",
-            ))
-    except Exception:
-        pass
-
-    events.sort(key=lambda x: x["date"])
     return events
+

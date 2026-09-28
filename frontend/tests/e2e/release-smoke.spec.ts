@@ -122,18 +122,45 @@ test.describe("admin release smoke", () => {
     await page.locator("#draw-day").fill(String(meta.entities.batch_create.draw_day));
     await page.locator("#start-date").fill(todayIso());
     await page.locator("#batch-status").selectOption(meta.entities.batch_create.status);
-    // Wait for button to be visible and enabled
     const createBatchButton = page.locator('button[type="submit"]', { hasText: /create batch/i });
     await createBatchButton.waitFor({ state: "visible", timeout: 15_000 });
-    
-    // Add a small delay to ensure form is fully interactive
+
     await page.waitForTimeout(500);
-    
-    // Click with extended timeout
+
+    const createBatchResponsePromise = page.waitForResponse((response) => {
+      const request = response.request();
+      return (
+        request.method() === "POST" &&
+        response.url().includes("/api/v1/admin") &&
+        response.url().includes("batch") &&
+        response.ok()
+      );
+    });
+
     await createBatchButton.click({ timeout: 15_000 });
+    const createBatchResponse = await createBatchResponsePromise;
+
+    const payload = (await createBatchResponse.json()) as {
+      id?: number;
+      code?: string;
+      batch_code?: string;
+      batch?: {
+        id?: number;
+        code?: string;
+        batch_code?: string;
+      };
+    };
+
+    const createdBatchCode =
+      payload.batch_code ??
+      payload.code ??
+      payload.batch?.batch_code ??
+      payload.batch?.code;
+
+    expect(createdBatchCode ?? batchCode).toBe(batchCode);
 
     await expect(page.getByText(/batch created/i)).toBeVisible();
-    await expect(page.locator("body")).toContainText(batchCode);
+    await expect(page.getByText(batchCode, { exact: true })).toBeVisible();
   });
 
   test("admin payment collection and reversal work", async ({ page }) => {
@@ -348,3 +375,4 @@ test.describe("customer release smoke", () => {
     }
   });
 });
+
