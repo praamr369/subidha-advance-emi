@@ -1,7 +1,7 @@
 // frontend/src/app/(auth)/login/page.tsx
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
 import {
   Eye,
@@ -53,7 +53,8 @@ function toMessage(error: unknown): string {
 function isExternalUrl(target: string): boolean {
   return /^https?:\/\//i.test(target);
 }
-export default function LoginPage() {
+
+function LoginContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -306,5 +307,13 @@ export default function LoginPage() {
         </div>
       </form>
     </AuthLayoutShell>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center p-4"><div className="animate-pulse">Loading login...</div></div>}>
+      <LoginContent />
+    </Suspense>
   );
 }
