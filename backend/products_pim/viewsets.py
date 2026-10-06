@@ -875,7 +875,52 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
             return ProductVariantCreateSerializer
         return ProductVariantSerializer
 
+
+    def _handle_variant_file_uploads(self, request):
+        data = request.data.copy() if hasattr(request.data, "copy") else request.data
+        from django.core.files.storage import default_storage
+        import uuid
+        
+        if 'image' in request.FILES:
+            file_obj = request.FILES['image']
+            ext = file_obj.name.split('.')[-1] if '.' in file_obj.name else 'bin'
+            filename = f"{uuid.uuid4().hex[:10]}.{ext}"
+            path = default_storage.save(f"pim/variants/{filename}", file_obj)
+            data['image'] = request.build_absolute_uri(default_storage.url(path))
+            
+        if 'video' in request.FILES:
+            file_obj = request.FILES['video']
+            ext = file_obj.name.split('.')[-1] if '.' in file_obj.name else 'bin'
+            filename = f"{uuid.uuid4().hex[:10]}.{ext}"
+            path = default_storage.save(f"pim/variants/videos/{filename}", file_obj)
+            data['video'] = request.build_absolute_uri(default_storage.url(path))
+            
+        return data
+
+    def create(self, request, *args, **kwargs):
+        data = self._handle_variant_file_uploads(request)
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        from rest_framework.response import Response
+        from rest_framework import status
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        data = self._handle_variant_file_uploads(request)
+        serializer = self.get_serializer(instance, data=data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        if getattr(instance, '_prefetched_objects_cache', None):
+            instance._prefetched_objects_cache = {}
+        from rest_framework.response import Response
+        return Response(serializer.data)
+
     def perform_update(self, serializer):
+
         variant = serializer.save()
         PIMSyncService.sync_variant_to_operational_product(variant)
 
@@ -975,6 +1020,48 @@ class ProductMediaItemViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         from .serializers import ProductMediaItemSerializer
         return ProductMediaItemSerializer
+
+
+    def _handle_file_uploads(self, request):
+        data = request.data.copy() if hasattr(request.data, "copy") else request.data
+        from django.core.files.storage import default_storage
+        import uuid
+        
+        if 'file' in request.FILES:
+            file_obj = request.FILES['file']
+            ext = file_obj.name.split('.')[-1] if '.' in file_obj.name else 'bin'
+            filename = f"{uuid.uuid4().hex[:10]}.{ext}"
+            path = default_storage.save(f"pim/gallery/{filename}", file_obj)
+            data['file'] = request.build_absolute_uri(default_storage.url(path))
+            
+        if 'ios_file' in request.FILES:
+            file_obj = request.FILES['ios_file']
+            ext = file_obj.name.split('.')[-1] if '.' in file_obj.name else 'bin'
+            filename = f"{uuid.uuid4().hex[:10]}.{ext}"
+            path = default_storage.save(f"pim/models/ios/{filename}", file_obj)
+            data['ios_file'] = request.build_absolute_uri(default_storage.url(path))
+            
+        return data
+
+    def create(self, request, *args, **kwargs):
+        data = self._handle_file_uploads(request)
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        from rest_framework.response import Response
+        from rest_framework import status
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        data = self._handle_file_uploads(request)
+        serializer = self.get_serializer(instance, data=data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        from rest_framework.response import Response
+        return Response(serializer.data)
 
     @action(detail=True, methods=["post"])
     def set_hero(self, request, pk=None):
