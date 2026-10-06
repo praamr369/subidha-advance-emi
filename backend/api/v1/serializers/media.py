@@ -10,6 +10,13 @@ def serialize_media_url(request, field_file) -> str | None:
         except (AttributeError, ValueError):
             return None
 
+    if image_url.startswith("http://") or image_url.startswith("https://"):
+        pass
+    elif not image_url.startswith("/"):
+        from django.conf import settings
+        media_url = getattr(settings, 'MEDIA_URL', '/media/')
+        image_url = f"{media_url}{image_url}"
+
     if request is None:
         return image_url
 
