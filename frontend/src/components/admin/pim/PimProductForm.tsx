@@ -713,7 +713,12 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
         ar_height_cm: arHeight || null,
         locked_attributes: Array.from(lockedAttributes),
         attributes: buildAttrPayload(attributes, attrValues),
-        ...(removedAttrIds.size > 0 ? { remove_attributes: Array.from(removedAttrIds) } : {}),
+        ...( (removedAttrIds.size > 0 || attributes.some(a => { const v = attrValues[a.id]; return !v || (v.value_text === "" && v.value_number === "" && v.value_boolean === null && v.value_date === ""); })) ? {
+          remove_attributes: Array.from(new Set([
+            ...Array.from(removedAttrIds),
+            ...attributes.filter(a => { const v = attrValues[a.id]; return !v || (v.value_text === "" && v.value_number === "" && v.value_boolean === null && v.value_date === ""); }).map(a => a.id)
+          ]))
+        } : {}),
         ...(!isEdit ? { product_type: defaultProductType } : {}),
       };
       if (isEdit && productId) {

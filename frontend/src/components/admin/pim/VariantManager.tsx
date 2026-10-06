@@ -609,7 +609,6 @@ export default function VariantManager({ productId, productCode, productName, ba
       barcode: state.barcode || undefined,
       reorder_level: state.reorder_level ? Number(state.reorder_level) : undefined,
       attribute_values: Object.entries(state.attrValues)
-        .filter(([, v]) => v !== "")
         .map(([attrId, v]) => ({ attribute: Number(attrId), value_text: v })),
     });
     onRefresh();

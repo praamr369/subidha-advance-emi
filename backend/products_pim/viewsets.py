@@ -374,6 +374,26 @@ class PimProductViewSet(viewsets.ModelViewSet):
                 changed = True
             if changed:
                 op.save()
+                
+                # Also update the variant's PIM record if it exists
+                child_pim = op.pim.first() if hasattr(op, "pim") else None
+                if child_pim:
+                    pim_changed = False
+                    if push_description and child_pim.description != product.description:
+                        child_pim.description = product.description
+                        pim_changed = True
+                    if push_name and child_pim.name != product.name:
+                        child_pim.name = product.name
+                        pim_changed = True
+                    if pim_changed:
+                        update_fields = []
+                        if push_name:
+                            update_fields.append("name")
+                        if push_description:
+                            update_fields.append("description")
+                        if update_fields:
+                            child_pim.save(update_fields=update_fields)
+                        
                 updated += 1
         return Response({"updated": updated, "total_variants": product.variants.count()})
 
@@ -970,15 +990,23 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
             attribute_id = av.get("attribute")
             if not attribute_id:
                 continue
-            VariantAttributeValue.objects.update_or_create(
-                variant=variant,
-                attribute_id=attribute_id,
-                defaults={
-                    "value_text": av.get("value_text", ""),
-                    "value_number": av.get("value_number"),
-                    "value_boolean": av.get("value_boolean"),
-                },
-            )
+            
+            val_text = av.get("value_text", "")
+            val_num = av.get("value_number")
+            val_bool = av.get("value_boolean")
+            
+            if val_text == "" and val_num is None and val_bool is None:
+                VariantAttributeValue.objects.filter(variant=variant, attribute_id=attribute_id).delete()
+            else:
+                VariantAttributeValue.objects.update_or_create(
+                    variant=variant,
+                    attribute_id=attribute_id,
+                    defaults={
+                        "value_text": val_text,
+                        "value_number": val_num,
+                        "value_boolean": val_bool,
+                    },
+                )
 
         PIMSyncService.sync_variant_to_operational_product(variant)
         variant.refresh_from_db()
