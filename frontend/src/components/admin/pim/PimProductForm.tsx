@@ -494,15 +494,30 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
   useEffect(() => {
     if (!categoryId) { setSubcategories([]); setAttributes([]); return; }
     pimService.getSubcategories(Number(categoryId)).then(setSubcategories).catch(() => {});
-    pimService.getAttributes(Number(categoryId), undefined).then(setAttributes).catch(() => {});
   }, [categoryId]);
 
   useEffect(() => {
     if (!categoryId) return;
+    // To prevent unnecessary fetches when removing attributes locally
+    let active = true;
     pimService.getAttributes(Number(categoryId), subcategoryId ? Number(subcategoryId) : undefined)
-      .then(setAttributes)
+      .then((fetchedAttrs) => {
+        if (!active) return;
+        setAttributes(prev => {
+          // If editing the product's actual category, only show attributes that were explicitly saved
+          // (or newly added). But we shouldn't wipe out user's current 'prev' list if it already has items.
+          // Wait, if category changes, we WANT to wipe out prev.
+          if (productId && product && product.category === Number(categoryId) && (product.subcategory || null) === (subcategoryId ? Number(subcategoryId) : null)) {
+            const savedIds = new Set((product.attributes || []).map((a) => a.attribute));
+            return fetchedAttrs.filter((a) => savedIds.has(a.id));
+          } else {
+            return fetchedAttrs;
+          }
+        });
+      })
       .catch(() => {});
-  }, [categoryId, subcategoryId]);
+    return () => { active = false; };
+  }, [categoryId, subcategoryId, productId, product]);
 
   useEffect(() => {
     if (!productId) { setLoading(false); return; }
