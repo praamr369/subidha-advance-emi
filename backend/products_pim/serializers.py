@@ -510,9 +510,27 @@ class ProductMediaItemSerializer(serializers.ModelSerializer):
 
     def _absolute(self, field_file):
         request = self.context.get("request")
-        if field_file and request:
-            return request.build_absolute_uri(field_file) if isinstance(field_file, str) else request.build_absolute_uri(field_file.url)
-        return str(field_file) if field_file else None
+        if not field_file:
+            return None
+            
+        if isinstance(field_file, str):
+            val = field_file
+        else:
+            try:
+                val = field_file.url
+            except Exception:
+                return None
+                
+        if val.startswith("http://") or val.startswith("https://"):
+            pass
+        elif not val.startswith("/"):
+            from django.conf import settings
+            media_url = getattr(settings, 'MEDIA_URL', '/media/')
+            val = f"{media_url}{val}"
+            
+        if request:
+            return request.build_absolute_uri(val)
+        return val
 
     def get_file_url(self, obj):
         return self._absolute(obj.file)
