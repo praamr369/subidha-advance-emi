@@ -377,6 +377,9 @@ class PimProductViewSet(viewsets.ModelViewSet):
                 
                 # Also update the variant's PIM record if it exists
                 child_pim = op.pim.first() if hasattr(op, "pim") else None
+                if not child_pim:
+                    child_pim = PimProduct.objects.filter(code=variant.sku).first()
+
                 if child_pim:
                     pim_changed = False
                     if push_description and child_pim.description != product.description:
@@ -604,17 +607,23 @@ class PimProductViewSet(viewsets.ModelViewSet):
                 errors.append({"code": child.code, "error": "No operational product found"})
                 continue
             try:
-                pv = ProductVariant.objects.create(
-                    product=base,
-                    operational_product=core,
-                    sku=child.code,
-                    price=core.base_price or child.base_price,
-                    quantity_on_hand=0,
-                    reorder_level=5,
-                    is_active=True,
-                )
-                PIMSyncService.sync_variant_to_operational_product(pv)
-                adopted.append(child.code)
+                from django.db import transaction
+                with transaction.atomic():
+                    pv = ProductVariant.objects.create(
+                        product=base,
+                        operational_product=core,
+                        sku=child.code,
+                        price=core.base_price or child.base_price,
+                        quantity_on_hand=0,
+                        reorder_level=5,
+                        is_active=True,
+                    )
+                    PIMSyncService.sync_variant_to_operational_product(pv)
+                    # Ensure the PIM child is correctly linked to the Core product
+                    if child.source_product != core:
+                        child.source_product = core
+                        child.save(update_fields=["source_product"])
+                    adopted.append(child.code)
             except Exception as exc:
                 errors.append({"code": child.code, "error": str(exc)})
 
