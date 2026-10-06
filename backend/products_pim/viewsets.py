@@ -370,7 +370,7 @@ class PimProductViewSet(viewsets.ModelViewSet):
                 op.description = product.description
                 changed = True
             if push_name:
-                op.name = product.name
+                op.name = f"{product.name} ({variant.sku})"
                 changed = True
             if changed:
                 op.save()
@@ -603,24 +603,24 @@ class PimProductViewSet(viewsets.ModelViewSet):
                 continue
             # Find the operational product by product_code matching the child's code
             core = CoreProduct.objects.filter(product_code=child.code).first()
-            if not core:
-                errors.append({"code": child.code, "error": "No operational product found"})
-                continue
             try:
                 from django.db import transaction
+                from decimal import Decimal
                 with transaction.atomic():
                     pv = ProductVariant.objects.create(
                         product=base,
                         operational_product=core,
                         sku=child.code,
-                        price=core.base_price or child.base_price,
+                        price=(core.base_price if core else child.base_price) or Decimal("0"),
                         quantity_on_hand=0,
                         reorder_level=5,
                         is_active=True,
                     )
                     PIMSyncService.sync_variant_to_operational_product(pv)
-                    # Ensure the PIM child is correctly linked to the Core product
-                    if child.source_product != core:
+                    pv.refresh_from_db()
+                    core = pv.operational_product
+                    
+                    if core and child.source_product != core:
                         child.source_product = core
                         child.save(update_fields=["source_product"])
                     adopted.append(child.code)

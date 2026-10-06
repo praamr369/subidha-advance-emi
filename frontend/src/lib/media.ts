@@ -85,22 +85,8 @@ export function toBrowserReachableMediaUrl(value?: string | null): string | null
 export function shouldBypassNextImageOptimization(
   value?: string | null
 ): boolean {
-  const resolved = resolveApiMediaUrl(value);
-  if (!resolved) {
-    return false;
-  }
-
-  try {
-    const url = new URL(resolved);
-    const hostname = url.hostname.toLowerCase();
-
-    return (
-      hostname === "localhost" ||
-      hostname === "0.0.0.0" ||
-      hostname === "::1" ||
-      isPrivateIpv4Hostname(hostname)
-    );
-  } catch {
-    return false;
-  }
+  // Bypass Next.js image optimization globally to fix production rendering
+  // issues where Next.js cannot fetch the image from the backend or CDN
+  // for optimization.
+  return true;
 }

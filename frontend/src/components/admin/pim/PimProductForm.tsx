@@ -723,6 +723,8 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
       };
       if (isEdit && productId) {
         await pimService.updateProduct(productId, payload);
+        const updatedProduct = await pimService.getProductWithAttributes(productId);
+        setProduct(updatedProduct);
         setRemovedAttrIds(new Set());
         setSuccessMsg("Product saved successfully.");
         setTimeout(() => setSuccessMsg(null), 3000);
