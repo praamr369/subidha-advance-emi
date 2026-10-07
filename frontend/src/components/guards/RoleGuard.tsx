@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import { getStoredSession } from "@/lib/auth/session";
@@ -15,17 +15,12 @@ function normalizeRole(value: string | null | undefined): string {
   return (value || "").trim().toUpperCase();
 }
 
-function subscribeToHydration(onStoreChange: () => void): () => void {
-  const timeoutId = window.setTimeout(onStoreChange, 0);
-  return () => window.clearTimeout(timeoutId);
-}
-
 function useHydrated(): boolean {
-  return useSyncExternalStore(
-    subscribeToHydration,
-    () => true,
-    () => false
-  );
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+  return hydrated;
 }
 
 export default function RoleGuard({

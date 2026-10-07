@@ -28,16 +28,20 @@ export function useLogout() {
         // Local cleanup must still happen.
       }
     } finally {
-      queryClient.clear();
-      // Clear React context, local storage, tokens, and auth cookies together.
-      // Keeping the provider authenticated during navigation leaves protected
-      // shells mounted and can make the next login appear to be a broken app.
+      // 1. Set flag to prevent double routing from RoleGuard
       if (typeof window !== "undefined") {
         (window as any).__subidha_logging_out = true;
       }
+      
+      // 2. Clear AuthContext. This causes RoleGuard to unmount the protected dashboard
+      // immediately without throwing suspense/query errors.
       logout();
+      
+      // 3. Now that components are unmounted, it is safe to clear the query cache
+      queryClient.clear();
 
       if (typeof window !== "undefined") {
+        // 4. Hard navigation to completely wipe React memory and ensure a clean login page
         window.location.replace(ROUTES.public.login);
         return;
       }
