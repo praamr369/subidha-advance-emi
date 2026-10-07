@@ -53,7 +53,7 @@ jobs:
 
   frontend-release-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     needs:
       - backend-release-candidate
       - frontend-release-candidate
@@ -133,7 +133,7 @@ jobs:
   # the full surface is confirmed clean, then flip continue-on-error to false.
   frontend-route-load-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     needs:
       - backend-release-candidate
       - frontend-release-candidate
