@@ -455,6 +455,56 @@ class ProductVariantCreateSerializer(serializers.ModelSerializer):
                 )
         return variant
 
+    def update(self, instance, validated_data):
+        av_data = validated_data.pop("attribute_values", None)
+        old_sku = instance.sku
+
+        variant = super().update(instance, validated_data)
+
+        if av_data is not None:
+            VariantAttributeValue.objects.filter(variant=variant).delete()
+            for av in av_data:
+                attribute_id = av.get("attribute")
+                if attribute_id:
+                    VariantAttributeValue.objects.create(
+                        variant=variant,
+                        attribute_id=attribute_id,
+                        value_text=av.get("value_text", ""),
+                        value_number=av.get("value_number"),
+                        value_boolean=av.get("value_boolean"),
+                    )
+
+        try:
+            from products_pim.services.sync_service import PIMSyncService
+            PIMSyncService.sync_variant_to_operational_product(variant)
+        except ImportError:
+            pass
+
+        # If SKU was changed, update Operational and Register products
+        if old_sku and old_sku != variant.sku:
+            try:
+                from products_core.models import Product as CoreProduct
+                from subscriptions.models import Product as RegisterProduct
+                
+                # Update Core Product SKU and product_code
+                core = variant.operational_product
+                if not core:
+                    core = CoreProduct.objects.filter(product_code=old_sku).first()
+                if core:
+                    core.sku = variant.sku
+                    core.product_code = variant.sku
+                    core.save(update_fields=["sku", "product_code"])
+                    
+                # Update Register Product
+                register = RegisterProduct.objects.filter(product_code=old_sku).first()
+                if register:
+                    register.product_code = variant.sku
+                    register.save(update_fields=["product_code"])
+            except Exception:
+                pass
+
+        return variant
+
 from products_core.models import ProductRelationship
 
 class PimProductRelationshipSerializer(serializers.ModelSerializer):

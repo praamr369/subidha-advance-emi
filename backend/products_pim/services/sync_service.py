@@ -72,7 +72,10 @@ class PIMSyncService:
         # Update core_product fields
         core_product.name = f"{pim_product.name} ({variant.sku})"
         core_product.base_price = variant.price
+        
+        old_product_code = core_product.product_code
         core_product.sku = variant.sku
+        core_product.product_code = variant.sku
         core_product.is_active = variant.is_active
         if variant.image:
             core_product.image = variant.image
@@ -134,5 +137,15 @@ class PIMSyncService:
             prepare_inventory_profile_for_product(product_id=core_product.id)
         except Exception:
             pass
+            
+        if old_product_code and old_product_code != variant.sku:
+            try:
+                from subscriptions.models import Product as RegisterProduct
+                register = RegisterProduct.objects.filter(product_code=old_product_code).first()
+                if register:
+                    register.product_code = variant.sku
+                    register.save(update_fields=["product_code"])
+            except Exception:
+                pass
 
         return core_product
