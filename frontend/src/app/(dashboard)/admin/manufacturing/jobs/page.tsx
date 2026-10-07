@@ -141,6 +141,7 @@ export default function AdminManufacturingJobsPage() {
         job_type: "MANUFACTURING",
         finishing_category: "",
         finished_good_inventory_item: "",
+        bom: "",
         finished_good_inventory_item_option: null,
         bom_option: null,
         stock_location: "",
