@@ -119,13 +119,16 @@ export function storeSession(session: StoredSession): void {
   setSession(session);
 }
 
-export function clearSession(): void {
+export function clearSession(silent = false): void {
   if (!isBrowser()) return;
 
   window.localStorage.removeItem(SESSION_KEY);
   clearTokens();
   syncAuthCookies(null);
-  notifySessionChanged();
+  
+  if (!silent) {
+    notifySessionChanged();
+  }
 }
 
 export function getAccessToken(): string | null {

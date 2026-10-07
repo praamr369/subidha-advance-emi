@@ -5,7 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 
 import { ROUTES } from "@/lib/routes";
-import { getRefreshToken } from "@/lib/auth/session";
+import { getRefreshToken, clearSession } from "@/lib/auth/session";
 import { useAuth } from "@/providers/AuthProvider";
 import { logoutRequest } from "@/services/auth.service";
 
@@ -29,7 +29,9 @@ export function useLogout() {
       }
     } finally {
       queryClient.clear();
-      logout();
+      // Remove synchronous state wipe to prevent double navigation race conditions
+      // from layout RoleGuards while the browser is unloading.
+      clearSession(true);
 
       if (typeof window !== "undefined") {
         window.location.replace(ROUTES.public.login);
