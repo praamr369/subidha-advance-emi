@@ -1,5 +1,5 @@
-import { useCallback } from 'react';
 "use client";
+import { useCallback } from 'react';
 import { useQuery } from "@tanstack/react-query";
 
 import { BarChart3, Building2, CircleDollarSign, PackageSearch, Users } from "lucide-react";
