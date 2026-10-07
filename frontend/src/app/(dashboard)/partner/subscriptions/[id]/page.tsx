@@ -281,7 +281,7 @@ export default function PartnerSubscriptionDetailPage() {
   const pendingEmiCount =
     subscription?.pending_emi_count ?? emiRows.filter((row) => row.outstanding_amount > 0).length;
 
-  const timelineItems = useMemo<WorkspaceTimelineItem[]>(() => {
+  const timelineItems: WorkspaceTimelineItem[] = (() => {
     if (!subscription) {
       return [];
     }
@@ -345,14 +345,7 @@ export default function PartnerSubscriptionDetailPage() {
     }
 
     return items;
-  }, [
-    detailSemantics.winnerHeadline,
-    nextDueAge,
-    nextDueDate,
-    nextDueOverdue,
-    subscription,
-    winnerSummary?.draw_revealed_at,
-  ]);
+  })();
 
   const emiColumns = useMemo<Column<EmiRow>[]>(
     () => [

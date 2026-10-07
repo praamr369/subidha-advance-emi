@@ -580,7 +580,7 @@ export default function AdminSubscriptionsPage() {
     return queryString ? `${pathname}?${queryString}` : pathname;
   }
 
-  const listQueryString = useMemo(() => {
+  const listQueryString = (() => {
     const params = new URLSearchParams();
     if (currentSearchQuery) params.set("q", currentSearchQuery);
     if (currentStatusFilter) params.set("status", currentStatusFilter);
@@ -592,18 +592,9 @@ export default function AdminSubscriptionsPage() {
     params.set("page", String(currentPage));
     params.set("page_size", String(PAGE_SIZE));
     return params.toString();
-  }, [
-    currentBatchFilter,
-    currentCustomerFilter,
-    currentPage,
-    currentPartnerFilter,
-    currentPlanTypeFilter,
-    currentProductFilter,
-    currentSearchQuery,
-    currentStatusFilter,
-  ]);
+  })();
 
-  const filterQueryString = useMemo(() => {
+  const filterQueryString = (() => {
     const params = new URLSearchParams();
     if (currentSearchQuery) params.set("q", currentSearchQuery);
     if (currentStatusFilter) params.set("status", currentStatusFilter);
@@ -613,36 +604,26 @@ export default function AdminSubscriptionsPage() {
     if (currentPartnerFilter) params.set("partner", currentPartnerFilter);
     if (currentBatchFilter) params.set("batch", currentBatchFilter);
     return params.toString();
-  }, [
-    currentBatchFilter,
-    currentCustomerFilter,
-    currentPartnerFilter,
-    currentPlanTypeFilter,
-    currentProductFilter,
-    currentSearchQuery,
-    currentStatusFilter,
-  ]);
-
-  const loadInsights = useCallback(async () => {
-    if (isWorkflowLanding) return;
-    const suffix = filterQueryString ? `?${filterQueryString}` : "";
-    try {
-      const [kpiPayload, batchPayload] = await Promise.all([
-        apiFetch<unknown>(`/admin/subscriptions/kpis/${suffix}`),
-        apiFetch<unknown>(`/admin/subscriptions/batch-breakdown/${suffix}`),
-      ]);
-      setKpis(normalizeKpis(kpiPayload));
-      setBatchBreakdown(normalizeBatchBreakdown(batchPayload).results);
-    } catch {
-      // KPIs are supplementary — a failure here must not blank the register.
-      setKpis(null);
-      setBatchBreakdown([]);
-    }
-  }, [filterQueryString, isWorkflowLanding]);
+  })();
 
   useEffect(() => {
+    async function loadInsights() {
+      if (isWorkflowLanding) return;
+      const suffix = filterQueryString ? `?${filterQueryString}` : "";
+      try {
+        const [kpiPayload, batchPayload] = await Promise.all([
+          apiFetch<unknown>(`/admin/subscriptions/kpis/${suffix}`),
+          apiFetch<unknown>(`/admin/subscriptions/batch-breakdown/${suffix}`),
+        ]);
+        setKpis(normalizeKpis(kpiPayload));
+        setBatchBreakdown(normalizeBatchBreakdown(batchPayload).results);
+      } catch {
+        setKpis(null);
+        setBatchBreakdown([]);
+      }
+    }
     void loadInsights();
-  }, [loadInsights]);
+  }, [filterQueryString, isWorkflowLanding]);
 
   const { data: queryData, isLoading: loading, isRefetching: refreshing, error: queryError, refetch } = useQuery({
     queryKey: ["admin_subscriptions_list", listQueryString],
@@ -809,7 +790,7 @@ export default function AdminSubscriptionsPage() {
     [rows]
   );
 
-  const createSubscriptionHref = useMemo(() => {
+  const createSubscriptionHref = (() => {
     const params = new URLSearchParams();
     if (currentCustomerFilter) params.set("customer", currentCustomerFilter);
     if (currentProductFilter) params.set("product", currentProductFilter);
@@ -820,7 +801,7 @@ export default function AdminSubscriptionsPage() {
     return queryString
       ? `/admin/subscriptions/advance-emi/create?${queryString}`
       : "/admin/subscriptions/advance-emi/create";
-  }, [currentBatchFilter, currentCustomerFilter, currentPartnerFilter, currentProductFilter]);
+  })();
 
   if (isWorkflowLanding) {
     return <SubscriptionWorkflowLanding />;
