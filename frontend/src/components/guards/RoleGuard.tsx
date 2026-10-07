@@ -71,6 +71,9 @@ export default function RoleGuard({
     if (!isReady) return;
 
     if (!effectiveAuthenticated) {
+      if (typeof window !== "undefined" && (window as any).__subidha_logging_out) {
+        return;
+      }
       const next = pathname || "/";
       router.replace(`/login?next=${encodeURIComponent(next)}`);
       return;

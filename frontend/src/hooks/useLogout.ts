@@ -5,7 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 
 import { ROUTES } from "@/lib/routes";
-import { getRefreshToken, clearSession } from "@/lib/auth/session";
+import { getRefreshToken } from "@/lib/auth/session";
 import { useAuth } from "@/providers/AuthProvider";
 import { logoutRequest } from "@/services/auth.service";
 
@@ -29,9 +29,13 @@ export function useLogout() {
       }
     } finally {
       queryClient.clear();
-      // Remove synchronous state wipe to prevent double navigation race conditions
-      // from layout RoleGuards while the browser is unloading.
-      clearSession(true);
+      // Clear React context, local storage, tokens, and auth cookies together.
+      // Keeping the provider authenticated during navigation leaves protected
+      // shells mounted and can make the next login appear to be a broken app.
+      if (typeof window !== "undefined") {
+        (window as any).__subidha_logging_out = true;
+      }
+      logout();
 
       if (typeof window !== "undefined") {
         window.location.replace(ROUTES.public.login);
