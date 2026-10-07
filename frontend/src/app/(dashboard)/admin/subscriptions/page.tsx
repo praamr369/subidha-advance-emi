@@ -606,23 +606,25 @@ export default function AdminSubscriptionsPage() {
     return params.toString();
   })();
 
-  useEffect(() => {
-    async function loadInsights() {
-      if (isWorkflowLanding) return;
-      const suffix = filterQueryString ? `?${filterQueryString}` : "";
-      try {
-        const [kpiPayload, batchPayload] = await Promise.all([
-          apiFetch<unknown>(`/admin/subscriptions/kpis/${suffix}`),
-          apiFetch<unknown>(`/admin/subscriptions/batch-breakdown/${suffix}`),
-        ]);
-        setKpis(normalizeKpis(kpiPayload));
-        setBatchBreakdown(normalizeBatchBreakdown(batchPayload).results);
-      } catch {
-        setKpis(null);
-        setBatchBreakdown([]);
-      }
+  async function loadInsights() {
+    if (isWorkflowLanding) return;
+    const suffix = filterQueryString ? `?${filterQueryString}` : "";
+    try {
+      const [kpiPayload, batchPayload] = await Promise.all([
+        apiFetch<unknown>(`/admin/subscriptions/kpis/${suffix}`),
+        apiFetch<unknown>(`/admin/subscriptions/batch-breakdown/${suffix}`),
+      ]);
+      setKpis(normalizeKpis(kpiPayload));
+      setBatchBreakdown(normalizeBatchBreakdown(batchPayload).results);
+    } catch {
+      setKpis(null);
+      setBatchBreakdown([]);
     }
+  }
+
+  useEffect(() => {
     void loadInsights();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterQueryString, isWorkflowLanding]);
 
   const { data: queryData, isLoading: loading, isRefetching: refreshing, error: queryError, refetch } = useQuery({
