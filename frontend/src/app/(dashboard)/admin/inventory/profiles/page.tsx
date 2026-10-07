@@ -121,10 +121,10 @@ export default function InventoryProfilesPage() {
         });
         await loadPage();
       } else {
-        setActionError(`Bulk prepare failed. Updated ${result.updated_count} of ${selectedIds.length} items.`);
+        setMessage(`Bulk prepare failed. Updated ${result.updated_count} of ${selectedIds.length} items.`);
       }
     } catch (err) {
-      setActionError(accountingErrorMessage(err, "Bulk prepare failed."));
+      setMessage(accountingErrorMessage(err, "Bulk prepare failed."));
     } finally {
       setBulkPrepareLoading(false);
     }
@@ -151,7 +151,7 @@ export default function InventoryProfilesPage() {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
     } catch (err) {
-      setActionError(accountingErrorMessage(err, "CSV export failed."));
+      setMessage(accountingErrorMessage(err, "CSV export failed."));
     }
   };
 

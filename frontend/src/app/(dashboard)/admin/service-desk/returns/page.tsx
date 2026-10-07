@@ -136,7 +136,7 @@ export default function AdminServiceDeskReturnsPage() {
       });
       await loadPage();
     } catch (err) {
-      setActionError(toErrorMessage(err));
+      setNotice(toErrorMessage(err));
     } finally {
       setSaving(false);
     }

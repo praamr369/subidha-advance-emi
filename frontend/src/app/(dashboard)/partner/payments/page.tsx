@@ -66,7 +66,7 @@ export default function PartnerPaymentsPage() {
           fallback.summary?.total_paid_amount ?? fallback.summary?.total_revenue_collected ?? 0
         );
         return {
-          results: fallbackRows as any,
+          results: fallbackRows as PartnerPayment[],
           count: fallbackRows.length,
           total_collected: Number.isFinite(fallbackTotal) ? fallbackTotal.toFixed(2) : "0.00",
         };

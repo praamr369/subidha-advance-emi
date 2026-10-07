@@ -84,7 +84,7 @@ export default function AccountingDebitNotesPage() {
       await loadPage();
     } catch (err) {
       setNotice(null);
-      setActionError(accountingErrorMessage(err, "Failed to create the debit note."));
+      setNotice(accountingErrorMessage(err, "Failed to create the debit note."));
     }
   }
 
@@ -95,7 +95,7 @@ export default function AccountingDebitNotesPage() {
       await loadPage();
     } catch (err) {
       setNotice(null);
-      setActionError(accountingErrorMessage(err, "Failed to approve the debit note."));
+      setNotice(accountingErrorMessage(err, "Failed to approve the debit note."));
     }
   }
 
@@ -106,7 +106,7 @@ export default function AccountingDebitNotesPage() {
       await loadPage();
     } catch (err) {
       setNotice(null);
-      setActionError(accountingErrorMessage(err, "Failed to post the debit note."));
+      setNotice(accountingErrorMessage(err, "Failed to post the debit note."));
     }
   }
 
@@ -117,7 +117,7 @@ export default function AccountingDebitNotesPage() {
       await loadPage();
     } catch (err) {
       setNotice(null);
-      setActionError(accountingErrorMessage(err, "Failed to cancel the debit note."));
+      setNotice(accountingErrorMessage(err, "Failed to cancel the debit note."));
     }
   }
 

@@ -210,7 +210,7 @@ export default function AdminServiceDeskTicketsPage() {
       setLookupResult(null);
       await loadPage();
     } catch (err) {
-      setActionError(toErrorMessage(err));
+      setNotice(toErrorMessage(err));
     } finally {
       setSaving(false);
     }

@@ -118,7 +118,7 @@ export default function AccountingTaxInvoicesPage() {
       await loadPage();
     } catch (err) {
       setNotice(null);
-      setActionError(accountingErrorMessage(err, "Failed to create the tax invoice."));
+      setNotice(accountingErrorMessage(err, "Failed to create the tax invoice."));
     }
   }
 
@@ -129,7 +129,7 @@ export default function AccountingTaxInvoicesPage() {
       await loadPage();
     } catch (err) {
       setNotice(null);
-      setActionError(accountingErrorMessage(err, "Failed to approve the tax invoice."));
+      setNotice(accountingErrorMessage(err, "Failed to approve the tax invoice."));
     }
   }
 
@@ -140,7 +140,7 @@ export default function AccountingTaxInvoicesPage() {
       await loadPage();
     } catch (err) {
       setNotice(null);
-      setActionError(accountingErrorMessage(err, "Failed to post the tax invoice."));
+      setNotice(accountingErrorMessage(err, "Failed to post the tax invoice."));
     }
   }
 
@@ -151,7 +151,7 @@ export default function AccountingTaxInvoicesPage() {
       await loadPage();
     } catch (err) {
       setNotice(null);
-      setActionError(accountingErrorMessage(err, "Failed to cancel the tax invoice."));
+      setNotice(accountingErrorMessage(err, "Failed to cancel the tax invoice."));
     }
   }
 
