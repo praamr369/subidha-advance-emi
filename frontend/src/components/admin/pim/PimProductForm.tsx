@@ -509,7 +509,29 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
           // Wait, if category changes, we WANT to wipe out prev.
           if (productId && product && product.category === Number(categoryId) && (product.subcategory || null) === (subcategoryId ? Number(subcategoryId) : null)) {
             const savedIds = new Set((product.attributes || []).map((a) => a.attribute));
-            return fetchedAttrs.filter((a) => savedIds.has(a.id));
+            const categoryAttrIds = new Set(fetchedAttrs.map(a => a.id));
+            
+            const matchedAttrs = fetchedAttrs.filter((a) => savedIds.has(a.id));
+            
+            // Add attributes that are saved on the product but not in the category's default list
+            const extraAttrs = (product.attributes || [])
+              .filter((a) => !categoryAttrIds.has(a.attribute))
+              .map((a) => ({
+                id: a.attribute,
+                name: a.attribute_name,
+                slug: a.attribute_slug,
+                data_type: a.data_type as PimCategoryAttribute["data_type"],
+                is_required: false,
+                is_variant_defining: false,
+                min_value: null,
+                max_value: null,
+                display_order: 999,
+              } as PimCategoryAttribute));
+              
+            // Also keep any extra attributes that were mapped manually during this session
+            const sessionExtraAttrs = prev.filter(a => !categoryAttrIds.has(a.id) && !savedIds.has(a.id) && !removedAttrIds.has(a.id));
+              
+            return [...matchedAttrs, ...extraAttrs, ...sessionExtraAttrs];
           } else {
             return fetchedAttrs;
           }
@@ -517,7 +539,7 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
       })
       .catch(() => {});
     return () => { active = false; };
-  }, [categoryId, subcategoryId, productId, product]);
+  }, [categoryId, subcategoryId, productId, product, removedAttrIds]);
 
   useEffect(() => {
     if (!productId) { setLoading(false); return; }
@@ -725,6 +747,7 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
         await pimService.updateProduct(productId, payload);
         const updatedProduct = await pimService.getProductWithAttributes(productId);
         setProduct(updatedProduct);
+        await refreshVariants();
         setRemovedAttrIds(new Set());
         setSuccessMsg("Product saved successfully.");
         setTimeout(() => setSuccessMsg(null), 3000);
@@ -753,8 +776,9 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
       const result = await pimService.adoptOrphanVariants(productId);
       setAdoptResult(result.message);
       if (result.adopted.length > 0) await refreshVariants();
-    } catch (err: any) {
-      const msg = err?.body?.message || err?.message || "Adopt failed — check backend logs";
+    } catch (err: unknown) {
+      const e = err as { body?: { message?: string }, message?: string };
+      const msg = e?.body?.message || e?.message || "Adopt failed — check backend logs";
       setAdoptResult(`Adopt failed: ${msg}`);
     } finally {
       setAdopting(false);

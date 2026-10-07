@@ -39,7 +39,7 @@ class PIMSyncService:
                 raise ValidationError({"sku": "An operational product already uses this code."})
             operational.product_code = new_sku
             operational.sku = new_sku
-            operational.save(update_fields=["product_code", "sku", "updated_at"])
+            operational.save(update_fields=["product_code", "sku"])
 
         return variant
 

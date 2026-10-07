@@ -91,6 +91,50 @@ class PimProductViewSet(viewsets.ModelViewSet):
     # the admin PIM tree show only 20 blueprints and broke its page maths.
     pagination_class = AdminListPagination
 
+    def perform_update(self, serializer):
+        instance = self.get_object()
+        old_code = instance.code
+        old_name = instance.name
+        
+        pim_product = serializer.save()
+        
+        name_changed = pim_product.name != old_name
+        code_changed = pim_product.code != old_code
+        
+        if name_changed or code_changed:
+            from products_pim.services.sync_service import PIMSyncService
+            from products_core.models import Product as CoreProduct
+            
+            # Sync variants automatically
+            for variant in pim_product.variants.select_related("operational_product").all():
+                op = variant.operational_product
+                
+                # If code changed, rename SKU safely if it starts with old_code
+                if code_changed and variant.sku and old_code and variant.sku.startswith(old_code):
+                    old_variant_sku = variant.sku
+                    new_sku = pim_product.code + old_variant_sku[len(old_code):]
+                    variant.sku = new_sku
+                    variant.save(update_fields=["sku"])
+                    try:
+                        PIMSyncService.rename_variant_sku(variant, old_sku=old_variant_sku)
+                    except Exception:
+                        pass
+                
+                # If name changed, update op.name and child_pim.name
+                if name_changed:
+                    if op:
+                        op.name = f"{pim_product.name} ({variant.sku})"
+                        op.save(update_fields=["name", "updated_at"])
+                    
+                    # Update variant's PimProduct (child_pim)
+                    child_pim = op.pim.first() if op and hasattr(op, "pim") else None
+                    if not child_pim:
+                        child_pim = PimProduct.objects.filter(code=variant.sku).first()
+                    if child_pim:
+                        child_pim.name = pim_product.name
+                        child_pim.save(update_fields=["name", "updated_at"])
+
+
     def get_queryset(self):
         qs = PimProduct.objects.select_related("category", "subcategory", "parent__category", "parent__subcategory").prefetch_related(
             "attributes__attribute",
