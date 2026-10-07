@@ -423,7 +423,7 @@ class PimProductCreateUpdateSerializer(serializers.ModelSerializer):
             core.product_code = pim_product.code
             if core.sku == old_code:
                 core.sku = pim_product.code
-            core.save(update_fields=["product_code", "sku", "updated_at"])
+            core.save(update_fields=["product_code", "sku"])
 
         register = RegisterProduct.objects.filter(product_code=old_code).first()
         if register:

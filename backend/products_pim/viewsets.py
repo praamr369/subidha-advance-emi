@@ -124,7 +124,7 @@ class PimProductViewSet(viewsets.ModelViewSet):
                 if name_changed:
                     if op:
                         op.name = f"{pim_product.name} ({variant.sku})"
-                        op.save(update_fields=["name", "updated_at"])
+                        op.save(update_fields=["name"])
                     
                     # Update variant's PimProduct (child_pim)
                     child_pim = op.pim.first() if op and hasattr(op, "pim") else None
