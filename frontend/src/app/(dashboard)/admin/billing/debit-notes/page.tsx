@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
+import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
 import { BILLING_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
@@ -22,25 +22,33 @@ import {
 
 export default function BillingDebitNotesPage() {
   const [rows, setRows] = useState<BillingDebitNote[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  async function loadPage() {
-    try {
+  const { data: queryData, isLoading: loading, error: queryError, refetch } = useQuery({
+    queryKey: ["billing_debit_notes"],
+    queryFn: async () => {
       const payload = await listBillingDebitNotes();
-      setRows(payload.results);
-      setError(null);
-    } catch (err) {
-      setRows([]);
-      setError(accountingErrorMessage(err, "Failed to load billing debit notes."));
-    } finally {
-      setLoading(false);
-    }
-  }
+      return payload.results;
+    },
+  });
+
+  const loadPage = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
 
   useEffect(() => {
-    void loadPage();
-  }, []);
+    if (queryData) {
+      setRows(queryData);
+      setError(null);
+    }
+  }, [queryData]);
+
+  useEffect(() => {
+    if (queryError) {
+      setRows([]);
+      setError(accountingErrorMessage(queryError, "Failed to load billing debit notes."));
+    }
+  }, [queryError]);
 
   const columns: EnterpriseColumnDef<BillingDebitNote>[] = [
     { key: "note_date", header: "Date", render: (row) => accountingDate(row.note_date) },

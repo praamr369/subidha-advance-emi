@@ -647,8 +647,6 @@ export default function AdminCollectionsPage() {
   const [overdueRows, setOverdueRows] = useState<EmiRow[]>([]);
   const [recentPayments, setRecentPayments] = useState<PaymentRegisterRow[]>([]);
   const [directSaleRows, setDirectSaleRows] = useState<DirectSale[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [unifiedSearchQuery, setUnifiedSearchQuery] = useState("");
@@ -659,59 +657,74 @@ export default function AdminCollectionsPage() {
   const [unifiedSearchError, setUnifiedSearchError] = useState<string | null>(null);
   const [unifiedSearchSubmitted, setUnifiedSearchSubmitted] = useState(false);
 
-  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
-    const today = localDateISO();
-
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
-
-    try {
+  const {
+    data: payload,
+    isLoading: loading,
+    isFetching,
+    error: queryError,
+    isError,
+    refetch,
+  } = useQuery({
+    queryKey: ["collectionsWorkspace"],
+    queryFn: async () => {
+      const today = localDateISO();
       const [
         dueTodayPayload,
         overduePayload,
         recentPaymentsPayload,
         directSalesPayload,
-      ] =
-        await Promise.all([
-          apiFetch<unknown>(
-            `/admin/emis/?status=PENDING&date_from=${today}&date_to=${today}`
-          ),
-          apiFetch<unknown>("/admin/emis/?overdue_only=true"),
-          getAdminPaymentRegister({
-            dateFrom: today,
-            dateTo: today,
-          }),
-          listDirectSales({
-            outstanding_only: "true",
-          }),
-        ]);
+      ] = await Promise.all([
+        apiFetch<unknown>(
+          `/admin/emis/?status=PENDING&date_from=${today}&date_to=${today}`
+        ),
+        apiFetch<unknown>("/admin/emis/?overdue_only=true"),
+        getAdminPaymentRegister({
+          dateFrom: today,
+          dateTo: today,
+        }),
+        listDirectSales({
+          outstanding_only: "true",
+        }),
+      ]);
 
-      setDueTodayRows(
-        toArray<Record<string, unknown>>(dueTodayPayload).map(normalizeEmi)
-      );
-      setOverdueRows(
-        toArray<Record<string, unknown>>(overduePayload).map(normalizeEmi)
-      );
-      setRecentPayments(recentPaymentsPayload.results);
-      setDirectSaleRows(directSalesPayload.results);
-      setError(null);
-    } catch (err) {
-      setError(toErrorMessage(err));
-      if (mode === "initial") {
-        setDueTodayRows([]);
-        setOverdueRows([]);
-        setRecentPayments([]);
-        setDirectSaleRows([]);
-      }
-    } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
-    }
-  }, []);
+      return {
+        dueTodayPayload,
+        overduePayload,
+        recentPaymentsPayload,
+        directSalesPayload,
+      };
+    },
+  });
+
+  const refreshing = isFetching && !loading;
+
+  const loadPage = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
 
   useEffect(() => {
-    void loadPage();
-  }, [loadPage]);
+    if (payload) {
+      setDueTodayRows(
+        toArray<Record<string, unknown>>(payload.dueTodayPayload).map(normalizeEmi)
+      );
+      setOverdueRows(
+        toArray<Record<string, unknown>>(payload.overduePayload).map(normalizeEmi)
+      );
+      setRecentPayments(payload.recentPaymentsPayload.results);
+      setDirectSaleRows(payload.directSalesPayload.results);
+      setError(null);
+    }
+  }, [payload]);
+
+  useEffect(() => {
+    if (isError) {
+      setError(toErrorMessage(queryError));
+      setDueTodayRows([]);
+      setOverdueRows([]);
+      setRecentPayments([]);
+      setDirectSaleRows([]);
+    }
+  }, [isError, queryError]);
 
   async function handleUnifiedReceivableSearch(query: string) {
     const trimmed = query.trim();

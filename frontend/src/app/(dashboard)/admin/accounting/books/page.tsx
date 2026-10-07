@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
@@ -57,12 +58,37 @@ function badgeClass(tone: "green" | "amber" | "red" | "blue" | "slate") {
 }
 
 export default function AccountingBooksPage() {
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [readiness, setReadiness] = useState<AccountingBooksReadiness | null>(null);
   const [moneyMovements, setMoneyMovements] = useState<MoneyMovement[]>([]);
+  
+  const query = useQuery({
+    queryKey: ["accountingBooksData"],
+    queryFn: async () => {
+      const [readinessPayload, movementPayload] = await Promise.all([
+        getAccountingBooksReadiness(),
+        listMoneyMovements(),
+      ]);
+      return { readiness: readinessPayload, moneyMovements: movementPayload.results };
+    },
+  });
+
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const error = query.error ? toErrorMessage(query.error) : null;
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (query.data) {
+      setReadiness(query.data.readiness);
+      setMoneyMovements(query.data.moneyMovements);
+    }
+  }, [query.data]);
+
+  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
+    await query.refetch();
+  }, [query]);
+
   const [movementForm, setMovementForm] = useState({
     movement_date: new Date().toISOString().slice(0, 10),
     from_finance_account: "",
@@ -71,34 +97,6 @@ export default function AccountingBooksPage() {
     reference_no: "",
     notes: "",
   });
-
-  async function loadPage(mode: "initial" | "refresh" = "initial") {
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
-
-    try {
-      const [readinessPayload, movementPayload] = await Promise.all([
-        getAccountingBooksReadiness(),
-        listMoneyMovements(),
-      ]);
-      setReadiness(readinessPayload);
-      setMoneyMovements(movementPayload.results);
-      setError(null);
-    } catch (err) {
-      setError(toErrorMessage(err));
-      if (mode === "initial") {
-        setReadiness(null);
-        setMoneyMovements([]);
-      }
-    } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
-    }
-  }
-
-  useEffect(() => {
-    void loadPage();
-  }, []);
 
   const eligibleAccounts = readiness?.movement_eligible_accounts ?? [];
   const financeAccounts = readiness?.finance_accounts ?? [];
@@ -138,7 +136,7 @@ export default function AccountingBooksPage() {
       await loadPage();
     } catch (err) {
       setNotice(null);
-      setError(toErrorMessage(err));
+      setActionError(toErrorMessage(err));
     }
   }
 
@@ -149,7 +147,7 @@ export default function AccountingBooksPage() {
       await loadPage();
     } catch (err) {
       setNotice(null);
-      setError(toErrorMessage(err));
+      setActionError(toErrorMessage(err));
     }
   }
 
@@ -195,7 +193,7 @@ export default function AccountingBooksPage() {
               />
             ) : null}
             {loading ? <LoadingBlock label="Loading books..." /> : null}
-            {!loading && error ? <ErrorState title="Unable to load books" description={error} onRetry={() => void loadPage()} /> : null}
+            {!loading && (error || actionError) ? <ErrorState title="Unable to load books" description={error || actionError || undefined} onRetry={() => void loadPage()} /> : null}
           </div>
         }
         register={

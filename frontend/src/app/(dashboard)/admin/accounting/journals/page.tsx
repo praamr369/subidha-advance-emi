@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
@@ -46,12 +47,10 @@ function fieldClassName() {
 }
 
 export default function AccountingJournalsPage() {
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [chartAccounts, setChartAccounts] = useState<ChartOfAccount[]>([]);
   const [journals, setJournals] = useState<JournalEntry[]>([]);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [journalForm, setJournalForm] = useState({
     entry_date: new Date().toISOString().slice(0, 10),
     memo: "",
@@ -61,33 +60,35 @@ export default function AccountingJournalsPage() {
     credit_account: "",
   });
 
-  async function loadPage(mode: "initial" | "refresh" = "initial") {
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
-
-    try {
+  const query = useQuery({
+    queryKey: ["accounting", "journals"],
+    queryFn: async () => {
       const [chartPayload, journalPayload] = await Promise.all([
         listChartOfAccounts(),
         listJournalEntries(),
       ]);
-      setChartAccounts(chartPayload.results);
-      setJournals(journalPayload.results);
-      setError(null);
-    } catch (err) {
-      setError(toErrorMessage(err));
-      if (mode === "initial") {
-        setChartAccounts([]);
-        setJournals([]);
-      }
-    } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
-    }
-  }
+      return {
+        chartAccounts: chartPayload.results,
+        journals: journalPayload.results,
+      };
+    },
+  });
+
+  const loading = query.isLoading;
+  const refreshing = query.isRefetching && !query.isLoading;
+  const error = (query.error ? toErrorMessage(query.error) : null) || actionError;
 
   useEffect(() => {
-    void loadPage();
-  }, []);
+    if (query.data) {
+      setChartAccounts(query.data.chartAccounts);
+      setJournals(query.data.journals);
+      setActionError(null);
+    }
+  }, [query.data]);
+
+  const loadPage = useCallback(async () => {
+    await query.refetch();
+  }, [query]);
 
   async function handleCreateJournal(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -123,7 +124,7 @@ export default function AccountingJournalsPage() {
       await loadPage();
     } catch (err) {
       setNotice(null);
-      setError(toErrorMessage(err));
+      setActionError(toErrorMessage(err));
     }
   }
 
@@ -134,7 +135,7 @@ export default function AccountingJournalsPage() {
       await loadPage();
     } catch (err) {
       setNotice(null);
-      setError(toErrorMessage(err));
+      setActionError(toErrorMessage(err));
     }
   }
 
@@ -148,7 +149,7 @@ export default function AccountingJournalsPage() {
       await loadPage();
     } catch (err) {
       setNotice(null);
-      setError(toErrorMessage(err));
+      setActionError(toErrorMessage(err));
     }
   }
 

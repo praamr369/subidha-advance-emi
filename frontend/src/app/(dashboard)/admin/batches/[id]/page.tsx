@@ -361,9 +361,52 @@ export default function AdminBatchDetailPage() {
   const [summary, setSummary] = useState<BatchSummaryRecord | null>(null);
   const [luckyIds, setLuckyIds] = useState<LuckyIdRow[]>([]);
   const [subscriptions, setSubscriptions] = useState<SubscriptionRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const query = useQuery({
+    queryKey: ["admin_batch", batchId],
+    queryFn: async () => {
+      if (!batchId) throw new Error("No batch ID");
+      const [detailPayload, summaryPayload, luckyRows, subscriptionRows] =
+        await Promise.all([
+          getBatchDetail(batchId),
+          getBatchSummary(batchId),
+          listLuckyIdsByBatch(batchId),
+          listSubscriptionsByBatch(batchId),
+        ]);
+      return {
+        batch: normalizeBatchDetail(detailPayload),
+        summary: normalizeBatchSummary(summaryPayload),
+        luckyIds: luckyRows
+          .map(normalizeLuckyIdRow)
+          .sort((a, b) => (a.lucky_number ?? 9999) - (b.lucky_number ?? 9999)),
+        subscriptions: subscriptionRows
+          .map(normalizeSubscriptionRow)
+          .sort((a, b) => {
+            const aDate = Date.parse(a.start_date || "") || 0;
+            const bDate = Date.parse(b.start_date || "") || 0;
+            return bDate - aDate;
+          }),
+      };
+    },
+    enabled: !!batchId,
+  });
+
+  useEffect(() => {
+    if (query.data) {
+      setBatch(query.data.batch);
+      setSummary(query.data.summary);
+      setLuckyIds(query.data.luckyIds);
+      setSubscriptions(query.data.subscriptions);
+      setError(null);
+    } else if (query.isError) {
+      setError(parseErrorMessage(query.error));
+      setBatch(null);
+      setSummary(null);
+      setLuckyIds([]);
+      setSubscriptions([]);
+    }
+  }, [query.data, query.isError, query.error]);
 
   const activeSubscriptions = subscriptions.filter((row) =>
     ["ACTIVE", "APPROVED", "PAYMENT_PENDING", "DELIVERY_PENDING"].includes(row.status)
@@ -372,56 +415,12 @@ export default function AdminBatchDetailPage() {
     (row) => !["ACTIVE", "APPROVED", "PAYMENT_PENDING", "DELIVERY_PENDING"].includes(row.status)
   );
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (!batchId) return;
-
-      if (mode === "initial") setLoading(true);
-      else setRefreshing(true);
-
-      try {
-        const [detailPayload, summaryPayload, luckyRows, subscriptionRows] =
-          await Promise.all([
-            getBatchDetail(batchId),
-            getBatchSummary(batchId),
-            listLuckyIdsByBatch(batchId),
-            listSubscriptionsByBatch(batchId),
-          ]);
-
-        setBatch(normalizeBatchDetail(detailPayload));
-        setSummary(normalizeBatchSummary(summaryPayload));
-        setLuckyIds(
-          luckyRows
-            .map(normalizeLuckyIdRow)
-            .sort((a, b) => (a.lucky_number ?? 9999) - (b.lucky_number ?? 9999))
-        );
-        setSubscriptions(
-          subscriptionRows
-            .map(normalizeSubscriptionRow)
-            .sort((a, b) => {
-              const aDate = Date.parse(a.start_date || "") || 0;
-              const bDate = Date.parse(b.start_date || "") || 0;
-              return bDate - aDate;
-            })
-        );
-        setError(null);
-      } catch (err) {
-        setError(parseErrorMessage(err));
-        setBatch(null);
-        setSummary(null);
-        setLuckyIds([]);
-        setSubscriptions([]);
-      } finally {
-        if (mode === "initial") setLoading(false);
-        else setRefreshing(false);
-      }
-    },
-    [batchId]
-  );
-
-  useEffect(() => {
-    void loadPage();
-  }, [loadPage]);
+  const loading = query.isLoading && !!batchId;
+  const refreshing = query.isFetching && !query.isLoading;
+  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
+    if (!batchId) return;
+    await query.refetch();
+  }, [query, batchId]);
 
   return (
     <ERPPageShell

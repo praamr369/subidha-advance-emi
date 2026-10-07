@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -12,8 +13,6 @@ import { accountingErrorMessage } from "@/components/accounting/shared";
 import { listCreditNotes, listDebitNotes, listTaxInvoices } from "@/services/accounting";
 
 export default function AccountingGstHubPage() {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState({
     invoices: 0,
     postedInvoices: 0,
@@ -21,38 +20,31 @@ export default function AccountingGstHubPage() {
     debitNotes: 0,
   });
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadPage() {
-      setLoading(true);
-      try {
-        const [invoicePayload, creditPayload, debitPayload] = await Promise.all([
-          listTaxInvoices(),
-          listCreditNotes(),
-          listDebitNotes(),
-        ]);
-        if (cancelled) return;
-        setStats({
-          invoices: invoicePayload.count,
-          postedInvoices: invoicePayload.results.filter((row) => row.status === "POSTED").length,
-          creditNotes: creditPayload.count,
-          debitNotes: debitPayload.count,
-        });
-        setError(null);
-      } catch (err) {
-        if (cancelled) return;
-        setError(accountingErrorMessage(err, "Failed to load GST document controls."));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+  const query = useQuery({
+    queryKey: ['adminGstStats'],
+    queryFn: async () => {
+      const [invoicePayload, creditPayload, debitPayload] = await Promise.all([
+        listTaxInvoices(),
+        listCreditNotes(),
+        listDebitNotes(),
+      ]);
+      return {
+        invoices: invoicePayload.count,
+        postedInvoices: invoicePayload.results.filter((row) => row.status === "POSTED").length,
+        creditNotes: creditPayload.count,
+        debitNotes: debitPayload.count,
+      };
     }
+  });
 
-    void loadPage();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const loading = query.isLoading;
+  const error = query.error ? accountingErrorMessage(query.error, "Failed to load GST document controls.") : null;
+
+  useEffect(() => {
+    if (query.data) {
+      setStats(query.data);
+    }
+  }, [query.data]);
 
   return (
     <ERPPageShell

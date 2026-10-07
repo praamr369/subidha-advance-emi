@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import { useCallback, useEffect, useState } from "react";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -48,7 +49,6 @@ function exportPurchaseNeedsToCSV(rows: PurchaseNeedsRow[], filename: string = "
 
 export default function AdminInventoryPurchaseNeedsPage() {
   const [rows, setRows] = useState<PurchaseNeedsRow[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updating, setUpdating] = useState<number | null>(null);
 
@@ -59,35 +59,40 @@ export default function AdminInventoryPurchaseNeedsPage() {
   const [summary, setSummary] = useState({ total_open: 0, total_all: 0, by_source: {} as Record<string, number> });
   const debouncedSearch = useDebounce(searchQuery, 350);
 
-  const loadPage = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
+  const query = useQuery({
+    queryKey: ["purchase_needs", pagination.page, pagination.page_size, debouncedSearch, sourceFilter],
+    queryFn: async () => {
       const payload = (await getBulkPurchaseNeeds({
         page: pagination.page,
         page_size: pagination.page_size,
         search: debouncedSearch || undefined,
         source_module: sourceFilter || undefined,
       })) as PurchaseNeedsPayload;
-
-      setRows(payload.results ?? []);
-      setSummary(payload.summary ?? { total_open: 0, total_all: 0, by_source: {} });
-      setPagination(prev => ({
-        ...prev,
-        total_count: payload.count,
-        num_pages: payload.num_pages,
-      }));
-    } catch (err) {
-      setRows([]);
-      setError(err instanceof Error ? err.message : "Failed to load purchase needs.");
-    } finally {
-      setLoading(false);
+      return payload;
     }
-  }, [pagination.page, pagination.page_size, debouncedSearch, sourceFilter]);
+  });
+
+  const loading = query.isLoading;
 
   useEffect(() => {
-    void loadPage();
-  }, [loadPage]);
+    if (query.data) {
+      setRows(query.data.results ?? []);
+      setSummary(query.data.summary ?? { total_open: 0, total_all: 0, by_source: {} });
+      setPagination(prev => ({
+        ...prev,
+        total_count: query.data.count,
+        num_pages: query.data.num_pages,
+      }));
+      setError(null);
+    } else if (query.isError) {
+      setRows([]);
+      setError(query.error instanceof Error ? query.error.message : "Failed to load purchase needs.");
+    }
+  }, [query.data, query.isError, query.error]);
+
+  const loadPage = useCallback(async () => {
+    await query.refetch();
+  }, [query]);
 
   const handleStatusChange = async (needId: number, newStatus: string) => {
     setUpdating(needId);

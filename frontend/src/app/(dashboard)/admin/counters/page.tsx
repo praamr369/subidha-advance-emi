@@ -1,7 +1,7 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
@@ -60,41 +60,42 @@ export default function AdminCountersPage() {
   const [cashiers, setCashiers] = useState<InternalUserRecord[]>([]);
   const [selectedCounterId, setSelectedCounterId] = useState<number | null>(null);
   const [form, setForm] = useState<CounterForm>(emptyForm());
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  async function loadPage(mode: "initial" | "refresh" = "initial") {
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
-
-    try {
+  const query = useQuery({
+    queryKey: ['adminCounters'],
+    queryFn: async () => {
       const [counterPayload, branchPayload, cashierPayload] = await Promise.all([
         listCashCounters(),
         listBranches({ status: "ACTIVE" }),
         listInternalUsers({ role: "CASHIER", is_active: "true" }),
       ]);
-      setRows(counterPayload.results);
-      setBranches(branchPayload.results);
-      setCashiers(cashierPayload.results);
-      setError(null);
-    } catch (err) {
+      return { counters: counterPayload.results, branches: branchPayload.results, cashiers: cashierPayload.results };
+    }
+  });
+
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const error = query.error ? toErrorMessage(query.error) : null;
+
+  const loadPage = useCallback(async (mode?: "initial" | "refresh") => {
+    await query.refetch();
+  }, [query]);
+
+  useEffect(() => {
+    if (query.data) {
+      setRows(query.data.counters);
+      setBranches(query.data.branches);
+      setCashiers(query.data.cashiers);
+    } else if (query.isError) {
       setRows([]);
       setBranches([]);
       setEligibleFinanceAccounts([]);
       setCashiers([]);
-      setError(toErrorMessage(err));
-    } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
     }
-  }
-
-  useEffect(() => {
-    void loadPage();
-  }, []);
+  }, [query.data, query.isError]);
 
   useEffect(() => {
     if (!form.branch) {
@@ -170,7 +171,7 @@ export default function AdminCountersPage() {
               notes: row.notes || "",
             });
             setNotice(null);
-            setError(null);
+            setFormError(null);
           }}
           className="rounded-xl border border-border bg-card px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-muted/50"
         >
@@ -183,7 +184,7 @@ export default function AdminCountersPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
-    setError(null);
+    setFormError(null);
     setNotice(null);
 
     const payload: CashCounterPayload = {
@@ -208,7 +209,7 @@ export default function AdminCountersPage() {
       setForm(emptyForm());
       await loadPage();
     } catch (err) {
-      setError(toErrorMessage(err));
+      setFormError(toErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -217,7 +218,7 @@ export default function AdminCountersPage() {
   function resetForm() {
     setSelectedCounterId(null);
     setForm(emptyForm());
-    setError(null);
+    setFormError(null);
     setNotice(null);
   }
 
@@ -417,9 +418,9 @@ export default function AdminCountersPage() {
                     </div>
                   ) : null}
 
-                  {error ? (
+                  {formError ? (
                     <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                      {error}
+                      {formError}
                     </div>
                   ) : null}
 

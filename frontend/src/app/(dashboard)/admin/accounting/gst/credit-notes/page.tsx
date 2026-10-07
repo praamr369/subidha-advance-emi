@@ -1,6 +1,7 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
@@ -31,10 +32,8 @@ import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 const today = new Date().toISOString().slice(0, 10);
 
 export default function AccountingCreditNotesPage() {
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [notes, setNotes] = useState<GstNote[]>([]);
   const [invoices, setInvoices] = useState<TaxInvoice[]>([]);
   const [form, setForm] = useState({
@@ -45,32 +44,35 @@ export default function AccountingCreditNotesPage() {
     tax_adjustment: "0.00",
   });
 
-  async function loadPage(mode: "initial" | "refresh" = "initial") {
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
-    try {
+  const query = useQuery({
+    queryKey: ['adminGstCreditNotes'],
+    queryFn: async () => {
       const [notesPayload, invoicesPayload] = await Promise.all([
         listCreditNotes(),
         listTaxInvoices(),
       ]);
-      setNotes(notesPayload.results);
-      setInvoices(invoicesPayload.results);
-      setError(null);
-    } catch (err) {
-      setError(accountingErrorMessage(err, "Failed to load credit notes."));
-      if (mode === "initial") {
-        setNotes([]);
-        setInvoices([]);
-      }
-    } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
+      return { notes: notesPayload.results, invoices: invoicesPayload.results };
     }
-  }
+  });
+
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const pageError = query.error ? accountingErrorMessage(query.error, "Failed to load credit notes.") : null;
+  const error = pageError || actionError;
+
+  const loadPage = useCallback(async (mode?: "initial" | "refresh") => {
+    await query.refetch();
+  }, [query]);
 
   useEffect(() => {
-    void loadPage();
-  }, []);
+    if (query.data) {
+      setNotes(query.data.notes);
+      setInvoices(query.data.invoices);
+    } else if (query.isError) {
+      setNotes([]);
+      setInvoices([]);
+    }
+  }, [query.data, query.isError]);
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -96,7 +98,7 @@ export default function AccountingCreditNotesPage() {
       await loadPage();
     } catch (err) {
       setNotice(null);
-      setError(accountingErrorMessage(err, "Failed to create the credit note."));
+      setActionError(accountingErrorMessage(err, "Failed to create the credit note."));
     }
   }
 
@@ -107,7 +109,7 @@ export default function AccountingCreditNotesPage() {
       await loadPage();
     } catch (err) {
       setNotice(null);
-      setError(accountingErrorMessage(err, "Failed to approve the credit note."));
+      setActionError(accountingErrorMessage(err, "Failed to approve the credit note."));
     }
   }
 
@@ -118,7 +120,7 @@ export default function AccountingCreditNotesPage() {
       await loadPage();
     } catch (err) {
       setNotice(null);
-      setError(accountingErrorMessage(err, "Failed to post the credit note."));
+      setActionError(accountingErrorMessage(err, "Failed to post the credit note."));
     }
   }
 
@@ -129,7 +131,7 @@ export default function AccountingCreditNotesPage() {
       await loadPage();
     } catch (err) {
       setNotice(null);
-      setError(accountingErrorMessage(err, "Failed to cancel the credit note."));
+      setActionError(accountingErrorMessage(err, "Failed to cancel the credit note."));
     }
   }
 

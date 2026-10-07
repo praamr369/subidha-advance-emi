@@ -1,4 +1,6 @@
+import { useCallback } from 'react';
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import { BarChart3, Building2, CircleDollarSign, PackageSearch, Users } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -32,36 +34,59 @@ function toErrorMessage(error: unknown): string {
 
 export default function AdminBranchReportingPage() {
   const [payload, setPayload] = useState<BranchReportingOverview | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [errorState, setErrorState] = useState<string | null>(null);
   const [branchId, setBranchId] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
-  async function loadPage(params?: {
+  const [appliedFilters, setAppliedFilters] = useState({
+    branch_id: "",
+    start_date: "",
+    end_date: "",
+  });
+
+  const rqQuery = useQuery({
+    queryKey: ['branchReporting', appliedFilters.branch_id, appliedFilters.start_date, appliedFilters.end_date],
+    queryFn: () => getBranchReportingOverview({
+      branch_id: appliedFilters.branch_id || undefined,
+      start_date: appliedFilters.start_date || undefined,
+      end_date: appliedFilters.end_date || undefined,
+    }),
+  });
+
+  const loading = rqQuery.isLoading || rqQuery.isFetching;
+  const error = errorState || (rqQuery.error ? toErrorMessage(rqQuery.error) : null);
+
+  const loadPage = useCallback(async (params?: {
     branch_id?: string;
     start_date?: string;
     end_date?: string;
-  }) {
-    try {
-      setLoading(true);
-      const next = await getBranchReportingOverview({
-        branch_id: params?.branch_id || undefined,
-        start_date: params?.start_date || undefined,
-        end_date: params?.end_date || undefined,
+  }) => {
+    setErrorState(null);
+    if (params) {
+      setAppliedFilters({
+        branch_id: params.branch_id || "",
+        start_date: params.start_date || "",
+        end_date: params.end_date || "",
       });
-      setPayload(next);
-      setError(null);
-    } catch (err) {
-      setPayload(null);
-      setError(toErrorMessage(err));
-    } finally {
-      setLoading(false);
+    } else {
+      setAppliedFilters({ branch_id: "", start_date: "", end_date: "" });
     }
-  }
+    await rqQuery.refetch();
+  }, [rqQuery]);
+
+  useEffect(() => {
+    if (rqQuery.data) {
+      setPayload(rqQuery.data);
+      setErrorState(null);
+    } else if (rqQuery.error) {
+      setPayload(null);
+    }
+  }, [rqQuery.data, rqQuery.error]);
 
   useEffect(() => {
     void loadPage();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const selectedBranchLabel = payload?.branch

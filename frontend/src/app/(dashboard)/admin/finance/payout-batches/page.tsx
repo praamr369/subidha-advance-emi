@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import { FINANCE_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
 import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
@@ -107,9 +108,7 @@ function SectionCard({
 
 export default function AdminPayoutBatchesPage() {
   const [allRows, setAllRows] = useState<PayoutBatchRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errorState, setErrorState] = useState<string | null>(null);
 
   const [searchInput, setSearchInput] = useState("");
   const [statusInput, setStatusInput] = useState<
@@ -121,35 +120,31 @@ export default function AdminPayoutBatchesPage() {
     "" | "DRAFT" | "FINALIZED" | "CANCELLED"
   >("");
 
-  async function loadPage(mode: "initial" | "refresh" = "initial") {
-    if (mode === "initial") {
-      setLoading(true);
-    } else {
-      setRefreshing(true);
-    }
-
-    try {
+  const rqQuery = useQuery({
+    queryKey: ["adminPayoutBatches"],
+    queryFn: async () => {
       const payload = await apiFetch<unknown>(
         "/admin/commission-payout-batches/list/"
       );
-      const normalized = toArray<Record<string, unknown>>(payload).map(
-        normalizeBatch
-      );
-
-      setAllRows(normalized);
-      setError(null);
-    } catch (err) {
-      setError(toErrorMessage(err));
-      if (mode === "initial") setAllRows([]);
-    } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
+      return toArray<Record<string, unknown>>(payload).map(normalizeBatch);
     }
-  }
+  });
+
+  const loading = rqQuery.isLoading;
+  const refreshing = rqQuery.isFetching && !rqQuery.isLoading;
+  const error = errorState || (rqQuery.error ? toErrorMessage(rqQuery.error) : null);
 
   useEffect(() => {
-    void loadPage();
-  }, []);
+    if (rqQuery.data) {
+      setAllRows(rqQuery.data);
+    } else if (rqQuery.error) {
+      setAllRows([]);
+    }
+  }, [rqQuery.data, rqQuery.error]);
+
+  const loadPage = async () => {
+    await rqQuery.refetch();
+  };
 
   function handleApplyFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

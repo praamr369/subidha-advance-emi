@@ -358,8 +358,6 @@ export default function AdminPaymentDetailRoutePage() {
   const [timelineData, setTimelineData] = useState<PaymentTimelineResponse | null>(
     null
   );
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [reverseReason, setReverseReason] = useState("");
@@ -372,57 +370,72 @@ export default function AdminPaymentDetailRoutePage() {
   const [receiptDocumentsError, setReceiptDocumentsError] = useState<string | null>(null);
   const [generatingReceipt, setGeneratingReceipt] = useState(false);
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (!paymentId) return;
-
-      if (mode === "initial") setLoading(true);
-      else setRefreshing(true);
-
+  const {
+    data: payload,
+    isLoading: loading,
+    isFetching,
+    error: queryError,
+    isError,
+    refetch,
+  } = useQuery({
+    queryKey: ["paymentDetail", paymentId],
+    queryFn: async () => {
+      if (!paymentId) return null;
+      const [paymentPayload, timelinePayload] = await Promise.all([
+        apiFetch<Record<string, unknown>>(`/admin/payments/${paymentId}/`),
+        apiFetch<Record<string, unknown>>(`/admin/payments/${paymentId}/timeline/`),
+      ]);
+      
+      let receiptPayload = null;
+      let receiptError = null;
       try {
-        const [paymentPayload, timelinePayload] = await Promise.all([
-          apiFetch<Record<string, unknown>>(`/admin/payments/${paymentId}/`),
-          apiFetch<Record<string, unknown>>(`/admin/payments/${paymentId}/timeline/`),
-        ]);
-
-        setPayment(normalizePaymentDetail(paymentPayload));
-        setTimelineData(normalizeTimelinePayload(timelinePayload));
-        setError(null);
-
-        setReceiptDocumentsLoading(true);
-        try {
-          const receiptPayload = await listReceiptDocuments({ payment: paymentId });
-          setReceiptDocuments(receiptPayload.results);
-          setReceiptDocumentsError(null);
-        } catch (err) {
-          setReceiptDocuments([]);
-          setReceiptDocumentsError(
-            err instanceof Error && err.message.trim()
-              ? err.message
-              : "Unable to load receipt documents."
-          );
-        } finally {
-          setReceiptDocumentsLoading(false);
-        }
+        receiptPayload = await listReceiptDocuments({ payment: paymentId });
       } catch (err) {
-        setError(toErrorMessage(err));
-        if (mode === "initial") {
-          setPayment(null);
-          setTimelineData(null);
-          setReceiptDocuments([]);
-          setReceiptDocumentsError(null);
-        }
-      } finally {
-        if (mode === "initial") setLoading(false);
-        else setRefreshing(false);
+        receiptError = err instanceof Error && err.message.trim()
+          ? err.message
+          : "Unable to load receipt documents.";
       }
+      
+      return { paymentPayload, timelinePayload, receiptPayload, receiptError };
     },
-    [paymentId]
-  );
+    enabled: !!paymentId,
+  });
+
+  const refreshing = isFetching && !loading;
+
+  const loadPage = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
 
   useEffect(() => {
-    void loadPage();
-  }, [loadPage]);
+    setReceiptDocumentsLoading(isFetching);
+  }, [isFetching]);
+
+  useEffect(() => {
+    if (payload) {
+      setPayment(normalizePaymentDetail(payload.paymentPayload));
+      setTimelineData(normalizeTimelinePayload(payload.timelinePayload));
+      setError(null);
+      
+      if (payload.receiptPayload) {
+        setReceiptDocuments(payload.receiptPayload.results);
+        setReceiptDocumentsError(null);
+      } else {
+        setReceiptDocuments([]);
+        setReceiptDocumentsError(payload.receiptError);
+      }
+    }
+  }, [payload]);
+
+  useEffect(() => {
+    if (isError) {
+      setError(toErrorMessage(queryError));
+      setPayment(null);
+      setTimelineData(null);
+      setReceiptDocuments([]);
+      setReceiptDocumentsError(null);
+    }
+  }, [isError, queryError]);
 
   const resolvedPayment = timelineData?.payment || payment;
   const isReversed = Boolean(timelineData?.flags?.is_reversed);

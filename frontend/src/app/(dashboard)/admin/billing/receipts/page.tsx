@@ -2,6 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
@@ -51,7 +52,6 @@ const RENT_LEASE_RECEIPT_LABELS: Record<string, string> = {
 export default function BillingReceiptsPage() {
   const searchParams = useSearchParams();
   const [rows, setRows] = useState<ReceiptDocument[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rentLeaseRows, setRentLeaseRows] = useState<RentLeaseReceiptRow[]>([]);
   const [rentLeaseLoading, setRentLeaseLoading] = useState(true);
@@ -133,9 +133,16 @@ export default function BillingReceiptsPage() {
     { key: "status", header: "Status" },
   ];
 
-  const loadPage = useCallback(async () => {
-    setLoading(true);
-    try {
+  const { data: queryData, isLoading: loading, error: queryError, refetch } = useQuery({
+    queryKey: [
+      "billing_receipts",
+      searchParams.get("payment"),
+      searchParams.get("billing_invoice"),
+      searchParams.get("direct_sale"),
+      searchParams.get("subscription"),
+      searchParams.get("source_type"),
+    ],
+    queryFn: async () => {
       const payload = await listReceiptDocuments({
         payment: searchParams.get("payment") || undefined,
         billing_invoice: searchParams.get("billing_invoice") || undefined,
@@ -143,19 +150,27 @@ export default function BillingReceiptsPage() {
         subscription: searchParams.get("subscription") || undefined,
         source_type: searchParams.get("source_type") || undefined,
       });
-      setRows(payload.results);
-      setError(null);
-    } catch (err) {
-      setRows([]);
-      setError(accountingErrorMessage(err, "Failed to load receipt register."));
-    } finally {
-      setLoading(false);
-    }
-  }, [searchParams]);
+      return payload.results;
+    },
+  });
+
+  const loadPage = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
 
   useEffect(() => {
-    void loadPage();
-  }, [loadPage]);
+    if (queryData) {
+      setRows(queryData);
+      setError(null);
+    }
+  }, [queryData]);
+
+  useEffect(() => {
+    if (queryError) {
+      setRows([]);
+      setError(accountingErrorMessage(queryError, "Failed to load receipt register."));
+    }
+  }, [queryError]);
 
   const receiptStats = useMemo(() => {
     const posted = rows.filter((row) => String(row.status || "").toUpperCase() === "POSTED");

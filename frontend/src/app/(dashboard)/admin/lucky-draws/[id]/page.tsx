@@ -440,73 +440,76 @@ export default function AdminLuckyDrawDetailPage() {
   const [persistedCommit, setPersistedCommit] =
     useState<PersistedCommitRecord | null>(null);
 
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [seedCopied, setSeedCopied] = useState(false);
   const [hashCopied, setHashCopied] = useState(false);
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (!drawId) return;
+  const { data: pageData, error: queryError, isLoading: loading, isFetching, refetch } = useQuery({
+    queryKey: ["admin_lucky_draw_detail", drawId],
+    queryFn: async () => {
+      const drawPayload = await apiFetch<Record<string, unknown>>(
+        `/admin/lucky-draws/${drawId}/`
+      );
+      const normalizedDraw = normalizeLuckyDrawDetail(drawPayload);
 
-      if (mode === "initial") setLoading(true);
-      else setRefreshing(true);
+      let nextBatchPreview: BatchPreview | null = null;
+      let nextSubscriptionPreview: SubscriptionPreview | null = null;
 
-      try {
-        const drawPayload = await apiFetch<Record<string, unknown>>(
-          `/admin/lucky-draws/${drawId}/`
-        );
-        const normalizedDraw = normalizeLuckyDrawDetail(drawPayload);
-
-        let nextBatchPreview: BatchPreview | null = null;
-        let nextSubscriptionPreview: SubscriptionPreview | null = null;
-
-        if (normalizedDraw.batch_id != null) {
-          try {
-            const batchPayload = await apiFetch<Record<string, unknown>>(
-              `/admin/batches/${normalizedDraw.batch_id}/`
-            );
-            nextBatchPreview = normalizeBatchPreview(batchPayload);
-          } catch {
-            nextBatchPreview = null;
-          }
+      if (normalizedDraw.batch_id != null) {
+        try {
+          const batchPayload = await apiFetch<Record<string, unknown>>(
+            `/admin/batches/${normalizedDraw.batch_id}/`
+          );
+          nextBatchPreview = normalizeBatchPreview(batchPayload);
+        } catch {
+          nextBatchPreview = null;
         }
-
-        if (normalizedDraw.winner_subscription_id != null) {
-          try {
-            const subscriptionPayload = await apiFetch<Record<string, unknown>>(
-              `/admin/subscriptions/${normalizedDraw.winner_subscription_id}/`
-            );
-            nextSubscriptionPreview = normalizeSubscriptionPreview(subscriptionPayload);
-          } catch {
-            nextSubscriptionPreview = null;
-          }
-        }
-
-        setDraw(normalizedDraw);
-        setBatchPreview(nextBatchPreview);
-        setSubscriptionPreview(nextSubscriptionPreview);
-        setPersistedCommit(loadPersistedCommitForDraw(normalizedDraw.id));
-        setError(null);
-      } catch (err) {
-        setError(parseErrorMessage(err));
-        setDraw(null);
-        setBatchPreview(null);
-        setSubscriptionPreview(null);
-        setPersistedCommit(null);
-      } finally {
-        if (mode === "initial") setLoading(false);
-        else setRefreshing(false);
       }
+
+      if (normalizedDraw.winner_subscription_id != null) {
+        try {
+          const subscriptionPayload = await apiFetch<Record<string, unknown>>(
+            `/admin/subscriptions/${normalizedDraw.winner_subscription_id}/`
+          );
+          nextSubscriptionPreview = normalizeSubscriptionPreview(subscriptionPayload);
+        } catch {
+          nextSubscriptionPreview = null;
+        }
+      }
+
+      return {
+        draw: normalizedDraw,
+        batchPreview: nextBatchPreview,
+        subscriptionPreview: nextSubscriptionPreview,
+      };
     },
-    [drawId]
-  );
+    enabled: !!drawId,
+  });
+
+  const refreshing = isFetching && !loading;
+
+  const loadPage = useCallback(async () => { await refetch(); }, [refetch]);
 
   useEffect(() => {
-    void loadPage();
-  }, [loadPage]);
+    if (pageData) {
+      setDraw(pageData.draw);
+      setBatchPreview(pageData.batchPreview);
+      setSubscriptionPreview(pageData.subscriptionPreview);
+      setPersistedCommit(loadPersistedCommitForDraw(pageData.draw.id));
+      setError(null);
+    }
+  }, [pageData]);
+
+  useEffect(() => {
+    if (queryError) {
+      setError(parseErrorMessage(queryError));
+      setDraw(null);
+      setBatchPreview(null);
+      setSubscriptionPreview(null);
+      setPersistedCommit(null);
+    }
+  }, [queryError]);
 
   const hasWinnerVisible = useMemo(() => {
     if (!draw) return false;

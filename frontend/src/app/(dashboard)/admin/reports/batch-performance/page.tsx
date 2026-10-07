@@ -45,44 +45,44 @@ function toErrorMessage(error: unknown): string {
 export default function BatchPerformanceReportPage() {
   const [rows, setRows] = useState<BatchPerformanceRow[]>([]);
   const [accuracyNote, setAccuracyNote] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (mode === "initial") setLoading(true);
-      else setRefreshing(true);
+  const query = useQuery({
+    queryKey: ['batch-performance-summary'],
+    queryFn: () => getBatchPerformanceSummary(),
+  });
 
-      try {
-        const payload = await getBatchPerformanceSummary();
-        setRows(
-          payload.rows.map((item) => ({
-            ...item,
-            id: item.batchId,
-            available_lucky_ids: item.available_lucky_ids,
-            assigned_lucky_ids: item.assigned_lucky_ids,
-            won_lucky_ids: item.won_lucky_ids,
-            monthly_booked_value: item.monthly_booked_value,
-          }))
-        );
-        setAccuracyNote(payload.accuracy.note);
-        setError(null);
-      } catch (err) {
-        setError(toErrorMessage(err));
-        setRows([]);
-        setAccuracyNote("");
-      } finally {
-        if (mode === "initial") setLoading(false);
-        else setRefreshing(false);
-      }
-    },
-    []
-  );
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
 
   useEffect(() => {
-    void loadPage();
-  }, [loadPage]);
+    if (query.data) {
+      setRows(
+        query.data.rows.map((item) => ({
+          ...item,
+          id: item.batchId,
+          available_lucky_ids: item.available_lucky_ids,
+          assigned_lucky_ids: item.assigned_lucky_ids,
+          won_lucky_ids: item.won_lucky_ids,
+          monthly_booked_value: item.monthly_booked_value,
+        }))
+      );
+      setAccuracyNote(query.data.accuracy.note);
+      setError(null);
+    }
+  }, [query.data]);
+
+  useEffect(() => {
+    if (query.error) {
+      setError(toErrorMessage(query.error));
+      setRows([]);
+      setAccuracyNote("");
+    }
+  }, [query.error]);
+
+  const loadPage = useCallback(async () => {
+    await query.refetch();
+  }, [query]);
 
   const totals = useMemo(() => {
     const totalSubscriptions = rows.reduce(

@@ -2,7 +2,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { formatRupee } from "@/lib/utils/currency";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { RefreshCw, Download, FileText, IndianRupee, Clock, TrendingUp } from "lucide-react";
 
 import EmptyState from "@/components/feedback/EmptyState";
@@ -54,36 +54,36 @@ export default function PartnerReportsPage() {
   const [statementDateFrom, setStatementDateFrom] = useState("");
   const [statementDateTo, setStatementDateTo] = useState("");
   const [exportingFormat, setExportingFormat] = useState<"csv" | "pdf" | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
 
-  async function loadPage(mode: "initial" | "refresh" = "initial") {
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
-
-    try {
+  const query = useQuery({
+    queryKey: ['partnerReports'],
+    queryFn: async () => {
       const [dashboardPayload, earningsPayload] = await Promise.all([
         getPartnerDashboard(),
         getPartnerEarningsSummary(),
       ]);
-      setDashboard(dashboardPayload);
-      setEarnings(earningsPayload);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load partner reports.");
-      setDashboard(null);
-      setEarnings(null);
-    } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
-    }
-  }
+      return { dashboardPayload, earningsPayload };
+    },
+  });
+
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const error = query.error ? (query.error instanceof Error ? query.error.message : "Failed to load partner reports.") : null;
+
+  const loadPage = useCallback(async (mode?: "initial" | "refresh") => {
+    await query.refetch();
+  }, [query]);
 
   useEffect(() => {
-    void loadPage();
-  }, []);
+    if (query.data) {
+      setDashboard(query.data.dashboardPayload);
+      setEarnings(query.data.earningsPayload);
+    } else if (query.isError) {
+      setDashboard(null);
+      setEarnings(null);
+    }
+  }, [query.data, query.isError]);
 
   const summary = dashboard?.summary;
 

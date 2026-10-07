@@ -165,46 +165,45 @@ export default function AdminInternalUserDetailPage() {
 
   const [user, setUser] = useState<InternalUserRecord | null>(null);
   const [auditRows, setAuditRows] = useState<InternalUserAuditEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<"activate" | "deactivate" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (!userId) return;
-
-      if (mode === "initial") {
-        setLoading(true);
-      } else {
-        setRefreshing(true);
-      }
-
-      try {
-        setError(null);
-
-        const [userPayload, auditPayload] = await Promise.all([
-          getInternalUser(userId),
-          getInternalUserAudit(userId),
-        ]);
-
-        setUser(userPayload);
-        setAuditRows(auditPayload.results || []);
-      } catch (err) {
-        setError(toMessage(err));
-        setUser(null);
-        setAuditRows([]);
-      } finally {
-        if (mode === "initial") {
-          setLoading(false);
-        } else {
-          setRefreshing(false);
-        }
-      }
+  const query = useQuery({
+    queryKey: ['internal-user', userId],
+    queryFn: async () => {
+      if (!userId) throw new Error("No user ID");
+      const [userPayload, auditPayload] = await Promise.all([
+        getInternalUser(userId),
+        getInternalUserAudit(userId),
+      ]);
+      return { userPayload, auditPayload };
     },
-    [userId]
-  );
+    enabled: !!userId,
+  });
+
+  const loading = query.isLoading && !!userId;
+  const refreshing = query.isFetching && !query.isLoading;
+
+  useEffect(() => {
+    if (query.data) {
+      setUser(query.data.userPayload);
+      setAuditRows(query.data.auditPayload.results || []);
+      setError(null);
+    }
+  }, [query.data]);
+
+  useEffect(() => {
+    if (query.error) {
+      setError(toMessage(query.error));
+      setUser(null);
+      setAuditRows([]);
+    }
+  }, [query.error]);
+
+  const loadPage = useCallback(async () => {
+    await query.refetch();
+  }, [query]);
 
   useEffect(() => {
     void loadPage();

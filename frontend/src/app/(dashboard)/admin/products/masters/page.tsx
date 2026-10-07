@@ -1,7 +1,8 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Layers, Box, Wrench, Shapes, RefreshCw, ExternalLink, Hash } from "lucide-react";
 
 import ERPDataToolbar from "@/components/erp/ERPDataToolbar";
@@ -370,31 +371,32 @@ function MaterialsTab() {
 export default function AdminProductMastersPage() {
   const [currentTab, setCurrentTab] = useState<"catalog" | "pim" | "bom" | "materials">("catalog");
   const [catalogOptions, setCatalogOptions] = useState<ProductCatalogOptions>(EMPTY_CATALOG_OPTIONS);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState<null | "category" | "subcategory" | "unit">(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  async function loadPage(mode: "initial" | "refresh" = "initial") {
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
-    try {
-      const payload = await getProductCatalogOptions();
-      setCatalogOptions(payload);
-      setError(null);
-    } catch (err) {
-      setError(toErrorMessage(err));
-      if (mode === "initial") setCatalogOptions(EMPTY_CATALOG_OPTIONS);
-    } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
-    }
-  }
+  const query = useQuery({
+    queryKey: ["admin_product_masters"],
+    queryFn: async () => {
+      return await getProductCatalogOptions();
+    },
+  });
 
   useEffect(() => {
-    void loadPage();
-  }, []);
+    if (query.data) {
+      setCatalogOptions(query.data);
+      setError(null);
+    } else if (query.isError) {
+      setCatalogOptions(EMPTY_CATALOG_OPTIONS);
+      setError(toErrorMessage(query.error));
+    }
+  }, [query.data, query.isError, query.error]);
+
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
+    await query.refetch();
+  }, [query]);
 
   const tabs = [
     { id: "catalog", label: "Catalog Masters", icon: <Layers className="h-4 w-4" /> },

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 
 import { BILLING_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
@@ -61,16 +62,15 @@ export default function BillingContractsPage() {
   const subscriptionFilter = searchParams.get("subscription") ?? "";
   const customerFilter = searchParams.get("customer") ?? "";
 
-  const [loading, setLoading] = useState(true);
   const [syncingId, setSyncingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<BillingProfile[]>([]);
   const [events, setEvents] = useState<BillingSyncEvent[]>([]);
 
-  const loadPage = useCallback(async () => {
-    setLoading(true);
-    try {
+  const { data: queryData, isLoading: loading, error: queryError, refetch } = useQuery({
+    queryKey: ["billing_contracts", subscriptionFilter, customerFilter],
+    queryFn: async () => {
       const [profilePayload, eventPayload] = await Promise.all([
         listBillingProfiles({
           subscription: subscriptionFilter || undefined,
@@ -80,21 +80,32 @@ export default function BillingContractsPage() {
           subscription: subscriptionFilter || undefined,
         }),
       ]);
-      setProfiles(profilePayload.results);
-      setEvents(eventPayload.results.slice(0, 10));
-      setError(null);
-    } catch (err) {
-      setError(toErrorMessage(err));
-      setProfiles([]);
-      setEvents([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [customerFilter, subscriptionFilter]);
+      return {
+        profiles: profilePayload.results,
+        events: eventPayload.results.slice(0, 10),
+      };
+    },
+  });
+
+  const loadPage = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
 
   useEffect(() => {
-    void loadPage();
-  }, [loadPage]);
+    if (queryData) {
+      setProfiles(queryData.profiles);
+      setEvents(queryData.events);
+      setError(null);
+    }
+  }, [queryData]);
+
+  useEffect(() => {
+    if (queryError) {
+      setError(toErrorMessage(queryError));
+      setProfiles([]);
+      setEvents([]);
+    }
+  }, [queryError]);
 
   const eligibleCount = useMemo(
     () => profiles.filter((profile) => profile.invoice_eligible).length,

@@ -31,37 +31,42 @@ function toErrorMessage(error: unknown): string {
 
 export default function AdminCrmPartyDirectoryPage() {
   const [rows, setRows] = useState<PartyListRow[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [roleType, setRoleType] = useState<PartyRoleType | "">("");
   const [followUpState, setFollowUpState] = useState<PartyFollowUpState | "">("");
 
-  const loadPage = useCallback(
-    async (
-      nextRoleType: PartyRoleType | "" = roleType,
-      nextFollowUpState: PartyFollowUpState | "" = followUpState
-    ) => {
-      try {
-        setLoading(true);
-        const payload = await listCrmParties({
-          role_type: nextRoleType,
-          follow_up_state: nextFollowUpState,
-        });
-        setRows(payload.results);
-        setError(null);
-      } catch (err) {
-        setRows([]);
-        setError(toErrorMessage(err));
-      } finally {
-        setLoading(false);
-      }
-    },
-    [followUpState, roleType]
-  );
+  const query = useQuery({
+    queryKey: ['parties-list', roleType, followUpState],
+    queryFn: () => listCrmParties({
+      role_type: roleType,
+      follow_up_state: followUpState,
+    }),
+  });
+
+  const loading = query.isLoading;
 
   useEffect(() => {
-    void loadPage("", "");
-  }, [loadPage]);
+    if (query.data) {
+      setRows(query.data.results);
+      setError(null);
+    }
+  }, [query.data]);
+
+  useEffect(() => {
+    if (query.error) {
+      setRows([]);
+      setError(toErrorMessage(query.error));
+    }
+  }, [query.error]);
+
+  const loadPage = useCallback(async (
+    nextRoleType: PartyRoleType | "" = roleType,
+    nextFollowUpState: PartyFollowUpState | "" = followUpState
+  ) => {
+    if (nextRoleType !== roleType) setRoleType(nextRoleType);
+    if (nextFollowUpState !== followUpState) setFollowUpState(nextFollowUpState);
+    await query.refetch();
+  }, [roleType, followUpState, query]);
 
   const columns: EnterpriseColumnDef<PartyListRow>[] = [
     {

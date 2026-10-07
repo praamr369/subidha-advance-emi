@@ -63,45 +63,31 @@ export default function PartnerCustomerDetailPage() {
   const customerId = params?.id;
 
   const [data, setData] = useState<PartnerCustomerDetailResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (mode === "initial") {
-        setLoading(true);
-      } else {
-        setRefreshing(true);
-      }
-
-      try {
-        if (!customerId) {
-          throw new Error("Missing customer id.");
-        }
-
-        const payload = await getPartnerCustomerDetail(customerId);
-        setData(payload);
-        setError(null);
-      } catch (err) {
-        setError(toErrorMessage(err));
-        if (mode === "initial") {
-          setData(null);
-        }
-      } finally {
-        if (mode === "initial") {
-          setLoading(false);
-        } else {
-          setRefreshing(false);
-        }
-      }
+  const query = useQuery({
+    queryKey: ['partnerCustomerDetail', customerId],
+    queryFn: async () => {
+      if (!customerId) throw new Error("Missing customer id.");
+      return await getPartnerCustomerDetail(customerId);
     },
-    [customerId]
-  );
+    enabled: !!customerId,
+  });
+
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const error = query.error ? toErrorMessage(query.error) : null;
+
+  const loadPage = useCallback(async (mode?: "initial" | "refresh") => {
+    await query.refetch();
+  }, [query]);
 
   useEffect(() => {
-    void loadPage();
-  }, [loadPage]);
+    if (query.data) {
+      setData(query.data);
+    } else if (query.isError) {
+      setData(null);
+    }
+  }, [query.data, query.isError]);
 
   const customer = data?.customer;
   const summary = data?.summary;

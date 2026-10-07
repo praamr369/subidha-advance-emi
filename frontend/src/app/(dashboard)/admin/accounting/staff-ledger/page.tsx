@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import { useCallback, useEffect, useState } from "react";
 
@@ -28,42 +29,39 @@ export default function AccountingStaffLedgerPage() {
   const [employees, setEmployees] = useState<EmployeeProfile[]>([]);
   const [report, setReport] = useState<StaffLedgerReport | null>(null);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const loadPage = useCallback(
-    async (
-      mode: "initial" | "refresh" = "initial",
-      employeeId = selectedEmployeeId
-    ) => {
-      if (mode === "initial") setLoading(true);
-      else setRefreshing(true);
-      try {
-        const [employeesPayload, ledgerPayload] = await Promise.all([
-          listEmployees(),
-          getStaffLedger(employeeId ? { employee: employeeId } : {}),
-        ]);
-        setEmployees(employeesPayload.results);
-        setReport(ledgerPayload);
-        setError(null);
-      } catch (err) {
-        setError(accountingErrorMessage(err, "Failed to load staff ledger."));
-        if (mode === "initial") {
-          setEmployees([]);
-          setReport(null);
-        }
-      } finally {
-        if (mode === "initial") setLoading(false);
-        else setRefreshing(false);
-      }
-    },
-    [selectedEmployeeId]
-  );
+  const query = useQuery({
+    queryKey: ['adminStaffLedger', selectedEmployeeId],
+    queryFn: async () => {
+      const [employeesPayload, ledgerPayload] = await Promise.all([
+        listEmployees(),
+        getStaffLedger(selectedEmployeeId ? { employee: selectedEmployeeId } : {}),
+      ]);
+      return { employees: employeesPayload.results, ledger: ledgerPayload };
+    }
+  });
+
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const error = query.error ? accountingErrorMessage(query.error, "Failed to load staff ledger.") : null;
+
+  const loadPage = useCallback(async (mode?: "initial" | "refresh", employeeId?: string) => {
+    if (employeeId !== undefined && employeeId !== selectedEmployeeId) {
+      setSelectedEmployeeId(employeeId);
+    } else {
+      await query.refetch();
+    }
+  }, [selectedEmployeeId, query]);
 
   useEffect(() => {
-    void loadPage("initial", "");
-  }, [loadPage]);
+    if (query.data) {
+      setEmployees(query.data.employees);
+      setReport(query.data.ledger);
+    } else if (query.isError) {
+      setEmployees([]);
+      setReport(null);
+    }
+  }, [query.data, query.isError]);
 
   const columns: EnterpriseColumnDef<StaffLedgerRow>[] = [
     {

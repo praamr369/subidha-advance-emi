@@ -114,8 +114,6 @@ export default function AdminBatchesPage() {
   const initialStatus = normalizeBatchFilterStatus(searchParams.get("status"));
 
   const [rows, setRows] = useState<BatchRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [queryInput, setQueryInput] = useState(initialQuery);
@@ -124,30 +122,37 @@ export default function AdminBatchesPage() {
   const [query, setQuery] = useState(initialQuery);
   const [statusFilter, setStatusFilter] = useState<"" | CanonicalBatchStatus>(initialStatus);
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (mode === "initial") setLoading(true);
-      else setRefreshing(true);
+  const {
+    data: payload,
+    isLoading: loading,
+    isFetching,
+    error: queryError,
+    isError,
+    refetch,
+  } = useQuery({
+    queryKey: ["batchRegisterRows", query, statusFilter],
+    queryFn: () => listBatchRegisterRows({ q: query, status: statusFilter }),
+  });
 
-      try {
-        const payload = await listBatchRegisterRows({ q: query, status: statusFilter });
+  const refreshing = isFetching && !loading;
 
-        setRows(payload.map(normalizeBatchRow));
-        setError(null);
-      } catch (err) {
-        setError(toErrorMessage(err));
-        if (mode === "initial") setRows([]);
-      } finally {
-        if (mode === "initial") setLoading(false);
-        else setRefreshing(false);
-      }
-    },
-    [query, statusFilter]
-  );
+  const loadPage = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
 
   useEffect(() => {
-    void loadPage();
-  }, [loadPage]);
+    if (payload) {
+      setRows(payload.map(normalizeBatchRow));
+      setError(null);
+    }
+  }, [payload]);
+
+  useEffect(() => {
+    if (isError) {
+      setError(toErrorMessage(queryError));
+      setRows([]);
+    }
+  }, [isError, queryError]);
 
   useEffect(() => {
     const params = new URLSearchParams(searchParamKey);

@@ -177,6 +177,7 @@ class ProductVariantSerializer(serializers.ModelSerializer):
 class PimProductListSerializer(serializers.ModelSerializer):
     category_name = serializers.SerializerMethodField()
     subcategory_name = serializers.SerializerMethodField()
+    attributes = ProductAttributeSerializer(many=True, read_only=True)
     variant_count = serializers.SerializerMethodField()
     parent_id = serializers.IntegerField(source="parent.id", read_only=True, default=None)
     parent_code = serializers.CharField(source="parent.code", read_only=True, default=None)
@@ -191,6 +192,7 @@ class PimProductListSerializer(serializers.ModelSerializer):
             "subcategory", "subcategory_name", "base_price",
             "is_active", "is_published", "product_type", "variant_count",
             "parent_id", "parent_code", "parent_name", "parent_is_published", "child_count",
+            "attributes",
         ]
 
     def get_parent_is_published(self, obj):
@@ -395,7 +397,10 @@ class PimProductCreateUpdateSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         attrs_data = validated_data.pop("attributes", [])
         remove_ids = validated_data.pop("remove_attributes", [])
+        old_code = instance.code
         product = super().update(instance, validated_data)
+        if product.code != old_code:
+            self._sync_product_code(product, old_code)
         if remove_ids:
             ProductAttribute.objects.filter(product=product, attribute_id__in=remove_ids).delete()
             # Also remove from locked_attributes if present
@@ -408,6 +413,22 @@ class PimProductCreateUpdateSerializer(serializers.ModelSerializer):
         self._clean_locked_attributes(product)
         self._sync_to_register(product)
         return product
+
+    def _sync_product_code(self, pim_product, old_code):
+        """Keep linked operational/register identifiers aligned with a PIM rename."""
+        from subscriptions.models import Product as RegisterProduct
+
+        core = pim_product.source_product
+        if core and core.product_code == old_code:
+            core.product_code = pim_product.code
+            if core.sku == old_code:
+                core.sku = pim_product.code
+            core.save(update_fields=["product_code", "sku", "updated_at"])
+
+        register = RegisterProduct.objects.filter(product_code=old_code).first()
+        if register:
+            register.product_code = pim_product.code
+            register.save(update_fields=["product_code"])
 
 
 class ProductVariantCreateSerializer(serializers.ModelSerializer):

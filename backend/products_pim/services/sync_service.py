@@ -5,6 +5,46 @@ from products_core.models import Product, ProductCategoryMaster, ProductSubcateg
 class PIMSyncService:
     @staticmethod
     @transaction.atomic
+    def rename_variant_sku(variant: ProductVariant, old_sku: str) -> ProductVariant:
+        """Synchronize an admin-approved SKU rename across PIM and operations.
+
+        Foreign-key history is preserved; only the human-readable identifier
+        fields are changed. The caller must have already validated the new SKU
+        on ``variant``.
+        """
+        new_sku = (variant.sku or "").strip()
+        old_sku = (old_sku or "").strip()
+        if not old_sku or old_sku == new_sku:
+            return variant
+
+        if ProductVariant.objects.exclude(pk=variant.pk).filter(sku=new_sku).exists():
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({"sku": "A variant already uses this SKU."})
+
+        from products_core.models import Product as CoreProduct
+        from products_pim.models import PimProduct
+
+        child = PimProduct.objects.filter(code=old_sku, parent_id=variant.product_id).first()
+        if child:
+            if PimProduct.objects.exclude(pk=child.pk).filter(code=new_sku).exists():
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({"sku": "A PIM product already uses this code."})
+            child.code = new_sku
+            child.save(update_fields=["code", "updated_at"])
+
+        operational = variant.operational_product
+        if operational:
+            if CoreProduct.objects.exclude(pk=operational.pk).filter(product_code=new_sku).exists():
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({"sku": "An operational product already uses this code."})
+            operational.product_code = new_sku
+            operational.sku = new_sku
+            operational.save(update_fields=["product_code", "sku", "updated_at"])
+
+        return variant
+
+    @staticmethod
+    @transaction.atomic
     def sync_variant_to_operational_product(variant: ProductVariant) -> Product:
         """
         Syncs a ProductVariant to the operational products_core.Product.

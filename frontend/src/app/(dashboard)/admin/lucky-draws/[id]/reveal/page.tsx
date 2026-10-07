@@ -423,56 +423,55 @@ export default function AdminLuckyDrawRevealPage() {
   const [batchPreview, setBatchPreview] = useState<BatchPreview | null>(null);
   const [revealedSeed, setRevealedSeed] = useState("");
 
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [revealing, setRevealing] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
   const [revealResult, setRevealResult] = useState<RevealResult | null>(null);
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (!drawId) return;
+  const { data: pageData, error: queryError, isLoading: loading, isFetching, refetch } = useQuery({
+    queryKey: ["admin_lucky_draw_reveal", drawId],
+    queryFn: async () => {
+      const drawPayload = await apiFetch<Record<string, unknown>>(
+        `/admin/lucky-draws/${drawId}/`
+      );
+      const normalizedDraw = normalizeLuckyDrawDetail(drawPayload);
 
-      if (mode === "initial") setLoading(true);
-      else setRefreshing(true);
-
-      try {
-        const drawPayload = await apiFetch<Record<string, unknown>>(
-          `/admin/lucky-draws/${drawId}/`
-        );
-        const normalizedDraw = normalizeLuckyDrawDetail(drawPayload);
-
-        let nextBatchPreview: BatchPreview | null = null;
-        if (normalizedDraw.batch_id != null) {
-          try {
-            const batchPayload = await apiFetch<Record<string, unknown>>(
-              `/admin/batches/${normalizedDraw.batch_id}/`
-            );
-            nextBatchPreview = normalizeBatchPreview(batchPayload);
-          } catch {
-            nextBatchPreview = null;
-          }
+      let nextBatchPreview: BatchPreview | null = null;
+      if (normalizedDraw.batch_id != null) {
+        try {
+          const batchPayload = await apiFetch<Record<string, unknown>>(
+            `/admin/batches/${normalizedDraw.batch_id}/`
+          );
+          nextBatchPreview = normalizeBatchPreview(batchPayload);
+        } catch {
+          nextBatchPreview = null;
         }
-
-        setDraw(normalizedDraw);
-        setBatchPreview(nextBatchPreview);
-        setError(null);
-      } catch (err) {
-        setError(parseErrorMessage(err));
-        setDraw(null);
-        setBatchPreview(null);
-      } finally {
-        if (mode === "initial") setLoading(false);
-        else setRefreshing(false);
       }
+
+      return { draw: normalizedDraw, batchPreview: nextBatchPreview };
     },
-    [drawId]
-  );
+    enabled: !!drawId,
+  });
+
+  const refreshing = isFetching && !loading;
+
+  const loadPage = useCallback(async () => { await refetch(); }, [refetch]);
 
   useEffect(() => {
-    void loadPage();
-  }, [loadPage]);
+    if (pageData) {
+      setDraw(pageData.draw);
+      setBatchPreview(pageData.batchPreview);
+      setError(null);
+    }
+  }, [pageData]);
+
+  useEffect(() => {
+    if (queryError) {
+      setError(parseErrorMessage(queryError));
+      setDraw(null);
+      setBatchPreview(null);
+    }
+  }, [queryError]);
 
   const revealBlockedReason = useMemo(() => {
     if (!draw) return null;

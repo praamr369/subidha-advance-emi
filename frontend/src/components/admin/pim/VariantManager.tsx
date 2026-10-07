@@ -43,6 +43,7 @@ interface NewVariantForm {
   quantity_on_hand: string; reorder_level: string; attrValues: Record<number, string>;
 }
 interface VariantEditState {
+  sku: string;
   price: string; cost_price: string; barcode: string; reorder_level: string;
   attrValues: Record<number, string>;
 }
@@ -160,6 +161,7 @@ function VariantEditPanel({
       attrValues[av.attribute] = av.value_text ?? "";
     }
     return {
+      sku: variant.sku,
       price: variant.price,
       cost_price: variant.cost_price ?? "",
       barcode: variant.barcode ?? "",
@@ -288,6 +290,12 @@ function VariantEditPanel({
 
       {/* Pricing + inventory */}
       <div>
+        <div className="mb-3">
+          <label className="text-xs font-medium">SKU / Product ID *</label>
+          <input type="text" className="mt-1 w-full rounded-lg border bg-background px-3 py-1.5 text-sm font-mono font-semibold"
+            value={state.sku} onChange={(e) => set("sku", e.target.value)} />
+          <p className="mt-1 text-[11px] text-muted-foreground">Changing this updates the linked PIM and operational product identifiers.</p>
+        </div>
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Pricing & Inventory</p>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div>
@@ -604,6 +612,7 @@ export default function VariantManager({ productId, productCode, productName, ba
 
   const handleSaveVariantEdit = useCallback(async (variantId: number, state: VariantEditState) => {
     await pimService.updateVariantAttributes(variantId, {
+      sku: state.sku.trim(),
       price: state.price,
       cost_price: state.cost_price || undefined,
       barcode: state.barcode || undefined,

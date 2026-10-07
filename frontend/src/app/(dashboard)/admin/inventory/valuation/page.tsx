@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import { useEffect, useState } from "react";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -36,7 +37,6 @@ const today = new Date().toISOString().slice(0, 10);
 
 export default function InventoryValuationPage() {
   const [report, setReport] = useState<InventoryValuationReport | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [asOfDate, setAsOfDate] = useState(today);
   const [searchQuery, setSearchQuery] = useState("");
@@ -99,39 +99,33 @@ export default function InventoryValuationPage() {
     };
   }, []);
 
-  // Load valuation data
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadPage() {
-      setLoading(true);
-      try {
-        const payload = await getInventoryValuation({
-          as_of_date: asOfDate || undefined,
-          search: debouncedSearch || undefined,
-          category: debouncedCategory || undefined,
-          exclude_zero: excludeZero || undefined,
-          stock_location_id: locationId || undefined,
-          page: pageIndex,
-          page_size: 25,
-        });
-        if (cancelled) return;
-        setReport(payload);
-        setError(null);
-      } catch (err) {
-        if (cancelled) return;
-        setReport(null);
-        setError(accountingErrorMessage(err, "Failed to load inventory valuation."));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+  const query = useQuery({
+    queryKey: ["inventory_valuation", asOfDate, debouncedSearch, debouncedCategory, excludeZero, locationId, pageIndex],
+    queryFn: async () => {
+      const payload = await getInventoryValuation({
+        as_of_date: asOfDate || undefined,
+        search: debouncedSearch || undefined,
+        category: debouncedCategory || undefined,
+        exclude_zero: excludeZero || undefined,
+        stock_location_id: locationId || undefined,
+        page: pageIndex,
+        page_size: 25,
+      });
+      return payload;
     }
+  });
 
-    void loadPage();
-    return () => {
-      cancelled = true;
-    };
-  }, [asOfDate, debouncedSearch, debouncedCategory, excludeZero, locationId, pageIndex]);
+  const loading = query.isLoading;
+
+  useEffect(() => {
+    if (query.data) {
+      setReport(query.data);
+      setError(null);
+    } else if (query.isError) {
+      setReport(null);
+      setError(accountingErrorMessage(query.error, "Failed to load inventory valuation."));
+    }
+  }, [query.data, query.isError, query.error]);
 
   const handleExportCsv = async () => {
     setExportingCsv(true);

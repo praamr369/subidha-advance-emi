@@ -145,8 +145,7 @@ export default function AdminSupportRequestDetailPage() {
   const [supportRequest, setSupportRequest] = useState<AdminSupportRequest | null>(null);
   const [timeline, setTimeline] = useState<AuditEntry[]>([]);
   const [assignees, setAssignees] = useState<InternalUserRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [errorState, setErrorState] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   const [statusInput, setStatusInput] =
@@ -176,50 +175,43 @@ export default function AdminSupportRequestDetailPage() {
     ];
   }, [supportRequest?.status]);
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (!supportRequestId) {
-        setError("Support request id is invalid.");
-        setLoading(false);
-        return;
-      }
-
-      if (mode === "initial") setLoading(true);
-
-      try {
-        const [requestPayload, assigneePayload, timelinePayload] = await Promise.all([
-          getAdminSupportRequest(supportRequestId),
-          listInternalUsers({ is_active: "true" }),
-          apiFetch<AuditTimelineResponse>(
-            `/admin/audit-logs/timeline/CustomerSupportRequest/${supportRequestId}/`
-          ),
-        ]);
-
-        setSupportRequest(requestPayload);
-        setStatusInput(requestPayload.status);
-        setAssigneeInput(
-          typeof requestPayload.assigned_to_id === "number"
-            ? String(requestPayload.assigned_to_id)
-            : ""
-        );
-        setResolutionInput(requestPayload.resolution_summary || "");
-        setAssignees(assigneePayload.results);
-        setTimeline(timelinePayload.results || []);
-        setError(null);
-      } catch (err) {
-        setSupportRequest(null);
-        setTimeline([]);
-        setError(toErrorMessage(err));
-      } finally {
-        if (mode === "initial") setLoading(false);
-      }
+  const rqQuery = useQuery({
+    queryKey: ["adminSupportRequest", supportRequestId],
+    queryFn: async () => {
+      if (!supportRequestId) throw new Error("Support request id is invalid.");
+      const [requestPayload, assigneePayload, timelinePayload] = await Promise.all([
+        getAdminSupportRequest(supportRequestId),
+        listInternalUsers({ is_active: "true" }),
+        apiFetch<AuditTimelineResponse>(
+          `/admin/audit-logs/timeline/CustomerSupportRequest/${supportRequestId}/`
+        ),
+      ]);
+      return { requestPayload, assigneePayload, timelinePayload };
     },
-    [supportRequestId]
-  );
+    enabled: !!supportRequestId,
+  });
+
+  const loading = rqQuery.isLoading;
+  const error = errorState || (rqQuery.error ? toErrorMessage(rqQuery.error) : null);
 
   useEffect(() => {
-    void loadPage();
-  }, [loadPage]);
+    if (rqQuery.data) {
+      setSupportRequest(rqQuery.data.requestPayload);
+      setStatusInput(rqQuery.data.requestPayload.status);
+      setAssigneeInput(
+        typeof rqQuery.data.requestPayload.assigned_to_id === "number"
+          ? String(rqQuery.data.requestPayload.assigned_to_id)
+          : ""
+      );
+      setResolutionInput(rqQuery.data.requestPayload.resolution_summary || "");
+      setAssignees(rqQuery.data.assigneePayload.results);
+      setTimeline(rqQuery.data.timelinePayload.results || []);
+    }
+  }, [rqQuery.data]);
+
+  const loadPage = useCallback(async () => {
+    await rqQuery.refetch();
+  }, [rqQuery]);
 
   async function handleStatusUpdate() {
     if (!supportRequest) return;
@@ -235,7 +227,7 @@ export default function AdminSupportRequestDetailPage() {
       setMessage(`Support request status updated to ${updated.status}.`);
       await loadPage();
     } catch (err) {
-      setError(toErrorMessage(err));
+      setErrorState(toErrorMessage(err));
     } finally {
       setActionLoading(null);
     }
@@ -255,7 +247,7 @@ export default function AdminSupportRequestDetailPage() {
       setMessage("Support request owner updated.");
       await loadPage();
     } catch (err) {
-      setError(toErrorMessage(err));
+      setErrorState(toErrorMessage(err));
     } finally {
       setActionLoading(null);
     }
@@ -280,7 +272,7 @@ export default function AdminSupportRequestDetailPage() {
       );
       await loadPage();
     } catch (err) {
-      setError(toErrorMessage(err));
+      setErrorState(toErrorMessage(err));
     } finally {
       setActionLoading(null);
     }
@@ -301,7 +293,7 @@ export default function AdminSupportRequestDetailPage() {
       setMessage("Support request resolved with explicit closure metadata.");
       await loadPage();
     } catch (err) {
-      setError(toErrorMessage(err));
+      setErrorState(toErrorMessage(err));
     } finally {
       setActionLoading(null);
     }

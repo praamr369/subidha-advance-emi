@@ -2,8 +2,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-
+import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
@@ -336,8 +335,6 @@ function downloadCsv(filename: string, rows: Record<string, string | number | nu
 export default function AdminLuckyDrawsPage() {
   const [allRows, setAllRows] = useState<LuckyDrawRow[]>([]);
   const [batchOptions, setBatchOptions] = useState<BatchOption[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [searchInput, setSearchInput] = useState("");
@@ -350,48 +347,48 @@ export default function AdminLuckyDrawsPage() {
   const [revealFilter, setRevealFilter] = useState<RevealFilter>("");
   const [monthFilter, setMonthFilter] = useState("");
 
-  async function loadPage(mode: "initial" | "refresh" = "initial") {
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
-
-    try {
+  const { data: queryData, isLoading: loading, isRefetching: refreshing, error: queryError, refetch } = useQuery({
+    queryKey: ["admin_lucky_draws"],
+    queryFn: async () => {
       const [drawRows, batchRows] = await Promise.all([
         fetchAllPagedRows(luckyPlanService.adminLuckyDrawsPath()),
         fetchAllPagedRows(luckyPlanService.adminBatchesPath()),
       ]);
 
-      setAllRows(
-        drawRows
+      return {
+        drawRows: drawRows
           .map(normalizeLuckyDrawRow)
           .sort((a, b) => {
             const aDate = Date.parse(a.created_at || "") || 0;
             const bDate = Date.parse(b.created_at || "") || 0;
             return bDate - aDate;
-          })
-      );
-
-      setBatchOptions(
-        batchRows
+          }),
+        batchOptions: batchRows
           .map(normalizeBatchOption)
           .sort((a, b) => a.batch_code.localeCompare(b.batch_code))
-      );
+      };
+    },
+  });
 
-      setError(null);
-    } catch (err) {
-      setError(parseErrorMessage(err));
-      if (mode === "initial") {
-        setAllRows([]);
-        setBatchOptions([]);
-      }
-    } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
-    }
-  }
+  const loadPage = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
 
   useEffect(() => {
-    void loadPage();
-  }, []);
+    if (queryData) {
+      setAllRows(queryData.drawRows);
+      setBatchOptions(queryData.batchOptions);
+      setError(null);
+    }
+  }, [queryData]);
+
+  useEffect(() => {
+    if (queryError) {
+      setError(parseErrorMessage(queryError));
+      setAllRows([]);
+      setBatchOptions([]);
+    }
+  }, [queryError]);
 
   function handleApplyFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

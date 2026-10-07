@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import { useEffect, useState } from "react";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -32,13 +33,12 @@ export default function AdminInventoryReservationsPage() {
   const [summary, setSummary] = useState<StockReservationSummary | null>(null);
   const [sourceModules, setSourceModules] = useState<string[]>([]);
 
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
 
-  async function loadPage() {
-    setLoading(true);
-    try {
+  const query = useQuery({
+    queryKey: ["inventory_reservations", pagination.page, pagination.page_size, debouncedSearch, filters.status, filters.source_module],
+    queryFn: async () => {
       const payload = await listStockReservations({
         page: pagination.page,
         page_size: pagination.page_size,
@@ -46,27 +46,29 @@ export default function AdminInventoryReservationsPage() {
         status: filters.status || undefined,
         source_module: filters.source_module || undefined,
       });
-      setRows(payload.results);
-      setSummary(payload.summary);
-      setSourceModules(payload.summary.source_modules);
-      setPagination({
-        page: payload.count > 0 ? pagination.page : 1,
-        page_size: pagination.page_size,
-        total_count: payload.count,
-        num_pages: payload.num_pages,
-      });
-      setError(null);
-    } catch (err) {
-      setRows([]);
-      setError(accountingErrorMessage(err, "Failed to load stock reservations."));
-    } finally {
-      setLoading(false);
+      return payload;
     }
-  }
+  });
+
+  const loading = query.isLoading;
 
   useEffect(() => {
-    void loadPage();
-  }, [pagination.page, debouncedSearch, filters.status, filters.source_module]);
+    if (query.data) {
+      setRows(query.data.results);
+      setSummary(query.data.summary);
+      setSourceModules(query.data.summary.source_modules);
+      setPagination((prev) => ({
+        ...prev,
+        page: query.data.count > 0 ? prev.page : 1,
+        total_count: query.data.count,
+        num_pages: query.data.num_pages,
+      }));
+      setError(null);
+    } else if (query.isError) {
+      setRows([]);
+      setError(accountingErrorMessage(query.error, "Failed to load stock reservations."));
+    }
+  }, [query.data, query.isError, query.error]);
 
   async function handleExport() {
     setExporting(true);

@@ -79,11 +79,10 @@ export default function AdminCustomerEditPage() {
 
   const [customer, setCustomer] = useState<CustomerDetail | null>(null);
   const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([]);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toggling, setToggling] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errorState, setErrorState] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -107,18 +106,27 @@ export default function AdminCustomerEditPage() {
     setKycStatus(record.kyc_status || "PENDING");
   }
 
-  const loadPage = useCallback(async () => {
-    if (!customerId) return;
-
-    try {
-      setLoading(true);
+  const rqQuery = useQuery({
+    queryKey: ["admin", "customers", customerId, "edit"],
+    queryFn: async () => {
+      if (!customerId) return null;
       const [detail, auditPayload] = await Promise.all([
         apiFetch<Record<string, unknown>>(`/admin/customers/${customerId}/`),
         apiFetch<{ results?: AuditEntry[] } | AuditEntry[]>(
           `/admin/audit-logs/timeline/Customer/${customerId}/`
         ).catch(() => []),
       ]);
+      return { detail, auditPayload };
+    },
+    enabled: !!customerId,
+  });
 
+  const loading = rqQuery.isLoading;
+  const error = errorState || (rqQuery.error ? toErrorMessage(rqQuery.error) : null);
+
+  useEffect(() => {
+    if (rqQuery.data) {
+      const { detail, auditPayload } = rqQuery.data;
       hydrate({
         id: Number(detail.id ?? 0),
         name: String(detail.name ?? ""),
@@ -143,20 +151,18 @@ export default function AdminCustomerEditPage() {
       } else {
         setAuditEntries(auditPayload.results || []);
       }
-
-      setError(null);
-    } catch (err) {
-      setError(toErrorMessage(err));
+      setErrorState(null);
+    } else if (rqQuery.error) {
       setCustomer(null);
       setAuditEntries([]);
-    } finally {
-      setLoading(false);
     }
-  }, [customerId]);
+  }, [rqQuery.data, rqQuery.error]);
 
-  useEffect(() => {
-    void loadPage();
-  }, [loadPage]);
+  const loadPage = useCallback(async () => {
+    if (!customerId) return;
+    setErrorState(null);
+    await rqQuery.refetch();
+  }, [customerId, rqQuery]);
 
   const customerEditSchema = z.object({
     name: z.string().min(1, "Name is required"),
@@ -190,13 +196,13 @@ export default function AdminCustomerEditPage() {
           parsed.error.issues.map((issue) => [String(issue.path[0]), issue.message])
         )
       );
-      setError(first?.message ?? "Please correct the highlighted fields.");
+      setErrorState(first?.message ?? "Please correct the highlighted fields.");
       return;
     }
     setFieldErrors({});
 
     setSaving(true);
-    setError(null);
+    setErrorState(null);
     setSuccess(null);
 
     try {
@@ -236,7 +242,7 @@ export default function AdminCustomerEditPage() {
       setSuccess("Customer account updated successfully.");
       void loadPage();
     } catch (err) {
-      setError(toErrorMessage(err));
+      setErrorState(toErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -245,7 +251,7 @@ export default function AdminCustomerEditPage() {
   async function handleToggleStatus() {
     if (!customerId || !customer) return;
     setToggling(true);
-    setError(null);
+    setErrorState(null);
     setSuccess(null);
 
     try {
@@ -262,7 +268,7 @@ export default function AdminCustomerEditPage() {
       );
       void loadPage();
     } catch (err) {
-      setError(toErrorMessage(err));
+      setErrorState(toErrorMessage(err));
     } finally {
       setToggling(false);
     }

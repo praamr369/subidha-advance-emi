@@ -313,68 +313,67 @@ export default function AdminLuckyIdDetailPage() {
   const [batchPreview, setBatchPreview] = useState<BatchPreview | null>(null);
   const [subscriptionPreview, setSubscriptionPreview] =
     useState<SubscriptionPreview | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errorState, setErrorState] = useState<string | null>(null);
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (!luckyIdId) return;
+  const rqQuery = useQuery({
+    queryKey: ['adminLuckyId', luckyIdId],
+    queryFn: async () => {
+      if (!luckyIdId) throw new Error("Lucky ID is missing.");
+      const luckyIdPayload = await apiFetch<Record<string, unknown>>(
+        `/admin/lucky-ids/${luckyIdId}/`
+      );
+      const normalizedLuckyId = normalizeLuckyIdDetail(luckyIdPayload);
 
-      if (mode === "initial") setLoading(true);
-      else setRefreshing(true);
+      let nextBatchPreview: BatchPreview | null = null;
+      let nextSubscriptionPreview: SubscriptionPreview | null = null;
 
-      try {
-        const luckyIdPayload = await apiFetch<Record<string, unknown>>(
-          `/admin/lucky-ids/${luckyIdId}/`
-        );
-        const normalizedLuckyId = normalizeLuckyIdDetail(luckyIdPayload);
-
-        let nextBatchPreview: BatchPreview | null = null;
-        let nextSubscriptionPreview: SubscriptionPreview | null = null;
-
-        if (normalizedLuckyId.batch_id != null) {
-          try {
-            const batchPayload = await apiFetch<Record<string, unknown>>(
-              `/admin/batches/${normalizedLuckyId.batch_id}/`
-            );
-            nextBatchPreview = normalizeBatchPreview(batchPayload);
-          } catch {
-            nextBatchPreview = null;
-          }
+      if (normalizedLuckyId.batch_id != null) {
+        try {
+          const batchPayload = await apiFetch<Record<string, unknown>>(
+            `/admin/batches/${normalizedLuckyId.batch_id}/`
+          );
+          nextBatchPreview = normalizeBatchPreview(batchPayload);
+        } catch {
+          nextBatchPreview = null;
         }
-
-        if (normalizedLuckyId.subscription_id != null) {
-          try {
-            const subscriptionPayload = await apiFetch<Record<string, unknown>>(
-              `/admin/subscriptions/${normalizedLuckyId.subscription_id}/`
-            );
-            nextSubscriptionPreview = normalizeSubscriptionPreview(subscriptionPayload);
-          } catch {
-            nextSubscriptionPreview = null;
-          }
-        }
-
-        setLuckyId(normalizedLuckyId);
-        setBatchPreview(nextBatchPreview);
-        setSubscriptionPreview(nextSubscriptionPreview);
-        setError(null);
-      } catch (err) {
-        setError(parseErrorMessage(err));
-        setLuckyId(null);
-        setBatchPreview(null);
-        setSubscriptionPreview(null);
-      } finally {
-        if (mode === "initial") setLoading(false);
-        else setRefreshing(false);
       }
+
+      if (normalizedLuckyId.subscription_id != null) {
+        try {
+          const subscriptionPayload = await apiFetch<Record<string, unknown>>(
+            `/admin/subscriptions/${normalizedLuckyId.subscription_id}/`
+          );
+          nextSubscriptionPreview = normalizeSubscriptionPreview(subscriptionPayload);
+        } catch {
+          nextSubscriptionPreview = null;
+        }
+      }
+      return { normalizedLuckyId, nextBatchPreview, nextSubscriptionPreview };
     },
-    [luckyIdId]
-  );
+    enabled: !!luckyIdId,
+  });
+
+  const loading = rqQuery.isLoading;
+  const refreshing = rqQuery.isFetching && !rqQuery.isLoading;
+  const error = errorState || (rqQuery.error ? parseErrorMessage(rqQuery.error) : null);
+
+  const loadPage = useCallback(async () => {
+    setErrorState(null);
+    await rqQuery.refetch();
+  }, [rqQuery]);
 
   useEffect(() => {
-    void loadPage();
-  }, [loadPage]);
+    if (rqQuery.data) {
+      setLuckyId(rqQuery.data.normalizedLuckyId);
+      setBatchPreview(rqQuery.data.nextBatchPreview);
+      setSubscriptionPreview(rqQuery.data.nextSubscriptionPreview);
+      setErrorState(null);
+    } else if (rqQuery.error) {
+      setLuckyId(null);
+      setBatchPreview(null);
+      setSubscriptionPreview(null);
+    }
+  }, [rqQuery.data, rqQuery.error]);
 
   const isAssignedState = useMemo(() => {
     if (!luckyId) return false;

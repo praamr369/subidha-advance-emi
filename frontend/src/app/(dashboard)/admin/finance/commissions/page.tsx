@@ -359,7 +359,7 @@ export default function AdminFinanceCommissionsPage() {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errorState, setErrorState] = useState<string | null>(null);
 
   const [searchInput, setSearchInput] = useState(queryParam);
   const [statusInput, setStatusInput] = useState<
@@ -385,11 +385,9 @@ export default function AdminFinanceCommissionsPage() {
     setStatusFilter(statusParam);
   }, [queryParam, statusParam]);
 
-  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
-
-    try {
+  const rqQuery = useQuery({
+    queryKey: ["adminFinanceCommissions", partnerId, paymentId, statusParam, subscriptionId],
+    queryFn: async () => {
       const params = new URLSearchParams();
       if (partnerId) params.set("partner", partnerId);
       if (subscriptionId) params.set("subscription", subscriptionId);
@@ -409,23 +407,36 @@ export default function AdminFinanceCommissionsPage() {
       const rowsPayload = await apiFetch<unknown>(
         `/admin/commissions/${listQuery ? `?${listQuery}` : ""}`
       );
-
-      setSummary(summaryPayload);
-      setAllRows(
-        toArray<Record<string, unknown>>(rowsPayload).map(normalizeCommissionRow)
-      );
-      setError(null);
-    } catch (err) {
-      setError(toErrorMessage(err));
-      if (mode === "initial") {
-        setSummary(null);
-        setAllRows([]);
-      }
-    } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
+      
+      return { summaryPayload, rowsPayload };
     }
-  }, [partnerId, paymentId, statusParam, subscriptionId]);
+  });
+
+  const error = errorState || (rqQuery.error ? toErrorMessage(rqQuery.error) : null);
+
+  useEffect(() => {
+    if (rqQuery.data) {
+      setSummary(rqQuery.data.summaryPayload);
+      setAllRows(
+        toArray<Record<string, unknown>>(rqQuery.data.rowsPayload).map(normalizeCommissionRow)
+      );
+    } else if (rqQuery.error) {
+      setSummary(null);
+      setAllRows([]);
+    }
+  }, [rqQuery.data, rqQuery.error]);
+
+  useEffect(() => {
+    setLoading(rqQuery.isLoading);
+  }, [rqQuery.isLoading]);
+
+  useEffect(() => {
+    setRefreshing(rqQuery.isFetching && !rqQuery.isLoading);
+  }, [rqQuery.isFetching, rqQuery.isLoading]);
+
+  const loadPage = useCallback(async () => {
+    await rqQuery.refetch();
+  }, [rqQuery]);
 
   const scopedPartnerSummary = useMemo(() => {
     if (!partnerId || !summary?.per_partner?.length) return null;
@@ -443,10 +454,6 @@ export default function AdminFinanceCommissionsPage() {
       ? `/admin/finance/commissions/settled?${next.toString()}`
       : "/admin/finance/commissions/settled";
   }, [partnerId]);
-
-  useEffect(() => {
-    void loadPage();
-  }, [loadPage]);
 
   function handleApplyFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -602,7 +609,7 @@ export default function AdminFinanceCommissionsPage() {
     if (row.status !== "UNSETTLED") return;
 
     setSuccessMessage(null);
-    setError(null);
+    setErrorState(null);
     setActingIds((current) => [...current, row.id]);
 
     try {
@@ -613,7 +620,7 @@ export default function AdminFinanceCommissionsPage() {
       setSuccessMessage(`Commission #${row.id} settled successfully.`);
       await loadPage();
     } catch (err) {
-      setError(toErrorMessage(err));
+      setErrorState(toErrorMessage(err));
     } finally {
       setActingIds((current) => current.filter((id) => id !== row.id));
     }
@@ -621,13 +628,13 @@ export default function AdminFinanceCommissionsPage() {
 
   async function settleSelectedRows() {
     if (selectedUnsettledRows.length === 0) {
-      setError("Select at least one unsettled commission row.");
+      setErrorState("Select at least one unsettled commission row.");
       return;
     }
 
     setBulkSubmitting(true);
     setSuccessMessage(null);
-    setError(null);
+    setErrorState(null);
 
     try {
       const payload = {
@@ -649,7 +656,7 @@ export default function AdminFinanceCommissionsPage() {
       setSelectedIds([]);
       await loadPage();
     } catch (err) {
-      setError(toErrorMessage(err));
+      setErrorState(toErrorMessage(err));
     } finally {
       setBulkSubmitting(false);
     }
@@ -657,13 +664,13 @@ export default function AdminFinanceCommissionsPage() {
 
   async function settleVisibleUnsettledRows() {
     if (unsettledRows.length === 0) {
-      setError("No visible unsettled commission rows available.");
+      setErrorState("No visible unsettled commission rows available.");
       return;
     }
 
     setBulkSubmitting(true);
     setSuccessMessage(null);
-    setError(null);
+    setErrorState(null);
 
     try {
       const payload = {
@@ -685,7 +692,7 @@ export default function AdminFinanceCommissionsPage() {
       setSelectedIds([]);
       await loadPage();
     } catch (err) {
-      setError(toErrorMessage(err));
+      setErrorState(toErrorMessage(err));
     } finally {
       setBulkSubmitting(false);
     }
@@ -693,7 +700,7 @@ export default function AdminFinanceCommissionsPage() {
 
   async function handleExport(format: "csv" | "pdf") {
     setExportingFormat(format);
-    setError(null);
+    setErrorState(null);
 
     try {
       await downloadAuthenticatedFile(
@@ -707,7 +714,7 @@ export default function AdminFinanceCommissionsPage() {
         `commission-statement.${format}`
       );
     } catch (err) {
-      setError(toErrorMessage(err));
+      setErrorState(toErrorMessage(err));
     } finally {
       setExportingFormat(null);
     }

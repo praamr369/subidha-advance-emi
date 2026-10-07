@@ -2,6 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
@@ -34,39 +35,36 @@ export default function AdminSalarySheetDetailPage() {
 
   const [salarySheet, setSalarySheet] = useState<SalarySheet | null>(null);
   const [payments, setPayments] = useState<SalaryPayment[]>([]);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const loadPage = useCallback(async () => {
-    if (!salarySheetId) {
-      setLoading(false);
-      setError("Salary sheet id is missing.");
-      return;
-    }
-
-    try {
-      setLoading(true);
+  const query = useQuery({
+    queryKey: ["salarySheetDetail", salarySheetId],
+    queryFn: async () => {
+      if (!salarySheetId) throw new Error("Salary sheet id is missing.");
       const [sheet, paymentsPayload] = await Promise.all([
         getSalarySheet(Number(salarySheetId)),
         listSalaryPayments({ salary_sheet: salarySheetId }),
       ]);
-      setSalarySheet(sheet);
-      setPayments(paymentsPayload.results);
-      setError(null);
-    } catch (err) {
-      setSalarySheet(null);
-      setPayments([]);
-      setError(toErrorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  }, [salarySheetId]);
+      return { sheet, payments: paymentsPayload.results };
+    },
+    enabled: !!salarySheetId,
+  });
+
+  const loading = query.isLoading;
+  const error = query.error ? toErrorMessage(query.error) : null;
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
-    void loadPage();
-  }, [loadPage]);
+    if (query.data) {
+      setSalarySheet(query.data.sheet);
+      setPayments(query.data.payments);
+    }
+  }, [query.data]);
+
+  const loadPage = useCallback(async () => {
+    await query.refetch();
+  }, [query]);
 
   async function handleApprove() {
     if (!salarySheet) return;
@@ -77,7 +75,7 @@ export default function AdminSalarySheetDetailPage() {
       setNotice("Salary sheet approved.");
       await loadPage();
     } catch (err) {
-      setError(toErrorMessage(err));
+      setActionError(toErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -92,7 +90,7 @@ export default function AdminSalarySheetDetailPage() {
       setNotice("Salary sheet posted.");
       await loadPage();
     } catch (err) {
-      setError(toErrorMessage(err));
+      setActionError(toErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -131,7 +129,7 @@ export default function AdminSalarySheetDetailPage() {
         {!loading && error ? (
           <ErrorState
             title="Unable to load salary sheet"
-            description={error}
+            description={error || actionError || undefined}
             onRetry={() => void loadPage()}
           />
         ) : null}

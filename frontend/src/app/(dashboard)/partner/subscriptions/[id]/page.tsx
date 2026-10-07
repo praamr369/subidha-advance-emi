@@ -121,55 +121,36 @@ export default function PartnerSubscriptionDetailPage() {
   const [subscription, setSubscription] = useState<PartnerSubscriptionDetail | null>(
     null
   );
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+
+  const query = useQuery({
+    queryKey: ['partnerSubscriptionDetail', subscriptionId],
+    queryFn: async () => {
+      if (!subscriptionId) throw new Error("Missing subscription id.");
+      return await getPartnerSubscriptionDetail(subscriptionId);
+    },
+    enabled: !!subscriptionId,
+  });
+
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const error = query.error ? (query.error instanceof Error ? query.error.message : "Failed to load subscription details.") : (!subscriptionId ? "Missing subscription id." : null);
 
   const backQuery = searchParams.toString();
   const backHref = backQuery
     ? `/partner/subscriptions?${backQuery}`
     : "/partner/subscriptions";
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (!subscriptionId) {
-        setError("Missing subscription id.");
-        setSubscription(null);
-        setLoading(false);
-        return;
-      }
-
-      if (mode === "initial") {
-        setLoading(true);
-      } else {
-        setRefreshing(true);
-      }
-
-      try {
-        const payload = await getPartnerSubscriptionDetail(subscriptionId);
-        setSubscription(payload);
-        setError(null);
-      } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Failed to load subscription details."
-        );
-        setSubscription(null);
-      } finally {
-        if (mode === "initial") {
-          setLoading(false);
-        } else {
-          setRefreshing(false);
-        }
-      }
-    },
-    [subscriptionId]
-  );
+  const loadPage = useCallback(async (mode?: "initial" | "refresh") => {
+    await query.refetch();
+  }, [query]);
 
   useEffect(() => {
-    void loadPage();
-  }, [loadPage]);
+    if (query.data) {
+      setSubscription(query.data);
+    } else if (query.isError) {
+      setSubscription(null);
+    }
+  }, [query.data, query.isError]);
 
   const emis = useMemo<PartnerSubscriptionEmi[]>(() => {
     return Array.isArray(subscription?.emis)

@@ -411,6 +411,7 @@ export const pimService = {
     variantId: number,
     data: {
       attribute_values?: { attribute: number; value_text?: string; value_number?: number | null; value_boolean?: boolean | null }[];
+      sku?: string;
       price?: string;
       cost_price?: string;
       barcode?: string;

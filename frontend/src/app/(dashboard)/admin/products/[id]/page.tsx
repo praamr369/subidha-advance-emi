@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 import { formatRupee } from "@/lib/utils/currency";
 import Link from "next/link";
 import Image from "next/image";
@@ -160,52 +161,57 @@ export default function AdminProductDetailPage() {
   const [product, setProduct] = useState<ProductRecord | null>(null);
   const [pimProduct, setPimProduct] = useState<PimProduct | null>(null);
   const [subscriptions, setSubscriptions] = useState<SubscriptionUsageRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
-
-  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
-    if (!productId) return;
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
-    try {
+  const query = useQuery({
+    queryKey: ["admin_product", productId],
+    queryFn: async () => {
+      if (!productId) throw new Error("No product ID");
       const [productPayload, subscriptionPayload] = await Promise.allSettled([
         getProduct(productId),
         request(`/admin/subscriptions/?product=${productId}`),
       ]);
       if (productPayload.status !== "fulfilled") throw productPayload.reason;
       const prod = productPayload.value;
-      setProduct(prod);
-      if (subscriptionPayload.status === "fulfilled") {
-        setSubscriptions(toArray<Record<string, unknown>>(subscriptionPayload.value).map(normalizeSub));
-      }
-      // Look up linked PIM product by code
+      const subs = subscriptionPayload.status === "fulfilled"
+        ? toArray<Record<string, unknown>>(subscriptionPayload.value).map(normalizeSub)
+        : [];
+      let pim: PimProduct | null = null;
       if (prod.product_code) {
         try {
           const { results } = await pimService.getProducts({ search: prod.product_code, page_size: 5 });
           const match = results.find((p) => p.code === prod.product_code);
           if (match) {
-            const full = await pimService.getProductWithAttributes(match.id);
-            setPimProduct(full);
-          } else {
-            setPimProduct(null);
+            pim = await pimService.getProductWithAttributes(match.id);
           }
         } catch {
-          setPimProduct(null);
+          // ignore
         }
       }
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load product detail.");
-      if (mode === "initial") { setProduct(null); setSubscriptions([]); }
-    } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
-    }
-  }, [productId]);
+      return { product: prod, subscriptions: subs, pim };
+    },
+    enabled: !!productId,
+  });
 
-  useEffect(() => { void loadPage(); }, [loadPage]);
+  useEffect(() => {
+    if (query.data) {
+      setProduct(query.data.product);
+      setSubscriptions(query.data.subscriptions);
+      setPimProduct(query.data.pim);
+      setError(null);
+    } else if (query.isError) {
+      setError(query.error instanceof Error ? query.error.message : "Failed to load product detail.");
+      setProduct(null);
+      setSubscriptions([]);
+    }
+  }, [query.data, query.isError, query.error]);
+
+  const loading = query.isLoading && !!productId;
+  const refreshing = query.isFetching && !query.isLoading;
+  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
+    if (!productId) return;
+    await query.refetch();
+  }, [query, productId]);
 
   // This product across Advance EMI, rent/lease and direct sale — the same
   // per-plan money breakdown as the inventory profile.

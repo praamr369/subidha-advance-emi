@@ -52,48 +52,32 @@ export default function CashierPaymentReceiptPage() {
   const paymentId = Number(params?.id ?? 0);
 
   const [payment, setPayment] = useState<CashierTransaction | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (!Number.isFinite(paymentId) || paymentId <= 0) {
-        setError("Invalid cashier payment id.");
-        setPayment(null);
-        setLoading(false);
-        return;
-      }
-
-      if (mode === "initial") {
-        setLoading(true);
-      } else {
-        setRefreshing(true);
-      }
-
-      try {
-        const payload = await getCashierPaymentDetail(paymentId);
-        setPayment(payload.payment);
-        setError(null);
-      } catch (err) {
-        setError(toErrorMessage(err));
-        if (mode === "initial") {
-          setPayment(null);
-        }
-      } finally {
-        if (mode === "initial") {
-          setLoading(false);
-        } else {
-          setRefreshing(false);
-        }
-      }
+  const query = useQuery({
+    queryKey: ['cashierPaymentDetail', paymentId],
+    queryFn: async () => {
+      if (!Number.isFinite(paymentId) || paymentId <= 0) throw new Error("Invalid cashier payment id.");
+      const payload = await getCashierPaymentDetail(paymentId);
+      return payload.payment;
     },
-    [paymentId]
-  );
+    enabled: Number.isFinite(paymentId) && paymentId > 0,
+  });
+
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const error = query.error ? toErrorMessage(query.error) : (!Number.isFinite(paymentId) || paymentId <= 0 ? "Invalid cashier payment id." : null);
+
+  const loadPage = useCallback(async (mode?: "initial" | "refresh") => {
+    await query.refetch();
+  }, [query]);
 
   useEffect(() => {
-    void loadPage();
-  }, [loadPage]);
+    if (query.data) {
+      setPayment(query.data);
+    } else if (query.isError) {
+      setPayment(null);
+    }
+  }, [query.data, query.isError]);
 
   const receiptReference = useMemo(() => {
     if (!payment) return "—";

@@ -200,55 +200,50 @@ export default function AdminBatchEditPage() {
   const [startDate, setStartDate] = useState("");
   const [targetStatus, setTargetStatus] = useState<CanonicalBatchStatus | "">("");
 
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [savingFields, setSavingFields] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
-
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (!batchId) return;
-
-      if (mode === "initial") setLoading(true);
-      else setRefreshing(true);
-
-      try {
-        const [detailPayload, summaryPayload] = await Promise.all([
-          apiFetch<Record<string, unknown>>(`/admin/batches/${batchId}/`),
-          apiFetch<Record<string, unknown>>(`/admin/batches/${batchId}/summary/`),
-        ]);
-
-        const normalizedBatch = normalizeBatchDetail(detailPayload);
-        const normalizedSummary = normalizeBatchSummary(summaryPayload);
-
-        setBatch(normalizedBatch);
-        setSummary(normalizedSummary);
-        setDrawDay(
-          normalizedBatch.draw_day != null ? String(normalizedBatch.draw_day) : ""
-        );
-        setStartDate(normalizedBatch.start_date ?? "");
-        setTargetStatus("");
-        setError(null);
-        setFieldErrors({});
-      } catch (err) {
-        setError(parseErrorMessage(err));
-        setBatch(null);
-        setSummary(null);
-      } finally {
-        if (mode === "initial") setLoading(false);
-        else setRefreshing(false);
-      }
+  const query = useQuery({
+    queryKey: ["admin_batch_edit", batchId],
+    queryFn: async () => {
+      if (!batchId) throw new Error("No batch ID");
+      const [detailPayload, summaryPayload] = await Promise.all([
+        apiFetch<Record<string, unknown>>(`/admin/batches/${batchId}/`),
+        apiFetch<Record<string, unknown>>(`/admin/batches/${batchId}/summary/`),
+      ]);
+      return {
+        batch: normalizeBatchDetail(detailPayload),
+        summary: normalizeBatchSummary(summaryPayload),
+      };
     },
-    [batchId]
-  );
+    enabled: !!batchId,
+  });
 
   useEffect(() => {
-    void loadPage();
-  }, [loadPage]);
+    if (query.data) {
+      setBatch(query.data.batch);
+      setSummary(query.data.summary);
+      setDrawDay(query.data.batch.draw_day != null ? String(query.data.batch.draw_day) : "");
+      setStartDate(query.data.batch.start_date ?? "");
+      setTargetStatus("");
+      setError(null);
+      setFieldErrors({});
+    } else if (query.isError) {
+      setError(parseErrorMessage(query.error));
+      setBatch(null);
+      setSummary(null);
+    }
+  }, [query.data, query.isError, query.error]);
+
+  const loading = query.isLoading && !!batchId;
+  const refreshing = query.isFetching && !query.isLoading;
+  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
+    if (!batchId) return;
+    await query.refetch();
+  }, [query, batchId]);
 
   const allowedStatuses = useMemo(
     () => (batch ? nextAllowedBatchStatuses(batch.status) : []),

@@ -1,7 +1,7 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
@@ -96,30 +96,36 @@ function gatewayConfigured(gateway: ReminderGatewayStatus | null, channel: strin
 export default function AdminRemindersPage() {
   const [rows, setRows] = useState<PaymentReminder[]>([]);
   const [gateway, setGateway] = useState<ReminderGatewayStatus | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  async function loadPage() {
-    try {
+  const { data: pageData, error: queryError, isLoading: loading, refetch } = useQuery({
+    queryKey: ["admin_reminders_page"],
+    queryFn: async () => {
       const [payload, gatewayPayload] = await Promise.all([
         listReminders(),
         getReminderGatewayStatus(),
       ]);
-      setRows(payload.results);
-      setGateway(gatewayPayload);
-      setError(null);
-    } catch (err) {
-      setRows([]);
-      setError(accountingErrorMessage(err, "Failed to load reminders."));
-    } finally {
-      setLoading(false);
-    }
-  }
+      return { payload, gatewayPayload };
+    },
+  });
+
+  const loadPage = useCallback(async () => { await refetch(); }, [refetch]);
 
   useEffect(() => {
-    void loadPage();
-  }, []);
+    if (pageData) {
+      setRows(pageData.payload.results);
+      setGateway(pageData.gatewayPayload);
+      setError(null);
+    }
+  }, [pageData]);
+
+  useEffect(() => {
+    if (queryError) {
+      setRows([]);
+      setError(accountingErrorMessage(queryError, "Failed to load reminders."));
+    }
+  }, [queryError]);
 
   async function handleRunGeneration() {
     try {

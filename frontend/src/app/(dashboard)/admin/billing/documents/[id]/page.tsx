@@ -1,7 +1,8 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
@@ -61,7 +62,7 @@ export default function BillingDocumentDetailPage() {
   const [receipts, setReceipts] = useState<ReceiptDocument[]>([]);
   const [creditNotes, setCreditNotes] = useState<BillingCreditNote[]>([]);
   const [debitNotes, setDebitNotes] = useState<BillingDebitNote[]>([]);
-  const [loading, setLoading] = useState(true);
+
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [collectDrawerOpen, setCollectDrawerOpen] = useState(false);
@@ -95,47 +96,51 @@ export default function BillingDocumentDetailPage() {
     };
   }, [invoiceCustomerId]);
 
+  const { data: queryData, isLoading: loading, error: queryError, refetch } = useQuery({
+    queryKey: ["billing_document_detail", documentId],
+    queryFn: async () => {
+      if (!documentId) throw new Error("Billing document id is missing.");
+      const invoicePayload = await getBillingInvoice(documentId);
+      const [receiptPayload, creditPayload, debitPayload] = await Promise.all([
+        listReceiptDocuments({ billing_invoice: documentId }),
+        listBillingCreditNotes({ original_invoice: documentId }),
+        listBillingDebitNotes({ original_invoice: documentId }),
+      ]);
+      return {
+        invoice: invoicePayload,
+        receipts: receiptPayload.results,
+        creditNotes: creditPayload.results,
+        debitNotes: debitPayload.results,
+      };
+    },
+    enabled: !!documentId,
+  });
+
+  const loadPage = useCallback(async () => {
+    if (documentId) {
+      await refetch();
+    }
+  }, [refetch, documentId]);
+
   useEffect(() => {
-    if (!documentId) {
-      setLoading(false);
-      setError("Billing document id is missing.");
-      return;
+    if (queryData) {
+      setInvoice(queryData.invoice);
+      setReceipts(queryData.receipts);
+      setCreditNotes(queryData.creditNotes);
+      setDebitNotes(queryData.debitNotes);
+      setError(null);
     }
+  }, [queryData]);
 
-    let cancelled = false;
-
-    async function loadPage() {
-      setLoading(true);
-      try {
-        const invoicePayload = await getBillingInvoice(documentId);
-        const [receiptPayload, creditPayload, debitPayload] = await Promise.all([
-          listReceiptDocuments({ billing_invoice: documentId }),
-          listBillingCreditNotes({ original_invoice: documentId }),
-          listBillingDebitNotes({ original_invoice: documentId }),
-        ]);
-        if (cancelled) return;
-        setInvoice(invoicePayload);
-        setReceipts(receiptPayload.results);
-        setCreditNotes(creditPayload.results);
-        setDebitNotes(debitPayload.results);
-        setError(null);
-      } catch (err) {
-        if (cancelled) return;
-        setInvoice(null);
-        setReceipts([]);
-        setCreditNotes([]);
-        setDebitNotes([]);
-        setError(accountingErrorMessage(err, "Failed to load the billing document detail."));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+  useEffect(() => {
+    if (queryError) {
+      setInvoice(null);
+      setReceipts([]);
+      setCreditNotes([]);
+      setDebitNotes([]);
+      setError(accountingErrorMessage(queryError, "Failed to load the billing document detail."));
     }
-
-    void loadPage();
-    return () => {
-      cancelled = true;
-    };
-  }, [documentId, reloadKey]);
+  }, [queryError]);
 
   const lineColumns: EnterpriseColumnDef<BillingInvoiceLine>[] = [
     { key: "product_code", header: "Product" },

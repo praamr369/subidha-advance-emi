@@ -49,44 +49,45 @@ export default function AccountingVendorSettlementsPage() {
   const [financeAccounts, setFinanceAccounts] = useState<FinanceAccount[]>([]);
   const [purchaseBills, setPurchaseBills] = useState<AccountingPurchaseBill[]>([]);
   const [form, setForm] = useState(EMPTY_FORM);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
-    try {
+  const query = useQuery({
+    queryKey: ["vendor_settlements"],
+    queryFn: async () => {
       const [settlementPayload, vendorPayload, financePayload, purchaseBillPayload] = await Promise.all([
         listVendorSettlements({ page_size: 200 }),
         listVendors({ page_size: 500, is_active: 1 }),
         listFinanceAccounts({ page_size: 500, is_active: 1, for_payment_collection: 1 }),
         listPurchaseBills({ page_size: 500, status: "POSTED" }),
       ]);
-      setRows(settlementPayload.results);
-      setVendors(vendorPayload.results);
-      setFinanceAccounts(financePayload.results.filter((account) => account.is_real_settlement_account !== false));
-      setPurchaseBills(purchaseBillPayload.results);
-      setError(null);
-    } catch (err) {
-      setError(accountingErrorMessage(err, "Failed to load vendor settlements."));
-      if (mode === "initial") {
-        setRows([]);
-        setVendors([]);
-        setFinanceAccounts([]);
-        setPurchaseBills([]);
-      }
-    } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
-    }
-  }, []);
+      return { settlementPayload, vendorPayload, financePayload, purchaseBillPayload };
+    },
+  });
+
+  const loading = query.isLoading;
+  const refreshing = query.isRefetching && !query.isLoading;
 
   useEffect(() => {
-    void loadPage();
-  }, [loadPage]);
+    if (query.data) {
+      setRows(query.data.settlementPayload.results);
+      setVendors(query.data.vendorPayload.results);
+      setFinanceAccounts(query.data.financePayload.results.filter((account) => account.is_real_settlement_account !== false));
+      setPurchaseBills(query.data.purchaseBillPayload.results);
+      setError(null);
+    } else if (query.isError) {
+      setRows([]);
+      setVendors([]);
+      setFinanceAccounts([]);
+      setPurchaseBills([]);
+      setError(accountingErrorMessage(query.error, "Failed to load vendor settlements."));
+    }
+  }, [query.data, query.isError, query.error]);
+
+  const loadPage = useCallback(async () => {
+    await query.refetch();
+  }, [query]);
 
   const eligiblePurchaseBills = useMemo(
     () => purchaseBills.filter((bill) =>

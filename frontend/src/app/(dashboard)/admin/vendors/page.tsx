@@ -138,43 +138,43 @@ export default function AdminVendorsPage() {
   const [editingVendorId, setEditingVendorId] = useState<number | null>(null);
   const [form, setForm] = useState<VendorFormState>(EMPTY_FORM);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
-
-    try {
+  const query = useQuery({
+    queryKey: ["admin_vendors"],
+    queryFn: async () => {
       const [vendorPayload, categoryPayload] = await Promise.all([
         listVendors(),
         listVendorCategories(),
       ]);
-      const nextVendors = normalizeVendors(vendorPayload);
+      return { vendorPayload, categoryPayload };
+    },
+  });
+
+  const loading = query.isLoading;
+  const refreshing = query.isRefetching && !query.isLoading;
+
+  useEffect(() => {
+    if (query.data) {
+      const nextVendors = normalizeVendors(query.data.vendorPayload);
       setVendors(nextVendors);
-      setCategories(normalizeCategories(categoryPayload));
+      setCategories(normalizeCategories(query.data.categoryPayload));
       setSelectedVendorId((current) =>
         current && nextVendors.some((vendor) => vendor.id === current) ? current : null
       );
       setError(null);
-    } catch (err) {
-      setError(accountingErrorMessage(err, "Failed to load the vendor register."));
-      if (mode === "initial") {
-        setVendors([]);
-        setCategories([]);
-      }
-    } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
+    } else if (query.isError) {
+      setVendors([]);
+      setCategories([]);
+      setError(accountingErrorMessage(query.error, "Failed to load the vendor register."));
     }
-  }, []);
+  }, [query.data, query.isError, query.error]);
 
-  useEffect(() => {
-    void loadPage();
-  }, [loadPage]);
+  const loadPage = useCallback(async () => {
+    await query.refetch();
+  }, [query]);
 
   const selectedVendor = useMemo(
     () => vendors.find((vendor) => vendor.id === selectedVendorId) ?? null,

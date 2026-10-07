@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import ChartAccountCreateDrawer from "@/components/accounting/ChartAccountCreateDrawer";
 import ChartAccountEditDrawer from "@/components/accounting/ChartAccountEditDrawer";
@@ -30,37 +31,44 @@ function metric(payload: AccountingSetupStatusPayload | null, key: string, fallb
 }
 
 export default function AccountingChartOfAccountsPage() {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [chartAccounts, setChartAccounts] = useState<ChartOfAccount[]>([]);
   const [setupStatus, setSetupStatus] = useState<AccountingSetupStatusPayload | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [selectedChartAccountId, setSelectedChartAccountId] = useState<number | null>(null);
   const [createChartOpen, setCreateChartOpen] = useState(false);
   const [typeFilter, setTypeFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
 
-  async function loadPage() {
-    setLoading(true);
-    try {
+  const query = useQuery({
+    queryKey: ["accounting", "chart-of-accounts"],
+    queryFn: async () => {
       const [chartResult, statusResult] = await Promise.allSettled([
         listChartOfAccounts({ page_size: 500 }),
         getAccountingSetupStatus(),
       ]);
       if (chartResult.status === "rejected") throw chartResult.reason;
-      setChartAccounts(chartResult.value.results ?? []);
-      setSetupStatus(statusResult.status === "fulfilled" ? statusResult.value : null);
-      setError(null);
-    } catch (err) {
-      setError(accountingErrorMessage(err, "Failed to load chart of accounts."));
-      setChartAccounts([]);
-      setSetupStatus(null);
-    } finally {
-      setLoading(false);
-    }
-  }
+      return {
+        chartAccounts: chartResult.value.results ?? [],
+        setupStatus: statusResult.status === "fulfilled" ? statusResult.value : null,
+      };
+    },
+  });
 
-  useEffect(() => { void loadPage(); }, []);
+  const loading = query.isLoading;
+  const error = (query.error ? accountingErrorMessage(query.error, "Failed to load chart of accounts.") : null) || actionError;
+
+  useEffect(() => {
+    if (query.data) {
+      setChartAccounts(query.data.chartAccounts);
+      setSetupStatus(query.data.setupStatus);
+      setActionError(null);
+    }
+  }, [query.data]);
+
+  const loadPage = useCallback(async () => {
+    await query.refetch();
+  }, [query]);
 
   const filtered = useMemo(() => chartAccounts.filter((row) => {
     const typeMatch = typeFilter === "ALL" || row.account_type === typeFilter;

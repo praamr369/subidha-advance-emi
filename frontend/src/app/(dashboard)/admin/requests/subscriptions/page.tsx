@@ -74,12 +74,9 @@ export default function AdminSubscriptionRequestsPage() {
     setQueryInput(query);
   }, [statusFilter, requesterRole, query]);
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      await rqQuery.refetch();
-    },
-    [rqQuery]
-  );
+  const loadPage = useCallback(async () => {
+    await rqQuery.refetch();
+  }, [rqQuery]);
 
   const summary = useMemo(() => {
     return {

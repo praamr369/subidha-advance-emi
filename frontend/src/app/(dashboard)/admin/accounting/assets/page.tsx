@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
@@ -37,10 +38,8 @@ export default function AccountingAssetsPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [purchaseBills, setPurchaseBills] = useState<AccountingPurchaseBill[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [categoryForm, setCategoryForm] = useState({
     code: "",
     name: "",
@@ -60,39 +59,41 @@ export default function AccountingAssetsPage() {
     purchase_bill: "",
   });
 
-  async function loadPage(mode: "initial" | "refresh" = "initial") {
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
-
-    try {
+  const query = useQuery({
+    queryKey: ["accounting", "assets"],
+    queryFn: async () => {
       const [categoryPayload, assetPayload, vendorPayload, purchaseBillPayload] = await Promise.all([
         listAssetCategories(),
         listAssets(),
         listVendors(),
         listPurchaseBills(),
       ]);
-      setCategories(categoryPayload.results);
-      setAssets(assetPayload.results);
-      setVendors(vendorPayload.results);
-      setPurchaseBills(purchaseBillPayload.results);
-      setError(null);
-    } catch (err) {
-      setError(accountingErrorMessage(err, "Failed to load asset registers."));
-      if (mode === "initial") {
-        setCategories([]);
-        setAssets([]);
-        setVendors([]);
-        setPurchaseBills([]);
-      }
-    } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
-    }
-  }
+      return {
+        categories: categoryPayload.results,
+        assets: assetPayload.results,
+        vendors: vendorPayload.results,
+        purchaseBills: purchaseBillPayload.results,
+      };
+    },
+  });
+
+  const loading = query.isLoading;
+  const refreshing = query.isRefetching && !query.isLoading;
+  const error = (query.error ? accountingErrorMessage(query.error, "Failed to load asset registers.") : null) || actionError;
 
   useEffect(() => {
-    void loadPage();
-  }, []);
+    if (query.data) {
+      setCategories(query.data.categories);
+      setAssets(query.data.assets);
+      setVendors(query.data.vendors);
+      setPurchaseBills(query.data.purchaseBills);
+      setActionError(null);
+    }
+  }, [query.data]);
+
+  const loadPage = useCallback(async () => {
+    await query.refetch();
+  }, [query]);
 
   async function handleCreateCategory(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -117,7 +118,7 @@ export default function AccountingAssetsPage() {
       await loadPage();
     } catch (err) {
       setNotice(null);
-      setError(accountingErrorMessage(err, "Failed to create the asset category."));
+      setActionError(accountingErrorMessage(err, "Failed to create the asset category."));
     }
   }
 
@@ -148,7 +149,7 @@ export default function AccountingAssetsPage() {
       await loadPage();
     } catch (err) {
       setNotice(null);
-      setError(accountingErrorMessage(err, "Failed to create the asset."));
+      setActionError(accountingErrorMessage(err, "Failed to create the asset."));
     }
   }
 

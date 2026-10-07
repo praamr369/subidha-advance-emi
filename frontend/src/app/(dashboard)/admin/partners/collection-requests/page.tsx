@@ -152,39 +152,37 @@ async function reopenAdminPartnerCollectionRequest(
 
 export default function AdminPartnerCollectionRequestsPage() {
   const [rows, setRows] = useState<PartnerCollectionRequestRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [processingId, setProcessingId] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [actionPanel, setActionPanel] = useState<ActionPanel | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (mode === "initial") setLoading(true);
-      else setRefreshing(true);
-
-      try {
-        const payload = await listAdminPartnerCollectionRequests(
-          statusFilter || undefined
-        );
-        setRows(Array.isArray(payload.results) ? payload.results : []);
-        setError(null);
-      } catch (err) {
-        setError(toErrorMessage(err));
-        setRows([]);
-      } finally {
-        if (mode === "initial") setLoading(false);
-        else setRefreshing(false);
-      }
+  const { data: queryData, isLoading: loading, isRefetching: refreshing, error: queryError, refetch } = useQuery({
+    queryKey: ["admin_partner_collection_requests", statusFilter],
+    queryFn: async () => {
+      const payload = await listAdminPartnerCollectionRequests(statusFilter || undefined);
+      return Array.isArray(payload.results) ? payload.results : [];
     },
-    [statusFilter]
-  );
+  });
+
+  const loadPage = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
 
   useEffect(() => {
-    void loadPage();
-  }, [loadPage]);
+    if (queryData) {
+      setRows(queryData);
+      setError(null);
+    }
+  }, [queryData]);
+
+  useEffect(() => {
+    if (queryError) {
+      setError(toErrorMessage(queryError));
+      setRows([]);
+    }
+  }, [queryError]);
 
   const submittedCount = useMemo(
     () => rows.filter((r) => r.status === "SUBMITTED").length,

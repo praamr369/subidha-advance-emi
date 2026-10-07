@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { ArrowRight, FileText, CheckCircle2, Clock, AlertCircle } from "lucide-react";
 
@@ -48,15 +49,49 @@ function fieldClassName() {
 
 export default function AccountingExpensesPage() {
   const [activeTab, setActiveTab] = useState("overview");
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const [expenses, setExpenses] = useState<ExpenseVoucher[]>([]);
   const [expenseAccounts, setExpenseAccounts] = useState<ChartOfAccount[]>([]);
   const [financeAccounts, setFinanceAccounts] = useState<FinanceAccount[]>([]);
   const [branches, setBranches] = useState<BranchRecord[]>([]);
+
+  const query = useQuery({
+    queryKey: ["expensesPageData"],
+    queryFn: async () => {
+      const [expensesPayload, chartPayload, financePayload, branchesPayload] =
+        await Promise.all([
+          listExpenses(),
+          listChartOfAccounts(),
+          listFinanceAccounts(),
+          listBranches(),
+        ]);
+      return {
+        expenses: expensesPayload.results,
+        expenseAccounts: chartPayload.results.filter((account) => account.account_type === "EXPENSE"),
+        financeAccounts: financePayload.results,
+        branches: branchesPayload.results || [],
+      };
+    },
+  });
+
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const error = query.error ? toErrorMessage(query.error) : null;
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (query.data) {
+      setExpenses(query.data.expenses);
+      setExpenseAccounts(query.data.expenseAccounts);
+      setFinanceAccounts(query.data.financeAccounts);
+      setBranches(query.data.branches);
+    }
+  }, [query.data]);
+
+  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
+    await query.refetch();
+  }, [query]);
 
   const [expenseForm, setExpenseForm] = useState({
     expense_date: new Date().toISOString().slice(0, 10),
@@ -72,46 +107,11 @@ export default function AccountingExpensesPage() {
     notes: "",
   });
 
-  async function loadPage(mode: "initial" | "refresh" = "initial") {
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
-
-    try {
-      const [expensesPayload, chartPayload, financePayload, branchesPayload] =
-        await Promise.all([
-          listExpenses(),
-          listChartOfAccounts(),
-          listFinanceAccounts(),
-          listBranches(),
-        ]);
-
-      setExpenses(expensesPayload.results);
-      setExpenseAccounts(
-        chartPayload.results.filter((account) => account.account_type === "EXPENSE")
-      );
-      setFinanceAccounts(financePayload.results);
-      setBranches(branchesPayload.results || []);
-      setError(null);
-    } catch (err) {
-      setError(toErrorMessage(err));
-      if (mode === "initial") {
-        setExpenses([]);
-      }
-    } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
-    }
-  }
-
-  useEffect(() => {
-    void loadPage();
-  }, []);
-
   async function handleCreateExpense(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const netAmount = parseFloat(expenseForm.net_amount);
     if (!Number.isFinite(netAmount) || netAmount <= 0) {
-      setError("Net amount must be greater than zero.");
+      setActionError("Net amount must be greater than zero.");
       return;
     }
     try {
@@ -149,7 +149,7 @@ export default function AccountingExpensesPage() {
       await loadPage();
     } catch (err) {
       setNotice(null);
-      setError(toErrorMessage(err));
+      setActionError(toErrorMessage(err));
     }
   }
 
@@ -160,7 +160,7 @@ export default function AccountingExpensesPage() {
       await loadPage();
     } catch (err) {
       setNotice(null);
-      setError(toErrorMessage(err));
+      setActionError(toErrorMessage(err));
     }
   }
 
@@ -171,7 +171,7 @@ export default function AccountingExpensesPage() {
       await loadPage();
     } catch (err) {
       setNotice(null);
-      setError(toErrorMessage(err));
+      setActionError(toErrorMessage(err));
     }
   }
 
@@ -229,7 +229,7 @@ export default function AccountingExpensesPage() {
         {!loading && error ? (
           <ErrorState
             title="Unable to load data"
-            description={error}
+            description={error || actionError || undefined}
             onRetry={() => void loadPage()}
           />
         ) : null}

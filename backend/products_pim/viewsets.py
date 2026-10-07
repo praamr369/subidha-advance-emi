@@ -134,8 +134,12 @@ class PimProductViewSet(viewsets.ModelViewSet):
                 | Q(code__icontains=search)
                 | Q(product_type__icontains=search)
                 | Q(attributes__value_text__icontains=search)
-                | Q(source_product__seo_title__icontains=search)
-                | Q(source_product__seo_description__icontains=search)
+                # products_core.Product has no SEO fields; its searchable
+                # catalog fields are deliberately kept to the stable product
+                # code, name, and description contract.
+                | Q(source_product__product_code__icontains=search)
+                | Q(source_product__name__icontains=search)
+                | Q(source_product__description__icontains=search)
             )
             if roots_only:
                 # A blueprint is also found through any of its variant SKUs.
@@ -970,10 +974,14 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
+        old_sku = instance.sku
         data = self._handle_variant_file_uploads(request)
         serializer = self.get_serializer(instance, data=data, partial=partial)
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
+        if "sku" in data and instance.sku != old_sku:
+            PIMSyncService.rename_variant_sku(instance, old_sku)
+            PIMSyncService.sync_variant_to_operational_product(instance)
         if getattr(instance, '_prefetched_objects_cache', None):
             instance._prefetched_objects_cache = {}
         from rest_framework.response import Response
@@ -1014,6 +1022,7 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
     def update_attributes(self, request, pk=None):
         """Update variant attributes, pricing, and barcode; syncs to operational product."""
         variant = self.get_object()
+        old_sku = variant.sku
         dirty_fields = []
 
         # Scalar fields
@@ -1022,8 +1031,14 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
             if val is not None:
                 setattr(variant, field, val)
                 dirty_fields.append(field)
+        if request.data.get("sku") is not None:
+            variant.sku = str(request.data.get("sku")).strip()
+            dirty_fields.append("sku")
         if dirty_fields:
             variant.save(update_fields=dirty_fields)
+
+        if variant.sku != old_sku:
+            PIMSyncService.rename_variant_sku(variant, old_sku)
 
         # Attribute values (upsert per attribute id)
         for av in request.data.get("attribute_values", []):

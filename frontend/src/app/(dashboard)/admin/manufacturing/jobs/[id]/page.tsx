@@ -43,9 +43,8 @@ export default function AdminManufacturingJobDetailPage() {
   const jobId = params?.id;
 
   const [job, setJob] = useState<ProductionJob | null>(null);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errorState, setErrorState] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [materialForm, setMaterialForm] = useState({
@@ -76,33 +75,36 @@ export default function AdminManufacturingJobDetailPage() {
     wage_amount: "",
   });
 
-  const loadPage = useCallback(async () => {
-    if (!jobId) {
-      setLoading(false);
-      setError("Production job id is missing.");
-      return;
-    }
-
-    try {
-      setLoading(true);
+  const rqQuery = useQuery({
+    queryKey: ['manufacturingJobPage', jobId],
+    queryFn: async () => {
+      if (!jobId) throw new Error("Production job id is missing.");
       const [next, staffRes] = await Promise.all([
-        getProductionJob(jobId),
+        getProductionJob(jobId as string),
         listHrStaff(),
       ]);
-      setJob(next);
-      setEmployees(staffRes.results);
-      setError(null);
-    } catch (err) {
-      setJob(null);
-      setError(toErrorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  }, [jobId]);
+      return { next, staffRes };
+    },
+    enabled: !!jobId,
+  });
+
+  const loading = rqQuery.isLoading;
+  const error = errorState || (rqQuery.error ? toErrorMessage(rqQuery.error) : (!jobId ? "Production job id is missing." : null));
+
+  const loadPage = useCallback(async () => {
+    setErrorState(null);
+    await rqQuery.refetch();
+  }, [rqQuery]);
 
   useEffect(() => {
-    void loadPage();
-  }, [loadPage]);
+    if (rqQuery.data) {
+      setJob(rqQuery.data.next);
+      setEmployees(rqQuery.data.staffRes.results);
+      setErrorState(null);
+    } else if (rqQuery.error) {
+      setJob(null);
+    }
+  }, [rqQuery.data, rqQuery.error]);
 
   async function handleRelease() {
     if (!job) return;
@@ -113,7 +115,7 @@ export default function AdminManufacturingJobDetailPage() {
       setJob(response.job);
       setNotice("Production job released.");
     } catch (err) {
-      setError(toErrorMessage(err));
+      setErrorState(toErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -130,7 +132,7 @@ export default function AdminManufacturingJobDetailPage() {
       setJob(response.job);
       setNotice("Pending material lines posted.");
     } catch (err) {
-      setError(toErrorMessage(err));
+      setErrorState(toErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -168,7 +170,7 @@ export default function AdminManufacturingJobDetailPage() {
         notes: "",
       });
     } catch (err) {
-      setError(toErrorMessage(err));
+      setErrorState(toErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -221,7 +223,7 @@ export default function AdminManufacturingJobDetailPage() {
         notes: "",
       });
     } catch (err) {
-      setError(toErrorMessage(err));
+      setErrorState(toErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -261,7 +263,7 @@ export default function AdminManufacturingJobDetailPage() {
         });
       }
     } catch (err) {
-      setError(toErrorMessage(err));
+      setErrorState(toErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -276,7 +278,7 @@ export default function AdminManufacturingJobDetailPage() {
       setJob(response.job);
       setNotice("Production job completed.");
     } catch (err) {
-      setError(toErrorMessage(err));
+      setErrorState(toErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -292,7 +294,7 @@ export default function AdminManufacturingJobDetailPage() {
       setNotice("Production job cancelled.");
       setCancelReason("");
     } catch (err) {
-      setError(toErrorMessage(err));
+      setErrorState(toErrorMessage(err));
     } finally {
       setSaving(false);
     }

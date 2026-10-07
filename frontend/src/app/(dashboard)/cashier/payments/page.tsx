@@ -53,50 +53,45 @@ export default function CashierPaymentsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [rows, setRows] = useState<CashierTransaction[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
   const [searchInput, setSearchInput] = useState("");
-  const [query, setQuery] = useState("");
+  const [queryStr, setQueryStr] = useState("");
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial", nextQuery = "") => {
-      if (mode === "initial") {
-        setLoading(true);
-      } else {
-        setRefreshing(true);
-      }
+  const query = useQuery({
+    queryKey: ['cashierPaymentHistory', queryStr],
+    queryFn: async () => {
+      const payload = await getCashierPaymentHistory({
+        q: queryStr || undefined,
+        limit: 100,
+      });
+      return payload.results;
+    }
+  });
 
-      try {
-        const payload = await getCashierPaymentHistory({
-          q: nextQuery || undefined,
-          limit: 100,
-        });
-        setRows(payload.results);
-        setError(null);
-      } catch (err) {
-        setError(toErrorMessage(err));
-        if (mode === "initial") {
-          setRows([]);
-        }
-      } finally {
-        if (mode === "initial") {
-          setLoading(false);
-        } else {
-          setRefreshing(false);
-        }
-      }
-    },
-    []
-  );
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const error = query.error ? toErrorMessage(query.error) : null;
+
+  const loadPage = useCallback(async (mode?: "initial" | "refresh", nextQuery?: string) => {
+    if (nextQuery !== undefined && nextQuery !== queryStr) {
+      setQueryStr(nextQuery);
+    } else {
+      await query.refetch();
+    }
+  }, [query, queryStr]);
+
+  useEffect(() => {
+    if (query.data) {
+      setRows(query.data);
+    } else if (query.isError) {
+      setRows([]);
+    }
+  }, [query.data, query.isError]);
 
   useEffect(() => {
     const qParam = (searchParams.get("q") || "").trim();
     setSearchInput(qParam);
-    setQuery(qParam);
-    void loadPage("initial", qParam);
-  }, [searchParams, loadPage]);
+    setQueryStr(qParam);
+  }, [searchParams]);
 
   function handleApplySearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -302,10 +297,10 @@ export default function CashierPaymentsPage() {
             }
           />
 
-          {query ? (
+          {queryStr ? (
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               <span className="font-semibold uppercase tracking-[0.14em]">Active search</span>
-              <ERPStatusBadge status="OPEN" label={query} hideIcon />
+              <ERPStatusBadge status="OPEN" label={queryStr} hideIcon />
             </div>
           ) : (
             <ERPAuditNote tone="info" title="Cashier-safe lookup">
@@ -318,8 +313,8 @@ export default function CashierPaymentsPage() {
         <ERPSectionShell
           title="Posted cashier-visible payments"
           description={
-            query
-              ? `Showing cashier-visible results for "${query}".`
+            queryStr
+              ? `Showing cashier-visible results for "${queryStr}".`
               : "Showing the most recent posted payments visible in cashier scope."
           }
         >

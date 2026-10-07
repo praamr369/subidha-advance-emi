@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
 import Phase7Guidance from "@/components/admin/workflow/Phase7Guidance";
@@ -233,8 +234,6 @@ export default function AdminFinancePage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const analyticsQuery = useMemo(
@@ -251,15 +250,9 @@ export default function AdminFinancePage() {
     [endDate, startDate, windowPreset]
   );
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (mode === "initial") {
-        setLoading(true);
-      } else {
-        setRefreshing(true);
-      }
-
-      // Use allSettled so one failing endpoint never blanks the whole page.
+  const rqQuery = useQuery({
+    queryKey: ["adminFinancePage", analyticsQuery],
+    queryFn: async () => {
       const [
         summaryResult,
         batchesResult,
@@ -308,49 +301,86 @@ export default function AdminFinancePage() {
             )
           : [];
 
-      const failedSections = [
-        summaryResult, batchesResult, analyticsResult, financeOperationalResult,
+      return {
+        summaryResult,
+        batchesResult,
+        analyticsResult,
+        chartResult,
+        financeAccountResult,
+        draftPurchaseResult,
+        approvedPurchaseResult,
+        directSalesResult,
+        paymentRegisterResult,
+        vendorsResult,
+        financeOperationalResult,
         reconciliationResult,
-      ].filter((r) => r.status === "rejected").length;
+        financeTransferResult,
+        moneyInHandResult,
+        vendorDetails,
+        ok,
+      };
+    }
+  });
 
-      setSummary(ok(summaryResult));
-      setBatches(toArray<Record<string, unknown>>(ok(batchesResult)).map(normalizePayoutBatch));
-      setAnalytics(ok(analyticsResult));
-      setChartAccounts(ok(chartResult));
-      setFinanceAccounts(ok(financeAccountResult));
-      setDraftPurchaseBills(ok(draftPurchaseResult));
-      setApprovedPurchaseBills(ok(approvedPurchaseResult));
-      setDirectSales(ok(directSalesResult)?.results ?? []);
-      setRecentCollections((ok(paymentRegisterResult)?.results ?? []).slice(0, 8));
-      setFinanceOperationalSummary(ok(financeOperationalResult));
-      setMoneyPosition(ok(moneyInHandResult));
-      setReconciliationOverview(ok(reconciliationResult));
-      setFinanceTransfers(ok(financeTransferResult));
-      setVendorSummaries(
-        vendorDetails.sort(
-          (left, right) =>
-            toNumber(right.summary.outstanding_payable_total) -
-            toNumber(left.summary.outstanding_payable_total)
-        )
-      );
-      setError(
-        failedSections > 0
-          ? `${failedSections} finance section(s) failed to load — data shown may be partial. Refresh to retry.`
-          : null
-      );
-
-      if (mode === "initial") {
-        setLoading(false);
-      } else {
-        setRefreshing(false);
-      }
-    },
-    [analyticsQuery]
-  );
+  const loading = rqQuery.isLoading;
+  const refreshing = rqQuery.isFetching && !rqQuery.isLoading;
 
   useEffect(() => {
-    void loadPage();
-  }, [loadPage]);
+    if (!rqQuery.data) return;
+
+    const {
+      summaryResult,
+      batchesResult,
+      analyticsResult,
+      chartResult,
+      financeAccountResult,
+      draftPurchaseResult,
+      approvedPurchaseResult,
+      directSalesResult,
+      paymentRegisterResult,
+      financeOperationalResult,
+      reconciliationResult,
+      financeTransferResult,
+      moneyInHandResult,
+      vendorDetails,
+      ok,
+    } = rqQuery.data;
+
+    const failedSections = [
+      summaryResult, batchesResult, analyticsResult, financeOperationalResult,
+      reconciliationResult,
+    ].filter((r) => r.status === "rejected").length;
+
+    setSummary(ok(summaryResult));
+    setBatches(toArray<Record<string, unknown>>(ok(batchesResult)).map(normalizePayoutBatch));
+    setAnalytics(ok(analyticsResult));
+    setChartAccounts(ok(chartResult));
+    setFinanceAccounts(ok(financeAccountResult));
+    setDraftPurchaseBills(ok(draftPurchaseResult));
+    setApprovedPurchaseBills(ok(approvedPurchaseResult));
+    setDirectSales(ok(directSalesResult)?.results ?? []);
+    setRecentCollections((ok(paymentRegisterResult)?.results ?? []).slice(0, 8));
+    setFinanceOperationalSummary(ok(financeOperationalResult));
+    setMoneyPosition(ok(moneyInHandResult));
+    setReconciliationOverview(ok(reconciliationResult));
+    setFinanceTransfers(ok(financeTransferResult));
+    setVendorSummaries(
+      vendorDetails.sort(
+        (left, right) =>
+          toNumber(right.summary.outstanding_payable_total) -
+          toNumber(left.summary.outstanding_payable_total)
+      )
+    );
+    setError(
+      failedSections > 0
+        ? `${failedSections} finance section(s) failed to load — data shown may be partial. Refresh to retry.`
+        : null
+    );
+  }, [rqQuery.data]);
+
+  const loadPage = useCallback(async () => {
+    await rqQuery.refetch();
+  }, [rqQuery]);
 
   const methodRows = analytics?.payment_method_mix.rows ?? [];
   const cashNet = toNumber(methodRows.find((row) => row.method === "CASH")?.net_amount);
