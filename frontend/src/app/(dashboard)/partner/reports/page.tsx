@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 import { formatRupee } from "@/lib/utils/currency";
 
 import { useEffect, useMemo, useState } from "react";
@@ -81,7 +82,7 @@ export default function PartnerReportsPage() {
   }
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, []);
 
   const summary = dashboard?.summary;
@@ -159,7 +160,7 @@ export default function PartnerReportsPage() {
         </div>
         <button
           type="button"
-          onClick={() => void loadPage("refresh")}
+          onClick={() => void loadPage()}
           disabled={refreshing}
           className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground shadow-sm transition hover:bg-muted disabled:opacity-50"
         >
@@ -170,7 +171,7 @@ export default function PartnerReportsPage() {
       {loading ? (
         <LoadingBlock label="Loading reports..." />
       ) : error ? (
-        <ErrorState title="Error" description={error} onRetry={() => void loadPage("initial")} />
+        <ErrorState title="Error" description={error} onRetry={() => void loadPage()} />
       ) : !dashboard || !earnings ? (
         <EmptyState
           title="No data"

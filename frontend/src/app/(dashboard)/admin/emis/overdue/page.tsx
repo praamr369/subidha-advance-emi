@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -91,7 +92,7 @@ export default function OverdueEmiPage() {
   }
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, []);
 
   const totalExposure = useMemo(
@@ -311,7 +312,7 @@ export default function OverdueEmiPage() {
         <section className="flex justify-end">
           <button
             type="button"
-            onClick={() => void loadPage("refresh")}
+            onClick={() => void loadPage()}
             disabled={refreshing || loading}
             className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
           >
@@ -325,7 +326,7 @@ export default function OverdueEmiPage() {
           <ErrorState
             title="Unable to load overdue EMI records"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 

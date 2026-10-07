@@ -753,8 +753,9 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
       const result = await pimService.adoptOrphanVariants(productId);
       setAdoptResult(result.message);
       if (result.adopted.length > 0) await refreshVariants();
-    } catch {
-      setAdoptResult("Adopt failed — check backend logs");
+    } catch (err: any) {
+      const msg = err?.body?.message || err?.message || "Adopt failed — check backend logs";
+      setAdoptResult(`Adopt failed: ${msg}`);
     } finally {
       setAdopting(false);
     }

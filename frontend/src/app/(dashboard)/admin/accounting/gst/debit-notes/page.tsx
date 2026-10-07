@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, useCallback, type FormEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
@@ -31,12 +32,7 @@ import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 const today = new Date().toISOString().slice(0, 10);
 
 export default function AccountingDebitNotesPage() {
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [notes, setNotes] = useState<GstNote[]>([]);
-  const [invoices, setInvoices] = useState<TaxInvoice[]>([]);
   const [form, setForm] = useState({
     original_invoice: "",
     note_date: today,
@@ -45,32 +41,24 @@ export default function AccountingDebitNotesPage() {
     tax_adjustment: "0.00",
   });
 
-  async function loadPage(mode: "initial" | "refresh" = "initial") {
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
-    try {
+  const query = useQuery({
+    queryKey: ["accounting_debit_notes_invoices"],
+    queryFn: async () => {
       const [notesPayload, invoicesPayload] = await Promise.all([
         listDebitNotes(),
         listTaxInvoices(),
       ]);
-      setNotes(notesPayload.results);
-      setInvoices(invoicesPayload.results);
-      setError(null);
-    } catch (err) {
-      setError(accountingErrorMessage(err, "Failed to load debit notes."));
-      if (mode === "initial") {
-        setNotes([]);
-        setInvoices([]);
-      }
-    } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
-    }
-  }
+      return { notes: notesPayload.results, invoices: invoicesPayload.results };
+    },
+  });
 
-  useEffect(() => {
-    void loadPage("initial");
-  }, []);
+  const notes = query.data?.notes || [];
+  const invoices = query.data?.invoices || [];
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const error = query.error ? accountingErrorMessage(query.error, "Failed to load debit notes.") : null;
+
+  const loadPage = useCallback(async () => { await query.refetch(); }, [query]);
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -93,10 +81,10 @@ export default function AccountingDebitNotesPage() {
         taxable_adjustment: "0.00",
         tax_adjustment: "0.00",
       });
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setNotice(null);
-      setError(accountingErrorMessage(err, "Failed to create the debit note."));
+      setActionError(accountingErrorMessage(err, "Failed to create the debit note."));
     }
   }
 
@@ -104,10 +92,10 @@ export default function AccountingDebitNotesPage() {
     try {
       await approveDebitNote(id);
       setNotice("Debit note approved.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setNotice(null);
-      setError(accountingErrorMessage(err, "Failed to approve the debit note."));
+      setActionError(accountingErrorMessage(err, "Failed to approve the debit note."));
     }
   }
 
@@ -115,10 +103,10 @@ export default function AccountingDebitNotesPage() {
     try {
       await postDebitNote(id);
       setNotice("Debit note posted.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setNotice(null);
-      setError(accountingErrorMessage(err, "Failed to post the debit note."));
+      setActionError(accountingErrorMessage(err, "Failed to post the debit note."));
     }
   }
 
@@ -126,10 +114,10 @@ export default function AccountingDebitNotesPage() {
     try {
       await cancelDebitNote(id, "Cancelled from GST debit note workspace.");
       setNotice("Debit note cancelled through reversal journal.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setNotice(null);
-      setError(accountingErrorMessage(err, "Failed to cancel the debit note."));
+      setActionError(accountingErrorMessage(err, "Failed to cancel the debit note."));
     }
   }
 
@@ -159,7 +147,7 @@ export default function AccountingDebitNotesPage() {
           <AccountingRefreshButton
             loading={loading}
             refreshing={refreshing}
-            onClick={() => void loadPage("refresh")}
+            onClick={() => void loadPage()}
           />
         </div>
 
@@ -167,7 +155,7 @@ export default function AccountingDebitNotesPage() {
         {loading ? <LoadingBlock label="Loading debit notes..." /> : null}
 
         {!loading && error ? (
-          <ErrorState title="Unable to load debit notes" description={error} onRetry={() => void loadPage("initial")} />
+          <ErrorState title="Unable to load debit notes" description={error} onRetry={() => void loadPage()} />
         ) : null}
 
         {!loading && !error ? (

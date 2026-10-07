@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, useCallback, type FormEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
@@ -29,11 +30,7 @@ import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 const today = new Date().toISOString().slice(0, 10);
 
 export default function AccountingTaxInvoicesPage() {
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [invoices, setInvoices] = useState<TaxInvoice[]>([]);
   const [form, setForm] = useState({
     invoice_date: today,
     supplier_name: "Subidha Furniture",
@@ -54,25 +51,17 @@ export default function AccountingTaxInvoicesPage() {
     hsn_sac: "",
   });
 
-  async function loadPage(mode: "initial" | "refresh" = "initial") {
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
-    try {
-      const payload = await listTaxInvoices();
-      setInvoices(payload.results);
-      setError(null);
-    } catch (err) {
-      setError(accountingErrorMessage(err, "Failed to load tax invoices."));
-      if (mode === "initial") setInvoices([]);
-    } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
-    }
-  }
+  const query = useQuery({
+    queryKey: ["accounting_tax_invoices"],
+    queryFn: () => listTaxInvoices(),
+  });
 
-  useEffect(() => {
-    void loadPage("initial");
-  }, []);
+  const invoices = query.data?.results || [];
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const error = query.error ? accountingErrorMessage(query.error, "Failed to load tax invoices.") : null;
+
+  const loadPage = useCallback(async () => { await query.refetch(); }, [query]);
 
   async function handleCreateInvoice(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -126,10 +115,10 @@ export default function AccountingTaxInvoicesPage() {
         igst_amount: "0.00",
         notes: "",
       }));
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setNotice(null);
-      setError(accountingErrorMessage(err, "Failed to create the tax invoice."));
+      setActionError(accountingErrorMessage(err, "Failed to create the tax invoice."));
     }
   }
 
@@ -137,10 +126,10 @@ export default function AccountingTaxInvoicesPage() {
     try {
       await approveTaxInvoice(id);
       setNotice("Tax invoice approved.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setNotice(null);
-      setError(accountingErrorMessage(err, "Failed to approve the tax invoice."));
+      setActionError(accountingErrorMessage(err, "Failed to approve the tax invoice."));
     }
   }
 
@@ -148,10 +137,10 @@ export default function AccountingTaxInvoicesPage() {
     try {
       await postTaxInvoice(id);
       setNotice("Tax invoice posted to accounting.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setNotice(null);
-      setError(accountingErrorMessage(err, "Failed to post the tax invoice."));
+      setActionError(accountingErrorMessage(err, "Failed to post the tax invoice."));
     }
   }
 
@@ -159,10 +148,10 @@ export default function AccountingTaxInvoicesPage() {
     try {
       await cancelTaxInvoice(id, "Cancelled from GST tax invoice workspace.");
       setNotice("Tax invoice cancelled through reversal journal.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setNotice(null);
-      setError(accountingErrorMessage(err, "Failed to cancel the tax invoice."));
+      setActionError(accountingErrorMessage(err, "Failed to cancel the tax invoice."));
     }
   }
 
@@ -192,7 +181,7 @@ export default function AccountingTaxInvoicesPage() {
           <AccountingRefreshButton
             loading={loading}
             refreshing={refreshing}
-            onClick={() => void loadPage("refresh")}
+            onClick={() => void loadPage()}
           />
         </div>
 
@@ -203,7 +192,7 @@ export default function AccountingTaxInvoicesPage() {
           <ErrorState
             title="Unable to load tax invoices"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 

@@ -21,15 +21,15 @@ import {
   listStockLocations,
 } from "@/services/inventory";
 
+import { useQuery } from "@tanstack/react-query";
+import { useCallback } from "react";
+
 export default function InventoryProfilesPage() {
   const [pagination, setPagination] = useState({ page: 1, page_size: 50, total_count: 0, num_pages: 0 });
-  const [rows, setRows] = useState<InventoryProfileListRow[]>([]);
-  const [locations, setLocations] = useState<StockLocation[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearch = useDebounce(searchQuery, 350);
 
   const [filters, setFilters] = useState({ stock_tracking_enabled: "" });
-  const [summary, setSummary] = useState<Record<string, unknown> | null>(null);
 
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [showBulkPrepareDialog, setShowBulkPrepareDialog] = useState(false);
@@ -39,14 +39,11 @@ export default function InventoryProfilesPage() {
     stock_item_type: "FINISHED_GOOD",
   });
   const [bulkPrepareLoading, setBulkPrepareLoading] = useState(false);
-
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  async function loadPage() {
-    setLoading(true);
-    try {
+  const query = useQuery({
+    queryKey: ["inventoryProfiles", pagination.page, pagination.page_size, debouncedSearch, filters.stock_tracking_enabled],
+    queryFn: async () => {
       const [profilesPayload, locationPayload] = await Promise.all([
         listInventoryProfiles({
           page: pagination.page,
@@ -61,27 +58,29 @@ export default function InventoryProfilesPage() {
         }),
         listStockLocations({ is_active: true }),
       ]);
-      setRows(profilesPayload.results);
-      setSummary(profilesPayload.summary);
-      setPagination({
-        page: profilesPayload.count > 0 ? pagination.page : 1,
-        page_size: pagination.page_size,
-        total_count: profilesPayload.count,
-        num_pages: profilesPayload.num_pages,
-      });
-      setLocations(locationPayload.results);
-      setError(null);
-    } catch (err) {
-      setRows([]);
-      setError(accountingErrorMessage(err, "Failed to load inventory profiles."));
-    } finally {
-      setLoading(false);
+      return { profilesPayload, locationPayload };
     }
-  }
+  });
+
+  const payload = query.data;
+  const rows = payload?.profilesPayload.results ?? [];
+  const locations = payload?.locationPayload.results ?? [];
+  const summary = payload?.profilesPayload.summary ?? null;
+  const loading = query.isLoading;
+  const error = query.error ? accountingErrorMessage(query.error, "Failed to load inventory profiles.") : null;
+
+  const loadPage = useCallback(async () => { await query.refetch(); }, [query]);
 
   useEffect(() => {
-    void loadPage();
-  }, [pagination.page, debouncedSearch, filters.stock_tracking_enabled]);
+    if (payload) {
+      setPagination(prev => ({
+        ...prev,
+        page: payload.profilesPayload.count > 0 ? prev.page : 1,
+        total_count: payload.profilesPayload.count,
+        num_pages: payload.profilesPayload.num_pages,
+      }));
+    }
+  }, [payload]);
 
   const toggleItemSelection = (id: number) => {
     setSelectedIds((prev) =>
@@ -122,10 +121,10 @@ export default function InventoryProfilesPage() {
         });
         await loadPage();
       } else {
-        setError(`Bulk prepare failed. Updated ${result.updated_count} of ${selectedIds.length} items.`);
+        setActionError(`Bulk prepare failed. Updated ${result.updated_count} of ${selectedIds.length} items.`);
       }
     } catch (err) {
-      setError(accountingErrorMessage(err, "Bulk prepare failed."));
+      setActionError(accountingErrorMessage(err, "Bulk prepare failed."));
     } finally {
       setBulkPrepareLoading(false);
     }
@@ -152,7 +151,7 @@ export default function InventoryProfilesPage() {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
     } catch (err) {
-      setError(accountingErrorMessage(err, "CSV export failed."));
+      setActionError(accountingErrorMessage(err, "CSV export failed."));
     }
   };
 

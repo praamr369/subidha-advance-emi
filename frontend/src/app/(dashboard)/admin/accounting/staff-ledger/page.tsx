@@ -166,7 +166,7 @@ export default function AccountingStaffLedgerPage() {
               <AccountingRefreshButton
                 loading={loading}
                 refreshing={refreshing}
-                onClick={() => void loadPage("refresh")}
+                onClick={() => void loadPage()}
               />
             </>
           }
@@ -214,7 +214,7 @@ export default function AccountingStaffLedgerPage() {
             columns={columns}
             loading={loading}
             error={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
             emptyTitle="No staff ledger rows"
             emptyDescription="Posted salary or reimbursement activity will appear here."
           />

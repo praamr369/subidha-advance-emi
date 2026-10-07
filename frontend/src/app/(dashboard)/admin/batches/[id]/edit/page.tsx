@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 import { formatRupee } from "@/lib/utils/currency";
 
 import Link from "next/link";
@@ -246,7 +247,7 @@ export default function AdminBatchEditPage() {
   );
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, [loadPage]);
 
   const allowedStatuses = useMemo(
@@ -332,7 +333,7 @@ export default function AdminBatchEditPage() {
       setStartDate(normalized.start_date ?? "");
       setFieldErrors({});
       setSuccessMessage("Batch operational fields updated successfully.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setFieldErrors(parseFieldErrors(err));
       setError(parseErrorMessage(err));
@@ -364,7 +365,7 @@ export default function AdminBatchEditPage() {
 
       setSuccessMessage(`Batch status changed to ${targetStatus}.`);
       setTargetStatus("");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setFieldErrors(parseFieldErrors(err));
       setError(parseErrorMessage(err));
@@ -431,7 +432,7 @@ export default function AdminBatchEditPage() {
         <section className="flex justify-end">
           <button
             type="button"
-            onClick={() => void loadPage("refresh")}
+            onClick={() => void loadPage()}
             disabled={refreshing || loading || savingFields || savingStatus}
             className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
           >
@@ -445,7 +446,7 @@ export default function AdminBatchEditPage() {
           <ERPErrorState
             title="Unable to load batch edit page"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 

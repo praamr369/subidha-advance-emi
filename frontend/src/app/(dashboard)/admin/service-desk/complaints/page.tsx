@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useCallback, useMemo } from "react";
 
 import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
 import DataTable from "@/components/ui/DataTable";
@@ -29,32 +30,19 @@ function toErrorMessage(error: unknown): string {
 }
 
 export default function AdminServiceDeskComplaintsPage() {
-  const [payload, setPayload] = useState<ServiceDeskComplaintListResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const query = useQuery({
+    queryKey: ["admin", "service-desk", "complaints"],
+    queryFn: () => listServiceDeskComplaints(),
+  });
 
-  useEffect(() => {
-    let cancelled = false;
-    async function loadPage() {
-      try {
-        setLoading(true);
-        const next = await listServiceDeskComplaints();
-        if (cancelled) return;
-        setPayload(next);
-        setError(null);
-      } catch (err) {
-        if (cancelled) return;
-        setPayload(null);
-        setError(toErrorMessage(err));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    void loadPage();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const payload = query.data || null;
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const error = query.error ? toErrorMessage(query.error) : null;
+
+  const loadPage = useCallback(async () => {
+    await query.refetch();
+  }, [query]);
 
   const rows = payload?.results || [];
   const columns = useMemo(

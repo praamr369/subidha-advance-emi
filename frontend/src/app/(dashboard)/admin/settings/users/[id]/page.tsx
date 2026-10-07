@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -206,7 +207,7 @@ export default function AdminInternalUserDetailPage() {
   );
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, [loadPage]);
 
   const stats = useMemo(() => {
@@ -267,7 +268,7 @@ export default function AdminInternalUserDetailPage() {
       const updated = await activateInternalUser(user.id);
       setUser(updated);
       setMessage(`${updated.username} activated successfully.`);
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(toMessage(err));
     } finally {
@@ -291,7 +292,7 @@ export default function AdminInternalUserDetailPage() {
       const updated = await deactivateInternalUser(user.id);
       setUser(updated);
       setMessage(`${updated.username} deactivated successfully.`);
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(toMessage(err));
     } finally {
@@ -364,7 +365,7 @@ export default function AdminInternalUserDetailPage() {
         <ErrorState
           title="Unable to load managed user detail"
           description={error}
-          onRetry={() => void loadPage("initial")}
+          onRetry={() => void loadPage()}
         />
       ) : null}
 
@@ -380,7 +381,7 @@ export default function AdminInternalUserDetailPage() {
           <section className="flex justify-end">
             <button
               type="button"
-              onClick={() => void loadPage("refresh")}
+              onClick={() => void loadPage()}
               disabled={refreshing || actionLoading !== null}
               className="inline-flex items-center rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -451,7 +452,7 @@ export default function AdminInternalUserDetailPage() {
 
               <button
                 type="button"
-                onClick={() => void loadPage("refresh")}
+                onClick={() => void loadPage()}
                 disabled={refreshing || actionLoading !== null}
                 className="inline-flex items-center rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
               >

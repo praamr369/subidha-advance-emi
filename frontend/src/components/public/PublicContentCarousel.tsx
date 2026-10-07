@@ -12,6 +12,8 @@ import { Children, useEffect, useId, useMemo, useState, type ReactNode } from "r
 
 import { cn } from "@/lib/utils";
 
+import Autoplay from "embla-carousel-autoplay";
+
 /**
  * Public media/product carousel backed by Embla (shadcn Carousel primitives).
  * Renders real slide children only — no placeholder media.
@@ -35,6 +37,10 @@ export default function PublicContentCarousel({
   const [api, setApi] = useState<CarouselApi>();
   const [activeIndex, setActiveIndex] = useState(0);
 
+  const plugin = useMemo(() => {
+    return Autoplay({ delay: 3000, stopOnInteraction: true });
+  }, []);
+
   useEffect(() => {
     if (!api) return;
     const sync = () => setActiveIndex(api.selectedScrollSnap());
@@ -57,7 +63,8 @@ export default function PublicContentCarousel({
   return (
     <Carousel
       setApi={setApi}
-      opts={{ loop: false, align: "start" }}
+      opts={{ loop: true, align: "start" }}
+      plugins={[plugin]}
       className={cn("relative contain-paint", className)}
       aria-label={ariaLabel}
       tabIndex={0}

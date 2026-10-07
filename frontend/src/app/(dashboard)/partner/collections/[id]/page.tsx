@@ -3,7 +3,8 @@ import { formatRupee } from "@/lib/utils/currency";
 
 import { RefreshCw } from "lucide-react";
 import { useParams, usePathname } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import ERPDetailGrid from "@/components/erp/ERPDetailGrid";
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
@@ -73,41 +74,21 @@ export default function PartnerCollectionDetailPage() {
   const pathRequestId = pathname?.split("/").pop();
   const requestId = params?.id || pathRequestId;
 
-  const [request, setRequest] = useState<PartnerCollectionRequestDetail | null>(
-    null
-  );
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      try {
-        if (mode === "initial") setLoading(true);
-        else setRefreshing(true);
-
-        setError(null);
-
-        if (!requestId) {
-          throw new Error("Missing collection request id.");
-        }
-
-        const payload = await getPartnerCollectionRequestDetail(requestId);
-        setRequest(payload);
-      } catch (err) {
-        setError(toErrorMessage(err));
-        setRequest(null);
-      } finally {
-        if (mode === "initial") setLoading(false);
-        else setRefreshing(false);
-      }
+  const query = useQuery({
+    queryKey: ["partnerCollectionRequestDetail", requestId],
+    queryFn: async () => {
+      if (!requestId) throw new Error("Missing collection request id.");
+      return await getPartnerCollectionRequestDetail(requestId);
     },
-    [requestId]
-  );
+    enabled: !!requestId,
+  });
 
-  useEffect(() => {
-    void loadPage("initial");
-  }, [loadPage]);
+  const request = query.data || null;
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const error = query.error ? (query.error as Error).message : null;
+
+  const loadPage = useCallback(async () => { await query.refetch(); }, [query]);
 
   const statusText = useMemo(() => prettyStatus(request?.status), [request?.status]);
 
@@ -247,7 +228,7 @@ export default function PartnerCollectionDetailPage() {
           actions={
             <ActionButton
               variant="outline"
-              onClick={() => void loadPage("refresh")}
+              onClick={() => void loadPage()}
               disabled={refreshing}
               leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
             >
@@ -272,7 +253,7 @@ export default function PartnerCollectionDetailPage() {
           <ERPErrorState
             title="Unable to load collection request"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 

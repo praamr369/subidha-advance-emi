@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { ChevronRight, RefreshCw, Search, CreditCard } from "lucide-react";
 
 import EmptyState from "@/components/feedback/EmptyState";
@@ -43,74 +44,44 @@ export default function PartnerPaymentsPage() {
 
   const [searchInput, setSearchInput] = useState(q);
   const [methodInput, setMethodInput] = useState(method);
-  const [rows, setRows] = useState<PartnerPayment[]>([]);
-  const [count, setCount] = useState(0);
-  const [totalCollected, setTotalCollected] = useState("0.00");
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
   useEffect(() => {
     setSearchInput(q);
     setMethodInput(method);
   }, [q, method]);
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (mode === "initial") {
-        setLoading(true);
-      } else {
-        setRefreshing(true);
-      }
-
+  const query = useQuery({
+    queryKey: ["partnerPayments", q, method, customer, subscription],
+    queryFn: async () => {
       try {
-        const payload = await listPartnerPayments({
+        return await listPartnerPayments({
           q: q || undefined,
           method: method || undefined,
           customer: customer || undefined,
           subscription: subscription || undefined,
         });
-
-        setRows(Array.isArray(payload.results) ? payload.results : []);
-        setCount(Number(payload.count || 0));
-        setTotalCollected(String(payload.total_collected || "0.00"));
-        setError(null);
       } catch (err) {
-        if (mode === "initial") {
-          try {
-            const fallback = await getPartnerDashboard();
-            const fallbackRows = Array.isArray(fallback.recent_verified_payments) ? fallback.recent_verified_payments : [];
-            const fallbackTotal = Number(
-              fallback.summary?.total_paid_amount ?? fallback.summary?.total_revenue_collected ?? 0
-            );
-
-            setRows(fallbackRows as any);
-            setCount(fallbackRows.length);
-            setTotalCollected(Number.isFinite(fallbackTotal) ? fallbackTotal.toFixed(2) : "0.00");
-            setError(null);
-          } catch {
-            setError(toErrorMessage(err));
-            setRows([]);
-            setCount(0);
-            setTotalCollected("0.00");
-          }
-        } else {
-          setError(toErrorMessage(err));
-        }
-      } finally {
-        if (mode === "initial") {
-          setLoading(false);
-        } else {
-          setRefreshing(false);
-        }
+        const fallback = await getPartnerDashboard();
+        const fallbackRows = Array.isArray(fallback.recent_verified_payments) ? fallback.recent_verified_payments : [];
+        const fallbackTotal = Number(
+          fallback.summary?.total_paid_amount ?? fallback.summary?.total_revenue_collected ?? 0
+        );
+        return {
+          results: fallbackRows as any,
+          count: fallbackRows.length,
+          total_collected: Number.isFinite(fallbackTotal) ? fallbackTotal.toFixed(2) : "0.00",
+        };
       }
-    },
-    [customer, method, q, subscription]
-  );
+    }
+  });
 
-  useEffect(() => {
-    void loadPage("initial");
-  }, [loadPage]);
+  const rows = query.data?.results || [];
+  const count = Number(query.data?.count || 0);
+  const totalCollected = String(query.data?.total_collected || "0.00");
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const error = query.error ? (query.error as Error).message : null;
+
+  const loadPage = useCallback(async () => { await query.refetch(); }, [query]);
 
   const currentQuery = searchParams.toString();
 
@@ -150,7 +121,7 @@ export default function PartnerPaymentsPage() {
         </div>
         <button
           type="button"
-          onClick={() => void loadPage("refresh")}
+          onClick={() => void loadPage()}
           disabled={refreshing}
           className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground shadow-sm transition hover:bg-muted disabled:opacity-50"
         >
@@ -216,7 +187,7 @@ export default function PartnerPaymentsPage() {
         {loading ? (
           <LoadingBlock label="Loading payments..." />
         ) : error ? (
-          <ErrorState title="Error" description={error} onRetry={() => void loadPage("initial")} />
+          <ErrorState title="Error" description={error} onRetry={() => void loadPage()} />
         ) : count === 0 ? (
           <EmptyState
             title="No payments found"

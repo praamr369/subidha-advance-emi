@@ -331,6 +331,7 @@ export default function ProductGrid({
                 imageUrl={product.image || ""}
                 media={buildProductSlides(product)}
                 href={`/products/${product.product_code}`}
+                attributes={product.pim_attributes}
               />
             );
           })}

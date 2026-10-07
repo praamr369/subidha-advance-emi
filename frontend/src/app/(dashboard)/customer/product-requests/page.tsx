@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
@@ -87,40 +88,25 @@ export default function CustomerProductRequestsPage() {
   const statusFilter = ((searchParams.get("status") || "").trim().toUpperCase() || "") as StatusFilter;
   const currentPage = Math.max(Number(searchParams.get("page") || 1), 1);
 
-  const [rows, setRows] = useState<ProductRequestRecord[]>([]);
-  const [count, setCount] = useState(0);
-  const [page, setPage] = useState(currentPage);
-  const [numPages, setNumPages] = useState(0);
-  const [hasNext, setHasNext] = useState(false);
-  const [hasPrevious, setHasPrevious] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const query = useQuery({
+    queryKey: ["productRequests", "customer", statusFilter, currentPage],
+    queryFn: () => listProductRequests("customer", {
+      status: statusFilter || undefined,
+      page: currentPage,
+      pageSize: PAGE_SIZE,
+    })
+  });
 
-  const loadPage = useCallback(async () => {
-    setLoading(true);
-    try {
-      const payload = await listProductRequests("customer", {
-        status: statusFilter || undefined,
-        page: currentPage,
-        pageSize: PAGE_SIZE,
-      });
-      setRows(payload.results);
-      setCount(payload.count);
-      setPage(payload.page);
-      setNumPages(payload.num_pages);
-      setHasNext(payload.has_next);
-      setHasPrevious(payload.has_previous);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load requests.");
-      setRows([]);
-      setCount(0);
-    } finally {
-      setLoading(false);
-    }
-  }, [currentPage, statusFilter]);
+  const rows = query.data?.results || [];
+  const count = query.data?.count || 0;
+  const page = query.data?.page || currentPage;
+  const numPages = query.data?.num_pages || 0;
+  const hasNext = query.data?.has_next || false;
+  const hasPrevious = query.data?.has_previous || false;
+  const loading = query.isLoading;
+  const error = query.error ? (query.error as Error).message : null;
 
-  useEffect(() => { void loadPage(); }, [loadPage]);
+  const loadPage = useCallback(async () => { await query.refetch(); }, [query]);
 
   const stats = useMemo(() => ({
     submitted: rows.filter((r) => r.status === "SUBMITTED").length,

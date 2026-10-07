@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useCallback } from "react";
 
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
@@ -19,27 +20,19 @@ function toErrorMessage(error: unknown): string {
 }
 
 export default function AdminManufacturingOverviewPage() {
-  const [payload, setPayload] = useState<ManufacturingOverview | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const query = useQuery({
+    queryKey: ["admin", "manufacturing", "overview"],
+    queryFn: () => getManufacturingOverview(),
+  });
 
-  async function loadPage() {
-    try {
-      setLoading(true);
-      const next = await getManufacturingOverview();
-      setPayload(next);
-      setError(null);
-    } catch (err) {
-      setPayload(null);
-      setError(toErrorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  }
+  const payload = query.data || null;
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const error = query.error ? (query.error as Error).message : null;
 
-  useEffect(() => {
-    void loadPage();
-  }, []);
+  const loadPage = useCallback(async () => {
+    await query.refetch();
+  }, [query]);
 
   return (
     <ERPPageShell

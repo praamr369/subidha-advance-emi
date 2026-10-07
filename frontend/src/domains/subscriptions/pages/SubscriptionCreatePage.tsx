@@ -403,6 +403,7 @@ export default function SubscriptionCreatePage({
   const [ownershipTransferAllowed, setOwnershipTransferAllowed] = useState(false);
   const [handoverNotes, setHandoverNotes] = useState("");
   const [contractTermsSnapshot, setContractTermsSnapshot] = useState("");
+  const [yieldRatePercent, setYieldRatePercent] = useState("5.00");
 
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [signatureFile, setSignatureFile] = useState<File | null>(null);
@@ -519,8 +520,15 @@ export default function SubscriptionCreatePage({
 
   const monthlyAmount = useMemo(() => {
     if (!tenureMonths || tenureMonths <= 0) return "0.00";
+    if (isRentPlan || isLeasePlan) {
+      const yieldRateNumber = Number(yieldRatePercent);
+      if (Number.isFinite(yieldRateNumber) && yieldRateNumber > 0) {
+        return ((totalAmount * yieldRateNumber) / 100).toFixed(2);
+      }
+      return "0.00";
+    }
     return (totalAmount / tenureMonths).toFixed(2);
-  }, [totalAmount, tenureMonths]);
+  }, [totalAmount, tenureMonths, isRentPlan, isLeasePlan, yieldRatePercent]);
 
   const depositPercentNumber = useMemo(() => {
     const parsed = Number(securityDepositPercent);
@@ -566,6 +574,8 @@ export default function SubscriptionCreatePage({
     if (isEmiPlan && !batch) return false;
     if (!isEmiPlan) {
       if (depositPercentNumber < 20 || depositPercentNumber > 30) return false;
+      const yieldRateNumber = Number(yieldRatePercent);
+      if (!Number.isFinite(yieldRateNumber) || yieldRateNumber <= 0) return false;
       if (isRentPlan && !product.is_rent_enabled) return false;
       if (isLeasePlan && !product.is_lease_enabled) return false;
     }
@@ -604,10 +614,16 @@ export default function SubscriptionCreatePage({
     if (!startDate) blockers.push("Set a start date.");
     if (!tenureMonths || tenureMonths <= 0) blockers.push("Tenure must be at least 1 month.");
     if (isEmiPlan && !batch) blockers.push("Select an EMI batch.");
-    if (!isEmiPlan && (depositPercentNumber < 20 || depositPercentNumber > 30)) {
-      blockers.push(
-        `Security deposit must be between 20% and 30% (currently ${depositPercentNumber || 0}%).`
-      );
+    if (!isEmiPlan) {
+      if (depositPercentNumber < 20 || depositPercentNumber > 30) {
+        blockers.push(
+          `Security deposit must be between 20% and 30% (currently ${depositPercentNumber || 0}%).`
+        );
+      }
+      const yieldRateNumber = Number(yieldRatePercent);
+      if (!Number.isFinite(yieldRateNumber) || yieldRateNumber <= 0) {
+        blockers.push("Yield rate must be greater than zero.");
+      }
     }
     if (!photoFile) blockers.push("Customer photo is required.");
     if (!signatureFile) blockers.push("Customer signature is required.");
@@ -1209,6 +1225,7 @@ export default function SubscriptionCreatePage({
           tenure_months: tenureMonths,
           start_date: startDate,
           security_deposit_percent: depositPercentNumber,
+          monthly_yield_percent: Number(yieldRatePercent) || 5.00,
           handover_notes: handoverNotes || "",
           contract_terms_snapshot: contractTermsSnapshot || "",
           save_as_draft: asDraft,
@@ -1225,6 +1242,7 @@ export default function SubscriptionCreatePage({
           tenure_months: tenureMonths,
           start_date: startDate,
           security_deposit_percent: depositPercentNumber,
+          monthly_yield_percent: Number(yieldRatePercent) || 5.00,
           buyout_amount: leaseBuyoutAmount.trim() ? leaseBuyoutAmount.trim() : null,
           ownership_transfer_allowed: ownershipTransferAllowed,
           handover_notes: handoverNotes || "",
@@ -1379,7 +1397,7 @@ export default function SubscriptionCreatePage({
               },
               {
                 label: "Contract Value",
-                value: money(totalAmount),
+                value: money(isRentPlan || isLeasePlan ? Number(monthlyAmount) * tenureMonths : totalAmount),
                 tone: "success",
               },
               {
@@ -1748,7 +1766,42 @@ export default function SubscriptionCreatePage({
                         {money(securityDepositAmount)}
                       </div>
                       <div className="mt-1 text-xs text-muted-foreground">
-                        Computed from contract value {money(totalAmount)}
+                        Computed from base price {money(totalAmount)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground">
+                        Yield rate (%)
+                      </label>
+                      <input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        value={yieldRatePercent}
+                        onChange={(event) => {
+                          setYieldRatePercent(event.target.value);
+                          setError(null);
+                          setSuccess(null);
+                        }}
+                        className="mt-2 h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                      />
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Monthly yield on base price
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                        Monthly rent amount
+                      </div>
+                      <div className="mt-2 text-sm font-semibold text-foreground">
+                        {money(monthlyAmount)}
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        Computed from base price {money(totalAmount)}
                       </div>
                     </div>
                   </div>
@@ -1942,7 +1995,7 @@ export default function SubscriptionCreatePage({
             />
             <DetailValue
               label="Contract Value"
-              value={money(totalAmount)}
+              value={money(isRentPlan || isLeasePlan ? Number(monthlyAmount) * tenureMonths : totalAmount)}
             />
             <DetailValue
               label={isEmiPlan ? "Default Advance EMI" : "Recurring Amount (monthly)"}

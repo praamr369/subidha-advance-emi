@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
@@ -323,7 +324,7 @@ export default function AdminLuckyIdsPage() {
   }
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, []);
 
   function handleApplyFilters(event: FormEvent<HTMLFormElement>) {
@@ -575,7 +576,7 @@ export default function AdminLuckyIdsPage() {
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => void loadPage("refresh")}
+                  onClick={() => void loadPage()}
                   disabled={refreshing || loading}
                   className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
                 >
@@ -601,7 +602,7 @@ export default function AdminLuckyIdsPage() {
           <ERPErrorState
             title="Unable to load Lucky ID register"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 

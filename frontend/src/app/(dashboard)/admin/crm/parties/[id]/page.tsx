@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -132,7 +133,7 @@ export default function AdminCrmPartyDetailPage() {
       setLoading(false);
       return;
     }
-    void loadPage("initial");
+    void loadPage();
   }, [loadPage, partyId]);
 
   const quickLinks = useMemo(() => {
@@ -185,7 +186,7 @@ export default function AdminCrmPartyDetailPage() {
         create_follow_up_reminder: true,
       });
       setNotice("Party interaction recorded.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(toErrorMessage(err));
     } finally {
@@ -199,7 +200,7 @@ export default function AdminCrmPartyDetailPage() {
       setNotice(null);
       await updatePartyInteractionStatus(interactionId, status);
       setNotice(`Interaction marked ${status}.`);
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(toErrorMessage(err));
     } finally {
@@ -269,7 +270,7 @@ export default function AdminCrmPartyDetailPage() {
           <ErrorState
             title="Unable to load party timeline"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 
@@ -326,7 +327,7 @@ export default function AdminCrmPartyDetailPage() {
                 action={
                   <button
                     type="button"
-                    onClick={() => void loadPage("refresh")}
+                    onClick={() => void loadPage()}
                     disabled={refreshing}
                     className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-60"
                   >

@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -420,7 +421,7 @@ export default function AdminPaymentDetailRoutePage() {
   );
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, [loadPage]);
 
   const resolvedPayment = timelineData?.payment || payment;
@@ -600,7 +601,7 @@ export default function AdminPaymentDetailRoutePage() {
 
       setReverseSuccess(payload.detail || "Payment reversed successfully.");
       setReverseReason("");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setReverseError(toErrorMessage(err));
     } finally {
@@ -667,7 +668,7 @@ export default function AdminPaymentDetailRoutePage() {
             <>
               <button
                 type="button"
-                onClick={() => void loadPage("refresh")}
+                onClick={() => void loadPage()}
                 disabled={refreshing || loading}
                 className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
               >
@@ -701,7 +702,7 @@ export default function AdminPaymentDetailRoutePage() {
           <ERPErrorState
             title="Unable to load payment detail"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 
@@ -817,7 +818,7 @@ export default function AdminPaymentDetailRoutePage() {
                             resolvedPayment.id,
                             resolvedPayment.finance_account_id as number
                           );
-                          await loadPage("refresh");
+                          await loadPage();
                         } catch (err) {
                           setReceiptDocumentsError(
                             err instanceof Error ? err.message : "Unable to generate receipt document."

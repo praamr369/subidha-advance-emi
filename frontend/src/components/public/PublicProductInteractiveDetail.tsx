@@ -123,6 +123,10 @@ export default function PublicProductInteractiveDetail({
   const factRows = [
     { label: "Category", value: displayProduct.category || "Not classified" },
     { label: "Subcategory", value: displayProduct.subcategory || "Not classified" },
+    ...(mergedPimAttributes ?? []).map(attr => ({
+      label: attr.name,
+      value: attr.value
+    }))
   ];
 
   const isVariantPage = Boolean(initialProduct.is_variant_page);

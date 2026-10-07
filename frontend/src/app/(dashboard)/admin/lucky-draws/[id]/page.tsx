@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 import { formatRupee } from "@/lib/utils/currency";
 
 import Link from "next/link";
@@ -504,7 +505,7 @@ export default function AdminLuckyDrawDetailPage() {
   );
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, [loadPage]);
 
   const hasWinnerVisible = useMemo(() => {
@@ -603,7 +604,7 @@ export default function AdminLuckyDrawDetailPage() {
         <section className="flex justify-end">
           <button
             type="button"
-            onClick={() => void loadPage("refresh")}
+            onClick={() => void loadPage()}
             disabled={refreshing || loading}
             className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
           >
@@ -617,7 +618,7 @@ export default function AdminLuckyDrawDetailPage() {
           <ErrorState
             title="Unable to load Lucky Draw detail"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 

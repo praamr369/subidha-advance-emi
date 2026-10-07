@@ -1,5 +1,6 @@
 // frontend/src/app/(dashboard)/admin/collections/page.tsx
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -709,7 +710,7 @@ export default function AdminCollectionsPage() {
   }, []);
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, [loadPage]);
 
   async function handleUnifiedReceivableSearch(query: string) {
@@ -906,7 +907,7 @@ export default function AdminCollectionsPage() {
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => void loadPage("refresh")}
+              onClick={() => void loadPage()}
               disabled={refreshing || loading}
               className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -970,7 +971,7 @@ export default function AdminCollectionsPage() {
           <ERPErrorState
             title="Unable to load collections workspace"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 

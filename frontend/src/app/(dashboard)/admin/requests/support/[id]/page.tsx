@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 import { formatRupee } from "@/lib/utils/currency";
 
 import { useParams, useSearchParams } from "next/navigation";
@@ -217,7 +218,7 @@ export default function AdminSupportRequestDetailPage() {
   );
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, [loadPage]);
 
   async function handleStatusUpdate() {
@@ -232,7 +233,7 @@ export default function AdminSupportRequestDetailPage() {
       );
       setSupportRequest(updated);
       setMessage(`Support request status updated to ${updated.status}.`);
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(toErrorMessage(err));
     } finally {
@@ -252,7 +253,7 @@ export default function AdminSupportRequestDetailPage() {
       );
       setSupportRequest(updated);
       setMessage("Support request owner updated.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(toErrorMessage(err));
     } finally {
@@ -277,7 +278,7 @@ export default function AdminSupportRequestDetailPage() {
           ? "Support request note appended."
           : "Support request note replaced."
       );
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(toErrorMessage(err));
     } finally {
@@ -298,7 +299,7 @@ export default function AdminSupportRequestDetailPage() {
       setStatusInput(updated.status);
       setResolutionInput(updated.resolution_summary || "");
       setMessage("Support request resolved with explicit closure metadata.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(toErrorMessage(err));
     } finally {
@@ -383,7 +384,7 @@ export default function AdminSupportRequestDetailPage() {
           <ERPErrorState
             title="Unable to load support request detail"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 

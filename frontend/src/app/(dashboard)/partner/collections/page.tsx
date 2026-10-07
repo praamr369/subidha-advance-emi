@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { ChevronRight, RefreshCw, Briefcase, Plus } from "lucide-react";
 
 import EmptyState from "@/components/feedback/EmptyState";
@@ -116,31 +117,17 @@ function normalizeVerifiedPaymentRow(
 }
 
 export default function PartnerCollectionsPage() {
-  const [data, setData] = useState<DashboardPayload | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const query = useQuery({
+    queryKey: ["partnerDashboard"],
+    queryFn: () => getPartnerDashboard()
+  });
 
-  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
+  const data = query.data || null;
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const error = query.error ? (query.error as Error).message : null;
 
-    try {
-      const payload = await getPartnerDashboard();
-      setData(payload);
-      setError(null);
-    } catch (err) {
-      setError(toErrorMessage(err));
-      setData(null);
-    } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadPage("initial");
-  }, [loadPage]);
+  const loadPage = useCallback(async () => { await query.refetch(); }, [query]);
 
   const dynamicCollectionsData = useMemo(() => {
     const root = (data ?? {}) as Record<string, unknown>;
@@ -189,7 +176,7 @@ export default function PartnerCollectionsPage() {
           </Link>
           <button
             type="button"
-            onClick={() => void loadPage("refresh")}
+            onClick={() => void loadPage()}
             disabled={refreshing}
             className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground shadow-sm transition hover:bg-muted disabled:opacity-50"
           >
@@ -214,7 +201,7 @@ export default function PartnerCollectionsPage() {
         {loading ? (
           <LoadingBlock label="Loading collections..." />
         ) : error ? (
-          <ErrorState title="Error" description={error} onRetry={() => void loadPage("initial")} />
+          <ErrorState title="Error" description={error} onRetry={() => void loadPage()} />
         ) : totalItems === 0 ? (
           <EmptyState
             title="No collections found"

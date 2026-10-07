@@ -53,7 +53,7 @@ export default function AccountingItrPackPage() {
   }
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, []);
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
@@ -65,7 +65,7 @@ export default function AccountingItrPackPage() {
         end_date: form.end_date,
       });
       setNotice(`ITR export pack ${job.id} generated.`);
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setNotice(null);
       setError(accountingErrorMessage(err, "Failed to generate the ITR export pack."));
@@ -108,7 +108,7 @@ export default function AccountingItrPackPage() {
           <AccountingRefreshButton
             loading={loading}
             refreshing={refreshing}
-            onClick={() => void loadPage("refresh")}
+            onClick={() => void loadPage()}
           />
         </div>
 
@@ -116,7 +116,7 @@ export default function AccountingItrPackPage() {
         {loading ? <LoadingBlock label="Loading ITR export packs..." /> : null}
 
         {!loading && error ? (
-          <ErrorState title="Unable to load ITR export packs" description={error} onRetry={() => void loadPage("initial")} />
+          <ErrorState title="Unable to load ITR export packs" description={error} onRetry={() => void loadPage()} />
         ) : null}
 
         {!loading && !error ? (

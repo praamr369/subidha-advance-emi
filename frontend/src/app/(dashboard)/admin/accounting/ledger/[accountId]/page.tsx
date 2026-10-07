@@ -71,7 +71,7 @@ export default function AccountingLedgerPage() {
   );
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, [loadPage]);
 
   const columns: EnterpriseColumnDef<GeneralLedgerRow>[] = [
@@ -194,7 +194,7 @@ export default function AccountingLedgerPage() {
             <>
               <button
                 type="button"
-                onClick={() => void loadPage("refresh")}
+                onClick={() => void loadPage()}
                 className="h-9 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-60"
                 disabled={loading || refreshing}
               >
@@ -209,7 +209,7 @@ export default function AccountingLedgerPage() {
                     setCategory("");
                     // We must clear state then refresh, but state updates are batched. 
                     // Simple hack is to just call loadPage and let the next effect cycle pick it up, or wait a tick.
-                    setTimeout(() => void loadPage("refresh"), 0);
+                    setTimeout(() => void loadPage(), 0);
                   }}
                   className="h-9 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-60"
                   disabled={loading || refreshing}
@@ -220,7 +220,7 @@ export default function AccountingLedgerPage() {
               <AccountingRefreshButton
                 loading={loading}
                 refreshing={refreshing}
-                onClick={() => void loadPage("refresh")}
+                onClick={() => void loadPage()}
               />
             </>
           }
@@ -237,7 +237,7 @@ export default function AccountingLedgerPage() {
             columns={columns}
             loading={loading}
             error={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
             emptyTitle="No ledger rows"
             emptyDescription="No transactions match the selected filters."
           />

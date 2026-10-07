@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 import { formatRupee } from "@/lib/utils/currency";
 
 import Link from "next/link";
@@ -91,7 +92,7 @@ export default function CashierPaymentReceiptPage() {
   );
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, [loadPage]);
 
   const receiptReference = useMemo(() => {
@@ -178,7 +179,7 @@ export default function CashierPaymentReceiptPage() {
             <>
               <button
                 type="button"
-                onClick={() => void loadPage("refresh")}
+                onClick={() => void loadPage()}
                 disabled={loading || refreshing}
                 className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-70"
               >
@@ -202,7 +203,7 @@ export default function CashierPaymentReceiptPage() {
           <ERPErrorState
             title="Unable to load payment receipt"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 

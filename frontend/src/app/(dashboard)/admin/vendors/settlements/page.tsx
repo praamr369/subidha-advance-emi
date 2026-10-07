@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 
@@ -84,7 +85,7 @@ export default function AccountingVendorSettlementsPage() {
   }, []);
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, [loadPage]);
 
   const eligiblePurchaseBills = useMemo(
@@ -119,7 +120,7 @@ export default function AccountingVendorSettlementsPage() {
       });
       setNotice(`Vendor settlement ${created.settlement_no} created as a draft.`);
       setForm(EMPTY_FORM);
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(accountingErrorMessage(err, "Failed to create the vendor settlement."));
     } finally {
@@ -149,7 +150,7 @@ export default function AccountingVendorSettlementsPage() {
                 await postVendorSettlement(row.id);
                 setNotice(`Vendor settlement ${row.settlement_no} posted.`);
                 setError(null);
-                await loadPage("refresh");
+                await loadPage();
               }}
               variant="primary"
             />
@@ -163,7 +164,7 @@ export default function AccountingVendorSettlementsPage() {
                 await cancelVendorSettlement(row.id, "Cancelled by admin from vendor settlement control room.");
                 setNotice(`Vendor settlement ${row.settlement_no} cancelled.`);
                 setError(null);
-                await loadPage("refresh");
+                await loadPage();
               }}
               variant="destructive"
             />
@@ -197,7 +198,7 @@ export default function AccountingVendorSettlementsPage() {
     >
       <div className="space-y-6">
         <div className="flex justify-end">
-          <AccountingRefreshButton loading={loading} refreshing={refreshing} onClick={() => void loadPage("refresh")} />
+          <AccountingRefreshButton loading={loading} refreshing={refreshing} onClick={() => void loadPage()} />
         </div>
         {notice ? <AccountingNotice message={notice} /> : null}
         {error ? <AccountingNotice tone="danger" message={error} /> : null}
@@ -223,7 +224,7 @@ export default function AccountingVendorSettlementsPage() {
           columns={columns}
           loading={loading}
           error={null}
-          onRetry={() => void loadPage("initial")}
+          onRetry={() => void loadPage()}
           emptyTitle="No vendor settlements found"
           emptyDescription="Create a settlement draft after posting a purchase bill or recording an opening payable."
         />

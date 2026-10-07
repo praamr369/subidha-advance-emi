@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -67,38 +68,23 @@ export default function PartnerSubscriptionRequestDetailPage() {
   const params = useParams<{ id: string }>();
   const requestId = params?.id ? String(params.id) : "";
 
-  const [request, setRequest] = useState<SubscriptionRequestRecord | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const query = useQuery({
+    queryKey: ["subscriptionRequestDetail", "partner", requestId],
+    queryFn: async () => {
+      if (!requestId) throw new Error("Request id is missing.");
+      return await getSubscriptionRequest("partner", requestId);
+    },
+    enabled: !!requestId,
+  });
+
+  const request = query.data || null;
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const error = query.error ? (query.error as Error).message : null;
   const [cancelling, setCancelling] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
-    if (!requestId) {
-      setError("Request id is missing.");
-      setLoading(false);
-      return;
-    }
-
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
-    try {
-      const payload = await getSubscriptionRequest("partner", requestId);
-      setRequest(payload);
-      setError(null);
-    } catch (err) {
-      setError(toErrorMessage(err));
-      setRequest(null);
-    } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
-    }
-  }, [requestId]);
-
-  useEffect(() => {
-    void loadPage("initial");
-  }, [loadPage]);
+  const loadPage = useCallback(async () => { await query.refetch(); }, [query]);
 
   const timelineItems = useMemo<WorkspaceTimelineItem[]>(() => {
     if (!request) {
@@ -172,7 +158,7 @@ export default function PartnerSubscriptionRequestDetailPage() {
     setActionError(null);
     try {
       const response = await cancelPartnerSubscriptionRequest(requestId);
-      setRequest(response.request);
+      await query.refetch();
     } catch (err) {
       setActionError(toErrorMessage(err));
     } finally {
@@ -234,7 +220,7 @@ export default function PartnerSubscriptionRequestDetailPage() {
               action={
                 <ActionButton
                   variant="outline"
-                  onClick={() => void loadPage("refresh")}
+                  onClick={() => void loadPage()}
                   disabled={loading || refreshing}
                   leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
                 >

@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 import { formatRupee } from "@/lib/utils/currency";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -167,7 +168,7 @@ export default function PartnerSubscriptionDetailPage() {
   );
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, [loadPage]);
 
   const emis = useMemo<PartnerSubscriptionEmi[]>(() => {
@@ -515,7 +516,7 @@ export default function PartnerSubscriptionDetailPage() {
             <ActionButton
               type="button"
               variant="outline"
-              onClick={() => void loadPage("refresh")}
+              onClick={() => void loadPage()}
               disabled={loading || refreshing}
               leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
             >
@@ -607,7 +608,7 @@ export default function PartnerSubscriptionDetailPage() {
           <ERPErrorState
             title="Unable to load subscription"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 

@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
@@ -92,7 +93,7 @@ export default function AdminCountersPage() {
   }
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, []);
 
   useEffect(() => {
@@ -205,7 +206,7 @@ export default function AdminCountersPage() {
       }
       setSelectedCounterId(null);
       setForm(emptyForm());
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(toErrorMessage(err));
     } finally {
@@ -251,7 +252,7 @@ export default function AdminCountersPage() {
           <ErrorState
             title="Unable to load counters"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 
@@ -439,7 +440,7 @@ export default function AdminCountersPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => void loadPage("refresh")}
+                      onClick={() => void loadPage()}
                       disabled={refreshing}
                       className="rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-muted/50 disabled:opacity-60"
                     >

@@ -24,6 +24,8 @@ interface ProductCard3DProps {
   subcategory?: string | null;
   /** Photos + videos for the swipeable slideshow; falls back to `imageUrl`. */
   media?: ProductSlide[];
+  /** Key PIM attributes to display on the card */
+  attributes?: Array<{ name: string; value: string }>;
 }
 
 export default function ProductCard3D({
@@ -38,6 +40,7 @@ export default function ProductCard3D({
   hideMonthly = false,
   subcategory = null,
   media,
+  attributes,
 }: ProductCard3DProps) {
   const { t } = useI18n();
   const slides: ProductSlide[] = media ?? (imageUrl ? [{ type: "image", src: imageUrl }] : []);
@@ -73,6 +76,16 @@ export default function ProductCard3D({
 
       <div className="mt-4 flex flex-col gap-1 px-1 pb-1">
         <h3 className={cn("line-clamp-2 text-sm font-semibold leading-snug", tone.text)}>{title}</h3>
+
+        {attributes && attributes.length > 0 && (
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {attributes.slice(0, 3).map((attr) => (
+              <span key={attr.name} className="inline-flex items-center rounded-md border border-border/50 bg-muted/50 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                <span className="opacity-70 mr-1">{attr.name}:</span> <span className={tone.text}>{attr.value}</span>
+              </span>
+            ))}
+          </div>
+        )}
 
         <div className="mt-2 flex items-end justify-between">
           <div className="flex flex-col">

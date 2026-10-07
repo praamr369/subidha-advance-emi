@@ -9,6 +9,7 @@ import {
   useState,
   type FormEvent,
 } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
@@ -444,7 +445,7 @@ export default function AdminFinanceCommissionsPage() {
   }, [partnerId]);
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, [loadPage]);
 
   function handleApplyFilters(event: FormEvent<HTMLFormElement>) {
@@ -610,7 +611,7 @@ export default function AdminFinanceCommissionsPage() {
       });
 
       setSuccessMessage(`Commission #${row.id} settled successfully.`);
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(toErrorMessage(err));
     } finally {
@@ -646,7 +647,7 @@ export default function AdminFinanceCommissionsPage() {
           `${selectedUnsettledRows.length} commission row(s) submitted for settlement.`
       );
       setSelectedIds([]);
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(toErrorMessage(err));
     } finally {
@@ -682,7 +683,7 @@ export default function AdminFinanceCommissionsPage() {
           `${unsettledRows.length} visible unsettled commission row(s) submitted for settlement.`
       );
       setSelectedIds([]);
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(toErrorMessage(err));
     } finally {
@@ -978,7 +979,7 @@ export default function AdminFinanceCommissionsPage() {
           <div className="mt-4 flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => void loadPage("refresh")}
+              onClick={() => void loadPage()}
               disabled={refreshing || loading}
               className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -1098,7 +1099,7 @@ export default function AdminFinanceCommissionsPage() {
           <ErrorState
             title="Unable to load commission register"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 

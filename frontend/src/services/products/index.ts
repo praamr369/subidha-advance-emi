@@ -44,6 +44,7 @@ export type ProductRecord = {
   image?: string | null;
   video?: string | null;
   is_active?: boolean;
+  is_published?: boolean;
   item_type?: ProductItemType | string;
   stock_type?: ProductStockType | string;
   plan_type_default?: "EMI" | "RENT" | "LEASE" | string | null;

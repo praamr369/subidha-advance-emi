@@ -205,7 +205,7 @@ export default function AdminProductDetailPage() {
     }
   }, [productId]);
 
-  useEffect(() => { void loadPage("initial"); }, [loadPage]);
+  useEffect(() => { void loadPage(); }, [loadPage]);
 
   // This product across Advance EMI, rent/lease and direct sale — the same
   // per-plan money breakdown as the inventory profile.
@@ -281,7 +281,7 @@ export default function AdminProductDetailPage() {
       statusBadge={{ label: product?.is_active === false ? "Inactive" : "Active", tone: product?.is_active === false ? "warning" : "success" }}
     >
       {loading ? <ERPLoadingState label="Loading product blueprint..." /> : null}
-      {!loading && error ? <ERPErrorState title="Unable to load product" description={error} onRetry={() => void loadPage("initial")} /> : null}
+      {!loading && error ? <ERPErrorState title="Unable to load product" description={error} onRetry={() => void loadPage()} /> : null}
       {!loading && !error && !product ? <ERPEmptyState title="Product not found" description="The requested product could not be loaded." /> : null}
 
       {!loading && !error && product && state ? (
@@ -295,7 +295,7 @@ export default function AdminProductDetailPage() {
             </div>
             <button
               type="button"
-              onClick={() => void loadPage("refresh")}
+              onClick={() => void loadPage()}
               disabled={refreshing}
               className="inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50 shrink-0"
             >
@@ -312,7 +312,7 @@ export default function AdminProductDetailPage() {
               </div>
 
               <ERPSectionShell title="Quick actions" description="Daily operation shortcuts. Full page edit for master data and image work.">
-                <ProductQuickActions product={product} mode="detail" onChanged={() => void loadPage("refresh")} />
+                <ProductQuickActions product={product} mode="detail" onChanged={() => void loadPage()} />
               </ERPSectionShell>
 
               <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
@@ -565,7 +565,7 @@ export default function AdminProductDetailPage() {
 
               <ERPSectionShell title="Inventory operations" description="Prepare the inventory profile and manage opening stock.">
                 <div className="flex flex-wrap gap-3">
-                  <ProductQuickActions product={product} onChanged={() => void loadPage("refresh")} />
+                  <ProductQuickActions product={product} onChanged={() => void loadPage()} />
                   {product.inventory_profile_id && (
                     <Link href={`/admin/inventory/profiles/${product.inventory_profile_id}`} className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-muted">
                       <BarChart3 className="h-4 w-4" /> Inventory Profile

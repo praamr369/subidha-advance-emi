@@ -385,6 +385,12 @@ class RentSubscriptionProfile(TimeStampedModel):
             MaxValueValidator(Decimal("30.00")),
         ],
     )
+    monthly_yield_percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("5.00"),
+        validators=[MinValueValidator(Decimal("0.01"))],
+    )
     security_deposit_amount = models.DecimalField(
         max_digits=12, decimal_places=2, default=MONEY_ZERO
     )
@@ -488,6 +494,12 @@ class LeaseSubscriptionProfile(TimeStampedModel):
             MinValueValidator(Decimal("20.00")),
             MaxValueValidator(Decimal("30.00")),
         ],
+    )
+    monthly_yield_percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("5.00"),
+        validators=[MinValueValidator(Decimal("0.01"))],
     )
     security_deposit_amount = models.DecimalField(
         max_digits=12, decimal_places=2, default=MONEY_ZERO

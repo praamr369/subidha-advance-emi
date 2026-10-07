@@ -94,7 +94,7 @@ function CatalogTab({ catalogOptions, loadPage, saving, setSaving, error, setErr
     try {
       await createProductCategoryMaster({ name: categoryName.trim(), description: categoryDescription.trim() || undefined, is_active: true });
       setCategoryName(""); setCategoryDescription(""); setMessage("Category master created.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) { setError(toErrorMessage(err)); } finally { setSaving(null); }
   }
 
@@ -106,7 +106,7 @@ function CatalogTab({ catalogOptions, loadPage, saving, setSaving, error, setErr
     try {
       await createProductSubcategoryMaster({ category: Number(subcategoryCategoryId), name: subcategoryName.trim(), description: subcategoryDescription.trim() || undefined, is_active: true });
       setSubcategoryName(""); setSubcategoryDescription(""); setMessage("Subcategory master created.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) { setError(toErrorMessage(err)); } finally { setSaving(null); }
   }
 
@@ -118,7 +118,7 @@ function CatalogTab({ catalogOptions, loadPage, saving, setSaving, error, setErr
     try {
       await createProductUnitMaster({ code: unitCode.trim().toUpperCase(), name: unitName.trim(), description: unitDescription.trim() || undefined, is_active: true });
       setUnitCode("PCS"); setUnitName("Pieces"); setUnitDescription(""); setMessage("Unit master created.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) { setError(toErrorMessage(err)); } finally { setSaving(null); }
   }
 
@@ -393,7 +393,7 @@ export default function AdminProductMastersPage() {
   }
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, []);
 
   const tabs = [
@@ -436,14 +436,14 @@ export default function AdminProductMastersPage() {
             </div>
           }
           right={
-            <button type="button" onClick={() => void loadPage("refresh")} disabled={refreshing || loading} className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium transition hover:bg-muted disabled:opacity-60 shrink-0">
+            <button type="button" onClick={() => void loadPage()} disabled={refreshing || loading} className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium transition hover:bg-muted disabled:opacity-60 shrink-0">
               <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} /> Refresh
             </button>
           }
         />
 
         {message && <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{message}</div>}
-        {error && <ERPErrorState title="Error" description={error} onRetry={() => void loadPage("initial")} />}
+        {error && <ERPErrorState title="Error" description={error} onRetry={() => void loadPage()} />}
 
         {loading ? (
           <ERPLoadingState label="Loading masters hub..." />

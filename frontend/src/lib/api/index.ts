@@ -573,6 +573,7 @@ async function apiFetchInternal<T>(
   let parsed: ParsedResponseBody;
   try {
     response = await fetch(buildApiUrl(path), {
+      cache: "no-store",
       ...requestOptions,
       body: requestBody,
       headers,

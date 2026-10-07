@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { MessageSquareWarning, RotateCcw, Wrench } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
 import ServiceControlCenter from "@/components/admin/control-center/ServiceControlCenter";
@@ -32,9 +33,16 @@ function toErrorMessage(error: unknown): string {
 }
 
 export default function AdminServiceDeskOverviewPage() {
-  const [payload, setPayload] = useState<ServiceDeskOverview | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const query = useQuery({
+    queryKey: ["admin", "service-desk", "overview"],
+    queryFn: () => getServiceDeskOverview(),
+  });
+
+  const payload = query.data || null;
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const error = query.error ? toErrorMessage(query.error) : null;
+
   const [issueTickets, setIssueTickets] = useState<SupportTicketListItem[]>([]);
   const [issueCount, setIssueCount] = useState(0);
   const [issueSummary, setIssueSummary] = useState<SupportDashboardSummary | null>(null);
@@ -56,23 +64,9 @@ export default function AdminServiceDeskOverviewPage() {
     );
   }, [issueTickets, issueQ]);
 
-  async function loadPage() {
-    try {
-      setLoading(true);
-      const next = await getServiceDeskOverview();
-      setPayload(next);
-      setError(null);
-    } catch (err) {
-      setPayload(null);
-      setError(toErrorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    void loadPage();
-  }, []);
+  const loadPage = useCallback(async () => {
+    await query.refetch();
+  }, [query]);
 
   const loadIssues = useCallback(async (lane: typeof issueLane = issueLane) => {
     setIssueLoading(true);

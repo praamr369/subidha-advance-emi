@@ -104,7 +104,7 @@ export default function AccountingSalaryPage() {
   }
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, []);
 
   const payableSheets = useMemo(
@@ -153,7 +153,7 @@ export default function AccountingSalaryPage() {
         net_amount: "0.00",
       });
       setNotice("Salary sheet created.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(toErrorMessage(err));
     }
@@ -179,7 +179,7 @@ export default function AccountingSalaryPage() {
         reference_no: "",
       });
       setNotice("Salary payment posted.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(toErrorMessage(err));
     }
@@ -191,7 +191,7 @@ export default function AccountingSalaryPage() {
     try {
       await approveSalarySheet(id);
       setNotice("Salary sheet approved.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(toErrorMessage(err));
     }
@@ -203,7 +203,7 @@ export default function AccountingSalaryPage() {
     try {
       await postSalarySheet(id);
       setNotice("Salary sheet posted.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(toErrorMessage(err));
     }
@@ -221,7 +221,7 @@ export default function AccountingSalaryPage() {
     try {
       await closePayrollPeriod(period.id, closeReason);
       setNotice(`Payroll period ${period.code} closed.`);
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(toErrorMessage(err));
     }
@@ -264,7 +264,7 @@ export default function AccountingSalaryPage() {
           <AccountingRefreshButton
             loading={loading}
             refreshing={refreshing}
-            onClick={() => void loadPage("refresh")}
+            onClick={() => void loadPage()}
           />
         </div>
 
@@ -276,7 +276,7 @@ export default function AccountingSalaryPage() {
           <ErrorState
             title="Unable to load salary register"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 

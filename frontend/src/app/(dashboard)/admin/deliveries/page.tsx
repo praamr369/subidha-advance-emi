@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -398,7 +399,7 @@ export default function AdminDeliveriesPage() {
   );
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, [loadPage]);
 
   function applyFilters(event: FormEvent<HTMLFormElement>) {
@@ -447,7 +448,7 @@ export default function AdminDeliveriesPage() {
           `Direct-sale delivery desk row synced (${created.case_no?.trim() ? created.case_no : `CASE-${deskId}`}).`
         );
         setCreateNotes("");
-        await loadPage("refresh");
+        await loadPage();
         router.push(`/admin/deliveries/direct-sale-cases/${deskId}${queryString ? `?${queryString}` : ""}`);
       } catch (err) {
         setError(toErrorMessage(err, "Failed to sync direct-sale delivery desk row."));
@@ -487,7 +488,7 @@ export default function AdminDeliveriesPage() {
       setMessage(`Delivery ${created.delivery_reference} created successfully.`);
       setCreateNotes("");
       if (createStatus === "PENDING") setCreateScheduledDate("");
-      await loadPage("refresh");
+      await loadPage();
       router.push(`/admin/deliveries/${created.id}${queryString ? `?${queryString}` : ""}`);
     } catch (err) {
       setError(toErrorMessage(err, "Failed to create delivery."));
@@ -564,7 +565,7 @@ export default function AdminDeliveriesPage() {
             </div>
             <button
               type="button"
-              onClick={() => void loadPage("refresh")}
+              onClick={() => void loadPage()}
               disabled={loading || refreshing}
               className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -580,7 +581,7 @@ export default function AdminDeliveriesPage() {
           <ErrorState
             title="Unable to load deliveries"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 
@@ -1401,7 +1402,7 @@ export default function AdminDeliveriesPage() {
                                         receiver_phone: row.receiver_phone || row.customer_phone || undefined,
                                         delivery_note: "Delivered from delivery register quick action.",
                                       });
-                                      await loadPage("refresh");
+                                      await loadPage();
                                       setMessage("Direct-sale delivery marked delivered.");
                                     } catch (err) {
                                       setError(toErrorMessage(err, "Unable to mark delivery as delivered."));

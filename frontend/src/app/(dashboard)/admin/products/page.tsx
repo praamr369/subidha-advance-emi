@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 import { formatRupee } from "@/lib/utils/currency";
 
 import Link from "next/link";
@@ -609,11 +610,7 @@ export default function AdminProductsPage() {
   const [activeTab, setActiveTab] = useState<"subscription" | "pim">(() => {
     return searchParams.get("tab") === "pim" ? "pim" : "subscription";
   });
-  const [payload, setPayload] = useState<ProductRegisterPage>(() => emptyPage());
   const [catalogOptions, setCatalogOptions] = useState<ProductCatalogOptions>(() => emptyCatalogOptions());
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   // Subscription products: hide variant SKUs by default (they're managed via PIM base product)
   const [showVariantSkus, setShowVariantSkus] = useState(false);
@@ -641,40 +638,33 @@ export default function AdminProductsPage() {
       .catch(() => {/* non-fatal */});
   }, []);
 
+  const query = useQuery({
+    queryKey: ["productRegister", filters, page, pageSize, showVariantSkus],
+    queryFn: () => listProductRegister({
+      q: filters.q || undefined,
+      category: filters.category || undefined,
+      subcategory: filters.subcategory || undefined,
+      item_type: filters.item_type || undefined,
+      stock_type: filters.stock_type || undefined,
+      readiness: filters.readiness || undefined,
+      capability: filters.capability || undefined,
+      active: filters.active || undefined,
+      inventory: filters.inventory || undefined,
+      image_status: filters.image_status || undefined,
+      exclude_variant_skus: showVariantSkus ? "false" : "true",
+      page,
+      page_size: pageSize,
+    })
+  });
+
+  const payload = query.data || emptyPage();
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const error = query.error ? (query.error as Error).message : null;
+  const loadPage = useCallback(async () => { await query.refetch(); }, [query]);
+
   const rows = payload.results;
   const summary = payload.summary;
-
-  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
-    try {
-      const nextPayload = await listProductRegister({
-        q: filters.q || undefined,
-        category: filters.category || undefined,
-        subcategory: filters.subcategory || undefined,
-        item_type: filters.item_type || undefined,
-        stock_type: filters.stock_type || undefined,
-        readiness: filters.readiness || undefined,
-        capability: filters.capability || undefined,
-        active: filters.active || undefined,
-        inventory: filters.inventory || undefined,
-        image_status: filters.image_status || undefined,
-        exclude_variant_skus: showVariantSkus ? "false" : "true",
-        page,
-        page_size: pageSize,
-      });
-      setPayload(nextPayload);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load product register.");
-      if (mode === "initial") setPayload(emptyPage());
-    } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
-    }
-  }, [filters, page, pageSize, showVariantSkus]);
-
-  useEffect(() => { void loadPage("initial"); }, [loadPage]);
 
   function applyFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1120,7 +1110,7 @@ export default function AdminProductsPage() {
               </select>
               <button
                 type="button"
-                onClick={() => void loadPage("refresh")}
+                onClick={() => void loadPage()}
                 disabled={refreshing || loading}
                 className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-medium transition hover:bg-muted disabled:opacity-60"
               >
@@ -1155,7 +1145,7 @@ export default function AdminProductsPage() {
         </ERPSectionShell>
 
         {loading ? <ERPLoadingState label="Loading product register…" /> : null}
-        {!loading && error ? <ERPErrorState title="Unable to load product register" description={error} onRetry={() => void loadPage("initial")} /> : null}
+        {!loading && error ? <ERPErrorState title="Unable to load product register" description={error} onRetry={() => void loadPage()} /> : null}
 
         {!loading && !error ? (
           <ERPSectionShell title="Product rows" description={`${rangeText}. Click any row to open detail.`}>
@@ -1195,7 +1185,7 @@ export default function AdminProductsPage() {
                   rows={rows}
                   columns={columns}
                   onRowClick={(row) => router.push(`/admin/products/${row.id}`)}
-                  rowActions={(row) => <ProductQuickActions product={row} onChanged={() => loadPage("refresh")} />}
+                  rowActions={(row) => <ProductQuickActions product={row} onChanged={() => loadPage()} />}
                 />
               </DataTableShell>
             )}

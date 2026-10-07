@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 import { formatRupee } from "@/lib/utils/currency";
 
 import Link from "next/link";
@@ -443,7 +444,7 @@ export default function AdminLuckyIdEditPage() {
   );
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, [loadPage]);
 
   const isAssignedState = useMemo(() => {
@@ -497,7 +498,7 @@ export default function AdminLuckyIdEditPage() {
       setLuckyId(normalized);
       setTargetStatus("");
       setSuccessMessage(`Lucky ID status updated to ${normalized.status}.`);
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setFieldErrors(parseFieldErrors(err));
       setError(parseErrorMessage(err));
@@ -572,7 +573,7 @@ export default function AdminLuckyIdEditPage() {
         <section className="flex justify-end">
           <button
             type="button"
-            onClick={() => void loadPage("refresh")}
+            onClick={() => void loadPage()}
             disabled={refreshing || loading || saving}
             className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
           >
@@ -586,7 +587,7 @@ export default function AdminLuckyIdEditPage() {
           <ERPErrorState
             title="Unable to load Lucky ID edit page"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 

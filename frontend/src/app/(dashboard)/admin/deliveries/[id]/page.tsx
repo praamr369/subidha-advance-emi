@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import { useParams, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -194,7 +195,7 @@ export default function AdminDeliveryDetailPage() {
   );
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, [loadPage]);
 
   // The customer's position across Advance EMI, rent/lease and direct sales —
@@ -244,7 +245,7 @@ export default function AdminDeliveryDetailPage() {
       });
       setDelivery(updated);
       setMessage("Delivery metadata updated.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(toErrorMessage(err, "Failed to update delivery metadata."));
     } finally {
@@ -300,7 +301,7 @@ export default function AdminDeliveryDetailPage() {
 
       setDelivery(updated);
       setMessage(`Delivery moved to ${updated.status}.`);
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(toErrorMessage(err, `Failed to update delivery status to ${action}.`));
     } finally {
@@ -390,7 +391,7 @@ export default function AdminDeliveryDetailPage() {
           <div className="flex justify-end">
             <button
               type="button"
-              onClick={() => void loadPage("refresh")}
+              onClick={() => void loadPage()}
               disabled={loading || refreshing}
               className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-semibold text-foreground transition hover:bg-muted/30 hover:border-ring disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -414,7 +415,7 @@ export default function AdminDeliveryDetailPage() {
           <ErrorState
             title="Unable to load delivery detail"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 

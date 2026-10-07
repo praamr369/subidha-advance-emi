@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
@@ -188,7 +189,7 @@ export default function AdminDirectSaleDeliveryDetailPage() {
   );
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, [loadPage]);
 
   async function handleSaveMetadata() {
@@ -210,7 +211,7 @@ export default function AdminDirectSaleDeliveryDetailPage() {
       });
       setDelivery(updated);
       setMessage("Delivery metadata saved.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(toErrorMessage(err, "Failed to save metadata."));
     } finally {
@@ -240,7 +241,7 @@ export default function AdminDirectSaleDeliveryDetailPage() {
       setMessage("Admin delivery release recorded. Outstanding balance is unchanged and remains receivable.");
       setPaymentExceptionReason("");
       setPaymentExceptionAck(false);
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(toErrorMessage(err, "Payment exception approval failed."));
     } finally {
@@ -298,7 +299,7 @@ export default function AdminDirectSaleDeliveryDetailPage() {
 
       setDelivery(updated);
       setMessage(`${actionLabel(action)} completed.`);
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(toErrorMessage(err, `${actionLabel(action)} failed.`));
     } finally {
@@ -410,7 +411,7 @@ export default function AdminDirectSaleDeliveryDetailPage() {
           <div className="flex justify-end">
             <button
               type="button"
-              onClick={() => void loadPage("refresh")}
+              onClick={() => void loadPage()}
               disabled={loading || refreshing}
               className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-semibold text-foreground transition hover:bg-muted/30 hover:border-ring disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -432,7 +433,7 @@ export default function AdminDirectSaleDeliveryDetailPage() {
 	          <ERPErrorState
 	            title="Unable to load direct-sale delivery detail"
 	            description={error}
-	            onRetry={() => void loadPage("initial")}
+	            onRetry={() => void loadPage()}
 	          />
 	        ) : null}
 	        {!loading && !error && !delivery ? (

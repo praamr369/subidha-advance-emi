@@ -129,13 +129,22 @@ class PimProductViewSet(viewsets.ModelViewSet):
                 Q(subcategory_id=subcategory_id) | Q(parent__subcategory_id=subcategory_id)
             )
         if search:
-            match = Q(name__icontains=search) | Q(code__icontains=search)
+            match = (
+                Q(name__icontains=search) 
+                | Q(code__icontains=search)
+                | Q(product_type__icontains=search)
+                | Q(attributes__value_text__icontains=search)
+                | Q(source_product__seo_title__icontains=search)
+                | Q(source_product__seo_description__icontains=search)
+            )
             if roots_only:
                 # A blueprint is also found through any of its variant SKUs.
-                match |= Q(child_pim_products__name__icontains=search) | Q(child_pim_products__code__icontains=search)
-            qs = qs.filter(match)
-            if roots_only:
-                qs = qs.distinct()
+                match |= (
+                    Q(child_pim_products__name__icontains=search) 
+                    | Q(child_pim_products__code__icontains=search)
+                    | Q(child_pim_products__attributes__value_text__icontains=search)
+                )
+            qs = qs.filter(match).distinct()
         if is_published is not None:
             qs = qs.filter(is_published=is_published.lower() == "true")
         return qs
@@ -422,7 +431,11 @@ class PimProductViewSet(viewsets.ModelViewSet):
 
         if search:
             qs = qs.filter(
-                Q(name__icontains=search) | Q(product_code__icontains=search) | Q(category__icontains=search)
+                Q(name__icontains=search) 
+                | Q(product_code__icontains=search) 
+                | Q(category__icontains=search)
+                | Q(seo_title__icontains=search)
+                | Q(seo_description__icontains=search)
             )
 
         if category_filter:
@@ -591,48 +604,66 @@ class PimProductViewSet(viewsets.ModelViewSet):
         and create the missing records, linking them to the base product and their
         existing operational (products_core) product.
         """
-        from products_core.models import Product as CoreProduct
-        base = self.get_object()
-        adopted = []
-        skipped = []
-        errors = []
+        try:
+            from products_core.models import Product as CoreProduct
+            base = self.get_object()
+            adopted = []
+            skipped = []
+            errors = []
 
-        for child in base.child_pim_products.all():
-            if ProductVariant.objects.filter(sku=child.code).exists():
-                skipped.append(child.code)
-                continue
-            # Find the operational product by product_code matching the child's code
-            core = CoreProduct.objects.filter(product_code=child.code).first()
-            try:
-                from django.db import transaction
-                from decimal import Decimal
-                with transaction.atomic():
-                    pv = ProductVariant.objects.create(
-                        product=base,
-                        operational_product=core,
-                        sku=child.code,
-                        price=(core.base_price if core else child.base_price) or Decimal("0"),
-                        quantity_on_hand=0,
-                        reorder_level=5,
-                        is_active=True,
-                    )
-                    PIMSyncService.sync_variant_to_operational_product(pv)
-                    pv.refresh_from_db()
-                    core = pv.operational_product
-                    
-                    if core and child.source_product != core:
-                        child.source_product = core
-                        child.save(update_fields=["source_product"])
-                    adopted.append(child.code)
-            except Exception as exc:
-                errors.append({"code": child.code, "error": str(exc)})
+            for child in base.child_pim_products.all():
+                if ProductVariant.objects.filter(sku=child.code).exists():
+                    skipped.append(child.code)
+                    continue
+                # Find the operational product by product_code matching the child's code
+                core = CoreProduct.objects.filter(product_code=child.code).first()
+                try:
+                    from django.db import transaction
+                    from decimal import Decimal
+                    with transaction.atomic():
+                        pv = ProductVariant.objects.create(
+                            product=base,
+                            operational_product=core,
+                            sku=child.code,
+                            price=(core.base_price if core else child.base_price) or Decimal("0"),
+                            quantity_on_hand=0,
+                            reorder_level=5,
+                            is_active=True,
+                        )
+                        PIMSyncService.sync_variant_to_operational_product(pv)
+                        pv.refresh_from_db()
+                        core = pv.operational_product
+                        
+                        if core and child.source_product != core:
+                            child.source_product = core
+                            child.save(update_fields=["source_product"])
+                        adopted.append(child.code)
+                except Exception as exc:
+                    errors.append({"code": child.code, "error": str(exc)})
 
-        return Response({
-            "adopted": adopted,
-            "skipped": skipped,
-            "errors": errors,
-            "message": f"Adopted {len(adopted)} orphan variant(s). {len(skipped)} already linked.",
-        })
+            status_code = 200 if not errors else 400
+            if errors and not adopted:
+                msg = "Failed to adopt orphans due to errors."
+            elif errors:
+                msg = f"Adopted {len(adopted)} orphan variant(s), but encountered errors."
+            else:
+                msg = f"Adopted {len(adopted)} orphan variant(s). {len(skipped)} already linked."
+
+            return Response({
+                "adopted": adopted,
+                "skipped": skipped,
+                "errors": errors,
+                "message": msg,
+            }, status=status_code)
+        except Exception as exc:
+            import traceback
+            traceback.print_exc()
+            return Response({
+                "message": f"Critical error during adoption: {str(exc)}",
+                "adopted": [],
+                "skipped": [],
+                "errors": [{"code": "CRITICAL", "error": str(exc)}]
+            }, status=500)
 
     @action(detail=True, methods=["post"])
     def clean_stale_locks(self, request, pk=None):

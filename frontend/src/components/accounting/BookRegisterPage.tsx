@@ -129,7 +129,7 @@ export default function BookRegisterPage<T extends GenericRecord>({
   );
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, [loadPage]);
 
   const printableRows = useMemo(
@@ -174,7 +174,7 @@ export default function BookRegisterPage<T extends GenericRecord>({
                 <AccountingRefreshButton
                   loading={loading}
                   refreshing={refreshing}
-                  onClick={() => void loadPage("refresh")}
+                  onClick={() => void loadPage()}
                 />
               }
             >
@@ -256,7 +256,7 @@ export default function BookRegisterPage<T extends GenericRecord>({
                 columns={columns}
                 loading={loading}
                 error={error}
-                onRetry={() => void loadPage("initial")}
+                onRetry={() => void loadPage()}
                 emptyTitle={`No ${title.toLowerCase()} rows found`}
                 emptyDescription="Adjust the date filter or post new operational documents."
               />

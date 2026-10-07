@@ -3,6 +3,7 @@
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { RefreshCw } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
@@ -186,36 +187,23 @@ export default function CustomerDeliveryDetailPage() {
   const params = useParams<{ id: string }>();
   const deliveryId = params?.id;
 
-  const [delivery, setDelivery] = useState<DeliveryRecord | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const query = useQuery({
+    queryKey: ["customerDeliveryDetail", deliveryId],
+    queryFn: async () => {
+      if (!deliveryId) throw new Error("Delivery id is missing.");
+      return await getCustomerDelivery(deliveryId);
+    },
+    enabled: !!deliveryId,
+  });
 
-  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
-    if (!deliveryId) {
-      setError("Delivery id is missing.");
-      setLoading(false);
-      return;
-    }
+  const delivery = query.data || null;
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const error = query.error ? (query.error as Error).message : null;
 
-    try {
-      if (mode === "initial") setLoading(true);
-      else setRefreshing(true);
-      const payload = await getCustomerDelivery(deliveryId);
-      setDelivery(payload);
-      setError(null);
-    } catch (err) {
-      setError(toErrorMessage(err));
-      setDelivery(null);
-    } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
-    }
-  }, [deliveryId]);
-
-  useEffect(() => {
-    void loadPage("initial");
-  }, [loadPage]);
+  const loadPage = useCallback(async (mode?: string) => {
+    await query.refetch();
+  }, [query]);
 
   const timelineItems = useMemo(
     () => (delivery ? buildTimeline(delivery) : []),
@@ -310,7 +298,7 @@ export default function CustomerDeliveryDetailPage() {
               actions={
                 <ActionButton
                   variant="outline"
-                  onClick={() => void loadPage("refresh")}
+                  onClick={() => void loadPage()}
                   disabled={loading || refreshing}
                   leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
                 >

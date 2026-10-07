@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
@@ -172,7 +173,7 @@ export default function AdminVendorsPage() {
   }, []);
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, [loadPage]);
 
   const selectedVendor = useMemo(
@@ -222,7 +223,7 @@ export default function AdminVendorsPage() {
           ? `Vendor ${saved.display_name || saved.name} updated.`
           : `Vendor ${saved.display_name || saved.name} created. You can create another vendor now.`
       );
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(accountingErrorMessage(err, "Failed to save the vendor."));
     } finally {
@@ -311,7 +312,7 @@ export default function AdminVendorsPage() {
               <button
                 type="button"
                 className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-semibold transition hover:bg-muted disabled:opacity-50"
-                onClick={() => void loadPage("refresh")}
+                onClick={() => void loadPage()}
                 disabled={loading || refreshing}
               >
                 <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
@@ -333,7 +334,7 @@ export default function AdminVendorsPage() {
               columns={columns}
               loading={loading}
               error={!drawerOpen ? error : null}
-              onRetry={() => void loadPage("refresh")}
+              onRetry={() => void loadPage()}
               globalFilterPlaceholder="Search code, name, phone, email, GSTIN…"
               emptyTitle="No vendors found"
               emptyDescription="Create the first vendor profile to enable procurement and payable workflows."

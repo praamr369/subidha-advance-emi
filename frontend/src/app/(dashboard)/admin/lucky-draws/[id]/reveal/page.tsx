@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -470,7 +471,7 @@ export default function AdminLuckyDrawRevealPage() {
   );
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, [loadPage]);
 
   const revealBlockedReason = useMemo(() => {
@@ -582,7 +583,7 @@ export default function AdminLuckyDrawRevealPage() {
         <section className="flex justify-end">
           <button
             type="button"
-            onClick={() => void loadPage("refresh")}
+            onClick={() => void loadPage()}
             disabled={refreshing || loading || revealing}
             className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
           >
@@ -596,7 +597,7 @@ export default function AdminLuckyDrawRevealPage() {
           <ErrorState
             title="Unable to load reveal page"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 

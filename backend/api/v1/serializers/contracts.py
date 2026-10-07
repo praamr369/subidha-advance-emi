@@ -21,6 +21,7 @@ class AdminRentContractCreateSerializer(serializers.Serializer):
     tenure_months = serializers.IntegerField(min_value=1)
     start_date = serializers.DateField(required=False)
     security_deposit_percent = serializers.DecimalField(max_digits=5, decimal_places=2)
+    monthly_yield_percent = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, default="5.00")
     handover_notes = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     contract_terms_snapshot = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     # Additive: when true the contract is created as DRAFT (KYC gate not applied).
@@ -41,6 +42,7 @@ class AdminLeaseContractCreateSerializer(serializers.Serializer):
     tenure_months = serializers.IntegerField(min_value=1)
     start_date = serializers.DateField(required=False)
     security_deposit_percent = serializers.DecimalField(max_digits=5, decimal_places=2)
+    monthly_yield_percent = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, default="5.00")
     buyout_amount = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True)
     ownership_transfer_allowed = serializers.BooleanField(required=False, default=False)
     handover_notes = serializers.CharField(required=False, allow_blank=True, allow_null=True)

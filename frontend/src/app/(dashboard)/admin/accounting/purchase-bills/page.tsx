@@ -280,7 +280,7 @@ export default function AccountingPurchaseBillsPage() {
   }
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, []);
 
   const selectedBill = useMemo(
@@ -348,7 +348,7 @@ export default function AccountingPurchaseBillsPage() {
       }
       setSelectedBillId(null);
       setForm(emptyForm());
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(accountingErrorMessage(err, "Failed to save purchase bill."));
     } finally {
@@ -412,7 +412,7 @@ export default function AccountingPurchaseBillsPage() {
               onConfirm={async () => {
                 await approvePurchaseBill(row.id);
                 setNotice(`Purchase bill ${row.bill_no} approved.`);
-                await loadPage("refresh");
+                await loadPage();
               }}
               variant="secondary"
             />
@@ -425,7 +425,7 @@ export default function AccountingPurchaseBillsPage() {
               onConfirm={async () => {
                 await postPurchaseBill(row.id);
                 setNotice(`Purchase bill ${row.bill_no} posted.`);
-                await loadPage("refresh");
+                await loadPage();
               }}
               variant="primary"
             />
@@ -438,7 +438,7 @@ export default function AccountingPurchaseBillsPage() {
               onConfirm={async () => {
                 await cancelPurchaseBill(row.id, "Cancelled from accounting purchase bills page.");
                 setNotice(`Purchase bill ${row.bill_no} cancelled.`);
-                await loadPage("refresh");
+                await loadPage();
               }}
               variant="destructive"
             />
@@ -475,7 +475,7 @@ export default function AccountingPurchaseBillsPage() {
     >
       <div className="space-y-6">
         <div className="flex justify-end">
-          <AccountingRefreshButton loading={loading} refreshing={refreshing} onClick={() => void loadPage("refresh")} />
+          <AccountingRefreshButton loading={loading} refreshing={refreshing} onClick={() => void loadPage()} />
         </div>
 
         {notice ? <AccountingNotice message={notice} /> : null}
@@ -800,7 +800,7 @@ export default function AccountingPurchaseBillsPage() {
             columns={columns}
             loading={loading}
             error={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
             emptyTitle="No purchase bills found"
             emptyDescription="Create the first draft purchase bill above."
           />

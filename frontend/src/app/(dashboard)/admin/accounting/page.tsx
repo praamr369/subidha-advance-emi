@@ -426,7 +426,7 @@ export default function AdminAccountingPage() {
     }
   }
 
-  useEffect(() => { void loadPage("initial"); }, []);
+  useEffect(() => { void loadPage(); }, []);
 
   const setupBlockers = useMemo(() => compactBlockers(data?.setupReadiness ?? null), [data?.setupReadiness]);
   const setupBlockerCount = metricNumber(data?.setupStatus?.setup_health_blockers_count) ?? data?.setupReadiness?.summary.blockers_count ?? null;
@@ -510,7 +510,7 @@ export default function AdminAccountingPage() {
 
         <div aria-live="polite">
         {loading ? <ERPLoadingState label="Loading accounting and finance cockpit..." /> : null}
-        {!loading && error ? <ERPErrorState title="Unable to load accounting cockpit" description={error} onRetry={() => void loadPage("initial")} /> : null}
+        {!loading && error ? <ERPErrorState title="Unable to load accounting cockpit" description={error} onRetry={() => void loadPage()} /> : null}
         </div>
         
         {/* Tab content wrapper */}
@@ -523,7 +523,7 @@ export default function AdminAccountingPage() {
                     title="Accounting Control Center"
                     description="Active blockers, primary actions, and daily finance workflows."
                     actions={
-                      <button type="button" onClick={() => void loadPage("refresh")} disabled={refreshing} aria-label={refreshing ? "Refreshing accounting data" : "Refresh accounting data"}
+                      <button type="button" onClick={() => void loadPage()} disabled={refreshing} aria-label={refreshing ? "Refreshing accounting data" : "Refresh accounting data"}
                         className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60">
                         <RefreshCw className={cn("h-3.5 w-3.5", refreshing ? "animate-spin" : "")} aria-hidden />
                         {refreshing ? "Refreshing…" : "Refresh"}

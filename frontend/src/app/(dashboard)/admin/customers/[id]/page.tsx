@@ -1,5 +1,6 @@
 // frontend/src/app/(dashboard)/admin/customers/[id]/page.tsx
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -1515,7 +1516,7 @@ export default function AdminCustomerDetailPage() {
   );
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, [loadPage]);
 
   const activeSubscriptionCount = useMemo(
@@ -1714,7 +1715,7 @@ export default function AdminCustomerDetailPage() {
           : "KYC status updated."
       );
       setKycReason("");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setKycError(
         err instanceof Error && err.message.trim()
@@ -1744,7 +1745,7 @@ export default function AdminCustomerDetailPage() {
       );
       setNewUsername("");
       setUsernameReason("");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setUsernameError(toErrorMessage(err));
     } finally {
@@ -1829,7 +1830,7 @@ export default function AdminCustomerDetailPage() {
           <div className="flex justify-end">
             <button
               type="button"
-              onClick={() => void loadPage("refresh")}
+              onClick={() => void loadPage()}
               disabled={refreshing || loading}
               className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -1845,7 +1846,7 @@ export default function AdminCustomerDetailPage() {
           <ErrorState
             title="Unable to load customer detail"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 

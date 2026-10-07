@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
@@ -680,7 +681,7 @@ export default function AdminSubscriptionsPage() {
   }, [isWorkflowLanding, listQueryString]);
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, [loadPage]);
 
   function handleApplyFilters(event: FormEvent<HTMLFormElement>) {
@@ -1123,7 +1124,7 @@ export default function AdminSubscriptionsPage() {
             <button
               type="button"
               onClick={() => {
-                void loadPage("refresh");
+                void loadPage();
                 void loadInsights();
               }}
               disabled={refreshing || loading}
@@ -1239,7 +1240,7 @@ export default function AdminSubscriptionsPage() {
           <ERPErrorState
             title="Unable to load subscription register"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
         </div>

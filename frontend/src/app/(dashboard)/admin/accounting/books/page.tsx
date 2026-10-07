@@ -97,7 +97,7 @@ export default function AccountingBooksPage() {
   }
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, []);
 
   const eligibleAccounts = readiness?.movement_eligible_accounts ?? [];
@@ -135,7 +135,7 @@ export default function AccountingBooksPage() {
         notes: "",
       });
       setNotice("Money movement draft created. Post explicitly after review.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setNotice(null);
       setError(toErrorMessage(err));
@@ -146,7 +146,7 @@ export default function AccountingBooksPage() {
     try {
       await postMoneyMovement(id);
       setNotice("Money movement posted and journal entry created.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setNotice(null);
       setError(toErrorMessage(err));
@@ -177,7 +177,7 @@ export default function AccountingBooksPage() {
         header={
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             {notice ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{notice}</div> : <div />}
-            <button type="button" onClick={() => void loadPage("refresh")} disabled={refreshing || loading} className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-60">
+            <button type="button" onClick={() => void loadPage()} disabled={refreshing || loading} className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-60">
               {refreshing ? "Refreshing..." : "Refresh"}
             </button>
           </div>
@@ -195,7 +195,7 @@ export default function AccountingBooksPage() {
               />
             ) : null}
             {loading ? <LoadingBlock label="Loading books..." /> : null}
-            {!loading && error ? <ErrorState title="Unable to load books" description={error} onRetry={() => void loadPage("initial")} /> : null}
+            {!loading && error ? <ErrorState title="Unable to load books" description={error} onRetry={() => void loadPage()} /> : null}
           </div>
         }
         register={

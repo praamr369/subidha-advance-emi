@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 import { formatRupee } from "@/lib/utils/currency";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -182,7 +183,7 @@ export default function AdminPartnerCollectionRequestsPage() {
   );
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, [loadPage]);
 
   const submittedCount = useMemo(
@@ -230,7 +231,7 @@ export default function AdminPartnerCollectionRequestsPage() {
         await reopenAdminPartnerCollectionRequest(actionPanel.row.id, actionPanel.note || undefined);
       }
       closePanel();
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setActionError(toErrorMessage(err));
     } finally {
@@ -279,7 +280,7 @@ export default function AdminPartnerCollectionRequestsPage() {
 
         <button
           type="button"
-          onClick={() => void loadPage("refresh")}
+          onClick={() => void loadPage()}
           disabled={refreshing}
           className="inline-flex items-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
         >
@@ -295,7 +296,7 @@ export default function AdminPartnerCollectionRequestsPage() {
         <ErrorState
           title="Unable to load partner collection requests"
           description={error}
-          onRetry={() => void loadPage("initial")}
+          onRetry={() => void loadPage()}
         />
       ) : null}
 

@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -831,7 +832,7 @@ export default function AdminSubscriptionDetailPage() {
   );
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, [loadPage]);
 
   const financialSummary = subscription?.financial_summary;
@@ -1065,7 +1066,7 @@ export default function AdminSubscriptionDetailPage() {
           <ERPErrorState
             title="Unable to load subscription detail"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 
@@ -1146,7 +1147,7 @@ export default function AdminSubscriptionDetailPage() {
 
                   <button
                     type="button"
-                    onClick={() => void loadPage("refresh")}
+                    onClick={() => void loadPage()}
                     disabled={refreshing || loading}
                     className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
                   >
@@ -2250,7 +2251,7 @@ export default function AdminSubscriptionDetailPage() {
             subscriptionId={subscription.id}
             open={settleModalOpen}
             onOpenChange={setSettleModalOpen}
-            onSettled={() => void loadPage("refresh")}
+            onSettled={() => void loadPage()}
           />
         ) : null}
       </div>

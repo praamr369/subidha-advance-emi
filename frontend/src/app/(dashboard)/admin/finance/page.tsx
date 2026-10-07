@@ -349,7 +349,7 @@ export default function AdminFinancePage() {
   );
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, [loadPage]);
 
   const methodRows = analytics?.payment_method_mix.rows ?? [];
@@ -531,7 +531,7 @@ export default function AdminFinancePage() {
         reference_no: "",
         notes: "",
       });
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(toErrorMessage(err));
     } finally {
@@ -616,7 +616,7 @@ export default function AdminFinancePage() {
         <section className="flex justify-end">
           <button
             type="button"
-            onClick={() => void loadPage("refresh")}
+            onClick={() => void loadPage()}
             disabled={refreshing || loading}
             className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-card px-4 text-sm font-medium text-foreground transition hover:border-ring hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
           >
@@ -683,7 +683,7 @@ export default function AdminFinancePage() {
               {error}{" "}
               <button
                 type="button"
-                onClick={() => void loadPage("refresh")}
+                onClick={() => void loadPage()}
                 className="underline font-medium"
               >
                 Retry

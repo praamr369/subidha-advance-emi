@@ -304,7 +304,7 @@ export default function AdminPayoutBatchDetailPage() {
   );
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, [loadPage]);
 
   useEffect(() => {
@@ -378,7 +378,7 @@ export default function AdminPayoutBatchDetailPage() {
       if (action === "finalize" && !selectedFinanceAccount && batch?.finance_account) {
         setSelectedFinanceAccount(String(batch.finance_account));
       }
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setActionError(toErrorMessage(err));
     } finally {
@@ -490,7 +490,7 @@ export default function AdminPayoutBatchDetailPage() {
         <section className="flex justify-end gap-3">
           <button
             type="button"
-            onClick={() => void loadPage("refresh")}
+            onClick={() => void loadPage()}
             disabled={refreshing || loading}
             className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-card px-4 text-sm font-medium text-foreground transition hover:border-ring hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
           >
@@ -530,7 +530,7 @@ export default function AdminPayoutBatchDetailPage() {
           <ErrorState
             title="Unable to load payout batch detail"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 

@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -464,7 +465,7 @@ export default function AdminReportsPage() {
             <ActionButton
               type="button"
               variant="outline"
-              onClick={() => void loadPage("refresh")}
+              onClick={() => void loadPage()}
               disabled={refreshing || loading}
               leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
             >
@@ -518,7 +519,7 @@ export default function AdminReportsPage() {
                 <ErrorState
                   title="Unable to load analytics"
                   description={liveError}
-                  onRetry={() => void loadPage("refresh")}
+                  onRetry={() => void loadPage()}
                 />
               ) : (
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -561,7 +562,7 @@ export default function AdminReportsPage() {
           <ErrorState
             title="Unable to load reports overview"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 
@@ -938,7 +939,7 @@ export default function AdminReportsPage() {
                 <ErrorState
                   title="Unable to load SME catalog"
                   description={catalogError}
-                  onRetry={() => void loadPage("refresh")}
+                  onRetry={() => void loadPage()}
                 />
               ) : !catalog?.sections?.length ? (
                 <EmptyState

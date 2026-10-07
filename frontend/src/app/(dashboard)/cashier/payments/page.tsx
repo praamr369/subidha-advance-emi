@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 import { formatRupee } from "@/lib/utils/currency";
 
 import { RefreshCw, Search } from "lucide-react";
@@ -328,7 +329,7 @@ export default function CashierPaymentsPage() {
             <ERPErrorState
               title="Unable to load payment history"
               description={error}
-              onRetry={() => void loadPage("initial")}
+              onRetry={() => void loadPage()}
             />
           ) : null}
 

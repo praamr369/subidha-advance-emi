@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -129,7 +130,7 @@ export default function AdminSupportRequestsPage() {
   );
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, [loadPage]);
 
   const columns = useMemo(
@@ -315,7 +316,7 @@ export default function AdminSupportRequestsPage() {
             <ActionButton
               type="button"
               variant="outline"
-              onClick={() => void loadPage("refresh")}
+              onClick={() => void loadPage()}
               disabled={loading || refreshing}
             >
               {refreshing ? "Refreshing..." : "Refresh"}
@@ -416,7 +417,7 @@ export default function AdminSupportRequestsPage() {
               <ERPErrorState
                 title="Unable to load support requests"
                 description={error}
-                onRetry={() => void loadPage("initial")}
+                onRetry={() => void loadPage()}
               />
             ) : null}
 

@@ -38,7 +38,7 @@ export function useLogout() {
       logout();
       
       // 3. Now that components are unmounted, it is safe to clear the query cache
-      queryClient.clear();
+      // queryClient.clear(); // Removed to prevent suspense errors on unmount
 
       if (typeof window !== "undefined") {
         // 4. Hard navigation to completely wipe React memory and ensure a clean login page

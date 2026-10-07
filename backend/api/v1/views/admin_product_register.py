@@ -73,6 +73,8 @@ def _apply_filters(queryset, request):
             | Q(category_master__name__icontains=q)
             | Q(subcategory_master__name__icontains=q)
             | Q(description__icontains=q)
+            | Q(seo_title__icontains=q)
+            | Q(seo_description__icontains=q)
         )
         if q.isdigit():
             query |= Q(id=int(q))

@@ -2,7 +2,8 @@
 import { formatRupee } from "@/lib/utils/currency";
 
 import { useParams, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { RefreshCw } from "lucide-react";
 
 import {
@@ -59,54 +60,27 @@ export default function PartnerPaymentDetailPage() {
   const searchParams = useSearchParams();
   const paymentId = Number(params?.id ?? 0);
 
-  const [payment, setPayment] = useState<PartnerPayment | null>(null);
-  const [statusLabel, setStatusLabel] = useState("RECORDED");
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
   const backQuery = searchParams.toString();
   const backHref = backQuery ? `/partner/payments?${backQuery}` : "/partner/payments";
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
+  const query = useQuery({
+    queryKey: ["partnerPaymentDetail", paymentId],
+    queryFn: async () => {
       if (!Number.isFinite(paymentId) || paymentId <= 0) {
-        setError("Invalid partner payment id.");
-        setPayment(null);
-        setLoading(false);
-        return;
+        throw new Error("Invalid partner payment id.");
       }
-
-      if (mode === "initial") {
-        setLoading(true);
-      } else {
-        setRefreshing(true);
-      }
-
-      try {
-        const payload = await getPartnerPaymentDetail(paymentId);
-        setPayment(payload.payment);
-        setStatusLabel(payload.status_label || "RECORDED");
-        setError(null);
-      } catch (err) {
-        setError(toErrorMessage(err));
-        if (mode === "initial") {
-          setPayment(null);
-        }
-      } finally {
-        if (mode === "initial") {
-          setLoading(false);
-        } else {
-          setRefreshing(false);
-        }
-      }
+      return await getPartnerPaymentDetail(paymentId);
     },
-    [paymentId]
-  );
+    enabled: !!paymentId && paymentId > 0,
+  });
 
-  useEffect(() => {
-    void loadPage("initial");
-  }, [loadPage]);
+  const payment = query.data?.payment || null;
+  const statusLabel = query.data?.status_label || "RECORDED";
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const error = query.error ? (query.error as Error).message : null;
+
+  const loadPage = useCallback(async () => { await query.refetch(); }, [query]);
 
   const subscriptionLabel = payment?.subscription_number
     ? payment.subscription_number
@@ -181,7 +155,7 @@ export default function PartnerPaymentDetailPage() {
               <div className="flex flex-wrap gap-2">
                 <ActionButton
                   variant="outline"
-                  onClick={() => void loadPage("refresh")}
+                  onClick={() => void loadPage()}
                   disabled={loading || refreshing}
                   leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
                 >
@@ -198,7 +172,7 @@ export default function PartnerPaymentDetailPage() {
         {loading ? <ERPLoadingState label="Loading partner payment detail..." /> : null}
 
         {!loading && error ? (
-          <ERPErrorState title="Unable to load partner payment detail" description={error} onRetry={() => void loadPage("initial")} />
+          <ERPErrorState title="Unable to load partner payment detail" description={error} onRetry={() => void loadPage()} />
         ) : null}
 
         {!loading && !error && !payment ? (

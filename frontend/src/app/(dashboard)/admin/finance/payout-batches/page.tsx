@@ -148,7 +148,7 @@ export default function AdminPayoutBatchesPage() {
   }
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, []);
 
   function handleApplyFilters(event: FormEvent<HTMLFormElement>) {
@@ -337,7 +337,7 @@ export default function AdminPayoutBatchesPage() {
           <div className="mt-4 flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => void loadPage("refresh")}
+              onClick={() => void loadPage()}
               disabled={refreshing || loading}
               className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-card px-4 text-sm font-medium text-foreground transition hover:border-ring hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -375,7 +375,7 @@ export default function AdminPayoutBatchesPage() {
           <ErrorState
             title="Unable to load payout batch register"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 

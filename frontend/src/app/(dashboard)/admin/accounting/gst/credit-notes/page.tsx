@@ -69,7 +69,7 @@ export default function AccountingCreditNotesPage() {
   }
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, []);
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
@@ -93,7 +93,7 @@ export default function AccountingCreditNotesPage() {
         taxable_adjustment: "0.00",
         tax_adjustment: "0.00",
       });
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setNotice(null);
       setError(accountingErrorMessage(err, "Failed to create the credit note."));
@@ -104,7 +104,7 @@ export default function AccountingCreditNotesPage() {
     try {
       await approveCreditNote(id);
       setNotice("Credit note approved.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setNotice(null);
       setError(accountingErrorMessage(err, "Failed to approve the credit note."));
@@ -115,7 +115,7 @@ export default function AccountingCreditNotesPage() {
     try {
       await postCreditNote(id);
       setNotice("Credit note posted.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setNotice(null);
       setError(accountingErrorMessage(err, "Failed to post the credit note."));
@@ -126,7 +126,7 @@ export default function AccountingCreditNotesPage() {
     try {
       await cancelCreditNote(id, "Cancelled from GST credit note workspace.");
       setNotice("Credit note cancelled through reversal journal.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setNotice(null);
       setError(accountingErrorMessage(err, "Failed to cancel the credit note."));
@@ -159,7 +159,7 @@ export default function AccountingCreditNotesPage() {
           <AccountingRefreshButton
             loading={loading}
             refreshing={refreshing}
-            onClick={() => void loadPage("refresh")}
+            onClick={() => void loadPage()}
           />
         </div>
 
@@ -167,7 +167,7 @@ export default function AccountingCreditNotesPage() {
         {loading ? <LoadingBlock label="Loading credit notes..." /> : null}
 
         {!loading && error ? (
-          <ErrorState title="Unable to load credit notes" description={error} onRetry={() => void loadPage("initial")} />
+          <ErrorState title="Unable to load credit notes" description={error} onRetry={() => void loadPage()} />
         ) : null}
 
         {!loading && !error ? (

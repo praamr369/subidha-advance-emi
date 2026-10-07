@@ -91,7 +91,7 @@ export default function AccountingAssetsPage() {
   }
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, []);
 
   async function handleCreateCategory(event: FormEvent<HTMLFormElement>) {
@@ -114,7 +114,7 @@ export default function AccountingAssetsPage() {
         rate_annual: "",
         default_salvage: "0.00",
       });
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setNotice(null);
       setError(accountingErrorMessage(err, "Failed to create the asset category."));
@@ -145,7 +145,7 @@ export default function AccountingAssetsPage() {
         vendor: "",
         purchase_bill: "",
       });
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setNotice(null);
       setError(accountingErrorMessage(err, "Failed to create the asset."));
@@ -195,7 +195,7 @@ export default function AccountingAssetsPage() {
     >
       <div className="space-y-6">
         <div className="flex justify-end">
-          <AccountingRefreshButton loading={loading} refreshing={refreshing} onClick={() => void loadPage("refresh")} />
+          <AccountingRefreshButton loading={loading} refreshing={refreshing} onClick={() => void loadPage()} />
         </div>
 
         {notice ? <AccountingNotice message={notice} /> : null}
@@ -303,7 +303,7 @@ export default function AccountingAssetsPage() {
           columns={categoryColumns}
           loading={loading}
           error={error}
-          onRetry={() => void loadPage("initial")}
+          onRetry={() => void loadPage()}
           emptyTitle="No asset categories found"
           emptyDescription="Create an asset category before adding assets."
         />
@@ -313,7 +313,7 @@ export default function AccountingAssetsPage() {
           columns={assetColumns}
           loading={loading}
           error={error}
-          onRetry={() => void loadPage("initial")}
+          onRetry={() => void loadPage()}
           emptyTitle="No assets found"
           emptyDescription="Create an asset to begin the fixed-asset register."
         />

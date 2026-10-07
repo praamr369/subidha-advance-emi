@@ -195,7 +195,12 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1"],
   compress: true,
   poweredByHeader: false,
-  experimental: {},
+  experimental: {
+    staleTimes: {
+      dynamic: 0,
+      static: 0,
+    },
+  },
   typescript: {
     ignoreBuildErrors: true,
   },

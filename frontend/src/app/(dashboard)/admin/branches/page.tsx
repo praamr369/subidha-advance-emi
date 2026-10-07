@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
@@ -93,7 +94,7 @@ export default function AdminBranchesPage() {
   }
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, []);
 
   const selectedBranch = useMemo(
@@ -171,7 +172,7 @@ export default function AdminBranchesPage() {
       }
       setSelectedBranchId(null);
       setForm(emptyForm());
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(toErrorMessage(err));
     } finally {
@@ -220,7 +221,7 @@ export default function AdminBranchesPage() {
           <ERPErrorState
             title="Unable to load branches"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 
@@ -271,7 +272,7 @@ export default function AdminBranchesPage() {
               <div className="mt-4 flex flex-wrap gap-2">
                 <Link href={ROUTES.admin.counters} className="rounded-xl border border-border px-3 py-2 text-sm font-semibold hover:bg-accent">Open counters</Link>
                 <Link href={ROUTES.admin.branchReporting} className="rounded-xl border border-border px-3 py-2 text-sm font-semibold hover:bg-accent">Open reporting</Link>
-                <button type="button" onClick={() => void loadPage("refresh")} disabled={refreshing} className="rounded-xl border border-border px-3 py-2 text-sm font-semibold hover:bg-accent disabled:opacity-60">{refreshing ? "Refreshing..." : "Refresh"}</button>
+                <button type="button" onClick={() => void loadPage()} disabled={refreshing} className="rounded-xl border border-border px-3 py-2 text-sm font-semibold hover:bg-accent disabled:opacity-60">{refreshing ? "Refreshing..." : "Refresh"}</button>
               </div>
             </WorkspaceSection>
 
@@ -415,7 +416,7 @@ export default function AdminBranchesPage() {
                       {saving ? "Saving..." : selectedBranch ? "Update Branch" : "Create Branch"}
                     </button>
                     <button type="button" onClick={resetForm} className="rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-muted">Reset</button>
-                    <button type="button" onClick={() => void loadPage("refresh")} disabled={refreshing} className="rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-muted disabled:opacity-60">
+                    <button type="button" onClick={() => void loadPage()} disabled={refreshing} className="rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-muted disabled:opacity-60">
                       {refreshing ? "Refreshing..." : "Refresh"}
                     </button>
                   </div>

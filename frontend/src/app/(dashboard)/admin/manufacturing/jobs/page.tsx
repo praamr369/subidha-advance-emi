@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
@@ -57,23 +58,19 @@ export default function AdminManufacturingJobsPage() {
     notes: "",
   });
 
-  async function loadPage() {
-    try {
-      setLoading(true);
-      const next = await listProductionJobs();
-      setRows(next.results);
-      setError(null);
-    } catch (err) {
-      setRows([]);
-      setError(toErrorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  }
+  const query = useQuery({
+    queryKey: ["admin", "manufacturing", "jobs"],
+    queryFn: () => listProductionJobs(),
+  });
 
-  useEffect(() => {
-    void loadPage();
-  }, []);
+  const rows = query.data?.results || [];
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const error = query.error ? (query.error as Error).message : null;
+
+  const loadPage = useCallback(async () => {
+    await query.refetch();
+  }, [query]);
 
   async function searchInventoryOptions(query: string): Promise<EntityLookupOption[]> {
     const payload = await searchAdminInventoryItems({ q: query });

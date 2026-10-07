@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import { accountingErrorMessage } from "@/components/accounting/shared";
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
@@ -74,19 +75,14 @@ function formatDate(iso?: string): string {
 }
 
 export default function AdminOnlineRequestsPage() {
-  const [rows, setRows] = useState<Row[]>([]);
-  const [count, setCount] = useState(0);
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [search, setSearch] = useState("");
 
-  const loadPage = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
+  const rqQuery = useQuery({
+    queryKey: ["admin", "online-requests", statusFilter, typeFilter, search, page],
+    queryFn: async () => {
       const payload = await listAdminOnlineRequests({
         status: statusFilter || undefined,
         request_type: typeFilter || undefined,
@@ -94,35 +90,37 @@ export default function AdminOnlineRequestsPage() {
         page,
       });
       const results = Array.isArray(payload?.results) ? payload.results : [];
-      setRows(
-        results.map((r) => ({
-          id: Number(r.id ?? 0),
-          request_number: String(r.request_number ?? ""),
-          customer_name: String(r.customer_name ?? ""),
-          product_name: String(r.product_name ?? ""),
-          request_type: String(r.request_type ?? ""),
-          quantity: Number(r.quantity ?? 0),
-          total_amount: r.total_amount as string | number,
-          status: String(r.status ?? ""),
-          status_display: String(r.status_display ?? r.status ?? ""),
-          created_at: String(r.created_at ?? ""),
-          source_lead_name: r.source_lead_name as string | undefined,
-          source_lead_id: r.source_lead_id as number | undefined,
-          converted_product_request_id: r.converted_product_request_id as number | undefined,
-          converted_subscription_request_id: r.converted_subscription_request_id as number | undefined,
-        })),
-      );
-      setCount(Number(payload?.count ?? results.length));
-    } catch (err) {
-      setError(accountingErrorMessage(err, "Could not load online requests."));
-    } finally {
-      setLoading(false);
-    }
-  }, [statusFilter, typeFilter, search, page]);
+      const mappedRows = results.map((r: any) => ({
+        id: Number(r.id ?? 0),
+        request_number: String(r.request_number ?? ""),
+        customer_name: String(r.customer_name ?? ""),
+        product_name: String(r.product_name ?? ""),
+        request_type: String(r.request_type ?? ""),
+        quantity: Number(r.quantity ?? 0),
+        total_amount: r.total_amount as string | number,
+        status: String(r.status ?? ""),
+        status_display: String(r.status_display ?? r.status ?? ""),
+        created_at: String(r.created_at ?? ""),
+        source_lead_name: r.source_lead_name as string | undefined,
+        source_lead_id: r.source_lead_id as number | undefined,
+        converted_product_request_id: r.converted_product_request_id as number | undefined,
+        converted_subscription_request_id: r.converted_subscription_request_id as number | undefined,
+      }));
+      return { rows: mappedRows, count: Number(payload?.count ?? results.length) };
+    },
+  });
 
-  useEffect(() => {
-    void loadPage();
-  }, [loadPage]);
+  const payload = rqQuery.data;
+  const rows = payload?.rows || [];
+  const count = payload?.count || 0;
+
+  const loading = rqQuery.isLoading;
+  const refreshing = rqQuery.isFetching && !rqQuery.isLoading;
+  const error = rqQuery.error ? accountingErrorMessage(rqQuery.error, "Could not load online requests.") : null;
+
+  const loadPage = useCallback(async () => {
+    await rqQuery.refetch();
+  }, [rqQuery]);
 
   useEffect(() => {
     setPage(1);

@@ -104,7 +104,7 @@ export default function AccountingExpensesPage() {
   }
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, []);
 
   async function handleCreateExpense(event: FormEvent<HTMLFormElement>) {
@@ -146,7 +146,7 @@ export default function AccountingExpensesPage() {
       });
       setNotice("Expense voucher created successfully.");
       setActiveTab("register");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setNotice(null);
       setError(toErrorMessage(err));
@@ -157,7 +157,7 @@ export default function AccountingExpensesPage() {
     try {
       await approveExpenseVoucher(id);
       setNotice("Expense voucher approved.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setNotice(null);
       setError(toErrorMessage(err));
@@ -168,7 +168,7 @@ export default function AccountingExpensesPage() {
     try {
       await postExpenseVoucher(id);
       setNotice("Expense voucher posted.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setNotice(null);
       setError(toErrorMessage(err));
@@ -209,7 +209,7 @@ export default function AccountingExpensesPage() {
 
           <button
             type="button"
-            onClick={() => void loadPage("refresh")}
+            onClick={() => void loadPage()}
             disabled={refreshing || loading}
             className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-60"
           >
@@ -230,7 +230,7 @@ export default function AccountingExpensesPage() {
           <ErrorState
             title="Unable to load data"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 

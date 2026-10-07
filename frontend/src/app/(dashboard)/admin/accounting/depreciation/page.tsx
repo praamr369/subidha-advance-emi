@@ -56,7 +56,7 @@ export default function AccountingDepreciationPage() {
   }
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, []);
 
   async function handleCreateRun(event: FormEvent<HTMLFormElement>) {
@@ -64,7 +64,7 @@ export default function AccountingDepreciationPage() {
     try {
       await createDepreciationRun(form);
       setNotice("Depreciation run created.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setNotice(null);
       setError(accountingErrorMessage(err, "Failed to create the depreciation run."));
@@ -99,7 +99,7 @@ export default function AccountingDepreciationPage() {
               onConfirm={async () => {
                 await runDepreciation(row.id);
                 setNotice(`Depreciation run ${row.run_code} executed.`);
-                await loadPage("refresh");
+                await loadPage();
               }}
               variant="secondary"
             />
@@ -112,7 +112,7 @@ export default function AccountingDepreciationPage() {
               onConfirm={async () => {
                 await postDepreciation(row.id);
                 setNotice(`Depreciation run ${row.run_code} posted.`);
-                await loadPage("refresh");
+                await loadPage();
               }}
               variant="primary"
             />
@@ -125,7 +125,7 @@ export default function AccountingDepreciationPage() {
               onConfirm={async () => {
                 await cancelDepreciation(row.id, "Cancelled from admin depreciation page.");
                 setNotice(`Depreciation run ${row.run_code} cancelled.`);
-                await loadPage("refresh");
+                await loadPage();
               }}
               variant="destructive"
             />
@@ -158,7 +158,7 @@ export default function AccountingDepreciationPage() {
     >
       <div className="space-y-6">
         <div className="flex justify-end">
-          <AccountingRefreshButton loading={loading} refreshing={refreshing} onClick={() => void loadPage("refresh")} />
+          <AccountingRefreshButton loading={loading} refreshing={refreshing} onClick={() => void loadPage()} />
         </div>
 
         {notice ? <AccountingNotice message={notice} /> : null}
@@ -187,7 +187,7 @@ export default function AccountingDepreciationPage() {
           columns={columns}
           loading={loading}
           error={error}
-          onRetry={() => void loadPage("initial")}
+          onRetry={() => void loadPage()}
           emptyTitle="No depreciation runs found"
           emptyDescription="Create a depreciation run after assets are registered."
         />

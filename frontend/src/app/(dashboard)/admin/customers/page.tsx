@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -365,7 +366,7 @@ export default function AdminCustomersPage() {
   );
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, [loadPage]);
 
   useEffect(() => {
@@ -501,7 +502,7 @@ export default function AdminCustomersPage() {
       if (customerImportFileRef.current) {
         customerImportFileRef.current.value = "";
       }
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setCustomerImportError(
         toActionMessage(err, "Unable to confirm customer import.")
@@ -903,7 +904,7 @@ export default function AdminCustomersPage() {
           <div className="mb-4 flex flex-wrap gap-2">
             <ActionButton
               variant="outline"
-              onClick={() => void loadPage("refresh")}
+              onClick={() => void loadPage()}
               disabled={refreshing || loading}
               leftIcon={<RefreshCw className="h-4 w-4" />}
             >
@@ -1041,7 +1042,7 @@ export default function AdminCustomersPage() {
           <ERPErrorState
             title="Unable to load customer register"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
         </div>

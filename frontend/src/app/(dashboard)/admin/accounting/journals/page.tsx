@@ -86,7 +86,7 @@ export default function AccountingJournalsPage() {
   }
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, []);
 
   async function handleCreateJournal(event: FormEvent<HTMLFormElement>) {
@@ -120,7 +120,7 @@ export default function AccountingJournalsPage() {
         credit_account: "",
       });
       setNotice("Draft journal created.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setNotice(null);
       setError(toErrorMessage(err));
@@ -131,7 +131,7 @@ export default function AccountingJournalsPage() {
     try {
       await postJournalEntry(id);
       setNotice("Journal posted.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setNotice(null);
       setError(toErrorMessage(err));
@@ -145,7 +145,7 @@ export default function AccountingJournalsPage() {
     try {
       await voidJournalEntry(id, reason);
       setNotice("Journal voided.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setNotice(null);
       setError(toErrorMessage(err));
@@ -191,7 +191,7 @@ export default function AccountingJournalsPage() {
               )}
               <button
                 type="button"
-                onClick={() => void loadPage("refresh")}
+                onClick={() => void loadPage()}
                 disabled={refreshing || loading}
                 className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-60"
               >
@@ -216,7 +216,7 @@ export default function AccountingJournalsPage() {
               <ErrorState
                 title="Unable to load journal register"
                 description={error}
-                onRetry={() => void loadPage("initial")}
+                onRetry={() => void loadPage()}
               />
             ) : null}
           </div>
