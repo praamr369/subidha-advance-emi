@@ -9,14 +9,12 @@ import { Download, RefreshCw, Search, SlidersHorizontal, X, Layers, ExternalLink
 import { pimService, type PimProduct, type PimCategory, type PimTreeSummary } from "@/services/pim";
 
 import ProductQuickActions from "@/components/admin/products/ProductQuickActions";
-import ERPDataToolbar from "@/components/erp/ERPDataToolbar";
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPMetricStrip from "@/components/erp/ERPMetricStrip";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
-import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import { DataTableShell } from "@/components/ui/operations";
 import { downloadCsv } from "@/lib/export/csv";
@@ -56,11 +54,6 @@ function formatDateTime(value: string | null | undefined): string {
 
 function label(value: string | null | undefined, fallback: string): string {
   return (value || "").trim() || fallback;
-}
-
-function truncate(value: string | null | undefined, length = 80): string {
-  const text = (value || "").trim();
-  return text.length > length ? `${text.slice(0, length - 1)}…` : text || "—";
 }
 
 function ItemTypeBadge({ value }: { value?: string | null }) {
@@ -483,7 +476,7 @@ function PimPanel() {
             { label: "Published", value: treeSummary?.published ?? 0 },
             { label: "Draft", value: treeSummary?.draft ?? 0 },
           ].map((m) => (
-            <div key={m.label} className="rounded-xl border bg-background px-4 py-2.5 min-w-[90px]">
+            <div key={m.label} className="rounded-xl border bg-background px-4 py-2.5 min-w-22.5">
               <div className="text-lg font-bold tabular-nums">{m.value}</div>
               <div className="text-xs text-muted-foreground">{m.label}</div>
             </div>
@@ -522,7 +515,7 @@ function PimPanel() {
 
       {/* Filters */}
       <div className="flex gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[180px]">
+        <div className="relative flex-1 min-w-45">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
             className="w-full pl-9 pr-3 py-2 text-sm border rounded-xl bg-background"
@@ -737,7 +730,7 @@ export default function AdminProductsPage() {
       title: "Product",
       sortable: true,
       render: (row) => (
-        <div className="space-y-1.5 min-w-[200px]">
+        <div className="space-y-1.5 min-w-50">
           <div className="font-semibold text-foreground leading-tight">{row.name}</div>
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground flex-wrap">
             <span className="font-mono">{row.product_code ?? `#${row.id}`}</span>
@@ -755,14 +748,14 @@ export default function AdminProductsPage() {
       key: "category",
       title: "Category",
       render: (row) => (
-        <div className="space-y-1 min-w-[130px]">
+        <div className="space-y-1 min-w-32.5">
           <div className="text-sm font-medium">{label(row.category || row.category_master_name, "—")}</div>
           {(row.subcategory || row.subcategory_master_name) && (
             <div className="text-xs text-muted-foreground">{label(row.subcategory || row.subcategory_master_name, "")}</div>
           )}
           <div className="text-xs text-muted-foreground">{row.unit_of_measure || "PCS"}</div>
           {row.description ? (
-            <div className="text-[10px] text-muted-foreground/70 max-w-[160px] truncate">
+            <div className="text-[10px] text-muted-foreground/70 max-w-40 truncate">
               {row.description.slice(0, 60)}
             </div>
           ) : null}
@@ -776,7 +769,7 @@ export default function AdminProductsPage() {
       sortable: true,
       sortAccessor: (row) => Number(row.base_price || 0),
       render: (row) => (
-        <div className="text-right space-y-0.5 min-w-[90px]">
+        <div className="text-right space-y-0.5 min-w-22.5">
           <div className="font-bold text-foreground">{formatRupee(row.base_price)}</div>
           {row.hsn_sac_code ? <div className="text-[10px] text-muted-foreground">HSN {row.hsn_sac_code}</div> : null}
           {row.gst_rate != null ? <div className="text-[10px] text-muted-foreground">GST {row.gst_rate}%</div> : null}
@@ -787,7 +780,7 @@ export default function AdminProductsPage() {
       key: "capabilities",
       title: "Modes",
       render: (row) => (
-        <div className="flex flex-col gap-1 min-w-[90px]">
+        <div className="flex flex-col gap-1 min-w-22.5">
           {[
             { label: "EMI", ok: row.is_emi_enabled !== false },
             { label: "Direct", ok: row.is_direct_sale_enabled !== false },
@@ -808,7 +801,7 @@ export default function AdminProductsPage() {
       key: "readiness",
       title: "Readiness",
       render: (row) => (
-        <div className="space-y-1.5 min-w-[130px]">
+        <div className="space-y-1.5 min-w-32.5">
           <div className="flex items-center gap-1.5">
             {row.inventory_ready
               ? <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
@@ -941,7 +934,7 @@ export default function AdminProductsPage() {
           <form onSubmit={applyFilters} className="space-y-3">
             {/* Row 1: Search + quick dropdowns */}
             <div className="flex flex-wrap gap-2">
-              <label htmlFor="f-setqueryinput-e-target-value-placeholder" className="relative flex-1 min-w-[200px]">
+              <label htmlFor="f-setqueryinput-e-target-value-placeholder" className="relative flex-1 min-w-50">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <input
                   type="text"
