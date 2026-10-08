@@ -116,10 +116,34 @@ def filter_catalog(
     return queryset
 
 
+def _resolve_catalog_image(product: Product, request=None) -> str | None:
+    from api.v1.serializers.media import serialize_media_url
+    own_v = getattr(product, "pim_variant", None)
+    if own_v and getattr(own_v, "image", None):
+        return serialize_media_url(request, own_v.image)
+    if getattr(product, "image", None):
+        return serialize_media_url(request, product.image)
+    try:
+        from products_pim.models import ProductMediaItem
+        from django.db.models import Q
+        pim = product.pim.first()
+        if pim:
+            base_pim = pim.parent if pim.parent_id else pim
+            qs = ProductMediaItem.objects.filter(product=base_pim, kind="IMAGE")
+            if pim.parent_id and own_v:
+                qs = qs.filter(Q(scope="ALL_VARIANTS") | Q(scope="VARIANT", variant=own_v))
+            else:
+                qs = qs.filter(scope="ALL_VARIANTS")
+            item = qs.order_by("-is_hero", "display_order", "-created_at").first()
+            if item and item.file:
+                return serialize_media_url(request, item.file)
+    except Exception:
+        pass
+    return None
+
+
 def serialize_catalog_product(product: Product, request=None) -> dict:
     """Serialize a product for the portal catalog grid."""
-    from api.v1.serializers.media import serialize_media_url
-
     return {
         "id": product.id,
         "product_code": product.product_code,
@@ -132,7 +156,7 @@ def serialize_catalog_product(product: Product, request=None) -> dict:
         "gst_rate": str(product.gst_rate) if product.gst_rate is not None else None,
         "hsn_sac_code": product.hsn_sac_code or "",
         "lifecycle_status": product.lifecycle_status,
-        "image": serialize_media_url(request, getattr(product, "image", None)),
+        "image": _resolve_catalog_image(product, request),
         "purposes": product_purposes(product),
         "flags": {
             "emi": bool(product.is_emi_enabled),

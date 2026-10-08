@@ -825,7 +825,7 @@ class PimProductViewSet(viewsets.ModelViewSet):
             "blueprints": blueprints.count(),
             "published": blueprints.filter(is_published=True).count(),
             "draft": blueprints.filter(is_published=False).count(),
-            "variant_skus": PimProduct.objects.filter(parent_id__in=blueprints.values("pk")).count(),
+            "variant_skus": PimProduct.objects.filter(parent_id__in=blueprints.order_by().values("pk")).count(),
         })
 
     # ── "View in your room" AR ───────────────────────────────────────────────

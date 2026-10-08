@@ -436,8 +436,6 @@ class PublicProductsView(generics.ListAPIView):
                 Q(name__icontains=search_query) |
                 Q(product_code__icontains=search_query) |
                 Q(category_master__name__icontains=search_query) |
-                Q(pim__seo_title__icontains=search_query) |
-                Q(pim__seo_keywords__icontains=search_query) |
                 Q(pim__attributes__value_text__icontains=search_query) |
                 Q(pim_variant__attribute_values__value_text__icontains=search_query) |
                 Q(pim__variants__attribute_values__value_text__icontains=search_query)
