@@ -18,7 +18,7 @@ concurrency:
 jobs:
   backend:
     name: backend (check + migrations + tests)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     defaults:
       run:
         working-directory: backend
@@ -143,7 +143,7 @@ jobs:
 
   frontend:
     name: frontend (lint + typecheck)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     defaults:
       run:
         working-directory: frontend

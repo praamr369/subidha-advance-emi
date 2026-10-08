@@ -9,7 +9,7 @@ on:
 
 jobs:
   backend-release-candidate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     env:
       DEPLOY_CHECK_SETTINGS_MODULE: core.settings.ci_deploy
     defaults:
@@ -33,7 +33,7 @@ jobs:
         run: bash scripts/validate-release-candidate.sh
 
   frontend-release-candidate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     defaults:
       run:
         working-directory: frontend
@@ -52,7 +52,7 @@ jobs:
         run: bash scripts/validate-release-candidate.sh
 
   frontend-release-smoke:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 40
     needs:
       - backend-release-candidate
@@ -132,7 +132,7 @@ jobs:
   # Heavy (~460 pages), so it runs as its own job. Reported (non-blocking) until
   # the full surface is confirmed clean, then flip continue-on-error to false.
   frontend-route-load-smoke:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 40
     needs:
       - backend-release-candidate
