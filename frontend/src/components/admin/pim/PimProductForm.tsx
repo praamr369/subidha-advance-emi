@@ -492,48 +492,55 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
   }, []);
 
   useEffect(() => {
-    if (!categoryId) { setSubcategories([]); setAttributes([]); return; }
+    if (!categoryId) { setSubcategories([]); return; }
     pimService.getSubcategories(Number(categoryId)).then(setSubcategories).catch(() => {});
   }, [categoryId]);
 
   useEffect(() => {
-    if (!categoryId) return;
-    // To prevent unnecessary fetches when removing attributes locally
     let active = true;
-    pimService.getAttributes(Number(categoryId), subcategoryId ? Number(subcategoryId) : undefined)
-      .then((fetchedAttrs) => {
+    const cid = categoryId ? Number(categoryId) : undefined;
+    const sid = subcategoryId ? Number(subcategoryId) : undefined;
+    
+    const promise = cid ? pimService.getAttributes(cid, sid) : Promise.resolve([]);
+    
+    promise.then((fetchedAttrs) => {
         if (!active) return;
         setAttributes(prev => {
-          // If editing the product's actual category, only show attributes that were explicitly saved
-          // (or newly added). But we shouldn't wipe out user's current 'prev' list if it already has items.
-          // Wait, if category changes, we WANT to wipe out prev.
-          if (productId && product && product.category === Number(categoryId) && (product.subcategory || null) === (subcategoryId ? Number(subcategoryId) : null)) {
+          const categoryAttrIds = new Set(fetchedAttrs.map(a => a.id));
+          
+          if (productId && product) {
             const savedIds = new Set((product.attributes || []).map((a) => a.attribute));
-            const categoryAttrIds = new Set(fetchedAttrs.map(a => a.id));
-            
             const matchedAttrs = fetchedAttrs.filter((a) => savedIds.has(a.id));
             
-            // Add attributes that are saved on the product but not in the category's default list
             const extraAttrs = (product.attributes || [])
               .filter((a) => !categoryAttrIds.has(a.attribute))
-              .map((a) => ({
-                id: a.attribute,
-                name: a.attribute_name,
-                slug: a.attribute_slug,
-                data_type: a.data_type as PimCategoryAttribute["data_type"],
-                is_required: false,
-                is_variant_defining: false,
-                min_value: null,
-                max_value: null,
-                display_order: 999,
-              } as PimCategoryAttribute));
+              .map((a) => {
+                const prevAttr = prev.find(p => p.id === a.attribute);
+                if (prevAttr) return prevAttr;
+                return {
+                  id: a.attribute,
+                  name: a.attribute_name,
+                  slug: a.attribute_slug,
+                  data_type: a.data_type as PimCategoryAttribute["data_type"],
+                  is_required: false,
+                  is_variant_defining: false,
+                  min_value: null,
+                  max_value: null,
+                  display_order: 999,
+                  options: []
+                } as PimCategoryAttribute;
+              });
               
-            // Also keep any extra attributes that were mapped manually during this session
             const sessionExtraAttrs = prev.filter(a => !categoryAttrIds.has(a.id) && !savedIds.has(a.id) && !removedAttrIds.has(a.id));
               
-            return [...matchedAttrs, ...extraAttrs, ...sessionExtraAttrs];
+            if (product.category === cid && (product.subcategory || null) === (sid || null)) {
+              return [...matchedAttrs, ...extraAttrs, ...sessionExtraAttrs];
+            } else {
+              return [...fetchedAttrs, ...extraAttrs, ...sessionExtraAttrs];
+            }
           } else {
-            return fetchedAttrs;
+            const sessionExtraAttrs = prev.filter(a => !categoryAttrIds.has(a.id) && !removedAttrIds.has(a.id));
+            return [...fetchedAttrs, ...sessionExtraAttrs];
           }
         });
       })
@@ -1223,7 +1230,7 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
       </section>
 
       {/* Dynamic Attributes */}
-      {categoryId && (
+      {true && (
         <section className="rounded-lg border p-5 space-y-4">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
