@@ -33,15 +33,12 @@ interface AttrPayloadItem {
 function buildAttrPayload(attrs: PimCategoryAttribute[], values: AttributeValues): AttrPayloadItem[] {
   const result: AttrPayloadItem[] = [];
   for (const attr of attrs) {
-    const v = values[attr.id];
-    if (!v) continue;
-    const hasValue = v.value_text !== "" || v.value_number !== "" || v.value_boolean !== null || v.value_date !== "";
-    if (!hasValue) continue;
+    const v = values[attr.id] || { value_text: "", value_number: "", value_boolean: null, value_date: "" };
     result.push({
       attribute: attr.id,
       value_text: v.value_text || "",
       value_number: v.value_number ? Number(v.value_number) : null,
-      value_boolean: v.value_boolean,
+      value_boolean: v.value_boolean !== undefined ? v.value_boolean : null,
       value_date: v.value_date || null,
     });
   }
@@ -742,11 +739,8 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
         ar_height_cm: arHeight || null,
         locked_attributes: Array.from(lockedAttributes),
         attributes: buildAttrPayload(attributes, attrValues),
-        ...( (removedAttrIds.size > 0 || attributes.some(a => { const v = attrValues[a.id]; return !v || (v.value_text === "" && v.value_number === "" && v.value_boolean === null && v.value_date === ""); })) ? {
-          remove_attributes: Array.from(new Set([
-            ...Array.from(removedAttrIds),
-            ...attributes.filter(a => { const v = attrValues[a.id]; return !v || (v.value_text === "" && v.value_number === "" && v.value_boolean === null && v.value_date === ""); }).map(a => a.id)
-          ]))
+        ...(removedAttrIds.size > 0 ? {
+          remove_attributes: Array.from(removedAttrIds)
         } : {}),
         ...(!isEdit ? { product_type: defaultProductType } : {}),
       };
