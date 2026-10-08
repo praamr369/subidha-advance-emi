@@ -113,20 +113,20 @@ class PIMSyncService:
         
         # Try to sync category if names match, this is best-effort since models are separate
         if pim_product.category:
+            core_product.category = pim_product.category.name
             try:
                 cat = ProductCategoryMaster.objects.filter(name=pim_product.category.name).first()
                 if cat:
                     core_product.category_master = cat
-                    core_product.category = cat.name
             except Exception:
                 pass
                 
         if pim_product.subcategory:
+            core_product.subcategory = pim_product.subcategory.name
             try:
                 subcat = ProductSubcategoryMaster.objects.filter(name=pim_product.subcategory.name).first()
                 if subcat:
                     core_product.subcategory_master = subcat
-                    core_product.subcategory = subcat.name
             except Exception:
                 pass
 

@@ -412,6 +412,8 @@ class PimProductCreateUpdateSerializer(serializers.ModelSerializer):
             self._sync_product_code(product, old_code)
         if remove_ids:
             ProductAttribute.objects.filter(product=product, attribute_id__in=remove_ids).delete()
+            if product.child_pim_products.exists():
+                ProductAttribute.objects.filter(product__in=product.child_pim_products.all(), attribute_id__in=remove_ids).delete()
             # Also remove from locked_attributes if present
             if product.locked_attributes:
                 cleaned = [aid for aid in product.locked_attributes if aid not in remove_ids]
