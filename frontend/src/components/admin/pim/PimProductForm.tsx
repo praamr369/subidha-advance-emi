@@ -868,7 +868,7 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
         <div className="rounded-xl border border-border bg-card px-5 py-4">
           <div className="flex flex-wrap items-start gap-4">
             <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="flex-shrink-0 rounded-lg bg-muted p-2.5">
+              <div className="shrink-0 rounded-lg bg-muted p-2.5">
                 <Box className="h-5 w-5 text-muted-foreground" />
               </div>
               <div className="min-w-0">
@@ -898,7 +898,7 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
               </div>
             </div>
             {variants.length > 0 && (
-              <div className="flex flex-shrink-0 flex-col items-end gap-0.5 text-right">
+              <div className="flex shrink-0 flex-col items-end gap-0.5 text-right">
                 <div className="text-lg font-bold tabular-nums leading-none">{variants.length}</div>
                 <div className="text-xs text-muted-foreground">
                   variant{variants.length !== 1 ? "s" : ""} linked

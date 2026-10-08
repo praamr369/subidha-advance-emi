@@ -758,3 +758,11 @@ read the code.
 
 **KYC/media (closed 2026-09-14):** nginx denies `/media/(customers|partners|vendors|staff)/kyc/` (403, verified against a real file); those files are served only via authenticated `/api/v1/.../kyc-documents/{id}/download/` (`FileResponse`). No frontend change was needed. Remaining hardening (app↔DB TLS, field-level PII encryption at rest) is tracked in `docs/DATA_ENCRYPTION_AND_HARDENING.md`.
 
+
+## 42. PIM Attribute Management (added 2026-10-08)
+
+### Product Attributes on Base Products
+- PIM Base Products serve as blueprints. The attributes defined on them form the template for their generated variants.
+- **Variant-defining Attributes**: Attributes mapped on a base product can have empty values at the base level (e.g., Size, Color). Their specific values are provided at the variant level.
+- **Payload Preservation**: The frontend `buildAttrPayload` function must ALWAYS include mapped attributes in the API payload, even if their `value_text`, `value_number`, etc., are empty. Aggressively stripping empty attributes from the payload causes them to be deleted from the base product blueprint upon save.
+- **UI Visibility**: The "Product Attributes" section in `PimProductForm` is decoupled from category selection, allowing dynamic attribute mapping to any product regardless of its category defaults.
