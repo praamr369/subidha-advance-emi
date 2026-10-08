@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from django.db.models import QuerySet
+from django.db.models import QuerySet, Q
 
 from subscriptions.models import Product
 
@@ -56,10 +56,11 @@ def approved_catalog_queryset() -> QuerySet[Product]:
     Products without an inventory item are treated as finished goods.
     """
     return (
-        Product.objects.filter(is_active=True)
+        Product.objects.filter(Q(is_active=True) & (Q(pim__isnull=True) | Q(pim__is_published=True)))
         .exclude(lifecycle_status="DISCONTINUED")
         .exclude(inventory_profile__stock_item_type__in=["RAW_MATERIAL", "ACCESSORY"])
         .select_related("category_master", "subcategory_master")
+        .distinct()
         .order_by("category", "name", "id")
     )
 
@@ -141,6 +142,51 @@ def _resolve_catalog_image(product: Product, request=None) -> str | None:
         pass
     return None
 
+def _resolve_catalog_media(product: Product, request=None) -> list[dict]:
+    from api.v1.serializers.media import serialize_media_url
+    media = []
+    own_v = getattr(product, "pim_variant", None)
+    
+    try:
+        from products_pim.models import ProductMediaItem
+        from django.db.models import Q
+        pim = product.pim.first()
+        if pim:
+            base_pim = pim.parent if pim.parent_id else pim
+            qs = ProductMediaItem.objects.filter(product=base_pim)
+            if pim.parent_id and own_v:
+                qs = qs.filter(Q(scope="ALL_VARIANTS") | Q(scope="VARIANT", variant=own_v))
+            else:
+                qs = qs.filter(scope="ALL_VARIANTS")
+            
+            for item in qs.order_by("-is_hero", "display_order", "-created_at"):
+                if item.file:
+                    media.append({
+                        "url": serialize_media_url(request, item.file),
+                        "kind": item.kind,
+                        "is_hero": item.is_hero,
+                        "title": item.title or product.name
+                    })
+    except Exception:
+        pass
+        
+    if not media:
+        if own_v and getattr(own_v, "image", None):
+            media.append({
+                "url": serialize_media_url(request, own_v.image),
+                "kind": "IMAGE",
+                "is_hero": True,
+                "title": product.name
+            })
+        elif getattr(product, "image", None):
+            media.append({
+                "url": serialize_media_url(request, product.image),
+                "kind": "IMAGE",
+                "is_hero": True,
+                "title": product.name
+            })
+            
+    return media
 
 def serialize_catalog_product(product: Product, request=None) -> dict:
     """Serialize a product for the portal catalog grid."""
@@ -180,6 +226,7 @@ def serialize_catalog_product_detail(product: Product, request=None) -> dict:
         "extended_warranty_cost_percentage": str(product.extended_warranty_cost_percentage),
         "sku": product.sku or "",
         "ar_model": _ar_model(product, request),
+        "media_items": _resolve_catalog_media(product, request),
     })
     return base
 

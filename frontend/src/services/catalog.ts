@@ -69,6 +69,7 @@ export type CatalogProduct = {
   flags?: Record<string, boolean>;
   /** "View in your room" AR (detail endpoint only). */
   ar_model?: ArModel | null;
+  media_items?: { url: string; kind: string; is_hero: boolean; title: string }[];
   [key: string]: unknown;
 };
 

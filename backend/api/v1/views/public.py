@@ -3,6 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from subscriptions.models import Product, ProductCategoryMaster
+from django.db.models import Q
 from api.v1.serializers.public import PublicProductSerializer, PublicProductCategorySerializer
 
 def _published_qs():
@@ -14,7 +15,7 @@ def _published_qs():
     """
     return (
         Product.objects
-        .filter(is_active=True, pim__is_published=True)
+        .filter(Q(is_active=True) & (Q(pim__isnull=True) | Q(pim__is_published=True)))
         .prefetch_related(
             "pim",
             "pim__attributes__attribute",
