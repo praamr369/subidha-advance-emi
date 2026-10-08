@@ -356,21 +356,16 @@ class PimProductCreateUpdateSerializer(serializers.ModelSerializer):
             )
 
     def _clean_locked_attributes(self, product):
-        """Remove any locked_attributes IDs that have no actual saved value."""
+        """Remove any locked_attributes IDs that are not actually mapped to the product."""
         if not product.locked_attributes:
             return
-        valued_ids = set(
+        mapped_ids = set(
             ProductAttribute.objects.filter(
                 product=product,
                 attribute_id__in=product.locked_attributes,
-            ).exclude(
-                value_text="",
-                value_number__isnull=True,
-                value_boolean__isnull=True,
-                value_date__isnull=True,
             ).values_list("attribute_id", flat=True)
         )
-        cleaned = [aid for aid in product.locked_attributes if aid in valued_ids]
+        cleaned = [aid for aid in product.locked_attributes if aid in mapped_ids]
         if len(cleaned) != len(product.locked_attributes):
             product.locked_attributes = cleaned
             product.save(update_fields=["locked_attributes"])
