@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useState } from "react";
 
 import ProductImagePlaceholder from "./ProductImagePlaceholder";
-import { shouldBypassNextImageOptimization } from "@/lib/media";
+import { shouldBypassNextImageOptimization, toBrowserReachableMediaUrl } from "@/lib/media";
 import { cn } from "@/lib/utils";
 
 type PublicProductMediaProps = {
@@ -36,7 +36,7 @@ export default function PublicProductMedia({
   subcategory,
 }: PublicProductMediaProps) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
-  const resolvedSrc = src ?? null;
+  const resolvedSrc = toBrowserReachableMediaUrl(src) ?? null;
   const shouldRenderImage = Boolean(resolvedSrc) && failedSrc !== resolvedSrc;
   const shouldBypassOptimization = shouldBypassNextImageOptimization(src);
 

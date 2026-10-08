@@ -68,13 +68,15 @@ function isLocalHostname(hostname: string): boolean {
  */
 export function toBrowserReachableMediaUrl(value?: string | null): string | null {
   const resolved = resolveApiMediaUrl(value);
-  if (!resolved || typeof window === "undefined") {
+  if (!resolved) {
     return resolved;
   }
   try {
     const url = new URL(resolved);
-    if (isLocalHostname(url.hostname) && !isLocalHostname(window.location.hostname)) {
-      return `${window.location.origin}${url.pathname}${url.search}`;
+    // If the URL points to a local/internal host (like 127.0.0.1), rewrite it to a relative path
+    // so it works in SSR without hydration mismatch, and the browser resolves it against the public origin.
+    if (isLocalHostname(url.hostname)) {
+      return `${url.pathname}${url.search}`;
     }
     return resolved;
   } catch {

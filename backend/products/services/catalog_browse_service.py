@@ -109,6 +109,8 @@ def filter_catalog(
             | Q(sku__icontains=search_value)
             | Q(category__icontains=search_value)
             | Q(subcategory__icontains=search_value)
+            | Q(description__icontains=search_value)
+            | Q(base_specs__icontains=search_value)
         )
 
     return queryset

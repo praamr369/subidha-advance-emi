@@ -189,7 +189,7 @@ export default function CatalogBrowser({ role, buildCtas, helperNote }: CatalogB
                   {product.image ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={product.image}
+                      src={toBrowserReachableMediaUrl(product.image) || ""}
                       alt={product.name}
                       className="h-full w-full object-cover"
                     />
