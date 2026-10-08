@@ -1651,6 +1651,58 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
             </>
           )}
         </button>
+        {isEdit && (
+          <button
+            type="button"
+            onClick={() => {
+              if (!productId) return;
+              pendingFetchRef.current = null;
+              setLoading(true);
+              pimService.getProductWithAttributes(productId)
+                .then((p) => {
+                  setProduct(p);
+                  setCode(p.code);
+                  setBrand(p.brand ?? "");
+                  setName(p.name);
+                  setDescription(p.description ?? "");
+                  setCategoryId(p.category);
+                  setSubcategoryId(p.subcategory ?? "");
+                  setBasePrice(p.base_price);
+                  setCostPrice(p.cost_price ?? "");
+                  setArWidth(p.ar_width_cm ?? "");
+                  setArDepth(p.ar_depth_cm ?? "");
+                  setArHeight(p.ar_height_cm ?? "");
+                  setIsPublished(p.is_published);
+                  setWarrantyEnabled(p.warranty_enabled ?? true);
+                  setWarrantyMonthsManufacturing(p.warranty_months_manufacturing ?? 12);
+                  setWarrantyMonthsStructural(p.warranty_months_structural ?? 36);
+                  setWarrantyMonthsExtendedMax(p.warranty_months_extended_max ?? 12);
+                  setExtendedWarrantyCostPercentage(p.extended_warranty_cost_percentage?.toString() ?? "7.5");
+                  setVariants(p.variants ?? []);
+                  const savedAttrIds = new Set((p.attributes ?? []).map((a) => a.attribute));
+                  const validLocks = (p.locked_attributes ?? []).filter((id) => savedAttrIds.has(id));
+                  setLockedAttributes(new Set(validLocks));
+                  const prefilled: AttributeValues = {};
+                  for (const a of p.attributes ?? []) {
+                    prefilled[a.attribute] = {
+                      value_text: a.value_text ?? "",
+                      value_number: a.value_number ?? "",
+                      value_boolean: a.value_boolean,
+                      value_date: a.value_date ?? "",
+                    };
+                  }
+                  setAttrValues(prefilled);
+                })
+                .catch(() => {})
+                .finally(() => setLoading(false));
+            }}
+            disabled={saving || loading}
+            className="inline-flex items-center gap-2 rounded-md border px-5 py-2.5 text-sm hover:bg-muted disabled:opacity-50"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            Refresh Data
+          </button>
+        )}
         <button
           type="button"
           onClick={() => router.push("/admin/pim/products")}

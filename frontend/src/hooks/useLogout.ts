@@ -42,7 +42,7 @@ export function useLogout() {
 
       if (typeof window !== "undefined") {
         // 4. Hard navigation to completely wipe React memory and ensure a clean login page
-        window.location.replace(ROUTES.public.login);
+        window.location.replace(ROUTES.public.login + "?logout=1");
         return;
       }
 

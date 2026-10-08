@@ -60,6 +60,7 @@ def approved_catalog_queryset() -> QuerySet[Product]:
         .exclude(lifecycle_status="DISCONTINUED")
         .exclude(inventory_profile__stock_item_type__in=["RAW_MATERIAL", "ACCESSORY"])
         .select_related("category_master", "subcategory_master")
+        .prefetch_related("pim", "pim_variant")
         .distinct()
         .order_by("category", "name", "id")
     )
@@ -119,7 +120,13 @@ def filter_catalog(
 
 def _resolve_catalog_image(product: Product, request=None) -> str | None:
     from api.v1.serializers.media import serialize_media_url
-    own_v = getattr(product, "pim_variant", None)
+    from django.core.exceptions import ObjectDoesNotExist
+    
+    try:
+        own_v = product.pim_variant
+    except ObjectDoesNotExist:
+        own_v = None
+
     if own_v and getattr(own_v, "image", None):
         return serialize_media_url(request, own_v.image)
     if getattr(product, "image", None):
@@ -153,8 +160,13 @@ def _resolve_catalog_image(product: Product, request=None) -> str | None:
 
 def _resolve_catalog_media(product: Product, request=None) -> list[dict]:
     from api.v1.serializers.media import serialize_media_url
+    from django.core.exceptions import ObjectDoesNotExist
+    
     media = []
-    own_v = getattr(product, "pim_variant", None)
+    try:
+        own_v = product.pim_variant
+    except ObjectDoesNotExist:
+        own_v = None
     
     try:
 

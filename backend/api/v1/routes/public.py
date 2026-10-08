@@ -421,7 +421,7 @@ class PublicProductsView(generics.ListAPIView):
             .distinct()
             .exclude(inventory_profile__stock_item_type__in=["RAW_MATERIAL", "ACCESSORY"])
             .select_related("category_master")
-            .prefetch_related("pim", "pim__attributes__attribute", "pim__variants__attribute_values__attribute")
+            .prefetch_related("pim", "pim_variant", "pim__attributes__attribute", "pim__variants__attribute_values__attribute")
             .order_by("name", "id")
         )
         
@@ -485,7 +485,7 @@ class PublicProductDetailView(APIView):
                 .filter(Q(pim__isnull=True) | Q(pim__is_published=True))
                 .distinct()
                 .exclude(inventory_profile__stock_item_type__in=["RAW_MATERIAL", "ACCESSORY"])
-                .prefetch_related("pim", "pim__attributes__attribute", "pim__variants__attribute_values__attribute")
+                .prefetch_related("pim", "pim_variant", "pim__attributes__attribute", "pim__variants__attribute_values__attribute")
             )
             if id is not None:
                 product = base_qs.get(id=id)

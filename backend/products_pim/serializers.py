@@ -184,11 +184,12 @@ class PimProductListSerializer(serializers.ModelSerializer):
     parent_name = serializers.CharField(source="parent.name", read_only=True, default=None)
     parent_is_published = serializers.SerializerMethodField()
     child_count = serializers.SerializerMethodField()
+    full_name = serializers.SerializerMethodField()
 
     class Meta:
         model = PimProduct
         fields = [
-            "id", "code", "brand", "name", "category", "category_name",
+            "id", "code", "brand", "name", "full_name", "category", "category_name",
             "subcategory", "subcategory_name", "base_price",
             "is_active", "is_published", "product_type", "variant_count",
             "parent_id", "parent_code", "parent_name", "parent_is_published", "child_count",
@@ -199,6 +200,19 @@ class PimProductListSerializer(serializers.ModelSerializer):
         if obj.parent_id and obj.parent:
             return obj.parent.is_published
         return None
+
+    def get_full_name(self, obj):
+        if obj.parent_id and obj.parent:
+            # We can use the source_product's name if it's already updated, 
+            # otherwise fetch the variant and compute it.
+            if obj.source_product and obj.source_product.name and obj.source_product.name != obj.name:
+                return obj.source_product.name
+            from products_pim.models import ProductVariant
+            variant = ProductVariant.objects.filter(sku=obj.code).prefetch_related('attribute_values__attribute').first()
+            if variant:
+                from products_pim.services.sync_service import PIMSyncService
+                return PIMSyncService.get_variant_display_name(variant)
+        return obj.name
 
     def _effective_category(self, obj):
         """Return own category unless it's the Unclassified sentinel; fall back to parent."""

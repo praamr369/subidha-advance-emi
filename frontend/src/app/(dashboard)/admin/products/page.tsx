@@ -502,6 +502,15 @@ function PimPanel() {
             <GitBranch className="h-4 w-4" />
             {relinking ? "Relinking…" : "Relink Orphans"}
           </button>
+          <button
+            type="button"
+            onClick={() => loadPimProducts()}
+            disabled={pimLoading}
+            className="inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm hover:bg-muted disabled:opacity-50"
+          >
+            <RefreshCw className={`h-4 w-4 ${pimLoading ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
           <Link href="/admin/pim/categories" className="inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm hover:bg-muted">
             Categories
           </Link>

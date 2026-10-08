@@ -136,7 +136,7 @@ class PimProductViewSet(viewsets.ModelViewSet):
 
 
     def get_queryset(self):
-        qs = PimProduct.objects.select_related("category", "subcategory", "parent__category", "parent__subcategory").prefetch_related(
+        qs = PimProduct.objects.select_related("category", "subcategory", "parent__category", "parent__subcategory", "source_product").prefetch_related(
             "attributes__attribute",
             "variants__attribute_values__attribute",
             "child_pim_products",
