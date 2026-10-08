@@ -125,19 +125,28 @@ def _resolve_catalog_image(product: Product, request=None) -> str | None:
     if getattr(product, "image", None):
         return serialize_media_url(request, product.image)
     try:
+
         from products_pim.models import ProductMediaItem
         from django.db.models import Q
-        pim = product.pim.first()
-        if pim:
-            base_pim = pim.parent if pim.parent_id else pim
+        
+        base_pim = None
+        if own_v:
+            base_pim = own_v.product
+        else:
+            pim = product.pim.first()
+            if pim:
+                base_pim = pim.parent if pim.parent_id else pim
+                
+        if base_pim:
             qs = ProductMediaItem.objects.filter(product=base_pim, kind="IMAGE")
-            if pim.parent_id and own_v:
+            if own_v:
                 qs = qs.filter(Q(scope="ALL_VARIANTS") | Q(scope="VARIANT", variant=own_v))
             else:
                 qs = qs.filter(scope="ALL_VARIANTS")
             item = qs.order_by("-is_hero", "display_order", "-created_at").first()
             if item and item.file:
                 return serialize_media_url(request, item.file)
+
     except Exception:
         pass
     return None
@@ -148,13 +157,21 @@ def _resolve_catalog_media(product: Product, request=None) -> list[dict]:
     own_v = getattr(product, "pim_variant", None)
     
     try:
+
         from products_pim.models import ProductMediaItem
         from django.db.models import Q
-        pim = product.pim.first()
-        if pim:
-            base_pim = pim.parent if pim.parent_id else pim
+        
+        base_pim = None
+        if own_v:
+            base_pim = own_v.product
+        else:
+            pim = product.pim.first()
+            if pim:
+                base_pim = pim.parent if pim.parent_id else pim
+                
+        if base_pim:
             qs = ProductMediaItem.objects.filter(product=base_pim)
-            if pim.parent_id and own_v:
+            if own_v:
                 qs = qs.filter(Q(scope="ALL_VARIANTS") | Q(scope="VARIANT", variant=own_v))
             else:
                 qs = qs.filter(scope="ALL_VARIANTS")
@@ -167,6 +184,7 @@ def _resolve_catalog_media(product: Product, request=None) -> list[dict]:
                         "is_hero": item.is_hero,
                         "title": item.title or product.name
                     })
+
     except Exception:
         pass
         

@@ -123,7 +123,7 @@ class PimProductViewSet(viewsets.ModelViewSet):
                 # If name changed, update op.name and child_pim.name
                 if name_changed:
                     if op:
-                        op.name = f"{pim_product.name} ({variant.sku})"
+                        op.name = PIMSyncService.get_variant_display_name(variant)
                         op.save(update_fields=["name"])
                     
                     # Update variant's PimProduct (child_pim)
@@ -427,7 +427,7 @@ class PimProductViewSet(viewsets.ModelViewSet):
                 op.description = product.description
                 changed = True
             if push_name:
-                op.name = f"{product.name} ({variant.sku})"
+                op.name = PIMSyncService.get_variant_display_name(variant)
                 changed = True
             if changed:
                 op.save()

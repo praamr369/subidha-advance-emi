@@ -131,7 +131,7 @@ function CreateRequestForm({ vendors, items, onSaved, onCancel }: CreateRequestF
                 className={inputCls}
               >
                 <option value="">— Item —</option>
-                {items.map((it) => <option key={it.id} value={it.id}>{it.product_name} ({it.sku ?? "—"})</option>)}
+                {items.map((it) => <option key={it.id} value={it.id}>{it.product_name}</option>)}
               </select>
               <input
                 type="number"

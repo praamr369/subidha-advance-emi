@@ -201,7 +201,7 @@ function CreateBillForm({ vendors, receipts, items, locations, onSaved, onCancel
                 className={inputCls}
               >
                 <option value="">— Item —</option>
-                {items.map((it) => <option key={it.id} value={it.id}>{it.product_name} ({it.sku ?? "—"})</option>)}
+                {items.map((it) => <option key={it.id} value={it.id}>{it.product_name}</option>)}
               </select>
               <input type="number" min="0.001" step="0.001" placeholder="Qty" value={line.quantity} onChange={(e) => setLine(i, { quantity: e.target.value })} className={inputCls} />
               <input type="number" min="0" step="0.01" placeholder="Unit cost" value={line.unit_cost} onChange={(e) => setLine(i, { unit_cost: e.target.value })} className={inputCls} />

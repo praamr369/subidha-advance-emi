@@ -146,7 +146,13 @@ class PublicProductSerializer(serializers.ModelSerializer):
         return None
 
     def get_video(self, obj):
-        return serialize_media_url(self.context.get("request"), getattr(obj, "video", None))
+        req = self.context.get("request")
+        if getattr(obj, "video", None):
+            return serialize_media_url(req, obj.video)
+        videos = self.get_gallery_videos(obj)
+        if videos:
+            return videos[0]
+        return None
 
     def _get_pim_media(self, obj):
         """Return PIM media items scoped to this product/variant.
@@ -446,9 +452,12 @@ class PublicProductSerializer(serializers.ModelSerializer):
             return []
 
         siblings = []
+        published_skus = set(parent_pim.child_pim_products.filter(is_published=True).values_list("code", flat=True))
         for variant in parent_pim.variants.filter(is_active=True).prefetch_related(
             "attribute_values__attribute", "operational_product"
         ):
+            if variant.sku not in published_skus:
+                continue
             op = getattr(variant, "operational_product", None)
             if not op:
                 continue

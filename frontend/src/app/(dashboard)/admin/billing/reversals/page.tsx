@@ -411,7 +411,7 @@ export default function AdminBillingReversalsPage() {
             <select className="mt-2 h-10 w-full rounded border px-2" value={exchangeInventoryItemId} onChange={(e) => setExchangeInventoryItemId(e.target.value)} aria-label="Replacement Inventory Item">
               <option value="">Select replacement item</option>
               {inventorySearchRows.map((row) => (
-                <option key={row.id} value={row.id}>{row.product_name} ({row.sku || "No SKU"})</option>
+                <option key={row.id} value={row.id}>{row.product_name}</option>
               ))}
             </select>
             <select className="mt-2 h-10 w-full rounded border px-2" value={exchangeReplacementLocationId} onChange={(e) => setExchangeReplacementLocationId(e.target.value)} aria-label="Replacement Stock Location">

@@ -4,6 +4,28 @@ from products_core.models import Product, ProductCategoryMaster, ProductSubcateg
 
 class PIMSyncService:
     @staticmethod
+    def get_variant_display_name(variant: ProductVariant) -> str:
+        pim_product = variant.product
+        attributes = []
+        for v_attr in variant.attribute_values.select_related('attribute').all():
+            dtype = v_attr.attribute.data_type
+            if dtype in ('TEXT', 'CHOICE', 'MULTI_CHOICE'):
+                val = v_attr.value_text
+            elif dtype in ('NUMBER', 'DECIMAL'):
+                val = str(v_attr.value_number).rstrip('0').rstrip('.') if v_attr.value_number is not None else ""
+            elif dtype == 'BOOLEAN':
+                val = "Yes" if v_attr.value_boolean else "No"
+            else:
+                val = v_attr.value_text
+                
+            if val:
+                attributes.append(f"{v_attr.attribute.name}: {val}")
+                
+        if attributes:
+            return f"{pim_product.name} ({', '.join(attributes)})"
+        return pim_product.name
+
+    @staticmethod
     @transaction.atomic
     def rename_variant_sku(variant: ProductVariant, old_sku: str) -> ProductVariant:
         """Synchronize an admin-approved SKU rename across PIM and operations.
@@ -61,7 +83,7 @@ class PIMSyncService:
             core_product, created = Product.objects.get_or_create(
                 product_code=variant.sku, # Using SKU as the operational product_code
                 defaults={
-                    "name": f"{pim_product.name} ({variant.sku})",
+                    "name": PIMSyncService.get_variant_display_name(variant),
                     "base_price": variant.price,
                 }
             )
@@ -70,7 +92,7 @@ class PIMSyncService:
             variant.save(update_fields=['operational_product'])
 
         # Update core_product fields
-        core_product.name = f"{pim_product.name} ({variant.sku})"
+        core_product.name = PIMSyncService.get_variant_display_name(variant)
         core_product.base_price = variant.price
         
         old_product_code = core_product.product_code
