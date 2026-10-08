@@ -8,6 +8,7 @@ import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { formatRupee } from "@/lib/utils/currency";
+import { toBrowserReachableMediaUrl } from "@/lib/media";
 import {
   getCatalogFacets,
   listCatalogProducts,
