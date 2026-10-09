@@ -229,6 +229,7 @@ export type ProductSchemePricing = {
   cash_has_discount: boolean;
   lowest_monthly: string | null;
   available_schemes: PublicScheme[];
+  has_active_batches: boolean;
   schemes: Partial<Record<PublicScheme, SchemeQuote>>;
   rules: SchemePricingRules;
 };

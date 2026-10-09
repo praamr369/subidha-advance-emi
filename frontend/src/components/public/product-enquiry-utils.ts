@@ -7,7 +7,8 @@ export function buildProductEnquiryHref(
   product: PublicProduct, 
   planInterest: ProductPlanInterest = "NOT_SURE",
   variantSku?: string,
-  stockStatus?: string
+  stockStatus?: string,
+  tenure?: string
 ) {
   const params = new URLSearchParams();
   params.set("product", String(product.id));
@@ -18,6 +19,9 @@ export function buildProductEnquiryHref(
   params.set("source", "product_detail");
   if (stockStatus) {
     params.set("stock_status", stockStatus);
+  }
+  if (tenure) {
+    params.set("tenure", tenure);
   }
 
   return `${ROUTES.public.apply}?${params.toString()}`;

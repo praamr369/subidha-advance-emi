@@ -533,6 +533,7 @@ def quote_product(
         "cash_has_discount": bool(cash and cash.discount),
         "lowest_monthly": str(_q2(min(monthlies))) if monthlies else None,
         "available_schemes": [s.scheme for s in available],
+        "has_active_batches": bool(catalog.batch_durations()),
         "schemes": {s.scheme: s.as_dict(public=public) for s in listed},
         # Shared so the page can recalculate a customer-typed tenure locally and
         # still land on exactly the figures this service would produce.
