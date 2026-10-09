@@ -391,6 +391,12 @@ class PimProductCreateUpdateSerializer(serializers.ModelSerializer):
                 if pim_product.cost_price is not None:
                     sub_product.inventory_profile.standard_unit_cost = pim_product.cost_price
                     sub_product.inventory_profile.save(update_fields=['standard_unit_cost'])
+            
+            # Cascade updates to all variant operational products
+            from products_pim.services.sync_service import PIMSyncService
+            for variant in pim_product.variants.all():
+                PIMSyncService.sync_variant_to_operational_product(variant)
+                
         except ImportError:
             pass
 
