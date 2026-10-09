@@ -529,14 +529,25 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
                 } as PimCategoryAttribute;
               });
               
-            const sessionExtraAttrs = prev.filter(a => !categoryAttrIds.has(a.id) && !savedIds.has(a.id) && !removedAttrIds.has(a.id));
-              
             if (product.category === cid && (product.subcategory || null) === (sid || null)) {
-              return [...matchedAttrs, ...extraAttrs, ...sessionExtraAttrs];
+              // MATCH BRANCH: The category is unchanged. We only show saved attributes + manually added ones.
+              // So sessionExtraAttrs must include ALL unsaved attributes from `prev`, even if they belong to the category.
+              const sessionExtraAttrs = prev.filter(a => !savedIds.has(a.id) && !removedAttrIds.has(a.id));
+              
+              // Ensure no duplicates in case a manual addition is somehow in matchedAttrs
+              const finalAttrs = [...matchedAttrs, ...extraAttrs];
+              const finalIds = new Set(finalAttrs.map(a => a.id));
+              sessionExtraAttrs.forEach(a => {
+                if (!finalIds.has(a.id)) finalAttrs.push(a);
+              });
+              return finalAttrs;
             } else {
+              // MISMATCH BRANCH: Category changed. We show ALL category attributes + old product extra attrs + unsaved manual additions.
+              const sessionExtraAttrs = prev.filter(a => !categoryAttrIds.has(a.id) && !savedIds.has(a.id) && !removedAttrIds.has(a.id));
               return [...activeFetchedAttrs, ...extraAttrs, ...sessionExtraAttrs];
             }
           } else {
+            // NO PRODUCT BRANCH: Creating a new product. Show ALL category attributes + unsaved manual additions.
             const sessionExtraAttrs = prev.filter(a => !categoryAttrIds.has(a.id) && !removedAttrIds.has(a.id));
             return [...activeFetchedAttrs, ...sessionExtraAttrs];
           }
