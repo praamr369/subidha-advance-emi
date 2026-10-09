@@ -218,6 +218,7 @@ export type SchemePricingRules = {
   tenure_presets: number[];
   deposit_schemes: PublicScheme[];
   deposit_bands: Array<{ up_to: string | null; percent: string }>;
+  monthly_yield_percent?: Partial<Record<"RENT" | "LEASE", string>>;
 };
 
 export type ProductSchemePricing = {

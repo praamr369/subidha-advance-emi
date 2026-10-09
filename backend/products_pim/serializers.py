@@ -270,6 +270,7 @@ class PimProductDetailSerializer(serializers.ModelSerializer):
             "warranty_months_extended_max", "extended_warranty_cost_percentage",
             "parent_id", "parent_code", "parent_name",
             "created_at", "updated_at",
+            "rent_monthly_yield_percent", "lease_monthly_yield_percent",
             "attributes", "variants", "variant_count",
             "inherited_attribute_values", "variant_attribute_values",
         ]
@@ -332,7 +333,7 @@ class PimProductCreateUpdateSerializer(serializers.ModelSerializer):
         model = PimProduct
         fields = [
             "id", "code", "brand", "name", "description", "category",
-            "subcategory", "base_price", "cost_price",
+            "subcategory", "base_price", "cost_price", "rent_monthly_yield_percent", "lease_monthly_yield_percent",
             "is_active", "is_published", "product_type", "locked_attributes", "attributes", "remove_attributes",
             "ar_width_cm", "ar_depth_cm", "ar_height_cm", "parent",
             "warranty_enabled", "warranty_months_manufacturing", "warranty_months_structural",
@@ -381,6 +382,8 @@ class PimProductCreateUpdateSerializer(serializers.ModelSerializer):
             
             sub_product.name = pim_product.name
             sub_product.base_price = pim_product.base_price
+            sub_product.rent_monthly_yield_percent = pim_product.rent_monthly_yield_percent
+            sub_product.lease_monthly_yield_percent = pim_product.lease_monthly_yield_percent
             if pim_product.category:
                 sub_product.category = pim_product.category.name
             if pim_product.subcategory:

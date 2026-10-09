@@ -121,6 +121,10 @@ class Product(TimeStampedModel):
         default=Decimal("0"),
         validators=[MinValueValidator(Decimal("0"))],
     )
+    # Product-level rent/lease pricing controls. Null means use the configured
+    # business default yield; existing products remain backward compatible.
+    rent_monthly_yield_percent = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    lease_monthly_yield_percent = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
 
     category_master = models.ForeignKey(
         ProductCategoryMaster,

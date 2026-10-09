@@ -143,6 +143,8 @@ class PimProduct(models.Model):
     )
     base_price = models.DecimalField(max_digits=14, decimal_places=2, default=0, validators=[MinValueValidator(0)])
     cost_price = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    rent_monthly_yield_percent = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    lease_monthly_yield_percent = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     image = models.ImageField(upload_to="pim/products/", null=True, blank=True)
     is_active = models.BooleanField(default=True)
     is_published = models.BooleanField(default=False)

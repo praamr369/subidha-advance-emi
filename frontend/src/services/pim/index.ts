@@ -70,6 +70,8 @@ export interface PimVariant {
   barcode: string | null;
   price: string;
   cost_price: string | null;
+  rent_monthly_yield_percent?: string | null;
+  lease_monthly_yield_percent?: string | null;
   quantity_on_hand: number;
   reorder_level: number;
   is_active: boolean;
@@ -135,6 +137,8 @@ export interface PimProductCreatePayload {
   parent?: number | null;
   base_price: string;
   cost_price?: string;
+  rent_monthly_yield_percent?: string | null;
+  lease_monthly_yield_percent?: string | null;
   is_active?: boolean;
   is_published?: boolean;
   product_type?: "FINISHED_GOOD" | "RAW_MATERIAL" | "ACCESSORY" | "SERVICE";

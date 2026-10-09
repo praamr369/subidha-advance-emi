@@ -403,6 +403,8 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
   const [subcategoryId, setSubcategoryId] = useState<number | "">("");
   const [basePrice, setBasePrice] = useState("");
   const [costPrice, setCostPrice] = useState("");
+  const [rentYieldPercent, setRentYieldPercent] = useState("");
+  const [leaseYieldPercent, setLeaseYieldPercent] = useState("");
   const [isPublished, setIsPublished] = useState(false);
   
   // Warranty State
@@ -578,6 +580,8 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
         setSubcategoryId(p.subcategory ?? "");
         setBasePrice(p.base_price);
         setCostPrice(p.cost_price ?? "");
+        setRentYieldPercent(p.rent_monthly_yield_percent ?? "");
+        setLeaseYieldPercent(p.lease_monthly_yield_percent ?? "");
         setArWidth(p.ar_width_cm ?? "");
         setArDepth(p.ar_depth_cm ?? "");
         setArHeight(p.ar_height_cm ?? "");
@@ -746,6 +750,8 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
         extended_warranty_cost_percentage: extendedWarrantyCostPercentage,
         base_price: basePrice || "0",
         cost_price: costPrice || undefined,
+        rent_monthly_yield_percent: rentYieldPercent || null,
+        lease_monthly_yield_percent: leaseYieldPercent || null,
         ar_width_cm: arWidth || null,
         ar_depth_cm: arDepth || null,
         ar_height_cm: arHeight || null,
@@ -1177,6 +1183,26 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
               />
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Rent / Lease pricing */}
+      <section className="rounded-lg border p-5 space-y-4">
+        <div>
+          <h3 className="font-semibold">Rent / Lease pricing</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Monthly amount is calculated from product price × yield rate. Leave blank to use the business default rate.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <label className="block text-sm font-medium">
+            Rent monthly yield rate (%)
+            <input type="number" min="0.01" max="100" step="0.01" value={rentYieldPercent} onChange={(e) => setRentYieldPercent(e.target.value)} placeholder="Business default" className="mt-1 w-full rounded-md border px-3 py-2 text-sm bg-background" />
+          </label>
+          <label className="block text-sm font-medium">
+            Lease monthly yield rate (%)
+            <input type="number" min="0.01" max="100" step="0.01" value={leaseYieldPercent} onChange={(e) => setLeaseYieldPercent(e.target.value)} placeholder="Business default" className="mt-1 w-full rounded-md border px-3 py-2 text-sm bg-background" />
+          </label>
         </div>
       </section>
 
