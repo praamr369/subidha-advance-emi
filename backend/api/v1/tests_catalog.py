@@ -197,6 +197,7 @@ class CatalogBrowseTests(TestCase):
         payload = serialize_catalog_product(variant_product)
         self.assertEqual(payload["pim_variants"][0]["sku"], "T-MATRIX-KING")
         self.assertEqual(payload["pim_variants"][0]["attributes"], {"Size": "King"})
+        self.assertEqual(payload["base_specs"], {"Size": "King"})
 
     @override_settings(DEBUG=True)
     def test_seed_catalog_demo_command_is_idempotent(self):

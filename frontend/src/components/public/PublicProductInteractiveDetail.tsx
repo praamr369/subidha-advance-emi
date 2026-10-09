@@ -41,7 +41,9 @@ export default function PublicProductInteractiveDetail({
   }, [initialSelectedAttributes]);
 
   const handleAttributeSelect = (attributeName: string, value: string) => {
-    const candidate = { ...selectedAttributes, [attributeName]: value };
+    const candidate = { ...selectedAttributes };
+    if (value) candidate[attributeName] = value;
+    else delete candidate[attributeName];
 
     // Drop stale attrs that don't exist in any variant carrying the new value
     const variants = initialProduct.pim_variants ?? [];
@@ -145,7 +147,9 @@ export default function PublicProductInteractiveDetail({
   }));
 
   const handleVariantPageAttributeSelect = (name: string, value: string) => {
-    const next = { ...selectedAttributes, [name]: value };
+    const next = { ...selectedAttributes };
+    if (value) next[name] = value;
+    else delete next[name];
     const match = variantPageOptions.find((variant) =>
       Object.entries(next).every(([key, selected]) => variant.attributes[key] === selected),
     );

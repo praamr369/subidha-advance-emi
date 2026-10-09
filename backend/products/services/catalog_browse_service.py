@@ -244,12 +244,29 @@ def serialize_catalog_product(product: Product, request=None) -> dict:
             pim = pim_variant.product
     pim_attributes = []
     pim_variants = []
+    pim_specs = {}
     if pim:
-        pim_attributes = [
-            {"name": value.attribute.name, "value": value.display_value}
-            for value in pim.attributes.select_related("attribute")
-            if value.display_value
-        ]
+        for value in pim.attributes.select_related("attribute"):
+            if value.display_value:
+                pim_specs[value.attribute.name] = value.display_value
+        pim_attributes = [{"name": name, "value": value} for name, value in pim_specs.items()]
+
+        # A catalog detail may represent a generated operational SKU. Apply
+        # that SKU's PIM values over the blueprint values, matching the public
+        # product serializer's specification precedence.
+        try:
+            own_variant = product.pim_variant
+        except Exception:
+            own_variant = None
+        if own_variant and own_variant.product_id == pim.id:
+            for value in own_variant.attribute_values.select_related("attribute"):
+                display = value.value_text
+                if not display and value.value_number is not None:
+                    display = str(value.value_number)
+                if not display and value.value_boolean is not None:
+                    display = "Yes" if value.value_boolean else "No"
+                if display:
+                    pim_specs[value.attribute.name] = display
         for variant in pim.variants.filter(is_active=True).prefetch_related("attribute_values__attribute"):
             attrs = {}
             for value in variant.attribute_values.all():
@@ -299,7 +316,8 @@ def serialize_catalog_product(product: Product, request=None) -> dict:
         } if product.is_rent_enabled else None,
         "default_plan_type": product.plan_type_default,
         "scheme_pricing": scheme_pricing,
-        "pim_attributes": pim_attributes,
+        "base_specs": pim_specs or (product.base_specs or {}),
+        "pim_attributes": [{"name": name, "value": value} for name, value in pim_specs.items()],
         "pim_variants": pim_variants,
     }
 
@@ -308,7 +326,6 @@ def serialize_catalog_product_detail(product: Product, request=None) -> dict:
     """Serialize a product with full details for the PDP (Product Detail Page)."""
     base = serialize_catalog_product(product, request)
     base.update({
-        "base_specs": product.base_specs or {},
         "warranty_enabled": bool(product.warranty_enabled),
         "warranty_months_manufacturing": product.warranty_months_manufacturing,
         "warranty_months_structural": product.warranty_months_structural,

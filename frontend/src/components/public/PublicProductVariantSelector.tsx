@@ -114,7 +114,7 @@ export default function PublicProductVariantSelector({
                     key={option}
                     type="button"
                     disabled={!available}
-                    onClick={() => onAttributeSelect(key, option)}
+                    onClick={() => onAttributeSelect(key, isSelected ? "" : option)}
                     aria-pressed={isSelected}
                     className={`inline-flex min-h-14 flex-col items-start justify-center rounded-xl border px-3 py-2 text-left text-sm transition-all duration-200 ${
                       isSelected

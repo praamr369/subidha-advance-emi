@@ -43,8 +43,14 @@ export default function CatalogProductDetailPage({
   const specs = (product.base_specs as Record<string, string>) || {};
   const mediaItems = product.media_items || [];
   const handleVariantSelect = async (name: string, value: string) => {
-    const nextAttributes = { ...selectedAttributes, [name]: value };
+    const nextAttributes = { ...selectedAttributes };
+    if (value) nextAttributes[name] = value;
+    else delete nextAttributes[name];
     setSelectedAttributes(nextAttributes);
+    if (Object.keys(nextAttributes).length === 0) {
+      setActiveProduct(null);
+      return;
+    }
     const variant = product.pim_variants?.find((candidate) =>
       Object.entries(nextAttributes).every(([key, selected]) => candidate.attributes[key] === selected),
     );
