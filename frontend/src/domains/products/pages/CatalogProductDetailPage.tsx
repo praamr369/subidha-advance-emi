@@ -25,11 +25,14 @@ export default function CatalogProductDetailPage({
   id: string;
   backHref: string;
 }) {
-  const { data: product, isLoading, error } = useQuery({
+  const { data: fetchedProduct, isLoading, error } = useQuery({
     queryKey: ["catalogProduct", role, id],
     queryFn: () => getCatalogProduct(role, id),
   });
   const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({});
+  const [activeProduct, setActiveProduct] = useState<typeof fetchedProduct>(null);
+  const [switchingVariant, setSwitchingVariant] = useState(false);
+  const product = activeProduct ?? fetchedProduct;
 
   if (isLoading) return <ERPLoadingState />;
   if (error || !product) {
@@ -39,9 +42,20 @@ export default function CatalogProductDetailPage({
   const imgUrl = resolveApiMediaUrl(product.image ?? null);
   const specs = (product.base_specs as Record<string, string>) || {};
   const mediaItems = product.media_items || [];
-  const selectedVariant = product.pim_variants?.find((variant) =>
-    Object.entries(selectedAttributes).every(([key, value]) => variant.attributes[key] === value),
-  );
+  const handleVariantSelect = async (name: string, value: string) => {
+    const nextAttributes = { ...selectedAttributes, [name]: value };
+    setSelectedAttributes(nextAttributes);
+    const variant = product.pim_variants?.find((candidate) =>
+      Object.entries(nextAttributes).every(([key, selected]) => candidate.attributes[key] === selected),
+    );
+    if (!variant?.product_id || variant.product_id === product.id) return;
+    setSwitchingVariant(true);
+    try {
+      setActiveProduct(await getCatalogProduct(role, variant.product_id));
+    } finally {
+      setSwitchingVariant(false);
+    }
+  };
 
   return (
     <SelfServicePageShell>
@@ -132,7 +146,8 @@ export default function CatalogProductDetailPage({
             </div>
 
             <div className="text-4xl font-black text-foreground">
-              ₹{Number(selectedVariant?.price ?? product.base_price).toLocaleString("en-IN")}
+              ₹{Number(product.base_price).toLocaleString("en-IN")}
+              {switchingVariant ? <span className="ml-2 text-sm font-medium text-muted-foreground">Updating…</span> : null}
             </div>
 
             {(product.pim_variants?.length ?? 0) > 0 && (
@@ -144,7 +159,7 @@ export default function CatalogProductDetailPage({
                     is_low_stock: false,
                   }))}
                   selectedAttributes={selectedAttributes}
-                  onAttributeSelect={(name, value) => setSelectedAttributes((current) => ({ ...current, [name]: value }))}
+                  onAttributeSelect={(name, value) => void handleVariantSelect(name, value)}
                 />
               </div>
             )}

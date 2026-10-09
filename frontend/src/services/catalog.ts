@@ -80,6 +80,7 @@ export type CatalogProduct = {
     price: string;
     attributes: Record<string, string>;
     image?: string | null;
+    product_id?: number | null;
     stock_status?: "IN_STOCK" | "MAKE_TO_ORDER";
   }>;
   [key: string]: unknown;

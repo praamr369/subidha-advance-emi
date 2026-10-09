@@ -266,6 +266,7 @@ def serialize_catalog_product(product: Product, request=None) -> dict:
                 "price": str(variant.price),
                 "attributes": attrs,
                 "image": _resolve_catalog_image(variant.operational_product, request) if variant.operational_product else None,
+                "product_id": variant.operational_product_id,
                 "stock_status": "IN_STOCK" if variant.quantity_on_hand > 0 else "MAKE_TO_ORDER",
             })
 
