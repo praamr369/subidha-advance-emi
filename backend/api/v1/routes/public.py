@@ -502,7 +502,10 @@ class PublicProductDetailView(APIView):
             return Response({"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
 
         serializer = PublicProductSerializer(product, context={"request": request})
-        return Response(serializer.data)
+        response = Response(serializer.data)
+        response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response["Pragma"] = "no-cache"
+        return response
 
 
 class PublicLeadView(APIView):
