@@ -229,7 +229,19 @@ def serialize_catalog_product(product: Product, request=None) -> dict:
         scheme_pricing = quote_product(product, public=True)
     except Exception:  # pricing must not take the catalog down
         scheme_pricing = None
+    # Catalog detail can be opened from either a base operational product or
+    # a generated variant SKU. Resolve both to the base PIM blueprint so the
+    # portal receives the complete attribute/variant matrix in either case.
     pim = product.pim.first()
+    if pim is not None and pim.parent_id:
+        pim = pim.parent
+    if pim is None:
+        try:
+            pim_variant = product.pim_variant
+        except Exception:
+            pim_variant = None
+        if pim_variant:
+            pim = pim_variant.product
     pim_attributes = []
     pim_variants = []
     if pim:

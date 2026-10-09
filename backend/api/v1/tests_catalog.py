@@ -10,7 +10,15 @@ from rest_framework.test import APIClient
 
 from accounts.models import UserRole
 from subscriptions.models import Customer, PlanType, Product
-from products_pim.models import PimProduct
+from products_pim.models import (
+    AttributeDataType,
+    CategoryAttribute,
+    PimProduct,
+    ProductCategory,
+    ProductVariant,
+    VariantAttributeValue,
+)
+from products.services.catalog_browse_service import serialize_catalog_product
 
 User = get_user_model()
 
@@ -154,6 +162,41 @@ class CatalogBrowseTests(TestCase):
             ).get(f"/api/v1/{role}/catalog/?search=T-DRAFT")
             self.assertEqual(resp.status_code, 200)
             self.assertEqual(resp.data["results"], [])
+
+    def test_variant_linked_catalog_product_returns_complete_variant_matrix(self):
+        base = _make_product("T-MATRIX", category="Beds")
+        base_pim = PimProduct.objects.get(source_product=base)
+        category = ProductCategory.objects.create(name="Beds", slug="beds")
+        base_pim.category = category
+        base_pim.is_published = True
+        base_pim.save(update_fields=["category", "is_published"])
+        size = CategoryAttribute.objects.create(
+            category=category,
+            name="Size",
+            slug="size",
+            data_type=AttributeDataType.CHOICE,
+            is_variant_defining=True,
+        )
+        variant_product = _make_product("T-MATRIX-KING", category="Beds")
+        variant_product_pim = PimProduct.objects.get(source_product=variant_product)
+        variant_product_pim.parent = base_pim
+        variant_product_pim.is_published = True
+        variant_product_pim.save(update_fields=["parent", "is_published"])
+        variant = ProductVariant.objects.create(
+            product=base_pim,
+            operational_product=variant_product,
+            sku="T-MATRIX-KING",
+            price=Decimal("12000"),
+        )
+        VariantAttributeValue.objects.create(
+            variant=variant,
+            attribute=size,
+            value_text="King",
+        )
+
+        payload = serialize_catalog_product(variant_product)
+        self.assertEqual(payload["pim_variants"][0]["sku"], "T-MATRIX-KING")
+        self.assertEqual(payload["pim_variants"][0]["attributes"], {"Size": "King"})
 
     @override_settings(DEBUG=True)
     def test_seed_catalog_demo_command_is_idempotent(self):
