@@ -229,6 +229,34 @@ def serialize_catalog_product(product: Product, request=None) -> dict:
         scheme_pricing = quote_product(product, public=True)
     except Exception:  # pricing must not take the catalog down
         scheme_pricing = None
+    pim = product.pim.first()
+    pim_attributes = []
+    pim_variants = []
+    if pim:
+        pim_attributes = [
+            {"name": value.attribute.name, "value": value.display_value}
+            for value in pim.attributes.select_related("attribute")
+            if value.display_value
+        ]
+        for variant in pim.variants.filter(is_active=True).prefetch_related("attribute_values__attribute"):
+            attrs = {}
+            for value in variant.attribute_values.all():
+                display = value.value_text
+                if not display and value.value_number is not None:
+                    display = str(value.value_number)
+                if not display and value.value_boolean is not None:
+                    display = "Yes" if value.value_boolean else "No"
+                if display:
+                    attrs[value.attribute.name] = display
+            pim_variants.append({
+                "id": variant.id,
+                "sku": variant.sku,
+                "price": str(variant.price),
+                "attributes": attrs,
+                "image": _resolve_catalog_image(variant.operational_product, request) if variant.operational_product else None,
+                "stock_status": "IN_STOCK" if variant.quantity_on_hand > 0 else "MAKE_TO_ORDER",
+            })
+
     return {
         "id": product.id,
         "product_code": product.product_code,
@@ -258,6 +286,8 @@ def serialize_catalog_product(product: Product, request=None) -> dict:
         } if product.is_rent_enabled else None,
         "default_plan_type": product.plan_type_default,
         "scheme_pricing": scheme_pricing,
+        "pim_attributes": pim_attributes,
+        "pim_variants": pim_variants,
     }
 
 

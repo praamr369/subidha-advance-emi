@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, Box, CheckCircle2, ShieldCheck, Tag } from "lucide-react";
@@ -13,6 +14,7 @@ import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import { SelfServicePageShell } from "@/components/layout/page-shells";
 import PublicProductSchemePricing from "@/components/public/PublicProductSchemePricing";
+import PublicProductVariantSelector from "@/components/public/PublicProductVariantSelector";
 
 export default function CatalogProductDetailPage({
   role,
@@ -37,6 +39,10 @@ export default function CatalogProductDetailPage({
   const basePrice = Number(product.base_price).toLocaleString("en-IN");
   const specs = (product.base_specs as Record<string, string>) || {};
   const mediaItems = product.media_items || [];
+  const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({});
+  const selectedVariant = product.pim_variants?.find((variant) =>
+    Object.entries(selectedAttributes).every(([key, value]) => variant.attributes[key] === value),
+  );
 
   return (
     <SelfServicePageShell>
@@ -127,8 +133,22 @@ export default function CatalogProductDetailPage({
             </div>
 
             <div className="text-4xl font-black text-foreground">
-              ₹{basePrice}
+              ₹{Number(selectedVariant?.price ?? product.base_price).toLocaleString("en-IN")}
             </div>
+
+            {(product.pim_variants?.length ?? 0) > 0 && (
+              <div className="rounded-2xl border border-border bg-card p-5">
+                <h3 className="mb-4 text-sm font-bold text-foreground">Choose options</h3>
+                <PublicProductVariantSelector
+                  variants={product.pim_variants!.map((variant) => ({
+                    ...variant,
+                    is_low_stock: false,
+                  }))}
+                  selectedAttributes={selectedAttributes}
+                  onAttributeSelect={(name, value) => setSelectedAttributes((current) => ({ ...current, [name]: value }))}
+                />
+              </div>
+            )}
 
             {product.description && (
               <div className="prose prose-sm dark:prose-invert">

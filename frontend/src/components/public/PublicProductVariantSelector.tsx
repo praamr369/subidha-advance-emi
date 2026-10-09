@@ -58,27 +58,39 @@ export default function PublicProductVariantSelector({
 
   const currentVariant = bestVariant(selectedAttributes);
 
+  function optionIsAvailable(key: string, option: string) {
+    const otherSelections = Object.fromEntries(
+      Object.entries(selectedAttributes).filter(([selectedKey]) => selectedKey !== key),
+    );
+    return variants.some((variant) =>
+      Object.entries(otherSelections).every(([selectedKey, value]) =>
+        variant.attributes[selectedKey] === value,
+      ) && variant.attributes[key] === option,
+    );
+  }
+
   return (
-    <div className="space-y-5 pt-1">
+    <div className="space-y-6 pt-1">
       {attributeKeys.map((key) => {
         const options = Array.from(attributeValues[key] || []);
         if (options.length === 0) return null;
 
         return (
-          <div key={key} className="space-y-3">
-            <div className="flex items-baseline gap-2">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+          <div key={key} className="space-y-3 border-b border-border/60 pb-5 last:border-b-0 last:pb-0">
+            <div className="flex flex-wrap items-baseline gap-2">
+              <span className="text-sm font-bold text-foreground">
                 {key}
               </span>
               {selectedAttributes[key] && (
-                <span className="text-xs font-medium text-foreground">
-                  — {selectedAttributes[key]}
+                <span className="text-xs font-medium text-primary">
+                  Selected: {selectedAttributes[key]}
                 </span>
               )}
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
               {options.map((option) => {
                 const isSelected = selectedAttributes[key] === option;
+                const available = optionIsAvailable(key, option);
                 const potentialAttrs = { ...selectedAttributes, [key]: option };
                 const potentialVariant = bestVariant(potentialAttrs);
 
@@ -101,16 +113,20 @@ export default function PublicProductVariantSelector({
                   <button
                     key={option}
                     type="button"
+                    disabled={!available}
                     onClick={() => onAttributeSelect(key, option)}
-                    className={`inline-flex flex-col items-center justify-center rounded-xl border px-4 py-2 text-sm transition-all duration-200 min-w-[72px] ${
+                    aria-pressed={isSelected}
+                    className={`inline-flex min-h-14 flex-col items-start justify-center rounded-xl border px-3 py-2 text-left text-sm transition-all duration-200 ${
                       isSelected
-                        ? "border-primary bg-[color-mix(in_oklab,var(--primary)_10%,transparent)] text-primary ring-1 ring-primary font-bold shadow-[0_0_16px_-3px_color-mix(in_oklab,var(--primary)_40%,transparent)]"
-                        : "border-border/70 bg-transparent text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground"
+                        ? "border-primary bg-[color-mix(in_oklab,var(--primary)_10%,transparent)] text-primary ring-1 ring-primary font-bold shadow-sm"
+                        : available
+                          ? "border-border/70 bg-background text-foreground hover:border-primary/60 hover:bg-muted"
+                          : "cursor-not-allowed border-border/40 bg-muted/40 text-muted-foreground/45 line-through"
                     }`}
                   >
-                    <span>{option}</span>
+                    <span className="line-clamp-2 w-full font-medium">{option}</span>
                     {priceLabel && (
-                      <span className={`text-[10px] mt-0.5 font-normal ${isSelected ? "text-primary/80" : "text-muted-foreground/70"}`}>
+                      <span className={`mt-1 text-[10px] font-normal ${isSelected ? "text-primary/80" : "text-muted-foreground/70"}`}>
                         {priceLabel}
                       </span>
                     )}

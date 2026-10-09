@@ -73,6 +73,15 @@ export type CatalogProduct = {
   rent_yield_estimates?: { short_tenure_min: string; short_tenure_max: string; long_tenure_min: string; long_tenure_max: string } | null;
   scheme_pricing?: ProductSchemePricing | null;
   media_items?: { url: string; kind: string; is_hero: boolean; title: string }[];
+  pim_attributes?: { name: string; value: string }[];
+  pim_variants?: Array<{
+    id: number;
+    sku: string;
+    price: string;
+    attributes: Record<string, string>;
+    image?: string | null;
+    stock_status?: "IN_STOCK" | "MAKE_TO_ORDER";
+  }>;
   [key: string]: unknown;
 };
 
