@@ -7,6 +7,8 @@ import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import { WorkspaceSection } from "@/components/ui/workspace";
+import ProductMediaSlideshow from "@/components/public/ui/ProductMediaSlideshow";
+import type { ProductSlide } from "@/components/public/ui/product-slides";
 import { formatRupee } from "@/lib/utils/currency";
 import { toBrowserReachableMediaUrl } from "@/lib/media";
 import {
@@ -186,19 +188,38 @@ export default function CatalogBrowser({ role, buildCtas, helperNote }: CatalogB
                 key={product.id}
                 className="flex flex-col overflow-hidden rounded-2xl border border-border bg-card"
               >
-                <div className="flex aspect-video items-center justify-center bg-muted/40">
-                  {product.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={toBrowserReachableMediaUrl(product.image) || ""}
-                      alt={product.name}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-xs uppercase tracking-wide text-muted-foreground">
-                      {product.category || "Product"}
-                    </span>
-                  )}
+                <div className="flex aspect-video items-center justify-center bg-muted/40 relative">
+                  {(() => {
+                    const slides: ProductSlide[] = [];
+                    if (product.image) {
+                      const url = toBrowserReachableMediaUrl(product.image);
+                      if (url) slides.push({ type: "image", src: url });
+                    }
+                    if (product.media_items) {
+                      product.media_items.forEach((mi) => {
+                        const url = toBrowserReachableMediaUrl(mi.url);
+                        if (url && !slides.some((s) => s.src === url)) {
+                          slides.push({ type: mi.kind === "VIDEO" ? "video" : "image", src: url });
+                        }
+                      });
+                    }
+                    if (slides.length > 0) {
+                      return (
+                        <ProductMediaSlideshow
+                          slides={slides}
+                          alt={product.name}
+                          href={ctas[0]?.href}
+                          category={product.category}
+                          sizes="(max-width: 768px) 100vw, 33vw"
+                        />
+                      );
+                    }
+                    return (
+                      <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                        {product.category || "Product"}
+                      </span>
+                    );
+                  })()}
                 </div>
                 <div className="flex flex-1 flex-col gap-2 p-4">
                   <div className="flex items-start justify-between gap-2">
@@ -222,6 +243,19 @@ export default function CatalogBrowser({ role, buildCtas, helperNote }: CatalogB
                       </span>
                     ))}
                   </div>
+                  {product.flags?.rent && (
+                    <div className="mt-1 rounded-md border border-amber-100 bg-amber-50/50 p-2 text-xs dark:border-amber-900/30 dark:bg-amber-900/10">
+                      <div className="font-semibold text-amber-700 dark:text-amber-400">Est. Monthly Rent:</div>
+                      <div className="mt-0.5 flex justify-between text-amber-600 dark:text-amber-300">
+                        <span>Short tenure (8-10%):</span>
+                        <span>{formatRupee(Number(product.base_price) * 0.08)} - {formatRupee(Number(product.base_price) * 0.10)}</span>
+                      </div>
+                      <div className="flex justify-between text-amber-600 dark:text-amber-300">
+                        <span>Long tenure (5-7%):</span>
+                        <span>{formatRupee(Number(product.base_price) * 0.05)} - {formatRupee(Number(product.base_price) * 0.07)}</span>
+                      </div>
+                    </div>
+                  )}
                   {product.description ? (
                     <p className="line-clamp-2 text-xs text-muted-foreground">{product.description}</p>
                   ) : null}

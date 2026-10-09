@@ -396,7 +396,7 @@ function CatalogEmptyState() {
         <div className="flex flex-wrap justify-center gap-3 pt-2">
           <Link
             href={ROUTES.public.apply}
-            className="public-action-primary h-11 !min-h-0 justify-center px-5"
+            className="public-action-primary h-11 min-h-0! justify-center px-5"
           >
             Open enquiry form
           </Link>

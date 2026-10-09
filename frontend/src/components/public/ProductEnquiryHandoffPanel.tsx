@@ -115,11 +115,11 @@ export default function ProductEnquiryHandoffPanel({ product, dict }: ProductEnq
         </p>
 
         <div className="mt-6 flex flex-wrap gap-3">
-          <Link href={buildProductEnquiryHref(product, "NOT_SURE", product.product_code, product.stock_status)} className="public-action-primary h-12 justify-center gap-2 !min-h-0 px-6">
+          <Link href={buildProductEnquiryHref(product, "NOT_SURE", product.product_code, product.stock_status)} className="public-action-primary h-12 justify-center gap-2 min-h-0! px-6">
             Enquire now
             <ArrowRight className="h-4 w-4" />
           </Link>
-          <Link href={ROUTES.public.contact} className="public-action-secondary h-12 justify-center gap-2 !min-h-0 px-6">
+          <Link href={ROUTES.public.contact} className="public-action-secondary h-12 justify-center gap-2 min-h-0! px-6">
             Contact branch
           </Link>
         </div>

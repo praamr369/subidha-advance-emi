@@ -151,10 +151,10 @@ export default function HomeBulletin({
               ) : null}
 
               <div className="mt-auto flex flex-wrap gap-2 pt-5">
-                <Link href={ROUTES.public.verifyDraw} className="public-action-primary h-10 !min-h-0 px-4 text-sm">
+                <Link href={ROUTES.public.verifyDraw} className="public-action-primary h-10 min-h-0! px-4 text-sm">
                   {copy.verifyDraw}
                 </Link>
-                <Link href={ROUTES.public.winnerHistory} className="public-action-secondary h-10 !min-h-0 px-4 text-sm">
+                <Link href={ROUTES.public.winnerHistory} className="public-action-secondary h-10 min-h-0! px-4 text-sm">
                   {copy.winnerHistory}
                 </Link>
               </div>
@@ -164,10 +164,10 @@ export default function HomeBulletin({
               <p className={cn("text-lg font-semibold", tone.text)}>{copy.emptyTitle}</p>
               <p className={cn("mt-2 text-sm leading-6", tone.muted)}>{copy.emptyBody}</p>
               <div className="mt-auto flex flex-wrap gap-2 pt-5">
-                <Link href={ROUTES.public.fairDraw} className="public-action-secondary h-10 !min-h-0 px-4 text-sm">
+                <Link href={ROUTES.public.fairDraw} className="public-action-secondary h-10 min-h-0! px-4 text-sm">
                   {copy.howDrawsWork}
                 </Link>
-                <Link href={ROUTES.public.winnerHistory} className="public-action-secondary h-10 !min-h-0 px-4 text-sm">
+                <Link href={ROUTES.public.winnerHistory} className="public-action-secondary h-10 min-h-0! px-4 text-sm">
                   {copy.winnerHistory}
                 </Link>
               </div>

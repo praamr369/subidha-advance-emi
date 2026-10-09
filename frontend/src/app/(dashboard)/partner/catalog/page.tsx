@@ -9,6 +9,9 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import { listCatalogProducts, type CatalogProduct } from "@/services/catalog";
 import { formatRupee } from "@/lib/utils/currency";
+import ProductMediaSlideshow from "@/components/public/ui/ProductMediaSlideshow";
+import type { ProductSlide } from "@/components/public/ui/product-slides";
+import { toBrowserReachableMediaUrl } from "@/lib/media";
 
 export default function PartnerCatalogPage() {
   const [products, setProducts] = useState<CatalogProduct[]>([]);
@@ -135,15 +138,34 @@ export default function PartnerCatalogPage() {
               className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm"
             >
               <div className="flex items-center gap-3">
-                <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted/40">
-                  {row.image ? (
-                    <>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={row.image} alt={row.name} className="h-full w-full object-cover" />
-                    </>
-                  ) : (
-                    <Package className="size-5 text-muted-foreground" />
-                  )}
+                <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted/40 relative">
+                  {(() => {
+                    const slides: ProductSlide[] = [];
+                    if (row.image) {
+                      const url = toBrowserReachableMediaUrl(row.image);
+                      if (url) slides.push({ type: "image", src: url });
+                    }
+                    if (row.media_items) {
+                      row.media_items.forEach((mi) => {
+                        const url = toBrowserReachableMediaUrl(mi.url);
+                        if (url && !slides.some((s) => s.src === url)) {
+                          slides.push({ type: mi.kind === "VIDEO" ? "video" : "image", src: url });
+                        }
+                      });
+                    }
+                    if (slides.length > 0) {
+                      return (
+                        <ProductMediaSlideshow
+                          slides={slides}
+                          alt={row.name}
+                          href={`/partner/catalog/${row.id}`}
+                          category={row.category}
+                          sizes="48px"
+                        />
+                      );
+                    }
+                    return <Package className="size-5 text-muted-foreground" />;
+                  })()}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="font-bold text-foreground truncate">{row.name}</div>
@@ -151,6 +173,19 @@ export default function PartnerCatalogPage() {
                   <div className="mt-2 text-sm font-bold text-foreground">
                     {formatRupee(row.base_price)}
                   </div>
+                  {row.flags?.rent && (
+                    <div className="mt-1.5 rounded-md border border-amber-100 bg-amber-50/50 p-1.5 text-[10px] dark:border-amber-900/30 dark:bg-amber-900/10">
+                      <div className="font-semibold text-amber-700 dark:text-amber-400 mb-0.5">Est. Monthly Rent:</div>
+                      <div className="flex justify-between text-amber-600 dark:text-amber-300">
+                        <span>Short tenure (8-10%):</span>
+                        <span>{formatRupee(Number(row.base_price) * 0.08)} - {formatRupee(Number(row.base_price) * 0.10)}</span>
+                      </div>
+                      <div className="flex justify-between text-amber-600 dark:text-amber-300">
+                        <span>Long tenure (5-7%):</span>
+                        <span>{formatRupee(Number(row.base_price) * 0.05)} - {formatRupee(Number(row.base_price) * 0.07)}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="flex flex-wrap gap-2 pt-2 border-t border-border">

@@ -83,8 +83,6 @@ class CategoryAttributeViewSet(viewsets.ModelViewSet):
         return qs
 
 
-@method_decorator(cache_page(60 * 15), name='list')
-@method_decorator(cache_page(60 * 15), name='retrieve')
 class PimProductViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsAdmin]
     # The project default paginator ignores ?page_size (always 20 rows), which made

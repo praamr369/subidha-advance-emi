@@ -109,6 +109,19 @@ export default function ProductCard3D({
             </span>
           </div>
         </div>
+        
+        {/* Rent Yield */}
+        <div className="mt-2 rounded-md border border-amber-100 bg-amber-50/50 p-2 text-xs dark:border-amber-900/30 dark:bg-amber-900/10">
+          <div className="font-semibold text-amber-700 dark:text-amber-400">Est. Monthly Rent:</div>
+          <div className="mt-0.5 flex justify-between text-amber-600 dark:text-amber-300">
+            <span>Short (8-10%):</span>
+            <span>₹{Math.round(price * 0.08).toLocaleString("en-IN")} - ₹{Math.round(price * 0.10).toLocaleString("en-IN")}</span>
+          </div>
+          <div className="flex justify-between text-amber-600 dark:text-amber-300">
+            <span>Long (5-7%):</span>
+            <span>₹{Math.round(price * 0.05).toLocaleString("en-IN")} - ₹{Math.round(price * 0.07).toLocaleString("en-IN")}</span>
+          </div>
+        </div>
 
         <Link
           href={href}
