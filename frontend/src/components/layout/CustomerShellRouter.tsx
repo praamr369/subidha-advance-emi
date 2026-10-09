@@ -131,7 +131,7 @@ export default function CustomerShellRouter({ children }: { children: ReactNode 
               <SidebarLink href="/customer/refunds/history" icon={RotateCcw} label="Refunds" onClick={closeMobileMenu} />
 
               <p className="px-3 py-2 pt-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Warranty & Support</p>
-              <SidebarLink href="/customer/warranty/status/check" icon={ShieldCheck} label="Warranty Status" onClick={closeMobileMenu} />
+              <SidebarLink href="/customer/warranty/check" icon={ShieldCheck} label="Warranty Status" onClick={closeMobileMenu} />
               <SidebarLink href="/customer/warranty/claim" icon={ShieldCheck} label="Warranty Claim" onClick={closeMobileMenu} />
               <SidebarLink href="/customer/support" icon={HelpCircle} label="Support Tickets" onClick={closeMobileMenu} />
               <SidebarLink href="/customer/reviews" icon={Star} label="My Reviews" onClick={closeMobileMenu} />

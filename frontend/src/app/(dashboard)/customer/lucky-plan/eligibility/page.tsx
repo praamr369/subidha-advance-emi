@@ -40,7 +40,7 @@ export default function EligibilityCheckPage() {
           <div className="text-center">
             <h1 className="text-3xl font-bold text-red-600 mb-4">Error</h1>
             <p className="text-gray-600 mb-6">{error}</p>
-            <Link href="/dashboard/customer" className="text-primary hover:underline">
+            <Link href="/customer" className="text-primary hover:underline">
               Back to Dashboard
             </Link>
           </div>
@@ -172,13 +172,13 @@ export default function EligibilityCheckPage() {
         {/* Action Buttons */}
         <div className="flex gap-4">
           <Link
-            href="/dashboard/customer/lucky-plan/results"
+            href="/customer/lucky-plan/results"
             className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-3 rounded-lg transition text-center"
           >
             View Draw Results
           </Link>
           <Link
-            href="/dashboard/customer/lucky-plan/history"
+            href="/customer/lucky-plan/history"
             className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-900 font-semibold py-3 rounded-lg transition text-center"
           >
             View Waiver History
