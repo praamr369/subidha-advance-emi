@@ -56,7 +56,11 @@ def approved_catalog_queryset() -> QuerySet[Product]:
     Products without an inventory item are treated as finished goods.
     """
     return (
-        Product.objects.filter(Q(is_active=True) & (Q(pim__isnull=True) | Q(pim__is_published=True)))
+        # A linked PIM record is authoritative for portal visibility.  Do not
+        # use ``pim__isnull OR pim__is_published`` here: that allows a product
+        # with multiple linked PIM rows to leak through when one row is
+        # published and another row is still draft/unpublished.
+        Product.objects.filter(is_active=True).exclude(pim__is_published=False)
         .exclude(lifecycle_status="DISCONTINUED")
         .exclude(inventory_profile__stock_item_type__in=["RAW_MATERIAL", "ACCESSORY"])
         .select_related("category_master", "subcategory_master")

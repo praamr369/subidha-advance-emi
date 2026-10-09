@@ -10,6 +10,7 @@ from rest_framework.test import APIClient
 
 from accounts.models import UserRole
 from subscriptions.models import Customer, PlanType, Product
+from products_pim.models import PimProduct
 
 User = get_user_model()
 
@@ -46,7 +47,11 @@ def _make_product(code, **flags):
     else:
         defaults["is_emi_enabled"] = True
         defaults.setdefault("plan_type_default", PlanType.EMI)
-    return Product.objects.create(product_code=code, **defaults)
+    product = Product.objects.create(product_code=code, **defaults)
+    # Product creation may provision a draft PIM blueprint through the sync
+    # signal. Published-catalog fixtures must explicitly publish that record.
+    PimProduct.objects.filter(source_product=product).update(is_published=True)
+    return product
 
 
 class CatalogBrowseTests(TestCase):
@@ -138,6 +143,17 @@ class CatalogBrowseTests(TestCase):
     def test_customer_cannot_read_partner_catalog(self):
         resp = self._client(self.customer_user).get("/api/v1/partner/catalog/")
         self.assertEqual(resp.status_code, 403)
+
+    def test_draft_pim_product_is_hidden_from_customer_and_partner_catalogs(self):
+        draft = _make_product("T-DRAFT")
+        PimProduct.objects.filter(source_product=draft).update(is_published=False)
+
+        for role in ("customer", "partner"):
+            resp = self._client(
+                self.customer_user if role == "customer" else self.partner_user
+            ).get(f"/api/v1/{role}/catalog/?search=T-DRAFT")
+            self.assertEqual(resp.status_code, 200)
+            self.assertEqual(resp.data["results"], [])
 
     @override_settings(DEBUG=True)
     def test_seed_catalog_demo_command_is_idempotent(self):

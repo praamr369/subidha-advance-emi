@@ -75,7 +75,7 @@ export default function CatalogBrowser({ role, buildCtas, helperNote }: CatalogB
         purpose: purpose || undefined,
         category: category || undefined,
         search: appliedSearch || undefined,
-        pageSize: 60,
+        page_size: 60,
       });
       setProducts(response.results);
       setError(null);

@@ -15,7 +15,8 @@ def _published_qs():
     """
     return (
         Product.objects
-        .filter(Q(is_active=True) & (Q(pim__isnull=True) | Q(pim__is_published=True)))
+        .filter(is_active=True)
+        .exclude(pim__is_published=False)
         .prefetch_related(
             "pim",
             "pim__attributes__attribute",

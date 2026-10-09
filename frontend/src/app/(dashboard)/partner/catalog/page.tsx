@@ -29,7 +29,7 @@ export default function PartnerCatalogPage() {
     try {
       const response = await listCatalogProducts("partner", {
         search: appliedSearch || undefined,
-        pageSize: 60,
+        page_size: 60,
       });
       setProducts(response.results);
       setCount(response.count ?? response.results.length);

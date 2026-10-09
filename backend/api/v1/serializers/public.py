@@ -474,12 +474,15 @@ class PublicProductSerializer(serializers.ModelSerializer):
             if not op:
                 continue
             attrs = _variant_attr_map(variant)
-            # Build a short label from the most meaningful attrs
-            label_parts = []
-            for key in ("Size", "Bed Type", "Color", "Variant", "Type"):
-                if key in attrs:
-                    label_parts.append(attrs[key])
-            label = " · ".join(label_parts) if label_parts else variant.sku
+            # Variant identity is configured in PIM, so do not maintain a
+            # hardcoded allow-list here.  A product may be defined by any
+            # combination of attributes (for example Size + Thickness +
+            # Material + Storage + Lock Base).  _variant_attr_map preserves
+            # the VariantAttributeValue relation ordering, which keeps the
+            # public label stable and aligned with the admin configuration.
+            label = " · ".join(
+                f"{name}: {value}" for name, value in attrs.items()
+            ) or variant.sku
             siblings.append({
                 "product_id": op.id,
                 "product_code": op.product_code,
