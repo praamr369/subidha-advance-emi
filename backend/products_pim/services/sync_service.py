@@ -8,15 +8,11 @@ class PIMSyncService:
         pim_product = variant.product
         attributes = []
         for v_attr in variant.attribute_values.select_related('attribute').all():
-            dtype = v_attr.attribute.data_type
-            if dtype in ('TEXT', 'CHOICE', 'MULTI_CHOICE'):
-                val = v_attr.value_text
-            elif dtype in ('NUMBER', 'DECIMAL'):
-                val = str(v_attr.value_number).rstrip('0').rstrip('.') if v_attr.value_number is not None else ""
-            elif dtype == 'BOOLEAN':
+            val = v_attr.value_text
+            if not val and v_attr.value_number is not None:
+                val = str(v_attr.value_number).rstrip('0').rstrip('.')
+            if not val and v_attr.value_boolean is not None:
                 val = "Yes" if v_attr.value_boolean else "No"
-            else:
-                val = v_attr.value_text
                 
             if val:
                 attributes.append(f"{v_attr.attribute.name}: {val}")

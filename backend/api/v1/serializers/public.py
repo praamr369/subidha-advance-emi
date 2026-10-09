@@ -110,6 +110,16 @@ class PublicProductSerializer(serializers.ModelSerializer):
 
     # ── helpers ──────────────────────────────────────────────────────────────
 
+
+    def get_rent_yield_estimates(self, obj):
+        price = float(obj.base_price) if obj.base_price else 0.0
+        return {
+            "short_tenure_min": str(round(price * 0.08)),
+            "short_tenure_max": str(round(price * 0.10)),
+            "long_tenure_min": str(round(price * 0.05)),
+            "long_tenure_max": str(round(price * 0.07)),
+        }
+
     def _pim(self, obj):
         return obj.pim.first()
 
@@ -506,14 +516,3 @@ class PublicProductCategorySerializer(serializers.ModelSerializer):
 
     def get_public_image(self, obj):
         return serialize_media_url(self.context.get("request"), obj.public_image)
-
-    def get_rent_yield_estimates(self, obj):
-        # We check if rent is generally supported by the product (or just always compute for preview).
-        # We'll compute it if the base product supports it or just directly from price.
-        price = float(obj.base_price) if obj.base_price else 0.0
-        return {
-            "short_tenure_min": str(round(price * 0.08)),
-            "short_tenure_max": str(round(price * 0.10)),
-            "long_tenure_min": str(round(price * 0.05)),
-            "long_tenure_max": str(round(price * 0.07)),
-        }
