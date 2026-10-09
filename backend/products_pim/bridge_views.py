@@ -222,6 +222,10 @@ class ProductPimVariantPublishControlView(APIView):
                 "name": child.name or child.code,
                 "sku": variant.sku if variant else child.code,
                 "is_published": child.is_published,
+                "is_emi_enabled": child.is_emi_enabled,
+                "is_rent_enabled": child.is_rent_enabled,
+                "is_lease_enabled": child.is_lease_enabled,
+                "is_direct_sale_enabled": child.is_direct_sale_enabled,
                 "is_active": child.is_active,
                 "price": str(variant.price) if variant else None,
             })

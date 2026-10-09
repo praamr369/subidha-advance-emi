@@ -271,6 +271,7 @@ class PimProductDetailSerializer(serializers.ModelSerializer):
             "parent_id", "parent_code", "parent_name",
             "created_at", "updated_at",
             "rent_monthly_yield_percent", "lease_monthly_yield_percent",
+            "is_emi_enabled", "is_rent_enabled", "is_lease_enabled", "is_direct_sale_enabled",
             "attributes", "variants", "variant_count",
             "inherited_attribute_values", "variant_attribute_values",
         ]
@@ -334,6 +335,7 @@ class PimProductCreateUpdateSerializer(serializers.ModelSerializer):
         fields = [
             "id", "code", "brand", "name", "description", "category",
             "subcategory", "base_price", "cost_price", "rent_monthly_yield_percent", "lease_monthly_yield_percent",
+            "is_emi_enabled", "is_rent_enabled", "is_lease_enabled", "is_direct_sale_enabled",
             "is_active", "is_published", "product_type", "locked_attributes", "attributes", "remove_attributes",
             "ar_width_cm", "ar_depth_cm", "ar_height_cm", "parent",
             "warranty_enabled", "warranty_months_manufacturing", "warranty_months_structural",

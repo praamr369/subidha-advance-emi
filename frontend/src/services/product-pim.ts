@@ -27,6 +27,10 @@ export type ProductPimDetail = {
   category_name: string | null;
   subcategory_id: number | null;
   is_published: boolean;
+  is_emi_enabled: boolean;
+  is_rent_enabled: boolean;
+  is_lease_enabled: boolean;
+  is_direct_sale_enabled: boolean;
   attributes: PimAttributeRow[];
 };
 
@@ -133,7 +137,7 @@ export function patchVariantPublishControl(
   productId: number | string,
   body:
     | { all: boolean }
-    | { base_published?: boolean; variants?: Array<{ id: number; is_published: boolean }> }
+  | { base_published?: boolean; variants?: Array<{ id: number; is_published: boolean; is_emi_enabled?: boolean; is_rent_enabled?: boolean; is_lease_enabled?: boolean; is_direct_sale_enabled?: boolean }> }
 ) {
   return apiFetch<PimVariantPublishControl>(`/pim/products/${productId}/variants_publish_control/`, {
     method: "PATCH",

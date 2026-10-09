@@ -295,10 +295,18 @@ class PimProductViewSet(viewsets.ModelViewSet):
                 for row in variant_updates:
                     vid = row.get("id")
                     flag = bool(row.get("is_published", False))
+                    mode_fields = {key: bool(row[key]) for key in ("is_emi_enabled", "is_rent_enabled", "is_lease_enabled", "is_direct_sale_enabled") if key in row}
                     if vid in child_ids:
-                        PimProduct.objects.filter(pk=vid).update(is_published=flag)
+                        PimProduct.objects.filter(pk=vid).update(is_published=flag, **mode_fields)
                     elif vid in variant_to_child:
-                        PimProduct.objects.filter(pk=variant_to_child[vid]).update(is_published=flag)
+                        PimProduct.objects.filter(pk=variant_to_child[vid]).update(is_published=flag, **mode_fields)
+                    target_id = vid if vid in child_ids else variant_to_child.get(vid)
+                    if target_id and mode_fields:
+                        child = PimProduct.objects.filter(pk=target_id).select_related("source_product").first()
+                        if child and child.source_product_id:
+                            for field, value in mode_fields.items():
+                                setattr(child.source_product, field, value)
+                            child.source_product.save(update_fields=list(mode_fields))
 
                 pim.refresh_from_db(fields=["is_published"])
 

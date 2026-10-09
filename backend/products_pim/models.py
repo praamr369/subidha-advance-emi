@@ -148,6 +148,11 @@ class PimProduct(models.Model):
     image = models.ImageField(upload_to="pim/products/", null=True, blank=True)
     is_active = models.BooleanField(default=True)
     is_published = models.BooleanField(default=False)
+    # Per-SKU portal capabilities. Defaults preserve existing product behavior.
+    is_emi_enabled = models.BooleanField(default=True)
+    is_rent_enabled = models.BooleanField(default=False)
+    is_lease_enabled = models.BooleanField(default=False)
+    is_direct_sale_enabled = models.BooleanField(default=True)
     variant_generating_attributes = models.ManyToManyField(
         CategoryAttribute, blank=True, related_name="used_for_variants"
     )

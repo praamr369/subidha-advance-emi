@@ -66,7 +66,7 @@ export default function VariantPublishControlPage() {
     try {
       const result = await patchVariantPublishControl(productId, {
         base_published: basePublished,
-        variants: localVariants.map((v) => ({ id: v.id, is_published: v.is_published })),
+        variants: localVariants.map((v) => ({ id: v.id, is_published: v.is_published, is_emi_enabled: v.is_emi_enabled, is_rent_enabled: v.is_rent_enabled, is_lease_enabled: v.is_lease_enabled, is_direct_sale_enabled: v.is_direct_sale_enabled })),
       });
       setData(result);
       setLocalVariants(result.variants);
@@ -104,6 +104,11 @@ export default function VariantPublishControlPage() {
 
   function toggleBase() {
     setBasePublished((prev) => !prev);
+    setDirty(true);
+  }
+
+  function toggleMode(id: number, field: "is_emi_enabled" | "is_rent_enabled" | "is_lease_enabled" | "is_direct_sale_enabled") {
+    setLocalVariants((prev) => prev.map((v) => v.id === id ? { ...v, [field]: !v[field] } : v));
     setDirty(true);
   }
 
@@ -224,6 +229,13 @@ export default function VariantPublishControlPage() {
                     </div>
                     <div className="text-sm text-foreground">
                       {variant.price ? `₹${Number(variant.price).toLocaleString("en-IN")}` : "—"}
+                      <div className="mt-1 flex flex-wrap gap-1 text-[10px]">
+                        {(["is_emi_enabled", "is_rent_enabled", "is_lease_enabled", "is_direct_sale_enabled"] as const).map((field) => (
+                          <button key={field} type="button" onClick={() => toggleMode(variant.id, field)} className={`rounded border px-1.5 py-0.5 ${variant[field] ? "border-green-300 bg-green-50 text-green-700" : "border-border text-muted-foreground"}`}>
+                            {field === "is_emi_enabled" ? "EMI" : field === "is_rent_enabled" ? "Rent" : field === "is_lease_enabled" ? "Lease" : "Sale"}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                     <div>
                       <PublishBadge published={variant.is_published} />
