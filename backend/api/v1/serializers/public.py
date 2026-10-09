@@ -41,6 +41,7 @@ class PublicProductSerializer(serializers.ModelSerializer):
     ar_model = serializers.SerializerMethodField()
     # Scheme pricing: cash/EMI/rent/lease with live offer discounts applied.
     scheme_pricing = serializers.SerializerMethodField()
+    rent_yield_estimates = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -70,6 +71,7 @@ class PublicProductSerializer(serializers.ModelSerializer):
             "selected_attributes",
             "sibling_variants",
             "scheme_pricing",
+            "rent_yield_estimates",
         ]
 
     # ── scheme pricing ────────────────────────────────────────────────────────
@@ -504,3 +506,14 @@ class PublicProductCategorySerializer(serializers.ModelSerializer):
 
     def get_public_image(self, obj):
         return serialize_media_url(self.context.get("request"), obj.public_image)
+
+    def get_rent_yield_estimates(self, obj):
+        # We check if rent is generally supported by the product (or just always compute for preview).
+        # We'll compute it if the base product supports it or just directly from price.
+        price = float(obj.base_price) if obj.base_price else 0.0
+        return {
+            "short_tenure_min": str(round(price * 0.08)),
+            "short_tenure_max": str(round(price * 0.10)),
+            "long_tenure_min": str(round(price * 0.05)),
+            "long_tenure_max": str(round(price * 0.07)),
+        }

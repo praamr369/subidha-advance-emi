@@ -26,6 +26,7 @@ interface ProductCard3DProps {
   media?: ProductSlide[];
   /** Key PIM attributes to display on the card */
   attributes?: Array<{ name: string; value: string }>;
+  rentYieldEstimates?: { short_tenure_min: string; short_tenure_max: string; long_tenure_min: string; long_tenure_max: string } | null;
 }
 
 export default function ProductCard3D({
@@ -41,6 +42,7 @@ export default function ProductCard3D({
   subcategory = null,
   media,
   attributes,
+  rentYieldEstimates,
 }: ProductCard3DProps) {
   const { t } = useI18n();
   const slides: ProductSlide[] = media ?? (imageUrl ? [{ type: "image", src: imageUrl }] : []);
@@ -111,17 +113,19 @@ export default function ProductCard3D({
         </div>
         
         {/* Rent Yield */}
-        <div className="mt-2 rounded-md border border-amber-100 bg-amber-50/50 p-2 text-xs dark:border-amber-900/30 dark:bg-amber-900/10">
-          <div className="font-semibold text-amber-700 dark:text-amber-400">Est. Monthly Rent:</div>
-          <div className="mt-0.5 flex justify-between text-amber-600 dark:text-amber-300">
-            <span>Short (8-10%):</span>
-            <span>₹{Math.round(price * 0.08).toLocaleString("en-IN")} - ₹{Math.round(price * 0.10).toLocaleString("en-IN")}</span>
+        {rentYieldEstimates && (
+          <div className="mt-2 rounded-md border border-amber-100 bg-amber-50/50 p-2 text-xs dark:border-amber-900/30 dark:bg-amber-900/10">
+            <div className="font-semibold text-amber-700 dark:text-amber-400">Est. Monthly Rent:</div>
+            <div className="mt-0.5 flex justify-between text-amber-600 dark:text-amber-300">
+              <span>Short (8-10%):</span>
+              <span>₹{Number(rentYieldEstimates.short_tenure_min).toLocaleString("en-IN")} - ₹{Number(rentYieldEstimates.short_tenure_max).toLocaleString("en-IN")}</span>
+            </div>
+            <div className="flex justify-between text-amber-600 dark:text-amber-300">
+              <span>Long (5-7%):</span>
+              <span>₹{Number(rentYieldEstimates.long_tenure_min).toLocaleString("en-IN")} - ₹{Number(rentYieldEstimates.long_tenure_max).toLocaleString("en-IN")}</span>
+            </div>
           </div>
-          <div className="flex justify-between text-amber-600 dark:text-amber-300">
-            <span>Long (5-7%):</span>
-            <span>₹{Math.round(price * 0.05).toLocaleString("en-IN")} - ₹{Math.round(price * 0.07).toLocaleString("en-IN")}</span>
-          </div>
-        </div>
+        )}
 
         <Link
           href={href}

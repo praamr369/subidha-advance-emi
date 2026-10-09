@@ -173,16 +173,16 @@ export default function PartnerCatalogPage() {
                   <div className="mt-2 text-sm font-bold text-foreground">
                     {formatRupee(row.base_price)}
                   </div>
-                  {row.flags?.rent && (
+                  {row.flags?.rent && row.rent_yield_estimates && (
                     <div className="mt-1.5 rounded-md border border-amber-100 bg-amber-50/50 p-1.5 text-[10px] dark:border-amber-900/30 dark:bg-amber-900/10">
                       <div className="font-semibold text-amber-700 dark:text-amber-400 mb-0.5">Est. Monthly Rent:</div>
                       <div className="flex justify-between text-amber-600 dark:text-amber-300">
                         <span>Short tenure (8-10%):</span>
-                        <span>{formatRupee(Number(row.base_price) * 0.08)} - {formatRupee(Number(row.base_price) * 0.10)}</span>
+                        <span>{formatRupee(Number(row.rent_yield_estimates.short_tenure_min))} - {formatRupee(Number(row.rent_yield_estimates.short_tenure_max))}</span>
                       </div>
                       <div className="flex justify-between text-amber-600 dark:text-amber-300">
                         <span>Long tenure (5-7%):</span>
-                        <span>{formatRupee(Number(row.base_price) * 0.05)} - {formatRupee(Number(row.base_price) * 0.07)}</span>
+                        <span>{formatRupee(Number(row.rent_yield_estimates.long_tenure_min))} - {formatRupee(Number(row.rent_yield_estimates.long_tenure_max))}</span>
                       </div>
                     </div>
                   )}

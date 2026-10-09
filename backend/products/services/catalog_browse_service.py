@@ -233,6 +233,7 @@ def serialize_catalog_product(product: Product, request=None) -> dict:
         "hsn_sac_code": product.hsn_sac_code or "",
         "lifecycle_status": product.lifecycle_status,
         "image": _resolve_catalog_image(product, request),
+        "media_items": _resolve_catalog_media(product, request),
         "purposes": product_purposes(product),
         "flags": {
             "emi": bool(product.is_emi_enabled),
@@ -240,6 +241,12 @@ def serialize_catalog_product(product: Product, request=None) -> dict:
             "lease": bool(product.is_lease_enabled),
             "direct_sale": bool(product.is_direct_sale_enabled),
         },
+        "rent_yield_estimates": {
+            "short_tenure_min": str(round(float(product.base_price) * 0.08)),
+            "short_tenure_max": str(round(float(product.base_price) * 0.10)),
+            "long_tenure_min": str(round(float(product.base_price) * 0.05)),
+            "long_tenure_max": str(round(float(product.base_price) * 0.07)),
+        } if product.is_rent_enabled else None,
         "default_plan_type": product.plan_type_default,
     }
 
@@ -256,7 +263,6 @@ def serialize_catalog_product_detail(product: Product, request=None) -> dict:
         "extended_warranty_cost_percentage": str(product.extended_warranty_cost_percentage),
         "sku": product.sku or "",
         "ar_model": _ar_model(product, request),
-        "media_items": _resolve_catalog_media(product, request),
     })
     return base
 

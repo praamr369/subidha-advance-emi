@@ -177,6 +177,7 @@ export type PublicProduct = {
   }>;
   /** Cash / EMI / rent / lease pricing with live offer discounts applied. */
   scheme_pricing?: ProductSchemePricing | null;
+  rent_yield_estimates?: { short_tenure_min: string; short_tenure_max: string; long_tenure_min: string; long_tenure_max: string } | null;
 };
 
 /** One selectable tenure within a scheme. */

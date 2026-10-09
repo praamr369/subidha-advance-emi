@@ -243,16 +243,16 @@ export default function CatalogBrowser({ role, buildCtas, helperNote }: CatalogB
                       </span>
                     ))}
                   </div>
-                  {product.flags?.rent && (
+                  {product.flags?.rent && product.rent_yield_estimates && (
                     <div className="mt-1 rounded-md border border-amber-100 bg-amber-50/50 p-2 text-xs dark:border-amber-900/30 dark:bg-amber-900/10">
                       <div className="font-semibold text-amber-700 dark:text-amber-400">Est. Monthly Rent:</div>
                       <div className="mt-0.5 flex justify-between text-amber-600 dark:text-amber-300">
                         <span>Short tenure (8-10%):</span>
-                        <span>{formatRupee(Number(product.base_price) * 0.08)} - {formatRupee(Number(product.base_price) * 0.10)}</span>
+                        <span>{formatRupee(Number(product.rent_yield_estimates.short_tenure_min))} - {formatRupee(Number(product.rent_yield_estimates.short_tenure_max))}</span>
                       </div>
                       <div className="flex justify-between text-amber-600 dark:text-amber-300">
                         <span>Long tenure (5-7%):</span>
-                        <span>{formatRupee(Number(product.base_price) * 0.05)} - {formatRupee(Number(product.base_price) * 0.07)}</span>
+                        <span>{formatRupee(Number(product.rent_yield_estimates.long_tenure_min))} - {formatRupee(Number(product.rent_yield_estimates.long_tenure_max))}</span>
                       </div>
                     </div>
                   )}

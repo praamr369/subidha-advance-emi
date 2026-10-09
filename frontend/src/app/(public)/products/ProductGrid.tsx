@@ -332,6 +332,7 @@ export default function ProductGrid({
                 media={buildProductSlides(product)}
                 href={`/products/${product.product_code}`}
                 attributes={product.pim_attributes}
+                rentYieldEstimates={product.rent_yield_estimates}
               />
             );
           })}
