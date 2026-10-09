@@ -213,8 +213,12 @@ class ProductPimVariantPublishControlView(APIView):
     def _variant_rows(self, pim):
         rows = []
         variants_by_sku = {v.sku: v for v in pim.variants.all()}
-        for child in pim.child_pim_products.order_by("code"):
+        for child in pim.child_pim_products.select_related("source_product").order_by("code"):
             variant = variants_by_sku.get(child.code)
+            # Existing variants may predate the PIM capability fields. Read the
+            # linked operational product as the compatibility source so the
+            # control panel cannot disagree with the live portal catalog.
+            operational = child.source_product
             rows.append({
                 "id": child.id,
                 "variant_id": variant.id if variant else None,
@@ -222,10 +226,10 @@ class ProductPimVariantPublishControlView(APIView):
                 "name": child.name or child.code,
                 "sku": variant.sku if variant else child.code,
                 "is_published": child.is_published,
-                "is_emi_enabled": child.is_emi_enabled,
-                "is_rent_enabled": child.is_rent_enabled,
-                "is_lease_enabled": child.is_lease_enabled,
-                "is_direct_sale_enabled": child.is_direct_sale_enabled,
+                "is_emi_enabled": bool(child.is_emi_enabled or getattr(operational, "is_emi_enabled", False)),
+                "is_rent_enabled": bool(child.is_rent_enabled or getattr(operational, "is_rent_enabled", False)),
+                "is_lease_enabled": bool(child.is_lease_enabled or getattr(operational, "is_lease_enabled", False)),
+                "is_direct_sale_enabled": bool(child.is_direct_sale_enabled or getattr(operational, "is_direct_sale_enabled", False)),
                 "is_active": child.is_active,
                 "price": str(variant.price) if variant else None,
             })
