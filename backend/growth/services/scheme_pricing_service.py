@@ -371,7 +371,9 @@ def quote_tenure(
     price = _q2(effective_price)
     if plan_type in DEPOSIT_SCHEMES:
         yield_percent = _q2(monthly_yield_percent or DEFAULT_MONTHLY_YIELD_PERCENT)
-        monthly = _q2(price * yield_percent / Decimal("100"))
+        # Yield is an annualized product yield. Convert it to the selected
+        # contract tenure so shorter terms carry the higher monthly demand.
+        monthly = _q2(price * yield_percent * Decimal("12") / Decimal(tenure) / Decimal("100"))
     else:
         monthly = _q2(price / Decimal(tenure))
 

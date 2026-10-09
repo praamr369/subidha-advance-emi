@@ -64,7 +64,9 @@ function quoteTenureLocally(
     scheme === "RENT" || scheme === "LEASE"
       ? round2(
           (effectivePrice *
-            Number(rules.monthly_yield_percent?.[scheme] ?? "5")) /
+            Number(rules.monthly_yield_percent?.[scheme] ?? "5") *
+            12) /
+            tenureMonths /
             100,
         )
       : round2(effectivePrice / tenureMonths);

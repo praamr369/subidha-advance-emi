@@ -122,6 +122,10 @@ export type PimVariantPublishRow = {
   is_published: boolean;
   is_active: boolean;
   price: string | null;
+  is_emi_enabled: boolean;
+  is_rent_enabled: boolean;
+  is_lease_enabled: boolean;
+  is_direct_sale_enabled: boolean;
 };
 
 export type PimVariantPublishControl = {
