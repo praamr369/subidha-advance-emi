@@ -1,6 +1,7 @@
 import { request } from "@/services/api";
 import { toResultsArray } from "@/services/api/list";
 import type { ArModel } from "@/lib/model-viewer";
+import type { ProductSchemePricing } from "@/services/public";
 
 export type CatalogInputType = "SELECT" | "MULTI_SELECT" | "NUMBER" | "TEXT" | "BOOLEAN";
 
@@ -70,6 +71,7 @@ export type CatalogProduct = {
   /** "View in your room" AR (detail endpoint only). */
   ar_model?: ArModel | null;
   rent_yield_estimates?: { short_tenure_min: string; short_tenure_max: string; long_tenure_min: string; long_tenure_max: string } | null;
+  scheme_pricing?: ProductSchemePricing | null;
   media_items?: { url: string; kind: string; is_hero: boolean; title: string }[];
   [key: string]: unknown;
 };

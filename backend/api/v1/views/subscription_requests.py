@@ -75,6 +75,7 @@ def _batch_param(request) -> str:
 
 def _serialize_request_products(request):
     products = requestable_product_queryset()
+    from growth.services.scheme_pricing_service import quote_product
     return [
         {
             "id": product.id,
@@ -84,6 +85,7 @@ def _serialize_request_products(request):
             "image": serialize_media_url(request, getattr(product, "image", None)),
             "category": getattr(product, "category", "") or "",
             "subcategory": getattr(product, "subcategory", "") or "",
+            "scheme_pricing": quote_product(product, public=True),
         }
         for product in products
     ]

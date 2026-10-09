@@ -12,6 +12,7 @@ import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import { SelfServicePageShell } from "@/components/layout/page-shells";
+import PublicProductSchemePricing from "@/components/public/PublicProductSchemePricing";
 
 export default function CatalogProductDetailPage({
   role,
@@ -134,6 +135,8 @@ export default function CatalogProductDetailPage({
                 <p>{product.description}</p>
               </div>
             )}
+
+            <PublicProductSchemePricing pricing={product.scheme_pricing} />
 
             {/* Request Actions */}
             <div className="pt-4 border-t border-border">

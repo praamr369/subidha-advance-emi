@@ -220,6 +220,11 @@ def _resolve_catalog_media(product: Product, request=None) -> list[dict]:
 
 def serialize_catalog_product(product: Product, request=None) -> dict:
     """Serialize a product for the portal catalog grid."""
+    from growth.services.scheme_pricing_service import quote_product
+    try:
+        scheme_pricing = quote_product(product, public=True)
+    except Exception:  # pricing must not take the catalog down
+        scheme_pricing = None
     return {
         "id": product.id,
         "product_code": product.product_code,
@@ -248,6 +253,7 @@ def serialize_catalog_product(product: Product, request=None) -> dict:
             "long_tenure_max": str(round(float(product.base_price) * 0.07)),
         } if product.is_rent_enabled else None,
         "default_plan_type": product.plan_type_default,
+        "scheme_pricing": scheme_pricing,
     }
 
 
