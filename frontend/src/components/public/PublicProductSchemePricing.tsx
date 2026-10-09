@@ -191,7 +191,7 @@ export default function PublicProductSchemePricing({
 
       {/* Advance EMI tenure is controlled by the active batch/business setup.
           Rent and lease may use the configured range for an estimate. */}
-      {active.scheme !== "CASH" ? (
+      {active.scheme !== "CASH" && tenure ? (
         <div className="mt-5">
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Tenure

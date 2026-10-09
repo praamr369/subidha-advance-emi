@@ -470,7 +470,7 @@ def quote_scheme(
             available=base_price > ZERO,
             base_price=base_price,
             effective_price=effective,
-            discount=discount,
+            discount=None,
             tenures=[],
             unavailable_reason="" if base_price > ZERO else "Price not published.",
         )
@@ -496,12 +496,22 @@ def quote_scheme(
             unavailable_reason="Price not published.",
         )
 
+    # Advance EMI is request-only until the admin opens a Lucky Plan batch.
+    # Do not expose fallback tenure presets without a real batch.
+    if plan_type == EMI and not catalog.batch_durations():
+        return SchemeQuote(
+            scheme=plan_type,
+            available=False,
+            base_price=base_price,
+            effective_price=base_price,
+            discount=None,
+            unavailable_reason="No open Advance EMI batch.",
+        )
+
     effective, discount = _best_price(product, plan_type, base_price, catalog, customer)
     tenures = _tenure_quotes(plan_type, effective, catalog, product=product)
 
-    # Availability follows the product's own scheme flags and having a price.
-    # Tenure presets are only shortcuts, so an empty config table never makes a
-    # scheme disappear from the catalogue.
+    # Availability follows the product's own scheme flags and backend readiness.
     return SchemeQuote(
         scheme=plan_type,
         available=True,
