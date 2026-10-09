@@ -5,7 +5,7 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, Box, CheckCircle2, ShieldCheck, Tag } from "lucide-react";
-import { getCatalogProduct, type CatalogRole } from "@/services/catalog";
+import { getCatalogProduct, type CatalogProduct, type CatalogRole } from "@/services/catalog";
 import { resolveApiMediaUrl } from "@/lib/media";
 import ProductARViewer from "@/components/public/ProductARViewer";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
@@ -30,7 +30,7 @@ export default function CatalogProductDetailPage({
     queryFn: () => getCatalogProduct(role, id),
   });
   const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({});
-  const [activeProduct, setActiveProduct] = useState<typeof fetchedProduct>(null);
+  const [activeProduct, setActiveProduct] = useState<CatalogProduct | null>(null);
   const [switchingVariant, setSwitchingVariant] = useState(false);
   const product = activeProduct ?? fetchedProduct;
 
