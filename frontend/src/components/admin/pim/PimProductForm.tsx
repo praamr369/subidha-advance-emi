@@ -508,6 +508,7 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
           
           if (productId && product) {
             const savedIds = new Set((product.attributes || []).map((a) => a.attribute));
+            const matchedAttrs = fetchedAttrs.filter((a) => savedIds.has(a.id) && !removedAttrIds.has(a.id));
             
             const extraAttrs = (product.attributes || [])
               .filter((a) => !categoryAttrIds.has(a.attribute) && !removedAttrIds.has(a.attribute))
@@ -530,7 +531,11 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
               
             const sessionExtraAttrs = prev.filter(a => !categoryAttrIds.has(a.id) && !savedIds.has(a.id) && !removedAttrIds.has(a.id));
               
-            return [...activeFetchedAttrs, ...extraAttrs, ...sessionExtraAttrs];
+            if (product.category === cid && (product.subcategory || null) === (sid || null)) {
+              return [...matchedAttrs, ...extraAttrs, ...sessionExtraAttrs];
+            } else {
+              return [...activeFetchedAttrs, ...extraAttrs, ...sessionExtraAttrs];
+            }
           } else {
             const sessionExtraAttrs = prev.filter(a => !categoryAttrIds.has(a.id) && !removedAttrIds.has(a.id));
             return [...activeFetchedAttrs, ...sessionExtraAttrs];

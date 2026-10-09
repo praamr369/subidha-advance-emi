@@ -414,6 +414,11 @@ class PimProductCreateUpdateSerializer(serializers.ModelSerializer):
             ProductAttribute.objects.filter(product=product, attribute_id__in=remove_ids).delete()
             if product.child_pim_products.exists():
                 ProductAttribute.objects.filter(product__in=product.child_pim_products.all(), attribute_id__in=remove_ids).delete()
+            
+            # Remove associated VariantAttributeValue records from variants of this product
+            from products_pim.models import VariantAttributeValue
+            VariantAttributeValue.objects.filter(variant__product=product, attribute_id__in=remove_ids).delete()
+
             # Also remove from locked_attributes if present
             if product.locked_attributes:
                 cleaned = [aid for aid in product.locked_attributes if aid not in remove_ids]
