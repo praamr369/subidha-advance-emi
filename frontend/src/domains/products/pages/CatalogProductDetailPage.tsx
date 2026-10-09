@@ -29,6 +29,7 @@ export default function CatalogProductDetailPage({
     queryKey: ["catalogProduct", role, id],
     queryFn: () => getCatalogProduct(role, id),
   });
+  const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({});
 
   if (isLoading) return <ERPLoadingState />;
   if (error || !product) {
@@ -36,10 +37,8 @@ export default function CatalogProductDetailPage({
   }
 
   const imgUrl = resolveApiMediaUrl(product.image ?? null);
-  const basePrice = Number(product.base_price).toLocaleString("en-IN");
   const specs = (product.base_specs as Record<string, string>) || {};
   const mediaItems = product.media_items || [];
-  const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({});
   const selectedVariant = product.pim_variants?.find((variant) =>
     Object.entries(selectedAttributes).every(([key, value]) => variant.attributes[key] === value),
   );
