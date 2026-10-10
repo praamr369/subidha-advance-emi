@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, BadgeCheck, ClipboardCheck, PackageCheck, ReceiptText, ShieldCheck, type LucideIcon } from "lucide-react";
 
@@ -73,17 +74,29 @@ function PriceDisplay({ product }: { product: PublicProduct }) {
 }
 
 export default function ProductEnquiryHandoffPanel({ product, dict }: ProductEnquiryHandoffPanelProps) {
+  const [rentTenure, setRentTenure] = useState<string>("6");
+  const [leaseTenure, setLeaseTenure] = useState<string>("12");
+
+  const hasAdvanceEmiBatch = product.scheme_pricing?.has_active_batches ?? false;
+  const yields = product.rent_yield_estimates;
 
   const planOptions: Array<{
     value: ProductPlanInterest;
     title: string;
     description: string;
     icon: LucideIcon;
+    showTenure?: boolean;
+    tenureValue?: string;
+    onTenureChange?: (v: string) => void;
   }> = [
     {
       value: "LUCKY_PLAN",
-      title: (dict.public as any).ProductEnquiryHandoffPanel_prop1 || "Lucky Plan Advance EMI",
-      description: (dict.public as any).ProductEnquiryHandoffPanel_prop2 || "Enquire about Lucky ID enrollment, monthly draw transparent rules, and transparent contract.",
+      title: hasAdvanceEmiBatch 
+        ? ((dict.public as any).ProductEnquiryHandoffPanel_prop1 || "Lucky Plan Advance EMI")
+        : "Request Advance EMI",
+      description: hasAdvanceEmiBatch
+        ? ((dict.public as any).ProductEnquiryHandoffPanel_prop2 || "Enquire about Lucky ID enrollment, monthly draw transparent rules, and transparent contract.")
+        : "No active batches currently. Register your interest for the next batch.",
       icon: BadgeCheck,
     },
     {
@@ -91,12 +104,18 @@ export default function ProductEnquiryHandoffPanel({ product, dict }: ProductEnq
       title: (dict.public as any).ProductEnquiryHandoffPanel_prop3 || "Short-Term Rent",
       description: (dict.public as any).ProductEnquiryHandoffPanel_prop4 || "Enquire about rental availability, deposit terms, and monthly rent options without ownership.",
       icon: PackageCheck,
+      showTenure: true,
+      tenureValue: rentTenure,
+      onTenureChange: setRentTenure,
     },
     {
       value: "LEASE",
       title: (dict.public as any).ProductEnquiryHandoffPanel_prop5 || "Long-Term Lease",
       description: (dict.public as any).ProductEnquiryHandoffPanel_prop6 || "Enquire about longer fixed-term lease arrangements, checkpoints, and transition to ownership.",
       icon: ClipboardCheck,
+      showTenure: true,
+      tenureValue: leaseTenure,
+      onTenureChange: setLeaseTenure,
     },
     {
       value: "DIRECT_SALE",
@@ -115,11 +134,11 @@ export default function ProductEnquiryHandoffPanel({ product, dict }: ProductEnq
         </p>
 
         <div className="mt-6 flex flex-wrap gap-3">
-          <Link href={buildProductEnquiryHref(product, "NOT_SURE", product.product_code, product.stock_status)} className="public-action-primary h-12 justify-center gap-2 !min-h-0 px-6">
+          <Link href={buildProductEnquiryHref(product, "NOT_SURE", product.product_code, product.stock_status)} className="public-action-primary h-12 justify-center gap-2 min-h-0! px-6">
             Enquire now
             <ArrowRight className="h-4 w-4" />
           </Link>
-          <Link href={ROUTES.public.contact} className="public-action-secondary h-12 justify-center gap-2 !min-h-0 px-6">
+          <Link href={ROUTES.public.contact} className="public-action-secondary h-12 justify-center gap-2 min-h-0! px-6">
             Contact branch
           </Link>
         </div>
@@ -134,20 +153,41 @@ export default function ProductEnquiryHandoffPanel({ product, dict }: ProductEnq
 
         <div className="mt-5 grid gap-3">
           {planOptions.map((option) => (
-            <Link
-              key={option.value}
-              href={buildProductEnquiryHref(product, option.value, product.product_code, product.stock_status)}
-              className="public-card-sm public-card-animated flex items-start gap-3 px-4 py-3 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2"
-            >
-              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--primary)_12%,var(--surface-card-elevated)_88%)] text-primary shadow-[inset_0_1px_0_var(--hairline-shine)]">
-                <option.icon className="h-4 w-4" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold text-foreground">{option.title}</span>
-                <span className="mt-1 block text-xs leading-5 text-muted-foreground">{option.description}</span>
-              </span>
-              <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-primary" />
-            </Link>
+            <div key={option.value} className="public-card-sm public-card-animated flex flex-col gap-3 px-4 py-3">
+              <div className="flex items-start gap-3">
+                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--primary)_12%,var(--surface-card-elevated)_88%)] text-primary shadow-[inset_0_1px_0_var(--hairline-shine)]">
+                  <option.icon className="h-4 w-4" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold text-foreground">{option.title}</span>
+                  <span className="mt-1 block text-xs leading-5 text-muted-foreground">{option.description}</span>
+                  {option.showTenure && yields && (
+                    <div className="mt-2 flex flex-col sm:flex-row sm:items-center gap-2">
+                      <select 
+                        value={option.tenureValue} 
+                        onChange={(e) => option.onTenureChange?.(e.target.value)}
+                        className="h-8 rounded-lg border border-border bg-white px-2 text-xs"
+                      >
+                        <option value="3">3 Months</option>
+                        <option value="6">6 Months</option>
+                        <option value="12">12 Months</option>
+                        <option value="24">24 Months</option>
+                      </select>
+                      <span className="text-[11px] font-medium text-primary">
+                        Security Deposit: 20-30% • Est. Monthly: ₹
+                        {Number(option.tenureValue) <= 12 ? yields.short_tenure_max : yields.long_tenure_max}
+                      </span>
+                    </div>
+                  )}
+                </span>
+              </div>
+              <Link
+                href={buildProductEnquiryHref(product, option.value, product.product_code, product.stock_status, option.tenureValue)}
+                className="mt-2 flex items-center gap-1 self-end text-xs font-semibold text-primary hover:underline focus-visible:outline-none"
+              >
+                Proceed with {option.title.split(' ')[0]} <ArrowRight className="h-3 w-3" />
+              </Link>
+            </div>
           ))}
         </div>
       </section>

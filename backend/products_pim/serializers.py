@@ -177,26 +177,42 @@ class ProductVariantSerializer(serializers.ModelSerializer):
 class PimProductListSerializer(serializers.ModelSerializer):
     category_name = serializers.SerializerMethodField()
     subcategory_name = serializers.SerializerMethodField()
+    attributes = ProductAttributeSerializer(many=True, read_only=True)
     variant_count = serializers.SerializerMethodField()
     parent_id = serializers.IntegerField(source="parent.id", read_only=True, default=None)
     parent_code = serializers.CharField(source="parent.code", read_only=True, default=None)
     parent_name = serializers.CharField(source="parent.name", read_only=True, default=None)
     parent_is_published = serializers.SerializerMethodField()
     child_count = serializers.SerializerMethodField()
+    full_name = serializers.SerializerMethodField()
 
     class Meta:
         model = PimProduct
         fields = [
-            "id", "code", "brand", "name", "category", "category_name",
+            "id", "code", "brand", "name", "full_name", "category", "category_name",
             "subcategory", "subcategory_name", "base_price",
             "is_active", "is_published", "product_type", "variant_count",
             "parent_id", "parent_code", "parent_name", "parent_is_published", "child_count",
+            "attributes",
         ]
 
     def get_parent_is_published(self, obj):
         if obj.parent_id and obj.parent:
             return obj.parent.is_published
         return None
+
+    def get_full_name(self, obj):
+        if obj.parent_id and obj.parent:
+            # We can use the source_product's name if it's already updated, 
+            # otherwise fetch the variant and compute it.
+            if obj.source_product and obj.source_product.name and obj.source_product.name != obj.name:
+                return obj.source_product.name
+            from products_pim.models import ProductVariant
+            variant = ProductVariant.objects.filter(sku=obj.code).prefetch_related('attribute_values__attribute').first()
+            if variant:
+                from products_pim.services.sync_service import PIMSyncService
+                return PIMSyncService.get_variant_display_name(variant)
+        return obj.name
 
     def _effective_category(self, obj):
         """Return own category unless it's the Unclassified sentinel; fall back to parent."""
@@ -250,8 +266,12 @@ class PimProductDetailSerializer(serializers.ModelSerializer):
             "subcategory", "subcategory_name", "base_price", "cost_price",
             "is_active", "is_published", "product_type", "locked_attributes",
             "ar_width_cm", "ar_depth_cm", "ar_height_cm",
+            "warranty_enabled", "warranty_months_manufacturing", "warranty_months_structural",
+            "warranty_months_extended_max", "extended_warranty_cost_percentage",
             "parent_id", "parent_code", "parent_name",
             "created_at", "updated_at",
+            "rent_monthly_yield_percent", "lease_monthly_yield_percent",
+            "is_emi_enabled", "is_rent_enabled", "is_lease_enabled", "is_direct_sale_enabled",
             "attributes", "variants", "variant_count",
             "inherited_attribute_values", "variant_attribute_values",
         ]
@@ -314,9 +334,12 @@ class PimProductCreateUpdateSerializer(serializers.ModelSerializer):
         model = PimProduct
         fields = [
             "id", "code", "brand", "name", "description", "category",
-            "subcategory", "base_price", "cost_price",
+            "subcategory", "base_price", "cost_price", "rent_monthly_yield_percent", "lease_monthly_yield_percent",
+            "is_emi_enabled", "is_rent_enabled", "is_lease_enabled", "is_direct_sale_enabled",
             "is_active", "is_published", "product_type", "locked_attributes", "attributes", "remove_attributes",
-            "ar_width_cm", "ar_depth_cm", "ar_height_cm",
+            "ar_width_cm", "ar_depth_cm", "ar_height_cm", "parent",
+            "warranty_enabled", "warranty_months_manufacturing", "warranty_months_structural",
+            "warranty_months_extended_max", "extended_warranty_cost_percentage",
         ]
 
     def _save_attributes(self, product, attrs_data):
@@ -336,21 +359,16 @@ class PimProductCreateUpdateSerializer(serializers.ModelSerializer):
             )
 
     def _clean_locked_attributes(self, product):
-        """Remove any locked_attributes IDs that have no actual saved value."""
+        """Remove any locked_attributes IDs that are not actually mapped to the product."""
         if not product.locked_attributes:
             return
-        valued_ids = set(
+        mapped_ids = set(
             ProductAttribute.objects.filter(
                 product=product,
                 attribute_id__in=product.locked_attributes,
-            ).exclude(
-                value_text="",
-                value_number__isnull=True,
-                value_boolean__isnull=True,
-                value_date__isnull=True,
             ).values_list("attribute_id", flat=True)
         )
-        cleaned = [aid for aid in product.locked_attributes if aid in valued_ids]
+        cleaned = [aid for aid in product.locked_attributes if aid in mapped_ids]
         if len(cleaned) != len(product.locked_attributes):
             product.locked_attributes = cleaned
             product.save(update_fields=["locked_attributes"])
@@ -366,6 +384,8 @@ class PimProductCreateUpdateSerializer(serializers.ModelSerializer):
             
             sub_product.name = pim_product.name
             sub_product.base_price = pim_product.base_price
+            sub_product.rent_monthly_yield_percent = pim_product.rent_monthly_yield_percent
+            sub_product.lease_monthly_yield_percent = pim_product.lease_monthly_yield_percent
             if pim_product.category:
                 sub_product.category = pim_product.category.name
             if pim_product.subcategory:
@@ -376,6 +396,12 @@ class PimProductCreateUpdateSerializer(serializers.ModelSerializer):
                 if pim_product.cost_price is not None:
                     sub_product.inventory_profile.standard_unit_cost = pim_product.cost_price
                     sub_product.inventory_profile.save(update_fields=['standard_unit_cost'])
+            
+            # Cascade updates to all variant operational products
+            from products_pim.services.sync_service import PIMSyncService
+            for variant in pim_product.variants.all():
+                PIMSyncService.sync_variant_to_operational_product(variant)
+                
         except ImportError:
             pass
 
@@ -391,9 +417,19 @@ class PimProductCreateUpdateSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         attrs_data = validated_data.pop("attributes", [])
         remove_ids = validated_data.pop("remove_attributes", [])
+        old_code = instance.code
         product = super().update(instance, validated_data)
+        if product.code != old_code:
+            self._sync_product_code(product, old_code)
         if remove_ids:
             ProductAttribute.objects.filter(product=product, attribute_id__in=remove_ids).delete()
+            if product.child_pim_products.exists():
+                ProductAttribute.objects.filter(product__in=product.child_pim_products.all(), attribute_id__in=remove_ids).delete()
+            
+            # Remove associated VariantAttributeValue records from variants of this product
+            from products_pim.models import VariantAttributeValue
+            VariantAttributeValue.objects.filter(variant__product=product, attribute_id__in=remove_ids).delete()
+
             # Also remove from locked_attributes if present
             if product.locked_attributes:
                 cleaned = [aid for aid in product.locked_attributes if aid not in remove_ids]
@@ -404,6 +440,22 @@ class PimProductCreateUpdateSerializer(serializers.ModelSerializer):
         self._clean_locked_attributes(product)
         self._sync_to_register(product)
         return product
+
+    def _sync_product_code(self, pim_product, old_code):
+        """Keep linked operational/register identifiers aligned with a PIM rename."""
+        from subscriptions.models import Product as RegisterProduct
+
+        core = pim_product.source_product
+        if core and core.product_code == old_code:
+            core.product_code = pim_product.code
+            if core.sku == old_code:
+                core.sku = pim_product.code
+            core.save(update_fields=["product_code", "sku"])
+
+        register = RegisterProduct.objects.filter(product_code=old_code).first()
+        if register:
+            register.product_code = pim_product.code
+            register.save(update_fields=["product_code"])
 
 
 class ProductVariantCreateSerializer(serializers.ModelSerializer):
@@ -428,6 +480,56 @@ class ProductVariantCreateSerializer(serializers.ModelSerializer):
                     value_number=av.get("value_number"),
                     value_boolean=av.get("value_boolean"),
                 )
+        return variant
+
+    def update(self, instance, validated_data):
+        av_data = validated_data.pop("attribute_values", None)
+        old_sku = instance.sku
+
+        variant = super().update(instance, validated_data)
+
+        if av_data is not None:
+            VariantAttributeValue.objects.filter(variant=variant).delete()
+            for av in av_data:
+                attribute_id = av.get("attribute")
+                if attribute_id:
+                    VariantAttributeValue.objects.create(
+                        variant=variant,
+                        attribute_id=attribute_id,
+                        value_text=av.get("value_text", ""),
+                        value_number=av.get("value_number"),
+                        value_boolean=av.get("value_boolean"),
+                    )
+
+        try:
+            from products_pim.services.sync_service import PIMSyncService
+            PIMSyncService.sync_variant_to_operational_product(variant)
+        except ImportError:
+            pass
+
+        # If SKU was changed, update Operational and Register products
+        if old_sku and old_sku != variant.sku:
+            try:
+                from products_core.models import Product as CoreProduct
+                from subscriptions.models import Product as RegisterProduct
+                
+                # Update Core Product SKU and product_code
+                core = variant.operational_product
+                if not core:
+                    core = CoreProduct.objects.filter(product_code=old_sku).first()
+                if core:
+                    core.sku = variant.sku
+                    core.product_code = variant.sku
+                    core.save(update_fields=["sku", "product_code"])
+                    
+                # Update Register Product
+                register = RegisterProduct.objects.filter(product_code=old_sku).first()
+                if register:
+                    register.product_code = variant.sku
+                    register.save(update_fields=["product_code"])
+            except Exception:
+                pass
+
         return variant
 
 from products_core.models import ProductRelationship
@@ -460,6 +562,10 @@ AR_MODEL_MAX_BYTES = 25 * 1024 * 1024  # matches nginx client_max_body_size
 
 def _check_model_file(upload, *, suffix, magic, label):
     """Extension + magic-byte check so a renamed JPG/ZIP can't pose as a 3D model."""
+    if isinstance(upload, str):
+        if not upload.lower().endswith(suffix):
+            raise serializers.ValidationError(f"{label} URL must end in {suffix}")
+        return
     if not upload.name.lower().endswith(suffix):
         raise serializers.ValidationError(f"{label} must be a {suffix} file.")
     if upload.size > AR_MODEL_MAX_BYTES:
@@ -502,9 +608,27 @@ class ProductMediaItemSerializer(serializers.ModelSerializer):
 
     def _absolute(self, field_file):
         request = self.context.get("request")
-        if field_file and request:
-            return request.build_absolute_uri(field_file.url)
-        return str(field_file) if field_file else None
+        if not field_file:
+            return None
+            
+        if isinstance(field_file, str):
+            val = field_file
+        else:
+            try:
+                val = field_file.url
+            except Exception:
+                return None
+                
+        if val.startswith("http://") or val.startswith("https://"):
+            pass
+        elif not val.startswith("/"):
+            from django.conf import settings
+            media_url = getattr(settings, 'MEDIA_URL', '/media/')
+            val = f"{media_url}{val}"
+            
+        if request:
+            return request.build_absolute_uri(val)
+        return val
 
     def get_file_url(self, obj):
         return self._absolute(obj.file)

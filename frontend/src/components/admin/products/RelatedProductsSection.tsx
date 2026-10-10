@@ -595,7 +595,7 @@ export default function RelatedProductsSection({
                         >
                           <option value="">All Variants (Base Product)</option>
                           {variants.map(v => (
-                            <option key={v.id} value={v.id}>{v.variant_label} ({v.sku})</option>
+                            <option key={v.id} value={v.id}>{v.variant_label}</option>
                           ))}
                         </select>
                       </label>
@@ -611,7 +611,7 @@ export default function RelatedProductsSection({
                         >
                           <option value="">Base Product (Any Variant)</option>
                           {relatedProductVariants.map(v => (
-                            <option key={v.id} value={v.id}>{v.variant_label} ({v.sku})</option>
+                            <option key={v.id} value={v.id}>{v.variant_label}</option>
                           ))}
                         </select>
                       </label>
@@ -707,7 +707,7 @@ export default function RelatedProductsSection({
                     >
                       <option value="">All Variants (Base Product)</option>
                       {variants.map(v => (
-                        <option key={v.id} value={v.id}>{v.variant_label} ({v.sku})</option>
+                        <option key={v.id} value={v.id}>{v.variant_label}</option>
                       ))}
                     </select>
                   </label>

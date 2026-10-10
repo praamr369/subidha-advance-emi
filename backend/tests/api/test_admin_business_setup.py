@@ -29,6 +29,7 @@ class AdminBusinessSetupApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_business_profile_enforces_single_active_profile(self):
+        BusinessProfile.objects.all().delete()
         BusinessProfile.objects.create(legal_name="Subidha Furniture", is_active=True)
         second = BusinessProfile(legal_name="Other Profile", is_active=True)
         with self.assertRaises(ValidationError):
@@ -37,6 +38,7 @@ class AdminBusinessSetupApiTests(APITestCase):
     def test_checklist_reports_ready_when_required_items_complete(self):
         self.client.force_authenticate(self.admin)
 
+        BusinessProfile.objects.all().delete()
         BusinessProfile.objects.create(legal_name="Subidha Furniture", is_active=True)
 
         branch = Branch.objects.filter(is_primary=True).first()

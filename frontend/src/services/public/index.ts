@@ -177,6 +177,7 @@ export type PublicProduct = {
   }>;
   /** Cash / EMI / rent / lease pricing with live offer discounts applied. */
   scheme_pricing?: ProductSchemePricing | null;
+  rent_yield_estimates?: { short_tenure_min: string; short_tenure_max: string; long_tenure_min: string; long_tenure_max: string } | null;
 };
 
 /** One selectable tenure within a scheme. */
@@ -217,6 +218,7 @@ export type SchemePricingRules = {
   tenure_presets: number[];
   deposit_schemes: PublicScheme[];
   deposit_bands: Array<{ up_to: string | null; percent: string }>;
+  monthly_yield_percent?: Partial<Record<"RENT" | "LEASE", string>>;
 };
 
 export type ProductSchemePricing = {
@@ -228,6 +230,7 @@ export type ProductSchemePricing = {
   cash_has_discount: boolean;
   lowest_monthly: string | null;
   available_schemes: PublicScheme[];
+  has_active_batches: boolean;
   schemes: Partial<Record<PublicScheme, SchemeQuote>>;
   rules: SchemePricingRules;
 };

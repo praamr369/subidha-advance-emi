@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -76,8 +77,6 @@ export default function AdminCrmPartyDetailPage() {
   const partyId = Number(params?.id || 0);
 
   const [payload, setPayload] = useState<PartyDetailResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -98,42 +97,45 @@ export default function AdminCrmPartyDetailPage() {
     is_active: true,
   });
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      try {
-        if (mode === "initial") setLoading(true);
-        else setRefreshing(true);
-        const next = await getCrmParty(partyId);
-        setPayload(next);
-        setPartyForm({
-          display_name: next.party.display_name || "",
-          party_kind: next.party.party_kind || "PERSON",
-          primary_phone: next.party.primary_phone || "",
-          primary_email: next.party.primary_email || "",
-          city: next.party.city || "",
-          notes_summary: next.party.notes_summary || "",
-          is_active: Boolean(next.party.is_active),
-        });
-        setError(null);
-      } catch (err) {
-        setPayload(null);
-        setError(toErrorMessage(err));
-      } finally {
-        if (mode === "initial") setLoading(false);
-        else setRefreshing(false);
-      }
-    },
-    [partyId]
-  );
+  const query = useQuery({
+    queryKey: ['party-detail', partyId],
+    queryFn: () => getCrmParty(partyId),
+    enabled: !!partyId,
+  });
+
+  const loading = query.isLoading && !!partyId;
+  const refreshing = query.isFetching && !query.isLoading;
+
+  useEffect(() => {
+    if (query.data) {
+      setPayload(query.data);
+      setPartyForm({
+        display_name: query.data.party.display_name || "",
+        party_kind: query.data.party.party_kind || "PERSON",
+        primary_phone: query.data.party.primary_phone || "",
+        primary_email: query.data.party.primary_email || "",
+        city: query.data.party.city || "",
+        notes_summary: query.data.party.notes_summary || "",
+        is_active: Boolean(query.data.party.is_active),
+      });
+      setError(null);
+    }
+  }, [query.data]);
 
   useEffect(() => {
     if (!partyId) {
       setError("Party id is invalid.");
-      setLoading(false);
       return;
     }
-    void loadPage("initial");
-  }, [loadPage, partyId]);
+    if (query.error) {
+      setPayload(null);
+      setError(toErrorMessage(query.error));
+    }
+  }, [query.error, partyId]);
+
+  const loadPage = useCallback(async () => {
+    await query.refetch();
+  }, [query]);
 
   const quickLinks = useMemo(() => {
     if (!payload) return [];
@@ -185,7 +187,7 @@ export default function AdminCrmPartyDetailPage() {
         create_follow_up_reminder: true,
       });
       setNotice("Party interaction recorded.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(toErrorMessage(err));
     } finally {
@@ -199,7 +201,7 @@ export default function AdminCrmPartyDetailPage() {
       setNotice(null);
       await updatePartyInteractionStatus(interactionId, status);
       setNotice(`Interaction marked ${status}.`);
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(toErrorMessage(err));
     } finally {
@@ -269,7 +271,7 @@ export default function AdminCrmPartyDetailPage() {
           <ErrorState
             title="Unable to load party timeline"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 
@@ -326,7 +328,7 @@ export default function AdminCrmPartyDetailPage() {
                 action={
                   <button
                     type="button"
-                    onClick={() => void loadPage("refresh")}
+                    onClick={() => void loadPage()}
                     disabled={refreshing}
                     className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-60"
                   >

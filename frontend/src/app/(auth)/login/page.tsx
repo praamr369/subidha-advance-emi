@@ -1,7 +1,7 @@
 // frontend/src/app/(auth)/login/page.tsx
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
 import {
   Eye,
@@ -53,7 +53,8 @@ function toMessage(error: unknown): string {
 function isExternalUrl(target: string): boolean {
   return /^https?:\/\//i.test(target);
 }
-export default function LoginPage() {
+
+function LoginContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -66,6 +67,8 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mfaRequired, setMfaRequired] = useState(false);
+  const [mfaCode, setMfaCode] = useState("");
 
   const nextUrl = useMemo(() => {
     const next = searchParams.get("next");
@@ -98,6 +101,7 @@ export default function LoginPage() {
       const response = await loginRequest({
         identifier: identifier.trim(),
         password,
+        mfa_code: mfaRequired ? mfaCode : undefined,
       });
 
       const accessToken = response.access;
@@ -136,7 +140,13 @@ export default function LoginPage() {
 
       router.replace(target);
     } catch (err) {
-      setError(toMessage(err));
+      const msg = toMessage(err);
+      if (msg === "MFA code is required.") {
+        setMfaRequired(true);
+        setError(null);
+      } else {
+        setError(msg);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -150,6 +160,29 @@ export default function LoginPage() {
       panelDescription={t("auth.login.panelDescription")}
     >
       <form onSubmit={handleSubmit} className="space-y-5">
+        {mfaRequired ? (
+          <div className="space-y-2">
+            <label htmlFor="mfaCode" className="text-sm font-medium text-foreground">
+              Authenticator Code (MFA)
+            </label>
+            <div className="relative">
+              <ShieldCheck className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                id="mfaCode"
+                name="mfaCode"
+                type="text"
+                autoComplete="one-time-code"
+                value={mfaCode}
+                onChange={(e) => setMfaCode(e.target.value)}
+                placeholder="6-digit code"
+                className="h-12 w-full rounded-xl border border-border bg-card pl-10 pr-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-[var(--ring)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
+                required
+                disabled={submitting}
+              />
+            </div>
+          </div>
+        ) : (
+          <>
         <div className="space-y-2">
           <label htmlFor="identifier" className="text-sm font-medium text-foreground">
             {t("auth.login.identifierLabel")}
@@ -227,6 +260,9 @@ export default function LoginPage() {
           </label>
         </div>
 
+          </>
+        )}
+
         {error ? (
           <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {error}
@@ -271,5 +307,13 @@ export default function LoginPage() {
         </div>
       </form>
     </AuthLayoutShell>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center p-4"><div className="animate-pulse">Loading login...</div></div>}>
+      <LoginContent />
+    </Suspense>
   );
 }

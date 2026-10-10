@@ -93,7 +93,7 @@ export default function WinnerSpotlight({
           </Link>
           <Link
             href={ROUTES.public.apply}
-            className="public-action-primary h-10 !min-h-0 px-4"
+            className="public-action-primary h-10 min-h-0! px-4"
           >
             Apply
           </Link>

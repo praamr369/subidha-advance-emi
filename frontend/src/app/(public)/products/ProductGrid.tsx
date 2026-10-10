@@ -331,6 +331,8 @@ export default function ProductGrid({
                 imageUrl={product.image || ""}
                 media={buildProductSlides(product)}
                 href={`/products/${product.product_code}`}
+                attributes={product.pim_attributes}
+                rentYieldEstimates={product.rent_yield_estimates}
               />
             );
           })}
@@ -395,7 +397,7 @@ function CatalogEmptyState() {
         <div className="flex flex-wrap justify-center gap-3 pt-2">
           <Link
             href={ROUTES.public.apply}
-            className="public-action-primary h-11 !min-h-0 justify-center px-5"
+            className="public-action-primary h-11 min-h-0! justify-center px-5"
           >
             Open enquiry form
           </Link>

@@ -4,7 +4,8 @@ import { formatRupee } from "@/lib/utils/currency";
 import Link from "next/link";
 import { RefreshCw, Package, Star } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
@@ -147,41 +148,25 @@ export default function CustomerSubscriptionsPage() {
   const statusFilter = (searchParams.get("status") || "").trim().toUpperCase();
   const currentPage = Math.max(Number(searchParams.get("page") || 1), 1);
 
-  const [rows, setRows] = useState<CustomerSubscription[]>([]);
-  const [count, setCount] = useState(0);
-  const [page, setPage] = useState(currentPage);
-  const [numPages, setNumPages] = useState(0);
-  const [hasNext, setHasNext] = useState(false);
-  const [hasPrevious, setHasPrevious] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const query = useQuery({
+    queryKey: ["customerSubscriptionsRegister", statusFilter, currentPage],
+    queryFn: () => listCustomerSubscriptionsRegister({
+      status: statusFilter || undefined,
+      page: currentPage,
+      pageSize: PAGE_SIZE,
+    })
+  });
 
-  const loadPage = useCallback(async () => {
-    setLoading(true);
-    try {
-      const payload: CustomerSubscriptionRegisterResponse =
-        await listCustomerSubscriptionsRegister({
-          status: statusFilter || undefined,
-          page: currentPage,
-          pageSize: PAGE_SIZE,
-        });
-      setRows(payload.results);
-      setCount(payload.count);
-      setPage(payload.page);
-      setNumPages(payload.num_pages);
-      setHasNext(payload.has_next);
-      setHasPrevious(payload.has_previous);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load subscriptions.");
-      setRows([]);
-      setCount(0);
-    } finally {
-      setLoading(false);
-    }
-  }, [currentPage, statusFilter]);
+  const rows = query.data?.results || [];
+  const count = query.data?.count || 0;
+  const page = query.data?.page || currentPage;
+  const numPages = query.data?.num_pages || 0;
+  const hasNext = query.data?.has_next || false;
+  const hasPrevious = query.data?.has_previous || false;
+  const loading = query.isLoading;
+  const error = query.error ? (query.error as Error).message : null;
 
-  useEffect(() => { void loadPage(); }, [loadPage]);
+  const loadPage = useCallback(async () => { await query.refetch(); }, [query]);
 
   const activeCount = useMemo(() => rows.filter((r) => (r.status || "").toUpperCase() === "ACTIVE").length, [rows]);
   const winnerCount = useMemo(

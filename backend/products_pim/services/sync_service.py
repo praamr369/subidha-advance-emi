@@ -4,6 +4,64 @@ from products_core.models import Product, ProductCategoryMaster, ProductSubcateg
 
 class PIMSyncService:
     @staticmethod
+    def get_variant_display_name(variant: ProductVariant) -> str:
+        pim_product = variant.product
+        attributes = []
+        for v_attr in variant.attribute_values.select_related('attribute').all():
+            val = v_attr.value_text
+            if not val and v_attr.value_number is not None:
+                val = str(v_attr.value_number).rstrip('0').rstrip('.')
+            if not val and v_attr.value_boolean is not None:
+                val = "Yes" if v_attr.value_boolean else "No"
+                
+            if val:
+                attributes.append(f"{v_attr.attribute.name}: {val}")
+                
+        if attributes:
+            return f"{pim_product.name} ({', '.join(attributes)})"
+        return pim_product.name
+
+    @staticmethod
+    @transaction.atomic
+    def rename_variant_sku(variant: ProductVariant, old_sku: str) -> ProductVariant:
+        """Synchronize an admin-approved SKU rename across PIM and operations.
+
+        Foreign-key history is preserved; only the human-readable identifier
+        fields are changed. The caller must have already validated the new SKU
+        on ``variant``.
+        """
+        new_sku = (variant.sku or "").strip()
+        old_sku = (old_sku or "").strip()
+        if not old_sku or old_sku == new_sku:
+            return variant
+
+        if ProductVariant.objects.exclude(pk=variant.pk).filter(sku=new_sku).exists():
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({"sku": "A variant already uses this SKU."})
+
+        from products_core.models import Product as CoreProduct
+        from products_pim.models import PimProduct
+
+        child = PimProduct.objects.filter(code=old_sku, parent_id=variant.product_id).first()
+        if child:
+            if PimProduct.objects.exclude(pk=child.pk).filter(code=new_sku).exists():
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({"sku": "A PIM product already uses this code."})
+            child.code = new_sku
+            child.save(update_fields=["code", "updated_at"])
+
+        operational = variant.operational_product
+        if operational:
+            if CoreProduct.objects.exclude(pk=operational.pk).filter(product_code=new_sku).exists():
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({"sku": "An operational product already uses this code."})
+            operational.product_code = new_sku
+            operational.sku = new_sku
+            operational.save(update_fields=["product_code", "sku"])
+
+        return variant
+
+    @staticmethod
     @transaction.atomic
     def sync_variant_to_operational_product(variant: ProductVariant) -> Product:
         """
@@ -21,7 +79,7 @@ class PIMSyncService:
             core_product, created = Product.objects.get_or_create(
                 product_code=variant.sku, # Using SKU as the operational product_code
                 defaults={
-                    "name": f"{pim_product.name} ({variant.sku})",
+                    "name": PIMSyncService.get_variant_display_name(variant),
                     "base_price": variant.price,
                 }
             )
@@ -30,30 +88,41 @@ class PIMSyncService:
             variant.save(update_fields=['operational_product'])
 
         # Update core_product fields
-        core_product.name = f"{pim_product.name} ({variant.sku})"
+        core_product.name = PIMSyncService.get_variant_display_name(variant)
         core_product.base_price = variant.price
+        
+        old_product_code = core_product.product_code
         core_product.sku = variant.sku
+        core_product.product_code = variant.sku
         core_product.is_active = variant.is_active
         if variant.image:
             core_product.image = variant.image
+            
+        # Sync brand and warranty from PIM Base Product
+        core_product.brand = pim_product.brand
+        core_product.warranty_enabled = pim_product.warranty_enabled
+        core_product.warranty_months_manufacturing = pim_product.warranty_months_manufacturing
+        core_product.warranty_months_structural = pim_product.warranty_months_structural
+        core_product.warranty_months_extended_max = pim_product.warranty_months_extended_max
+        core_product.extended_warranty_cost_percentage = pim_product.extended_warranty_cost_percentage
 
         
         # Try to sync category if names match, this is best-effort since models are separate
         if pim_product.category:
+            core_product.category = pim_product.category.name
             try:
                 cat = ProductCategoryMaster.objects.filter(name=pim_product.category.name).first()
                 if cat:
                     core_product.category_master = cat
-                    core_product.category = cat.name
             except Exception:
                 pass
                 
         if pim_product.subcategory:
+            core_product.subcategory = pim_product.subcategory.name
             try:
                 subcat = ProductSubcategoryMaster.objects.filter(name=pim_product.subcategory.name).first()
                 if subcat:
                     core_product.subcategory_master = subcat
-                    core_product.subcategory = subcat.name
             except Exception:
                 pass
 
@@ -86,5 +155,15 @@ class PIMSyncService:
             prepare_inventory_profile_for_product(product_id=core_product.id)
         except Exception:
             pass
+            
+        if old_product_code and old_product_code != variant.sku:
+            try:
+                from subscriptions.models import Product as RegisterProduct
+                register = RegisterProduct.objects.filter(product_code=old_product_code).first()
+                if register:
+                    register.product_code = variant.sku
+                    register.save(update_fields=["product_code"])
+            except Exception:
+                pass
 
         return core_product

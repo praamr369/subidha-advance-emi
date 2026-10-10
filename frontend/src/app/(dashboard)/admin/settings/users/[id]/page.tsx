@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -63,55 +64,149 @@ function InfoRow({
   );
 }
 
+
+import { useAuth } from "@/providers/AuthProvider";
+import { apiFetch } from "@/lib/api";
+
+function UserSessionsSection({ userId }: { userId: string }) {
+  const { user } = useAuth();
+  const accessToken = user?.accessToken;
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchSessions = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await apiFetch<any[]>(`/api/v1/auth/sessions/?user_id=${userId}`);
+      setSessions(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    if (accessToken) fetchSessions();
+  }, [fetchSessions, accessToken]);
+
+  const revokeAll = async () => {
+    if (!window.confirm("Force logout all devices?")) return;
+    try {
+      await apiFetch("/api/v1/auth/sessions/revoke-all/", {
+        method: "POST",
+        body: { user_id: userId }
+      });
+      fetchSessions();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const revokeSession = async (id: number) => {
+    if (!window.confirm("Force logout this device?")) return;
+    try {
+      await apiFetch(`/api/v1/auth/sessions/${id}/revoke/`, {
+        method: "POST",
+      });
+      fetchSessions();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  if (loading) return <LoadingBlock label="Loading active sessions..." />;
+
+  return (
+    <section className="rounded-xl border border-border bg-card p-5 shadow-sm mt-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-foreground">Active Sessions</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Manage active logins for this user.</p>
+        </div>
+        <button onClick={revokeAll} className="inline-flex items-center rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-100">
+          Force Logout of All Devices
+        </button>
+      </div>
+      <div className="mt-4 overflow-x-auto rounded-xl border border-border">
+        <table className="min-w-full divide-y divide-border">
+          <thead className="bg-muted/40">
+            <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
+              <th className="px-4 py-3 font-medium">Device</th>
+              <th className="px-4 py-3 font-medium">IP Address</th>
+              <th className="px-4 py-3 font-medium">Last Active</th>
+              <th className="px-4 py-3 font-medium">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border text-sm">
+            {sessions.map(s => (
+              <tr key={s.id}>
+                <td className="px-4 py-3">{s.device_name || "Unknown"}</td>
+                <td className="px-4 py-3">{s.ip_address || "—"}</td>
+                <td className="px-4 py-3">{new Date(s.last_active_at).toLocaleString()}</td>
+                <td className="px-4 py-3">
+                  <button onClick={() => revokeSession(s.id)} className="text-red-600 hover:underline">Revoke</button>
+                </td>
+              </tr>
+            ))}
+            {sessions.length === 0 && (
+              <tr><td colSpan={4} className="px-4 py-3 text-center text-muted-foreground">No active sessions</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 export default function AdminInternalUserDetailPage() {
   const params = useParams<{ id: string }>();
   const userId = params?.id;
 
   const [user, setUser] = useState<InternalUserRecord | null>(null);
   const [auditRows, setAuditRows] = useState<InternalUserAuditEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<"activate" | "deactivate" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (!userId) return;
-
-      if (mode === "initial") {
-        setLoading(true);
-      } else {
-        setRefreshing(true);
-      }
-
-      try {
-        setError(null);
-
-        const [userPayload, auditPayload] = await Promise.all([
-          getInternalUser(userId),
-          getInternalUserAudit(userId),
-        ]);
-
-        setUser(userPayload);
-        setAuditRows(auditPayload.results || []);
-      } catch (err) {
-        setError(toMessage(err));
-        setUser(null);
-        setAuditRows([]);
-      } finally {
-        if (mode === "initial") {
-          setLoading(false);
-        } else {
-          setRefreshing(false);
-        }
-      }
+  const query = useQuery({
+    queryKey: ['internal-user', userId],
+    queryFn: async () => {
+      if (!userId) throw new Error("No user ID");
+      const [userPayload, auditPayload] = await Promise.all([
+        getInternalUser(userId),
+        getInternalUserAudit(userId),
+      ]);
+      return { userPayload, auditPayload };
     },
-    [userId]
-  );
+    enabled: !!userId,
+  });
+
+  const loading = query.isLoading && !!userId;
+  const refreshing = query.isFetching && !query.isLoading;
 
   useEffect(() => {
-    void loadPage("initial");
+    if (query.data) {
+      setUser(query.data.userPayload);
+      setAuditRows(query.data.auditPayload.results || []);
+      setError(null);
+    }
+  }, [query.data]);
+
+  useEffect(() => {
+    if (query.error) {
+      setError(toMessage(query.error));
+      setUser(null);
+      setAuditRows([]);
+    }
+  }, [query.error]);
+
+  const loadPage = useCallback(async () => {
+    await query.refetch();
+  }, [query]);
+
+  useEffect(() => {
+    void loadPage();
   }, [loadPage]);
 
   const stats = useMemo(() => {
@@ -172,7 +267,7 @@ export default function AdminInternalUserDetailPage() {
       const updated = await activateInternalUser(user.id);
       setUser(updated);
       setMessage(`${updated.username} activated successfully.`);
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(toMessage(err));
     } finally {
@@ -196,7 +291,7 @@ export default function AdminInternalUserDetailPage() {
       const updated = await deactivateInternalUser(user.id);
       setUser(updated);
       setMessage(`${updated.username} deactivated successfully.`);
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(toMessage(err));
     } finally {
@@ -269,7 +364,7 @@ export default function AdminInternalUserDetailPage() {
         <ErrorState
           title="Unable to load managed user detail"
           description={error}
-          onRetry={() => void loadPage("initial")}
+          onRetry={() => void loadPage()}
         />
       ) : null}
 
@@ -285,7 +380,7 @@ export default function AdminInternalUserDetailPage() {
           <section className="flex justify-end">
             <button
               type="button"
-              onClick={() => void loadPage("refresh")}
+              onClick={() => void loadPage()}
               disabled={refreshing || actionLoading !== null}
               className="inline-flex items-center rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -356,7 +451,7 @@ export default function AdminInternalUserDetailPage() {
 
               <button
                 type="button"
-                onClick={() => void loadPage("refresh")}
+                onClick={() => void loadPage()}
                 disabled={refreshing || actionLoading !== null}
                 className="inline-flex items-center rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
               >
@@ -404,6 +499,7 @@ export default function AdminInternalUserDetailPage() {
           </section>
         </>
       ) : null}
+      <UserSessionsSection userId={userId} />
     </ERPPageShell>
   );
 }

@@ -1,7 +1,8 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Layers, Box, Wrench, Shapes, RefreshCw, ExternalLink, Hash } from "lucide-react";
 
 import ERPDataToolbar from "@/components/erp/ERPDataToolbar";
@@ -94,7 +95,7 @@ function CatalogTab({ catalogOptions, loadPage, saving, setSaving, error, setErr
     try {
       await createProductCategoryMaster({ name: categoryName.trim(), description: categoryDescription.trim() || undefined, is_active: true });
       setCategoryName(""); setCategoryDescription(""); setMessage("Category master created.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) { setError(toErrorMessage(err)); } finally { setSaving(null); }
   }
 
@@ -106,7 +107,7 @@ function CatalogTab({ catalogOptions, loadPage, saving, setSaving, error, setErr
     try {
       await createProductSubcategoryMaster({ category: Number(subcategoryCategoryId), name: subcategoryName.trim(), description: subcategoryDescription.trim() || undefined, is_active: true });
       setSubcategoryName(""); setSubcategoryDescription(""); setMessage("Subcategory master created.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) { setError(toErrorMessage(err)); } finally { setSaving(null); }
   }
 
@@ -118,7 +119,7 @@ function CatalogTab({ catalogOptions, loadPage, saving, setSaving, error, setErr
     try {
       await createProductUnitMaster({ code: unitCode.trim().toUpperCase(), name: unitName.trim(), description: unitDescription.trim() || undefined, is_active: true });
       setUnitCode("PCS"); setUnitName("Pieces"); setUnitDescription(""); setMessage("Unit master created.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) { setError(toErrorMessage(err)); } finally { setSaving(null); }
   }
 
@@ -370,31 +371,32 @@ function MaterialsTab() {
 export default function AdminProductMastersPage() {
   const [currentTab, setCurrentTab] = useState<"catalog" | "pim" | "bom" | "materials">("catalog");
   const [catalogOptions, setCatalogOptions] = useState<ProductCatalogOptions>(EMPTY_CATALOG_OPTIONS);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState<null | "category" | "subcategory" | "unit">(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  async function loadPage(mode: "initial" | "refresh" = "initial") {
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
-    try {
-      const payload = await getProductCatalogOptions();
-      setCatalogOptions(payload);
-      setError(null);
-    } catch (err) {
-      setError(toErrorMessage(err));
-      if (mode === "initial") setCatalogOptions(EMPTY_CATALOG_OPTIONS);
-    } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
-    }
-  }
+  const query = useQuery({
+    queryKey: ["admin_product_masters"],
+    queryFn: async () => {
+      return await getProductCatalogOptions();
+    },
+  });
 
   useEffect(() => {
-    void loadPage("initial");
-  }, []);
+    if (query.data) {
+      setCatalogOptions(query.data);
+      setError(null);
+    } else if (query.isError) {
+      setCatalogOptions(EMPTY_CATALOG_OPTIONS);
+      setError(toErrorMessage(query.error));
+    }
+  }, [query.data, query.isError, query.error]);
+
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
+    await query.refetch();
+  }, [query]);
 
   const tabs = [
     { id: "catalog", label: "Catalog Masters", icon: <Layers className="h-4 w-4" /> },
@@ -436,14 +438,14 @@ export default function AdminProductMastersPage() {
             </div>
           }
           right={
-            <button type="button" onClick={() => void loadPage("refresh")} disabled={refreshing || loading} className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium transition hover:bg-muted disabled:opacity-60 shrink-0">
+            <button type="button" onClick={() => void loadPage()} disabled={refreshing || loading} className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium transition hover:bg-muted disabled:opacity-60 shrink-0">
               <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} /> Refresh
             </button>
           }
         />
 
         {message && <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{message}</div>}
-        {error && <ERPErrorState title="Error" description={error} onRetry={() => void loadPage("initial")} />}
+        {error && <ERPErrorState title="Error" description={error} onRetry={() => void loadPage()} />}
 
         {loading ? (
           <ERPLoadingState label="Loading masters hub..." />

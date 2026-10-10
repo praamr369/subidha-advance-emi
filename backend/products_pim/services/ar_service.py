@@ -99,8 +99,8 @@ def resolve_ar_model(product, request, media_items=None):
         item = models_3d[0]
         return {
             "kind": "MODEL",
-            "src": _absolute(request, item.file.url),
-            "ios_src": _absolute(request, item.ios_file.url) if item.ios_file else None,
+            "src": _absolute(request, item.file),
+            "ios_src": _absolute(request, item.ios_file) if item.ios_file else None,
             "title": item.title or "",
             "size_cm": size_cm,
         }

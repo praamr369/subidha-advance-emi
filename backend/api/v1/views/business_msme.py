@@ -43,7 +43,7 @@ def _row(profile: BusinessProfile | None) -> dict:
 @api_view(["GET", "PATCH"])
 @permission_classes([IsAdmin])
 def business_msme_view(request):
-    profile = BusinessProfile.objects.order_by("pk").first()
+    profile = BusinessProfile.get_current()
 
     if request.method == "GET":
         return Response(_row(profile))

@@ -33,15 +33,12 @@ interface AttrPayloadItem {
 function buildAttrPayload(attrs: PimCategoryAttribute[], values: AttributeValues): AttrPayloadItem[] {
   const result: AttrPayloadItem[] = [];
   for (const attr of attrs) {
-    const v = values[attr.id];
-    if (!v) continue;
-    const hasValue = v.value_text !== "" || v.value_number !== "" || v.value_boolean !== null || v.value_date !== "";
-    if (!hasValue) continue;
+    const v = values[attr.id] || { value_text: "", value_number: "", value_boolean: null, value_date: "" };
     result.push({
       attribute: attr.id,
       value_text: v.value_text || "",
       value_number: v.value_number ? Number(v.value_number) : null,
-      value_boolean: v.value_boolean,
+      value_boolean: v.value_boolean !== undefined ? v.value_boolean : null,
       value_date: v.value_date || null,
     });
   }
@@ -399,13 +396,24 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
   const [product, setProduct] = useState<PimProduct | null>(null);
 
   const [code, setCode] = useState("");
+  const [brand, setBrand] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [categoryId, setCategoryId] = useState<number | "">("");
   const [subcategoryId, setSubcategoryId] = useState<number | "">("");
   const [basePrice, setBasePrice] = useState("");
   const [costPrice, setCostPrice] = useState("");
+  const [rentYieldPercent, setRentYieldPercent] = useState("");
+  const [leaseYieldPercent, setLeaseYieldPercent] = useState("");
   const [isPublished, setIsPublished] = useState(false);
+  
+  // Warranty State
+  const [warrantyEnabled, setWarrantyEnabled] = useState(true);
+  const [warrantyMonthsManufacturing, setWarrantyMonthsManufacturing] = useState<number>(12);
+  const [warrantyMonthsStructural, setWarrantyMonthsStructural] = useState<number>(36);
+  const [warrantyMonthsExtendedMax, setWarrantyMonthsExtendedMax] = useState<number>(12);
+  const [extendedWarrantyCostPercentage, setExtendedWarrantyCostPercentage] = useState<string>("7.5");
+
   const [attrValues, setAttrValues] = useState<AttributeValues>({});
   const [variants, setVariants] = useState(product?.variants ?? []);
 
@@ -483,17 +491,73 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
   }, []);
 
   useEffect(() => {
-    if (!categoryId) { setSubcategories([]); setAttributes([]); return; }
+    if (!categoryId) { setSubcategories([]); return; }
     pimService.getSubcategories(Number(categoryId)).then(setSubcategories).catch(() => {});
-    pimService.getAttributes(Number(categoryId), undefined).then(setAttributes).catch(() => {});
   }, [categoryId]);
 
   useEffect(() => {
-    if (!categoryId) return;
-    pimService.getAttributes(Number(categoryId), subcategoryId ? Number(subcategoryId) : undefined)
-      .then(setAttributes)
+    let active = true;
+    const cid = categoryId ? Number(categoryId) : undefined;
+    const sid = subcategoryId ? Number(subcategoryId) : undefined;
+    
+    const promise = cid ? pimService.getAttributes(cid, sid) : Promise.resolve([]);
+    
+    promise.then((fetchedAttrs) => {
+        if (!active) return;
+        setAttributes(prev => {
+          const categoryAttrIds = new Set(fetchedAttrs.map(a => a.id));
+          const activeFetchedAttrs = fetchedAttrs.filter(a => !removedAttrIds.has(a.id));
+          
+          if (productId && product) {
+            const savedIds = new Set((product.attributes || []).map((a) => a.attribute));
+            const matchedAttrs = fetchedAttrs.filter((a) => savedIds.has(a.id) && !removedAttrIds.has(a.id));
+            
+            const extraAttrs = (product.attributes || [])
+              .filter((a) => !categoryAttrIds.has(a.attribute) && !removedAttrIds.has(a.attribute))
+              .map((a) => {
+                const prevAttr = prev.find(p => p.id === a.attribute);
+                if (prevAttr) return prevAttr;
+                return {
+                  id: a.attribute,
+                  name: a.attribute_name,
+                  slug: a.attribute_slug,
+                  data_type: a.data_type as PimCategoryAttribute["data_type"],
+                  is_required: false,
+                  is_variant_defining: false,
+                  min_value: null,
+                  max_value: null,
+                  display_order: 999,
+                  options: []
+                } as PimCategoryAttribute;
+              });
+              
+            if (product.category === cid && (product.subcategory || null) === (sid || null)) {
+              // MATCH BRANCH: The category is unchanged. We only show saved attributes + manually added ones.
+              // So sessionExtraAttrs must include ALL unsaved attributes from `prev`, even if they belong to the category.
+              const sessionExtraAttrs = prev.filter(a => !savedIds.has(a.id) && !removedAttrIds.has(a.id));
+              
+              // Ensure no duplicates in case a manual addition is somehow in matchedAttrs
+              const finalAttrs = [...matchedAttrs, ...extraAttrs];
+              const finalIds = new Set(finalAttrs.map(a => a.id));
+              sessionExtraAttrs.forEach(a => {
+                if (!finalIds.has(a.id)) finalAttrs.push(a);
+              });
+              return finalAttrs;
+            } else {
+              // MISMATCH BRANCH: Category changed. We show ALL category attributes + old product extra attrs + unsaved manual additions.
+              const sessionExtraAttrs = prev.filter(a => !categoryAttrIds.has(a.id) && !savedIds.has(a.id) && !removedAttrIds.has(a.id));
+              return [...activeFetchedAttrs, ...extraAttrs, ...sessionExtraAttrs];
+            }
+          } else {
+            // NO PRODUCT BRANCH: Creating a new product. Show ALL category attributes + unsaved manual additions.
+            const sessionExtraAttrs = prev.filter(a => !categoryAttrIds.has(a.id) && !removedAttrIds.has(a.id));
+            return [...activeFetchedAttrs, ...sessionExtraAttrs];
+          }
+        });
+      })
       .catch(() => {});
-  }, [categoryId, subcategoryId]);
+    return () => { active = false; };
+  }, [categoryId, subcategoryId, productId, product, removedAttrIds]);
 
   useEffect(() => {
     if (!productId) { setLoading(false); return; }
@@ -509,16 +573,24 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
         if (stale) return;
         setProduct(p);
         setCode(p.code);
+        setBrand(p.brand ?? "");
         setName(p.name);
         setDescription(p.description ?? "");
         setCategoryId(p.category);
         setSubcategoryId(p.subcategory ?? "");
         setBasePrice(p.base_price);
         setCostPrice(p.cost_price ?? "");
+        setRentYieldPercent(p.rent_monthly_yield_percent ?? "");
+        setLeaseYieldPercent(p.lease_monthly_yield_percent ?? "");
         setArWidth(p.ar_width_cm ?? "");
         setArDepth(p.ar_depth_cm ?? "");
         setArHeight(p.ar_height_cm ?? "");
         setIsPublished(p.is_published);
+        setWarrantyEnabled(p.warranty_enabled ?? true);
+        setWarrantyMonthsManufacturing(p.warranty_months_manufacturing ?? 12);
+        setWarrantyMonthsStructural(p.warranty_months_structural ?? 36);
+        setWarrantyMonthsExtendedMax(p.warranty_months_extended_max ?? 12);
+        setExtendedWarrantyCostPercentage(p.extended_warranty_cost_percentage?.toString() ?? "7.5");
         setVariants(p.variants ?? []);
         // Restore operator-locked attributes from backend — only keep IDs
         // that actually have a saved value (backend also enforces this on save,
@@ -670,18 +742,31 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
         description,
         category: Number(categoryId),
         subcategory: subcategoryId ? Number(subcategoryId) : null,
+        brand,
+        warranty_enabled: warrantyEnabled,
+        warranty_months_manufacturing: warrantyMonthsManufacturing,
+        warranty_months_structural: warrantyMonthsStructural,
+        warranty_months_extended_max: warrantyMonthsExtendedMax,
+        extended_warranty_cost_percentage: extendedWarrantyCostPercentage,
         base_price: basePrice || "0",
         cost_price: costPrice || undefined,
+        rent_monthly_yield_percent: rentYieldPercent || null,
+        lease_monthly_yield_percent: leaseYieldPercent || null,
         ar_width_cm: arWidth || null,
         ar_depth_cm: arDepth || null,
         ar_height_cm: arHeight || null,
         locked_attributes: Array.from(lockedAttributes),
         attributes: buildAttrPayload(attributes, attrValues),
-        ...(removedAttrIds.size > 0 ? { remove_attributes: Array.from(removedAttrIds) } : {}),
+        ...(removedAttrIds.size > 0 ? {
+          remove_attributes: Array.from(removedAttrIds)
+        } : {}),
         ...(!isEdit ? { product_type: defaultProductType } : {}),
       };
       if (isEdit && productId) {
         await pimService.updateProduct(productId, payload);
+        const updatedProduct = await pimService.getProductWithAttributes(productId);
+        setProduct(updatedProduct);
+        await refreshVariants();
         setRemovedAttrIds(new Set());
         setSuccessMsg("Product saved successfully.");
         setTimeout(() => setSuccessMsg(null), 3000);
@@ -710,8 +795,10 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
       const result = await pimService.adoptOrphanVariants(productId);
       setAdoptResult(result.message);
       if (result.adopted.length > 0) await refreshVariants();
-    } catch {
-      setAdoptResult("Adopt failed — check backend logs");
+    } catch (err: unknown) {
+      const e = err as { body?: { message?: string }, message?: string };
+      const msg = e?.body?.message || e?.message || "Adopt failed — check backend logs";
+      setAdoptResult(`Adopt failed: ${msg}`);
     } finally {
       setAdopting(false);
     }
@@ -799,7 +886,7 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
         <div className="rounded-xl border border-border bg-card px-5 py-4">
           <div className="flex flex-wrap items-start gap-4">
             <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="flex-shrink-0 rounded-lg bg-muted p-2.5">
+              <div className="shrink-0 rounded-lg bg-muted p-2.5">
                 <Box className="h-5 w-5 text-muted-foreground" />
               </div>
               <div className="min-w-0">
@@ -829,7 +916,7 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
               </div>
             </div>
             {variants.length > 0 && (
-              <div className="flex flex-shrink-0 flex-col items-end gap-0.5 text-right">
+              <div className="flex shrink-0 flex-col items-end gap-0.5 text-right">
                 <div className="text-lg font-bold tabular-nums leading-none">{variants.length}</div>
                 <div className="text-xs text-muted-foreground">
                   variant{variants.length !== 1 ? "s" : ""} linked
@@ -872,6 +959,15 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Teak Queen Bed with Storage"
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label htmlFor="f-product-brand" className="block text-sm font-medium mb-1">Brand</label>
+            <input id="f-product-brand"
+              className="w-full rounded-md border px-3 py-2 text-sm bg-background"
+              value={brand}
+              onChange={(e) => setBrand(e.target.value)}
+              placeholder="e.g. Subidha Furniture"
             />
           </div>
           <div className="sm:col-span-2">
@@ -939,6 +1035,68 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
             )}
           </div>
         </div>
+      </section>
+
+      {/* Warranty Information */}
+      <section className="rounded-lg border p-5 space-y-4 bg-muted/20">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold">Warranty Information</h3>
+          <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+            <input 
+              type="checkbox" 
+              checked={warrantyEnabled} 
+              onChange={(e) => setWarrantyEnabled(e.target.checked)} 
+              className="accent-primary h-4 w-4 rounded" 
+            />
+            Enable Warranty
+          </label>
+        </div>
+        
+        {warrantyEnabled && (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4 pt-2">
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">Manufacturing (Months)</label>
+              <input
+                type="number"
+                min="0"
+                className="w-full rounded-md border px-3 py-2 text-sm bg-background"
+                value={warrantyMonthsManufacturing}
+                onChange={(e) => setWarrantyMonthsManufacturing(Number(e.target.value))}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">Structural (Months)</label>
+              <input
+                type="number"
+                min="0"
+                className="w-full rounded-md border px-3 py-2 text-sm bg-background"
+                value={warrantyMonthsStructural}
+                onChange={(e) => setWarrantyMonthsStructural(Number(e.target.value))}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">Extended Max (Months)</label>
+              <input
+                type="number"
+                min="0"
+                className="w-full rounded-md border px-3 py-2 text-sm bg-background"
+                value={warrantyMonthsExtendedMax}
+                onChange={(e) => setWarrantyMonthsExtendedMax(Number(e.target.value))}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">Extended Cost (%)</label>
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                className="w-full rounded-md border px-3 py-2 text-sm bg-background"
+                value={extendedWarrantyCostPercentage}
+                onChange={(e) => setExtendedWarrantyCostPercentage(e.target.value)}
+              />
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Category */}
@@ -1028,6 +1186,26 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
         </div>
       </section>
 
+      {/* Rent / Lease pricing */}
+      <section className="rounded-lg border p-5 space-y-4">
+        <div>
+          <h3 className="font-semibold">Rent / Lease pricing</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Monthly amount is calculated from product price × yield rate. Leave blank to use the business default rate.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <label className="block text-sm font-medium">
+            Rent monthly yield rate (%)
+            <input type="number" min="0.01" max="100" step="0.01" value={rentYieldPercent} onChange={(e) => setRentYieldPercent(e.target.value)} placeholder="Business default" className="mt-1 w-full rounded-md border px-3 py-2 text-sm bg-background" />
+          </label>
+          <label className="block text-sm font-medium">
+            Lease monthly yield rate (%)
+            <input type="number" min="0.01" max="100" step="0.01" value={leaseYieldPercent} onChange={(e) => setLeaseYieldPercent(e.target.value)} placeholder="Business default" className="mt-1 w-full rounded-md border px-3 py-2 text-sm bg-background" />
+          </label>
+        </div>
+      </section>
+
       {/* Room view (AR) size */}
       <section className="rounded-lg border p-5 space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1084,7 +1262,7 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
       </section>
 
       {/* Dynamic Attributes */}
-      {categoryId && (
+      {true && (
         <section className="rounded-lg border p-5 space-y-4">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
@@ -1130,6 +1308,56 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
                 title="Add an existing attribute from the library"
               >
                 <Search className="h-3 w-3" /> Map Existing
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!productId) return;
+                  pendingFetchRef.current = null;
+                  setLoading(true);
+                  pimService.getProductWithAttributes(productId)
+                    .then((p) => {
+                      setProduct(p);
+                      setCode(p.code);
+                      setBrand(p.brand ?? "");
+                      setName(p.name);
+                      setDescription(p.description ?? "");
+                      setCategoryId(p.category);
+                      setSubcategoryId(p.subcategory ?? "");
+                      setBasePrice(p.base_price);
+                      setCostPrice(p.cost_price ?? "");
+                      setArWidth(p.ar_width_cm ?? "");
+                      setArDepth(p.ar_depth_cm ?? "");
+                      setArHeight(p.ar_height_cm ?? "");
+                      setIsPublished(p.is_published);
+                      setWarrantyEnabled(p.warranty_enabled ?? true);
+                      setWarrantyMonthsManufacturing(p.warranty_months_manufacturing ?? 12);
+                      setWarrantyMonthsStructural(p.warranty_months_structural ?? 36);
+                      setWarrantyMonthsExtendedMax(p.warranty_months_extended_max ?? 12);
+                      setExtendedWarrantyCostPercentage(p.extended_warranty_cost_percentage?.toString() ?? "7.5");
+                      setVariants(p.variants ?? []);
+                      const savedAttrIds = new Set((p.attributes ?? []).map((a) => a.attribute));
+                      const validLocks = (p.locked_attributes ?? []).filter((id) => savedAttrIds.has(id));
+                      setLockedAttributes(new Set(validLocks));
+                      const prefilled: AttributeValues = {};
+                      for (const a of p.attributes ?? []) {
+                        prefilled[a.attribute] = {
+                          value_text: a.value_text ?? "",
+                          value_number: a.value_number ?? "",
+                          value_boolean: a.value_boolean,
+                          value_date: a.value_date ?? "",
+                        };
+                      }
+                      setAttrValues(prefilled);
+                    })
+                    .catch(() => {})
+                    .finally(() => setLoading(false));
+                }}
+                disabled={saving || loading}
+                className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                title="Refresh product data"
+              >
+                <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} /> Refresh
               </button>
               <button
                 type="button"
@@ -1512,6 +1740,7 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
             </>
           )}
         </button>
+        
         <button
           type="button"
           onClick={() => router.push("/admin/pim/products")}

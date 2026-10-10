@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -91,7 +92,6 @@ export default function AdminPartnerDetailPage() {
   const partnerId = Number(params?.id || 0);
 
   const [partner, setPartner] = useState<PartnerDetail | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [segment, setSegment] = useState<Segment>("overview");
 
@@ -104,26 +104,34 @@ export default function AdminPartnerDetailPage() {
     msg: string;
   } | null>(null);
 
+  const { data: queryData, isLoading: loading, error: queryError, refetch } = useQuery({
+    queryKey: ["admin_partner_detail", partnerId],
+    queryFn: async () => {
+      if (!partnerId) throw new Error("No partner ID");
+      return await apiFetch<PartnerDetail>(`/admin/partners/${partnerId}/`);
+    },
+    enabled: !!partnerId,
+  });
+
   const loadPage = useCallback(async () => {
-    if (!partnerId) return;
-    setLoading(true);
-    try {
-      const payload = await apiFetch<PartnerDetail>(
-        `/admin/partners/${partnerId}/`
-      );
-      setPartner(payload);
-      setError(null);
-    } catch (err) {
-      setPartner(null);
-      setError(toErrorMessage(err));
-    } finally {
-      setLoading(false);
+    if (partnerId) {
+      await refetch();
     }
-  }, [partnerId]);
+  }, [refetch, partnerId]);
 
   useEffect(() => {
-    void loadPage();
-  }, [loadPage]);
+    if (queryData) {
+      setPartner(queryData);
+      setError(null);
+    }
+  }, [queryData]);
+
+  useEffect(() => {
+    if (queryError) {
+      setPartner(null);
+      setError(toErrorMessage(queryError));
+    }
+  }, [queryError]);
 
   const handleChangeUsername = useCallback(async () => {
     if (!partner?.id) return;

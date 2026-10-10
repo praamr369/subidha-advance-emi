@@ -24,6 +24,7 @@ from inventory.models import (
     PurchaseRequest,
     PurchaseRequestLine,
     PurchaseRequestStatus,
+    GoodsReceiptLine,
 )
 from inventory.services.audit_service import log_inventory_event
 from inventory.services.purchase_need_reconciliation_service import (
@@ -332,7 +333,6 @@ def post_vendor_bill(*, vendor_bill_id: int, posted_by=None):
 
     # Feature: Auto-generate PO and GR for legacy Vendor Bills to maintain accurate pipeline
     if not bill.purchase_order_id and not bill.goods_receipt_id:
-        from inventory.models import PurchaseOrder, PurchaseOrderStatus, PurchaseOrderLine, GoodsReceipt, GoodsReceiptStatus, GoodsReceiptLine
         # 1. Create Purchase Order
         po = PurchaseOrder.objects.create(
             po_no=f"PO-AUTO-{bill.bill_no}",

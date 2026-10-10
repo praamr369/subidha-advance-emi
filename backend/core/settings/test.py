@@ -38,3 +38,13 @@ DATABASES = {
 PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.MD5PasswordHasher",
 ]
+
+import sys
+
+# Disable migrations in tests to massively speed up test DB creation.
+# This prevents Django from running all the migrations sequentially (which is
+# painfully slow on SQLite) and instead just creates all tables directly from
+# the current state of the models (syncdb).
+is_makemigrations = any(arg in ["makemigrations", "check_model_field_drift"] for arg in sys.argv)
+if not is_makemigrations:
+    MIGRATION_MODULES = {app.split(".")[-1]: None for app in INSTALLED_APPS}

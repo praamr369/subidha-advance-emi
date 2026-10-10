@@ -26,6 +26,10 @@ KNOWN_500: dict[str, str] = {}
 
 @override_settings(REST_FRAMEWORK=_RF_NO_THROTTLE)
 class EndpointSmokeTest(APITestCase):
+    def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
+
     @classmethod
     def setUpTestData(cls):
         User = get_user_model()

@@ -27,6 +27,7 @@ export interface PimCategoryAttribute {
   is_variant_defining: boolean;
   min_value: string | null;
   max_value: string | null;
+  regex_validation?: string;
   display_order: number;
   options: PimAttributeOption[];
 }
@@ -86,6 +87,7 @@ export interface PimProduct {
   code: string;
   brand?: string;
   name: string;
+  full_name?: string;
   description: string;
   category: number;
   category_name: string;
@@ -93,6 +95,8 @@ export interface PimProduct {
   subcategory_name: string | null;
   base_price: string;
   cost_price: string | null;
+  rent_monthly_yield_percent?: string | null;
+  lease_monthly_yield_percent?: string | null;
   is_active: boolean;
   is_published: boolean;
   product_type?: "FINISHED_GOOD" | "RAW_MATERIAL" | "ACCESSORY" | "SERVICE";
@@ -117,6 +121,11 @@ export interface PimProduct {
   variant_attribute_values?: PimVariantAttributeValue[];
   created_at?: string;
   updated_at?: string;
+  warranty_enabled?: boolean;
+  warranty_months_manufacturing?: number;
+  warranty_months_structural?: number;
+  warranty_months_extended_max?: number;
+  extended_warranty_cost_percentage?: string | number;
 }
 
 export interface PimProductCreatePayload {
@@ -125,8 +134,11 @@ export interface PimProductCreatePayload {
   description?: string;
   category: number;
   subcategory?: number | null;
+  parent?: number | null;
   base_price: string;
   cost_price?: string;
+  rent_monthly_yield_percent?: string | null;
+  lease_monthly_yield_percent?: string | null;
   is_active?: boolean;
   is_published?: boolean;
   product_type?: "FINISHED_GOOD" | "RAW_MATERIAL" | "ACCESSORY" | "SERVICE";
@@ -135,6 +147,12 @@ export interface PimProductCreatePayload {
   ar_width_cm?: string | null;
   ar_depth_cm?: string | null;
   ar_height_cm?: string | null;
+  brand?: string;
+  warranty_enabled?: boolean;
+  warranty_months_manufacturing?: number;
+  warranty_months_structural?: number;
+  warranty_months_extended_max?: number;
+  extended_warranty_cost_percentage?: string | number;
   attributes?: {
     attribute: number;
     value_text?: string;
@@ -397,6 +415,7 @@ export const pimService = {
     variantId: number,
     data: {
       attribute_values?: { attribute: number; value_text?: string; value_number?: number | null; value_boolean?: boolean | null }[];
+      sku?: string;
       price?: string;
       cost_price?: string;
       barcode?: string;

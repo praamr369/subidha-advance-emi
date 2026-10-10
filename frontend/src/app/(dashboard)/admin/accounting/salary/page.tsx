@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
@@ -41,15 +42,52 @@ function toErrorMessage(error: unknown): string {
 }
 
 export default function AccountingSalaryPage() {
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [employees, setEmployees] = useState<EmployeeProfile[]>([]);
   const [salarySheets, setSalarySheets] = useState<SalarySheet[]>([]);
   const [salaryPayments, setSalaryPayments] = useState<SalaryPayment[]>([]);
   const [financeAccounts, setFinanceAccounts] = useState<FinanceAccount[]>([]);
   const [payrollPeriods, setPayrollPeriods] = useState<PayrollPeriod[]>([]);
+
+  const query = useQuery({
+    queryKey: ["salaryPageData"],
+    queryFn: async () => {
+      const [employeesPayload, salaryPayload, paymentsPayload, financePayload, periodsPayload] =
+        await Promise.all([
+          listEmployees({ is_active: 1 }),
+          listSalarySheets(),
+          listSalaryPayments(),
+          listFinanceAccounts({ is_active: 1 }),
+          listPayrollPeriods(),
+        ]);
+      return {
+        employees: employeesPayload.results,
+        salarySheets: salaryPayload.results,
+        salaryPayments: paymentsPayload.results,
+        financeAccounts: financePayload.results,
+        payrollPeriods: periodsPayload.results,
+      };
+    },
+  });
+
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const error = query.error ? toErrorMessage(query.error) : null;
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (query.data) {
+      setEmployees(query.data.employees);
+      setSalarySheets(query.data.salarySheets);
+      setSalaryPayments(query.data.salaryPayments);
+      setFinanceAccounts(query.data.financeAccounts);
+      setPayrollPeriods(query.data.payrollPeriods);
+    }
+  }, [query.data]);
+
+  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
+    await query.refetch();
+  }, [query]);
 
   const [salaryForm, setSalaryForm] = useState({
     employee: "",
@@ -69,44 +107,6 @@ export default function AccountingSalaryPage() {
     reference_no: "",
   });
 
-  async function loadPage(mode: "initial" | "refresh" = "initial") {
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
-
-    try {
-      const [employeesPayload, salaryPayload, paymentsPayload, financePayload, periodsPayload] =
-        await Promise.all([
-          listEmployees({ is_active: 1 }),
-          listSalarySheets(),
-          listSalaryPayments(),
-          listFinanceAccounts({ is_active: 1 }),
-          listPayrollPeriods(),
-        ]);
-      setEmployees(employeesPayload.results);
-      setSalarySheets(salaryPayload.results);
-      setSalaryPayments(paymentsPayload.results);
-      setFinanceAccounts(financePayload.results);
-      setPayrollPeriods(periodsPayload.results);
-      setError(null);
-    } catch (err) {
-      setError(toErrorMessage(err));
-      if (mode === "initial") {
-        setEmployees([]);
-        setSalarySheets([]);
-        setSalaryPayments([]);
-        setFinanceAccounts([]);
-        setPayrollPeriods([]);
-      }
-    } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
-    }
-  }
-
-  useEffect(() => {
-    void loadPage("initial");
-  }, []);
-
   const payableSheets = useMemo(
     () =>
       salarySheets.filter(
@@ -120,12 +120,12 @@ export default function AccountingSalaryPage() {
 
   async function handleCreateSalarySheet(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError(null);
+    setActionError(null);
     setNotice(null);
     if (!salaryForm.auto_generate) {
       const netAmount = parseFloat(salaryForm.net_amount);
       if (!Number.isFinite(netAmount) || netAmount <= 0) {
-        setError("Net amount must be greater than zero when not using auto-generate.");
+        setActionError("Net amount must be greater than zero when not using auto-generate.");
         return;
       }
     }
@@ -153,15 +153,15 @@ export default function AccountingSalaryPage() {
         net_amount: "0.00",
       });
       setNotice("Salary sheet created.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
-      setError(toErrorMessage(err));
+      setActionError(toErrorMessage(err));
     }
   }
 
   async function handleCreateSalaryPayment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError(null);
+    setActionError(null);
     setNotice(null);
     try {
       await createSalaryPayment({
@@ -179,33 +179,33 @@ export default function AccountingSalaryPage() {
         reference_no: "",
       });
       setNotice("Salary payment posted.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
-      setError(toErrorMessage(err));
+      setActionError(toErrorMessage(err));
     }
   }
 
   async function handleApproveSalarySheet(id: number) {
-    setError(null);
+    setActionError(null);
     setNotice(null);
     try {
       await approveSalarySheet(id);
       setNotice("Salary sheet approved.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
-      setError(toErrorMessage(err));
+      setActionError(toErrorMessage(err));
     }
   }
 
   async function handlePostSalarySheet(id: number) {
-    setError(null);
+    setActionError(null);
     setNotice(null);
     try {
       await postSalarySheet(id);
       setNotice("Salary sheet posted.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
-      setError(toErrorMessage(err));
+      setActionError(toErrorMessage(err));
     }
   }
 
@@ -216,14 +216,14 @@ export default function AccountingSalaryPage() {
         ""
       ) ?? "";
 
-    setError(null);
+    setActionError(null);
     setNotice(null);
     try {
       await closePayrollPeriod(period.id, closeReason);
       setNotice(`Payroll period ${period.code} closed.`);
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
-      setError(toErrorMessage(err));
+      setActionError(toErrorMessage(err));
     }
   }
 
@@ -264,7 +264,7 @@ export default function AccountingSalaryPage() {
           <AccountingRefreshButton
             loading={loading}
             refreshing={refreshing}
-            onClick={() => void loadPage("refresh")}
+            onClick={() => void loadPage()}
           />
         </div>
 
@@ -275,8 +275,8 @@ export default function AccountingSalaryPage() {
         {!loading && error ? (
           <ErrorState
             title="Unable to load salary register"
-            description={error}
-            onRetry={() => void loadPage("initial")}
+            description={error || actionError || undefined}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 

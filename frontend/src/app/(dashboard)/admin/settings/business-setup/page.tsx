@@ -139,6 +139,26 @@ function FreshStartResult({ result }: { result: EnsureFreshStartSetupResult | nu
         <div>Stock ledger created: {result.stock_ledger_created ?? 0}</div>
         <div>Reconciliation items created: {result.reconciliation_items_created ?? 0}</div>
       </div>
+      {(result.before || result.after) && (
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          {result.before && (
+            <div className="rounded-lg border border-emerald-200/60 bg-emerald-100/50 p-3">
+              <h4 className="mb-2 font-semibold text-emerald-900">Before Snapshot</h4>
+              <pre className="max-h-60 overflow-y-auto rounded bg-emerald-950/5 p-2 text-xs text-emerald-900">
+                {JSON.stringify(result.before, null, 2)}
+              </pre>
+            </div>
+          )}
+          {result.after && (
+            <div className="rounded-lg border border-emerald-200/60 bg-emerald-100/50 p-3">
+              <h4 className="mb-2 font-semibold text-emerald-900">After Snapshot</h4>
+              <pre className="max-h-60 overflow-y-auto rounded bg-emerald-950/5 p-2 text-xs text-emerald-900">
+                {JSON.stringify(result.after, null, 2)}
+              </pre>
+            </div>
+          )}
+        </div>
+      )}
     </section>
   );
 }

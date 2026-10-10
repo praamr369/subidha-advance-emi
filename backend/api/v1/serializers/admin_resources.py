@@ -1544,6 +1544,9 @@ class ProductAdminSerializer(serializers.ModelSerializer):
     inventory_ready = serializers.SerializerMethodField()
     inventory_stock_tracking_enabled = serializers.SerializerMethodField()
     inventory_delivery_stock_bridge_enabled = serializers.SerializerMethodField()
+    full_name = serializers.CharField(read_only=True)
+    seo_name = serializers.CharField(read_only=True)
+    is_published = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -1551,6 +1554,8 @@ class ProductAdminSerializer(serializers.ModelSerializer):
             "id",
             "product_code",
             "name",
+            "full_name",
+            "seo_name",
             "base_price",
             "category_master",
             "category_master_name",
@@ -1571,6 +1576,7 @@ class ProductAdminSerializer(serializers.ModelSerializer):
             "video",
             "clear_video",
             "is_active",
+            "is_published",
             "plan_type_default",
             "is_emi_enabled",
             "is_rent_enabled",
@@ -1763,6 +1769,13 @@ class ProductAdminSerializer(serializers.ModelSerializer):
     def get_inventory_delivery_stock_bridge_enabled(self, obj):
         profile = getattr(obj, "inventory_profile", None)
         return bool(getattr(profile, "delivery_stock_bridge_enabled", False)) if profile is not None else False
+
+    def get_is_published(self, obj):
+        pim = getattr(obj, "pim", None)
+        if hasattr(pim, "all"):
+            pim = pim.first()
+        return pim.is_published if pim else False
+
 
     def create(self, validated_data):
         validated_data.pop("clear_image", None)

@@ -1,6 +1,8 @@
 from django.db.models import Q
 from products_pim.services.sync_service import PIMSyncService
 from rest_framework import viewsets, status
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -87,8 +89,52 @@ class PimProductViewSet(viewsets.ModelViewSet):
     # the admin PIM tree show only 20 blueprints and broke its page maths.
     pagination_class = AdminListPagination
 
+    def perform_update(self, serializer):
+        instance = self.get_object()
+        old_code = instance.code
+        old_name = instance.name
+        
+        pim_product = serializer.save()
+        
+        name_changed = pim_product.name != old_name
+        code_changed = pim_product.code != old_code
+        
+        if name_changed or code_changed:
+            from products_pim.services.sync_service import PIMSyncService
+            from products_core.models import Product as CoreProduct
+            
+            # Sync variants automatically
+            for variant in pim_product.variants.select_related("operational_product").all():
+                op = variant.operational_product
+                
+                # If code changed, rename SKU safely if it starts with old_code
+                if code_changed and variant.sku and old_code and variant.sku.startswith(old_code):
+                    old_variant_sku = variant.sku
+                    new_sku = pim_product.code + old_variant_sku[len(old_code):]
+                    variant.sku = new_sku
+                    variant.save(update_fields=["sku"])
+                    try:
+                        PIMSyncService.rename_variant_sku(variant, old_sku=old_variant_sku)
+                    except Exception:
+                        pass
+                
+                # If name changed, update op.name and child_pim.name
+                if name_changed:
+                    if op:
+                        op.name = PIMSyncService.get_variant_display_name(variant)
+                        op.save(update_fields=["name"])
+                    
+                    # Update variant's PimProduct (child_pim)
+                    child_pim = op.pim.first() if op and hasattr(op, "pim") else None
+                    if not child_pim:
+                        child_pim = PimProduct.objects.filter(code=variant.sku).first()
+                    if child_pim:
+                        child_pim.name = pim_product.name
+                        child_pim.save(update_fields=["name", "updated_at"])
+
+
     def get_queryset(self):
-        qs = PimProduct.objects.select_related("category", "subcategory", "parent__category", "parent__subcategory").prefetch_related(
+        qs = PimProduct.objects.select_related("category", "subcategory", "parent__category", "parent__subcategory", "source_product").prefetch_related(
             "attributes__attribute",
             "variants__attribute_values__attribute",
             "child_pim_products",
@@ -125,13 +171,26 @@ class PimProductViewSet(viewsets.ModelViewSet):
                 Q(subcategory_id=subcategory_id) | Q(parent__subcategory_id=subcategory_id)
             )
         if search:
-            match = Q(name__icontains=search) | Q(code__icontains=search)
+            match = (
+                Q(name__icontains=search) 
+                | Q(code__icontains=search)
+                | Q(product_type__icontains=search)
+                | Q(attributes__value_text__icontains=search)
+                # products_core.Product has no SEO fields; its searchable
+                # catalog fields are deliberately kept to the stable product
+                # code, name, and description contract.
+                | Q(source_product__product_code__icontains=search)
+                | Q(source_product__name__icontains=search)
+                | Q(source_product__description__icontains=search)
+            )
             if roots_only:
                 # A blueprint is also found through any of its variant SKUs.
-                match |= Q(child_pim_products__name__icontains=search) | Q(child_pim_products__code__icontains=search)
-            qs = qs.filter(match)
-            if roots_only:
-                qs = qs.distinct()
+                match |= (
+                    Q(child_pim_products__name__icontains=search) 
+                    | Q(child_pim_products__code__icontains=search)
+                    | Q(child_pim_products__attributes__value_text__icontains=search)
+                )
+            qs = qs.filter(match).distinct()
         if is_published is not None:
             qs = qs.filter(is_published=is_published.lower() == "true")
         return qs
@@ -184,6 +243,77 @@ class PimProductViewSet(viewsets.ModelViewSet):
             "published": False,
             "child_pim_unpublished": child_count,
         })
+
+
+    @action(detail=True, methods=["get", "patch"], url_path="variants_publish_control")
+    def variants_publish_control(self, request, pk=None):
+        pim = self.get_object()
+        
+        # If this is a variant, redirect logic to its base product
+        if pim.parent_id:
+            pim = pim.parent
+
+        if request.method == "GET":
+            from .bridge_views import ProductPimVariantPublishControlView
+            view = ProductPimVariantPublishControlView()
+            return Response({
+                "base": view._base_response(pim, pim.source_product_id),
+                "variants": view._variant_rows(pim),
+            })
+            
+        elif request.method == "PATCH":
+            data = request.data
+            from .bridge_views import ProductPimVariantPublishControlView
+            view = ProductPimVariantPublishControlView()
+
+            # Bulk toggle all
+            if "all" in data:
+                flag = bool(data["all"])
+                pim.is_published = flag
+                pim.save(update_fields=["is_published"])
+                pim.child_pim_products.all().update(is_published=flag)
+                return Response({
+                    "base": view._base_response(pim, pim.source_product_id),
+                    "variants": view._variant_rows(pim),
+                })
+
+            # Toggle base
+            if "base_published" in data:
+                pim.is_published = bool(data["base_published"])
+                pim.save(update_fields=["is_published"])
+
+            # Per-variant toggles
+            from products_pim.models import PimProduct
+            variant_updates = data.get("variants", [])
+            if variant_updates:
+                child_ids = set(pim.child_pim_products.values_list("id", flat=True))
+                variants_by_sku = {v.sku: v.id for v in pim.variants.all()}
+                variant_to_child = {}
+                for child in pim.child_pim_products.all():
+                    if child.code in variants_by_sku:
+                        variant_to_child[variants_by_sku[child.code]] = child.id
+                for row in variant_updates:
+                    vid = row.get("id")
+                    flag = bool(row.get("is_published", False))
+                    mode_fields = {key: bool(row[key]) for key in ("is_emi_enabled", "is_rent_enabled", "is_lease_enabled", "is_direct_sale_enabled") if key in row}
+                    if vid in child_ids:
+                        PimProduct.objects.filter(pk=vid).update(is_published=flag, **mode_fields)
+                    elif vid in variant_to_child:
+                        PimProduct.objects.filter(pk=variant_to_child[vid]).update(is_published=flag, **mode_fields)
+                    target_id = vid if vid in child_ids else variant_to_child.get(vid)
+                    if target_id and mode_fields:
+                        child = PimProduct.objects.filter(pk=target_id).select_related("source_product").first()
+                        if child and child.source_product_id:
+                            for field, value in mode_fields.items():
+                                setattr(child.source_product, field, value)
+                            child.source_product.save(update_fields=list(mode_fields))
+
+                pim.refresh_from_db(fields=["is_published"])
+
+            return Response({
+                "base": view._base_response(pim, pim.source_product_id),
+                "variants": view._variant_rows(pim),
+            })
 
     @action(detail=True, methods=["post"])
     def auto_bom(self, request, pk=None):
@@ -303,10 +433,33 @@ class PimProductViewSet(viewsets.ModelViewSet):
                 op.description = product.description
                 changed = True
             if push_name:
-                op.name = product.name
+                op.name = PIMSyncService.get_variant_display_name(variant)
                 changed = True
             if changed:
                 op.save()
+                
+                # Also update the variant's PIM record if it exists
+                child_pim = op.pim.first() if hasattr(op, "pim") else None
+                if not child_pim:
+                    child_pim = PimProduct.objects.filter(code=variant.sku).first()
+
+                if child_pim:
+                    pim_changed = False
+                    if push_description and child_pim.description != product.description:
+                        child_pim.description = product.description
+                        pim_changed = True
+                    if push_name and child_pim.name != product.name:
+                        child_pim.name = product.name
+                        pim_changed = True
+                    if pim_changed:
+                        update_fields = []
+                        if push_name:
+                            update_fields.append("name")
+                        if push_description:
+                            update_fields.append("description")
+                        if update_fields:
+                            child_pim.save(update_fields=update_fields)
+                        
                 updated += 1
         return Response({"updated": updated, "total_variants": product.variants.count()})
 
@@ -332,7 +485,11 @@ class PimProductViewSet(viewsets.ModelViewSet):
 
         if search:
             qs = qs.filter(
-                Q(name__icontains=search) | Q(product_code__icontains=search) | Q(category__icontains=search)
+                Q(name__icontains=search) 
+                | Q(product_code__icontains=search) 
+                | Q(category__icontains=search)
+                | Q(seo_title__icontains=search)
+                | Q(seo_description__icontains=search)
             )
 
         if category_filter:
@@ -501,42 +658,66 @@ class PimProductViewSet(viewsets.ModelViewSet):
         and create the missing records, linking them to the base product and their
         existing operational (products_core) product.
         """
-        from products_core.models import Product as CoreProduct
-        base = self.get_object()
-        adopted = []
-        skipped = []
-        errors = []
+        try:
+            from products_core.models import Product as CoreProduct
+            base = self.get_object()
+            adopted = []
+            skipped = []
+            errors = []
 
-        for child in base.child_pim_products.all():
-            if ProductVariant.objects.filter(sku=child.code).exists():
-                skipped.append(child.code)
-                continue
-            # Find the operational product by product_code matching the child's code
-            core = CoreProduct.objects.filter(product_code=child.code).first()
-            if not core:
-                errors.append({"code": child.code, "error": "No operational product found"})
-                continue
-            try:
-                pv = ProductVariant.objects.create(
-                    product=base,
-                    operational_product=core,
-                    sku=child.code,
-                    price=core.base_price or child.base_price,
-                    quantity_on_hand=0,
-                    reorder_level=5,
-                    is_active=True,
-                )
-                PIMSyncService.sync_variant_to_operational_product(pv)
-                adopted.append(child.code)
-            except Exception as exc:
-                errors.append({"code": child.code, "error": str(exc)})
+            for child in base.child_pim_products.all():
+                if ProductVariant.objects.filter(sku=child.code).exists():
+                    skipped.append(child.code)
+                    continue
+                # Find the operational product by product_code matching the child's code
+                core = CoreProduct.objects.filter(product_code=child.code).first()
+                try:
+                    from django.db import transaction
+                    from decimal import Decimal
+                    with transaction.atomic():
+                        pv = ProductVariant.objects.create(
+                            product=base,
+                            operational_product=core,
+                            sku=child.code,
+                            price=(core.base_price if core else child.base_price) or Decimal("0"),
+                            quantity_on_hand=0,
+                            reorder_level=5,
+                            is_active=True,
+                        )
+                        PIMSyncService.sync_variant_to_operational_product(pv)
+                        pv.refresh_from_db()
+                        core = pv.operational_product
+                        
+                        if core and child.source_product != core:
+                            child.source_product = core
+                            child.save(update_fields=["source_product"])
+                        adopted.append(child.code)
+                except Exception as exc:
+                    errors.append({"code": child.code, "error": str(exc)})
 
-        return Response({
-            "adopted": adopted,
-            "skipped": skipped,
-            "errors": errors,
-            "message": f"Adopted {len(adopted)} orphan variant(s). {len(skipped)} already linked.",
-        })
+            status_code = 200 if not errors else 400
+            if errors and not adopted:
+                msg = "Failed to adopt orphans due to errors."
+            elif errors:
+                msg = f"Adopted {len(adopted)} orphan variant(s), but encountered errors."
+            else:
+                msg = f"Adopted {len(adopted)} orphan variant(s). {len(skipped)} already linked."
+
+            return Response({
+                "adopted": adopted,
+                "skipped": skipped,
+                "errors": errors,
+                "message": msg,
+            }, status=status_code)
+        except Exception as exc:
+            import traceback
+            traceback.print_exc()
+            return Response({
+                "message": f"Critical error during adoption: {str(exc)}",
+                "adopted": [],
+                "skipped": [],
+                "errors": [{"code": "CRITICAL", "error": str(exc)}]
+            }, status=500)
 
     @action(detail=True, methods=["post"])
     def clean_stale_locks(self, request, pk=None):
@@ -650,7 +831,7 @@ class PimProductViewSet(viewsets.ModelViewSet):
             "blueprints": blueprints.count(),
             "published": blueprints.filter(is_published=True).count(),
             "draft": blueprints.filter(is_published=False).count(),
-            "variant_skus": PimProduct.objects.filter(parent_id__in=blueprints.values("pk")).count(),
+            "variant_skus": PimProduct.objects.filter(parent_id__in=blueprints.order_by().values("pk")).count(),
         })
 
     # ── "View in your room" AR ───────────────────────────────────────────────
@@ -808,7 +989,56 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
             return ProductVariantCreateSerializer
         return ProductVariantSerializer
 
+
+    def _handle_variant_file_uploads(self, request):
+        data = request.data.copy() if hasattr(request.data, "copy") else request.data
+        from django.core.files.storage import default_storage
+        import uuid
+        
+        if 'image' in request.FILES:
+            file_obj = request.FILES['image']
+            ext = file_obj.name.split('.')[-1] if '.' in file_obj.name else 'bin'
+            filename = f"{uuid.uuid4().hex[:10]}.{ext}"
+            path = default_storage.save(f"pim/variants/{filename}", file_obj)
+            data['image'] = request.build_absolute_uri(default_storage.url(path))
+            
+        if 'video' in request.FILES:
+            file_obj = request.FILES['video']
+            ext = file_obj.name.split('.')[-1] if '.' in file_obj.name else 'bin'
+            filename = f"{uuid.uuid4().hex[:10]}.{ext}"
+            path = default_storage.save(f"pim/variants/videos/{filename}", file_obj)
+            data['video'] = request.build_absolute_uri(default_storage.url(path))
+            
+        return data
+
+    def create(self, request, *args, **kwargs):
+        data = self._handle_variant_file_uploads(request)
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        from rest_framework.response import Response
+        from rest_framework import status
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        old_sku = instance.sku
+        data = self._handle_variant_file_uploads(request)
+        serializer = self.get_serializer(instance, data=data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        if "sku" in data and instance.sku != old_sku:
+            PIMSyncService.rename_variant_sku(instance, old_sku)
+            PIMSyncService.sync_variant_to_operational_product(instance)
+        if getattr(instance, '_prefetched_objects_cache', None):
+            instance._prefetched_objects_cache = {}
+        from rest_framework.response import Response
+        return Response(serializer.data)
+
     def perform_update(self, serializer):
+
         variant = serializer.save()
         PIMSyncService.sync_variant_to_operational_product(variant)
 
@@ -842,6 +1072,7 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
     def update_attributes(self, request, pk=None):
         """Update variant attributes, pricing, and barcode; syncs to operational product."""
         variant = self.get_object()
+        old_sku = variant.sku
         dirty_fields = []
 
         # Scalar fields
@@ -850,23 +1081,37 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
             if val is not None:
                 setattr(variant, field, val)
                 dirty_fields.append(field)
+        if request.data.get("sku") is not None:
+            variant.sku = str(request.data.get("sku")).strip()
+            dirty_fields.append("sku")
         if dirty_fields:
             variant.save(update_fields=dirty_fields)
+
+        if variant.sku != old_sku:
+            PIMSyncService.rename_variant_sku(variant, old_sku)
 
         # Attribute values (upsert per attribute id)
         for av in request.data.get("attribute_values", []):
             attribute_id = av.get("attribute")
             if not attribute_id:
                 continue
-            VariantAttributeValue.objects.update_or_create(
-                variant=variant,
-                attribute_id=attribute_id,
-                defaults={
-                    "value_text": av.get("value_text", ""),
-                    "value_number": av.get("value_number"),
-                    "value_boolean": av.get("value_boolean"),
-                },
-            )
+            
+            val_text = av.get("value_text", "")
+            val_num = av.get("value_number")
+            val_bool = av.get("value_boolean")
+            
+            if val_text == "" and val_num is None and val_bool is None:
+                VariantAttributeValue.objects.filter(variant=variant, attribute_id=attribute_id).delete()
+            else:
+                VariantAttributeValue.objects.update_or_create(
+                    variant=variant,
+                    attribute_id=attribute_id,
+                    defaults={
+                        "value_text": val_text,
+                        "value_number": val_num,
+                        "value_boolean": val_bool,
+                    },
+                )
 
         PIMSyncService.sync_variant_to_operational_product(variant)
         variant.refresh_from_db()
@@ -908,6 +1153,48 @@ class ProductMediaItemViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         from .serializers import ProductMediaItemSerializer
         return ProductMediaItemSerializer
+
+
+    def _handle_file_uploads(self, request):
+        data = request.data.copy() if hasattr(request.data, "copy") else request.data
+        from django.core.files.storage import default_storage
+        import uuid
+        
+        if 'file' in request.FILES:
+            file_obj = request.FILES['file']
+            ext = file_obj.name.split('.')[-1] if '.' in file_obj.name else 'bin'
+            filename = f"{uuid.uuid4().hex[:10]}.{ext}"
+            path = default_storage.save(f"pim/gallery/{filename}", file_obj)
+            data['file'] = request.build_absolute_uri(default_storage.url(path))
+            
+        if 'ios_file' in request.FILES:
+            file_obj = request.FILES['ios_file']
+            ext = file_obj.name.split('.')[-1] if '.' in file_obj.name else 'bin'
+            filename = f"{uuid.uuid4().hex[:10]}.{ext}"
+            path = default_storage.save(f"pim/models/ios/{filename}", file_obj)
+            data['ios_file'] = request.build_absolute_uri(default_storage.url(path))
+            
+        return data
+
+    def create(self, request, *args, **kwargs):
+        data = self._handle_file_uploads(request)
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        from rest_framework.response import Response
+        from rest_framework import status
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        data = self._handle_file_uploads(request)
+        serializer = self.get_serializer(instance, data=data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        from rest_framework.response import Response
+        return Response(serializer.data)
 
     @action(detail=True, methods=["post"])
     def set_hero(self, request, pk=None):

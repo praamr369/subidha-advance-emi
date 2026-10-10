@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 import { formatRupee } from "@/lib/utils/currency";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -151,39 +152,37 @@ async function reopenAdminPartnerCollectionRequest(
 
 export default function AdminPartnerCollectionRequestsPage() {
   const [rows, setRows] = useState<PartnerCollectionRequestRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [processingId, setProcessingId] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [actionPanel, setActionPanel] = useState<ActionPanel | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (mode === "initial") setLoading(true);
-      else setRefreshing(true);
-
-      try {
-        const payload = await listAdminPartnerCollectionRequests(
-          statusFilter || undefined
-        );
-        setRows(Array.isArray(payload.results) ? payload.results : []);
-        setError(null);
-      } catch (err) {
-        setError(toErrorMessage(err));
-        setRows([]);
-      } finally {
-        if (mode === "initial") setLoading(false);
-        else setRefreshing(false);
-      }
+  const { data: queryData, isLoading: loading, isRefetching: refreshing, error: queryError, refetch } = useQuery({
+    queryKey: ["admin_partner_collection_requests", statusFilter],
+    queryFn: async () => {
+      const payload = await listAdminPartnerCollectionRequests(statusFilter || undefined);
+      return Array.isArray(payload.results) ? payload.results : [];
     },
-    [statusFilter]
-  );
+  });
+
+  const loadPage = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
 
   useEffect(() => {
-    void loadPage("initial");
-  }, [loadPage]);
+    if (queryData) {
+      setRows(queryData);
+      setError(null);
+    }
+  }, [queryData]);
+
+  useEffect(() => {
+    if (queryError) {
+      setError(toErrorMessage(queryError));
+      setRows([]);
+    }
+  }, [queryError]);
 
   const submittedCount = useMemo(
     () => rows.filter((r) => r.status === "SUBMITTED").length,
@@ -230,7 +229,7 @@ export default function AdminPartnerCollectionRequestsPage() {
         await reopenAdminPartnerCollectionRequest(actionPanel.row.id, actionPanel.note || undefined);
       }
       closePanel();
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setActionError(toErrorMessage(err));
     } finally {
@@ -279,7 +278,7 @@ export default function AdminPartnerCollectionRequestsPage() {
 
         <button
           type="button"
-          onClick={() => void loadPage("refresh")}
+          onClick={() => void loadPage()}
           disabled={refreshing}
           className="inline-flex items-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
         >
@@ -295,7 +294,7 @@ export default function AdminPartnerCollectionRequestsPage() {
         <ErrorState
           title="Unable to load partner collection requests"
           description={error}
-          onRetry={() => void loadPage("initial")}
+          onRetry={() => void loadPage()}
         />
       ) : null}
 

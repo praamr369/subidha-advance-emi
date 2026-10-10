@@ -5,6 +5,7 @@ import re
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.text import slugify
+from mptt.models import MPTTModel, TreeForeignKey
 
 
 class CatalogTimeStampedModel(models.Model):
@@ -15,12 +16,12 @@ class CatalogTimeStampedModel(models.Model):
         abstract = True
 
 
-class CatalogCategory(CatalogTimeStampedModel):
+class CatalogCategory(MPTTModel, CatalogTimeStampedModel):
     """Admin-managed category tree for the new PIM catalog only."""
 
     name = models.CharField(max_length=120)
     slug = models.SlugField(max_length=140, unique=True)
-    parent = models.ForeignKey(
+    parent = TreeForeignKey(
         "self",
         null=True,
         blank=True,
@@ -30,6 +31,7 @@ class CatalogCategory(CatalogTimeStampedModel):
     path = models.CharField(max_length=1024, unique=True, editable=False, db_index=True)
     is_active = models.BooleanField(default=True, db_index=True)
     sort_order = models.PositiveIntegerField(default=0, db_index=True)
+    google_taxonomy_id = models.CharField(max_length=50, blank=True, default="", help_text="Standardized taxonomy ID for external marketplaces")
 
     class Meta:
         db_table = "catalog_categories"
@@ -44,15 +46,7 @@ class CatalogCategory(CatalogTimeStampedModel):
             errors["name"] = "Category name is required."
         if self.parent_id and self.parent_id == self.pk:
             errors["parent"] = "A category cannot be its own parent."
-        if self.pk and self.parent_id:
-            ancestor_ids = set()
-            node = self.parent
-            while node is not None:
-                if node.pk in ancestor_ids or node.pk == self.pk:
-                    errors["parent"] = "A category cannot be moved below one of its descendants."
-                    break
-                ancestor_ids.add(node.pk)
-                node = node.parent
+
         if errors:
             raise ValidationError(errors)
 
@@ -60,7 +54,14 @@ class CatalogCategory(CatalogTimeStampedModel):
         self.name = (self.name or "").strip()
         self.slug = slugify(self.slug or self.name)[:140]
         self.full_clean()
-        super().save(*args, **kwargs)
+        try:
+            super().save(*args, **kwargs)
+        except Exception as e:
+            from mptt.exceptions import InvalidMove
+            from django.core.exceptions import ValidationError
+            if isinstance(e, InvalidMove):
+                raise ValidationError({"parent": str(e)})
+            raise
 
     def __str__(self):
         return self.path or self.name
@@ -93,6 +94,7 @@ class AttributeDefinition(CatalogTimeStampedModel):
     sort_order = models.PositiveIntegerField(default=0)
     min_value = models.DecimalField(max_digits=14, decimal_places=3, null=True, blank=True)
     max_value = models.DecimalField(max_digits=14, decimal_places=3, null=True, blank=True)
+    regex_validation = models.CharField(max_length=255, blank=True, default="", help_text="Regex pattern for text validation")
     sku_code_map = models.JSONField(default=dict, blank=True)
     is_active = models.BooleanField(default=True, db_index=True)
 

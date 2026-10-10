@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Loader2, ShieldCheck } from "lucide-react";
@@ -18,7 +18,7 @@ function toMessage(error: unknown): string {
   return "Failed to send reset instructions.";
 }
 
-export default function ForgotPasswordPage() {
+function ForgotPasswordContent() {
   const searchParams = useSearchParams();
   const initialIdentifier = useMemo(
     () => (searchParams.get("identifier") || "").trim(),
@@ -149,5 +149,13 @@ export default function ForgotPasswordPage() {
         </Link>
       </div>
     </AuthLayoutShell>
+  );
+}
+
+export default function ForgotPasswordPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center p-4"><div className="animate-pulse">Loading...</div></div>}>
+      <ForgotPasswordContent />
+    </Suspense>
   );
 }

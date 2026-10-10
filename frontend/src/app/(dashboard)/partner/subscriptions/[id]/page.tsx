@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 import { formatRupee } from "@/lib/utils/currency";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -120,55 +121,36 @@ export default function PartnerSubscriptionDetailPage() {
   const [subscription, setSubscription] = useState<PartnerSubscriptionDetail | null>(
     null
   );
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+
+  const query = useQuery({
+    queryKey: ['partnerSubscriptionDetail', subscriptionId],
+    queryFn: async () => {
+      if (!subscriptionId) throw new Error("Missing subscription id.");
+      return await getPartnerSubscriptionDetail(subscriptionId);
+    },
+    enabled: !!subscriptionId,
+  });
+
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const error = query.error ? (query.error instanceof Error ? query.error.message : "Failed to load subscription details.") : (!subscriptionId ? "Missing subscription id." : null);
 
   const backQuery = searchParams.toString();
   const backHref = backQuery
     ? `/partner/subscriptions?${backQuery}`
     : "/partner/subscriptions";
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (!subscriptionId) {
-        setError("Missing subscription id.");
-        setSubscription(null);
-        setLoading(false);
-        return;
-      }
-
-      if (mode === "initial") {
-        setLoading(true);
-      } else {
-        setRefreshing(true);
-      }
-
-      try {
-        const payload = await getPartnerSubscriptionDetail(subscriptionId);
-        setSubscription(payload);
-        setError(null);
-      } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Failed to load subscription details."
-        );
-        setSubscription(null);
-      } finally {
-        if (mode === "initial") {
-          setLoading(false);
-        } else {
-          setRefreshing(false);
-        }
-      }
-    },
-    [subscriptionId]
-  );
+  const loadPage = useCallback(async (mode?: "initial" | "refresh") => {
+    await query.refetch();
+  }, [query]);
 
   useEffect(() => {
-    void loadPage("initial");
-  }, [loadPage]);
+    if (query.data) {
+      setSubscription(query.data);
+    } else if (query.isError) {
+      setSubscription(null);
+    }
+  }, [query.data, query.isError]);
 
   const emis = useMemo<PartnerSubscriptionEmi[]>(() => {
     return Array.isArray(subscription?.emis)
@@ -299,7 +281,7 @@ export default function PartnerSubscriptionDetailPage() {
   const pendingEmiCount =
     subscription?.pending_emi_count ?? emiRows.filter((row) => row.outstanding_amount > 0).length;
 
-  const timelineItems = useMemo<WorkspaceTimelineItem[]>(() => {
+  const timelineItems: WorkspaceTimelineItem[] = (() => {
     if (!subscription) {
       return [];
     }
@@ -363,14 +345,7 @@ export default function PartnerSubscriptionDetailPage() {
     }
 
     return items;
-  }, [
-    detailSemantics.winnerHeadline,
-    nextDueAge,
-    nextDueDate,
-    nextDueOverdue,
-    subscription,
-    winnerSummary?.draw_revealed_at,
-  ]);
+  })();
 
   const emiColumns = useMemo<Column<EmiRow>[]>(
     () => [
@@ -515,7 +490,7 @@ export default function PartnerSubscriptionDetailPage() {
             <ActionButton
               type="button"
               variant="outline"
-              onClick={() => void loadPage("refresh")}
+              onClick={() => void loadPage()}
               disabled={loading || refreshing}
               leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
             >
@@ -607,7 +582,7 @@ export default function PartnerSubscriptionDetailPage() {
           <ERPErrorState
             title="Unable to load subscription"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 

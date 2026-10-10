@@ -9,23 +9,18 @@ DB_NAME="${DB_NAME:-subidha}"
 APP_DIR="${APP_DIR:-/var/www/subidha/app}"
 BACKUP_ROOT="${BACKUP_ROOT:-/var/backups/subidha}"
 SERVICE="${SERVICE:-subidha-gunicorn}"
-FRONTEND_SERVICE="${FRONTEND_SERVICE:-subidha-next}"
+FRONTEND_SERVICE="${FRONTEND_SERVICE:-subidha-frontend}"
 CELERY_SERVICES="${CELERY_SERVICES:-subidha-celery subidha-celery-beat}"
 BACKEND_ENV="${BACKEND_ENV:-/etc/subidha/backend.env}"
 FRONTEND_ENV="${FRONTEND_ENV:-/etc/subidha/frontend.env}"
-HEALTH_URL="${HEALTH_URL:-https://subidhafurnitureasansol.com/api/v1/health/}"
+HEALTH_URL="${HEALTH_URL:-https://subidhafurnitureasansol.com/api/v1/public/health/}"
 PY="$APP_DIR/backend/.venv/bin/python"
 PIP="$APP_DIR/backend/.venv/bin/pip"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 STAMP="$(date +%Y%m%d-%H%M%S)"
 
-echo "==> [1/7] Pre-update backup (this is your rollback point)"
-"$SCRIPT_DIR/backup.sh" pre-update
-LATEST_BACKUP="$(ls -1dt "$BACKUP_ROOT"/pre-update-* | head -n 1)"
-echo "    Rollback point: $LATEST_BACKUP"
-
-echo "==> [2/7] Fetching new code"
+echo "==> [1/7] Checking for a new release"
 cd "$APP_DIR"
 git fetch origin
 NEW_COMMIT="$(git rev-parse origin/main)"
@@ -34,6 +29,11 @@ if [ "$NEW_COMMIT" = "$OLD_COMMIT" ]; then
   echo "    Already on latest main ($OLD_COMMIT). Nothing to deploy."; exit 0
 fi
 echo "    $OLD_COMMIT -> $NEW_COMMIT"
+
+echo "==> [2/7] Pre-update backup (this is your rollback point)"
+"$SCRIPT_DIR/backup.sh" pre-update
+LATEST_BACKUP="$(ls -1dt "$BACKUP_ROOT"/pre-update-* | head -n 1)"
+echo "    Rollback point: $LATEST_BACKUP"
 
 echo "==> [3/7] Rehearsing migrations on a copy of the live DB"
 # Postgres identifiers can't contain hyphens unquoted — use underscores only.
@@ -89,8 +89,19 @@ if id subidha >/dev/null 2>&1; then
   echo "    non-root app: chowning .next + media to subidha"
   chown -R subidha:subidha "$APP_DIR/frontend/.next" "${MEDIA_ROOT:-/var/www/subidha/media}" 2>/dev/null || true
 fi
-systemctl restart "$SERVICE"
-systemctl restart "$FRONTEND_SERVICE"
+echo "    restarting backend and frontend in parallel"
+# Gunicorn supports a graceful reload, so existing requests finish on the
+# previous workers while new workers load the new code. The frontend is
+# stopped first so a manually-started next-server cannot steal port 3000 from
+# systemd and create a restart loop.
+systemctl reload-or-restart "$SERVICE" &
+BACKEND_RESTART_PID=$!
+systemctl stop "$FRONTEND_SERVICE" || true
+for pid in $(ss -ltnp "sport = :3000" 2>/dev/null | sed -n 's/.*pid=\([0-9][0-9]*\).*/\1/p' | sort -u); do
+  kill "$pid" 2>/dev/null || true
+done
+systemctl start "$FRONTEND_SERVICE" &
+FRONTEND_RESTART_PID=$!
 
 # Background workers run the same codebase, so a release that restarts only
 # gunicorn leaves them executing the previous revision until something else
@@ -99,9 +110,16 @@ systemctl restart "$FRONTEND_SERVICE"
 for unit in $CELERY_SERVICES; do
   if systemctl list-unit-files "$unit.service" --no-legend 2>/dev/null | grep -q .; then
     echo "    restarting $unit"
-    systemctl restart "$unit"
+    systemctl restart "$unit" &
   else
     echo "    $unit not installed — skipping"
+  fi
+done
+
+wait "$BACKEND_RESTART_PID" "$FRONTEND_RESTART_PID"
+for unit in $CELERY_SERVICES; do
+  if systemctl list-unit-files "$unit.service" --no-legend 2>/dev/null | grep -q .; then
+    systemctl is-active --quiet "$unit"
   fi
 done
 

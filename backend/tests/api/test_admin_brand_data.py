@@ -59,7 +59,7 @@ class AdminBrandDataApiTests(APITestCase):
             self.assertEqual(approve.status_code, status.HTTP_200_OK, msg=approve.data)
         apply_response = self.client.post("/api/v1/admin/brand-data/apply/", {"approved_item_ids": item_ids}, format="json")
         self.assertEqual(apply_response.status_code, status.HTTP_200_OK, msg=apply_response.data)
-        profile = PublicBusinessProfile.objects.filter(is_active=True).first()
+        profile = PublicBusinessProfile.get_current()
         self.assertIsNotNone(profile)
         self.assertEqual(profile.display_name, "Subidha Furniture")
         self.assertEqual(Payment.objects.count(), before_counts["payment"])

@@ -1,7 +1,8 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 
 import BusinessSetupLinks from "@/components/admin/business-setup/BusinessSetupLinks";
 import PageHeader from "@/components/ui/PageHeader";
@@ -38,36 +39,45 @@ export default function BranchesAndDesksWorkbench() {
   const [readiness, setReadiness] = useState<BranchReadiness | null>(null);
   const [branches, setBranches] = useState<BranchRecord[]>([]);
   const [counters, setCounters] = useState<CashCounterRecord[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  async function loadPage() {
-    try {
-      setLoading(true);
+  const query = useQuery({
+    queryKey: ['branches-and-desks'],
+    queryFn: async () => {
       const [checklistPayload, readinessPayload, branchPayload, counterPayload] = await Promise.all([
         getSetupChecklist(),
         getBranchReadiness(),
         listBranches(),
         listCashCounters({ is_active: "true" }),
       ]);
-      setChecklist(checklistPayload);
-      setReadiness(readinessPayload);
-      setBranches(branchPayload.results);
-      setCounters(counterPayload.results);
+      return { checklistPayload, readinessPayload, branchPayload, counterPayload };
+    }
+  });
+
+  const loading = query.isLoading;
+
+  useEffect(() => {
+    if (query.data) {
+      setChecklist(query.data.checklistPayload);
+      setReadiness(query.data.readinessPayload);
+      setBranches(query.data.branchPayload.results);
+      setCounters(query.data.counterPayload.results);
       setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load branches and desks setup status.");
+    }
+  }, [query.data]);
+
+  useEffect(() => {
+    if (query.error) {
+      setError(query.error instanceof Error ? query.error.message : "Failed to load branches and desks setup status.");
       setReadiness(null);
       setBranches([]);
       setCounters([]);
-    } finally {
-      setLoading(false);
     }
-  }
+  }, [query.error]);
 
-  useEffect(() => {
-    void loadPage();
-  }, []);
+  const loadPage = useCallback(async () => {
+    await query.refetch();
+  }, [query]);
 
   // -- Branch Math --
   const branchesActive = readiness?.counts.branches_active ?? toNumber(checklist?.counts?.branches_active);

@@ -66,7 +66,7 @@ export default function ExtendedWarrantyPage() {
           <p className="text-gray-600 dark:text-gray-400 text-sm">Your extended warranty is now active. You'll receive a confirmation.</p>
           <div className="flex gap-3 mt-6 justify-center">
             <a href="/customer/warranty/check" className="px-4 py-2 border rounded-lg text-sm">Check Coverage</a>
-            <a href="/customer/dashboard" className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm">Back to Dashboard</a>
+          <a href="/customer" className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm">Back to Dashboard</a>
           </div>
         </div>
       </ERPPageShell>

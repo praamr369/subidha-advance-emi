@@ -469,6 +469,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Settings & Governance", "Settings", ROUTES.admin.settings, "Settings cockpit."),
   item("Settings & Governance", "Sidebar & Navigation Customizer", ROUTES.admin.settingsNavigation, "Interactive desktop layout builder to reorder parent modules, rearrange pages, and toggle sidebar visibility."),
   item("Settings & Governance", "Staff Users", ROUTES.admin.settingsUsers, "Internal staff users."),
+  item("Settings & Governance", "MFA Setup", "/admin/settings/mfa", "Manage your Two-Factor Authentication settings."),
   item("Settings & Governance", "Roles & Permissions", ROUTES.admin.settingsRolesPermissions, "Role setup and access control."),
   item("Settings & Governance", "Business Profile", ROUTES.admin.settingsBusinessSetupProfile, "Business profile."),
   item("Settings & Governance", "Business Setup", ROUTES.admin.settingsBusinessSetup, "Fresh-start readiness, finance setup, branch/counter setup, documents, inventory onboarding."),

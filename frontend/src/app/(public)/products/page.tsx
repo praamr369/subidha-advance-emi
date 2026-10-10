@@ -198,10 +198,10 @@ export default async function ProductsPage({
           Listed amounts come from the same product records shown here. Stock, batch seats, tenure, monthly EMI, rent, lease, and direct-sale terms are confirmed only after branch review—not from this page alone.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
-          <Link href={ROUTES.public.apply} className="public-action-primary h-10 !min-h-0">
+          <Link href={ROUTES.public.apply} className="public-action-primary h-10 min-h-0!">
             {dictionary.common.apply}
           </Link>
-          <Link href={ROUTES.public.contact} className="public-action-secondary h-10 !min-h-0">
+          <Link href={ROUTES.public.contact} className="public-action-secondary h-10 min-h-0!">
             {dictionary.common.contact}
           </Link>
         </div>

@@ -212,8 +212,13 @@ class ProductPimVariantPublishControlView(APIView):
 
     def _variant_rows(self, pim):
         rows = []
-        for child in pim.child_pim_products.prefetch_related("variants").order_by("code"):
-            variant = child.variants.first()
+        variants_by_sku = {v.sku: v for v in pim.variants.all()}
+        for child in pim.child_pim_products.select_related("source_product").order_by("code"):
+            variant = variants_by_sku.get(child.code)
+            # Existing variants may predate the PIM capability fields. Read the
+            # linked operational product as the compatibility source so the
+            # control panel cannot disagree with the live portal catalog.
+            operational = child.source_product
             rows.append({
                 "id": child.id,
                 "variant_id": variant.id if variant else None,
@@ -221,6 +226,10 @@ class ProductPimVariantPublishControlView(APIView):
                 "name": child.name or child.code,
                 "sku": variant.sku if variant else child.code,
                 "is_published": child.is_published,
+                "is_emi_enabled": bool(child.is_emi_enabled or getattr(operational, "is_emi_enabled", False)),
+                "is_rent_enabled": bool(child.is_rent_enabled or getattr(operational, "is_rent_enabled", False)),
+                "is_lease_enabled": bool(child.is_lease_enabled or getattr(operational, "is_lease_enabled", False)),
+                "is_direct_sale_enabled": bool(child.is_direct_sale_enabled or getattr(operational, "is_direct_sale_enabled", False)),
                 "is_active": child.is_active,
                 "price": str(variant.price) if variant else None,
             })
@@ -274,12 +283,12 @@ class ProductPimVariantPublishControlView(APIView):
         variant_updates = data.get("variants", [])
         if variant_updates:
             child_ids = set(pim.child_pim_products.values_list("id", flat=True))
-            # Build ProductVariant.id → child PimProduct.id mapping for fallback
-            variant_to_child = {
-                v_id: pim_id
-                for pim_id, v_id in pim.child_pim_products.values_list("id", "variants__id")
-                if v_id is not None
-            }
+            # Map by SKU because ProductVariant records are linked to the base PimProduct
+            variants_by_sku = {v.sku: v.id for v in pim.variants.all()}
+            variant_to_child = {}
+            for child in pim.child_pim_products.all():
+                if child.code in variants_by_sku:
+                    variant_to_child[variants_by_sku[child.code]] = child.id
             any_published_now = False
             for row in variant_updates:
                 vid = row.get("id")

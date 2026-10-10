@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
@@ -40,65 +41,42 @@ export default function AdminSubscriptionRequestsPage() {
   const query = (searchParams.get("q") || "").trim();
   const currentPage = Math.max(Number(searchParams.get("page") || 1), 1);
 
-  const [rows, setRows] = useState<SubscriptionRequestRecord[]>([]);
-  const [count, setCount] = useState(0);
-  const [page, setPage] = useState(currentPage);
-  const [numPages, setNumPages] = useState(0);
-  const [hasNext, setHasNext] = useState(false);
-  const [hasPrevious, setHasPrevious] = useState(false);
   const [statusInput, setStatusInput] = useState<RequestStatusFilter>(statusFilter);
-  const [requesterRoleInput, setRequesterRoleInput] =
-    useState<RequesterRoleFilter>(requesterRole);
+  const [requesterRoleInput, setRequesterRoleInput] = useState<RequesterRoleFilter>(requesterRole);
   const [queryInput, setQueryInput] = useState(query);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+
+  const rqQuery = useQuery({
+    queryKey: ["admin", "subscription-requests", statusFilter, requesterRole, query, currentPage],
+    queryFn: () => listSubscriptionRequests("admin", {
+      status: statusFilter || undefined,
+      requesterRole: requesterRole || undefined,
+      q: query || undefined,
+      page: currentPage,
+      pageSize: PAGE_SIZE,
+    }),
+  });
+
+  const payload = rqQuery.data;
+  const rows = payload?.results || [];
+  const count = payload?.count || 0;
+  const page = payload?.page || currentPage;
+  const numPages = payload?.num_pages || 0;
+  const hasNext = payload?.has_next || false;
+  const hasPrevious = payload?.has_previous || false;
+
+  const loading = rqQuery.isLoading;
+  const refreshing = rqQuery.isFetching && !rqQuery.isLoading;
+  const error = rqQuery.error ? toErrorMessage(rqQuery.error) : null;
 
   useEffect(() => {
     setStatusInput(statusFilter);
     setRequesterRoleInput(requesterRole);
     setQueryInput(query);
-    setPage(currentPage);
-  }, [statusFilter, requesterRole, query, currentPage]);
+  }, [statusFilter, requesterRole, query]);
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (mode === "initial") setLoading(true);
-      else setRefreshing(true);
-
-      try {
-        const payload = await listSubscriptionRequests("admin", {
-          status: statusFilter || undefined,
-          requesterRole: requesterRole || undefined,
-          q: query || undefined,
-          page: currentPage,
-          pageSize: PAGE_SIZE,
-        });
-        setRows(payload.results);
-        setCount(payload.count);
-        setPage(payload.page);
-        setNumPages(payload.num_pages);
-        setHasNext(payload.has_next);
-        setHasPrevious(payload.has_previous);
-        setError(null);
-      } catch (err) {
-        setError(toErrorMessage(err));
-        setRows([]);
-        setCount(0);
-        setNumPages(0);
-        setHasNext(false);
-        setHasPrevious(false);
-      } finally {
-        if (mode === "initial") setLoading(false);
-        else setRefreshing(false);
-      }
-    },
-    [currentPage, query, requesterRole, statusFilter]
-  );
-
-  useEffect(() => {
-    void loadPage("initial");
-  }, [loadPage]);
+  const loadPage = useCallback(async () => {
+    await rqQuery.refetch();
+  }, [rqQuery]);
 
   const summary = useMemo(() => {
     return {
@@ -221,7 +199,7 @@ export default function AdminSubscriptionRequestsPage() {
               </button>
               <button
                 type="button"
-                onClick={() => void loadPage("refresh")}
+                onClick={() => void loadPage()}
                 disabled={loading || refreshing}
                 className="inline-flex h-11 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
               >
@@ -237,7 +215,7 @@ export default function AdminSubscriptionRequestsPage() {
           <ERPErrorState
             title="Unable to load admin request register"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 

@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -54,41 +55,23 @@ export default function AdminServiceDeskCaseDetailPage() {
   const caseId = params?.id;
 
   const [serviceCase, setServiceCase] = useState<ServiceDeskCase | null>(null);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [nextStatus, setNextStatus] = useState<ServiceDeskCaseStatus>("UNDER_REVIEW");
   const [resolutionSummary, setResolutionSummary] = useState("");
   const [deliveryNotes, setDeliveryNotes] = useState("");
   const [replacementSaleId, setReplacementSaleId] = useState("");
 
-  const loadPage = useCallback(async () => {
-    if (!caseId) {
-      setLoading(false);
-      setError("Service desk case id is missing.");
-      return;
-    }
+  const query = useQuery({
+    queryKey: ["admin-service-desk-cases", caseId],
+    queryFn: () => getServiceDeskCase(caseId)
+  });
 
-    try {
-      setLoading(true);
-      const next = await getServiceDeskCase(caseId);
-      setServiceCase(next);
-      setNextStatus(
-        next.status === "DRAFT" ? "OPEN" : next.status === "OPEN" ? "UNDER_REVIEW" : "RESOLVED"
-      );
-      setError(null);
-    } catch (err) {
-      setServiceCase(null);
-      setError(toErrorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  }, [caseId]);
-
-  useEffect(() => {
-    void loadPage();
-  }, [loadPage]);
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const [actionError, setActionError] = useState<string | null>(null);
+  const error = actionError || (query.error ? (query.error as Error).message : null);
+  const loadPage = useCallback(async () => { await query.refetch(); }, [query]);
 
   // The customer's position across Advance EMI, rent/lease and direct sales —
   // the same breakdown as the customer pages — so a return/exchange decision
@@ -136,7 +119,7 @@ export default function AdminServiceDeskCaseDetailPage() {
         setResolutionSummary("");
       }
     } catch (err) {
-      setError(toErrorMessage(err));
+      setActionError(toErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -152,7 +135,7 @@ export default function AdminServiceDeskCaseDetailPage() {
       setNotice("Delivery return requested from the service case.");
       setDeliveryNotes("");
     } catch (err) {
-      setError(toErrorMessage(err));
+      setActionError(toErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -168,7 +151,7 @@ export default function AdminServiceDeskCaseDetailPage() {
       setNotice("Delivery return completed and stock bridge settlement recorded.");
       setDeliveryNotes("");
     } catch (err) {
-      setError(toErrorMessage(err));
+      setActionError(toErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -183,7 +166,7 @@ export default function AdminServiceDeskCaseDetailPage() {
       setServiceCase(response.service_case);
       setNotice(`Credit note ${response.service_case.credit_note_no || response.credit_note_id} posted.`);
     } catch (err) {
-      setError(toErrorMessage(err));
+      setActionError(toErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -198,7 +181,7 @@ export default function AdminServiceDeskCaseDetailPage() {
       setServiceCase(response.service_case);
       setNotice(`Debit note ${response.service_case.debit_note_no || response.debit_note_id} posted.`);
     } catch (err) {
-      setError(toErrorMessage(err));
+      setActionError(toErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -214,7 +197,7 @@ export default function AdminServiceDeskCaseDetailPage() {
       setNotice("Replacement direct sale linked.");
       setReplacementSaleId("");
     } catch (err) {
-      setError(toErrorMessage(err));
+      setActionError(toErrorMessage(err));
     } finally {
       setSaving(false);
     }

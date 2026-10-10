@@ -417,11 +417,11 @@ class PublicProductsView(generics.ListAPIView):
             # Honour the PIM publish flag. This filter was described in the
             # comment above but never implemented, so unpublishing a product in
             # the PIM did not remove it from the public site.
-            .filter(Q(pim__isnull=True) | Q(pim__is_published=True))
+            .exclude(pim__is_published=False)
             .distinct()
             .exclude(inventory_profile__stock_item_type__in=["RAW_MATERIAL", "ACCESSORY"])
             .select_related("category_master")
-            .prefetch_related("pim", "pim__attributes__attribute", "pim__variants__attribute_values__attribute")
+            .prefetch_related("pim", "pim_variant", "pim__attributes__attribute", "pim__variants__attribute_values__attribute")
             .order_by("name", "id")
         )
         
@@ -435,8 +435,11 @@ class PublicProductsView(generics.ListAPIView):
             queryset = queryset.filter(
                 Q(name__icontains=search_query) |
                 Q(product_code__icontains=search_query) |
-                Q(category_master__name__icontains=search_query)
-            )
+                Q(category_master__name__icontains=search_query) |
+                Q(pim__attributes__value_text__icontains=search_query) |
+                Q(pim_variant__attribute_values__value_text__icontains=search_query) |
+                Q(pim__variants__attribute_values__value_text__icontains=search_query)
+            ).distinct()
             
         if category:
             queryset = queryset.filter(category_master__name__iexact=category)
@@ -479,10 +482,10 @@ class PublicProductDetailView(APIView):
                 Product.objects.filter(is_active=True)
                 # Same publish rule as the listing, otherwise an unpublished
                 # product stays reachable by direct URL.
-                .filter(Q(pim__isnull=True) | Q(pim__is_published=True))
+                .exclude(pim__is_published=False)
                 .distinct()
                 .exclude(inventory_profile__stock_item_type__in=["RAW_MATERIAL", "ACCESSORY"])
-                .prefetch_related("pim", "pim__attributes__attribute", "pim__variants__attribute_values__attribute")
+                .prefetch_related("pim", "pim_variant", "pim__attributes__attribute", "pim__variants__attribute_values__attribute")
             )
             if id is not None:
                 product = base_qs.get(id=id)
@@ -499,7 +502,10 @@ class PublicProductDetailView(APIView):
             return Response({"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
 
         serializer = PublicProductSerializer(product, context={"request": request})
-        return Response(serializer.data)
+        response = Response(serializer.data)
+        response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response["Pragma"] = "no-cache"
+        return response
 
 
 class PublicLeadView(APIView):

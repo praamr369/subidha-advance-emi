@@ -678,7 +678,7 @@ export default function FGProfilePage() {
                             <label htmlFor="f-accessory" className="mb-1 block text-xs font-medium text-muted-foreground">Accessory *</label>
                             <select id="f-accessory" value={accForm.accessory} onChange={(e) => setAccForm((f) => ({ ...f, accessory: Number(e.target.value) }))} className={SEL}>
                               <option value={0}>— Select accessory —</option>
-                              {availableAcc.map((a) => <option key={a.id} value={a.id}>{a.product_name} ({a.product_code})</option>)}
+                              {availableAcc.map((a) => <option key={a.id} value={a.id}>{a.product_name}</option>)}
                             </select>
                           </div>
                         )

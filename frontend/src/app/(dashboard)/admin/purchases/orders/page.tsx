@@ -169,7 +169,7 @@ function CreatePOForm({ vendors, items, onSaved, onCancel }: CreatePOFormProps) 
               >
                 <option value="">— Item —</option>
                 {items.map((it) => (
-                  <option key={it.id} value={it.id}>{it.product_name} ({it.sku ?? "—"})</option>
+                  <option key={it.id} value={it.id}>{it.product_name}</option>
                 ))}
               </select>
               <input

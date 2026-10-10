@@ -14,7 +14,7 @@ import {
   useRef,
   useState,
   type ReactNode,
-} from "react";
+startTransition } from "react";
 import {
   ArrowRight,
   BadgeCheck,
@@ -659,8 +659,10 @@ export default function AdminDashboardPage() {
       return false;
     } finally {
       if (requestId === coreRequestIdRef.current) {
-        if (mode === "initial") setLoading(false);
-        else setRefreshing(false);
+        startTransition(() => {
+          if (mode === "initial") setLoading(false);
+          else setRefreshing(false);
+        });
       }
     }
   }, []);
@@ -1092,7 +1094,7 @@ export default function AdminDashboardPage() {
           onEndDateChange={setEndDate}
         />
 
-        <div aria-live="polite">
+        <div aria-live="polite" className={loading ? "flex min-h-[50vh] flex-col justify-center" : ""}>
         {loading ? <LoadingBlock label="Loading admin dashboard..." /> : null}
 
         {!loading && error ? (

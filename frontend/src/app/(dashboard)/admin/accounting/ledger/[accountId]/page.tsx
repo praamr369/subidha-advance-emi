@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
@@ -32,47 +33,45 @@ export default function AccountingLedgerPage() {
   const accountId = params?.accountId;
   
   const [report, setReport] = useState<GeneralLedgerReport | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [category, setCategory] = useState("");
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (!accountId) return;
-      if (mode === "initial") setLoading(true);
-      else setRefreshing(true);
-      try {
-        const params: Record<string, string | number> = {
-          account_id: accountId,
-          start_date: dateFrom || "",
-          end_date: dateTo || "",
-        };
-        if (category) {
-          params.category = category;
-        }
-        const payload = await getGeneralLedger(params);
-        setReport(payload);
-        setError(null);
-      } catch (err) {
-        setError(accountingErrorMessage(err, "Failed to load ledger statement."));
-        if (mode === "initial") {
-          setReport(null);
-        }
-      } finally {
-        if (mode === "initial") setLoading(false);
-        else setRefreshing(false);
+  const query = useQuery({
+    queryKey: ["accounting", "ledger", accountId, dateFrom, dateTo, category],
+    queryFn: async () => {
+      if (!accountId) return null;
+      const reqParams: Record<string, string | number> = {
+        account_id: accountId,
+        start_date: dateFrom || "",
+        end_date: dateTo || "",
+      };
+      if (category) {
+        reqParams.category = category;
       }
+      return await getGeneralLedger(reqParams);
     },
-    [accountId, dateFrom, dateTo, category]
-  );
+    enabled: Boolean(accountId),
+  });
+
+  const loading = query.isLoading && query.fetchStatus !== "idle";
+  const refreshing = query.isRefetching && !query.isLoading;
+  const error = (query.error ? accountingErrorMessage(query.error, "Failed to load ledger statement.") : null) || actionError;
 
   useEffect(() => {
-    void loadPage("initial");
-  }, [loadPage]);
+    if (query.data) {
+      setReport(query.data);
+      setActionError(null);
+    } else if (query.isError && query.error) {
+      setReport(null);
+    }
+  }, [query.data, query.isError, query.error]);
+
+  const loadPage = useCallback(async () => {
+    await query.refetch();
+  }, [query]);
 
   const columns: EnterpriseColumnDef<GeneralLedgerRow>[] = [
     {
@@ -194,7 +193,7 @@ export default function AccountingLedgerPage() {
             <>
               <button
                 type="button"
-                onClick={() => void loadPage("refresh")}
+                onClick={() => void loadPage()}
                 className="h-9 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-60"
                 disabled={loading || refreshing}
               >
@@ -209,7 +208,7 @@ export default function AccountingLedgerPage() {
                     setCategory("");
                     // We must clear state then refresh, but state updates are batched. 
                     // Simple hack is to just call loadPage and let the next effect cycle pick it up, or wait a tick.
-                    setTimeout(() => void loadPage("refresh"), 0);
+                    setTimeout(() => void loadPage(), 0);
                   }}
                   className="h-9 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-60"
                   disabled={loading || refreshing}
@@ -220,7 +219,7 @@ export default function AccountingLedgerPage() {
               <AccountingRefreshButton
                 loading={loading}
                 refreshing={refreshing}
-                onClick={() => void loadPage("refresh")}
+                onClick={() => void loadPage()}
               />
             </>
           }
@@ -237,7 +236,7 @@ export default function AccountingLedgerPage() {
             columns={columns}
             loading={loading}
             error={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
             emptyTitle="No ledger rows"
             emptyDescription="No transactions match the selected filters."
           />

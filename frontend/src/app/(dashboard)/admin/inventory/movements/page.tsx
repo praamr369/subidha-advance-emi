@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -76,7 +77,6 @@ const columns: EnterpriseColumnDef<StockLedgerRow>[] = [
 
 export default function InventoryMovementsPage() {
   const [response, setResponse] = useState<StockLedgerMovementsResponse | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -114,40 +114,34 @@ export default function InventoryMovementsPage() {
     };
   }, []);
 
-  // Load movements data
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadPage() {
-      setLoading(true);
-      try {
-        const payload = await listInventoryMovements({
-          start_date: startDate || undefined,
-          end_date: endDate || undefined,
-          search: debouncedSearch || undefined,
-          reference_model: debouncedReferenceSearch || undefined,
-          movement_type: selectedMovementTypes.length > 0 ? selectedMovementTypes.join(",") : undefined,
-          location_id: locationId || undefined,
-          page: pageIndex,
-          page_size: 50,
-        });
-        if (cancelled) return;
-        setResponse(payload);
-        setError(null);
-      } catch (err) {
-        if (cancelled) return;
-        setResponse(null);
-        setError(accountingErrorMessage(err, "Failed to load inventory movements."));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+  const query = useQuery({
+    queryKey: ["inventory_movements", startDate, endDate, debouncedSearch, debouncedReferenceSearch, selectedMovementTypes, locationId, pageIndex],
+    queryFn: async () => {
+      const payload = await listInventoryMovements({
+        start_date: startDate || undefined,
+        end_date: endDate || undefined,
+        search: debouncedSearch || undefined,
+        reference_model: debouncedReferenceSearch || undefined,
+        movement_type: selectedMovementTypes.length > 0 ? selectedMovementTypes.join(",") : undefined,
+        location_id: locationId || undefined,
+        page: pageIndex,
+        page_size: 50,
+      });
+      return payload;
     }
+  });
 
-    void loadPage();
-    return () => {
-      cancelled = true;
-    };
-  }, [startDate, endDate, debouncedSearch, debouncedReferenceSearch, selectedMovementTypes, locationId, pageIndex]);
+  const loading = query.isLoading;
+
+  useEffect(() => {
+    if (query.data) {
+      setResponse(query.data);
+      setError(null);
+    } else if (query.isError) {
+      setResponse(null);
+      setError(accountingErrorMessage(query.error, "Failed to load inventory movements."));
+    }
+  }, [query.data, query.isError, query.error]);
 
   const handleMovementTypeToggle = (type: string) => {
     setSelectedMovementTypes((prev) =>

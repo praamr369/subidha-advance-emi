@@ -2,7 +2,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle,
   ArrowRight,
@@ -130,7 +131,6 @@ function CategoryRow({ label, count, inStock, low, out, value, icon, color, href
 }
 
 export default function AdminInventoryPage() {
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dashboard, setDashboard] = useState<InventoryDashboardResponse | null>(null);
   const [adjustments, setAdjustments] = useState<StockAdjustment[]>([]);
@@ -138,37 +138,44 @@ export default function AdminInventoryPage() {
   const [bridgeRows, setBridgeRows] = useState<StockLedgerRow[]>([]);
   const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function loadPage() {
-      setLoading(true);
-      try {
-        const [dashboardPayload, adjPayload, locPayload, bridgePayload] = await Promise.all([
-          getInventoryDashboard({ location_id: selectedLocationId || undefined }),
-          listStockAdjustments(),
-          listStockLocations(),
-          listInventoryMovements({
-            movement_type:
-              "EMI_DELIVERY_OUT,EMI_RETURN_IN,RENT_HANDOVER_OUT,RENT_RETURN_IN,LEASE_HANDOVER_OUT,LEASE_RETURN_IN",
-          }),
-        ]);
-        if (cancelled) return;
-        setDashboard(dashboardPayload);
-        setAdjustments(adjPayload.results);
-        setLocations(locPayload.results);
-        setBridgeRows(bridgePayload.results.slice(0, 10));
-        setError(null);
-      } catch (err) {
-        if (cancelled) return;
-        setDashboard(null);
-        setError(accountingErrorMessage(err, "Failed to load inventory operations."));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+  const query = useQuery({
+    queryKey: ['inventory-dashboard', selectedLocationId],
+    queryFn: async () => {
+      const [dashboardPayload, adjPayload, locPayload, bridgePayload] = await Promise.all([
+        getInventoryDashboard({ location_id: selectedLocationId || undefined }),
+        listStockAdjustments(),
+        listStockLocations(),
+        listInventoryMovements({
+          movement_type:
+            "EMI_DELIVERY_OUT,EMI_RETURN_IN,RENT_HANDOVER_OUT,RENT_RETURN_IN,LEASE_HANDOVER_OUT,LEASE_RETURN_IN",
+        }),
+      ]);
+      return { dashboardPayload, adjPayload, locPayload, bridgePayload };
     }
-    void loadPage();
-    return () => { cancelled = true; };
-  }, [selectedLocationId]);
+  });
+
+  const loading = query.isLoading;
+
+  useEffect(() => {
+    if (query.data) {
+      setDashboard(query.data.dashboardPayload);
+      setAdjustments(query.data.adjPayload.results);
+      setLocations(query.data.locPayload.results);
+      setBridgeRows(query.data.bridgePayload.results.slice(0, 10));
+      setError(null);
+    }
+  }, [query.data]);
+
+  useEffect(() => {
+    if (query.error) {
+      setDashboard(null);
+      setError(accountingErrorMessage(query.error, "Failed to load inventory operations."));
+    }
+  }, [query.error]);
+
+  const loadPage = useCallback(async () => {
+    await query.refetch();
+  }, [query]);
 
   const activeLocations = locations.filter(l => l.is_active).length;
   const draftAdjustments = adjustments.filter(a => a.status === "DRAFT").length;

@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { Suspense } from "react";
 import type { ReactNode } from "react";
 
 import RoleGuard from "@/components/guards/RoleGuard";
@@ -19,7 +20,9 @@ export default function AdminShellRouter({ children }: { children: ReactNode }) 
 
   return (
     <RoleGuard allowedRoles={["ADMIN"]}>
-      <DashboardShell>{children}</DashboardShell>
+      <Suspense fallback={<div className="min-h-screen bg-background" aria-busy="true" />}>
+        <DashboardShell>{children}</DashboardShell>
+      </Suspense>
     </RoleGuard>
   );
 }

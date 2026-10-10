@@ -1,5 +1,6 @@
 // frontend/src/app/(dashboard)/admin/customers/[id]/page.tsx
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -1385,138 +1386,137 @@ export default function AdminCustomerDetailPage() {
   const [operationalProfile, setOperationalProfile] =
     useState<CustomerOperationalProfile | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [savingKyc, setSavingKyc] = useState(false);
   const [kycReason, setKycReason] = useState("");
   const [kycError, setKycError] = useState<string | null>(null);
   const [kycSuccess, setKycSuccess] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [errorState, setErrorState] = useState<string | null>(null);
   const [newUsername, setNewUsername] = useState("");
   const [usernameReason, setUsernameReason] = useState("");
   const [usernameSaving, setUsernameSaving] = useState(false);
   const [usernameError, setUsernameError] = useState<string | null>(null);
   const [usernameSuccess, setUsernameSuccess] = useState<string | null>(null);
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (!customerId) return;
+  const rqQuery = useQuery({
+    queryKey: ["admin", "customers", customerId],
+    queryFn: async () => {
+      if (!customerId) return null;
+      const [customerResult, subscriptionResult, paymentResult, operationalResult] =
+        await Promise.allSettled([
+          apiFetch<Record<string, unknown>>(`/admin/customers/${customerId}/`),
+          apiFetch<unknown>(`/admin/subscriptions/?customer=${customerId}`),
+          apiFetch<unknown>(`/admin/payments/?customer=${customerId}`),
+          apiFetch<Record<string, unknown>>(
+            `/admin/customers/${customerId}/operational-profile/`
+          ),
+        ]);
 
-      if (mode === "initial") setLoading(true);
-      else setRefreshing(true);
-
-      try {
-        const [customerResult, subscriptionResult, paymentResult, operationalResult] =
-          await Promise.allSettled([
-            apiFetch<Record<string, unknown>>(`/admin/customers/${customerId}/`),
-            apiFetch<unknown>(`/admin/subscriptions/?customer=${customerId}`),
-            apiFetch<unknown>(`/admin/payments/?customer=${customerId}`),
-            apiFetch<Record<string, unknown>>(
-              `/admin/customers/${customerId}/operational-profile/`
-            ),
-          ]);
-
-        if (customerResult.status !== "fulfilled") {
-          throw customerResult.reason;
-        }
-
-        const basePayload = customerResult.value;
-        const nextWarnings: string[] = [];
-
-        const normalizedCustomer = normalizeCustomerDetail(basePayload);
-
-        let nextSubscriptions: SubscriptionPreviewRow[] = [];
-        let nextPayments: PaymentPreviewRow[] = [];
-        let nextOperationalProfile: CustomerOperationalProfile | null = null;
-
-        if (subscriptionResult.status === "fulfilled") {
-          nextSubscriptions = toArray<Record<string, unknown>>(subscriptionResult.value)
-            .map(normalizeSubscriptionPreview)
-            .sort((a, b) => {
-              const aDate = Date.parse(a.start_date || "") || 0;
-              const bDate = Date.parse(b.start_date || "") || 0;
-              return bDate - aDate;
-            });
-        } else {
-          nextSubscriptions = extractNestedArray(basePayload, [
-            "subscriptions",
-            "subscription_rows",
-            "subscription_history",
-          ])
-            .map(normalizeSubscriptionPreview)
-            .sort((a, b) => {
-              const aDate = Date.parse(a.start_date || "") || 0;
-              const bDate = Date.parse(b.start_date || "") || 0;
-              return bDate - aDate;
-            });
-
-          nextWarnings.push(
-            "Subscription preview was loaded from customer detail payload because the filtered subscription endpoint did not return successfully."
-          );
-        }
-
-        if (paymentResult.status === "fulfilled") {
-          nextPayments = toArray<Record<string, unknown>>(paymentResult.value)
-            .map(normalizePaymentPreview)
-            .sort((a, b) => {
-              const aDate = Date.parse(a.payment_date || "") || 0;
-              const bDate = Date.parse(b.payment_date || "") || 0;
-              return bDate - aDate;
-            });
-        } else {
-          nextPayments = extractNestedArray(basePayload, [
-            "payments",
-            "payment_rows",
-            "payment_history",
-          ])
-            .map(normalizePaymentPreview)
-            .sort((a, b) => {
-              const aDate = Date.parse(a.payment_date || "") || 0;
-              const bDate = Date.parse(b.payment_date || "") || 0;
-              return bDate - aDate;
-            });
-
-          nextWarnings.push(
-            "Payment preview was loaded from customer detail payload because the filtered payment endpoint did not return successfully."
-          );
-        }
-
-        if (operationalResult.status === "fulfilled") {
-          nextOperationalProfile = normalizeCustomerOperationalProfile(
-            operationalResult.value
-          );
-        } else {
-          nextWarnings.push(
-            "Operational profile sections could not be loaded from the dedicated customer operations endpoint."
-          );
-        }
-
-        setCustomer(normalizedCustomer);
-        setSubscriptions(nextSubscriptions);
-        setPayments(nextPayments);
-        setOperationalProfile(nextOperationalProfile);
-        setWarnings(nextWarnings);
-        setError(null);
-      } catch (err) {
-        setError(toErrorMessage(err));
-        if (mode === "initial") {
-          setCustomer(null);
-          setSubscriptions([]);
-          setPayments([]);
-          setOperationalProfile(null);
-          setWarnings([]);
-        }
-      } finally {
-        if (mode === "initial") setLoading(false);
-        else setRefreshing(false);
+      if (customerResult.status !== "fulfilled") {
+        throw customerResult.reason;
       }
+      return { customerResult, subscriptionResult, paymentResult, operationalResult };
     },
-    [customerId]
-  );
+    enabled: !!customerId,
+  });
+
+  const loading = rqQuery.isLoading;
+  const refreshing = rqQuery.isFetching && !rqQuery.isLoading;
+  const error = errorState || (rqQuery.error ? toErrorMessage(rqQuery.error) : null);
 
   useEffect(() => {
-    void loadPage("initial");
-  }, [loadPage]);
+    if (rqQuery.data) {
+      const { customerResult, subscriptionResult, paymentResult, operationalResult } = rqQuery.data;
+      const basePayload = customerResult.value;
+      const nextWarnings: string[] = [];
+
+      const normalizedCustomer = normalizeCustomerDetail(basePayload);
+
+      let nextSubscriptions: SubscriptionPreviewRow[] = [];
+      let nextPayments: PaymentPreviewRow[] = [];
+      let nextOperationalProfile: CustomerOperationalProfile | null = null;
+
+      if (subscriptionResult.status === "fulfilled") {
+        nextSubscriptions = toArray<Record<string, unknown>>(subscriptionResult.value)
+          .map(normalizeSubscriptionPreview)
+          .sort((a, b) => {
+            const aDate = Date.parse(a.start_date || "") || 0;
+            const bDate = Date.parse(b.start_date || "") || 0;
+            return bDate - aDate;
+          });
+      } else {
+        nextSubscriptions = extractNestedArray(basePayload, [
+          "subscriptions",
+          "subscription_rows",
+          "subscription_history",
+        ])
+          .map(normalizeSubscriptionPreview)
+          .sort((a, b) => {
+            const aDate = Date.parse(a.start_date || "") || 0;
+            const bDate = Date.parse(b.start_date || "") || 0;
+            return bDate - aDate;
+          });
+
+        nextWarnings.push(
+          "Subscription preview was loaded from customer detail payload because the filtered subscription endpoint did not return successfully."
+        );
+      }
+
+      if (paymentResult.status === "fulfilled") {
+        nextPayments = toArray<Record<string, unknown>>(paymentResult.value)
+          .map(normalizePaymentPreview)
+          .sort((a, b) => {
+            const aDate = Date.parse(a.payment_date || "") || 0;
+            const bDate = Date.parse(b.payment_date || "") || 0;
+            return bDate - aDate;
+          });
+      } else {
+        nextPayments = extractNestedArray(basePayload, [
+          "payments",
+          "payment_rows",
+          "payment_history",
+        ])
+          .map(normalizePaymentPreview)
+          .sort((a, b) => {
+            const aDate = Date.parse(a.payment_date || "") || 0;
+            const bDate = Date.parse(b.payment_date || "") || 0;
+            return bDate - aDate;
+          });
+
+        nextWarnings.push(
+          "Payment preview was loaded from customer detail payload because the filtered payment endpoint did not return successfully."
+        );
+      }
+
+      if (operationalResult.status === "fulfilled") {
+        nextOperationalProfile = normalizeCustomerOperationalProfile(
+          operationalResult.value
+        );
+      } else {
+        nextWarnings.push(
+          "Operational profile sections could not be loaded from the dedicated customer operations endpoint."
+        );
+      }
+
+      setCustomer(normalizedCustomer);
+      setSubscriptions(nextSubscriptions);
+      setPayments(nextPayments);
+      setOperationalProfile(nextOperationalProfile);
+      setWarnings(nextWarnings);
+      setErrorState(null);
+    } else if (rqQuery.error) {
+      setCustomer(null);
+      setSubscriptions([]);
+      setPayments([]);
+      setOperationalProfile(null);
+      setWarnings([]);
+    }
+  }, [rqQuery.data, rqQuery.error]);
+
+  const loadPage = useCallback(async () => {
+    if (!customerId) return;
+    setErrorState(null);
+    await rqQuery.refetch();
+  }, [customerId, rqQuery]);
 
   const activeSubscriptionCount = useMemo(
     () =>
@@ -1714,7 +1714,7 @@ export default function AdminCustomerDetailPage() {
           : "KYC status updated."
       );
       setKycReason("");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setKycError(
         err instanceof Error && err.message.trim()
@@ -1744,7 +1744,7 @@ export default function AdminCustomerDetailPage() {
       );
       setNewUsername("");
       setUsernameReason("");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setUsernameError(toErrorMessage(err));
     } finally {
@@ -1829,7 +1829,7 @@ export default function AdminCustomerDetailPage() {
           <div className="flex justify-end">
             <button
               type="button"
-              onClick={() => void loadPage("refresh")}
+              onClick={() => void loadPage()}
               disabled={refreshing || loading}
               className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -1845,7 +1845,7 @@ export default function AdminCustomerDetailPage() {
           <ErrorState
             title="Unable to load customer detail"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 

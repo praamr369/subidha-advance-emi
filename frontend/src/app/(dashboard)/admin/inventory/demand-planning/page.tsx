@@ -49,11 +49,9 @@ function exportDemandPlanningToCSV(rows: DemandPlanningRow[], filename: string =
   document.body.removeChild(link);
 }
 
-export default function AdminInventoryDemandPlanningPage() {
-  const [rows, setRows] = useState<DemandPlanningRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+import { useQuery } from "@tanstack/react-query";
 
+export default function AdminInventoryDemandPlanningPage() {
   // Pagination & Filter State
   const [pagination, setPagination] = useState({ page: 1, page_size: 50, total_count: 0, num_pages: 0 });
   const [searchQuery, setSearchQuery] = useState("");
@@ -61,36 +59,35 @@ export default function AdminInventoryDemandPlanningPage() {
   const [demandSources, setDemandSources] = useState<Set<string>>(new Set(["subscriptions", "direct_sales", "rent_lease"])); // All selected by default
   const debouncedSearch = useDebounce(searchQuery, 350);
 
-  const loadPage = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
+  const query = useQuery({
+    queryKey: ["demandPlanning", pagination.page, pagination.page_size, debouncedSearch, criticalShortageOnly, Array.from(demandSources).join(",")],
+    queryFn: () => {
       const demandSourcesArray = Array.from(demandSources);
-      const payload = await getBulkDemandPlanning({
+      return getBulkDemandPlanning({
         page: pagination.page,
         page_size: pagination.page_size,
         search: debouncedSearch || undefined,
         critical_shortage: criticalShortageOnly ? "true" : undefined,
         demand_sources: demandSourcesArray.length > 0 ? demandSourcesArray.join(",") : undefined,
       });
+    }
+  });
 
-      setRows(payload.results ?? []);
+  const payload = query.data;
+  const rows = payload?.results ?? [];
+  const loading = query.isLoading;
+  const error = query.error ? (query.error as Error).message : null;
+  const loadPage = useCallback(async () => { await query.refetch(); }, [query]);
+
+  useEffect(() => {
+    if (payload) {
       setPagination(prev => ({
         ...prev,
         total_count: payload.count,
         num_pages: payload.num_pages,
       }));
-    } catch (err) {
-      setRows([]);
-      setError(err instanceof Error ? err.message : "Failed to load demand planning.");
-    } finally {
-      setLoading(false);
     }
-  }, [pagination.page, pagination.page_size, debouncedSearch, criticalShortageOnly, demandSources]);
-
-  useEffect(() => {
-    void loadPage();
-  }, [loadPage]);
+  }, [payload]);
 
   const columns: EnterpriseColumnDef<DemandPlanningRow>[] = [
     { key: "sku", header: "SKU" },

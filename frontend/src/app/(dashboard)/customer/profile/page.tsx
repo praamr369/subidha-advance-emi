@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import { formatRupee } from "@/lib/utils/currency";
 import { Camera, FileText, GitBranch, RefreshCw } from "lucide-react";
@@ -48,9 +49,8 @@ const inputCls = "w-full rounded-2xl border border-border bg-card px-4 py-3 text
 export default function CustomerProfilePage() {
   const { logout, isLoggingOut } = useLogout();
   const [data, setData] = useState<CustomerProfileResponse | null>(null);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   const [name, setName] = useState("");
@@ -91,30 +91,39 @@ export default function CustomerProfilePage() {
     if (payload.kyc_status) setKycStatus(payload.kyc_status);
   }
 
-  const loadPage = useCallback(async () => {
-    setLoading(true);
-    try {
+  const query = useQuery({
+    queryKey: ['customerProfile'],
+    queryFn: async () => {
       const [profileResult, kycResult, referralResult] = await Promise.allSettled([
         getCustomerProfile(),
         listCustomerKycDocuments(),
         listCustomerReferrals(),
       ]);
       if (profileResult.status === "rejected") throw profileResult.reason;
-      hydrate(profileResult.value);
-      setError(null);
-      if (kycResult.status === "fulfilled") {
-        setKycDocs(kycResult.value.results);
-        setKycStatus(kycResult.value.kyc_status);
-      }
-      if (referralResult.status === "fulfilled") setReferrals(referralResult.value.results);
-    } catch (err) {
-      setError(toErrorMessage(err));
-    } finally {
-      setLoading(false);
+      return { profileResult, kycResult, referralResult };
     }
-  }, []);
+  });
 
-  useEffect(() => { void loadPage(); }, [loadPage]);
+  const loading = query.isLoading || query.isFetching;
+  const pageError = query.error ? toErrorMessage(query.error) : null;
+  const error = pageError || formError;
+
+  const loadPage = useCallback(async () => {
+    await query.refetch();
+  }, [query]);
+
+  useEffect(() => {
+    if (query.data) {
+      hydrate(query.data.profileResult.value as CustomerProfileResponse);
+      if (query.data.kycResult.status === "fulfilled") {
+        setKycDocs(query.data.kycResult.value.results);
+        setKycStatus(query.data.kycResult.value.kyc_status);
+      }
+      if (query.data.referralResult.status === "fulfilled") {
+        setReferrals(query.data.referralResult.value.results);
+      }
+    }
+  }, [query.data]);
 
   async function handlePhotoUpload(file: File) {
     setPhotoUploading(true);
@@ -152,13 +161,13 @@ export default function CustomerProfilePage() {
     e.preventDefault();
     setSaving(true);
     setSaveSuccess(false);
-    setError(null);
+    setFormError(null);
     try {
       const payload = await updateCustomerProfile({ name: name.trim(), phone: phone.trim(), email: email.trim(), address: address.trim(), city: city.trim() });
       hydrate(payload);
       setSaveSuccess(true);
     } catch (err) {
-      setError(toErrorMessage(err));
+      setFormError(toErrorMessage(err));
     } finally {
       setSaving(false);
     }

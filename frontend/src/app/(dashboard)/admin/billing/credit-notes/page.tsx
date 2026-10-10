@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
@@ -195,26 +196,34 @@ function ApplyCreditNoteDialog({
 
 export default function BillingCreditNotesPage() {
   const [rows, setRows] = useState<BillingCreditNote[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [applyingNote, setApplyingNote] = useState<BillingCreditNote | null>(null);
 
-  const loadPage = useCallback(async () => {
-    try {
+  const { data: queryData, isLoading: loading, error: queryError, refetch } = useQuery({
+    queryKey: ["billing_credit_notes"],
+    queryFn: async () => {
       const payload = await listBillingCreditNotes();
-      setRows(payload.results);
-      setError(null);
-    } catch (err) {
-      setRows([]);
-      setError(accountingErrorMessage(err, "Failed to load billing credit notes."));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      return payload.results;
+    },
+  });
+
+  const loadPage = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
 
   useEffect(() => {
-    void loadPage();
-  }, [loadPage]);
+    if (queryData) {
+      setRows(queryData);
+      setError(null);
+    }
+  }, [queryData]);
+
+  useEffect(() => {
+    if (queryError) {
+      setRows([]);
+      setError(accountingErrorMessage(queryError, "Failed to load billing credit notes."));
+    }
+  }, [queryError]);
 
   const columns: EnterpriseColumnDef<BillingCreditNote>[] = [
     { key: "note_date", header: "Date", render: (row) => accountingDate(row.note_date) },

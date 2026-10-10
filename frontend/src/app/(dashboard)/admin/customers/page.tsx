@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -293,8 +294,6 @@ export default function AdminCustomersPage() {
   const [rows, setRows] = useState<CustomerRow[]>([]);
   const [count, setCount] = useState(0);
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<CustomerOperationalSummary | null>(null);
 
@@ -320,53 +319,55 @@ export default function AdminCustomersPage() {
     null
   );
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (mode === "initial") setLoading(true);
-      else setRefreshing(true);
+  const queryString = useMemo(() => {
+    const params = new URLSearchParams();
+    if (query) params.set("q", query);
+    if (kycFilter) params.set("kyc_status", kycFilter);
+    if (statusFilter) params.set("status", statusFilter);
+    params.set("page", String(page));
+    params.set("page_size", String(CUSTOMERS_PAGE_SIZE));
+    return params.toString();
+  }, [kycFilter, page, query, statusFilter]);
 
-      try {
-        const params = new URLSearchParams();
-        if (query) params.set("q", query);
-        if (kycFilter) params.set("kyc_status", kycFilter);
-        if (statusFilter) params.set("status", statusFilter);
-        params.set("page", String(page));
-        params.set("page_size", String(CUSTOMERS_PAGE_SIZE));
-
-        const [payloadResult, summaryResult] = await Promise.allSettled([
-          apiFetch<unknown>(`/admin/customers/?${params.toString()}`),
-          apiFetch<CustomerOperationalSummary>("/admin/customers/operational-summary/"),
-        ]);
-
-        if (payloadResult.status === "fulfilled") {
-          const normalized = toPaginated<Record<string, unknown>>(payloadResult.value);
-          setRows((normalized.results ?? []).map(normalizeCustomerRow));
-          setCount(normalized.count ?? 0);
-          setError(null);
-        } else {
-          throw payloadResult.reason;
-        }
-
-        if (summaryResult.status === "fulfilled" && summaryResult.value) {
-          setSummary(summaryResult.value);
-        }
-      } catch (err) {
-        setError(toErrorMessage(err));
-        if (mode === "initial") {
-          setRows([]);
-          setCount(0);
-        }
-      } finally {
-        if (mode === "initial") setLoading(false);
-        else setRefreshing(false);
+  const { data: queryData, isLoading: loading, isRefetching: refreshing, error: queryError, refetch } = useQuery({
+    queryKey: ["admin_customers", queryString],
+    queryFn: async () => {
+      const [payloadResult, summaryResult] = await Promise.allSettled([
+        apiFetch<unknown>(`/admin/customers/?${queryString}`),
+        apiFetch<CustomerOperationalSummary>("/admin/customers/operational-summary/"),
+      ]);
+      if (payloadResult.status === "rejected") {
+        throw payloadResult.reason;
       }
+      return {
+        payload: toPaginated<Record<string, unknown>>(payloadResult.value),
+        summary: summaryResult.status === "fulfilled" ? summaryResult.value : null,
+      };
     },
-    [kycFilter, page, query, statusFilter]
-  );
+  });
+
+  const loadPage = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
 
   useEffect(() => {
-    void loadPage("initial");
-  }, [loadPage]);
+    if (queryData) {
+      setRows((queryData.payload.results ?? []).map(normalizeCustomerRow));
+      setCount(queryData.payload.count ?? 0);
+      if (queryData.summary) {
+        setSummary(queryData.summary);
+      }
+      setError(null);
+    }
+  }, [queryData]);
+
+  useEffect(() => {
+    if (queryError) {
+      setError(toErrorMessage(queryError));
+      setRows([]);
+      setCount(0);
+    }
+  }, [queryError]);
 
   useEffect(() => {
     const params = new URLSearchParams(searchParamKey);
@@ -501,7 +502,7 @@ export default function AdminCustomersPage() {
       if (customerImportFileRef.current) {
         customerImportFileRef.current.value = "";
       }
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setCustomerImportError(
         toActionMessage(err, "Unable to confirm customer import.")
@@ -903,7 +904,7 @@ export default function AdminCustomersPage() {
           <div className="mb-4 flex flex-wrap gap-2">
             <ActionButton
               variant="outline"
-              onClick={() => void loadPage("refresh")}
+              onClick={() => void loadPage()}
               disabled={refreshing || loading}
               leftIcon={<RefreshCw className="h-4 w-4" />}
             >
@@ -1041,7 +1042,7 @@ export default function AdminCustomersPage() {
           <ERPErrorState
             title="Unable to load customer register"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
         </div>

@@ -93,7 +93,7 @@ def company_name() -> str:
     try:
         from business_setup.models import BusinessProfile
 
-        profile = BusinessProfile.objects.filter(is_active=True).order_by("id").first()
+        profile = BusinessProfile.get_current()
     except Exception:  # pragma: no cover - profile table missing in odd setups
         profile = None
     if profile is None:

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState, useRef, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef, type FormEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
@@ -234,54 +235,56 @@ export default function AccountingPurchaseBillsPage() {
   const [legacyBills, setLegacyBills] = useState<VendorBill[]>([]);
   const [selectedBillId, setSelectedBillId] = useState<number | null>(null);
   const [form, setForm] = useState<PurchaseBillForm>(emptyForm());
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [activeTaxMode, setActiveTaxMode] = useState<BusinessTaxMode>("GST_UNREGISTERED");
 
-  async function loadPage(mode: "initial" | "refresh" = "initial") {
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
-
-    try {
+  const query = useQuery({
+    queryKey: ["accounting", "purchase-bills"],
+    queryFn: async () => {
       const [purchasePayload, vendorPayload, financePayload, locationPayload, itemPayload, compliancePayload, legacyBillsPayload] =
-                  await Promise.all([
-            listPurchaseBills(),
-            listVendors({ is_active: 1 }),
-            listFinanceAccounts({ is_active: 1 }),
-            listStockLocations({ is_active: 1 }),
-            listInventoryItems({ is_active: 1, stock_tracking_enabled: 1 }),
-            getComplianceTaxProfile(),
-            listVendorBills({ page_size: 100 }),
-          ]);
-      setRows(purchasePayload.results);
-      setVendors(vendorPayload.results);
-      setFinanceAccounts(financePayload.results);
-      setLocations(locationPayload.results);
-      setInventoryItems(itemPayload.results);
-        setLegacyBills(legacyBillsPayload.results);
-      setActiveTaxMode(compliancePayload.active.mode);
-      setError(null);
-    } catch (err) {
-      setError(accountingErrorMessage(err, "Failed to load purchase bills."));
-      if (mode === "initial") {
-        setRows([]);
-        setVendors([]);
-        setFinanceAccounts([]);
-        setLocations([]);
-        setInventoryItems([]);
-      }
-    } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
-    }
-  }
+        await Promise.all([
+          listPurchaseBills(),
+          listVendors({ is_active: 1 }),
+          listFinanceAccounts({ is_active: 1 }),
+          listStockLocations({ is_active: 1 }),
+          listInventoryItems({ is_active: 1, stock_tracking_enabled: 1 }),
+          getComplianceTaxProfile(),
+          listVendorBills({ page_size: 100 }),
+        ]);
+      return {
+        rows: purchasePayload.results,
+        vendors: vendorPayload.results,
+        financeAccounts: financePayload.results,
+        locations: locationPayload.results,
+        inventoryItems: itemPayload.results,
+        legacyBills: legacyBillsPayload.results,
+        taxMode: compliancePayload.active.mode,
+      };
+    },
+  });
+
+  const loading = query.isLoading;
+  const refreshing = query.isRefetching && !query.isLoading;
+  const error = (query.error ? accountingErrorMessage(query.error, "Failed to load purchase bills.") : null) || actionError;
 
   useEffect(() => {
-    void loadPage("initial");
-  }, []);
+    if (query.data) {
+      setRows(query.data.rows);
+      setVendors(query.data.vendors);
+      setFinanceAccounts(query.data.financeAccounts);
+      setLocations(query.data.locations);
+      setInventoryItems(query.data.inventoryItems);
+      setLegacyBills(query.data.legacyBills);
+      setActiveTaxMode(query.data.taxMode);
+      setActionError(null);
+    }
+  }, [query.data]);
+
+  const loadPage = useCallback(async () => {
+    await query.refetch();
+  }, [query]);
 
   const selectedBill = useMemo(
     () => rows.find((row) => row.id === selectedBillId) ?? null,
@@ -320,7 +323,7 @@ export default function AccountingPurchaseBillsPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
-    setError(null);
+    setActionError(null);
     setNotice(null);
     try {
       const payload = {
@@ -348,9 +351,9 @@ export default function AccountingPurchaseBillsPage() {
       }
       setSelectedBillId(null);
       setForm(emptyForm());
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
-      setError(accountingErrorMessage(err, "Failed to save purchase bill."));
+      setActionError(accountingErrorMessage(err, "Failed to save purchase bill."));
     } finally {
       setSaving(false);
     }
@@ -360,7 +363,7 @@ export default function AccountingPurchaseBillsPage() {
     setSelectedBillId(null);
     setForm(emptyForm());
     setNotice(null);
-    setError(null);
+    setActionError(null);
   }
 
   const columns: EnterpriseColumnDef<AccountingPurchaseBill>[] = [
@@ -397,7 +400,7 @@ export default function AccountingPurchaseBillsPage() {
                   lines: row.lines?.length ? row.lines.map(toLineForm) : [blankLine()],
                 });
                 setNotice(null);
-                setError(null);
+                setActionError(null);
               }}
               className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-medium text-foreground transition hover:bg-muted"
             >
@@ -412,7 +415,7 @@ export default function AccountingPurchaseBillsPage() {
               onConfirm={async () => {
                 await approvePurchaseBill(row.id);
                 setNotice(`Purchase bill ${row.bill_no} approved.`);
-                await loadPage("refresh");
+                await loadPage();
               }}
               variant="secondary"
             />
@@ -425,7 +428,7 @@ export default function AccountingPurchaseBillsPage() {
               onConfirm={async () => {
                 await postPurchaseBill(row.id);
                 setNotice(`Purchase bill ${row.bill_no} posted.`);
-                await loadPage("refresh");
+                await loadPage();
               }}
               variant="primary"
             />
@@ -438,7 +441,7 @@ export default function AccountingPurchaseBillsPage() {
               onConfirm={async () => {
                 await cancelPurchaseBill(row.id, "Cancelled from accounting purchase bills page.");
                 setNotice(`Purchase bill ${row.bill_no} cancelled.`);
-                await loadPage("refresh");
+                await loadPage();
               }}
               variant="destructive"
             />
@@ -475,7 +478,7 @@ export default function AccountingPurchaseBillsPage() {
     >
       <div className="space-y-6">
         <div className="flex justify-end">
-          <AccountingRefreshButton loading={loading} refreshing={refreshing} onClick={() => void loadPage("refresh")} />
+          <AccountingRefreshButton loading={loading} refreshing={refreshing} onClick={() => void loadPage()} />
         </div>
 
         {notice ? <AccountingNotice message={notice} /> : null}
@@ -800,7 +803,7 @@ export default function AccountingPurchaseBillsPage() {
             columns={columns}
             loading={loading}
             error={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
             emptyTitle="No purchase bills found"
             emptyDescription="Create the first draft purchase bill above."
           />

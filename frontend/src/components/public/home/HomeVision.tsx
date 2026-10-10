@@ -66,10 +66,10 @@ export default function HomeVision({ copy }: { copy: HomeCopy["vision"] }) {
             ))}
           </ul>
           <div className="mt-auto flex flex-wrap gap-2 pt-5">
-            <Link href={ROUTES.public.visionTrust} className="public-action-secondary h-10 !min-h-0 px-4 text-sm">
+            <Link href={ROUTES.public.visionTrust} className="public-action-secondary h-10 min-h-0! px-4 text-sm">
               {copy.visionTrust}
             </Link>
-            <Link href={ROUTES.public.about} className="public-action-secondary h-10 !min-h-0 px-4 text-sm">
+            <Link href={ROUTES.public.about} className="public-action-secondary h-10 min-h-0! px-4 text-sm">
               {copy.aboutUs}
             </Link>
           </div>

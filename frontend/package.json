@@ -47,6 +47,7 @@
     "@tanstack/react-query-devtools": "^5.91.3",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
+    "embla-carousel-autoplay": "^8.6.0",
     "embla-carousel-react": "^8.6.0",
     "framer-motion": "^12.42.2",
     "input-otp": "^1.4.2",
@@ -79,6 +80,6 @@
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
     "ts-morph": "^28.0.0",
-    "typescript": "^5"
+    "typescript": "^5.9.3"
   }
 }

@@ -136,7 +136,7 @@ export default function WaiverHistoryPage() {
             <h3 className="text-xl font-semibold text-gray-900 mb-2">No Waivers Yet</h3>
             <p className="text-gray-600 mb-6">You haven't won any EMI waivers yet. Keep trying!</p>
             <Link
-              href="/dashboard/customer/lucky-plan/eligibility"
+              href="/customer/lucky-plan/eligibility"
               className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg transition"
             >
               Check Your Eligibility
@@ -193,13 +193,13 @@ export default function WaiverHistoryPage() {
         {/* Navigation */}
         <div className="flex gap-4">
           <Link
-            href="/dashboard/customer/lucky-plan/eligibility"
+            href="/customer/lucky-plan/eligibility"
             className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-900 font-semibold py-3 rounded-lg transition text-center"
           >
             Check Eligibility
           </Link>
           <Link
-            href="/dashboard/customer/lucky-plan/results"
+            href="/customer/lucky-plan/results"
             className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition text-center"
           >
             View Draw Results

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
   Banknote,
@@ -396,15 +397,11 @@ function ModuleCard({ module, setupBlocked, setupBlockers, readiness }: { module
 }
 
 export default function AdminAccountingPage() {
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<CockpitData | null>(null);
 
-  async function loadPage(mode: "initial" | "refresh" = "initial") {
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
-    try {
+  const query = useQuery({
+    queryKey: ["accountingCockpitData"],
+    queryFn: async () => {
       const [chartAccounts, financeAccounts, draftJournals, controlPayload, setupStatus, setupReadiness, bridgeReadiness, accountingReadiness] = await Promise.all([
         listChartOfAccounts(),
         listFinanceAccounts(),
@@ -415,18 +412,23 @@ export default function AdminAccountingPage() {
         getAccountingBridgeReadiness(),
         getAccountingReadiness(),
       ]);
-      setData({ chartAccountsCount: chartAccounts.count, financeAccountsCount: financeAccounts.count, draftJournalsCount: draftJournals.count, postedMovementsCount: null, controlPayload, setupStatus, setupReadiness, bridgeReadiness, accountingReadiness });
-      setError(null);
-    } catch (err) {
-      setError(toErrorMessage(err));
-      if (mode === "initial") setData(null);
-    } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
-    }
-  }
+      return { chartAccountsCount: chartAccounts.count, financeAccountsCount: financeAccounts.count, draftJournalsCount: draftJournals.count, postedMovementsCount: null, controlPayload, setupStatus, setupReadiness, bridgeReadiness, accountingReadiness };
+    },
+  });
 
-  useEffect(() => { void loadPage("initial"); }, []);
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const error = query.error ? toErrorMessage(query.error) : null;
+
+  useEffect(() => {
+    if (query.data) {
+      setData(query.data);
+    }
+  }, [query.data]);
+
+  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
+    await query.refetch();
+  }, [query]);
 
   const setupBlockers = useMemo(() => compactBlockers(data?.setupReadiness ?? null), [data?.setupReadiness]);
   const setupBlockerCount = metricNumber(data?.setupStatus?.setup_health_blockers_count) ?? data?.setupReadiness?.summary.blockers_count ?? null;
@@ -510,7 +512,7 @@ export default function AdminAccountingPage() {
 
         <div aria-live="polite">
         {loading ? <ERPLoadingState label="Loading accounting and finance cockpit..." /> : null}
-        {!loading && error ? <ERPErrorState title="Unable to load accounting cockpit" description={error} onRetry={() => void loadPage("initial")} /> : null}
+        {!loading && error ? <ERPErrorState title="Unable to load accounting cockpit" description={error} onRetry={() => void loadPage()} /> : null}
         </div>
         
         {/* Tab content wrapper */}
@@ -523,7 +525,7 @@ export default function AdminAccountingPage() {
                     title="Accounting Control Center"
                     description="Active blockers, primary actions, and daily finance workflows."
                     actions={
-                      <button type="button" onClick={() => void loadPage("refresh")} disabled={refreshing} aria-label={refreshing ? "Refreshing accounting data" : "Refresh accounting data"}
+                      <button type="button" onClick={() => void loadPage()} disabled={refreshing} aria-label={refreshing ? "Refreshing accounting data" : "Refresh accounting data"}
                         className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60">
                         <RefreshCw className={cn("h-3.5 w-3.5", refreshing ? "animate-spin" : "")} aria-hidden />
                         {refreshing ? "Refreshing…" : "Refresh"}

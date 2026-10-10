@@ -100,14 +100,14 @@ export default function BusinessSetupWorkflowBanner({
   if (showCashierBanner) {
     return (
       <section
-        className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900"
+        className="pointer-events-none fixed bottom-4 right-4 z-50 w-[calc(100%-2rem)] max-w-sm rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900 shadow-xl [&>*]:pointer-events-auto"
         data-testid="business-setup-readiness-banner"
       >
         <div className="text-sm font-semibold">Counter pre-flight reminder</div>
-        <p className="mt-1 text-sm leading-6">
-          If counter collection or receipt workflows look incomplete, pause live posting and ask admin to verify the
-          business setup checklist before continuing operations.
-        </p>
+        <div className="mt-1 flex flex-col gap-1 text-sm leading-6">
+          <p>If counter collection or receipt workflows look incomplete,</p>
+          <p>pause live posting and ask admin to verify the business setup checklist before continuing operations.</p>
+        </div>
       </section>
     );
   }
@@ -117,21 +117,13 @@ export default function BusinessSetupWorkflowBanner({
   }
 
   if (loading) {
-    return (
-      <section
-        className="mb-4 rounded-xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground"
-        aria-busy="true"
-        aria-label="Checking business setup readiness"
-      >
-        Checking setup readiness for this workflow...
-      </section>
-    );
+    return null;
   }
 
   if (error) {
     return (
       <section
-        className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900"
+        className="pointer-events-none fixed bottom-4 right-4 z-50 w-[calc(100%-2rem)] max-w-sm rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900 shadow-xl [&>*]:pointer-events-auto"
         data-testid="business-setup-readiness-banner"
       >
         <div className="text-sm font-semibold">Setup readiness could not be verified</div>
@@ -161,14 +153,14 @@ export default function BusinessSetupWorkflowBanner({
 
   return (
     <section
-      className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900"
+      className="pointer-events-none fixed bottom-4 right-4 z-50 w-[calc(100%-2rem)] max-w-md rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900 shadow-xl [&>*]:pointer-events-auto"
       data-testid="business-setup-readiness-banner"
     >
       <div className="text-sm font-semibold">Setup incomplete for live operations</div>
-      <p className="mt-1 text-sm leading-6">
-        {adminScope.label} is available, but required first-run setup is still incomplete. Proceed carefully for review,
-        and complete blockers before live financial posting.
-      </p>
+      <div className="mt-1 flex flex-col gap-1 text-sm leading-6">
+        <p>{adminScope.label} is available, but required first-run setup is still incomplete.</p>
+        <p>Proceed carefully for review, and complete blockers before live financial posting.</p>
+      </div>
 
       {topMissingItems.length > 0 ? (
         <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">

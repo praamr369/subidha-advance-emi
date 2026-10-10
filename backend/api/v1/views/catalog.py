@@ -49,7 +49,10 @@ class _CatalogListMixin:
             ],
             default_page_size=24,
         )
-        return payload if isinstance(payload, Response) else Response(payload)
+        response = payload if isinstance(payload, Response) else Response(payload)
+        response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response["Pragma"] = "no-cache"
+        return response
 
 
 class _CatalogDetailMixin:
@@ -60,7 +63,10 @@ class _CatalogDetailMixin:
 
         queryset = approved_catalog_queryset()
         product = get_object_or_404(queryset, pk=pk)
-        return Response(serialize_catalog_product_detail(product, request))
+        response = Response(serialize_catalog_product_detail(product, request))
+        response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response["Pragma"] = "no-cache"
+        return response
 
 
 class _CatalogFacetsMixin:

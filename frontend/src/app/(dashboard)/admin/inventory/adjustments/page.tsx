@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import { useEffect, useMemo, useState } from "react";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -117,16 +118,15 @@ export default function InventoryAdjustmentsPage() {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [locations, setLocations] = useState<StockLocation[]>([]);
   const [form, setForm] = useState<AdjustmentFormState>(createInitialForm());
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  async function loadPage() {
-    setLoading(true);
-    try {
+  const query = useQuery({
+    queryKey: ["inventory_adjustments", pagination.page, pagination.page_size, statusFilter, debouncedSearch],
+    queryFn: async () => {
       const [adjustmentPayload, itemPayload, locationPayload] = await Promise.all([
         listStockAdjustments({
           page: pagination.page,
@@ -137,37 +137,43 @@ export default function InventoryAdjustmentsPage() {
         listInventoryItems({ is_active: 1 }),
         listStockLocations({ is_active: 1 }),
       ]);
-      setRows(adjustmentPayload.results);
+      return { adjustmentPayload, itemPayload, locationPayload };
+    }
+  });
+
+  const loading = query.isLoading;
+
+  useEffect(() => {
+    if (query.data) {
+      setRows(query.data.adjustmentPayload.results);
       setKpiCounts({
-        draft: adjustmentPayload.draft_count,
-        approved: adjustmentPayload.approved_count,
-        posted: adjustmentPayload.posted_count,
+        draft: query.data.adjustmentPayload.draft_count,
+        approved: query.data.adjustmentPayload.approved_count,
+        posted: query.data.adjustmentPayload.posted_count,
       });
       setPagination(prev => ({
         ...prev,
-        total_count: adjustmentPayload.count,
-        num_pages: adjustmentPayload.num_pages,
+        total_count: query.data.adjustmentPayload.count,
+        num_pages: query.data.adjustmentPayload.num_pages,
       }));
-      setItems(itemPayload.results);
-      setLocations(locationPayload.results);
+      setItems(query.data.itemPayload.results);
+      setLocations(query.data.locationPayload.results);
       setLoadError(null);
       setForm((current) => {
         if (current.lines.some((line) => line.inventory_item)) return current;
-        return createInitialForm(itemPayload.results[0]?.id);
+        return createInitialForm(query.data.itemPayload.results[0]?.id);
       });
-    } catch (err) {
+    } else if (query.isError) {
       setRows([]);
       setItems([]);
       setLocations([]);
-      setLoadError(accountingErrorMessage(err, "Failed to load stock adjustments."));
-    } finally {
-      setLoading(false);
+      setLoadError(accountingErrorMessage(query.error, "Failed to load stock adjustments."));
     }
-  }
+  }, [query.data, query.isError, query.error]);
 
-  useEffect(() => {
-    void loadPage();
-  }, [pagination.page, pagination.page_size, statusFilter, debouncedSearch]);
+  const loadPage = async () => {
+    await query.refetch();
+  };
 
   const columns: EnterpriseColumnDef<StockAdjustment>[] = [
     { key: "adjustment_no", header: "Adjustment" },

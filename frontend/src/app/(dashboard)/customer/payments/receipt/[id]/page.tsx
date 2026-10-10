@@ -49,7 +49,7 @@ export default function ReceiptPage() {
         <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-lg p-8 text-center">
           <h1 className="text-2xl font-bold text-red-600 mb-4">Error</h1>
           <p className="text-gray-600 mb-6">{error || 'Receipt not found'}</p>
-          <Link href="/dashboard/customer/payments/history" className="text-blue-600 hover:underline">
+          <Link href="/customer/payments" className="text-blue-600 hover:underline">
             Back to Payment History
           </Link>
         </div>
@@ -166,7 +166,7 @@ export default function ReceiptPage() {
             Download PDF
           </button>
           <Link
-            href="/dashboard/customer/payments/history"
+            href="/customer/payments"
             className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-900 font-semibold py-3 rounded-lg transition text-center"
           >
             Back to History

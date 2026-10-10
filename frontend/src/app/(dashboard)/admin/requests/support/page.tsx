@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -74,9 +75,6 @@ export default function AdminSupportRequestsPage() {
     assigned: 0,
     unassigned: 0,
   });
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setSearchInput(q);
@@ -84,53 +82,43 @@ export default function AdminSupportRequestsPage() {
     setCategoryInput(categoryFilter);
   }, [q, statusFilter, categoryFilter]);
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (mode === "initial") {
-        setLoading(true);
-      } else {
-        setRefreshing(true);
-      }
+  const rqQuery = useQuery({
+    queryKey: ["adminSupportRequests", q, statusFilter, categoryFilter],
+    queryFn: async () => {
+      return await listAdminSupportRequests({
+        q: q || undefined,
+        status: statusFilter || undefined,
+        category: categoryFilter || undefined,
+      });
+    }
+  });
 
-      try {
-        const payload = await listAdminSupportRequests({
-          q: q || undefined,
-          status: statusFilter || undefined,
-          category: categoryFilter || undefined,
-        });
-
-        setRows(payload.results);
-        setCount(payload.count);
-        setSummary(payload.summary);
-        setError(null);
-      } catch (err) {
-        setError(toErrorMessage(err));
-        if (mode === "initial") {
-          setRows([]);
-          setCount(0);
-          setSummary({
-            total: 0,
-            submitted: 0,
-            under_review: 0,
-            closed: 0,
-            assigned: 0,
-            unassigned: 0,
-          });
-        }
-      } finally {
-        if (mode === "initial") {
-          setLoading(false);
-        } else {
-          setRefreshing(false);
-        }
-      }
-    },
-    [categoryFilter, q, statusFilter]
-  );
+  const loading = rqQuery.isLoading;
+  const refreshing = rqQuery.isFetching && !rqQuery.isLoading;
+  const error = rqQuery.error ? toErrorMessage(rqQuery.error) : null;
 
   useEffect(() => {
-    void loadPage("initial");
-  }, [loadPage]);
+    if (rqQuery.data) {
+      setRows(rqQuery.data.results);
+      setCount(rqQuery.data.count);
+      setSummary(rqQuery.data.summary);
+    } else if (rqQuery.error) {
+      setRows([]);
+      setCount(0);
+      setSummary({
+        total: 0,
+        submitted: 0,
+        under_review: 0,
+        closed: 0,
+        assigned: 0,
+        unassigned: 0,
+      });
+    }
+  }, [rqQuery.data, rqQuery.error]);
+
+  const loadPage = useCallback(async () => {
+    await rqQuery.refetch();
+  }, [rqQuery]);
 
   const columns = useMemo(
     () => [
@@ -315,7 +303,7 @@ export default function AdminSupportRequestsPage() {
             <ActionButton
               type="button"
               variant="outline"
-              onClick={() => void loadPage("refresh")}
+              onClick={() => void loadPage()}
               disabled={loading || refreshing}
             >
               {refreshing ? "Refreshing..." : "Refresh"}
@@ -416,7 +404,7 @@ export default function AdminSupportRequestsPage() {
               <ERPErrorState
                 title="Unable to load support requests"
                 description={error}
-                onRetry={() => void loadPage("initial")}
+                onRetry={() => void loadPage()}
               />
             ) : null}
 

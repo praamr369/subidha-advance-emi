@@ -115,6 +115,13 @@ class PimProduct(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, db_index=True)
     code = models.CharField(max_length=100, unique=True)
     brand = models.CharField(max_length=150, blank=True)
+    
+    # Warranty config
+    warranty_enabled = models.BooleanField(default=True, help_text="Enable warranty coverage for this product")
+    warranty_months_manufacturing = models.PositiveIntegerField(default=12, help_text="Manufacturing defect warranty (months)")
+    warranty_months_structural = models.PositiveIntegerField(default=36, help_text="Structural warranty for furniture (months, 0 = none)")
+    warranty_months_extended_max = models.PositiveIntegerField(default=12, help_text="Max months for extended warranty plan")
+    extended_warranty_cost_percentage = models.DecimalField(max_digits=4, decimal_places=2, default=7.5, help_text="Extended warranty cost as % of product price")
     # Link to the operational product master (subscriptions.Product). This makes the
     # PIM record the rich-editing layer of a single operational product, so editing
     # attributes/variants here reflects on the product used for inventory,
@@ -136,9 +143,16 @@ class PimProduct(models.Model):
     )
     base_price = models.DecimalField(max_digits=14, decimal_places=2, default=0, validators=[MinValueValidator(0)])
     cost_price = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    rent_monthly_yield_percent = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    lease_monthly_yield_percent = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     image = models.ImageField(upload_to="pim/products/", null=True, blank=True)
     is_active = models.BooleanField(default=True)
     is_published = models.BooleanField(default=False)
+    # Per-SKU portal capabilities. Defaults preserve existing product behavior.
+    is_emi_enabled = models.BooleanField(default=True)
+    is_rent_enabled = models.BooleanField(default=False)
+    is_lease_enabled = models.BooleanField(default=False)
+    is_direct_sale_enabled = models.BooleanField(default=True)
     variant_generating_attributes = models.ManyToManyField(
         CategoryAttribute, blank=True, related_name="used_for_variants"
     )
@@ -240,8 +254,8 @@ class ProductVariant(models.Model):
     barcode = models.CharField(max_length=100, unique=True, null=True, blank=True)
     price = models.DecimalField(max_digits=14, decimal_places=2, validators=[MinValueValidator(0)])
     cost_price = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
-    image = models.ImageField(upload_to="pim/variants/", null=True, blank=True)
-    video = models.FileField(upload_to="pim/variants/videos/", null=True, blank=True)
+    image = models.URLField(max_length=500, null=True, blank=True, help_text="CDN URL to image")
+    video = models.URLField(max_length=500, null=True, blank=True, help_text="CDN URL to video")
     quantity_on_hand = models.IntegerField(default=0)
     reorder_level = models.IntegerField(default=0)
     is_active = models.BooleanField(default=True)
@@ -334,10 +348,10 @@ class ProductMediaItem(models.Model):
     )
     kind = models.CharField(max_length=10, choices=MediaKind.choices, default=MediaKind.IMAGE)
     scope = models.CharField(max_length=20, choices=MediaScope.choices, default=MediaScope.ALL_VARIANTS)
-    file = models.FileField(upload_to="pim/gallery/")
+    file = models.URLField(max_length=500, help_text="CDN URL to the asset", default="", blank=True)
     # MODEL_3D only: optional hand-made .usdz for iPhone Quick Look. Without it the
     # viewer converts the .glb on the device, which works but can lose material detail.
-    ios_file = models.FileField(upload_to="pim/models/ios/", null=True, blank=True)
+    ios_file = models.URLField(max_length=500, null=True, blank=True, help_text="CDN URL to iOS specific asset")
     title = models.CharField(max_length=200, blank=True)
     is_hero = models.BooleanField(default=False, help_text="Hero image shown as primary in catalog")
     display_order = models.PositiveIntegerField(default=0)

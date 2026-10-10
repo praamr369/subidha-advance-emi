@@ -3,6 +3,7 @@ import { formatRupee } from "@/lib/utils/currency";
 
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import {
   ERPActionPanel,
@@ -58,49 +59,21 @@ export default function CustomerPaymentReceiptPage() {
   const paymentId = Number(params?.id ?? 0);
   const hasValidPaymentId = Number.isFinite(paymentId) && paymentId > 0;
 
-  const [payment, setPayment] = useState<CustomerPayment | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
+  const query = useQuery({
+    queryKey: ["customerPaymentDetail", paymentId],
+    queryFn: async () => {
       if (!Number.isFinite(paymentId) || paymentId <= 0) {
-        setError("Invalid customer payment id.");
-        setPayment(null);
-        setLoading(false);
-        return;
+        throw new Error("Invalid customer payment id.");
       }
-
-      if (mode === "initial") {
-        setLoading(true);
-      } else {
-        setRefreshing(true);
-      }
-
-      try {
-        const payload = await getCustomerPaymentDetail(paymentId);
-        setPayment(payload);
-        setError(null);
-      } catch (err) {
-        setError(toErrorMessage(err));
-        if (mode === "initial") {
-          setPayment(null);
-        }
-      } finally {
-        if (mode === "initial") {
-          setLoading(false);
-        } else {
-          setRefreshing(false);
-        }
-      }
+      return await getCustomerPaymentDetail(paymentId);
     },
-    [paymentId]
-  );
+  });
 
-  useEffect(() => {
-    void loadPage("initial");
-  }, [loadPage]);
+  const payment = query.data || null;
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const error = query.error ? (query.error as Error).message : null;
+  const loadPage = useCallback(async (mode?: string) => { await query.refetch(); }, [query]);
 
   const receiptReference = useMemo(() => {
     if (!payment) return "—";
@@ -197,7 +170,7 @@ export default function CustomerPaymentReceiptPage() {
               <div className="flex flex-wrap gap-2">
                 <ActionButton
                   variant="outline"
-                  onClick={() => void loadPage("refresh")}
+                  onClick={() => void loadPage()}
                   disabled={loading || refreshing}
                 >
                   {refreshing ? "Refreshing..." : "Refresh"}
@@ -217,7 +190,7 @@ export default function CustomerPaymentReceiptPage() {
         {loading ? <ERPLoadingState label="Loading payment receipt..." /> : null}
 
         {!loading && error ? (
-          <ERPErrorState title="Unable to load payment receipt" description={error} onRetry={() => void loadPage("initial")} />
+          <ERPErrorState title="Unable to load payment receipt" description={error} onRetry={() => void loadPage()} />
         ) : null}
 
         {!loading && !error && !payment ? (

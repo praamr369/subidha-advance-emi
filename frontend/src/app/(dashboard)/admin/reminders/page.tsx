@@ -1,6 +1,7 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
@@ -21,6 +22,7 @@ import {
   listReminders,
   retryReminder,
   runPaymentReminders,
+  runAutomatedDunning,
   scheduleReminder,
   sendReminder,
 } from "@/services/reminders";
@@ -94,30 +96,36 @@ function gatewayConfigured(gateway: ReminderGatewayStatus | null, channel: strin
 export default function AdminRemindersPage() {
   const [rows, setRows] = useState<PaymentReminder[]>([]);
   const [gateway, setGateway] = useState<ReminderGatewayStatus | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  async function loadPage() {
-    try {
+  const { data: pageData, error: queryError, isLoading: loading, refetch } = useQuery({
+    queryKey: ["admin_reminders_page"],
+    queryFn: async () => {
       const [payload, gatewayPayload] = await Promise.all([
         listReminders(),
         getReminderGatewayStatus(),
       ]);
-      setRows(payload.results);
-      setGateway(gatewayPayload);
-      setError(null);
-    } catch (err) {
-      setRows([]);
-      setError(accountingErrorMessage(err, "Failed to load reminders."));
-    } finally {
-      setLoading(false);
-    }
-  }
+      return { payload, gatewayPayload };
+    },
+  });
+
+  const loadPage = useCallback(async () => { await refetch(); }, [refetch]);
 
   useEffect(() => {
-    void loadPage();
-  }, []);
+    if (pageData) {
+      setRows(pageData.payload.results);
+      setGateway(pageData.gatewayPayload);
+      setError(null);
+    }
+  }, [pageData]);
+
+  useEffect(() => {
+    if (queryError) {
+      setRows([]);
+      setError(accountingErrorMessage(queryError, "Failed to load reminders."));
+    }
+  }, [queryError]);
 
   async function handleRunGeneration() {
     try {
@@ -134,6 +142,24 @@ export default function AdminRemindersPage() {
     } catch (err) {
       setNotice(null);
       setError(accountingErrorMessage(err, "Failed to run reminder generation."));
+    }
+  }
+
+  async function handleRunAutomatedDunning() {
+    if (!confirm("Are you sure you want to run Automated Dunning? This will generate reminders and dispatch them via WhatsApp Cloud API.")) return;
+    try {
+      await runAutomatedDunning();
+      setNotice("Automated dunning run completed.");
+      try {
+        await loadPage();
+        setTimeout(() => setNotice(null), 5000);
+      } catch (loadErr) {
+        setNotice(null);
+        setError(accountingErrorMessage(loadErr, "Failed to load updated reminders."));
+      }
+    } catch (err) {
+      setNotice(null);
+      setError(accountingErrorMessage(err, "Failed to run automated dunning."));
     }
   }
 
@@ -295,9 +321,14 @@ export default function AdminRemindersPage() {
             </div>
           }
           right={
-            <ActionButton variant="primary" disabled={loading} onClick={() => void handleRunGeneration()}>
-              Run Reminder Generation
-            </ActionButton>
+            <div className="flex gap-2">
+              <ActionButton variant="secondary" disabled={loading} onClick={() => void handleRunAutomatedDunning()}>
+                Run WhatsApp Dunning
+              </ActionButton>
+              <ActionButton variant="primary" disabled={loading} onClick={() => void handleRunGeneration()}>
+                Run Reminder Generation
+              </ActionButton>
+            </div>
           }
         />
 

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from django.db.models import QuerySet
+from django.db.models import QuerySet, Q
 
 from subscriptions.models import Product
 
@@ -56,10 +56,16 @@ def approved_catalog_queryset() -> QuerySet[Product]:
     Products without an inventory item are treated as finished goods.
     """
     return (
-        Product.objects.filter(is_active=True)
+        # A linked PIM record is authoritative for portal visibility.  Do not
+        # use ``pim__isnull OR pim__is_published`` here: that allows a product
+        # with multiple linked PIM rows to leak through when one row is
+        # published and another row is still draft/unpublished.
+        Product.objects.filter(is_active=True).exclude(pim__is_published=False)
         .exclude(lifecycle_status="DISCONTINUED")
         .exclude(inventory_profile__stock_item_type__in=["RAW_MATERIAL", "ACCESSORY"])
         .select_related("category_master", "subcategory_master")
+        .prefetch_related("pim", "pim_variant")
+        .distinct()
         .order_by("category", "name", "id")
     )
 
@@ -109,14 +115,177 @@ def filter_catalog(
             | Q(sku__icontains=search_value)
             | Q(category__icontains=search_value)
             | Q(subcategory__icontains=search_value)
+            | Q(description__icontains=search_value)
+            | Q(base_specs__icontains=search_value)
         )
 
     return queryset
 
 
+def _resolve_catalog_image(product: Product, request=None) -> str | None:
+    from api.v1.serializers.media import serialize_media_url
+    from django.core.exceptions import ObjectDoesNotExist
+    
+    try:
+        own_v = product.pim_variant
+    except ObjectDoesNotExist:
+        own_v = None
+
+    if own_v and getattr(own_v, "image", None):
+        return serialize_media_url(request, own_v.image)
+    if getattr(product, "image", None):
+        return serialize_media_url(request, product.image)
+    try:
+
+        from products_pim.models import ProductMediaItem
+        from django.db.models import Q
+        
+        base_pim = None
+        if own_v:
+            base_pim = own_v.product
+        else:
+            pim = product.pim.first()
+            if pim:
+                base_pim = pim.parent if pim.parent_id else pim
+                
+        if base_pim:
+            qs = ProductMediaItem.objects.filter(product=base_pim, kind="IMAGE")
+            if own_v:
+                qs = qs.filter(Q(scope="ALL_VARIANTS") | Q(scope="VARIANT", variant=own_v))
+            else:
+                qs = qs.filter(scope="ALL_VARIANTS")
+            item = qs.order_by("-is_hero", "display_order", "-created_at").first()
+            if item and item.file:
+                return serialize_media_url(request, item.file)
+
+    except Exception:
+        pass
+    return None
+
+def _resolve_catalog_media(product: Product, request=None) -> list[dict]:
+    from api.v1.serializers.media import serialize_media_url
+    from django.core.exceptions import ObjectDoesNotExist
+    
+    media = []
+    try:
+        own_v = product.pim_variant
+    except ObjectDoesNotExist:
+        own_v = None
+    
+    try:
+
+        from products_pim.models import ProductMediaItem
+        from django.db.models import Q
+        
+        base_pim = None
+        if own_v:
+            base_pim = own_v.product
+        else:
+            pim = product.pim.first()
+            if pim:
+                base_pim = pim.parent if pim.parent_id else pim
+                
+        if base_pim:
+            qs = ProductMediaItem.objects.filter(product=base_pim)
+            if own_v:
+                qs = qs.filter(Q(scope="ALL_VARIANTS") | Q(scope="VARIANT", variant=own_v))
+            else:
+                qs = qs.filter(scope="ALL_VARIANTS")
+            
+            for item in qs.order_by("-is_hero", "display_order", "-created_at"):
+                if item.file:
+                    media.append({
+                        "url": serialize_media_url(request, item.file),
+                        "kind": item.kind,
+                        "is_hero": item.is_hero,
+                        "title": item.title or product.name
+                    })
+
+    except Exception:
+        pass
+        
+    if not media:
+        if own_v and getattr(own_v, "image", None):
+            media.append({
+                "url": serialize_media_url(request, own_v.image),
+                "kind": "IMAGE",
+                "is_hero": True,
+                "title": product.name
+            })
+        elif getattr(product, "image", None):
+            media.append({
+                "url": serialize_media_url(request, product.image),
+                "kind": "IMAGE",
+                "is_hero": True,
+                "title": product.name
+            })
+            
+    return media
+
 def serialize_catalog_product(product: Product, request=None) -> dict:
     """Serialize a product for the portal catalog grid."""
-    from api.v1.serializers.media import serialize_media_url
+    from growth.services.scheme_pricing_service import quote_product
+    try:
+        scheme_pricing = quote_product(product, public=True)
+    except Exception:  # pricing must not take the catalog down
+        scheme_pricing = None
+    # Catalog detail can be opened from either a base operational product or
+    # a generated variant SKU. Resolve both to the base PIM blueprint so the
+    # portal receives the complete attribute/variant matrix in either case.
+    pim = product.pim.first()
+    if pim is not None and pim.parent_id:
+        pim = pim.parent
+    if pim is None:
+        try:
+            pim_variant = product.pim_variant
+        except Exception:
+            pim_variant = None
+        if pim_variant:
+            pim = pim_variant.product
+    pim_attributes = []
+    pim_variants = []
+    pim_specs = {}
+    if pim:
+        for value in pim.attributes.select_related("attribute"):
+            if value.display_value:
+                pim_specs[value.attribute.name] = value.display_value
+        pim_attributes = [{"name": name, "value": value} for name, value in pim_specs.items()]
+
+        # A catalog detail may represent a generated operational SKU. Apply
+        # that SKU's PIM values over the blueprint values, matching the public
+        # product serializer's specification precedence.
+        try:
+            own_variant = product.pim_variant
+        except Exception:
+            own_variant = None
+        if own_variant and own_variant.product_id == pim.id:
+            for value in own_variant.attribute_values.select_related("attribute"):
+                display = value.value_text
+                if not display and value.value_number is not None:
+                    display = str(value.value_number)
+                if not display and value.value_boolean is not None:
+                    display = "Yes" if value.value_boolean else "No"
+                if display:
+                    pim_specs[value.attribute.name] = display
+        for variant in pim.variants.filter(is_active=True).prefetch_related("attribute_values__attribute"):
+            attrs = {}
+            for value in variant.attribute_values.all():
+                display = value.value_text
+                if not display and value.value_number is not None:
+                    display = str(value.value_number)
+                if not display and value.value_boolean is not None:
+                    display = "Yes" if value.value_boolean else "No"
+                if display:
+                    attrs[value.attribute.name] = display
+            pim_variants.append({
+                "id": variant.id,
+                "sku": variant.sku,
+                "price": str(variant.price),
+                "attributes": attrs,
+                "image": _resolve_catalog_image(variant.operational_product, request) if variant.operational_product else None,
+                "product_id": variant.operational_product_id,
+                "stock_status": "IN_STOCK" if variant.quantity_on_hand > 0 else "MAKE_TO_ORDER",
+            })
 
     return {
         "id": product.id,
@@ -130,7 +299,8 @@ def serialize_catalog_product(product: Product, request=None) -> dict:
         "gst_rate": str(product.gst_rate) if product.gst_rate is not None else None,
         "hsn_sac_code": product.hsn_sac_code or "",
         "lifecycle_status": product.lifecycle_status,
-        "image": serialize_media_url(request, getattr(product, "image", None)),
+        "image": _resolve_catalog_image(product, request),
+        "media_items": _resolve_catalog_media(product, request),
         "purposes": product_purposes(product),
         "flags": {
             "emi": bool(product.is_emi_enabled),
@@ -138,7 +308,17 @@ def serialize_catalog_product(product: Product, request=None) -> dict:
             "lease": bool(product.is_lease_enabled),
             "direct_sale": bool(product.is_direct_sale_enabled),
         },
+        "rent_yield_estimates": {
+            "short_tenure_min": str(round(float(product.base_price) * 0.08)),
+            "short_tenure_max": str(round(float(product.base_price) * 0.10)),
+            "long_tenure_min": str(round(float(product.base_price) * 0.05)),
+            "long_tenure_max": str(round(float(product.base_price) * 0.07)),
+        } if product.is_rent_enabled else None,
         "default_plan_type": product.plan_type_default,
+        "scheme_pricing": scheme_pricing,
+        "base_specs": pim_specs or (product.base_specs or {}),
+        "pim_attributes": [{"name": name, "value": value} for name, value in pim_specs.items()],
+        "pim_variants": pim_variants,
     }
 
 
@@ -146,7 +326,6 @@ def serialize_catalog_product_detail(product: Product, request=None) -> dict:
     """Serialize a product with full details for the PDP (Product Detail Page)."""
     base = serialize_catalog_product(product, request)
     base.update({
-        "base_specs": product.base_specs or {},
         "warranty_enabled": bool(product.warranty_enabled),
         "warranty_months_manufacturing": product.warranty_months_manufacturing,
         "warranty_months_structural": product.warranty_months_structural,

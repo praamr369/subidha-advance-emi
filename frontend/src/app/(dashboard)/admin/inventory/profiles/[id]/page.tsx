@@ -19,6 +19,7 @@ import ProductPostureCard, {
   type ProductPosture,
 } from "@/components/customers/ProductPostureCard";
 import RentalAssetsAwaitingRelease from "@/components/customer-intelligence/RentalAssetsAwaitingRelease";
+import StockLedgerPanel from "@/components/inventory/StockLedgerPanel";
 import {
   getInventoryProfile,
   type InventoryProfileDetail,
@@ -125,7 +126,9 @@ export default function InventoryProfileDetailPage() {
                 { label: "Product Code", value: profile.product_code || "—" },
                 { label: "Base/Sale Price Ref", value: profile.product_base_price || "—" },
                 { label: "Purchase Cost", value: profile.purchase_unit_cost || "—" },
-                { label: "Standard Cost", value: profile.standard_unit_cost || "—" },
+                { label: "Standard Cost (Base)", value: profile.standard_unit_cost || "—" },
+                { label: "Accessories/Services Cost", value: profile.included_accessories_cost || "0.00" },
+                { label: "Total Cost", value: profile.total_cost || "—" },
                 { label: "Margin Preview", value: profile.margin_preview || "—" },
               ]}
             />
@@ -173,6 +176,10 @@ export default function InventoryProfileDetailPage() {
               <RentalAssetsAwaitingRelease productId={postureProductId} />
             </div>
           ) : null}
+
+          <ERPSectionShell title="Stock Ledger History" description="Historical movements, purchases, and sales for this item.">
+            <StockLedgerPanel productId={postureProductId} />
+          </ERPSectionShell>
 
           <ERPSectionShell title="Manufacturing Cost (Estimate)" description="Read-only cost basis for manufacturing reporting.">
             <ERPDetailGrid

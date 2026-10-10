@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -136,9 +137,7 @@ export default function AdminDeliveriesPage() {
     returned: 0,
   });
   const [count, setCount] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errorState, setErrorState] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   const [qInput, setQInput] = useState(initialQ);
@@ -353,53 +352,40 @@ export default function AdminDeliveriesPage() {
     void prefillFromSubscriptionId(initialSubscription.trim());
   }, [createPortfolio, initialSubscription, prefillFromSubscriptionId]);
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (mode === "initial") setLoading(true);
-      else setRefreshing(true);
+  const rqQuery = useQuery({
+    queryKey: ['adminDeliveries', initialQ, initialStatus, initialBucket, initialCustomer, initialSubscription, initialBatch, initialDateFrom, initialDateTo],
+    queryFn: () => listAdminDeliveries({
+      q: initialQ || undefined,
+      status: initialStatus || undefined,
+      bucket: initialBucket || undefined,
+      customer: initialCustomer || undefined,
+      subscription: initialSubscription || undefined,
+      batch: initialBatch || undefined,
+      date_from: initialDateFrom || undefined,
+      date_to: initialDateTo || undefined,
+    }),
+  });
 
-      try {
-        const payload = await listAdminDeliveries({
-          q: initialQ || undefined,
-          status: initialStatus || undefined,
-          bucket: initialBucket || undefined,
-          customer: initialCustomer || undefined,
-          subscription: initialSubscription || undefined,
-          batch: initialBatch || undefined,
-          date_from: initialDateFrom || undefined,
-          date_to: initialDateTo || undefined,
-        });
+  const loading = rqQuery.isLoading;
+  const refreshing = rqQuery.isFetching && !rqQuery.isLoading;
+  const error = errorState || (rqQuery.error ? toErrorMessage(rqQuery.error, "Failed to load deliveries.") : null);
 
-        setRows(payload.results);
-        setSummary(payload.summary);
-        setCount(payload.count);
-        setError(null);
-      } catch (err) {
-        setError(toErrorMessage(err, "Failed to load deliveries."));
-        if (mode === "initial") {
-          setRows([]);
-          setCount(0);
-        }
-      } finally {
-        if (mode === "initial") setLoading(false);
-        else setRefreshing(false);
-      }
-    },
-    [
-      initialBatch,
-      initialBucket,
-      initialCustomer,
-      initialDateFrom,
-      initialDateTo,
-      initialQ,
-      initialStatus,
-      initialSubscription,
-    ]
-  );
+  const loadPage = useCallback(async () => {
+    setErrorState(null);
+    await rqQuery.refetch();
+  }, [rqQuery]);
 
   useEffect(() => {
-    void loadPage("initial");
-  }, [loadPage]);
+    if (rqQuery.data) {
+      setRows(rqQuery.data.results);
+      setSummary(rqQuery.data.summary);
+      setCount(rqQuery.data.count);
+      setErrorState(null);
+    } else if (rqQuery.error) {
+      setRows([]);
+      setCount(0);
+    }
+  }, [rqQuery.data, rqQuery.error]);
 
   function applyFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -432,14 +418,14 @@ export default function AdminDeliveriesPage() {
     event.preventDefault();
     if (createPortfolio === "DIRECT_SALE") {
       if (!selectedDsSource?.id) {
-        setError("Select a direct sale source before syncing delivery desk tracking.");
+        setErrorState("Select a direct sale source before syncing delivery desk tracking.");
         return;
       }
 
       try {
         setCreating(true);
         setMessage(null);
-        setError(null);
+        setErrorState(null);
 
         const created = await createAdminDelivery({ direct_sale: selectedDsSource.id });
         const deskId = created.service_case_id ?? created.id;
@@ -447,21 +433,21 @@ export default function AdminDeliveriesPage() {
           `Direct-sale delivery desk row synced (${created.case_no?.trim() ? created.case_no : `CASE-${deskId}`}).`
         );
         setCreateNotes("");
-        await loadPage("refresh");
+        await loadPage();
         router.push(`/admin/deliveries/direct-sale-cases/${deskId}${queryString ? `?${queryString}` : ""}`);
       } catch (err) {
-        setError(toErrorMessage(err, "Failed to sync direct-sale delivery desk row."));
+        setErrorState(toErrorMessage(err, "Failed to sync direct-sale delivery desk row."));
       } finally {
         setCreating(false);
       }
       return;
     }
     if (!createSubscriptionId.trim()) {
-      setError("Subscription id is required to create a delivery.");
+      setErrorState("Subscription id is required to create a delivery.");
       return;
     }
     if (activeSelectedDelivery) {
-      setError(
+      setErrorState(
         `An active delivery already exists for this subscription (${activeSelectedDelivery.delivery_reference}). Complete or cancel the active delivery before creating a new one.`
       );
       return;
@@ -470,7 +456,7 @@ export default function AdminDeliveriesPage() {
     try {
       setCreating(true);
       setMessage(null);
-      setError(null);
+      setErrorState(null);
 
       const created = await createAdminDelivery({
         subscription: Number(createSubscriptionId),
@@ -487,10 +473,10 @@ export default function AdminDeliveriesPage() {
       setMessage(`Delivery ${created.delivery_reference} created successfully.`);
       setCreateNotes("");
       if (createStatus === "PENDING") setCreateScheduledDate("");
-      await loadPage("refresh");
+      await loadPage();
       router.push(`/admin/deliveries/${created.id}${queryString ? `?${queryString}` : ""}`);
     } catch (err) {
-      setError(toErrorMessage(err, "Failed to create delivery."));
+      setErrorState(toErrorMessage(err, "Failed to create delivery."));
     } finally {
       setCreating(false);
     }
@@ -564,7 +550,7 @@ export default function AdminDeliveriesPage() {
             </div>
             <button
               type="button"
-              onClick={() => void loadPage("refresh")}
+              onClick={() => void loadPage()}
               disabled={loading || refreshing}
               className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -580,7 +566,7 @@ export default function AdminDeliveriesPage() {
           <ErrorState
             title="Unable to load deliveries"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 
@@ -1401,10 +1387,10 @@ export default function AdminDeliveriesPage() {
                                         receiver_phone: row.receiver_phone || row.customer_phone || undefined,
                                         delivery_note: "Delivered from delivery register quick action.",
                                       });
-                                      await loadPage("refresh");
+                                      await loadPage();
                                       setMessage("Direct-sale delivery marked delivered.");
                                     } catch (err) {
-                                      setError(toErrorMessage(err, "Unable to mark delivery as delivered."));
+                                      setErrorState(toErrorMessage(err, "Unable to mark delivery as delivered."));
                                     } finally {
                                       setActingCaseId(null);
                                     }

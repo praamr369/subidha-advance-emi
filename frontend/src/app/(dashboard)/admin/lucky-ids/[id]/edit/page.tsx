@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 import { formatRupee } from "@/lib/utils/currency";
 
 import Link from "next/link";
@@ -377,73 +378,77 @@ export default function AdminLuckyIdEditPage() {
 
   const [targetStatus, setTargetStatus] = useState<LuckyIdStatus | "">("");
 
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const [error, setError] = useState<string | null>(null);
+  const [errorState, setErrorState] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (!luckyIdId) return;
+  const rqQuery = useQuery({
+    queryKey: ['adminLuckyIdEdit', luckyIdId],
+    queryFn: async () => {
+      if (!luckyIdId) throw new Error("Lucky ID is missing.");
+      const luckyIdPayload = await apiFetch<Record<string, unknown>>(
+        `/admin/lucky-ids/${luckyIdId}/`
+      );
+      const normalizedLuckyId = normalizeLuckyIdDetail(luckyIdPayload);
 
-      if (mode === "initial") setLoading(true);
-      else setRefreshing(true);
+      let nextBatchPreview: BatchPreview | null = null;
+      let nextSubscriptionPreview: SubscriptionPreview | null = null;
 
-      try {
-        const luckyIdPayload = await apiFetch<Record<string, unknown>>(
-          `/admin/lucky-ids/${luckyIdId}/`
-        );
-        const normalizedLuckyId = normalizeLuckyIdDetail(luckyIdPayload);
-
-        let nextBatchPreview: BatchPreview | null = null;
-        let nextSubscriptionPreview: SubscriptionPreview | null = null;
-
-        if (normalizedLuckyId.batch_id != null) {
-          try {
-            const batchPayload = await apiFetch<Record<string, unknown>>(
-              `/admin/batches/${normalizedLuckyId.batch_id}/`
-            );
-            nextBatchPreview = normalizeBatchPreview(batchPayload);
-          } catch {
-            nextBatchPreview = null;
-          }
+      if (normalizedLuckyId.batch_id != null) {
+        try {
+          const batchPayload = await apiFetch<Record<string, unknown>>(
+            `/admin/batches/${normalizedLuckyId.batch_id}/`
+          );
+          nextBatchPreview = normalizeBatchPreview(batchPayload);
+        } catch {
+          nextBatchPreview = null;
         }
-
-        if (normalizedLuckyId.subscription_id != null) {
-          try {
-            const subscriptionPayload = await apiFetch<Record<string, unknown>>(
-              `/admin/subscriptions/${normalizedLuckyId.subscription_id}/`
-            );
-            nextSubscriptionPreview = normalizeSubscriptionPreview(subscriptionPayload);
-          } catch {
-            nextSubscriptionPreview = null;
-          }
-        }
-
-        setLuckyId(normalizedLuckyId);
-        setBatchPreview(nextBatchPreview);
-        setSubscriptionPreview(nextSubscriptionPreview);
-        setTargetStatus("");
-        setFieldErrors({});
-        setError(null);
-      } catch (err) {
-        setError(parseErrorMessage(err));
-        setLuckyId(null);
-        setBatchPreview(null);
-        setSubscriptionPreview(null);
-      } finally {
-        if (mode === "initial") setLoading(false);
-        else setRefreshing(false);
       }
+
+      if (normalizedLuckyId.subscription_id != null) {
+        try {
+          const subscriptionPayload = await apiFetch<Record<string, unknown>>(
+            `/admin/subscriptions/${normalizedLuckyId.subscription_id}/`
+          );
+          nextSubscriptionPreview = normalizeSubscriptionPreview(subscriptionPayload);
+        } catch {
+          nextSubscriptionPreview = null;
+        }
+      }
+      return { normalizedLuckyId, nextBatchPreview, nextSubscriptionPreview };
     },
-    [luckyIdId]
-  );
+    enabled: !!luckyIdId,
+  });
+
+  const loading = rqQuery.isLoading;
+  const refreshing = rqQuery.isFetching && !rqQuery.isLoading;
+  const error = errorState || (rqQuery.error ? parseErrorMessage(rqQuery.error) : null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const loadPage = useCallback(async () => {
+    setErrorState(null);
+    await rqQuery.refetch();
+  }, [rqQuery]);
 
   useEffect(() => {
-    void loadPage("initial");
+    if (rqQuery.data) {
+      setLuckyId(rqQuery.data.normalizedLuckyId);
+      setBatchPreview(rqQuery.data.nextBatchPreview);
+      setSubscriptionPreview(rqQuery.data.nextSubscriptionPreview);
+      setTargetStatus("");
+      setFieldErrors({});
+      setErrorState(null);
+    } else if (rqQuery.error) {
+      setLuckyId(null);
+      setBatchPreview(null);
+      setSubscriptionPreview(null);
+    }
+  }, [rqQuery.data, rqQuery.error]);
+
+  useEffect(() => {
+    void loadPage();
   }, [loadPage]);
 
   const isAssignedState = useMemo(() => {
@@ -476,7 +481,7 @@ export default function AdminLuckyIdEditPage() {
 
     setSaving(true);
     setFieldErrors({});
-    setError(null);
+    setErrorState(null);
     setSuccessMessage(null);
 
     try {
@@ -497,10 +502,10 @@ export default function AdminLuckyIdEditPage() {
       setLuckyId(normalized);
       setTargetStatus("");
       setSuccessMessage(`Lucky ID status updated to ${normalized.status}.`);
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setFieldErrors(parseFieldErrors(err));
-      setError(parseErrorMessage(err));
+      setErrorState(parseErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -572,7 +577,7 @@ export default function AdminLuckyIdEditPage() {
         <section className="flex justify-end">
           <button
             type="button"
-            onClick={() => void loadPage("refresh")}
+            onClick={() => void loadPage()}
             disabled={refreshing || loading || saving}
             className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
           >
@@ -585,8 +590,8 @@ export default function AdminLuckyIdEditPage() {
         {!loading && error && !luckyId ? (
           <ERPErrorState
             title="Unable to load Lucky ID edit page"
-            description={error}
-            onRetry={() => void loadPage("initial")}
+            description={error || actionError || undefined}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 
@@ -701,7 +706,7 @@ export default function AdminLuckyIdEditPage() {
                         value={targetStatus}
                         onChange={(event) => {
                           setTargetStatus(event.target.value as LuckyIdStatus);
-                          setError(null);
+                          setErrorState(null);
                           setSuccessMessage(null);
                         }}
                         disabled={saving}
@@ -735,7 +740,7 @@ export default function AdminLuckyIdEditPage() {
                         type="button"
                         onClick={() => {
                           setTargetStatus("");
-                          setError(null);
+                          setErrorState(null);
                           setSuccessMessage(null);
                           setFieldErrors({});
                         }}
@@ -851,7 +856,7 @@ export default function AdminLuckyIdEditPage() {
             {error ? (
               <ERPErrorState
                 title="Unable to update Lucky ID"
-                description={error}
+                description={error || actionError || undefined}
               />
             ) : null}
 
@@ -901,7 +906,7 @@ export default function AdminLuckyIdEditPage() {
                   type="button"
                   onClick={() => {
                     setTargetStatus("");
-                    setError(null);
+                    setActionError(null);
                     setSuccessMessage(null);
                     setFieldErrors({});
                   }}

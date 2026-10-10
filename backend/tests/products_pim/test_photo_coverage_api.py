@@ -37,7 +37,7 @@ class PhotoCoverageApiTests(APITestCase):
 
         return ProductMediaItem.objects.create(
             product=product, kind=kind,
-            file=SimpleUploadedFile(f"{product.code}.gif", PIXEL, content_type="image/gif"),
+            file=f"https://cdn.example.com/{product.code}.gif",
         )
 
     # ── access control ───────────────────────────────────────────────────────

@@ -44,9 +44,13 @@ export default function DashboardTimeWindowSelector({
       </div>
 
       <div className="flex flex-col gap-3 md:flex-row md:items-end">
-        <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-          Window
+        <div className="flex flex-col gap-1">
+          <label htmlFor="dashboard-time-window" className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            Window
+          </label>
           <select
+            id="dashboard-time-window"
+            name="dashboard-time-window"
             value={value}
             disabled={loading}
             onChange={(event) =>
@@ -60,30 +64,38 @@ export default function DashboardTimeWindowSelector({
               </option>
             ))}
           </select>
-        </label>
+        </div>
 
         {value === "CUSTOM" ? (
           <>
-            <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-              Start date
+            <div className="flex flex-col gap-1">
+              <label htmlFor="dashboard-start-date" className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Start date
+              </label>
               <input
+                id="dashboard-start-date"
+                name="dashboard-start-date"
                 type="date"
                 value={startDate}
                 disabled={loading}
                 onChange={(event) => onStartDateChange(event.target.value)}
                 className="rounded-xl border border-[color-mix(in_oklab,var(--surface-border-strong)_78%,white_22%)] bg-[var(--surface-card-elevated)] px-3 py-2 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)]"
               />
-            </label>
-            <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-              End date
+            </div>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="dashboard-end-date" className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                End date
+              </label>
               <input
+                id="dashboard-end-date"
+                name="dashboard-end-date"
                 type="date"
                 value={endDate}
                 disabled={loading}
                 onChange={(event) => onEndDateChange(event.target.value)}
                 className="rounded-xl border border-[color-mix(in_oklab,var(--surface-border-strong)_78%,white_22%)] bg-[var(--surface-card-elevated)] px-3 py-2 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)]"
               />
-            </label>
+            </div>
           </>
         ) : null}
       </div>

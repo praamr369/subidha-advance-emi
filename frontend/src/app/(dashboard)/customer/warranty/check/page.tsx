@@ -53,7 +53,7 @@ export default function WarrantyCheckPage() {
     <ERPPageShell
       title="Warranty Check"
       subtitle="Check warranty coverage for your products"
-      breadcrumbs={[{ label: "Home", href: "/customer/dashboard" }, { label: "Warranty" }, { label: "Check Coverage" }]}
+      breadcrumbs={[{ label: "Home", href: "/customer" }, { label: "Warranty" }, { label: "Check Coverage" }]}
     >
       <div className="max-w-2xl mx-auto space-y-6">
         <WorkspaceSection title="Select Product">

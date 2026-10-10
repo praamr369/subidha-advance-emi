@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 import { formatRupee } from "@/lib/utils/currency";
 import Link from "next/link";
 import Image from "next/image";
@@ -160,52 +161,57 @@ export default function AdminProductDetailPage() {
   const [product, setProduct] = useState<ProductRecord | null>(null);
   const [pimProduct, setPimProduct] = useState<PimProduct | null>(null);
   const [subscriptions, setSubscriptions] = useState<SubscriptionUsageRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
-
-  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
-    if (!productId) return;
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
-    try {
+  const query = useQuery({
+    queryKey: ["admin_product", productId],
+    queryFn: async () => {
+      if (!productId) throw new Error("No product ID");
       const [productPayload, subscriptionPayload] = await Promise.allSettled([
         getProduct(productId),
         request(`/admin/subscriptions/?product=${productId}`),
       ]);
       if (productPayload.status !== "fulfilled") throw productPayload.reason;
       const prod = productPayload.value;
-      setProduct(prod);
-      if (subscriptionPayload.status === "fulfilled") {
-        setSubscriptions(toArray<Record<string, unknown>>(subscriptionPayload.value).map(normalizeSub));
-      }
-      // Look up linked PIM product by code
+      const subs = subscriptionPayload.status === "fulfilled"
+        ? toArray<Record<string, unknown>>(subscriptionPayload.value).map(normalizeSub)
+        : [];
+      let pim: PimProduct | null = null;
       if (prod.product_code) {
         try {
           const { results } = await pimService.getProducts({ search: prod.product_code, page_size: 5 });
           const match = results.find((p) => p.code === prod.product_code);
           if (match) {
-            const full = await pimService.getProductWithAttributes(match.id);
-            setPimProduct(full);
-          } else {
-            setPimProduct(null);
+            pim = await pimService.getProductWithAttributes(match.id);
           }
         } catch {
-          setPimProduct(null);
+          // ignore
         }
       }
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load product detail.");
-      if (mode === "initial") { setProduct(null); setSubscriptions([]); }
-    } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
-    }
-  }, [productId]);
+      return { product: prod, subscriptions: subs, pim };
+    },
+    enabled: !!productId,
+  });
 
-  useEffect(() => { void loadPage("initial"); }, [loadPage]);
+  useEffect(() => {
+    if (query.data) {
+      setProduct(query.data.product);
+      setSubscriptions(query.data.subscriptions);
+      setPimProduct(query.data.pim);
+      setError(null);
+    } else if (query.isError) {
+      setError(query.error instanceof Error ? query.error.message : "Failed to load product detail.");
+      setProduct(null);
+      setSubscriptions([]);
+    }
+  }, [query.data, query.isError, query.error]);
+
+  const loading = query.isLoading && !!productId;
+  const refreshing = query.isFetching && !query.isLoading;
+  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
+    if (!productId) return;
+    await query.refetch();
+  }, [query, productId]);
 
   // This product across Advance EMI, rent/lease and direct sale — the same
   // per-plan money breakdown as the inventory profile.
@@ -281,7 +287,7 @@ export default function AdminProductDetailPage() {
       statusBadge={{ label: product?.is_active === false ? "Inactive" : "Active", tone: product?.is_active === false ? "warning" : "success" }}
     >
       {loading ? <ERPLoadingState label="Loading product blueprint..." /> : null}
-      {!loading && error ? <ERPErrorState title="Unable to load product" description={error} onRetry={() => void loadPage("initial")} /> : null}
+      {!loading && error ? <ERPErrorState title="Unable to load product" description={error} onRetry={() => void loadPage()} /> : null}
       {!loading && !error && !product ? <ERPEmptyState title="Product not found" description="The requested product could not be loaded." /> : null}
 
       {!loading && !error && product && state ? (
@@ -295,7 +301,7 @@ export default function AdminProductDetailPage() {
             </div>
             <button
               type="button"
-              onClick={() => void loadPage("refresh")}
+              onClick={() => void loadPage()}
               disabled={refreshing}
               className="inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50 shrink-0"
             >
@@ -312,7 +318,7 @@ export default function AdminProductDetailPage() {
               </div>
 
               <ERPSectionShell title="Quick actions" description="Daily operation shortcuts. Full page edit for master data and image work.">
-                <ProductQuickActions product={product} mode="detail" onChanged={() => void loadPage("refresh")} />
+                <ProductQuickActions product={product} mode="detail" onChanged={() => void loadPage()} />
               </ERPSectionShell>
 
               <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
@@ -565,7 +571,7 @@ export default function AdminProductDetailPage() {
 
               <ERPSectionShell title="Inventory operations" description="Prepare the inventory profile and manage opening stock.">
                 <div className="flex flex-wrap gap-3">
-                  <ProductQuickActions product={product} onChanged={() => void loadPage("refresh")} />
+                  <ProductQuickActions product={product} onChanged={() => void loadPage()} />
                   {product.inventory_profile_id && (
                     <Link href={`/admin/inventory/profiles/${product.inventory_profile_id}`} className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-muted">
                       <BarChart3 className="h-4 w-4" /> Inventory Profile

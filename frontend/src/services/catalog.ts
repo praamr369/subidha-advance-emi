@@ -1,6 +1,7 @@
 import { request } from "@/services/api";
 import { toResultsArray } from "@/services/api/list";
 import type { ArModel } from "@/lib/model-viewer";
+import type { ProductSchemePricing } from "@/services/public";
 
 export type CatalogInputType = "SELECT" | "MULTI_SELECT" | "NUMBER" | "TEXT" | "BOOLEAN";
 
@@ -11,6 +12,7 @@ export type CatalogCategory = {
   path: string;
   parent: number | null;
   is_active: boolean;
+  google_taxonomy_id?: string;
 };
 
 export type AttributeDefinition = {
@@ -27,6 +29,7 @@ export type AttributeDefinition = {
   sort_order: number;
   min_value: string | null;
   max_value: string | null;
+  regex_validation?: string;
   is_active: boolean;
 };
 
@@ -67,6 +70,19 @@ export type CatalogProduct = {
   flags?: Record<string, boolean>;
   /** "View in your room" AR (detail endpoint only). */
   ar_model?: ArModel | null;
+  rent_yield_estimates?: { short_tenure_min: string; short_tenure_max: string; long_tenure_min: string; long_tenure_max: string } | null;
+  scheme_pricing?: ProductSchemePricing | null;
+  media_items?: { url: string; kind: string; is_hero: boolean; title: string }[];
+  pim_attributes?: { name: string; value: string }[];
+  pim_variants?: Array<{
+    id: number;
+    sku: string;
+    price: string;
+    attributes: Record<string, string>;
+    image?: string | null;
+    product_id?: number | null;
+    stock_status?: "IN_STOCK" | "MAKE_TO_ORDER";
+  }>;
   [key: string]: unknown;
 };
 

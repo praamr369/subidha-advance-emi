@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -755,84 +756,90 @@ export default function AdminSubscriptionDetailPage() {
   const [subscription, setSubscription] = useState<SubscriptionDetailRecord | null>(null);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [timeline, setTimeline] = useState<AuditEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [settleModalOpen, setSettleModalOpen] = useState(false);
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (!subscriptionId) return;
+  const { data: queryData, isLoading: loading, isRefetching: refreshing, error: queryError, refetch } = useQuery({
+    queryKey: ["admin_subscription_detail", subscriptionId],
+    queryFn: async () => {
+      if (!subscriptionId) throw new Error("No subscription ID");
+      const [subscriptionRes, paymentsRes, timelineRes] = await Promise.allSettled([
+        apiFetch<Record<string, unknown>>(`/admin/subscriptions/${subscriptionId}/`, {
+          cache: "no-store",
+        }),
+        listPayments({ subscription: subscriptionId }),
+        apiFetch<Record<string, unknown>>(`/admin/subscriptions/${subscriptionId}/timeline/`, {
+          cache: "no-store",
+        }),
+      ]);
 
-      if (mode === "initial") setLoading(true);
-      else setRefreshing(true);
-
-      try {
-        const [subscriptionRes, paymentsRes, timelineRes] = await Promise.allSettled([
-          apiFetch<Record<string, unknown>>(`/admin/subscriptions/${subscriptionId}/`, {
-            cache: "no-store",
-          }),
-          listPayments({ subscription: subscriptionId }),
-          apiFetch<Record<string, unknown>>(`/admin/subscriptions/${subscriptionId}/timeline/`, {
-            cache: "no-store",
-          }),
-        ]);
-
-        let subscriptionPayload: Record<string, unknown> | null = null;
-        if (subscriptionRes.status === "fulfilled") {
-          subscriptionPayload = subscriptionRes.value;
-        } else {
-          const fallback = await apiFetch<Record<string, unknown>>(
-            `/admin/subscriptions/?id=${encodeURIComponent(String(subscriptionId))}`,
-            { cache: "no-store" }
-          );
-          const fallbackRows = toArray<Record<string, unknown>>(fallback.results);
-          subscriptionPayload = fallbackRows.find(
-            (row) => String(row.id ?? "") === String(subscriptionId)
-          ) ?? null;
-        }
-
-        if (!subscriptionPayload) {
-          throw subscriptionRes.status === "rejected"
-            ? subscriptionRes.reason
-            : new Error("Subscription detail is unavailable.");
-        }
-
-        const nextSubscription = normalizeSubscriptionDetail(subscriptionPayload);
-        const nextPayments =
-          paymentsRes.status === "fulfilled" ? paymentsRes.value.results ?? [] : [];
-        const nextTimeline =
-          timelineRes.status === "fulfilled"
-            ? toArray<Record<string, unknown>>(timelineRes.value.results)
-                .map(normalizeAuditEvent)
-                .sort((a, b) => {
-                  const aTime = Date.parse(a.created_at || "") || 0;
-                  const bTime = Date.parse(b.created_at || "") || 0;
-                  return bTime - aTime;
-                })
-            : [];
-
-        setSubscription(nextSubscription);
-        setPayments(nextPayments);
-        setTimeline(nextTimeline);
-        setError(null);
-      } catch (err) {
-        setError(parseErrorMessage(err));
-        setSubscription(null);
-        setPayments([]);
-        setTimeline([]);
-      } finally {
-        if (mode === "initial") setLoading(false);
-        else setRefreshing(false);
+      let subscriptionPayload: Record<string, unknown> | null = null;
+      if (subscriptionRes.status === "fulfilled") {
+        subscriptionPayload = subscriptionRes.value;
+      } else {
+        const fallback = await apiFetch<Record<string, unknown>>(
+          `/admin/subscriptions/?id=${encodeURIComponent(String(subscriptionId))}`,
+          { cache: "no-store" }
+        );
+        const fallbackRows = toArray<Record<string, unknown>>(fallback.results);
+        subscriptionPayload = fallbackRows.find(
+          (row) => String(row.id ?? "") === String(subscriptionId)
+        ) ?? null;
       }
+
+      if (!subscriptionPayload) {
+        throw subscriptionRes.status === "rejected"
+          ? subscriptionRes.reason
+          : new Error("Subscription detail is unavailable.");
+      }
+
+      const nextSubscription = normalizeSubscriptionDetail(subscriptionPayload);
+      const nextPayments =
+        paymentsRes.status === "fulfilled" ? paymentsRes.value.results ?? [] : [];
+      const nextTimeline =
+        timelineRes.status === "fulfilled"
+          ? toArray<Record<string, unknown>>(timelineRes.value.results)
+              .map(normalizeAuditEvent)
+              .sort((a, b) => {
+                const aTime = Date.parse(a.created_at || "") || 0;
+                const bTime = Date.parse(b.created_at || "") || 0;
+                return bTime - aTime;
+              })
+          : [];
+
+      return {
+        subscription: nextSubscription,
+        payments: nextPayments,
+        timeline: nextTimeline,
+      };
     },
-    [subscriptionId]
-  );
+    enabled: !!subscriptionId,
+  });
+
+  const loadPage = useCallback(async () => {
+    if (subscriptionId) {
+      await refetch();
+    }
+  }, [refetch, subscriptionId]);
 
   useEffect(() => {
-    void loadPage("initial");
-  }, [loadPage]);
+    if (queryData) {
+      setSubscription(queryData.subscription);
+      setPayments(queryData.payments);
+      setTimeline(queryData.timeline);
+      setError(null);
+    }
+  }, [queryData]);
+
+  useEffect(() => {
+    if (queryError) {
+      setError(parseErrorMessage(queryError));
+      setSubscription(null);
+      setPayments([]);
+      setTimeline([]);
+    }
+  }, [queryError]);
 
   const financialSummary = subscription?.financial_summary;
   const reconciliationFlags = subscription?.reconciliation_flags;
@@ -1065,7 +1072,7 @@ export default function AdminSubscriptionDetailPage() {
           <ERPErrorState
             title="Unable to load subscription detail"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 
@@ -1146,7 +1153,7 @@ export default function AdminSubscriptionDetailPage() {
 
                   <button
                     type="button"
-                    onClick={() => void loadPage("refresh")}
+                    onClick={() => void loadPage()}
                     disabled={refreshing || loading}
                     className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
                   >
@@ -2250,7 +2257,7 @@ export default function AdminSubscriptionDetailPage() {
             subscriptionId={subscription.id}
             open={settleModalOpen}
             onOpenChange={setSettleModalOpen}
-            onSettled={() => void loadPage("refresh")}
+            onSettled={() => void loadPage()}
           />
         ) : null}
       </div>

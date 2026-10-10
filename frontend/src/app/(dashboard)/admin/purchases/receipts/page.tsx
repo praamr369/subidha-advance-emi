@@ -146,7 +146,7 @@ function CreateGRForm({ purchaseOrders, items, onSaved, onCancel }: CreateGRForm
               >
                 <option value="">— Item —</option>
                 {items.map((it) => (
-                  <option key={it.id} value={it.id}>{line.inventory_item === it.id && line.inventory_item_product_name ? line.inventory_item_product_name : it.product_name} ({it.sku ?? "—"})</option>
+                  <option key={it.id} value={it.id}>{line.inventory_item === it.id && line.inventory_item_product_name ? line.inventory_item_product_name : it.product_name}</option>
                 ))}
               </select>
               <input

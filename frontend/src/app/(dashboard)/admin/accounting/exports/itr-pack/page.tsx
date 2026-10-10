@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
@@ -25,9 +26,6 @@ import {
 const today = new Date().toISOString().slice(0, 10);
 
 export default function AccountingItrPackPage() {
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [jobs, setJobs] = useState<ExportPackJob[]>([]);
   const [form, setForm] = useState({
@@ -36,25 +34,27 @@ export default function AccountingItrPackPage() {
     end_date: today,
   });
 
-  async function loadPage(mode: "initial" | "refresh" = "initial") {
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
-    try {
-      const payload = await listItrExportPacks();
-      setJobs(payload);
-      setError(null);
-    } catch (err) {
-      setError(accountingErrorMessage(err, "Failed to load ITR export packs."));
-      if (mode === "initial") setJobs([]);
-    } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
-    }
-  }
+  const query = useQuery({
+    queryKey: ["itrExportPacks"],
+    queryFn: async () => {
+      return await listItrExportPacks();
+    },
+  });
+
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const error = query.error ? accountingErrorMessage(query.error, "Failed to load ITR export packs.") : null;
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
-    void loadPage("initial");
-  }, []);
+    if (query.data) {
+      setJobs(query.data);
+    }
+  }, [query.data]);
+
+  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
+    await query.refetch();
+  }, [query]);
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -65,10 +65,10 @@ export default function AccountingItrPackPage() {
         end_date: form.end_date,
       });
       setNotice(`ITR export pack ${job.id} generated.`);
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setNotice(null);
-      setError(accountingErrorMessage(err, "Failed to generate the ITR export pack."));
+      setActionError(accountingErrorMessage(err, "Failed to generate the ITR export pack."));
     }
   }
 
@@ -78,7 +78,7 @@ export default function AccountingItrPackPage() {
       setNotice(`ITR export pack ${id} downloaded.`);
     } catch (err) {
       setNotice(null);
-      setError(accountingErrorMessage(err, "Failed to download the ITR export pack."));
+      setActionError(accountingErrorMessage(err, "Failed to download the ITR export pack."));
     }
   }
 
@@ -108,7 +108,7 @@ export default function AccountingItrPackPage() {
           <AccountingRefreshButton
             loading={loading}
             refreshing={refreshing}
-            onClick={() => void loadPage("refresh")}
+            onClick={() => void loadPage()}
           />
         </div>
 
@@ -116,7 +116,7 @@ export default function AccountingItrPackPage() {
         {loading ? <LoadingBlock label="Loading ITR export packs..." /> : null}
 
         {!loading && error ? (
-          <ErrorState title="Unable to load ITR export packs" description={error} onRetry={() => void loadPage("initial")} />
+          <ErrorState title="Unable to load ITR export packs" description={error || actionError || undefined} onRetry={() => void loadPage()} />
         ) : null}
 
         {!loading && !error ? (

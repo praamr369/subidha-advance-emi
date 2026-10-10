@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
@@ -128,9 +129,7 @@ export default function AdminDirectSaleDeliveryDetailPage() {
     };
   }, [postureCustomerId]);
   const [timeline, setTimeline] = useState<AuditEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errorState, setErrorState] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
@@ -149,52 +148,52 @@ export default function AdminDirectSaleDeliveryDetailPage() {
     return qs ? `/admin/deliveries?${qs}` : "/admin/deliveries";
   }, [searchParams]);
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (!caseId) {
-        setError("Direct-sale case id is missing.");
-        setLoading(false);
-        return;
-      }
-      if (mode === "initial") setLoading(true);
-      else setRefreshing(true);
-
-      try {
-        const [payload, auditPayload] = await Promise.all([
-          getAdminDirectSaleDeliveryCase(caseId),
-          apiFetch<{ results?: AuditEntry[] }>(
-            `/admin/audit-logs/timeline/ServiceDeskCase/${caseId}/`
-          ),
-        ]);
-        setDelivery(payload);
-        setTimeline(auditPayload.results || []);
-        setScheduledDate(payload.scheduled_date || "");
-        setReceiverName(payload.receiver_name || "");
-        setReceiverPhone(payload.receiver_phone || "");
-        setAddress(payload.delivery_address_snapshot || "");
-        setFailureReason(payload.failure_or_cancellation_reason || "");
-        setOperationalNotes(payload.operational_notes || payload.notes || "");
-        setError(null);
-      } catch (err) {
-        setDelivery(null);
-        setTimeline([]);
-        setError(toErrorMessage(err, "Failed to load direct-sale delivery detail."));
-      } finally {
-        if (mode === "initial") setLoading(false);
-        else setRefreshing(false);
-      }
+  const rqQuery = useQuery({
+    queryKey: ['adminDirectSaleDeliveryPage', caseId],
+    queryFn: async () => {
+      if (!caseId) throw new Error("Direct-sale case id is missing.");
+      const [payload, auditPayload] = await Promise.all([
+        getAdminDirectSaleDeliveryCase(caseId),
+        apiFetch<{ results?: AuditEntry[] }>(
+          `/admin/audit-logs/timeline/ServiceDeskCase/${caseId}/`
+        ),
+      ]);
+      return { payload, auditPayload };
     },
-    [caseId]
-  );
+    enabled: !!caseId,
+  });
+
+  const loading = rqQuery.isLoading;
+  const refreshing = rqQuery.isFetching && !rqQuery.isLoading;
+  const error = errorState || (rqQuery.error ? toErrorMessage(rqQuery.error, "Failed to load direct-sale delivery detail.") : (!caseId ? "Direct-sale case id is missing." : null));
+
+  const loadPage = useCallback(async () => {
+    setErrorState(null);
+    await rqQuery.refetch();
+  }, [rqQuery]);
 
   useEffect(() => {
-    void loadPage("initial");
-  }, [loadPage]);
+    if (rqQuery.data) {
+      const { payload, auditPayload } = rqQuery.data;
+      setDelivery(payload);
+      setTimeline(auditPayload.results || []);
+      setScheduledDate(payload.scheduled_date || "");
+      setReceiverName(payload.receiver_name || "");
+      setReceiverPhone(payload.receiver_phone || "");
+      setAddress(payload.delivery_address_snapshot || "");
+      setFailureReason(payload.failure_or_cancellation_reason || "");
+      setOperationalNotes(payload.operational_notes || payload.notes || "");
+      setErrorState(null);
+    } else if (rqQuery.error) {
+      setDelivery(null);
+      setTimeline([]);
+    }
+  }, [rqQuery.data, rqQuery.error]);
 
   async function handleSaveMetadata() {
     if (!caseId) return;
     if (isHistoryOnly) {
-      setError("This direct-sale delivery is history-only. Active delivery edits are disabled.");
+      setErrorState("This direct-sale delivery is history-only. Active delivery edits are disabled.");
       return;
     }
     try {
@@ -210,9 +209,9 @@ export default function AdminDirectSaleDeliveryDetailPage() {
       });
       setDelivery(updated);
       setMessage("Delivery metadata saved.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
-      setError(toErrorMessage(err, "Failed to save metadata."));
+      setErrorState(toErrorMessage(err, "Failed to save metadata."));
     } finally {
       setActionLoading(null);
     }
@@ -222,11 +221,11 @@ export default function AdminDirectSaleDeliveryDetailPage() {
     if (!caseId || !delivery) return;
     if (isHistoryOnly) return;
     if (!paymentExceptionReason.trim()) {
-      setError("Approval reason is required.");
+      setErrorState("Approval reason is required.");
       return;
     }
     if (!paymentExceptionAck) {
-      setError("You must acknowledge that the outstanding balance remains collectible.");
+      setErrorState("You must acknowledge that the outstanding balance remains collectible.");
       return;
     }
     try {
@@ -240,9 +239,9 @@ export default function AdminDirectSaleDeliveryDetailPage() {
       setMessage("Admin delivery release recorded. Outstanding balance is unchanged and remains receivable.");
       setPaymentExceptionReason("");
       setPaymentExceptionAck(false);
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
-      setError(toErrorMessage(err, "Payment exception approval failed."));
+      setErrorState(toErrorMessage(err, "Payment exception approval failed."));
     } finally {
       setActionLoading(null);
     }
@@ -251,7 +250,7 @@ export default function AdminDirectSaleDeliveryDetailPage() {
   async function runAction(action: "SCHEDULE" | "DISPATCH" | "MARK_DELIVERED" | "CANCEL" | "ADD_NOTE") {
     if (!caseId || !delivery) return;
     if (isHistoryOnly) {
-      setError("This direct-sale delivery is history-only. Active delivery actions are disabled.");
+      setErrorState("This direct-sale delivery is history-only. Active delivery actions are disabled.");
       return;
     }
     try {
@@ -280,7 +279,7 @@ export default function AdminDirectSaleDeliveryDetailPage() {
         });
       } else if (action === "CANCEL") {
         if (!failureReason.trim()) {
-          setError("Cancellation reason is required.");
+          setErrorState("Cancellation reason is required.");
           return;
         }
         updated = await cancelDirectSaleDeliveryCase(caseId, {
@@ -289,7 +288,7 @@ export default function AdminDirectSaleDeliveryDetailPage() {
         });
       } else {
         if (!noteDraft.trim()) {
-          setError("Note is required.");
+          setErrorState("Note is required.");
           return;
         }
         updated = await addDirectSaleDeliveryCaseNote(caseId, { note: noteDraft.trim() });
@@ -298,9 +297,9 @@ export default function AdminDirectSaleDeliveryDetailPage() {
 
       setDelivery(updated);
       setMessage(`${actionLabel(action)} completed.`);
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
-      setError(toErrorMessage(err, `${actionLabel(action)} failed.`));
+      setErrorState(toErrorMessage(err, `${actionLabel(action)} failed.`));
     } finally {
       setActionLoading(null);
     }
@@ -410,7 +409,7 @@ export default function AdminDirectSaleDeliveryDetailPage() {
           <div className="flex justify-end">
             <button
               type="button"
-              onClick={() => void loadPage("refresh")}
+              onClick={() => void loadPage()}
               disabled={loading || refreshing}
               className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-semibold text-foreground transition hover:bg-muted/30 hover:border-ring disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -432,7 +431,7 @@ export default function AdminDirectSaleDeliveryDetailPage() {
 	          <ERPErrorState
 	            title="Unable to load direct-sale delivery detail"
 	            description={error}
-	            onRetry={() => void loadPage("initial")}
+	            onRetry={() => void loadPage()}
 	          />
 	        ) : null}
 	        {!loading && !error && !delivery ? (

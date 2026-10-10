@@ -60,6 +60,13 @@ The system must remain suitable for today’s Lucky Plan EMI, Rent, Lease, and D
 
 ## 5. Core business invariants
 
+### Portal pricing and request visibility
+
+- Advance EMI pricing is visible only when the backend has an OPEN Lucky Plan batch with available duration configuration. Without an open batch, portals must show request-only guidance and must not show fallback EMI tenure buttons.
+- When an open batch exists, Advance EMI tenure comes from the batch and Lucky ID choices come only from Lucky IDs whose persisted status is `AVAILABLE`; assigned, won, occupied, and otherwise unavailable IDs must never be shown.
+- Rent and Lease remain separate portal choices whenever the product is enabled. Their monthly amount is `product price × configured monthly yield rate ÷ 100`; security deposit amount and percentage come from the backend quote.
+- Public, customer, and partner catalog/request routes consume the same backend pricing schema. The frontend must not calculate or invent financial terms beyond display-only estimates returned by that schema.
+
 | Invariant | Source |
 |---|---|
 | Product `base_price` is the contract `total_amount` for EMI creation. | Confirmed from `subscriptions.services.subscription_service.create_emi_subscription`. |
@@ -758,3 +765,11 @@ read the code.
 
 **KYC/media (closed 2026-09-14):** nginx denies `/media/(customers|partners|vendors|staff)/kyc/` (403, verified against a real file); those files are served only via authenticated `/api/v1/.../kyc-documents/{id}/download/` (`FileResponse`). No frontend change was needed. Remaining hardening (app↔DB TLS, field-level PII encryption at rest) is tracked in `docs/DATA_ENCRYPTION_AND_HARDENING.md`.
 
+
+## 42. PIM Attribute Management (added 2026-10-08)
+
+### Product Attributes on Base Products
+- PIM Base Products serve as blueprints. The attributes defined on them form the template for their generated variants.
+- **Variant-defining Attributes**: Attributes mapped on a base product can have empty values at the base level (e.g., Size, Color). Their specific values are provided at the variant level.
+- **Payload Preservation**: The frontend `buildAttrPayload` function must ALWAYS include mapped attributes in the API payload, even if their `value_text`, `value_number`, etc., are empty. Aggressively stripping empty attributes from the payload causes them to be deleted from the base product blueprint upon save.
+- **UI Visibility**: The "Product Attributes" section in `PimProductForm` is decoupled from category selection, allowing dynamic attribute mapping to any product regardless of its category defaults.

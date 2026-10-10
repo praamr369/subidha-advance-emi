@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -98,7 +99,6 @@ export default function InventoryItemsPage() {
   const [locations, setLocations] = useState<StockLocation[]>([]);
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
   const [form, setForm] = useState<ItemFormState | null>(null);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -107,29 +107,34 @@ export default function InventoryItemsPage() {
   const [typeFilter, setTypeFilter] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
   const [sortBy, setSortBy] = useState("attention");
-
-  async function loadPage() {
-    setLoading(true);
-    try {
+  const query = useQuery({
+    queryKey: ["inventory_items"],
+    queryFn: async () => {
       const [itemsPayload, locationPayload] = await Promise.all([
         listInventoryItems(),
         listStockLocations({ is_active: 1 }),
       ]);
-      setRows(itemsPayload.results);
-      setLocations(locationPayload.results);
-      setError(null);
-    } catch (err) {
-      setRows([]);
-      setLocations([]);
-      setError(accountingErrorMessage(err, "Failed to load inventory items."));
-    } finally {
-      setLoading(false);
+      return { itemsPayload, locationPayload };
     }
-  }
+  });
+
+  const loading = query.isLoading;
 
   useEffect(() => {
-    void loadPage();
-  }, []);
+    if (query.data) {
+      setRows(query.data.itemsPayload.results);
+      setLocations(query.data.locationPayload.results);
+      setError(null);
+    } else if (query.isError) {
+      setRows([]);
+      setLocations([]);
+      setError(accountingErrorMessage(query.error, "Failed to load inventory items."));
+    }
+  }, [query.data, query.isError, query.error]);
+
+  const loadPage = async () => {
+    await query.refetch();
+  };
 
   useEffect(() => {
     if (!rows.length) {

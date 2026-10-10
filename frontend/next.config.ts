@@ -195,7 +195,14 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1"],
   compress: true,
   poweredByHeader: false,
-  experimental: {},
+  experimental: {
+    staleTimes: {
+      dynamic: 0,
+      // Next.js 16 requires static stale times to be at least 30 seconds.
+      // Operational pages still use React Query for immediate client refreshes.
+      static: 30,
+    },
+  },
   typescript: {
     ignoreBuildErrors: true,
   },

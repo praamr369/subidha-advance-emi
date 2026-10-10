@@ -1,5 +1,6 @@
 import { apiFetch } from "@/lib/api";
 import { resolveApiMediaUrl } from "@/lib/media";
+import type { ProductSchemePricing } from "@/services/public";
 
 export type ProductRequestType = "ADVANCE_EMI" | "RENT" | "LEASE" | "DIRECT_SALE";
 export type ProductRequestStatus = "SUBMITTED" | "APPROVED" | "REJECTED" | "CANCELLED";
@@ -73,6 +74,7 @@ export type ProductRequestProductOption = {
   image?: string | null;
   category?: string | null;
   subcategory?: string | null;
+  scheme_pricing?: ProductSchemePricing | null;
 };
 
 export type ProductRequestBatchOption = {

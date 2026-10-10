@@ -25,6 +25,7 @@ import {
   type ProductRequestType,
 } from "@/services/product-requests";
 import { resolveApiMediaUrl } from "@/lib/media";
+import PublicProductSchemePricing from "@/components/public/PublicProductSchemePricing";
 
 /* ─── helpers ─────────────────────────────────────────────── */
 
@@ -139,6 +140,7 @@ function ProductPicker({
           </button>
         </div>
       ) : null}
+      {selectedProduct?.scheme_pricing ? <PublicProductSchemePricing pricing={selectedProduct.scheme_pricing} /> : null}
 
       {/* Search */}
       <div className="relative">

@@ -10,6 +10,15 @@ from rest_framework.test import APIClient
 
 from accounts.models import UserRole
 from subscriptions.models import Customer, PlanType, Product
+from products_pim.models import (
+    AttributeDataType,
+    CategoryAttribute,
+    PimProduct,
+    ProductCategory,
+    ProductVariant,
+    VariantAttributeValue,
+)
+from products.services.catalog_browse_service import serialize_catalog_product
 
 User = get_user_model()
 
@@ -46,7 +55,11 @@ def _make_product(code, **flags):
     else:
         defaults["is_emi_enabled"] = True
         defaults.setdefault("plan_type_default", PlanType.EMI)
-    return Product.objects.create(product_code=code, **defaults)
+    product = Product.objects.create(product_code=code, **defaults)
+    # Product creation may provision a draft PIM blueprint through the sync
+    # signal. Published-catalog fixtures must explicitly publish that record.
+    PimProduct.objects.filter(source_product=product).update(is_published=True)
+    return product
 
 
 class CatalogBrowseTests(TestCase):
@@ -138,6 +151,53 @@ class CatalogBrowseTests(TestCase):
     def test_customer_cannot_read_partner_catalog(self):
         resp = self._client(self.customer_user).get("/api/v1/partner/catalog/")
         self.assertEqual(resp.status_code, 403)
+
+    def test_draft_pim_product_is_hidden_from_customer_and_partner_catalogs(self):
+        draft = _make_product("T-DRAFT")
+        PimProduct.objects.filter(source_product=draft).update(is_published=False)
+
+        for role in ("customer", "partner"):
+            resp = self._client(
+                self.customer_user if role == "customer" else self.partner_user
+            ).get(f"/api/v1/{role}/catalog/?search=T-DRAFT")
+            self.assertEqual(resp.status_code, 200)
+            self.assertEqual(resp.data["results"], [])
+
+    def test_variant_linked_catalog_product_returns_complete_variant_matrix(self):
+        base = _make_product("T-MATRIX", category="Beds")
+        base_pim = PimProduct.objects.get(source_product=base)
+        category = ProductCategory.objects.create(name="Beds", slug="beds")
+        base_pim.category = category
+        base_pim.is_published = True
+        base_pim.save(update_fields=["category", "is_published"])
+        size = CategoryAttribute.objects.create(
+            category=category,
+            name="Size",
+            slug="size",
+            data_type=AttributeDataType.CHOICE,
+            is_variant_defining=True,
+        )
+        variant_product = _make_product("T-MATRIX-KING", category="Beds")
+        variant_product_pim = PimProduct.objects.get(source_product=variant_product)
+        variant_product_pim.parent = base_pim
+        variant_product_pim.is_published = True
+        variant_product_pim.save(update_fields=["parent", "is_published"])
+        variant = ProductVariant.objects.create(
+            product=base_pim,
+            operational_product=variant_product,
+            sku="T-MATRIX-KING",
+            price=Decimal("12000"),
+        )
+        VariantAttributeValue.objects.create(
+            variant=variant,
+            attribute=size,
+            value_text="King",
+        )
+
+        payload = serialize_catalog_product(variant_product)
+        self.assertEqual(payload["pim_variants"][0]["sku"], "T-MATRIX-KING")
+        self.assertEqual(payload["pim_variants"][0]["attributes"], {"Size": "King"})
+        self.assertEqual(payload["base_specs"], {"Size": "King"})
 
     @override_settings(DEBUG=True)
     def test_seed_catalog_demo_command_is_idempotent(self):

@@ -67,6 +67,7 @@ DEPOSIT_PERCENT_HIGH = Decimal("30.00")
 TENURE_PRESETS = (6, 12, 24, 36)
 TENURE_MIN = 3
 TENURE_MAX = 60
+DEFAULT_MONTHLY_YIELD_PERCENT = Decimal("5.00")
 
 
 def deposit_percent_for_price(price) -> Decimal:
@@ -357,6 +358,7 @@ def quote_tenure(
     *,
     template_code: str = "",
     deposit_percent_override=None,
+    monthly_yield_percent=None,
 ) -> TenureQuote:
     """
     Price one tenure. Customers type their own tenure, so this must work for any
@@ -367,7 +369,13 @@ def quote_tenure(
         raise ValueError(f"Tenure must be between {TENURE_MIN} and {TENURE_MAX} months.")
 
     price = _q2(effective_price)
-    monthly = _q2(price / Decimal(tenure))
+    if plan_type in DEPOSIT_SCHEMES:
+        yield_percent = _q2(monthly_yield_percent or DEFAULT_MONTHLY_YIELD_PERCENT)
+        # Yield is an annualized product yield. Convert it to the selected
+        # contract tenure so shorter terms carry the higher monthly demand.
+        monthly = _q2(price * yield_percent * Decimal("12") / Decimal(tenure) / Decimal("100"))
+    else:
+        monthly = _q2(price / Decimal(tenure))
 
     deposit_percent = None
     deposit_amount = None
@@ -414,9 +422,21 @@ def _preset_tenures(plan_type: str, catalog: "PricingCatalog") -> list[tuple[int
     return [(t, "", None) for t in TENURE_PRESETS]
 
 
-def _tenure_quotes(plan_type: str, effective_price: Decimal, catalog: "PricingCatalog") -> list[TenureQuote]:
+def _yield_percent_for_template(template) -> Decimal:
+    metadata = getattr(template, "metadata", {}) or {}
+    try:
+        value = _q2(metadata.get("monthly_yield_percent"))
+        return value if value > ZERO else DEFAULT_MONTHLY_YIELD_PERCENT
+    except (TypeError, ValueError, ArithmeticError):
+        return DEFAULT_MONTHLY_YIELD_PERCENT
+
+
+def _tenure_quotes(plan_type: str, effective_price: Decimal, catalog: "PricingCatalog", product=None) -> list[TenureQuote]:
     quotes: list[TenureQuote] = []
     seen: set[int] = set()
+    templates = catalog.templates(plan_type)
+    yield_by_code = {t.template_code: _yield_percent_for_template(t) for t in templates}
+    product_override = getattr(product, "_public_yield_override_" + plan_type, None)
     for tenure, template_code, deposit_override in _preset_tenures(plan_type, catalog):
         if tenure in seen or tenure < TENURE_MIN or tenure > TENURE_MAX:
             continue
@@ -428,6 +448,7 @@ def _tenure_quotes(plan_type: str, effective_price: Decimal, catalog: "PricingCa
                 tenure,
                 template_code=template_code,
                 deposit_percent_override=deposit_override,
+                monthly_yield_percent=product_override or yield_by_code.get(template_code),
             )
         )
     return sorted(quotes, key=lambda q: q.tenure_months)
@@ -451,7 +472,7 @@ def quote_scheme(
             available=base_price > ZERO,
             base_price=base_price,
             effective_price=effective,
-            discount=discount,
+            discount=None,
             tenures=[],
             unavailable_reason="" if base_price > ZERO else "Price not published.",
         )
@@ -477,12 +498,22 @@ def quote_scheme(
             unavailable_reason="Price not published.",
         )
 
-    effective, discount = _best_price(product, plan_type, base_price, catalog, customer)
-    tenures = _tenure_quotes(plan_type, effective, catalog)
+    # Advance EMI is request-only until the admin opens a Lucky Plan batch.
+    # Do not expose fallback tenure presets without a real batch.
+    if plan_type == EMI and not catalog.batch_durations():
+        return SchemeQuote(
+            scheme=plan_type,
+            available=False,
+            base_price=base_price,
+            effective_price=base_price,
+            discount=None,
+            unavailable_reason="No open Advance EMI batch.",
+        )
 
-    # Availability follows the product's own scheme flags and having a price.
-    # Tenure presets are only shortcuts, so an empty config table never makes a
-    # scheme disappear from the catalogue.
+    effective, discount = _best_price(product, plan_type, base_price, catalog, customer)
+    tenures = _tenure_quotes(plan_type, effective, catalog, product=product)
+
+    # Availability follows the product's own scheme flags and backend readiness.
     return SchemeQuote(
         scheme=plan_type,
         available=True,
@@ -513,6 +544,12 @@ def quote_product(
     templates and offers per row.
     """
     catalog = catalog or PricingCatalog(on_date=on_date)
+    # A product-level override is controlled from PIM. Null keeps the existing
+    # PlanTemplate/default-rate behavior.
+    for scheme, field_name in ((RENT, "rent_monthly_yield_percent"), (LEASE, "lease_monthly_yield_percent")):
+        override = getattr(product, field_name, None)
+        if override is not None:
+            setattr(product, "_public_yield_override_" + scheme, _q2(override))
     on_date = catalog.on_date
     schemes = [
         quote_scheme(product, s, catalog=catalog, customer=customer)
@@ -533,6 +570,7 @@ def quote_product(
         "cash_has_discount": bool(cash and cash.discount),
         "lowest_monthly": str(_q2(min(monthlies))) if monthlies else None,
         "available_schemes": [s.scheme for s in available],
+        "has_active_batches": bool(catalog.batch_durations()),
         "schemes": {s.scheme: s.as_dict(public=public) for s in listed},
         # Shared so the page can recalculate a customer-typed tenure locally and
         # still land on exactly the figures this service would produce.
@@ -546,5 +584,11 @@ def quote_product(
                 {"up_to": str(_q2(DEPOSIT_BAND_MID_MAX)), "percent": str(DEPOSIT_PERCENT_MID)},
                 {"up_to": None, "percent": str(DEPOSIT_PERCENT_HIGH)},
             ],
+            "monthly_yield_percent": {
+                scheme: str(_yield_percent_for_template(catalog.templates(scheme)[0]))
+                if catalog.templates(scheme)
+                else str(DEFAULT_MONTHLY_YIELD_PERCENT)
+                for scheme in (RENT, LEASE)
+            },
         },
     }

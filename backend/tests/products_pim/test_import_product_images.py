@@ -73,7 +73,7 @@ class ImportProductImagesTests(TestCase):
         item = ProductMediaItem.objects.get()
         self.assertEqual(item.product, self.pim)
         self.assertEqual(item.kind, MediaKind.IMAGE)
-        self.assertIn("BED-001", item.file.name)
+        self.assertIn("BED-001", item.file)
 
     def test_rerunning_does_not_duplicate(self):
         self._file("BED-001.jpg")

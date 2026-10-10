@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 import { formatRupee } from "@/lib/utils/currency";
 
 import Link from "next/link";
@@ -62,45 +63,31 @@ export default function PartnerCustomerDetailPage() {
   const customerId = params?.id;
 
   const [data, setData] = useState<PartnerCustomerDetailResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (mode === "initial") {
-        setLoading(true);
-      } else {
-        setRefreshing(true);
-      }
-
-      try {
-        if (!customerId) {
-          throw new Error("Missing customer id.");
-        }
-
-        const payload = await getPartnerCustomerDetail(customerId);
-        setData(payload);
-        setError(null);
-      } catch (err) {
-        setError(toErrorMessage(err));
-        if (mode === "initial") {
-          setData(null);
-        }
-      } finally {
-        if (mode === "initial") {
-          setLoading(false);
-        } else {
-          setRefreshing(false);
-        }
-      }
+  const query = useQuery({
+    queryKey: ['partnerCustomerDetail', customerId],
+    queryFn: async () => {
+      if (!customerId) throw new Error("Missing customer id.");
+      return await getPartnerCustomerDetail(customerId);
     },
-    [customerId]
-  );
+    enabled: !!customerId,
+  });
+
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const error = query.error ? toErrorMessage(query.error) : null;
+
+  const loadPage = useCallback(async (mode?: "initial" | "refresh") => {
+    await query.refetch();
+  }, [query]);
 
   useEffect(() => {
-    void loadPage("initial");
-  }, [loadPage]);
+    if (query.data) {
+      setData(query.data);
+    } else if (query.isError) {
+      setData(null);
+    }
+  }, [query.data, query.isError]);
 
   const customer = data?.customer;
   const summary = data?.summary;
@@ -322,7 +309,7 @@ export default function PartnerCustomerDetailPage() {
           action={
             <button
               type="button"
-              onClick={() => void loadPage("refresh")}
+              onClick={() => void loadPage()}
               disabled={loading || refreshing}
               className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -348,7 +335,7 @@ export default function PartnerCustomerDetailPage() {
           <ErrorState
             title="Unable to load customer detail"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 

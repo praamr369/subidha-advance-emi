@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { cookies } from "next/headers";
+import { Suspense } from "react";
 
 import { getDictionary } from "@/i18n/get-dictionary";
 import { cookieName, fallbackLng, type Locale } from "@/i18n/settings";
@@ -25,7 +26,9 @@ export default async function AuthLayout({ children }: { children: ReactNode }) 
       <div className="public-app relative min-h-screen w-full overflow-x-hidden text-foreground">
         <div className="pointer-events-none absolute right-4 top-4 z-20 sm:right-6 sm:top-5">
           <div className="pointer-events-auto flex items-center gap-3">
-            <LanguageSwitcher />
+            <Suspense fallback={<div className="h-9 w-24" aria-hidden="true" />}>
+              <LanguageSwitcher />
+            </Suspense>
             <ThemeToggle variant="public" />
           </div>
         </div>

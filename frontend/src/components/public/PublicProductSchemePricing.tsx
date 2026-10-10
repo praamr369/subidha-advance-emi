@@ -60,7 +60,16 @@ function quoteTenureLocally(
   tenureMonths: number,
   rules: SchemePricingRules,
 ): SchemeTenureQuote {
-  const monthly = round2(effectivePrice / tenureMonths);
+  const monthly =
+    scheme === "RENT" || scheme === "LEASE"
+      ? round2(
+          (effectivePrice *
+            Number(rules.monthly_yield_percent?.[scheme] ?? "5") *
+            12) /
+            tenureMonths /
+            100,
+        )
+      : round2(effectivePrice / tenureMonths);
   const takesDeposit = rules.deposit_schemes.includes(scheme);
   const percent = takesDeposit ? depositPercentForPrice(effectivePrice, rules) : null;
   const depositAmount = percent != null ? round2((effectivePrice * percent) / 100) : null;
@@ -118,6 +127,7 @@ export default function PublicProductSchemePricing({
   };
 
   const draftInvalid =
+    active.scheme !== "EMI" &&
     tenureDraft.trim() !== "" &&
     !(
       Number.isFinite(Number.parseInt(tenureDraft, 10)) &&
@@ -151,7 +161,10 @@ export default function PublicProductSchemePricing({
               type="button"
               role="tab"
               aria-selected={isActive}
-              onClick={() => setActiveScheme(q.scheme)}
+              onClick={() => {
+                setActiveScheme(q.scheme);
+                setTenureDraft("");
+              }}
               className={cn(
                 "rounded-xl border px-4 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45",
                 isActive
@@ -178,8 +191,9 @@ export default function PublicProductSchemePricing({
         <span className="text-xs text-muted-foreground">total payable</span>
       </div>
 
-      {/* Tenure: preset shortcuts plus free entry */}
-      {active.scheme !== "CASH" ? (
+      {/* Advance EMI tenure is controlled by the active batch/business setup.
+          Rent and lease may use the configured range for an estimate. */}
+      {active.scheme !== "CASH" && tenure ? (
         <div className="mt-5">
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Tenure
@@ -208,22 +222,24 @@ export default function PublicProductSchemePricing({
               );
             })}
 
-            <label className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-1.5">
-              <span className="text-xs text-muted-foreground">Or enter</span>
-              <input
-                type="number"
-                inputMode="numeric"
-                min={rules.tenure_min}
-                max={rules.tenure_max}
-                value={tenureDraft}
-                onChange={(e) => applyTypedTenure(e.target.value)}
-                placeholder={String(rules.tenure_min)}
-                aria-label={`Tenure in months, ${rules.tenure_min} to ${rules.tenure_max}`}
-                aria-invalid={draftInvalid}
-                className="w-16 bg-transparent text-sm font-medium text-foreground outline-none"
-              />
-              <span className="text-xs text-muted-foreground">months</span>
-            </label>
+            {active.scheme !== "EMI" ? (
+              <label className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-1.5">
+                <span className="text-xs text-muted-foreground">Or enter</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={rules.tenure_min}
+                  max={rules.tenure_max}
+                  value={tenureDraft}
+                  onChange={(e) => applyTypedTenure(e.target.value)}
+                  placeholder={String(rules.tenure_min)}
+                  aria-label={`Tenure in months, ${rules.tenure_min} to ${rules.tenure_max}`}
+                  aria-invalid={draftInvalid}
+                  className="w-16 bg-transparent text-sm font-medium text-foreground outline-none"
+                />
+                <span className="text-xs text-muted-foreground">months</span>
+              </label>
+            ) : null}
           </div>
           <p
             className={cn(
@@ -231,7 +247,11 @@ export default function PublicProductSchemePricing({
               draftInvalid ? "text-destructive" : "text-muted-foreground",
             )}
           >
-            {draftInvalid
+            {active.scheme === "EMI"
+              ? pricing.has_active_batches
+                ? "Tenure is set by the currently open Advance EMI batch."
+                : "No Advance EMI batch is open. Send a request and the business team will confirm tenure."
+              : draftInvalid
               ? `Enter a tenure between ${rules.tenure_min} and ${rules.tenure_max} months.`
               : `Any tenure from ${rules.tenure_min} to ${rules.tenure_max} months.`}
           </p>
@@ -261,6 +281,20 @@ export default function PublicProductSchemePricing({
               </dd>
               <p className="mt-1 text-[11px] text-muted-foreground">
                 {tenure.security_deposit_percent}% · refundable
+              </p>
+            </div>
+          ) : null}
+
+          {active.scheme === "RENT" || active.scheme === "LEASE" ? (
+            <div className="rounded-xl border border-border bg-background p-4">
+              <dt className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Approx. rate
+              </dt>
+              <dd className="mt-1 text-lg font-bold text-foreground">
+                {money(tenure.monthly_amount)} / month
+              </dd>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Backend quote for {tenure.tenure_months} months · deposit {tenure.security_deposit_percent ?? "—"}%
               </p>
             </div>
           ) : null}

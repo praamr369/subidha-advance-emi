@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -117,8 +118,6 @@ export default function AdminReportsPage() {
   const [windowPreset, setWindowPreset] = useState<DashboardWindowPreset>("THIS_MONTH");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<ReportCenterCatalog | null>(null);
   const [catalogError, setCatalogError] = useState<string | null>(null);
@@ -138,6 +137,21 @@ export default function AdminReportsPage() {
           },
     [endDate, startDate, windowPreset]
   );
+
+  const query = useQuery({
+    queryKey: ['admin-reports', analyticsQuery],
+    queryFn: async () => {
+      const [summaryResult, catalogResult, dashboardResult] = await Promise.allSettled([
+        getAdminAnalyticsSummary(analyticsQuery),
+        fetchReportsCenterCatalog(),
+        apiFetch<AdminDashboardApiResponse>("/admin/dashboard/"),
+      ]);
+      return { summaryResult, catalogResult, dashboardResult };
+    }
+  });
+
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
 
   const commitFetchResults = useCallback(
     (
@@ -177,58 +191,34 @@ export default function AdminReportsPage() {
   );
 
   useEffect(() => {
-    let cancelled = false;
-
-    void (async () => {
-      const bundle = await Promise.allSettled([
-        getAdminAnalyticsSummary(analyticsQuery),
-        fetchReportsCenterCatalog(),
-        apiFetch<AdminDashboardApiResponse>("/admin/dashboard/"),
+    if (query.data) {
+      commitFetchResults([
+        query.data.summaryResult,
+        query.data.catalogResult,
+        query.data.dashboardResult,
+      ] as [
+        PromiseSettledResult<AdminAnalyticsSummaryResponse>,
+        PromiseSettledResult<ReportCenterCatalog>,
+        PromiseSettledResult<AdminDashboardApiResponse>
       ]);
-
-      if (cancelled) return;
-      commitFetchResults(bundle as Parameters<typeof commitFetchResults>[0]);
-      setLoading(false);
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [analyticsQuery, commitFetchResults]);
+    }
+  }, [query.data, commitFetchResults]);
 
   const handleWindowPresetChange = useCallback((preset: DashboardWindowPreset) => {
-    setLoading(true);
     setWindowPreset(preset);
   }, []);
 
   const handleStartDateChange = useCallback((value: string) => {
-    setLoading(true);
     setStartDate(value);
   }, []);
 
   const handleEndDateChange = useCallback((value: string) => {
-    setLoading(true);
     setEndDate(value);
   }, []);
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (mode === "initial") setLoading(true);
-      else setRefreshing(true);
-
-      const bundle = await Promise.allSettled([
-        getAdminAnalyticsSummary(analyticsQuery),
-        fetchReportsCenterCatalog(),
-        apiFetch<AdminDashboardApiResponse>("/admin/dashboard/"),
-      ]);
-
-      commitFetchResults(bundle as Parameters<typeof commitFetchResults>[0]);
-
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
-    },
-    [analyticsQuery, commitFetchResults]
-  );
+  const loadPage = useCallback(async () => {
+    await query.refetch();
+  }, [query]);
 
   useEffect(() => {
     if (loading) return;
@@ -464,7 +454,7 @@ export default function AdminReportsPage() {
             <ActionButton
               type="button"
               variant="outline"
-              onClick={() => void loadPage("refresh")}
+              onClick={() => void loadPage()}
               disabled={refreshing || loading}
               leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
             >
@@ -518,7 +508,7 @@ export default function AdminReportsPage() {
                 <ErrorState
                   title="Unable to load analytics"
                   description={liveError}
-                  onRetry={() => void loadPage("refresh")}
+                  onRetry={() => void loadPage()}
                 />
               ) : (
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -561,7 +551,7 @@ export default function AdminReportsPage() {
           <ErrorState
             title="Unable to load reports overview"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 
@@ -938,7 +928,7 @@ export default function AdminReportsPage() {
                 <ErrorState
                   title="Unable to load SME catalog"
                   description={catalogError}
-                  onRetry={() => void loadPage("refresh")}
+                  onRetry={() => void loadPage()}
                 />
               ) : !catalog?.sections?.length ? (
                 <EmptyState

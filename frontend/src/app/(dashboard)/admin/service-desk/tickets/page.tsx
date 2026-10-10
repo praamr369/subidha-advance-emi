@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import DataTable from "@/components/ui/DataTable";
 import ERPErrorState from "@/components/erp/ERPErrorState";
@@ -89,11 +90,7 @@ const emptyForm: FormState = {
 };
 
 export default function AdminServiceDeskTicketsPage() {
-  const [rows, setRows] = useState<ServiceDeskCase[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>({ ...emptyForm });
 
@@ -104,24 +101,19 @@ export default function AdminServiceDeskTicketsPage() {
   const [activeTab, setActiveTab] = useState<"create" | "history">("create");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  async function loadPage(isInitial = false) {
-    try {
-      if (isInitial) setLoading(true); else setRefreshing(true);
-      const next = await listServiceDeskCases({ case_type: "SERVICE" });
-      setRows(next.results);
-      setError(null);
-    } catch (err) {
-      if (isInitial) setRows([]);
-      setError(toErrorMessage(err));
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }
+  const query = useQuery({
+    queryKey: ["admin", "service-desk", "tickets"],
+    queryFn: () => listServiceDeskCases({ case_type: "SERVICE" }),
+  });
 
-  useEffect(() => {
-    void loadPage(true);
-  }, []);
+  const rows = query.data?.results || [];
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const error = query.error ? toErrorMessage(query.error) : null;
+
+  const loadPage = useCallback(async () => {
+    await query.refetch();
+  }, [query]);
 
   const handlePhoneLookup = useCallback(async (phone: string) => {
     if (phone.trim().length < 4) {
@@ -218,7 +210,7 @@ export default function AdminServiceDeskTicketsPage() {
       setLookupResult(null);
       await loadPage();
     } catch (err) {
-      setError(toErrorMessage(err));
+      setNotice(toErrorMessage(err));
     } finally {
       setSaving(false);
     }

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 
 import DataTable from "@/components/ui/DataTable";
@@ -34,10 +35,7 @@ export default function AdminServiceDeskReturnsPage() {
   const searchParams = useSearchParams();
   const isRentLeaseInspection = searchParams?.get("plan_type") === "RENT_LEASE";
 
-  const [rows, setRows] = useState<ServiceDeskCase[]>([]);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [form, setForm] = useState({
     case_type: "SALES_RETURN",
@@ -58,31 +56,28 @@ export default function AdminServiceDeskReturnsPage() {
     tax_amount: "0.00",
   });
 
-  async function loadPage() {
-    try {
-      setLoading(true);
-      const next = await listServiceDeskCases({
-        case_type: "SALES_RETURN",
-      });
-      const exchange = await listServiceDeskCases({
-        case_type: "EXCHANGE",
-      });
-      const deliveryReturns = await listServiceDeskCases({
-        case_type: "DELIVERY_RETURN",
-      });
-      setRows([...next.results, ...exchange.results, ...deliveryReturns.results].sort((left, right) => Date.parse(right.created_at || "") - Date.parse(left.created_at || "")));
-      setError(null);
-    } catch (err) {
-      setRows([]);
-      setError(toErrorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  }
+  const query = useQuery({
+    queryKey: ["admin", "service-desk", "returns"],
+    queryFn: async () => {
+      const [next, exchange, deliveryReturns] = await Promise.all([
+        listServiceDeskCases({ case_type: "SALES_RETURN" }),
+        listServiceDeskCases({ case_type: "EXCHANGE" }),
+        listServiceDeskCases({ case_type: "DELIVERY_RETURN" }),
+      ]);
+      return [...next.results, ...exchange.results, ...deliveryReturns.results].sort(
+        (left, right) => Date.parse(right.created_at || "") - Date.parse(left.created_at || "")
+      );
+    },
+  });
 
-  useEffect(() => {
-    void loadPage();
-  }, []);
+  const rows = query.data || [];
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const error = query.error ? toErrorMessage(query.error) : null;
+
+  const loadPage = useCallback(async () => {
+    await query.refetch();
+  }, [query]);
 
   async function handleCreateCase() {
     if (!form.issue_summary.trim()) return;
@@ -141,7 +136,7 @@ export default function AdminServiceDeskReturnsPage() {
       });
       await loadPage();
     } catch (err) {
-      setError(toErrorMessage(err));
+      setNotice(toErrorMessage(err));
     } finally {
       setSaving(false);
     }

@@ -1,16 +1,20 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, Box, CheckCircle2, ShieldCheck, Tag } from "lucide-react";
-import { getCatalogProduct, type CatalogRole } from "@/services/catalog";
+import { getCatalogProduct, type CatalogProduct, type CatalogRole } from "@/services/catalog";
 import { resolveApiMediaUrl } from "@/lib/media";
 import ProductARViewer from "@/components/public/ProductARViewer";
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import { SelfServicePageShell } from "@/components/layout/page-shells";
+import PublicProductSchemePricing from "@/components/public/PublicProductSchemePricing";
+import PublicProductVariantSelector from "@/components/public/PublicProductVariantSelector";
 
 export default function CatalogProductDetailPage({
   role,
@@ -21,10 +25,14 @@ export default function CatalogProductDetailPage({
   id: string;
   backHref: string;
 }) {
-  const { data: product, isLoading, error } = useQuery({
+  const { data: fetchedProduct, isLoading, error } = useQuery({
     queryKey: ["catalogProduct", role, id],
     queryFn: () => getCatalogProduct(role, id),
   });
+  const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({});
+  const [activeProduct, setActiveProduct] = useState<CatalogProduct | null>(null);
+  const [switchingVariant, setSwitchingVariant] = useState(false);
+  const product = activeProduct ?? fetchedProduct;
 
   if (isLoading) return <ERPLoadingState />;
   if (error || !product) {
@@ -32,8 +40,28 @@ export default function CatalogProductDetailPage({
   }
 
   const imgUrl = resolveApiMediaUrl(product.image ?? null);
-  const basePrice = Number(product.base_price).toLocaleString("en-IN");
   const specs = (product.base_specs as Record<string, string>) || {};
+  const mediaItems = product.media_items || [];
+  const handleVariantSelect = async (name: string, value: string) => {
+    const nextAttributes = { ...selectedAttributes };
+    if (value) nextAttributes[name] = value;
+    else delete nextAttributes[name];
+    setSelectedAttributes(nextAttributes);
+    if (Object.keys(nextAttributes).length === 0) {
+      setActiveProduct(null);
+      return;
+    }
+    const variant = product.pim_variants?.find((candidate) =>
+      Object.entries(nextAttributes).every(([key, selected]) => candidate.attributes[key] === selected),
+    );
+    if (!variant?.product_id || variant.product_id === product.id) return;
+    setSwitchingVariant(true);
+    try {
+      setActiveProduct(await getCatalogProduct(role, variant.product_id));
+    } finally {
+      setSwitchingVariant(false);
+    }
+  };
 
   return (
     <SelfServicePageShell>
@@ -51,21 +79,60 @@ export default function CatalogProductDetailPage({
         {/* Product Header / Image */}
         <div className="flex flex-col md:flex-row gap-6">
           <div className="w-full md:w-1/2 lg:w-1/3 shrink-0">
-            <div className="relative aspect-square w-full overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
-              {imgUrl ? (
-                <Image
-                  src={imgUrl}
-                  alt={product.name}
-                  fill
-                  className="object-cover"
-                  sizes="(max-width: 768px) 100vw, 33vw"
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center bg-muted/40">
-                  <Box className="size-16 text-muted-foreground/40" />
-                </div>
-              )}
-            </div>
+            {mediaItems.length > 0 ? (
+              <div className="group relative">
+                <Carousel className="w-full">
+                  <CarouselContent>
+                    {mediaItems.map((item, index) => (
+                      <CarouselItem key={index}>
+                        <div className="relative aspect-square w-full overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
+                          {item.kind === "VIDEO" ? (
+                            <video
+                              src={item.url}
+                              controls
+                              autoPlay
+                              muted
+                              loop
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <Image
+                              src={item.url}
+                              alt={item.title || product.name}
+                              fill
+                              className="object-cover"
+                              sizes="(max-width: 768px) 100vw, 33vw"
+                            />
+                          )}
+                        </div>
+                      </CarouselItem>
+                    ))}
+                  </CarouselContent>
+                  {mediaItems.length > 1 && (
+                    <>
+                      <CarouselPrevious className="absolute left-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <CarouselNext className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </>
+                  )}
+                </Carousel>
+              </div>
+            ) : (
+              <div className="relative aspect-square w-full overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
+                {imgUrl ? (
+                  <Image
+                    src={imgUrl}
+                    alt={product.name}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, 33vw"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-muted/40">
+                    <Box className="size-16 text-muted-foreground/40" />
+                  </div>
+                )}
+              </div>
+            )}
             {product.ar_model && (
               <div className="mt-4">
                 <ProductARViewer model={product.ar_model} productName={product.name} poster={imgUrl} />
@@ -85,14 +152,31 @@ export default function CatalogProductDetailPage({
             </div>
 
             <div className="text-4xl font-black text-foreground">
-              ₹{basePrice}
+              ₹{Number(product.base_price).toLocaleString("en-IN")}
+              {switchingVariant ? <span className="ml-2 text-sm font-medium text-muted-foreground">Updating…</span> : null}
             </div>
+
+            {(product.pim_variants?.length ?? 0) > 0 && (
+              <div className="rounded-2xl border border-border bg-card p-5">
+                <h3 className="mb-4 text-sm font-bold text-foreground">Choose options</h3>
+                <PublicProductVariantSelector
+                  variants={product.pim_variants!.map((variant) => ({
+                    ...variant,
+                    is_low_stock: false,
+                  }))}
+                  selectedAttributes={selectedAttributes}
+                  onAttributeSelect={(name, value) => void handleVariantSelect(name, value)}
+                />
+              </div>
+            )}
 
             {product.description && (
               <div className="prose prose-sm dark:prose-invert">
                 <p>{product.description}</p>
               </div>
             )}
+
+            <PublicProductSchemePricing pricing={product.scheme_pricing} />
 
             {/* Request Actions */}
             <div className="pt-4 border-t border-border">

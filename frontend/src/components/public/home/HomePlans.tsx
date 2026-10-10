@@ -72,10 +72,10 @@ export default function HomePlans({ copy }: { copy: HomeCopy["plans"] }) {
               {text.note ? <p className={cn("mt-2 text-xs leading-5", tone.muted)}>{text.note}</p> : null}
 
               <div className="mt-auto flex gap-2 pt-5">
-                <Link href={plan.href} className="public-action-secondary h-10 !min-h-0 flex-1 px-3 text-sm">
+                <Link href={plan.href} className="public-action-secondary h-10 min-h-0! flex-1 px-3 text-sm">
                   {copy.details}
                 </Link>
-                <Link href={ROUTES.public.apply} className="public-action-primary h-10 !min-h-0 flex-1 px-3 text-sm">
+                <Link href={ROUTES.public.apply} className="public-action-primary h-10 min-h-0! flex-1 px-3 text-sm">
                   {copy.enquire}
                 </Link>
               </div>

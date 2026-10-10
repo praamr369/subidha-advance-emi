@@ -90,7 +90,7 @@ export default function AdminPaymentCollectPage({
     }
   }, [queryString]);
 
-  async function handleSearch(query: string, autoSelectContext?: string) {
+  async function handleSearch(query: string, autoSelectContext?: string, suppressAutoSelect = false) {
     const trimmed = query.trim();
     setSearchError(null);
     // Do NOT clear successResponse here: handleSuccess() re-invokes handleSearch
@@ -118,7 +118,7 @@ export default function AdminPaymentCollectPage({
         } else if (payload.results.length === 1) {
           handleSelectReceivable(payload.results[0]);
         }
-      } else if (payload.results.length === 1 && (query.startsWith("subscription:") || query.startsWith("outstanding:"))) {
+      } else if (!suppressAutoSelect && payload.results.length === 1 && (query.startsWith("subscription:") || query.startsWith("outstanding:"))) {
         handleSelectReceivable(payload.results[0]);
       }
     } catch (error) {
@@ -178,7 +178,7 @@ export default function AdminPaymentCollectPage({
     }
     // Refresh search results in background
     if (searchQuery) {
-      void handleSearch(searchQuery);
+      void handleSearch(searchQuery, undefined, true);
     }
   }
 

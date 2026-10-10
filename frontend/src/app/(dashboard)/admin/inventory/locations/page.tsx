@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -97,7 +98,6 @@ export default function InventoryLocationsPage() {
   const [rows, setRows] = useState<StockLocationsRow[]>([]);
   const [branches, setBranches] = useState<BranchRecord[]>([]);
   const [form, setForm] = useState<LocationFormState>(EMPTY_FORM);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -112,9 +112,9 @@ export default function InventoryLocationsPage() {
   // KPI State
   const [kpiCounts, setKpiCounts] = useState({ active: 0, warehouse: 0, showroom: 0, store: 0 });
 
-  const loadPage = useCallback(async () => {
-    setLoading(true);
-    try {
+  const query = useQuery({
+    queryKey: ["inventory_locations", pagination.page, pagination.page_size, typeFilter, activeFilter, debouncedSearch],
+    queryFn: async () => {
       const [payload, branchPayload] = await Promise.all([
         listStockLocations({
           page: pagination.page,
@@ -125,32 +125,38 @@ export default function InventoryLocationsPage() {
         }) as Promise<StockLocationsPayload>,
         listBranches({ status: "ACTIVE" }),
       ]);
-      setRows(payload.results ?? []);
+      return { payload, branchPayload };
+    },
+  });
+
+  const loading = query.isLoading;
+
+  useEffect(() => {
+    if (query.data) {
+      setRows(query.data.payload.results ?? []);
       setKpiCounts({
-        active: payload.active_count,
-        warehouse: payload.warehouse_count,
-        showroom: payload.showroom_count,
-        store: payload.store_count,
+        active: query.data.payload.active_count,
+        warehouse: query.data.payload.warehouse_count,
+        showroom: query.data.payload.showroom_count,
+        store: query.data.payload.store_count,
       });
       setPagination(prev => ({
         ...prev,
-        total_count: payload.count,
-        num_pages: payload.num_pages,
+        total_count: query.data.payload.count,
+        num_pages: query.data.payload.num_pages,
       }));
-      setBranches(branchPayload.results);
+      setBranches(query.data.branchPayload.results);
       setError(null);
-    } catch (err) {
+    } else if (query.isError) {
       setRows([]);
       setBranches([]);
-      setError(accountingErrorMessage(err, "Failed to load stock locations."));
-    } finally {
-      setLoading(false);
+      setError(accountingErrorMessage(query.error, "Failed to load stock locations."));
     }
-  }, [pagination.page, pagination.page_size, typeFilter, activeFilter, debouncedSearch]);
+  }, [query.data, query.isError, query.error]);
 
-  useEffect(() => {
-    void loadPage();
-  }, [loadPage]);
+  const loadPage = useCallback(async () => {
+    await query.refetch();
+  }, [query]);
 
   const columns: EnterpriseColumnDef<StockLocationsRow>[] = [
     { key: "code", header: "Code" },

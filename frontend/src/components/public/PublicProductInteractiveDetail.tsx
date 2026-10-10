@@ -41,7 +41,9 @@ export default function PublicProductInteractiveDetail({
   }, [initialSelectedAttributes]);
 
   const handleAttributeSelect = (attributeName: string, value: string) => {
-    const candidate = { ...selectedAttributes, [attributeName]: value };
+    const candidate = { ...selectedAttributes };
+    if (value) candidate[attributeName] = value;
+    else delete candidate[attributeName];
 
     // Drop stale attrs that don't exist in any variant carrying the new value
     const variants = initialProduct.pim_variants ?? [];
@@ -123,11 +125,38 @@ export default function PublicProductInteractiveDetail({
   const factRows = [
     { label: "Category", value: displayProduct.category || "Not classified" },
     { label: "Subcategory", value: displayProduct.subcategory || "Not classified" },
+    ...(mergedPimAttributes ?? []).map(attr => ({
+      label: attr.name,
+      value: attr.value
+    }))
   ];
 
   const isVariantPage = Boolean(initialProduct.is_variant_page);
   const siblings = initialProduct.sibling_variants ?? [];
   const hasVariants = (initialProduct.pim_variants?.length ?? 0) > 0;
+  const variantPageOptions = siblings.map((variant) => ({
+    id: variant.product_id,
+    sku: variant.sku,
+    price: variant.price,
+    attributes: variant.attributes,
+    image: variant.image,
+    is_low_stock: false,
+    stock_status: "IN_STOCK" as const,
+    product_code: variant.product_code,
+    product_id: variant.product_id,
+  }));
+
+  const handleVariantPageAttributeSelect = (name: string, value: string) => {
+    const next = { ...selectedAttributes };
+    if (value) next[name] = value;
+    else delete next[name];
+    const match = variantPageOptions.find((variant) =>
+      Object.entries(next).every(([key, selected]) => variant.attributes[key] === selected),
+    );
+    if (match) {
+      window.location.assign(`/products/${match.product_code || match.product_id}`);
+    }
+  };
 
   return (
     <>
@@ -191,8 +220,16 @@ export default function PublicProductInteractiveDetail({
             {/* Variant page: sibling switcher */}
             {isVariantPage && siblings.length > 0 && (
               <div className="mt-4 rounded-[1.5rem] border border-border bg-card p-5 shadow-sm">
-                <h3 className="mb-1 text-sm font-semibold text-foreground">Other variants</h3>
-                <p className="mb-4 text-xs text-muted-foreground">Each variant is its own page with its own price.</p>
+                <h3 className="mb-1 text-sm font-semibold text-foreground">Choose your options</h3>
+                <p className="mb-4 text-xs text-muted-foreground">Select each available attribute to open the matching variant and price.</p>
+                <PublicProductVariantSelector
+                  variants={variantPageOptions}
+                  selectedAttributes={selectedAttributes}
+                  onAttributeSelect={handleVariantPageAttributeSelect}
+                />
+                <div className="mt-5 border-t border-border/60 pt-4">
+                  <h4 className="mb-1 text-sm font-semibold text-foreground">Other variants</h4>
+                  <p className="mb-3 text-xs text-muted-foreground">Each variant has its own published price.</p>
                 <div className="flex flex-wrap gap-2">
                   {siblings.map((s) => (
                     <Link
@@ -212,6 +249,7 @@ export default function PublicProductInteractiveDetail({
                       </span>
                     </Link>
                   ))}
+                </div>
                 </div>
               </div>
             )}

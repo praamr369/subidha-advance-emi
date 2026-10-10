@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
@@ -73,11 +74,7 @@ export default function AdminCommissionPayoutQueuePage() {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [batchNotes, setBatchNotes] = useState("");
 
-  const [data, setData] = useState<PayoutBatchPreviewResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -87,31 +84,23 @@ export default function AdminCommissionPayoutQueuePage() {
     setSearchInput(q);
   }, [dateFrom, dateTo, partner, q]);
 
-  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
-
-    try {
-      const query: PayoutBatchPreviewQuery = {};
-      if (partner) query.partner = partner;
-      if (dateFrom) query.date_from = dateFrom;
-      if (dateTo) query.date_to = dateTo;
-
-      const payload = await getPayoutBatchPreview(query);
-      setData(payload);
-      setError(null);
-    } catch (err) {
-      setError(toErrorMessage(err));
-      if (mode === "initial") setData(null);
-    } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
+  const query = useQuery({
+    queryKey: ["payoutBatchPreview", partner, dateFrom, dateTo],
+    queryFn: async () => {
+      const queryPayload: PayoutBatchPreviewQuery = {};
+      if (partner) queryPayload.partner = partner;
+      if (dateFrom) queryPayload.date_from = dateFrom;
+      if (dateTo) queryPayload.date_to = dateTo;
+      return getPayoutBatchPreview(queryPayload);
     }
-  }, [dateFrom, dateTo, partner]);
+  });
 
-  useEffect(() => {
-    void loadPage("initial");
-  }, [loadPage]);
+  const data = query.data || null;
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const [actionError, setError] = useState<string | null>(null);
+  const error = actionError || (query.error ? toErrorMessage(query.error) : null);
+  const loadPage = useCallback(async () => { await query.refetch(); }, [query]);
 
   const rows = useMemo(() => {
     const search = searchInput.trim().toLowerCase();
@@ -225,7 +214,7 @@ export default function AdminCommissionPayoutQueuePage() {
       );
       setSelectedIds([]);
       setBatchNotes("");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(toErrorMessage(err));
     } finally {
@@ -364,7 +353,7 @@ export default function AdminCommissionPayoutQueuePage() {
               </button>
               <button
                 type="button"
-                onClick={() => void loadPage("refresh")}
+                onClick={() => void loadPage()}
                 disabled={loading || refreshing}
                 className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
               >
@@ -499,7 +488,7 @@ export default function AdminCommissionPayoutQueuePage() {
           <ErrorState
             title="Unable to load payout queue"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 

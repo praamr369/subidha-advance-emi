@@ -1,7 +1,8 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
@@ -67,34 +68,35 @@ export default function AdminBranchesPage() {
   const [readiness, setReadiness] = useState<BranchReadiness | null>(null);
   const [selectedBranchId, setSelectedBranchId] = useState<number | null>(null);
   const [form, setForm] = useState<BranchForm>(emptyForm());
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  async function loadPage(mode: "initial" | "refresh" = "initial") {
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
-
-    try {
+  const query = useQuery({
+    queryKey: ["admin_branches"],
+    queryFn: async () => {
       const [branchPayload, readinessPayload] = await Promise.all([listBranches(), getBranchReadiness()]);
-      setRows(branchPayload.results);
-      setReadiness(readinessPayload);
-      setError(null);
-    } catch (err) {
-      setRows([]);
-      setReadiness(null);
-      setError(toErrorMessage(err));
-    } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
-    }
-  }
+      return { branches: branchPayload.results, readiness: readinessPayload };
+    },
+  });
 
   useEffect(() => {
-    void loadPage("initial");
-  }, []);
+    if (query.data) {
+      setRows(query.data.branches);
+      setReadiness(query.data.readiness);
+      setError(null);
+    } else if (query.isError) {
+      setRows([]);
+      setReadiness(null);
+      setError(toErrorMessage(query.error));
+    }
+  }, [query.data, query.isError, query.error]);
+
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
+    await query.refetch();
+  }, [query]);
 
   const selectedBranch = useMemo(
     () => rows.find((row) => row.id === selectedBranchId) ?? null,
@@ -171,7 +173,7 @@ export default function AdminBranchesPage() {
       }
       setSelectedBranchId(null);
       setForm(emptyForm());
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(toErrorMessage(err));
     } finally {
@@ -220,7 +222,7 @@ export default function AdminBranchesPage() {
           <ERPErrorState
             title="Unable to load branches"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 
@@ -271,7 +273,7 @@ export default function AdminBranchesPage() {
               <div className="mt-4 flex flex-wrap gap-2">
                 <Link href={ROUTES.admin.counters} className="rounded-xl border border-border px-3 py-2 text-sm font-semibold hover:bg-accent">Open counters</Link>
                 <Link href={ROUTES.admin.branchReporting} className="rounded-xl border border-border px-3 py-2 text-sm font-semibold hover:bg-accent">Open reporting</Link>
-                <button type="button" onClick={() => void loadPage("refresh")} disabled={refreshing} className="rounded-xl border border-border px-3 py-2 text-sm font-semibold hover:bg-accent disabled:opacity-60">{refreshing ? "Refreshing..." : "Refresh"}</button>
+                <button type="button" onClick={() => void loadPage()} disabled={refreshing} className="rounded-xl border border-border px-3 py-2 text-sm font-semibold hover:bg-accent disabled:opacity-60">{refreshing ? "Refreshing..." : "Refresh"}</button>
               </div>
             </WorkspaceSection>
 
@@ -415,7 +417,7 @@ export default function AdminBranchesPage() {
                       {saving ? "Saving..." : selectedBranch ? "Update Branch" : "Create Branch"}
                     </button>
                     <button type="button" onClick={resetForm} className="rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-muted">Reset</button>
-                    <button type="button" onClick={() => void loadPage("refresh")} disabled={refreshing} className="rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-muted disabled:opacity-60">
+                    <button type="button" onClick={() => void loadPage()} disabled={refreshing} className="rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-muted disabled:opacity-60">
                       {refreshing ? "Refreshing..." : "Refresh"}
                     </button>
                   </div>

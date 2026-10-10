@@ -11,7 +11,7 @@ from subscriptions.models_business_setup import BusinessProfile
 
 
 def get_active_business_profile():
-    return BusinessProfile.objects.filter(is_active=True).order_by("-created_at", "-id").first()
+    return BusinessProfile.get_current()
 
 
 @transaction.atomic

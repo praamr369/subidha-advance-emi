@@ -239,7 +239,7 @@ export default function AccountingPeriodsPage() {
       .catch(() => setBridgeSummary(null));
   }
 
-  useEffect(() => { void loadPage("initial"); }, []);
+  useEffect(() => { void loadPage(); }, []);
 
   async function handleCreateFinancialYear(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -247,7 +247,7 @@ export default function AccountingPeriodsPage() {
       await createFinancialYear(fyForm);
       setNotice("Financial year created.");
       setFyForm({ code: "", name: "", start_date: "", end_date: "", notes: "" });
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(accountingErrorMessage(err, "Failed to create financial year."));
     }
@@ -259,7 +259,7 @@ export default function AccountingPeriodsPage() {
       await createPostingLock(lockForm);
       setNotice("Posting lock created.");
       setLockForm((current) => ({ ...current, reason: "" }));
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(accountingErrorMessage(err, "Failed to create posting lock."));
     }
@@ -270,7 +270,7 @@ export default function AccountingPeriodsPage() {
     try {
       const result = await generateCurrentAccountingPeriod();
       setNotice(result.detail || "Current accounting period generated or confirmed.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(accountingErrorMessage(err, "Failed to generate current accounting period."));
     } finally {
@@ -283,7 +283,7 @@ export default function AccountingPeriodsPage() {
     try {
       const result = await seedSupportedAccountingMappings();
       setNotice(`Supported mappings seeded. Journals created: ${result.journal_entries_created}; numbering profiles created: ${result.document_sequences_allocated}.`);
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(accountingErrorMessage(err, "Failed to seed supported mappings."));
     } finally {
@@ -299,7 +299,7 @@ export default function AccountingPeriodsPage() {
       else if (status === "LOCKED") await lockAccountingPeriod(period.id, reason);
       else await closeAccountingPeriod(period.id, reason);
       setNotice(`Period ${period.code} moved to ${STATUS_LABEL[status]}.`);
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(accountingErrorMessage(err, `Failed to ${STATUS_LABEL[status].toLowerCase()} ${period.code}.`));
     } finally {
@@ -313,7 +313,7 @@ export default function AccountingPeriodsPage() {
     try {
       const result = await reopenCurrentPeriod();
       setNotice(result.detail);
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(accountingErrorMessage(err, "Failed to reopen current period."));
     } finally {
@@ -329,7 +329,7 @@ export default function AccountingPeriodsPage() {
       const result = await bulkLockOpenPeriods(activeFinancialYear?.id);
       setBulkLockResult(result);
       setNotice(`Bulk lock: ${result.locked_count} period(s) locked${result.error_count ? `, ${result.error_count} error(s)` : ""}.`);
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(accountingErrorMessage(err, "Failed to bulk lock open periods."));
     } finally {
@@ -342,7 +342,7 @@ export default function AccountingPeriodsPage() {
     try {
       const result = await generateAccountingPeriods(year.id);
       setNotice(`Generated ${result.created_count} period(s) for ${year.code}.`);
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(accountingErrorMessage(err, `Failed to generate periods for ${year.code}.`));
     } finally {
@@ -355,7 +355,7 @@ export default function AccountingPeriodsPage() {
     try {
       await activateFinancialYear(year.id);
       setNotice(`${year.code} activated.`);
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(accountingErrorMessage(err, `Failed to activate ${year.code}.`));
     } finally {
@@ -368,7 +368,7 @@ export default function AccountingPeriodsPage() {
     try {
       await removePostingLock(lock.id);
       setNotice(`Posting lock ${lock.lock_date} removed.`);
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setError(accountingErrorMessage(err, "Failed to remove posting lock."));
     } finally {
@@ -395,7 +395,7 @@ export default function AccountingPeriodsPage() {
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <div className="flex flex-wrap gap-2">
-        <button type="button" disabled={refreshing} onClick={() => loadPage("refresh")} className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold hover:bg-muted disabled:opacity-50">{refreshing ? "Refreshing…" : "Refresh"}</button>
+        <button type="button" disabled={refreshing} onClick={() => loadPage()} className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold hover:bg-muted disabled:opacity-50">{refreshing ? "Refreshing…" : "Refresh"}</button>
         <button type="button" disabled={actionBusy === "period"} onClick={handleGenerateCurrentPeriod} className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold hover:bg-muted disabled:opacity-50">Generate current period</button>
         <button type="button" disabled={actionBusy === "seed"} onClick={handleSeedMappings} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background hover:bg-foreground/90 disabled:opacity-50">Seed supported mappings</button>
         {openPeriodCount > 0 ? <button type="button" disabled={actionBusy === "bulk-lock"} onClick={() => void handleBulkLockOpen()} className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50">{actionBusy === "bulk-lock" ? "Locking…" : `Lock All ${openPeriodCount} Open Periods`}</button> : null}
@@ -403,7 +403,7 @@ export default function AccountingPeriodsPage() {
       {notice ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">{notice}</div> : null}
       {error ? (
         periods.length === 0 ? (
-          <ErrorState message={error} onRetry={() => void loadPage("initial")} />
+          <ErrorState message={error} onRetry={() => void loadPage()} />
         ) : (
           <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-900">{error}</div>
         )
@@ -434,7 +434,7 @@ export default function AccountingPeriodsPage() {
 
       <ReadinessPanel readiness={readiness} />
       <BridgeReadinessPanel summary={bridgeSummary} />
-      <YearEndClosePanel financialYears={financialYears} activeFinancialYear={activeFinancialYear} onChanged={() => loadPage("refresh")} />
+      <YearEndClosePanel financialYears={financialYears} activeFinancialYear={activeFinancialYear} onChanged={() => loadPage()} />
       <PeriodsTable periods={periods} busy={actionBusy} onChangeStatus={changePeriodStatus} />
 
       <section className="grid gap-6 xl:grid-cols-2">

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { RefreshCw } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
@@ -43,29 +44,26 @@ export default function CustomerSubscriptionRequestDetailPage() {
   const params = useParams<{ id: string }>();
   const requestId = params?.id ? String(params.id) : "";
 
-  const [request, setRequest] = useState<SubscriptionRequestRecord | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const query = useQuery({
+    queryKey: ["subscriptionRequestDetail", "customer", requestId],
+    queryFn: async () => {
+      if (!requestId) throw new Error("Request id is missing.");
+      return await getSubscriptionRequest("customer", requestId);
+    },
+    enabled: !!requestId,
+  });
+
+  const request = query.data || null;
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const error = query.error ? (query.error as Error).message : null;
+  
   const [cancelling, setCancelling] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
-    if (!requestId) { setError("Request id is missing."); setLoading(false); return; }
-    if (mode === "initial") setLoading(true); else setRefreshing(true);
-    try {
-      const payload = await getSubscriptionRequest("customer", requestId);
-      setRequest(payload);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load request.");
-      setRequest(null);
-    } finally {
-      if (mode === "initial") setLoading(false); else setRefreshing(false);
-    }
-  }, [requestId]);
-
-  useEffect(() => { void loadPage(); }, [loadPage]);
+  const loadPage = useCallback(async (mode?: string) => {
+    await query.refetch();
+  }, [query]);
 
   async function handleCancel() {
     if (!requestId) return;
@@ -73,7 +71,7 @@ export default function CustomerSubscriptionRequestDetailPage() {
     setActionError(null);
     try {
       const response = await cancelCustomerSubscriptionRequest(requestId);
-      setRequest(response.request);
+      await query.refetch();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Could not cancel.");
     } finally {
@@ -95,7 +93,7 @@ export default function CustomerSubscriptionRequestDetailPage() {
       actions={
         <button
           type="button"
-          onClick={() => void loadPage("refresh")}
+          onClick={() => void loadPage()}
           disabled={refreshing}
           className="flex items-center gap-1.5 rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground disabled:opacity-50"
         >

@@ -2,8 +2,9 @@
 
 import { formatRupee } from "@/lib/utils/currency";
 import { RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { useParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
@@ -88,34 +89,28 @@ export default function CustomerSubscriptionDetailPage() {
   const params = useParams<{ id: string }>();
   const subscriptionId = params?.id;
 
-  const [subscription, setSubscription] = useState<CustomerSubscription | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
-    try {
-      if (mode === "initial") setLoading(true); else setRefreshing(true);
-      setError(null);
+  const query = useQuery({
+    queryKey: ["customerSubscriptionDetail", subscriptionId],
+    queryFn: async () => {
       if (!subscriptionId) throw new Error("Missing subscription id.");
       try {
-        const payload = await getCustomerSubscription(subscriptionId);
-        setSubscription(payload);
+        return await getCustomerSubscription(subscriptionId);
       } catch (primaryError) {
         const listPayload = await listCustomerSubscriptions();
         const fallback = listPayload.results.find((item) => String(item.id) === String(subscriptionId));
         if (!fallback) throw primaryError;
-        setSubscription(fallback);
+        return fallback;
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load subscription details.");
-      setSubscription(null);
-    } finally {
-      if (mode === "initial") setLoading(false); else setRefreshing(false);
-    }
-  }, [subscriptionId]);
+    },
+    enabled: !!subscriptionId,
+  });
 
-  useEffect(() => { void loadPage("initial"); }, [loadPage]);
+  const subscription = query.data || null;
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const error = query.error ? (query.error as Error).message : null;
+
+  const loadPage = useCallback(async (mode?: string) => { await query.refetch(); }, [query]);
 
   const emis = useMemo<CustomerEmi[]>(() => (
     Array.isArray(subscription?.emis) ? (subscription?.emis as CustomerEmi[]) : []
@@ -192,7 +187,7 @@ export default function CustomerSubscriptionDetailPage() {
       actions={
         <button
           type="button"
-          onClick={() => void loadPage("refresh")}
+          onClick={() => void loadPage()}
           disabled={refreshing}
           className="flex items-center gap-1.5 rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
         >
@@ -203,7 +198,7 @@ export default function CustomerSubscriptionDetailPage() {
     >
       {loading ? <ERPLoadingState label="Loading subscription…" /> : null}
       {!loading && error ? (
-        <ERPErrorState title="Unable to load subscription" description={error} onRetry={() => void loadPage("initial")} />
+        <ERPErrorState title="Unable to load subscription" description={error} onRetry={() => void loadPage()} />
       ) : null}
       {!loading && !error && !subscription ? (
         <ERPEmptyState title="Subscription not found" description="No customer subscription record was returned." />

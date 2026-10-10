@@ -13,22 +13,10 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RemoveIndex(
-            model_name='emi',
-            name='emis_subscri_302ecc_idx',
-        ),
-        migrations.RemoveIndex(
-            model_name='financialledger',
-            name='subscriptio_emi_id_91e83b_idx',
-        ),
-        migrations.RemoveIndex(
-            model_name='financialledger',
-            name='subscriptio_entry_t_43b583_idx',
-        ),
-        migrations.RemoveIndex(
-            model_name='payment',
-            name='payments_referen_84b5bb_idx',
-        ),
+        
+        
+        
+        
         migrations.RemoveField(
             model_name='auditlog',
             name='action',

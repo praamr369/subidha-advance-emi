@@ -21,6 +21,8 @@ export type ProductPickerValue = {
   unit_of_measure: string;
   default_stock_location_id?: number | null;
   default_stock_location_code?: string | null;
+  attributes?: Record<string, string | number | boolean>;
+  accessories?: Array<{ name: string; qty: number; type: string }>;
 };
 
 type Props = {
@@ -124,6 +126,8 @@ export default function ProductPickerCombobox({
       unit_of_measure: item.unit_of_measure,
       default_stock_location_id: item.default_stock_location_id,
       default_stock_location_code: item.default_stock_location_code,
+      attributes: item.attributes,
+      accessories: item.accessories,
     });
     setOpen(false);
     setQuery("");
@@ -352,6 +356,28 @@ export default function ProductPickerCombobox({
                       {locs.slice(0, 6).map((l) => (
                         <span key={l.stock_location_id} className="rounded border border-slate-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300">
                           <span className="font-normal text-slate-400 dark:text-slate-500">{l.stock_location_code || l.stock_location_name}: </span>{l.available_quantity}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {/* Row 4: Attributes (Specs) */}
+                  {item.attributes && Object.keys(item.attributes).length > 0 ? (
+                    <div className="mt-1.5 flex flex-wrap gap-1 pl-0.5">
+                      {Object.entries(item.attributes).map(([key, val]) => (
+                        <span key={key} className="rounded border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-700 dark:border-indigo-800/50 dark:bg-indigo-900/30 dark:text-indigo-300">
+                          <span className="opacity-70">{key}: </span>{String(val)}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {/* Row 5: Accessories */}
+                  {item.accessories && item.accessories.length > 0 ? (
+                    <div className="mt-1.5 flex flex-wrap gap-1 pl-0.5">
+                      {item.accessories.map((acc, accIdx) => (
+                        <span key={accIdx} className="rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:border-amber-800/50 dark:bg-amber-900/30 dark:text-amber-300 flex items-center gap-1">
+                          <span className="text-amber-500/80">⊎</span> {acc.name} <span className="opacity-70">x{acc.qty}</span>
                         </span>
                       ))}
                     </div>

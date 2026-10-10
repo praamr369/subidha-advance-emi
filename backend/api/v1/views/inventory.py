@@ -874,6 +874,9 @@ class AdminInventoryItemSearchView(APIView):
 
         queryset = InventoryItem.objects.select_related(
             "product", "default_stock_location"
+        ).prefetch_related(
+            "product__related_products__related_product",
+            "product__pim_variant__attribute_values__attribute"
         ).filter(is_active=True)
 
         if term:
@@ -900,6 +903,31 @@ class AdminInventoryItemSearchView(APIView):
 
         rows = []
         for item in queryset:
+            accessories = []
+            for rel in item.product.related_products.all():
+                if rel.related_product:
+                    accessories.append({
+                        "name": rel.related_product.name,
+                        "qty": float(rel.quantity) if rel.quantity else 1,
+                        "type": rel.relationship_type,
+                    })
+
+            attributes = {}
+            if isinstance(item.product.base_specs, dict):
+                attributes.update(item.product.base_specs)
+
+            if hasattr(item.product, "pim_variant") and item.product.pim_variant:
+                for attr_val in item.product.pim_variant.attribute_values.all():
+                    if attr_val.attribute.data_type == "BOOLEAN":
+                        val = "Yes" if attr_val.value_boolean else "No"
+                    elif attr_val.attribute.data_type in ("NUMBER", "DECIMAL"):
+                        val = float(attr_val.value_number) if attr_val.value_number is not None else None
+                    else:
+                        val = attr_val.value_text
+                    
+                    if val is not None and val != "":
+                        attributes[attr_val.attribute.name] = val
+
             row = {
                 "id": item.id,
                 "inventory_item_id": item.id,
@@ -915,6 +943,8 @@ class AdminInventoryItemSearchView(APIView):
                 "barcode": item.barcode or "",
                 "default_stock_location_id": item.default_stock_location_id,
                 "default_stock_location_code": item.default_stock_location.code if item.default_stock_location else None,
+                "attributes": attributes,
+                "accessories": accessories,
             }
             if include_locations:
                 by_location = []
@@ -1305,6 +1335,7 @@ class AdminStockLedgerListView(APIView):
         reference_model = (request.query_params.get("reference_model") or "").strip()
         date_from = (request.query_params.get("start_date") or request.query_params.get("date_from") or "").strip()
         date_to = (request.query_params.get("end_date") or request.query_params.get("date_to") or "").strip()
+        inventory_item_id = (request.query_params.get("inventory_item_id") or "").strip()
 
         if export_format == "csv":
             import csv
@@ -1317,6 +1348,7 @@ class AdminStockLedgerListView(APIView):
                 reference_model_filter=reference_model,
                 date_from=date_from,
                 date_to=date_to,
+                inventory_item_id=inventory_item_id,
             )
             output = io.StringIO()
             if rows:
@@ -1344,6 +1376,7 @@ class AdminStockLedgerListView(APIView):
             reference_model_filter=reference_model,
             date_from=date_from,
             date_to=date_to,
+            inventory_item_id=inventory_item_id,
             page=page,
             page_size=page_size,
         )

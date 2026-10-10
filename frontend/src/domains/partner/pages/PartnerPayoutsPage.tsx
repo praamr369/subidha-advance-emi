@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import { ChevronRight, RefreshCw, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -133,7 +134,7 @@ export default function PartnerPayoutsPage({
   );
 
   useEffect(() => {
-    void loadPage("initial");
+    void loadPage();
   }, [loadPage]);
 
   const pendingAmount = useMemo(
@@ -312,7 +313,7 @@ export default function PartnerPayoutsPage({
             action={
               <ActionButton
                 variant="outline"
-                onClick={() => void loadPage("refresh")}
+                onClick={() => void loadPage()}
                 disabled={loading || refreshing}
                 leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
               >
@@ -435,7 +436,7 @@ export default function PartnerPayoutsPage({
           <ERPErrorState
             title="Unable to load payout visibility"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 

@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import { useParams, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -135,9 +136,7 @@ export default function AdminDeliveryDetailPage() {
 
   const [delivery, setDelivery] = useState<DeliveryRecord | null>(null);
   const [timeline, setTimeline] = useState<AuditEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errorState, setErrorState] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
@@ -153,49 +152,45 @@ export default function AdminDeliveryDetailPage() {
     return qs ? `/admin/deliveries?${qs}` : "/admin/deliveries";
   }, [searchParams]);
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (!deliveryId) {
-        setError("Delivery id is missing.");
-        setLoading(false);
-        return;
-      }
-
-      if (mode === "initial") setLoading(true);
-      else setRefreshing(true);
-
-      try {
-        const [deliveryPayload, timelinePayload] = await Promise.all([
-          getAdminDelivery(deliveryId),
-          apiFetch<{ results?: AuditEntry[] }>(
-            `/admin/audit-logs/timeline/SubscriptionDelivery/${deliveryId}/`
-          ),
-        ]);
-
-        setDelivery(deliveryPayload);
-        setTimeline(timelinePayload.results || []);
-        setScheduledDate(deliveryPayload.scheduled_date || "");
-        setReceiverName(deliveryPayload.receiver_name || "");
-        setReceiverPhone(deliveryPayload.receiver_phone || "");
-        setAddress(deliveryPayload.delivery_address_snapshot || "");
-        setNotes(deliveryPayload.notes || "");
-        setReason(deliveryPayload.failure_reason || "");
-        setError(null);
-      } catch (err) {
-        setError(toErrorMessage(err, "Failed to load delivery detail."));
-        setDelivery(null);
-        setTimeline([]);
-      } finally {
-        if (mode === "initial") setLoading(false);
-        else setRefreshing(false);
-      }
+  const rqQuery = useQuery({
+    queryKey: ["adminDeliveryDetail", deliveryId],
+    queryFn: async () => {
+      if (!deliveryId) throw new Error("Delivery id is missing.");
+      const [deliveryPayload, timelinePayload] = await Promise.all([
+        getAdminDelivery(deliveryId),
+        apiFetch<{ results?: AuditEntry[] }>(
+          `/admin/audit-logs/timeline/SubscriptionDelivery/${deliveryId}/`
+        ),
+      ]);
+      return { deliveryPayload, timelinePayload };
     },
-    [deliveryId]
-  );
+    enabled: !!deliveryId,
+  });
+
+  const loading = rqQuery.isLoading;
+  const refreshing = rqQuery.isFetching && !rqQuery.isLoading;
+  const error = errorState || (rqQuery.error ? toErrorMessage(rqQuery.error, "Failed to load delivery detail.") : null);
 
   useEffect(() => {
-    void loadPage("initial");
-  }, [loadPage]);
+    if (rqQuery.data) {
+      const { deliveryPayload, timelinePayload } = rqQuery.data;
+      setDelivery(deliveryPayload);
+      setTimeline(timelinePayload.results || []);
+      setScheduledDate(deliveryPayload.scheduled_date || "");
+      setReceiverName(deliveryPayload.receiver_name || "");
+      setReceiverPhone(deliveryPayload.receiver_phone || "");
+      setAddress(deliveryPayload.delivery_address_snapshot || "");
+      setNotes(deliveryPayload.notes || "");
+      setReason(deliveryPayload.failure_reason || "");
+    } else if (rqQuery.error) {
+      setDelivery(null);
+      setTimeline([]);
+    }
+  }, [rqQuery.data, rqQuery.error]);
+
+  const loadPage = useCallback(async () => {
+    await rqQuery.refetch();
+  }, [rqQuery]);
 
   // The customer's position across Advance EMI, rent/lease and direct sales —
   // the same breakdown as the customer pages — so the delivery team sees what
@@ -244,9 +239,9 @@ export default function AdminDeliveryDetailPage() {
       });
       setDelivery(updated);
       setMessage("Delivery metadata updated.");
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
-      setError(toErrorMessage(err, "Failed to update delivery metadata."));
+      setErrorState(toErrorMessage(err, "Failed to update delivery metadata."));
     } finally {
       setActionLoading(null);
     }
@@ -300,9 +295,9 @@ export default function AdminDeliveryDetailPage() {
 
       setDelivery(updated);
       setMessage(`Delivery moved to ${updated.status}.`);
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
-      setError(toErrorMessage(err, `Failed to update delivery status to ${action}.`));
+      setErrorState(toErrorMessage(err, `Failed to update delivery status to ${action}.`));
     } finally {
       setActionLoading(null);
     }
@@ -390,7 +385,7 @@ export default function AdminDeliveryDetailPage() {
           <div className="flex justify-end">
             <button
               type="button"
-              onClick={() => void loadPage("refresh")}
+              onClick={() => void loadPage()}
               disabled={loading || refreshing}
               className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-semibold text-foreground transition hover:bg-muted/30 hover:border-ring disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -414,7 +409,7 @@ export default function AdminDeliveryDetailPage() {
           <ErrorState
             title="Unable to load delivery detail"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 

@@ -121,6 +121,10 @@ class Product(TimeStampedModel):
         default=Decimal("0"),
         validators=[MinValueValidator(Decimal("0"))],
     )
+    # Product-level rent/lease pricing controls. Null means use the configured
+    # business default yield; existing products remain backward compatible.
+    rent_monthly_yield_percent = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    lease_monthly_yield_percent = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
 
     category_master = models.ForeignKey(
         ProductCategoryMaster,
@@ -326,6 +330,48 @@ class Product(TimeStampedModel):
         self.full_clean()
         super().save(*args, **kwargs)
         sync_inventory_product_master_fields(self)
+
+    @property
+    def full_name(self):
+        """Returns the product name appended with its PIM variant attributes.
+
+        Uses the parent blueprint's name as base when the product is a variant SKU,
+        then appends the variant's attribute values in parentheses.
+        """
+        base_name = self.name
+        try:
+            # pim_variant is a OneToOneField reverse (ProductVariant.operational_product)
+            pim_variant = getattr(self, 'pim_variant', None)
+            if pim_variant:
+                # If this variant belongs to a parent blueprint, use the parent's
+                # operational product name for a cleaner display
+                pim_product = pim_variant.product  # PimProduct that owns this variant
+                if pim_product and pim_product.parent_id and pim_product.parent:
+                    parent_op = pim_product.parent.source_product
+                    if parent_op:
+                        base_name = parent_op.name
+
+                attrs = []
+                for attr_val in pim_variant.attribute_values.select_related('attribute').all():
+                    if attr_val.attribute.data_type == "BOOLEAN":
+                        val = "Yes" if attr_val.value_boolean else "No"
+                    elif attr_val.attribute.data_type in ("NUMBER", "DECIMAL"):
+                        val = str(attr_val.value_number) if attr_val.value_number is not None else ""
+                        if val.endswith('.00'):
+                            val = val[:-3]
+                    else:
+                        val = attr_val.value_text or ""
+                    if val:
+                        attrs.append(str(val))
+                if attrs:
+                    return f"{base_name} ({', '.join(attrs)})"
+        except Exception:
+            pass
+        return base_name
+
+    @property
+    def seo_name(self):
+        return self.full_name
 
     def __str__(self):
         return f"{self.product_code} - {self.name}"

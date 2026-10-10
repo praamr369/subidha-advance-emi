@@ -26,6 +26,7 @@ import {
 } from "@/services/product-requests";
 import { listPartnerCustomers, type PartnerCustomerListResponse } from "@/services/partner";
 import { resolveApiMediaUrl } from "@/lib/media";
+import PublicProductSchemePricing from "@/components/public/PublicProductSchemePricing";
 
 /* ─── helpers ─────────────────────────────────────────────── */
 
@@ -145,6 +146,7 @@ function ProductPicker({
           </button>
         </div>
       ) : null}
+      {selectedProduct?.scheme_pricing ? <PublicProductSchemePricing pricing={selectedProduct.scheme_pricing} /> : null}
 
       {/* Search bar */}
       <div className="relative">

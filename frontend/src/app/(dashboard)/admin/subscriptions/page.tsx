@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
@@ -542,8 +543,6 @@ export default function AdminSubscriptionsPage() {
   const [numPages, setNumPages] = useState(0);
   const [hasNext, setHasNext] = useState(false);
   const [hasPrevious, setHasPrevious] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [searchInput, setSearchInput] = useState(currentSearchQuery);
@@ -581,7 +580,7 @@ export default function AdminSubscriptionsPage() {
     return queryString ? `${pathname}?${queryString}` : pathname;
   }
 
-  const listQueryString = useMemo(() => {
+  const listQueryString = (() => {
     const params = new URLSearchParams();
     if (currentSearchQuery) params.set("q", currentSearchQuery);
     if (currentStatusFilter) params.set("status", currentStatusFilter);
@@ -593,18 +592,9 @@ export default function AdminSubscriptionsPage() {
     params.set("page", String(currentPage));
     params.set("page_size", String(PAGE_SIZE));
     return params.toString();
-  }, [
-    currentBatchFilter,
-    currentCustomerFilter,
-    currentPage,
-    currentPartnerFilter,
-    currentPlanTypeFilter,
-    currentProductFilter,
-    currentSearchQuery,
-    currentStatusFilter,
-  ]);
+  })();
 
-  const filterQueryString = useMemo(() => {
+  const filterQueryString = (() => {
     const params = new URLSearchParams();
     if (currentSearchQuery) params.set("q", currentSearchQuery);
     if (currentStatusFilter) params.set("status", currentStatusFilter);
@@ -614,17 +604,9 @@ export default function AdminSubscriptionsPage() {
     if (currentPartnerFilter) params.set("partner", currentPartnerFilter);
     if (currentBatchFilter) params.set("batch", currentBatchFilter);
     return params.toString();
-  }, [
-    currentBatchFilter,
-    currentCustomerFilter,
-    currentPartnerFilter,
-    currentPlanTypeFilter,
-    currentProductFilter,
-    currentSearchQuery,
-    currentStatusFilter,
-  ]);
+  })();
 
-  const loadInsights = useCallback(async () => {
+  async function loadInsights() {
     if (isWorkflowLanding) return;
     const suffix = filterQueryString ? `?${filterQueryString}` : "";
     try {
@@ -635,53 +617,56 @@ export default function AdminSubscriptionsPage() {
       setKpis(normalizeKpis(kpiPayload));
       setBatchBreakdown(normalizeBatchBreakdown(batchPayload).results);
     } catch {
-      // KPIs are supplementary — a failure here must not blank the register.
       setKpis(null);
       setBatchBreakdown([]);
     }
-  }, [filterQueryString, isWorkflowLanding]);
+  }
 
   useEffect(() => {
     void loadInsights();
-  }, [loadInsights]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterQueryString, isWorkflowLanding]);
 
-  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
-    if (isWorkflowLanding) {
-      setLoading(false);
-      return;
-    }
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
-
-    try {
+  const { data: queryData, isLoading: loading, isRefetching: refreshing, error: queryError, refetch } = useQuery({
+    queryKey: ["admin_subscriptions_list", listQueryString],
+    queryFn: async () => {
+      if (isWorkflowLanding) return null;
       const payload = await apiFetch<unknown>(`/admin/subscriptions/?${listQueryString}`);
-      const normalized = normalizeSubscriptionListPayload(payload, currentPage);
+      return normalizeSubscriptionListPayload(payload, currentPage);
+    },
+    enabled: !isWorkflowLanding,
+  });
 
-      setRows(normalized.results);
-      setCount(normalized.count);
-      setPage(normalized.page);
-      setNumPages(normalized.num_pages);
-      setHasNext(normalized.has_next);
-      setHasPrevious(normalized.has_previous);
-      setError(null);
-    } catch (err) {
-      setError(toErrorMessage(err));
-      if (mode === "initial") {
-        setRows([]);
-        setCount(0);
-        setNumPages(0);
-        setHasNext(false);
-        setHasPrevious(false);
-      }
-    } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
+  const loadPage = useCallback(async () => {
+    if (!isWorkflowLanding) {
+      await refetch();
     }
-  }, [isWorkflowLanding, listQueryString]);
+  }, [refetch, isWorkflowLanding]);
 
   useEffect(() => {
-    void loadPage("initial");
-  }, [loadPage]);
+    if (isWorkflowLanding) {
+      // Landing page active
+    } else if (queryData) {
+      setRows(queryData.results);
+      setCount(queryData.count);
+      setPage(queryData.page);
+      setNumPages(queryData.num_pages);
+      setHasNext(queryData.has_next);
+      setHasPrevious(queryData.has_previous);
+      setError(null);
+    }
+  }, [queryData, isWorkflowLanding]);
+
+  useEffect(() => {
+    if (queryError) {
+      setError(toErrorMessage(queryError));
+      setRows([]);
+      setCount(0);
+      setNumPages(0);
+      setHasNext(false);
+      setHasPrevious(false);
+    }
+  }, [queryError]);
 
   function handleApplyFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -807,7 +792,7 @@ export default function AdminSubscriptionsPage() {
     [rows]
   );
 
-  const createSubscriptionHref = useMemo(() => {
+  const createSubscriptionHref = (() => {
     const params = new URLSearchParams();
     if (currentCustomerFilter) params.set("customer", currentCustomerFilter);
     if (currentProductFilter) params.set("product", currentProductFilter);
@@ -818,7 +803,7 @@ export default function AdminSubscriptionsPage() {
     return queryString
       ? `/admin/subscriptions/advance-emi/create?${queryString}`
       : "/admin/subscriptions/advance-emi/create";
-  }, [currentBatchFilter, currentCustomerFilter, currentPartnerFilter, currentProductFilter]);
+  })();
 
   if (isWorkflowLanding) {
     return <SubscriptionWorkflowLanding />;
@@ -1123,7 +1108,7 @@ export default function AdminSubscriptionsPage() {
             <button
               type="button"
               onClick={() => {
-                void loadPage("refresh");
+                void loadPage();
                 void loadInsights();
               }}
               disabled={refreshing || loading}
@@ -1239,7 +1224,7 @@ export default function AdminSubscriptionsPage() {
           <ERPErrorState
             title="Unable to load subscription register"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
         </div>

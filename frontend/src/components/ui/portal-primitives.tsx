@@ -38,7 +38,16 @@ export function SectionHeader({
     >
       <div className="min-w-0">
         <h2 className="enterprise-section-title text-base">{title}</h2>
-        {description ? <p className="mt-1 text-sm leading-6 text-muted-foreground">{description}</p> : null}
+        {description ? (
+          <div className="mt-1 text-sm leading-6 text-muted-foreground">
+            {description.split('. ').map((sentence, idx, arr) => (
+              <span key={idx}>
+                {sentence}
+                {idx < arr.length - 1 ? '. ' : ''}
+              </span>
+            ))}
+          </div>
+        ) : null}
       </div>
       {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
     </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
@@ -30,13 +31,20 @@ import { buildAdminBillingDocumentRoute } from "@/lib/route-builders";
 export default function BillingInvoicesPage() {
   const searchParams = useSearchParams();
   const [rows, setRows] = useState<BillingInvoice[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [cancelTarget, setCancelTarget] = useState<BillingInvoice | null>(null);
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
 
-  const loadPage = useCallback(async () => {
-    try {
+  const { data: queryData, isLoading: loading, error: queryError, refetch } = useQuery({
+    queryKey: [
+      "billing_invoices",
+      searchParams.get("subscription"),
+      searchParams.get("customer"),
+      searchParams.get("direct_sale"),
+      searchParams.get("source_type"),
+      searchParams.get("status"),
+    ],
+    queryFn: async () => {
       const payload = await listBillingInvoices({
         subscription: searchParams.get("subscription") || undefined,
         customer: searchParams.get("customer") || undefined,
@@ -44,19 +52,27 @@ export default function BillingInvoicesPage() {
         source_type: searchParams.get("source_type") || undefined,
         status: searchParams.get("status") || undefined,
       });
-      setRows(payload.results);
-      setError(null);
-    } catch (err) {
-      setRows([]);
-      setError(accountingErrorMessage(err, "Failed to load billing invoices."));
-    } finally {
-      setLoading(false);
-    }
-  }, [searchParams]);
+      return payload.results;
+    },
+  });
+
+  const loadPage = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
 
   useEffect(() => {
-    void loadPage();
-  }, [loadPage]);
+    if (queryData) {
+      setRows(queryData);
+      setError(null);
+    }
+  }, [queryData]);
+
+  useEffect(() => {
+    if (queryError) {
+      setRows([]);
+      setError(accountingErrorMessage(queryError, "Failed to load billing invoices."));
+    }
+  }, [queryError]);
 
   const invoiceStats = useMemo(() => {
     const isHistory = (status: unknown) =>

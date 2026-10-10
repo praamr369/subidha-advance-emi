@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { useEffect, useMemo } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
-import { getStoredSession } from "@/lib/auth/session";
 import { useAuth } from "@/providers/AuthProvider";
 
 type RoleGuardProps = {
@@ -15,62 +14,34 @@ function normalizeRole(value: string | null | undefined): string {
   return (value || "").trim().toUpperCase();
 }
 
-function subscribeToHydration(onStoreChange: () => void): () => void {
-  const timeoutId = window.setTimeout(onStoreChange, 0);
-  return () => window.clearTimeout(timeoutId);
-}
-
-function useHydrated(): boolean {
-  return useSyncExternalStore(
-    subscribeToHydration,
-    () => true,
-    () => false
-  );
-}
-
 export default function RoleGuard({
   allowedRoles,
   children,
 }: RoleGuardProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const hydrated = useHydrated();
 
-  const { role, isAuthenticated } = useAuth();
+  const { role, isAuthenticated, isLoading } = useAuth();
 
   const normalizedAllowedRoles = useMemo(
     () => allowedRoles.map((item) => normalizeRole(item)),
     [allowedRoles]
   );
 
-  const storedSession = useMemo(() => {
-    if (!hydrated) return null;
-    return getStoredSession();
-  }, [hydrated]);
-
   const effectiveRole = useMemo(() => {
-    const authRole = normalizeRole(role);
-    if (authRole) return authRole;
-    return normalizeRole(storedSession?.role);
-  }, [role, storedSession]);
+    return normalizeRole(role);
+  }, [role]);
 
-  const effectiveAuthenticated = useMemo(() => {
-    if (isAuthenticated) return true;
-
-    return Boolean(
-      storedSession?.accessToken && storedSession?.refreshToken
-    );
-  }, [isAuthenticated, storedSession]);
-
-  // Once this guard has hydrated it can trust the persisted session it reads
-  // directly. Waiting for a second provider effect can leave protected routes
-  // on the loading fallback when the provider hydration is delayed.
-  const isReady = hydrated;
+  // If AuthProvider is still hydrating from localStorage, wait.
+  const isReady = !isLoading;
 
   useEffect(() => {
     if (!isReady) return;
 
-    if (!effectiveAuthenticated) {
+    if (!isAuthenticated) {
+      if (typeof window !== "undefined" && (window as any).__subidha_logging_out) {
+        return;
+      }
       const next = pathname || "/";
       router.replace(`/login?next=${encodeURIComponent(next)}`);
       return;
@@ -81,7 +52,7 @@ export default function RoleGuard({
     }
   }, [
     isReady,
-    effectiveAuthenticated,
+    isAuthenticated,
     effectiveRole,
     normalizedAllowedRoles,
     pathname,
@@ -96,7 +67,7 @@ export default function RoleGuard({
     );
   }
 
-  if (!effectiveAuthenticated) return null;
+  if (!isAuthenticated) return null;
   if (!normalizedAllowedRoles.includes(effectiveRole)) return null;
 
   return <>{children}</>;

@@ -22,6 +22,8 @@ export const STOCK_TYPE_LABELS: Record<ProductStockType, string> = {
 export type ProductRecord = {
   id: number;
   name: string;
+  full_name?: string;
+  seo_name?: string;
   product_code?: string;
   base_price?: string;
   sku?: string | null;
@@ -42,6 +44,7 @@ export type ProductRecord = {
   image?: string | null;
   video?: string | null;
   is_active?: boolean;
+  is_published?: boolean;
   item_type?: ProductItemType | string;
   stock_type?: ProductStockType | string;
   plan_type_default?: "EMI" | "RENT" | "LEASE" | string | null;

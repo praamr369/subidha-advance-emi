@@ -39,7 +39,14 @@ export default function ERPPageHeader({
           {status ? <div className="mt-0.5">{status}</div> : null}
         </div>
         {description ? (
-          <p className="mt-1 text-sm leading-6 text-muted-foreground">{description}</p>
+          <div className="mt-1 text-sm leading-6 text-muted-foreground">
+            {description.split('. ').map((sentence, idx, arr) => (
+              <span key={idx}>
+                {sentence}
+                {idx < arr.length - 1 ? '. ' : ''}
+              </span>
+            ))}
+          </div>
         ) : null}
         {helperNote ? (
           <div

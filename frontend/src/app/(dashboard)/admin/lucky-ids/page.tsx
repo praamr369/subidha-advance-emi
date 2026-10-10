@@ -1,7 +1,8 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 
 import {
   ERPDataToolbar,
@@ -269,9 +270,7 @@ function downloadCsv(filename: string, rows: Record<string, string | number | nu
 export default function AdminLuckyIdsPage() {
   const [allRows, setAllRows] = useState<LuckyIdRow[]>([]);
   const [batchOptions, setBatchOptions] = useState<BatchOption[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errorState, setErrorState] = useState<string | null>(null);
 
   const [searchInput, setSearchInput] = useState("");
   const [batchInput, setBatchInput] = useState("");
@@ -280,18 +279,26 @@ export default function AdminLuckyIdsPage() {
   const [batchFilter, setBatchFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<"" | LuckyIdStatus>("");
 
-  async function loadPage(mode: "initial" | "refresh" = "initial") {
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
-
-    try {
+  const rqQuery = useQuery({
+    queryKey: ["admin", "lucky-ids"],
+    queryFn: async () => {
       const [luckyRows, batchRows] = await Promise.all([
         // Request a large page so the full (per-grid, client-filtered) set loads
         // in one round-trip; fetchAllPagedRows still follows next as a safety net.
         fetchAllPagedRows(luckyPlanService.adminLuckyIdsPath(200)),
         fetchAllPagedRows(luckyPlanService.adminBatchesPath()),
       ]);
+      return { luckyRows, batchRows };
+    },
+  });
 
+  const loading = rqQuery.isLoading;
+  const refreshing = rqQuery.isFetching && !rqQuery.isLoading;
+  const error = errorState || (rqQuery.error ? parseErrorMessage(rqQuery.error) : null);
+
+  useEffect(() => {
+    if (rqQuery.data) {
+      const { luckyRows, batchRows } = rqQuery.data;
       setAllRows(
         luckyRows
           .map(normalizeLuckyIdRow)
@@ -308,23 +315,17 @@ export default function AdminLuckyIdsPage() {
           .map(normalizeBatchOption)
           .sort((a, b) => a.batch_code.localeCompare(b.batch_code))
       );
-
-      setError(null);
-    } catch (err) {
-      setError(parseErrorMessage(err));
-      if (mode === "initial") {
-        setAllRows([]);
-        setBatchOptions([]);
-      }
-    } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
+      setErrorState(null);
+    } else if (rqQuery.error) {
+      setAllRows([]);
+      setBatchOptions([]);
     }
-  }
+  }, [rqQuery.data, rqQuery.error]);
 
-  useEffect(() => {
-    void loadPage("initial");
-  }, []);
+  const loadPage = useCallback(async () => {
+    setErrorState(null);
+    await rqQuery.refetch();
+  }, [rqQuery]);
 
   function handleApplyFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -575,7 +576,7 @@ export default function AdminLuckyIdsPage() {
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => void loadPage("refresh")}
+                  onClick={() => void loadPage()}
                   disabled={refreshing || loading}
                   className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
                 >
@@ -601,7 +602,7 @@ export default function AdminLuckyIdsPage() {
           <ERPErrorState
             title="Unable to load Lucky ID register"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 

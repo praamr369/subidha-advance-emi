@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -422,56 +423,55 @@ export default function AdminLuckyDrawRevealPage() {
   const [batchPreview, setBatchPreview] = useState<BatchPreview | null>(null);
   const [revealedSeed, setRevealedSeed] = useState("");
 
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [revealing, setRevealing] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
   const [revealResult, setRevealResult] = useState<RevealResult | null>(null);
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (!drawId) return;
+  const { data: pageData, error: queryError, isLoading: loading, isFetching, refetch } = useQuery({
+    queryKey: ["admin_lucky_draw_reveal", drawId],
+    queryFn: async () => {
+      const drawPayload = await apiFetch<Record<string, unknown>>(
+        `/admin/lucky-draws/${drawId}/`
+      );
+      const normalizedDraw = normalizeLuckyDrawDetail(drawPayload);
 
-      if (mode === "initial") setLoading(true);
-      else setRefreshing(true);
-
-      try {
-        const drawPayload = await apiFetch<Record<string, unknown>>(
-          `/admin/lucky-draws/${drawId}/`
-        );
-        const normalizedDraw = normalizeLuckyDrawDetail(drawPayload);
-
-        let nextBatchPreview: BatchPreview | null = null;
-        if (normalizedDraw.batch_id != null) {
-          try {
-            const batchPayload = await apiFetch<Record<string, unknown>>(
-              `/admin/batches/${normalizedDraw.batch_id}/`
-            );
-            nextBatchPreview = normalizeBatchPreview(batchPayload);
-          } catch {
-            nextBatchPreview = null;
-          }
+      let nextBatchPreview: BatchPreview | null = null;
+      if (normalizedDraw.batch_id != null) {
+        try {
+          const batchPayload = await apiFetch<Record<string, unknown>>(
+            `/admin/batches/${normalizedDraw.batch_id}/`
+          );
+          nextBatchPreview = normalizeBatchPreview(batchPayload);
+        } catch {
+          nextBatchPreview = null;
         }
-
-        setDraw(normalizedDraw);
-        setBatchPreview(nextBatchPreview);
-        setError(null);
-      } catch (err) {
-        setError(parseErrorMessage(err));
-        setDraw(null);
-        setBatchPreview(null);
-      } finally {
-        if (mode === "initial") setLoading(false);
-        else setRefreshing(false);
       }
+
+      return { draw: normalizedDraw, batchPreview: nextBatchPreview };
     },
-    [drawId]
-  );
+    enabled: !!drawId,
+  });
+
+  const refreshing = isFetching && !loading;
+
+  const loadPage = useCallback(async () => { await refetch(); }, [refetch]);
 
   useEffect(() => {
-    void loadPage("initial");
-  }, [loadPage]);
+    if (pageData) {
+      setDraw(pageData.draw);
+      setBatchPreview(pageData.batchPreview);
+      setError(null);
+    }
+  }, [pageData]);
+
+  useEffect(() => {
+    if (queryError) {
+      setError(parseErrorMessage(queryError));
+      setDraw(null);
+      setBatchPreview(null);
+    }
+  }, [queryError]);
 
   const revealBlockedReason = useMemo(() => {
     if (!draw) return null;
@@ -582,7 +582,7 @@ export default function AdminLuckyDrawRevealPage() {
         <section className="flex justify-end">
           <button
             type="button"
-            onClick={() => void loadPage("refresh")}
+            onClick={() => void loadPage()}
             disabled={refreshing || loading || revealing}
             className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
           >
@@ -596,7 +596,7 @@ export default function AdminLuckyDrawRevealPage() {
           <ErrorState
             title="Unable to load reveal page"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 

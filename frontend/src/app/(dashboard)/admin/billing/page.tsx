@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { FileBadge2, FileText, Receipt, RotateCcw } from "lucide-react";
 
 import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
@@ -26,7 +27,7 @@ import PrintActionBanner from "@/components/print/PrintActionBanner";
 import { toAmountInWordsINR } from "@/lib/print/formatters";
 
 export default function BillingOverviewPage() {
-  const [loading, setLoading] = useState(true);
+
   const [error, setError] = useState<string | null>(null);
   const [invoices, setInvoices] = useState<BillingInvoice[]>([]);
   const [creditCount, setCreditCount] = useState(0);
@@ -35,39 +36,49 @@ export default function BillingOverviewPage() {
   const [contractCount, setContractCount] = useState(0);
   const [directSaleCount, setDirectSaleCount] = useState(0);
 
+  const { data: queryData, isLoading: loading, error: queryError, refetch } = useQuery({
+    queryKey: ["billing_dashboard"],
+    queryFn: async () => {
+      const [invoicePayload, creditPayload, debitPayload, receiptPayload, contractPayload, directSalePayload] = await Promise.all([
+        listBillingInvoices(),
+        listBillingCreditNotes(),
+        listBillingDebitNotes(),
+        listReceiptDocuments(),
+        listBillingProfiles(),
+        listDirectSales(),
+      ]);
+      return {
+        invoices: invoicePayload.results,
+        creditCount: creditPayload.count,
+        debitCount: debitPayload.count,
+        receiptCount: receiptPayload.count,
+        contractCount: contractPayload.count,
+        directSaleCount: directSalePayload.count,
+      };
+    },
+  });
+
+  const loadPage = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
+
   useEffect(() => {
-    let cancelled = false;
-    async function loadPage() {
-      setLoading(true);
-      try {
-        const [invoicePayload, creditPayload, debitPayload, receiptPayload, contractPayload, directSalePayload] = await Promise.all([
-          listBillingInvoices(),
-          listBillingCreditNotes(),
-          listBillingDebitNotes(),
-          listReceiptDocuments(),
-          listBillingProfiles(),
-          listDirectSales(),
-        ]);
-        if (cancelled) return;
-        setInvoices(invoicePayload.results);
-        setCreditCount(creditPayload.count);
-        setDebitCount(debitPayload.count);
-        setReceiptCount(receiptPayload.count);
-        setContractCount(contractPayload.count);
-        setDirectSaleCount(directSalePayload.count);
-        setError(null);
-      } catch (err) {
-        if (cancelled) return;
-        setError(accountingErrorMessage(err, "Failed to load billing operations."));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+    if (queryData) {
+      setInvoices(queryData.invoices);
+      setCreditCount(queryData.creditCount);
+      setDebitCount(queryData.debitCount);
+      setReceiptCount(queryData.receiptCount);
+      setContractCount(queryData.contractCount);
+      setDirectSaleCount(queryData.directSaleCount);
+      setError(null);
     }
-    void loadPage();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  }, [queryData]);
+
+  useEffect(() => {
+    if (queryError) {
+      setError(accountingErrorMessage(queryError, "Failed to load billing operations."));
+    }
+  }, [queryError]);
 
   const postedInvoices = invoices.filter((row) => row.status === "POSTED");
   const draftInvoices = invoices.filter((row) => row.status === "DRAFT").length;

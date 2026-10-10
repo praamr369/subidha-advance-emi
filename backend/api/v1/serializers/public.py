@@ -41,6 +41,7 @@ class PublicProductSerializer(serializers.ModelSerializer):
     ar_model = serializers.SerializerMethodField()
     # Scheme pricing: cash/EMI/rent/lease with live offer discounts applied.
     scheme_pricing = serializers.SerializerMethodField()
+    rent_yield_estimates = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -70,6 +71,7 @@ class PublicProductSerializer(serializers.ModelSerializer):
             "selected_attributes",
             "sibling_variants",
             "scheme_pricing",
+            "rent_yield_estimates",
         ]
 
     # ── scheme pricing ────────────────────────────────────────────────────────
@@ -107,6 +109,16 @@ class PublicProductSerializer(serializers.ModelSerializer):
             return None
 
     # ── helpers ──────────────────────────────────────────────────────────────
+
+
+    def get_rent_yield_estimates(self, obj):
+        price = float(obj.base_price) if obj.base_price else 0.0
+        return {
+            "short_tenure_min": str(round(price * 0.08)),
+            "short_tenure_max": str(round(price * 0.10)),
+            "long_tenure_min": str(round(price * 0.05)),
+            "long_tenure_max": str(round(price * 0.07)),
+        }
 
     def _pim(self, obj):
         return obj.pim.first()
@@ -146,7 +158,13 @@ class PublicProductSerializer(serializers.ModelSerializer):
         return None
 
     def get_video(self, obj):
-        return serialize_media_url(self.context.get("request"), getattr(obj, "video", None))
+        req = self.context.get("request")
+        if getattr(obj, "video", None):
+            return serialize_media_url(req, obj.video)
+        videos = self.get_gallery_videos(obj)
+        if videos:
+            return videos[0]
+        return None
 
     def _get_pim_media(self, obj):
         """Return PIM media items scoped to this product/variant.
@@ -350,6 +368,9 @@ class PublicProductSerializer(serializers.ModelSerializer):
 
         if pim.parent_id:
             # Variant product — pull from its own ProductVariant
+            parent_src = getattr(pim.parent, 'source_product', None)
+            if parent_src:
+                base_name = parent_src.name or base_name
             own_v = self._own_variant(obj)
             if own_v:
                 attr_map = _variant_attr_map(own_v)
@@ -443,19 +464,25 @@ class PublicProductSerializer(serializers.ModelSerializer):
             return []
 
         siblings = []
+        published_skus = set(parent_pim.child_pim_products.filter(is_published=True).values_list("code", flat=True))
         for variant in parent_pim.variants.filter(is_active=True).prefetch_related(
             "attribute_values__attribute", "operational_product"
         ):
+            if variant.sku not in published_skus:
+                continue
             op = getattr(variant, "operational_product", None)
             if not op:
                 continue
             attrs = _variant_attr_map(variant)
-            # Build a short label from the most meaningful attrs
-            label_parts = []
-            for key in ("Size", "Bed Type", "Color", "Variant", "Type"):
-                if key in attrs:
-                    label_parts.append(attrs[key])
-            label = " · ".join(label_parts) if label_parts else variant.sku
+            # Variant identity is configured in PIM, so do not maintain a
+            # hardcoded allow-list here.  A product may be defined by any
+            # combination of attributes (for example Size + Thickness +
+            # Material + Storage + Lock Base).  _variant_attr_map preserves
+            # the VariantAttributeValue relation ordering, which keeps the
+            # public label stable and aligned with the admin configuration.
+            label = " · ".join(
+                f"{name}: {value}" for name, value in attrs.items()
+            ) or variant.sku
             siblings.append({
                 "product_id": op.id,
                 "product_code": op.product_code,

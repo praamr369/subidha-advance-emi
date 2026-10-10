@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
@@ -132,7 +133,6 @@ function buildRegisterRows({
 export default function BillingDocumentRegisterPage() {
   const searchParams = useSearchParams();
   const [rows, setRows] = useState<RegisterRow[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const filters = useMemo(
@@ -148,61 +148,60 @@ export default function BillingDocumentRegisterPage() {
     [searchParams]
   );
 
+  const { data: queryData, isLoading: loading, error: queryError, refetch } = useQuery({
+    queryKey: ["billing_register", filters],
+    queryFn: async () => {
+      const [invoicePayload, receiptPayload, creditPayload, debitPayload] = await Promise.all([
+        listBillingInvoices({
+          subscription: filters.subscription,
+          customer: filters.customer,
+          direct_sale: filters.direct_sale,
+          source_type: filters.source_type,
+          status: filters.status,
+        }),
+        listReceiptDocuments({
+          subscription: filters.subscription,
+          customer: filters.customer,
+          direct_sale: filters.direct_sale,
+          payment: filters.payment,
+          billing_invoice: filters.billing_invoice,
+          source_type: filters.source_type,
+        }),
+        listBillingCreditNotes({
+          original_invoice: filters.billing_invoice,
+          direct_sale: filters.direct_sale,
+        }),
+        listBillingDebitNotes({
+          original_invoice: filters.billing_invoice,
+          direct_sale: filters.direct_sale,
+        }),
+      ]);
+      return buildRegisterRows({
+        invoices: invoicePayload.results,
+        receipts: receiptPayload.results,
+        creditNotes: creditPayload.results,
+        debitNotes: debitPayload.results,
+      });
+    },
+  });
+
+  const loadPage = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
+
   useEffect(() => {
-    let cancelled = false;
-
-    async function loadPage() {
-      setLoading(true);
-      try {
-        const [invoicePayload, receiptPayload, creditPayload, debitPayload] = await Promise.all([
-          listBillingInvoices({
-            subscription: filters.subscription,
-            customer: filters.customer,
-            direct_sale: filters.direct_sale,
-            source_type: filters.source_type,
-            status: filters.status,
-          }),
-          listReceiptDocuments({
-            subscription: filters.subscription,
-            customer: filters.customer,
-            direct_sale: filters.direct_sale,
-            payment: filters.payment,
-            billing_invoice: filters.billing_invoice,
-            source_type: filters.source_type,
-          }),
-          listBillingCreditNotes({
-            original_invoice: filters.billing_invoice,
-            direct_sale: filters.direct_sale,
-          }),
-          listBillingDebitNotes({
-            original_invoice: filters.billing_invoice,
-            direct_sale: filters.direct_sale,
-          }),
-        ]);
-        if (cancelled) return;
-        setRows(
-          buildRegisterRows({
-            invoices: invoicePayload.results,
-            receipts: receiptPayload.results,
-            creditNotes: creditPayload.results,
-            debitNotes: debitPayload.results,
-          })
-        );
-        setError(null);
-      } catch (err) {
-        if (cancelled) return;
-        setRows([]);
-        setError(accountingErrorMessage(err, "Failed to load the billing document register."));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+    if (queryData) {
+      setRows(queryData);
+      setError(null);
     }
+  }, [queryData]);
 
-    void loadPage();
-    return () => {
-      cancelled = true;
-    };
-  }, [filters]);
+  useEffect(() => {
+    if (queryError) {
+      setRows([]);
+      setError(accountingErrorMessage(queryError, "Failed to load the billing document register."));
+    }
+  }, [queryError]);
 
   const columns: EnterpriseColumnDef<RegisterRow>[] = [
     { key: "document_date", header: "Date", render: (row) => accountingDate(row.document_date) },

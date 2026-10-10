@@ -8,6 +8,7 @@ from api.v1.views.reminders import (
     PaymentReminderRunView,
     PaymentReminderViewSet,
 )
+from api.v1.views.automated_dunning import AutomatedDunningRunView
 
 router = DefaultRouter()
 router.register(r"", PaymentReminderViewSet, basename="payment-reminders")
@@ -21,6 +22,7 @@ template_router.register(r"", NotificationTemplateViewSet, basename="notificatio
 urlpatterns = [
     path("gateway/status/", PaymentReminderGatewayStatusView.as_view()),
     path("run/", PaymentReminderRunView.as_view()),
+    path("run-automated-dunning/", AutomatedDunningRunView.as_view()),
     path("whatsapp/", include(whatsapp_router.urls)),
     path("templates/", include(template_router.urls)),
     path("payment-reminders/", include(router.urls)),

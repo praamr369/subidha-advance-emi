@@ -1,7 +1,8 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { Filter, Search } from "lucide-react";
 
 import EmptyState from "@/components/feedback/EmptyState";
@@ -55,44 +56,39 @@ function toErrorMessage(error: unknown): string {
 export default function OverdueEmiPage() {
   const [summary, setSummary] = useState<OverdueSummary | null>(null);
   const [rows, setRows] = useState<EmiRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [agingFilter, setAgingFilter] = useState<"ALL" | "1_7" | "8_30" | "31_PLUS">(
     "ALL"
   );
 
-  async function loadPage(mode: "initial" | "refresh" = "initial") {
-    if (mode === "initial") {
-      setLoading(true);
-    } else {
-      setRefreshing(true);
-    }
+  const query = useQuery({
+    queryKey: ['overdue-emis-summary'],
+    queryFn: () => getOverdueSummary(),
+  });
 
-    try {
-      const payload = await getOverdueSummary();
-      setSummary(payload);
-      setRows(payload.rows ?? []);
-      setError(null);
-    } catch (err) {
-      setError(toErrorMessage(err));
-      if (mode === "initial") {
-        setSummary(null);
-        setRows([]);
-      }
-    } finally {
-      if (mode === "initial") {
-        setLoading(false);
-      } else {
-        setRefreshing(false);
-      }
-    }
-  }
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
 
   useEffect(() => {
-    void loadPage("initial");
-  }, []);
+    if (query.data) {
+      setSummary(query.data);
+      setRows(query.data.rows ?? []);
+      setError(null);
+    }
+  }, [query.data]);
+
+  useEffect(() => {
+    if (query.error) {
+      setSummary(null);
+      setRows([]);
+      setError(toErrorMessage(query.error));
+    }
+  }, [query.error]);
+
+  const loadPage = useCallback(async () => {
+    await query.refetch();
+  }, [query]);
 
   const totalExposure = useMemo(
     () =>
@@ -311,7 +307,7 @@ export default function OverdueEmiPage() {
         <section className="flex justify-end">
           <button
             type="button"
-            onClick={() => void loadPage("refresh")}
+            onClick={() => void loadPage()}
             disabled={refreshing || loading}
             className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
           >
@@ -325,7 +321,7 @@ export default function OverdueEmiPage() {
           <ErrorState
             title="Unable to load overdue EMI records"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 

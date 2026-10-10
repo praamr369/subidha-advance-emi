@@ -63,6 +63,7 @@ def create_rent_contract(
     tenure_months: int,
     start_date=None,
     security_deposit_percent: Decimal,
+    monthly_yield_percent: Decimal = Decimal("5.00"),
     performed_by=None,
     handover_notes: str = "",
     contract_terms_snapshot: str = "",
@@ -87,12 +88,20 @@ def create_rent_contract(
             customer=customer, plan_type=PlanType.RENT, stage="activate"
         )
 
-    total_amount = Decimal(product.base_price).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    monthly_amount = (total_amount / Decimal(tenure_months)).quantize(
+    product_value = Decimal(product.base_price).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    
+    monthly_yield_percent = Decimal(str(monthly_yield_percent)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    if monthly_yield_percent <= Decimal("0.00"):
+        raise ValidationError({"monthly_yield_percent": "Yield rate must be greater than zero."})
+
+    monthly_amount = (product_value * monthly_yield_percent / Decimal("100.00")).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
+    total_amount = (monthly_amount * Decimal(tenure_months)).quantize(
         Decimal("0.01"), rounding=ROUND_HALF_UP
     )
 
-    deposit = calculate_security_deposit(contract_value=total_amount, percent=security_deposit_percent)
+    deposit = calculate_security_deposit(contract_value=product_value, percent=security_deposit_percent)
     terms_snapshot = (contract_terms_snapshot or "").strip() or _default_terms_snapshot(plan_type="RENT")
 
     subscription = Subscription.objects.create(
@@ -116,6 +125,7 @@ def create_rent_contract(
     RentSubscriptionProfile.objects.create(
         subscription=subscription,
         security_deposit_percent=deposit.percent,
+        monthly_yield_percent=monthly_yield_percent,
         security_deposit_amount=deposit.amount,
         refundable_security_deposit=deposit.amount,
         return_condition_status=ContractReturnConditionStatus.NOT_ASSESSED,
@@ -170,6 +180,7 @@ def create_lease_contract(
     tenure_months: int,
     start_date=None,
     security_deposit_percent: Decimal,
+    monthly_yield_percent: Decimal = Decimal("5.00"),
     buyout_amount: Decimal | None = None,
     ownership_transfer_allowed: bool = False,
     performed_by=None,
@@ -196,12 +207,20 @@ def create_lease_contract(
             customer=customer, plan_type=PlanType.LEASE, stage="activate"
         )
 
-    total_amount = Decimal(product.base_price).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    monthly_amount = (total_amount / Decimal(tenure_months)).quantize(
+    product_value = Decimal(product.base_price).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    
+    monthly_yield_percent = Decimal(str(monthly_yield_percent)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    if monthly_yield_percent <= Decimal("0.00"):
+        raise ValidationError({"monthly_yield_percent": "Yield rate must be greater than zero."})
+
+    monthly_amount = (product_value * monthly_yield_percent / Decimal("100.00")).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
+    total_amount = (monthly_amount * Decimal(tenure_months)).quantize(
         Decimal("0.01"), rounding=ROUND_HALF_UP
     )
 
-    deposit = calculate_security_deposit(contract_value=total_amount, percent=security_deposit_percent)
+    deposit = calculate_security_deposit(contract_value=product_value, percent=security_deposit_percent)
     terms_snapshot = (contract_terms_snapshot or "").strip() or _default_terms_snapshot(plan_type="LEASE")
 
     normalized_buyout = None
@@ -231,6 +250,7 @@ def create_lease_contract(
     LeaseSubscriptionProfile.objects.create(
         subscription=subscription,
         security_deposit_percent=deposit.percent,
+        monthly_yield_percent=monthly_yield_percent,
         security_deposit_amount=deposit.amount,
         refundable_security_deposit=deposit.amount,
         buyout_amount=normalized_buyout,

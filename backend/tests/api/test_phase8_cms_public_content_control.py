@@ -155,6 +155,7 @@ class Phase8CmsPublicContentControlTests(APITestCase):
             )
 
     def test_public_pages_endpoints_do_not_require_auth(self):
+        PublicBusinessProfile.objects.all().delete()
         PublicBusinessProfile.objects.create(
             display_name="Subidha Furniture",
             is_active=True,

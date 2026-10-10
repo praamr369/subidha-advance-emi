@@ -55,7 +55,13 @@ class CapabilityMatrixRbacTests(APITestCase):
 
     def test_override_works_only_if_configured(self):
         self.assertFalse(user_has_capability(self.cashier, "accounting.reverse_entry"))
-        capability = Capability.objects.get(code="accounting.reverse_entry")
+        capability, _ = Capability.objects.get_or_create(
+            code="accounting.reverse_entry",
+            defaults={
+                "label": "Reverse Journal Entry",
+                "description": "Can reverse posted entries",
+            }
+        )
         UserCapabilityOverride.objects.update_or_create(
             user=self.cashier,
             capability=capability,

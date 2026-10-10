@@ -1,4 +1,5 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -46,27 +47,16 @@ function MiniBar({ label, value, total, amount }: { label: string; value: number
 
 export default function CollectionsReportPage() {
   const [analytics, setAnalytics] = useState<AdminAnalyticsSummaryResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
-    try {
-      const payload = await getAdminAnalyticsSummary({ window: "THIS_MONTH" });
-      setAnalytics(payload);
-      setError(null);
-    } catch (err) {
-      setError(toErrorMessage(err));
-      setAnalytics(null);
-    } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
-    }
-  }, []);
+  const query = useQuery({
+    queryKey: ["admin-reports-collections"],
+    queryFn: () => getAdminAnalyticsSummary({ window: "THIS_MONTH" })
+  });
 
-  useEffect(() => { void loadPage("initial"); }, [loadPage]);
+  const loading = query.isLoading;
+  const refreshing = query.isFetching && !query.isLoading;
+  const error = query.error ? (query.error as Error).message : null;
+  const loadPage = useCallback(async () => { await query.refetch(); }, [query]);
 
   const trendPoints = useMemo(() => analytics?.collections_trend.points ?? [], [analytics]);
   const recentTrend = useMemo(() => trendPoints.slice(-10), [trendPoints]);
@@ -110,7 +100,7 @@ export default function CollectionsReportPage() {
           </p>
           <button
             type="button"
-            onClick={() => void loadPage("refresh")}
+            onClick={() => void loadPage()}
             disabled={loading || refreshing}
             className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
           >
@@ -125,7 +115,7 @@ export default function CollectionsReportPage() {
           <ErrorState
             title="Unable to load collections report"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 

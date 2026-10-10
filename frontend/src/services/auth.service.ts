@@ -3,6 +3,7 @@ import { API_BASE_URL } from "@/lib/constants";
 export type LoginRequest = {
   identifier: string;
   password: string;
+  mfa_code?: string;
 };
 
 export type LoginResponse = {
@@ -104,6 +105,7 @@ export async function loginRequest(
 ): Promise<LoginResponse> {
   const identifier = payload.identifier.trim();
   const password = payload.password;
+  const mfa_code = payload.mfa_code;
 
   async function attempt(body: Record<string, unknown>): Promise<Response> {
     return fetch(buildApiUrl("/auth/login/"), {
@@ -115,7 +117,7 @@ export async function loginRequest(
     });
   }
 
-  const primary = await attempt({ identifier, password });
+  const primary = await attempt({ identifier, password, mfa_code });
   if (primary.ok) {
     return parseResponse<LoginResponse>(primary);
   }
@@ -134,7 +136,7 @@ export async function loginRequest(
       typeof (payloadBody as Record<string, unknown>).identifier !== "undefined");
 
   if (shouldRetry) {
-    const legacy = await attempt({ username: identifier, password });
+    const legacy = await attempt({ username: identifier, password, mfa_code });
     return parseResponse<LoginResponse>(legacy);
   }
 

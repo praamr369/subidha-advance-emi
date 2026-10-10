@@ -32,7 +32,7 @@ function setCookie(name: string, value: string, maxAgeSeconds = 60 * 60 * 24 * 7
 function clearCookie(name: string) {
   if (!isBrowser()) return;
 
-  document.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax`;
+  document.cookie = `${name}=; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
 }
 
 function syncAuthCookies(session: StoredSession | null) {
@@ -119,13 +119,16 @@ export function storeSession(session: StoredSession): void {
   setSession(session);
 }
 
-export function clearSession(): void {
+export function clearSession(silent = false): void {
   if (!isBrowser()) return;
 
   window.localStorage.removeItem(SESSION_KEY);
   clearTokens();
   syncAuthCookies(null);
-  notifySessionChanged();
+  
+  if (!silent) {
+    notifySessionChanged();
+  }
 }
 
 export function getAccessToken(): string | null {

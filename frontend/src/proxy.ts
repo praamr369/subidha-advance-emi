@@ -57,8 +57,16 @@ export function proxy(request: NextRequest) {
     const authPresent = request.cookies.get("subidha_auth")?.value === "1";
     const role = normalizeRole(request.cookies.get("subidha_role")?.value);
 
-    if (pathname === "/login" && authPresent && role && ROLE_BASE_PATHS[role]) {
-      return NextResponse.redirect(new URL(getDashboardPathForRole(role), request.url));
+    if (pathname === "/login") {
+      if (request.nextUrl.searchParams.get("logout") === "1") {
+        const res = NextResponse.redirect(new URL("/login", request.url));
+        res.cookies.delete("subidha_auth");
+        res.cookies.delete("subidha_role");
+        return res;
+      }
+      if (authPresent && role && ROLE_BASE_PATHS[role]) {
+        return NextResponse.redirect(new URL(getDashboardPathForRole(role), request.url));
+      }
     }
 
     return NextResponse.next();

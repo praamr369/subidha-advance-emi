@@ -40,7 +40,7 @@ export default function LuckyIDTrackerPage() {
           <div className="text-center">
             <h1 className="text-3xl font-bold text-red-600 mb-4">Error</h1>
             <p className="text-gray-600 mb-6">{error || 'Failed to load lucky ID information'}</p>
-            <Link href="/dashboard/customer" className="text-primary hover:underline">
+            <Link href="/customer" className="text-primary hover:underline">
               Back to Dashboard
             </Link>
           </div>
@@ -180,19 +180,19 @@ export default function LuckyIDTrackerPage() {
         {/* Navigation */}
         <div className="flex gap-4 mt-8">
           <Link
-            href="/dashboard/customer/lucky-plan/eligibility"
+            href="/customer/lucky-plan/eligibility"
             className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-900 font-semibold py-3 rounded-lg transition text-center"
           >
             Check Eligibility
           </Link>
           <Link
-            href="/dashboard/customer/lucky-plan/results"
+            href="/customer/lucky-plan/results"
             className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-lg transition text-center"
           >
             View Draw Results
           </Link>
           <Link
-            href="/dashboard/customer/lucky-plan/history"
+            href="/customer/lucky-plan/history"
             className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-lg transition text-center"
           >
             View Waivers

@@ -7,6 +7,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from subscriptions.models import PlanType, Product
+from products_pim.models import PimProduct
 
 
 def _default_plan_type(emi: bool, rent: bool, lease: bool) -> tuple[str, bool]:
@@ -102,13 +103,18 @@ class Command(BaseCommand):
             }
             product = Product.objects.filter(product_code=code).first()
             if product is None:
-                Product.objects.create(product_code=code, **defaults)
+                product = Product.objects.create(product_code=code, **defaults)
                 created += 1
             else:
                 for field, value in defaults.items():
                     setattr(product, field, value)
                 product.save()
                 updated += 1
+
+            # Demo rows are intended to exercise portal catalogs. The PIM
+            # sync may provision a draft blueprint, so publish the linked
+            # blueprint explicitly instead of relying on is_active alone.
+            PimProduct.objects.filter(source_product=product).update(is_published=True)
 
         self.stdout.write(
             self.style.SUCCESS(

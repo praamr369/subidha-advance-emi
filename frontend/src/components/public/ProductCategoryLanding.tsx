@@ -22,7 +22,7 @@ function ProductCard({ product, categoryName, dict }: { product: PublicProduct; 
     <li className="flex flex-col overflow-hidden rounded-2xl border border-border bg-card">
       <div className="relative aspect-[4/3] w-full bg-muted">
         {product.image ? (
-          <Image src={product.image} alt={alt} fill sizes="(max-width: 768px) 100vw, 33vw" className="object-cover" />
+          <Image src={product.image} alt={alt} fill sizes="(max-width: 768px) 100vw, 33vw" className="object-cover" unoptimized={true} />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
             {categoryName} at Subidha Furniture

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
@@ -33,10 +34,7 @@ function toErrorMessage(error: unknown): string {
 }
 
 export default function AdminManufacturingJobsPage() {
-  const [rows, setRows] = useState<ProductionJob[]>([]);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [validation, setValidation] = useState<{
     frontend: string[];
@@ -57,23 +55,18 @@ export default function AdminManufacturingJobsPage() {
     notes: "",
   });
 
-  async function loadPage() {
-    try {
-      setLoading(true);
-      const next = await listProductionJobs();
-      setRows(next.results);
-      setError(null);
-    } catch (err) {
-      setRows([]);
-      setError(toErrorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  }
+  const query = useQuery({
+    queryKey: ["admin", "manufacturing", "jobs"],
+    queryFn: () => listProductionJobs(),
+  });
 
-  useEffect(() => {
-    void loadPage();
-  }, []);
+  const rows = query.data?.results || [];
+  const loading = query.isLoading;
+  const error = query.error ? (query.error as Error).message : null;
+
+  const loadPage = useCallback(async () => {
+    await query.refetch();
+  }, [query]);
 
   async function searchInventoryOptions(query: string): Promise<EntityLookupOption[]> {
     const payload = await searchAdminInventoryItems({ q: query });
@@ -132,7 +125,6 @@ export default function AdminManufacturingJobsPage() {
     try {
       setSaving(true);
       setNotice(null);
-      setError(null);
       await createProductionJob({
         job_date: form.job_date,
         job_type: form.job_type,
@@ -149,8 +141,8 @@ export default function AdminManufacturingJobsPage() {
         job_type: "MANUFACTURING",
         finishing_category: "",
         finished_good_inventory_item: "",
-        finished_good_inventory_item_option: null,
         bom: "",
+        finished_good_inventory_item_option: null,
         bom_option: null,
         stock_location: "",
         stock_location_option: null,
@@ -167,7 +159,7 @@ export default function AdminManufacturingJobsPage() {
         });
         return;
       }
-      setError(toErrorMessage(err));
+      setNotice(toErrorMessage(err));
     } finally {
       setSaving(false);
     }

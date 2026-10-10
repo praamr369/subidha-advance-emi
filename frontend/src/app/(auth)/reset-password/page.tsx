@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff, ShieldCheck } from "lucide-react";
@@ -22,7 +22,7 @@ function toMessage(error: unknown): string {
   return "Failed to reset password.";
 }
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialIdentifier = useMemo(
@@ -306,5 +306,13 @@ export default function ResetPasswordPage() {
         </Link>
       </div>
     </AuthLayoutShell>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center p-4"><div className="animate-pulse">Loading...</div></div>}>
+      <ResetPasswordContent />
+    </Suspense>
   );
 }

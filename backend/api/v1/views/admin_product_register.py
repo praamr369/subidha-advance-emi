@@ -226,6 +226,10 @@ class AdminProductCreateView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
     parser_classes = (MultiPartParser, FormParser)
 
+    def get(self, request):
+        """Keep the canonical admin products endpoint listable and creatable."""
+        return AdminProductRegisterView().get(request)
+
     def post(self, request):
         """Create a new product with optional variants"""
         try:

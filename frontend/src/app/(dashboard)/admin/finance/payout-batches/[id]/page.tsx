@@ -1,7 +1,10 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
+
 import { useParams } from "next/navigation";
+
 import {
   useCallback,
   useEffect,
@@ -15,8 +18,11 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ERPPageShell from "@/components/erp/ERPPageShell";
+
 import { apiFetch, toArray } from "@/lib/api";
+
 import { downloadCsv } from "@/lib/export/csv";
+
 import { listFinanceAccounts } from "@/services/accounting";
 
 type BatchStatus = "DRAFT" | "FINALIZED" | "PAID" | "CANCELLED";
@@ -259,53 +265,45 @@ export default function AdminPayoutBatchDetailPage() {
   const [batch, setBatch] = useState<PayoutBatchMeta | null>(null);
   const [rows, setRows] = useState<BatchCommissionRow[]>([]);
   const [financeAccounts, setFinanceAccounts] = useState<FinanceAccountOption[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [acting, setActing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errorState, setErrorState] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [actionNote, setActionNote] = useState("");
   const [selectedFinanceAccount, setSelectedFinanceAccount] = useState("");
   const [referenceNo, setReferenceNo] = useState("");
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (!batchId) return;
-
-      if (mode === "initial") setLoading(true);
-      else setRefreshing(true);
-
-      try {
-        const payload = await apiFetch<Record<string, unknown>>(
-          `/admin/commission-payout-batches/${batchId}/`
-        );
-
-        const meta = extractBatchMeta(payload);
-        setBatch(meta);
-        setRows(extractCommissionRows(payload));
-        setSelectedFinanceAccount((current) =>
-          current || (meta.finance_account ? String(meta.finance_account) : "")
-        );
-        setReferenceNo((current) => current || meta.reference_no || "");
-        setError(null);
-      } catch (err) {
-        setError(toErrorMessage(err));
-        if (mode === "initial") {
-          setBatch(null);
-          setRows([]);
-        }
-      } finally {
-        if (mode === "initial") setLoading(false);
-        else setRefreshing(false);
-      }
+  const rqQuery = useQuery({
+    queryKey: ["adminPayoutBatchDetail", batchId],
+    queryFn: async () => {
+      if (!batchId) throw new Error("Batch ID is missing");
+      return await apiFetch<Record<string, unknown>>(`/admin/commission-payout-batches/${batchId}/`);
     },
-    [batchId]
-  );
+    enabled: !!batchId,
+  });
+
+  const loading = rqQuery.isLoading;
+  const refreshing = rqQuery.isFetching && !rqQuery.isLoading;
+  const error = errorState || (rqQuery.error ? toErrorMessage(rqQuery.error) : null);
 
   useEffect(() => {
-    void loadPage("initial");
-  }, [loadPage]);
+    if (rqQuery.data) {
+      const meta = extractBatchMeta(rqQuery.data);
+      setBatch(meta);
+      setRows(extractCommissionRows(rqQuery.data));
+      setSelectedFinanceAccount((current) =>
+        current || (meta.finance_account ? String(meta.finance_account) : "")
+      );
+      setReferenceNo((current) => current || meta.reference_no || "");
+    } else if (rqQuery.error) {
+      setBatch(null);
+      setRows([]);
+    }
+  }, [rqQuery.data, rqQuery.error]);
+
+  const loadPage = useCallback(async () => {
+    await rqQuery.refetch();
+  }, [rqQuery]);
 
   useEffect(() => {
     let cancelled = false;
@@ -378,7 +376,7 @@ export default function AdminPayoutBatchDetailPage() {
       if (action === "finalize" && !selectedFinanceAccount && batch?.finance_account) {
         setSelectedFinanceAccount(String(batch.finance_account));
       }
-      await loadPage("refresh");
+      await loadPage();
     } catch (err) {
       setActionError(toErrorMessage(err));
     } finally {
@@ -490,7 +488,7 @@ export default function AdminPayoutBatchDetailPage() {
         <section className="flex justify-end gap-3">
           <button
             type="button"
-            onClick={() => void loadPage("refresh")}
+            onClick={() => void loadPage()}
             disabled={refreshing || loading}
             className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-card px-4 text-sm font-medium text-foreground transition hover:border-ring hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
           >
@@ -530,7 +528,7 @@ export default function AdminPayoutBatchDetailPage() {
           <ErrorState
             title="Unable to load payout batch detail"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void loadPage()}
           />
         ) : null}
 
