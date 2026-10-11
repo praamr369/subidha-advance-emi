@@ -28,15 +28,14 @@ import { apiPaths } from "@/lib/api-paths";
 type RegisterResponse = {
   access?: string;
   refresh?: string;
-  user?: {
-    id?: number;
-    username?: string;
-    role?: string;
-  };
+  user?: { id?: number; username?: string; role?: string };
   detail?: string;
 };
 
 function toMessage(error: unknown): string {
+  if (error instanceof ApiError && error.readableMessage) {
+    return error.readableMessage;
+  }
   if (!(error instanceof Error)) return "Registration failed.";
 
   const raw = error.message.trim();
@@ -244,7 +243,7 @@ export default function RegisterPage() {
       setError(null);
       setSuccessMessage(null);
 
-      await apiFetch(apiPaths.auth.register, {
+      await apiFetch<RegisterResponse>(apiPaths.auth.register, {
         method: "POST",
         body: {
           username: trimmedUsername,
@@ -687,14 +686,14 @@ export default function RegisterPage() {
                 ) : null}
 
                 <div className="flex flex-col gap-3 pt-1 sm:flex-row">
-                  <button
+                  <ActionButton
                     type="submit"
                     disabled={submitting}
                     className="public-action-primary h-12 flex-1 justify-center disabled:opacity-50"
                   >
                     {submitting ? t("auth.register.creatingAccount") : t("auth.register.createAccountBtn")}
                     {!submitting && <ArrowRight className="h-4 w-4 ml-2" />}
-                  </button>
+                  </ActionButton>
 
                   <Link
                     href="/login"
