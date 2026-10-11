@@ -34,6 +34,8 @@ import {
   normalizeDashboardSummary,
 } from "@/services/dashboards";
 import { listPublicProducts, type PublicProduct } from "@/services/public";
+import { WorkspaceBrandMark } from "@/components/brand/WorkspaceBrandMark";
+import { brandConfig } from "@/config/brand";
 import { ROUTES } from "@/lib/routes";
 
 function money(value: string | number | null | undefined): string {
@@ -194,9 +196,12 @@ export default function PartnerDashboardPage() {
 
       {/* ── Header ── */}
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Partner Portal</p>
-          <h1 className="text-2xl font-bold text-foreground">Home</h1>
+        <div className="flex items-center gap-3">
+          <WorkspaceBrandMark size={36} variant="onLight" className="rounded-xl shadow-xs" />
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{brandConfig.companyName} · Partner Portal</p>
+            <h1 className="text-2xl font-bold text-foreground">Workspace Home</h1>
+          </div>
         </div>
         <button
           type="button"

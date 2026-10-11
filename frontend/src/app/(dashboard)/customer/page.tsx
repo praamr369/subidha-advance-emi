@@ -25,6 +25,7 @@ import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageHeader from "@/components/erp/ERPPageHeader";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import ActionButton from "@/components/ui/ActionButton";
+import { brandConfig } from "@/config/brand";
 import { MetricStrip } from "@/components/ui/operations";
 import { SelfServicePageShell } from "@/components/layout/page-shells";
 import { WorkspaceSection } from "@/components/ui/workspace";
@@ -419,7 +420,7 @@ export default function CustomerDashboardPage() {
       glance={
         <>
           <ERPPageHeader
-            eyebrow="Your account"
+            eyebrow={`${brandConfig.companyName} · Your account`}
             title="Customer Workspace"
             description="See what is due, what you paid last, and where deliveries or support stand—using the same live records the shop uses for your contracts."
             helperNote="Amounts and statuses come from your subscriptions and payments. They update when the shop records activity."

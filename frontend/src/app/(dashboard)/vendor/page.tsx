@@ -24,6 +24,8 @@ import {
 
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import { WorkspaceBrandMark } from "@/components/brand/WorkspaceBrandMark";
+import { brandConfig } from "@/config/brand";
 import { ROUTES } from "@/lib/routes";
 import { formatRupee } from "@/lib/utils/currency";
 import { resolveApiMediaUrl } from "@/lib/media";
@@ -326,9 +328,12 @@ export default function VendorDashboardPage() {
       {/* Top nav bar */}
       <header className="sticky top-0 z-40 border-b border-border bg-card/95 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3">
-          <div className="flex-1">
-            <div className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Vendor Portal</div>
-            <div className="text-lg font-bold text-foreground">Dashboard</div>
+          <div className="flex flex-1 items-center gap-3">
+            <WorkspaceBrandMark size={32} variant="onLight" className="rounded-xl shadow-xs" />
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">{brandConfig.companyName} · Vendor Portal</div>
+              <div className="text-lg font-bold text-foreground">Dashboard</div>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <button

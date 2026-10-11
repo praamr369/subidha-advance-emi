@@ -7,6 +7,8 @@ import { useCallback, useState } from "react";
 import RoleGuard from "@/components/guards/RoleGuard";
 import CustomerMobileBottomNav from "@/components/layout/CustomerMobileBottomNav";
 import RoleSidebar from "@/components/layout/RoleSidebar";
+import { WorkspaceBrandMark } from "@/components/brand/WorkspaceBrandMark";
+import { brandConfig } from "@/config/brand";
 import { useAuth } from "@/hooks/useAuth";
 import { useLogout } from "@/hooks/useLogout";
 import {
@@ -52,10 +54,15 @@ export default function CustomerShellRouter({ children }: { children: ReactNode 
       <div className="relative overflow-x-clip bg-background min-h-screen max-w-150 mx-auto border-x border-border shadow-sm flex flex-col">
         {/* Mobile Top Header */}
         <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-background/80 px-4 backdrop-blur-xl">
-          <div className="flex items-center gap-2">
-            <div className="text-sm font-bold tracking-tight text-foreground">Subidha</div>
-            <div className="rounded-md bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-primary">
-              {displayName}
+          <div className="flex items-center gap-2.5">
+            <WorkspaceBrandMark size={28} variant="onLight" className="rounded-lg shadow-xs" />
+            <div>
+              <div className="text-xs font-bold leading-none tracking-tight text-foreground">
+                {brandConfig.companyName}
+              </div>
+              <div className="mt-0.5 inline-block rounded bg-primary/10 px-1.5 py-0.2 text-[9px] font-bold uppercase tracking-widest text-primary">
+                {displayName}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-1">
@@ -87,9 +94,12 @@ export default function CustomerShellRouter({ children }: { children: ReactNode 
           <div className="flex h-full flex-col overflow-y-auto bg-card text-card-foreground">
             {/* Drawer header */}
             <div className="flex items-center justify-between px-4 pt-5 pb-4 border-b border-border">
-              <div>
-                <h2 className="text-base font-bold text-foreground">All Sections</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">{displayName}</p>
+              <div className="flex items-center gap-2.5">
+                <WorkspaceBrandMark size={32} variant="onLight" className="rounded-lg shadow-xs" />
+                <div>
+                  <h2 className="text-sm font-bold text-foreground">{brandConfig.companyName}</h2>
+                  <p className="text-xs text-muted-foreground">{displayName} · Customer</p>
+                </div>
               </div>
               <button aria-label="Close menu"
                 onClick={closeMobileMenu}

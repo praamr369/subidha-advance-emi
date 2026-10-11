@@ -7,6 +7,8 @@ import { useCallback, useState } from "react";
 import RoleGuard from "@/components/guards/RoleGuard";
 import PartnerMobileBottomNav from "@/components/layout/PartnerMobileBottomNav";
 import RoleSidebar from "@/components/layout/RoleSidebar";
+import { WorkspaceBrandMark } from "@/components/brand/WorkspaceBrandMark";
+import { brandConfig } from "@/config/brand";
 import { useAuth } from "@/hooks/useAuth";
 import { useLogout } from "@/hooks/useLogout";
 import { LogOut, FileText, ScrollText, Bell, LineChart, Package, ShieldCheck, CreditCard, ChevronRight } from "lucide-react";
@@ -28,10 +30,15 @@ export default function PartnerShellRouter({ children }: { children: ReactNode }
       <div className="relative overflow-x-clip bg-background min-h-screen max-w-[600px] mx-auto border-x border-border shadow-sm flex flex-col">
         {/* Mobile Top Header */}
         <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-background/80 px-4 backdrop-blur-xl">
-          <div className="flex items-center gap-2">
-            <div className="text-sm font-bold tracking-tight text-foreground">Subidha Partner</div>
-            <div className="rounded-md bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-primary">
-              {displayName}
+          <div className="flex items-center gap-2.5">
+            <WorkspaceBrandMark size={28} variant="onLight" className="rounded-lg shadow-xs" />
+            <div>
+              <div className="text-xs font-bold leading-none tracking-tight text-foreground">
+                {brandConfig.companyName}
+              </div>
+              <div className="mt-0.5 inline-block rounded bg-primary/10 px-1.5 py-0.2 text-[9px] font-bold uppercase tracking-widest text-primary">
+                {displayName} · Partner
+              </div>
             </div>
           </div>
           <button
@@ -53,9 +60,12 @@ export default function PartnerShellRouter({ children }: { children: ReactNode }
         <RoleSidebar mobile mobileOpen={mobileMenuOpen} onOverlayClick={closeMobileMenu}>
           <div className="flex h-full flex-col overflow-y-auto p-4 bg-card text-card-foreground">
             <div className="mb-6 flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-bold">More Options</h2>
-                <p className="text-xs text-muted-foreground">{displayName}</p>
+              <div className="flex items-center gap-2.5">
+                <WorkspaceBrandMark size={32} variant="onLight" className="rounded-lg shadow-xs" />
+                <div>
+                  <h2 className="text-sm font-bold text-foreground">{brandConfig.companyName}</h2>
+                  <p className="text-xs text-muted-foreground">{displayName} · Partner Portal</p>
+                </div>
               </div>
               <button aria-label="Close menu"
                 onClick={closeMobileMenu}

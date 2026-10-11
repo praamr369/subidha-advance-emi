@@ -6,8 +6,12 @@ export function buildPortalMetadata(
   portalName: string,
   description: string
 ): Metadata {
+  const fullTitle = portalName.includes(brandConfig.companyName)
+    ? portalName
+    : `${portalName} | ${brandConfig.companyName}`;
+
   return {
-    title: portalName,
+    title: fullTitle,
     description,
     applicationName: brandConfig.companyName,
     robots: {
