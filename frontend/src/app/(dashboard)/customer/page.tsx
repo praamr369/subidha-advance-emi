@@ -97,15 +97,15 @@ function QuickLinkCard({ title, description, href }: QuickLink) {
   return (
     <Link
       href={href}
-      className="group workspace-section-shell surface-panel-elevated rounded-[1.6rem] p-5 transition hover:-translate-y-0.5 hover:shadow-[0_26px_60px_-36px_rgba(15,23,42,0.52)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2"
+      className="group workspace-section-shell surface-panel-elevated rounded-[1.6rem] p-5 transition hover:-translate-y-0.5 hover:shadow-[0_26px_60px_-36px_rgba(15,23,42,0.52)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
-      <span className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[var(--surface-border-strong)]/75 to-transparent" />
+      <span className="pointer-events-none absolute inset-x-8 top-0 h-px bg-linear-to-r from-transparent via-(--surface-border-strong)/75 to-transparent" />
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-2">
           <h3 className="text-base font-semibold text-foreground">{title}</h3>
           <p className="text-sm leading-6 text-muted-foreground">{description}</p>
         </div>
-        <span className="rounded-2xl border border-[color-mix(in_oklab,var(--surface-border-strong)_76%,white_24%)] bg-[var(--surface-card-elevated)] p-2 text-slate-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition group-hover:text-slate-900">
+        <span className="rounded-2xl border border-[color-mix(in_oklab,var(--surface-border-strong)_76%,white_24%)] bg-(--surface-card-elevated) p-2 text-slate-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition group-hover:text-slate-900">
           <ArrowRight className="h-4 w-4" />
         </span>
       </div>
@@ -544,7 +544,7 @@ export default function CustomerDashboardPage() {
 
       {!loading && !error && legacy && summary ? (
         <>
-          <section className="relative overflow-hidden rounded-[2rem] border border-slate-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94),rgba(239,246,255,0.92))] p-6 shadow-[0_28px_90px_-54px_rgba(15,23,42,0.5)]">
+          <section className="relative overflow-hidden rounded-4xl border border-slate-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94),rgba(239,246,255,0.92))] p-6 shadow-[0_28px_90px_-54px_rgba(15,23,42,0.5)]">
             <div className="pointer-events-none absolute right-0 top-0 h-40 w-40 rounded-full bg-sky-200/25 blur-3xl" />
             <div className="pointer-events-none absolute left-0 top-0 h-28 w-28 rounded-full bg-amber-200/20 blur-3xl" />
 
@@ -564,7 +564,7 @@ export default function CustomerDashboardPage() {
                 </p>
               </div>
 
-              <dl className="grid gap-3 sm:grid-cols-2 lg:w-[360px]">
+              <dl className="grid gap-3 sm:grid-cols-2 lg:w-90">
                 <div className="rounded-2xl border border-white/80 bg-white/85 p-4 shadow-sm">
                   <dt className="text-xs font-medium text-slate-500">KYC status</dt>
                   <dd className="mt-1 text-sm font-semibold text-slate-950">
