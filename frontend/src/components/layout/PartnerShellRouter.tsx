@@ -27,7 +27,7 @@ export default function PartnerShellRouter({ children }: { children: ReactNode }
 
   return (
     <RoleGuard allowedRoles={["PARTNER"]}>
-      <div className="relative overflow-x-clip bg-background min-h-screen max-w-[600px] mx-auto border-x border-border shadow-sm flex flex-col">
+      <div className="relative overflow-x-clip bg-background min-h-screen max-w-150 mx-auto border-x border-border shadow-sm flex flex-col">
         {/* Mobile Top Header */}
         <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-background/80 px-4 backdrop-blur-xl">
           <div className="flex items-center gap-2.5">

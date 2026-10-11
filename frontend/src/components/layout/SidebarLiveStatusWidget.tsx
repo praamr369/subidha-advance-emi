@@ -90,7 +90,9 @@ export default function SidebarLiveStatusWidget({
   }, []);
 
   useEffect(() => {
-    void checkHealth();
+    const initialProbe = window.setTimeout(() => {
+      void checkHealth();
+    }, 0);
 
     const interval = setInterval(() => {
       // Avoid excessive pings when document is backgrounded
@@ -99,6 +101,7 @@ export default function SidebarLiveStatusWidget({
     }, 15000);
 
     return () => {
+      window.clearTimeout(initialProbe);
       clearInterval(interval);
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -160,7 +163,7 @@ export default function SidebarLiveStatusWidget({
   if (collapsed && !isMobile) {
     return (
       <div
-        className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-card/[0.04] ring-1 ring-inset ring-white/[0.06] transition-all cursor-pointer"
+        className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-card/4 ring-1 ring-inset ring-white/6 transition-all cursor-pointer"
         title={`${health.label} (${latencyDisplay})`}
         onClick={() => void checkHealth()}
       >
@@ -175,9 +178,9 @@ export default function SidebarLiveStatusWidget({
   }
 
   return (
-    <div className="group relative flex w-full flex-col overflow-hidden rounded-2xl bg-gradient-to-b from-card/[0.08] to-card/[0.02] p-3 ring-1 ring-inset ring-white/[0.08] transition-all hover:bg-card/[0.1]">
+    <div className="group relative flex w-full flex-col overflow-hidden rounded-2xl bg-linear-to-b from-card/8 to-card/2 p-3 ring-1 ring-inset ring-white/8 transition-all hover:bg-card/10">
       {/* 3D Glass shine effect */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px w-full bg-gradient-to-r from-transparent via-white/[0.2] to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px w-full bg-linear-to-r from-transparent via-white/20 to-transparent" />
       
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
