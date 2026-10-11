@@ -8,6 +8,8 @@ import RoleGuard from "@/components/guards/RoleGuard";
 import { ROUTES } from "@/lib/routes";
 import { LogOut } from "lucide-react";
 import { useLogout } from "@/hooks/useLogout";
+import { WorkspaceBrandMark } from "@/components/brand/WorkspaceBrandMark";
+import { brandConfig } from "@/config/brand";
 
 const STAFF_NAV = [
   { href: ROUTES.staff.dashboard, label: "Dashboard" },
@@ -32,9 +34,12 @@ export default function StaffShell({ children }: { children: ReactNode }) {
       <div className="min-h-screen bg-background text-foreground">
         <header className="border-b border-border bg-card/95 px-4 py-4 shadow-sm">
           <div className="mx-auto flex max-w-7xl flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Subidha staff portal</div>
-              <div className="text-lg font-semibold text-foreground">My work, attendance, and payroll</div>
+            <div className="flex items-center gap-3">
+              <WorkspaceBrandMark size={36} variant="onLight" className="rounded-xl shadow-xs" />
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{brandConfig.companyName} · Staff Portal</div>
+                <div className="text-lg font-bold text-foreground">My work, attendance, and payroll</div>
+              </div>
             </div>
             <nav className="flex flex-wrap gap-2">
               {STAFF_NAV.map((item) => (
