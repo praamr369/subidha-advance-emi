@@ -139,3 +139,43 @@ def get_critical_shortages(page: int = 1, page_size: int = 50):
         "num_pages": num_pages,
         "results": results,
     }
+
+
+def get_stock_on_hand_items(page: int = 1, page_size: int = 50, search: str = ""):
+    """Return every inventory profile with its ledger-backed physical balance."""
+    # Inventory Profiles/Items are the source of operational stock truth. Do not
+    # hide inactive profiles here: operators still need to reconcile their
+    # historical balance and ledger movements from the stock-on-hand screen.
+    qs = _annotate_stock_qty(InventoryItem.objects.all()).select_related("product")
+    if search:
+        qs = qs.filter(
+            Q(sku__icontains=search)
+            | Q(inventory_code__icontains=search)
+            | Q(product__product_code__icontains=search)
+            | Q(product__name__icontains=search)
+        )
+    qs = qs.order_by("product__product_code", "sku", "id")
+    total_count = qs.count()
+    num_pages = max(1, (total_count + page_size - 1) // page_size) if total_count else 0
+    page = max(1, min(page, num_pages)) if num_pages else 1
+    rows = qs[(page - 1) * page_size : page * page_size]
+    results = []
+    for item in rows:
+        physical = item.physical_qty or Decimal("0")
+        reorder = item.reorder_level_qty or Decimal("0")
+        results.append({
+            "inventory_item_id": item.id,
+            "product_id": item.product_id,
+            "product_code": item.product.product_code if item.product else "",
+            "product_name": item.product.name if item.product else item.inventory_code,
+            "sku": item.sku or "",
+            "physical_qty": str(physical),
+            "reserved_qty": "0",
+            "available_qty": str(physical),
+            "reorder_point": str(reorder),
+            "shortage_qty": str(max(reorder - physical, Decimal("0"))),
+            "stock_tracking_enabled": item.stock_tracking_enabled,
+            "stock_tracking_status": item.stock_tracking_status,
+            "is_active": item.is_active,
+        })
+    return {"count": total_count, "page": page, "page_size": page_size, "num_pages": num_pages, "results": results}

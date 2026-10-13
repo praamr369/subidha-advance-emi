@@ -8,6 +8,7 @@ import VariantManager from "./VariantManager";
 import RelatedProductsSection from "../products/RelatedProductsSection";
 import PimProductAccessoriesPanel from "./PimProductAccessoriesPanel";
 import ProductMediaGallery from "./ProductMediaGallery";
+import StockLedgerPanel from "@/components/inventory/StockLedgerPanel";
 import {
   pimService,
   type PimCategory,
@@ -250,7 +251,7 @@ function BomVariantRow({ variant, productId }: { variant: PimVariant; productId:
 // Inventory Management panel (shown on base product PIM edit page)
 // ---------------------------------------------------------------------------
 
-function PimInventoryPanel({ variants }: { variants: PimVariant[] }) {
+function PimInventoryPanel({ variants, productCode }: { variants: PimVariant[]; productCode: string }) {
   const [collapsed, setCollapsed] = useState(false);
 
   return (
@@ -276,6 +277,7 @@ function PimInventoryPanel({ variants }: { variants: PimVariant[] }) {
       </div>
 
       {!collapsed && (
+        <div className="space-y-5">
         <div className="divide-y divide-border rounded-xl border overflow-hidden">
           {/* Header row */}
           <div className="grid grid-cols-[1fr_80px_1fr] gap-3 px-4 py-2 bg-muted/30 text-xs font-semibold text-muted-foreground">
@@ -331,6 +333,15 @@ function PimInventoryPanel({ variants }: { variants: PimVariant[] }) {
               </div>
             </div>
           ))}
+        </div>
+        <div className="rounded-xl border overflow-hidden bg-background">
+          <div className="border-b bg-muted/20 px-4 py-3">
+            <p className="text-xs text-muted-foreground">
+              Authoritative movement history from the same live inventory ledger used by Inventory → Stock Ledger.
+            </p>
+          </div>
+          <StockLedgerPanel search={productCode} title="Live Inventory Ledger" />
+        </div>
         </div>
       )}
 
@@ -1660,7 +1671,7 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
 
       {/* Inventory Management (base products with variants) */}
       {isEdit && productId && variants.length > 0 && (
-        <PimInventoryPanel variants={variants} />
+        <PimInventoryPanel variants={variants} productCode={code} />
       )}
 
       {/* Media Gallery */}

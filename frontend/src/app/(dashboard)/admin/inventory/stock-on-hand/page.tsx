@@ -11,7 +11,7 @@ import RentalAssetsAwaitingRelease from "@/components/customer-intelligence/Rent
 import { ROUTES } from "@/lib/routes";
 import {
   getStockOnHandSummary,
-  getCriticalShortages,
+  getStockOnHandItems,
   type StockOnHandSummaryResponse,
   type CriticalShortagesListResponse,
   type CriticalShortage,
@@ -59,7 +59,7 @@ export default function StockOnHandPage() {
     try {
       const [summaryData, shortagesData] = await Promise.all([
         getStockOnHandSummary(),
-        getCriticalShortages(page, pageSize),
+        getStockOnHandItems(page, pageSize),
       ]);
       setSummary(summaryData);
       setCriticalShortages(shortagesData);
@@ -144,8 +144,8 @@ export default function StockOnHandPage() {
   return (
     <ERPPageShell
       eyebrow="Inventory"
-      title="Stock on Hand Command Center"
-      subtitle="Real-time inventory KPIs and critical shortage alerts."
+      title="Stock on Hand"
+      subtitle="Real-time inventory quantities calculated from opening stock and posted stock ledger movements."
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Inventory", href: ROUTES.admin.inventory },
@@ -202,10 +202,10 @@ export default function StockOnHandPage() {
         <div className="rounded-lg border bg-card overflow-hidden">
           <div className="bg-muted/40 p-4 border-b">
             <h2 className="font-semibold text-foreground">
-              Critical Shortages ({criticalShortages?.count ?? 0} items)
+              Inventory Products ({criticalShortages?.count ?? 0} items)
             </h2>
             <p className="text-sm text-muted-foreground mt-1">
-              SKUs currently below their reorder point.
+              Physical and available quantities for every active inventory item. Quantities come from the stock ledger.
             </p>
           </div>
 
@@ -216,8 +216,8 @@ export default function StockOnHandPage() {
             </div>
           ) : !criticalShortages?.results?.length ? (
             <div className="p-8 text-center text-muted-foreground">
-              <div className="mb-2 font-medium">✓ No critical shortages</div>
-              <div className="text-sm">All SKUs are above their reorder points.</div>
+              <div className="mb-2 font-medium">No inventory items found</div>
+              <div className="text-sm">Prepare inventory items and post stock movements to see quantities here.</div>
             </div>
           ) : (
             <EnterpriseDataTable<CriticalShortage>
