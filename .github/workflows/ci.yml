@@ -101,6 +101,7 @@ jobs:
             | tee /tmp/layer-a-output.log
       - name: Upload Layer-A output on failure
         if: failure()
+        continue-on-error: true
         uses: actions/upload-artifact@v5
         with:
           name: layer-a-output
@@ -134,6 +135,7 @@ jobs:
       # even if the step is ever made non-blocking again.
       - name: Upload test output
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v5
         with:
           name: test-suite-output

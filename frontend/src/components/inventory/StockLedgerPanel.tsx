@@ -6,7 +6,7 @@ import { Loader2 } from "lucide-react";
 import { accountingDate } from "@/components/accounting/shared";
 import { listStockLedger, type StockLedgerResult } from "@/services/inventory";
 
-export default function StockLedgerPanel({ productId }: { productId?: number }) {
+export default function StockLedgerPanel({ productId, search, title = "Stock Ledger" }: { productId?: number; search?: string; title?: string }) {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<StockLedgerResult[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -17,6 +17,8 @@ export default function StockLedgerPanel({ productId }: { productId?: number }) 
     try {
       const res = await listStockLedger({ 
         inventory_item_id: productId,
+        search,
+        page_size: 100,
       });
       setData(res.results);
     } catch (err) {
@@ -24,7 +26,7 @@ export default function StockLedgerPanel({ productId }: { productId?: number }) 
     } finally {
       setLoading(false);
     }
-  }, [productId]);
+  }, [productId, search]);
 
   useEffect(() => {
     load();
@@ -43,11 +45,13 @@ export default function StockLedgerPanel({ productId }: { productId?: number }) 
   }
 
   if (data.length === 0) {
-    return <div className="p-4 text-sm text-muted-foreground">No stock history recorded yet.</div>;
+    return <div className="p-4 text-sm text-muted-foreground">No stock history recorded yet for this product.</div>;
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div className="space-y-3">
+      <div className="px-1 text-sm font-semibold">{title}</div>
+      <div className="overflow-x-auto">
       <table className="w-full min-w-[800px] text-left text-sm">
         <thead>
           <tr className="border-b border-border bg-muted/20">
@@ -86,6 +90,7 @@ export default function StockLedgerPanel({ productId }: { productId?: number }) 
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

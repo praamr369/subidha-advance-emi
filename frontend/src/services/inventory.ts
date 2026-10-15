@@ -140,6 +140,7 @@ export type StockOnHandKPIS = {
 };
 
 export type CriticalShortage = {
+  inventory_item_id?: number;
   product_id: number;
   product_code: string;
   product_name: string;
@@ -148,6 +149,9 @@ export type CriticalShortage = {
   reserved_qty: string;
   reorder_point: string;
   shortage_qty: string;
+  stock_tracking_enabled?: boolean;
+  stock_tracking_status?: string;
+  is_active?: boolean;
 };
 
 export type StockOnHandSummaryResponse = {
@@ -195,6 +199,12 @@ export function getCriticalShortages(
   return apiFetch<CriticalShortagesListResponse>(url, {
     method: "GET",
   });
+}
+
+export function getStockOnHandItems(page = 1, pageSize = 50, search = ""): Promise<CriticalShortagesListResponse> {
+  const params = new URLSearchParams({ filter: "all", page: String(page), page_size: String(pageSize) });
+  if (search) params.set("search", search);
+  return apiFetch<CriticalShortagesListResponse>(`/admin/inventory/stock-on-hand/?${params.toString()}`);
 }
 
 // ============================================================================

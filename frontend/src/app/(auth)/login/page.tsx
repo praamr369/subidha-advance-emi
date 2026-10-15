@@ -269,14 +269,14 @@ function LoginContent() {
           </div>
         ) : null}
 
-        <button
+        <ActionButton
           type="submit"
           disabled={submitting}
           className="public-action-primary h-12 w-full justify-center disabled:opacity-50"
         >
           {submitting ? t("auth.login.authenticating") : t("auth.login.signIn")}
           {!submitting && <ArrowRight className="h-4 w-4 ml-2" />}
-        </button>
+        </ActionButton>
 
         <div className="rounded-2xl border border-border bg-card space-y-3 p-4">
           <div className="flex items-start gap-3">

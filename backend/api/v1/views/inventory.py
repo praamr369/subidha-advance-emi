@@ -61,7 +61,7 @@ from inventory.services.stock_service import (
 from inventory.services.stock_reservation_list_service import build_stock_reservations_list
 from inventory.services.purchase_needs_list_service import build_purchase_needs_list
 from inventory.services.lot_tracking_list_service import build_lot_tracking_list, export_lots_csv
-from inventory.services.stock_on_hand_service import build_stock_on_hand_summary, get_critical_shortages
+from inventory.services.stock_on_hand_service import build_stock_on_hand_summary, get_critical_shortages, get_stock_on_hand_items
 from inventory.services.stock_ledger_service import build_stock_ledger_list, export_ledger_csv
 from billing.services.reversal_service import _location_quantity
 from subscriptions.models import AuditLog
@@ -1315,6 +1315,12 @@ class AdminStockOnHandView(APIView):
         if filter_type == "critical":
             # Return only critical shortages (paginated)
             payload = get_critical_shortages(page=page, page_size=page_size)
+        elif filter_type == "all":
+            payload = get_stock_on_hand_items(
+                page=page,
+                page_size=page_size,
+                search=(request.query_params.get("search") or "").strip(),
+            )
         else:
             # Return full summary with critical shortages list
             payload = build_stock_on_hand_summary()
