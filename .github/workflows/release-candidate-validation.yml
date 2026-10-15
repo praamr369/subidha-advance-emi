@@ -119,6 +119,7 @@ jobs:
 
       - name: Upload Playwright smoke artifacts
         if: failure()
+        continue-on-error: true
         uses: actions/upload-artifact@v5
         with:
           name: playwright-smoke-artifacts
@@ -193,6 +194,7 @@ jobs:
 
       - name: Upload route-load smoke artifacts
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v5
         with:
           name: playwright-route-load-artifacts
