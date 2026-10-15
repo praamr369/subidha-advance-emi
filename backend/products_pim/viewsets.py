@@ -43,6 +43,19 @@ class AttributeOptionViewSet(viewsets.ModelViewSet):
             qs = qs.filter(attribute_id=attribute_id)
         return qs.order_by("display_order", "id")
 
+    def create(self, request, *args, **kwargs):
+        attribute_id = request.data.get("attribute")
+        value = str(request.data.get("value", "")).strip()
+        if attribute_id and value:
+            existing = AttributeOption.objects.filter(
+                attribute_id=attribute_id,
+                value__iexact=value,
+            ).first()
+            if existing:
+                serializer = self.get_serializer(existing)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+        return super().create(request, *args, **kwargs)
+
 
 class ProductCategoryViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsAdmin]
@@ -135,7 +148,7 @@ class PimProductViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = PimProduct.objects.select_related("category", "subcategory", "parent__category", "parent__subcategory", "source_product").prefetch_related(
-            "attributes__attribute",
+            "attributes__attribute__options",
             "variants__attribute_values__attribute",
             "child_pim_products",
         )

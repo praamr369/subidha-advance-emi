@@ -499,6 +499,18 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
 
   useEffect(() => {
     pimService.getCategories().then(setCategories).catch(() => {});
+    pimService.getAllAttributes().then((attrs) => {
+      setAllAttributes(attrs);
+      setAttributes((prev) =>
+        prev.map((attr) => {
+          const match = attrs.find((a) => a.id === attr.id);
+          if (match && (!attr.options || attr.options.length === 0) && match.options?.length > 0) {
+            return { ...attr, options: match.options, data_type: match.data_type || attr.data_type };
+          }
+          return attr;
+        })
+      );
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -526,19 +538,21 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
             const extraAttrs = (product.attributes || [])
               .filter((a) => !categoryAttrIds.has(a.attribute) && !removedAttrIds.has(a.attribute))
               .map((a) => {
-                const prevAttr = prev.find(p => p.id === a.attribute);
-                if (prevAttr) return prevAttr;
+                const globalAttr = allAttributes.find((ga) => ga.id === a.attribute);
+                if (globalAttr && globalAttr.options?.length > 0) return globalAttr;
+                const prevAttr = prev.find((p) => p.id === a.attribute);
+                if (prevAttr && prevAttr.options?.length > 0) return prevAttr;
                 return {
                   id: a.attribute,
                   name: a.attribute_name,
                   slug: a.attribute_slug,
-                  data_type: a.data_type as PimCategoryAttribute["data_type"],
-                  is_required: false,
-                  is_variant_defining: false,
+                  data_type: (a.data_type || "TEXT") as PimCategoryAttribute["data_type"],
+                  is_required: a.is_required ?? false,
+                  is_variant_defining: a.is_variant_defining ?? false,
                   min_value: null,
                   max_value: null,
                   display_order: 999,
-                  options: []
+                  options: a.options || (globalAttr?.options ?? []),
                 } as PimCategoryAttribute;
               });
               
@@ -568,7 +582,7 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
       })
       .catch(() => {});
     return () => { active = false; };
-  }, [categoryId, subcategoryId, productId, product, removedAttrIds]);
+  }, [categoryId, subcategoryId, productId, product, removedAttrIds, allAttributes]);
 
   useEffect(() => {
     if (!productId) { setLoading(false); return; }
@@ -718,7 +732,8 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
   // is reused instead of creating a duplicate.
   const handleQuickAddOption = useCallback(async (attr: PimCategoryAttribute, rawValue: string) => {
     const value = rawValue.trim();
-    const existing = attr.options.find((o) => o.value.trim().toLowerCase() === value.toLowerCase());
+    const pool = [...attr.options, ...(allAttributes.find((a) => a.id === attr.id)?.options ?? [])];
+    const existing = pool.find((o) => o.value.trim().toLowerCase() === value.toLowerCase());
     if (existing) return existing;
     const created = await pimService.createAttributeOption(attr.id, {
       value,
@@ -726,11 +741,11 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
       display_order: attr.options.length,
     });
     const withOption = (list: PimCategoryAttribute[]) =>
-      list.map((a) => (a.id === attr.id ? { ...a, options: [...a.options, created] } : a));
+      list.map((a) => (a.id === attr.id ? { ...a, options: a.options.some((o) => o.id === created.id) ? a.options : [...a.options, created] } : a));
     setAttributes(withOption);
     setAllAttributes(withOption);
     return created;
-  }, []);
+  }, [allAttributes]);
 
   const handleAddExistingAttribute = (attr: PimCategoryAttribute) => {
     if (attributes.some((a) => a.id === attr.id)) return;

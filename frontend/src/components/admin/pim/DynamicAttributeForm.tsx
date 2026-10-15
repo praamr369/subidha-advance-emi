@@ -57,8 +57,9 @@ export function templateValuesFor(attr: PimCategoryAttribute, templateAttributes
   const seen = new Set<string>();
   const out: string[] = [];
   for (const other of templateAttributes) {
-    if (other.id === attr.id || VALUE_FAMILY[other.data_type] !== family) continue;
-    if (other.slug !== attr.slug && other.name.trim().toLowerCase() !== name) continue;
+    if (other.id === attr.id && attr.options.length > 0) continue;
+    if (VALUE_FAMILY[other.data_type] !== family) continue;
+    if (other.id !== attr.id && other.slug !== attr.slug && other.name.trim().toLowerCase() !== name) continue;
     for (const opt of other.options) {
       const key = opt.value.trim().toLowerCase();
       if (!key || own.has(key) || seen.has(key)) continue;

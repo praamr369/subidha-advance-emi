@@ -158,7 +158,8 @@ function VariantEditPanel({
   const [state, setState] = useState<VariantEditState>(() => {
     const attrValues: Record<number, string> = {};
     for (const av of variant.attribute_values) {
-      attrValues[av.attribute] = av.value_text ?? "";
+      attrValues[av.attribute] =
+        av.value_text ?? (av.value_number != null ? String(av.value_number) : av.value_boolean != null ? (av.value_boolean ? "Yes" : "No") : "");
     }
     return {
       sku: variant.sku,
@@ -177,10 +178,37 @@ function VariantEditPanel({
   const setAttr = (id: number, val: string) =>
     setState((s) => ({ ...s, attrValues: { ...s.attrValues, [id]: val } }));
 
-  // Split attributes into locked (parent-controlled) and editable
-  const locked = allAttributes.filter((a) => lockedAttributes?.has(a.id));
-  const variantDefining = allAttributes.filter((a) => a.is_variant_defining && !lockedAttributes?.has(a.id));
-  const nonDefining = allAttributes.filter((a) => !a.is_variant_defining && !lockedAttributes?.has(a.id));
+  // Split attributes into locked (parent-controlled) and editable.
+  // Also include any attribute present in variant.attribute_values that may not be in allAttributes.
+  const attrMap = new Map<number, PimCategoryAttribute>();
+  for (const a of allAttributes) attrMap.set(a.id, a);
+  if (templateAttributes) {
+    for (const av of variant.attribute_values) {
+      if (!attrMap.has(av.attribute)) {
+        const found = templateAttributes.find((t) => t.id === av.attribute);
+        if (found) {
+          attrMap.set(found.id, found);
+        } else {
+          attrMap.set(av.attribute, {
+            id: av.attribute,
+            name: av.attribute_name,
+            slug: av.attribute_slug,
+            data_type: "TEXT",
+            is_required: false,
+            is_variant_defining: false,
+            min_value: null,
+            max_value: null,
+            display_order: 999,
+            options: [],
+          });
+        }
+      }
+    }
+  }
+  const mergedAttrs = Array.from(attrMap.values());
+  const locked = mergedAttrs.filter((a) => lockedAttributes?.has(a.id));
+  const variantDefining = mergedAttrs.filter((a) => a.is_variant_defining && !lockedAttributes?.has(a.id));
+  const nonDefining = mergedAttrs.filter((a) => !a.is_variant_defining && !lockedAttributes?.has(a.id));
 
   const handleSave = async () => {
     setSaving(true);
@@ -197,13 +225,20 @@ function VariantEditPanel({
   // render is re-created on every keystroke, which dropped input focus.
   function renderAttrInput(attr: PimCategoryAttribute) {
     const val = state.attrValues[attr.id] ?? "";
-    if (attr.data_type === "BOOLEAN") {
+    let effectiveAttr = attr;
+    if ((!attr.options || attr.options.length === 0) && templateAttributes) {
+      const match = templateAttributes.find((t) => t.id === attr.id);
+      if (match && match.options && match.options.length > 0) {
+        effectiveAttr = match;
+      }
+    }
+    if (effectiveAttr.data_type === "BOOLEAN") {
       return (
         <div className="flex gap-3 mt-1">
           {["Yes", "No"].map((l) => (
             <label htmlFor="f-setattr-attr-id-l-classname-accent-prima" key={l} className="flex items-center gap-1.5 text-xs cursor-pointer">
-              <input type="radio" name={`bool-${variant.id}-${attr.id}`}
-                checked={val === l} onChange={() => setAttr(attr.id, l)} className="accent-primary" />
+              <input type="radio" name={`bool-${variant.id}-${effectiveAttr.id}`}
+                checked={val === l} onChange={() => setAttr(effectiveAttr.id, l)} className="accent-primary" />
               {l}
             </label>
           ))}
@@ -212,9 +247,9 @@ function VariantEditPanel({
     }
     return (
       <AttributeValuePicker
-        attr={attr}
+        attr={effectiveAttr}
         value={val}
-        onChange={(next) => setAttr(attr.id, next)}
+        onChange={(next) => setAttr(effectiveAttr.id, next)}
         onAddOption={onAddOption}
         templateAttributes={templateAttributes}
       />
@@ -1166,9 +1201,12 @@ export default function VariantManager({ productId, productCode, productName, ba
                         <td className="px-3 py-2 text-xs text-muted-foreground max-w-xs">
                           <div className="flex flex-wrap gap-1">
                             {v.attribute_values.length > 0
-                              ? v.attribute_values.map((a) => (
-                                  <span key={a.attribute} className="inline-flex rounded-md bg-muted px-1.5 py-0.5 text-[11px]">{a.value_text}</span>
-                                ))
+                              ? v.attribute_values.map((a) => {
+                                  const display = a.value_text || (a.value_number != null ? String(a.value_number) : a.value_boolean != null ? (a.value_boolean ? "Yes" : "No") : "");
+                                  return (
+                                    <span key={a.attribute} className="inline-flex rounded-md bg-muted px-1.5 py-0.5 text-[11px]">{display}</span>
+                                  );
+                                })
                               : <span className="text-muted-foreground/40 italic text-[11px]">No attributes mapped</span>
                             }
                           </div>

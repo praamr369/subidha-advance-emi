@@ -47,6 +47,9 @@ export interface PimProductAttribute {
   attribute_name: string;
   attribute_slug: string;
   data_type: string;
+  is_required?: boolean;
+  is_variant_defining?: boolean;
+  options?: PimAttributeOption[];
   value_text: string;
   value_number: string | null;
   value_boolean: boolean | null;

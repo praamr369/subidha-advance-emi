@@ -125,12 +125,16 @@ class ProductAttributeSerializer(serializers.ModelSerializer):
     attribute_name = serializers.CharField(source="attribute.name", read_only=True)
     attribute_slug = serializers.CharField(source="attribute.slug", read_only=True)
     data_type = serializers.CharField(source="attribute.data_type", read_only=True)
+    is_required = serializers.BooleanField(source="attribute.is_required", read_only=True)
+    is_variant_defining = serializers.BooleanField(source="attribute.is_variant_defining", read_only=True)
+    options = AttributeOptionSerializer(source="attribute.options", many=True, read_only=True)
     display_value = serializers.CharField(read_only=True)
 
     class Meta:
         model = ProductAttribute
         fields = [
             "id", "attribute", "attribute_name", "attribute_slug", "data_type",
+            "is_required", "is_variant_defining", "options",
             "value_text", "value_number", "value_boolean", "value_date", "display_value",
         ]
 

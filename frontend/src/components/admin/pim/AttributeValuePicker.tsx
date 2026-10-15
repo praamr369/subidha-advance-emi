@@ -84,11 +84,16 @@ export default function AttributeValuePicker({
             const label = cost > 0 ? `${opt.display_name}  (+₹${cost.toLocaleString("en-IN")})` : opt.display_name;
             return <option key={opt.id} value={opt.value}>{label}</option>;
           })}
+          {Boolean(value && !attr.options.some((opt) => opt.value === value)) && (
+            <option value={value}>{value}</option>
+          )}
           {onAddOption && templates.length > 0 && (
             <optgroup label="From other categories (adds it here)">
-              {templates.map((t) => (
-                <option key={t} value={`${TEMPLATE_PREFIX}${t}`}>{t}</option>
-              ))}
+              {templates
+                .filter((t) => !attr.options.some((o) => o.value === t) && t !== value)
+                .map((t) => (
+                  <option key={t} value={`${TEMPLATE_PREFIX}${t}`}>{t}</option>
+                ))}
             </optgroup>
           )}
           {onAddOption && <option value={ADD_NEW}>+ Add new value…</option>}
