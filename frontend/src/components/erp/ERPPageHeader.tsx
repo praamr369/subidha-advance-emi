@@ -28,7 +28,7 @@ export default function ERPPageHeader({
   return (
     <div
       className={cn(
-        "workspace-header-panel flex flex-col gap-4 rounded-[1.6rem] border border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--surface-card-elevated)_92%,white_8%),color-mix(in_oklab,var(--surface-card-soft)_78%,var(--surface-muted)_22%))] p-5 shadow-[0_22px_55px_-46px_rgba(15,23,42,0.38)] md:flex-row md:items-start md:justify-between",
+        "workspace-header-panel flex flex-col gap-4 rounded-[1.6rem] border border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--surface-card-elevated)_92%,white_8%),color-mix(in_oklab,var(--surface-card-soft)_78%,var(--surface-muted)_22%))] dark:bg-card dark:bg-none p-5 shadow-[0_22px_55px_-46px_rgba(15,23,42,0.38)] md:flex-row md:items-start md:justify-between",
         className
       )}
     >

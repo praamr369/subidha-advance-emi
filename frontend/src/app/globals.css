@@ -1256,24 +1256,26 @@ button {
   border-color: var(--border);
 }
 
-.dark .dashboard-app .workspace-kpi-band,
-.dark .dashboard-app .workspace-header-panel,
-.dark .dashboard-app .workspace-pill,
-.dark .dashboard-app .workspace-action-bar,
-.dark .dashboard-app .workspace-filter-bar,
-.dark .dashboard-app .table-surface-frame {
-  background: var(--surface-card);
-  border-color: var(--border);
-  box-shadow: var(--surface-shadow);
+.dark .workspace-kpi-band,
+.dark .workspace-header-panel,
+.dark .workspace-pill,
+.dark .workspace-action-bar,
+.dark .workspace-filter-bar,
+.dark .table-surface-frame,
+.dark .surface-panel-elevated,
+.dark :is(.dashboard-app, [class*="workspace"]) .workspace-header-panel {
+  background: var(--surface-card) !important;
+  border-color: var(--border) !important;
+  box-shadow: var(--surface-shadow) !important;
 }
 
-.dark .dashboard-app .workspace-shell-stage::before,
-.dark .dashboard-app .workspace-shell-stage::after {
+.dark .workspace-shell-stage::before,
+.dark .workspace-shell-stage::after {
   opacity: 0.18;
 }
 
-.dark .dashboard-app .workspace-header-panel::after {
-  opacity: 0.08;
+.dark .workspace-header-panel::after {
+  opacity: 0 !important;
 }
 
 .dark .dashboard-app .popup-control {

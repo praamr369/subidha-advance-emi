@@ -15,7 +15,7 @@ export default function ERPActionPanel({ title, description, children, className
   return (
     <aside
       className={cn(
-        "surface-panel-elevated rounded-[1.6rem] border border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--surface-card-elevated)_92%,white_8%),color-mix(in_oklab,var(--surface-card-soft)_78%,var(--surface-muted)_22%))] p-4 shadow-[0_22px_55px_-46px_rgba(15,23,42,0.4)]",
+        "surface-panel-elevated rounded-[1.6rem] border border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--surface-card-elevated)_92%,white_8%),color-mix(in_oklab,var(--surface-card-soft)_78%,var(--surface-muted)_22%))] dark:bg-card dark:bg-none p-4 shadow-[0_22px_55px_-46px_rgba(15,23,42,0.4)]",
         className
       )}
     >

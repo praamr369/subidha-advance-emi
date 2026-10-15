@@ -17,7 +17,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 
   return (
     <I18nProvider locale={locale} dictionary={dictionary}>
-      <div className="min-h-screen bg-background text-foreground">{children}</div>
+      <div className="dashboard-app min-h-screen bg-background text-foreground">{children}</div>
     </I18nProvider>
   );
 }
