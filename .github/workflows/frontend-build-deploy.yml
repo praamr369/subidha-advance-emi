@@ -48,7 +48,7 @@ jobs:
         continue-on-error: true
         if: always()
         env:
-          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_SSH_KEY: ${{ secrets['VPS_SSH_KEY'] }}
         run: |
           if [[ -z "$VPS_SSH_KEY" ]]; then
             echo "::warning::VPS_SSH_KEY secret is not set; skipping VPS deploy step."
