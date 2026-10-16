@@ -17,6 +17,7 @@ for (const role of ROLES) {
   const routes = staticRoutesForRole(role);
 
   test.describe(`route-load smoke: ${role} (${routes.length} routes)`, () => {
+    test.describe.configure({ mode: "parallel" });
     test.use({ storageState: authStatePath(role) });
 
     for (const route of routes) {
