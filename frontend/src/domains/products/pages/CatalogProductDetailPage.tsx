@@ -8,7 +8,7 @@ import { ArrowLeft, Box, CheckCircle2, ShieldCheck, Tag } from "lucide-react";
 import { getCatalogProduct, type CatalogProduct, type CatalogRole } from "@/services/catalog";
 import { resolveApiMediaUrl } from "@/lib/media";
 import ProductARViewer from "@/components/public/ProductARViewer";
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
+import ProductMediaGallery, { buildCatalogProductMediaItems } from "@/components/public/ProductMediaGallery";
 
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
@@ -41,7 +41,7 @@ export default function CatalogProductDetailPage({
 
   const imgUrl = resolveApiMediaUrl(product.image ?? null);
   const specs = (product.base_specs as Record<string, string>) || {};
-  const mediaItems = product.media_items || [];
+  const galleryItems = buildCatalogProductMediaItems(product);
   const handleVariantSelect = async (name: string, value: string) => {
     const nextAttributes = { ...selectedAttributes };
     if (value) nextAttributes[name] = value;
@@ -78,61 +78,15 @@ export default function CatalogProductDetailPage({
 
         {/* Product Header / Image */}
         <div className="flex flex-col md:flex-row gap-6">
-          <div className="w-full md:w-1/2 lg:w-1/3 shrink-0">
-            {mediaItems.length > 0 ? (
-              <div className="group relative">
-                <Carousel className="w-full">
-                  <CarouselContent>
-                    {mediaItems.map((item, index) => (
-                      <CarouselItem key={index}>
-                        <div className="relative aspect-square w-full overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
-                          {item.kind === "VIDEO" ? (
-                            <video
-                              src={item.url}
-                              controls
-                              autoPlay
-                              muted
-                              loop
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <Image
-                              src={item.url}
-                              alt={item.title || product.name}
-                              fill
-                              className="object-cover"
-                              sizes="(max-width: 768px) 100vw, 33vw"
-                            />
-                          )}
-                        </div>
-                      </CarouselItem>
-                    ))}
-                  </CarouselContent>
-                  {mediaItems.length > 1 && (
-                    <>
-                      <CarouselPrevious className="absolute left-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity" />
-                      <CarouselNext className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </>
-                  )}
-                </Carousel>
-              </div>
-            ) : (
-              <div className="relative aspect-square w-full overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
-                {imgUrl ? (
-                  <Image
-                    src={imgUrl}
-                    alt={product.name}
-                    fill
-                    className="object-cover"
-                    sizes="(max-width: 768px) 100vw, 33vw"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center bg-muted/40">
-                    <Box className="size-16 text-muted-foreground/40" />
-                  </div>
-                )}
-              </div>
-            )}
+          <div className="w-full md:w-1/2 lg:w-5/12 shrink-0">
+            <ProductMediaGallery
+              items={galleryItems}
+              productName={product.name}
+              category={product.category}
+              subcategory={product.subcategory}
+              badge={product.category || (role === "partner" ? "Partner Catalog" : "Customer Catalog")}
+              aspectRatio={1}
+            />
             {product.ar_model && (
               <div className="mt-4">
                 <ProductARViewer model={product.ar_model} productName={product.name} poster={imgUrl} />
