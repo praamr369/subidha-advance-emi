@@ -1093,15 +1093,49 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
             old_sku = variant.sku
             dirty_fields = []
 
-            # Scalar fields
-            for field in ("price", "cost_price", "barcode", "reorder_level"):
-                val = request.data.get(field)
-                if val is not None:
-                    setattr(variant, field, val)
-                    dirty_fields.append(field)
+            # Scalar fields with robust type coercion
+            if "price" in request.data:
+                raw_price = request.data.get("price")
+                if raw_price is not None and str(raw_price).strip() != "":
+                    try:
+                        variant.price = Decimal(str(raw_price).strip())
+                        dirty_fields.append("price")
+                    except (InvalidOperation, TypeError, ValueError):
+                        pass
+
+            if "cost_price" in request.data:
+                raw_cost = request.data.get("cost_price")
+                if raw_cost is not None and str(raw_cost).strip() != "":
+                    try:
+                        variant.cost_price = Decimal(str(raw_cost).strip())
+                    except (InvalidOperation, TypeError, ValueError):
+                        variant.cost_price = None
+                else:
+                    variant.cost_price = None
+                dirty_fields.append("cost_price")
+
+            if "barcode" in request.data:
+                raw_bc = request.data.get("barcode")
+                variant.barcode = str(raw_bc).strip() if raw_bc and str(raw_bc).strip() != "" else None
+                dirty_fields.append("barcode")
+
+            if "reorder_level" in request.data:
+                raw_rl = request.data.get("reorder_level")
+                if raw_rl is not None and str(raw_rl).strip() != "":
+                    try:
+                        variant.reorder_level = int(raw_rl)
+                    except (TypeError, ValueError):
+                        variant.reorder_level = 0
+                else:
+                    variant.reorder_level = 0
+                dirty_fields.append("reorder_level")
+
             if request.data.get("sku") is not None:
-                variant.sku = str(request.data.get("sku")).strip()
-                dirty_fields.append("sku")
+                new_sku = str(request.data.get("sku")).strip()
+                if new_sku and new_sku != variant.sku:
+                    variant.sku = new_sku
+                    dirty_fields.append("sku")
+
             if dirty_fields:
                 variant.save(update_fields=dirty_fields)
 
@@ -1118,7 +1152,7 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
                 if "price" in dirty_fields and variant.price is not None:
                     child_pim.base_price = variant.price
                     child_dirty.append("base_price")
-                if "cost_price" in dirty_fields and variant.cost_price is not None:
+                if "cost_price" in dirty_fields:
                     child_pim.cost_price = variant.cost_price
                     child_dirty.append("cost_price")
                 if child_dirty:
@@ -1178,29 +1212,52 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
                 if is_empty:
                     VariantAttributeValue.objects.filter(variant=variant, attribute=attr_obj).delete()
                     if child_pim:
-                        ProductAttribute.objects.filter(product=child_pim, attribute=attr_obj).delete()
+                        try:
+                            ProductAttribute.objects.filter(product=child_pim, attribute=attr_obj).delete()
+                        except Exception:
+                            pass
                 else:
-                    VariantAttributeValue.objects.update_or_create(
-                        variant=variant,
-                        attribute=attr_obj,
-                        defaults={
-                            "value_text": val_text,
-                            "value_number": val_num,
-                            "value_boolean": val_bool,
-                        },
-                    )
-                    if child_pim:
-                        ProductAttribute.objects.update_or_create(
-                            product=child_pim,
+                    existing_vav = VariantAttributeValue.objects.filter(variant=variant, attribute=attr_obj).first()
+                    if existing_vav:
+                        existing_vav.value_text = val_text
+                        existing_vav.value_number = val_num
+                        existing_vav.value_boolean = val_bool
+                        existing_vav.save()
+                        VariantAttributeValue.objects.filter(variant=variant, attribute=attr_obj).exclude(pk=existing_vav.pk).delete()
+                    else:
+                        VariantAttributeValue.objects.create(
+                            variant=variant,
                             attribute=attr_obj,
-                            defaults={
-                                "value_text": val_text,
-                                "value_number": val_num,
-                                "value_boolean": val_bool,
-                            },
+                            value_text=val_text,
+                            value_number=val_num,
+                            value_boolean=val_bool,
                         )
 
-            PIMSyncService.sync_variant_to_operational_product(variant)
+                    if child_pim:
+                        try:
+                            existing_pa = ProductAttribute.objects.filter(product=child_pim, attribute=attr_obj).first()
+                            if existing_pa:
+                                existing_pa.value_text = val_text
+                                existing_pa.value_number = val_num
+                                existing_pa.value_boolean = val_bool
+                                existing_pa.save()
+                                ProductAttribute.objects.filter(product=child_pim, attribute=attr_obj).exclude(pk=existing_pa.pk).delete()
+                            else:
+                                ProductAttribute.objects.create(
+                                    product=child_pim,
+                                    attribute=attr_obj,
+                                    value_text=val_text,
+                                    value_number=val_num,
+                                    value_boolean=val_bool,
+                                )
+                        except Exception:
+                            pass
+
+            try:
+                PIMSyncService.sync_variant_to_operational_product(variant)
+            except Exception as e:
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({"detail": f"Failed to sync operational product: {str(e)}"})
 
         variant.refresh_from_db()
         # Re-prefetch for correct serialisation

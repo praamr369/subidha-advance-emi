@@ -7,7 +7,12 @@ class PIMSyncService:
     def get_variant_display_name(variant: ProductVariant) -> str:
         pim_product = variant.product
         attributes = []
-        for v_attr in variant.attribute_values.select_related('attribute').all():
+        # Prefer variant-defining attributes first so operational titles stay concise (e.g. Size, Color)
+        v_attrs = list(variant.attribute_values.select_related('attribute').all())
+        variant_defining_attrs = [va for va in v_attrs if getattr(va.attribute, 'is_variant_defining', False)]
+        chosen_attrs = variant_defining_attrs if variant_defining_attrs else v_attrs
+
+        for v_attr in chosen_attrs:
             val = v_attr.value_text
             if not val and v_attr.value_number is not None:
                 val = str(v_attr.value_number).rstrip('0').rstrip('.')
@@ -18,8 +23,14 @@ class PIMSyncService:
                 attributes.append(f"{v_attr.attribute.name}: {val}")
                 
         if attributes:
-            return f"{pim_product.name} ({', '.join(attributes)})"
-        return pim_product.name
+            display_name = f"{pim_product.name} ({', '.join(attributes)})"
+        else:
+            display_name = pim_product.name
+
+        # Product.name in products_core has max_length=255. Ensure safety against DB overflow!
+        if len(display_name) > 255:
+            display_name = display_name[:252] + "..."
+        return display_name
 
     @staticmethod
     @transaction.atomic
@@ -76,10 +87,11 @@ class PIMSyncService:
             core_product = variant.operational_product
         else:
             # Fallback to search by sku, or create
+            sku_key = (variant.sku or "")[:50]
             core_product, created = Product.objects.get_or_create(
-                product_code=variant.sku, # Using SKU as the operational product_code
+                product_code=sku_key,
                 defaults={
-                    "name": PIMSyncService.get_variant_display_name(variant),
+                    "name": PIMSyncService.get_variant_display_name(variant)[:255],
                     "base_price": variant.price,
                 }
             )
@@ -88,12 +100,12 @@ class PIMSyncService:
             variant.save(update_fields=['operational_product'])
 
         # Update core_product fields
-        core_product.name = PIMSyncService.get_variant_display_name(variant)
+        core_product.name = PIMSyncService.get_variant_display_name(variant)[:255]
         core_product.base_price = variant.price
         
         old_product_code = core_product.product_code
-        core_product.sku = variant.sku
-        core_product.product_code = variant.sku
+        core_product.sku = (variant.sku or "")[:60]
+        core_product.product_code = (variant.sku or "")[:50]
         core_product.is_active = variant.is_active
         if variant.image:
             core_product.image = variant.image

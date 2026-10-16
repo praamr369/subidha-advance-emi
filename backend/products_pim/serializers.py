@@ -1,4 +1,6 @@
-from django.utils.text import slugify
+# pyright: reportMissingImports=false, reportMissingModuleSource=false
+from django.conf import settings  # pyright: ignore[reportMissingModuleSource]
+from django.utils.text import slugify # type: ignore
 from rest_framework import serializers
 from .models import (
     ProductCategory,
