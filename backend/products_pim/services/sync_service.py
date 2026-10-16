@@ -139,9 +139,22 @@ class PIMSyncService:
             if dtype in ('TEXT', 'CHOICE', 'MULTI_CHOICE'):
                 val = v_attr.value_text
             elif dtype in ('NUMBER', 'DECIMAL'):
-                val = float(v_attr.value_number) if v_attr.value_number is not None else None
+                if v_attr.value_number is not None:
+                    val = float(v_attr.value_number)
+                elif v_attr.value_text:
+                    try:
+                        val = float(v_attr.value_text)
+                    except (ValueError, TypeError):
+                        val = v_attr.value_text
+                else:
+                    val = None
             elif dtype == 'BOOLEAN':
-                val = v_attr.value_boolean
+                if v_attr.value_boolean is not None:
+                    val = v_attr.value_boolean
+                elif v_attr.value_text:
+                    val = True if str(v_attr.value_text).strip().lower() in ('yes', 'true', '1') else False if str(v_attr.value_text).strip().lower() in ('no', 'false', '0') else None
+                else:
+                    val = None
             else:
                 val = v_attr.value_text
             base_specs[v_attr.attribute.slug] = val

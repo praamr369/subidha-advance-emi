@@ -1083,50 +1083,125 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["patch"])
     def update_attributes(self, request, pk=None):
-        """Update variant attributes, pricing, and barcode; syncs to operational product."""
-        variant = self.get_object()
-        old_sku = variant.sku
-        dirty_fields = []
+        """Update variant attributes, pricing, and barcode; syncs to operational product and child PIM product."""
+        from decimal import Decimal, InvalidOperation
+        from django.db import transaction
+        from .models import AttributeDataType, ProductAttribute
 
-        # Scalar fields
-        for field in ("price", "cost_price", "barcode", "reorder_level"):
-            val = request.data.get(field)
-            if val is not None:
-                setattr(variant, field, val)
-                dirty_fields.append(field)
-        if request.data.get("sku") is not None:
-            variant.sku = str(request.data.get("sku")).strip()
-            dirty_fields.append("sku")
-        if dirty_fields:
-            variant.save(update_fields=dirty_fields)
+        with transaction.atomic():
+            variant = self.get_object()
+            old_sku = variant.sku
+            dirty_fields = []
 
-        if variant.sku != old_sku:
-            PIMSyncService.rename_variant_sku(variant, old_sku)
+            # Scalar fields
+            for field in ("price", "cost_price", "barcode", "reorder_level"):
+                val = request.data.get(field)
+                if val is not None:
+                    setattr(variant, field, val)
+                    dirty_fields.append(field)
+            if request.data.get("sku") is not None:
+                variant.sku = str(request.data.get("sku")).strip()
+                dirty_fields.append("sku")
+            if dirty_fields:
+                variant.save(update_fields=dirty_fields)
 
-        # Attribute values (upsert per attribute id)
-        for av in request.data.get("attribute_values", []):
-            attribute_id = av.get("attribute")
-            if not attribute_id:
-                continue
-            
-            val_text = av.get("value_text", "")
-            val_num = av.get("value_number")
-            val_bool = av.get("value_boolean")
-            
-            if val_text == "" and val_num is None and val_bool is None:
-                VariantAttributeValue.objects.filter(variant=variant, attribute_id=attribute_id).delete()
-            else:
-                VariantAttributeValue.objects.update_or_create(
-                    variant=variant,
-                    attribute_id=attribute_id,
-                    defaults={
-                        "value_text": val_text,
-                        "value_number": val_num,
-                        "value_boolean": val_bool,
-                    },
-                )
+            if variant.sku != old_sku:
+                PIMSyncService.rename_variant_sku(variant, old_sku)
 
-        PIMSyncService.sync_variant_to_operational_product(variant)
+            # Find matching child PIM product if present
+            child_pim = PimProduct.objects.filter(code=variant.sku, parent_id=variant.product_id).first()
+            if not child_pim and old_sku:
+                child_pim = PimProduct.objects.filter(code=old_sku, parent_id=variant.product_id).first()
+
+            if child_pim:
+                child_dirty = []
+                if "price" in dirty_fields and variant.price is not None:
+                    child_pim.base_price = variant.price
+                    child_dirty.append("base_price")
+                if "cost_price" in dirty_fields and variant.cost_price is not None:
+                    child_pim.cost_price = variant.cost_price
+                    child_dirty.append("cost_price")
+                if child_dirty:
+                    child_pim.save(update_fields=child_dirty)
+
+            # Attribute values (upsert per attribute id)
+            for av in request.data.get("attribute_values", []):
+                attribute_id = av.get("attribute")
+                if not attribute_id:
+                    continue
+
+                try:
+                    attr_obj = CategoryAttribute.objects.get(id=attribute_id)
+                except CategoryAttribute.DoesNotExist:
+                    continue
+
+                raw_text = av.get("value_text")
+                raw_num = av.get("value_number")
+                raw_bool = av.get("value_boolean")
+
+                val_text = str(raw_text).strip() if raw_text is not None else ""
+                val_num = None
+                val_bool = None
+
+                if attr_obj.data_type in (AttributeDataType.NUMBER, AttributeDataType.DECIMAL):
+                    if raw_num is not None:
+                        try:
+                            val_num = Decimal(str(raw_num))
+                        except (InvalidOperation, TypeError, ValueError):
+                            val_num = None
+                    elif val_text != "":
+                        try:
+                            val_num = Decimal(val_text)
+                        except (InvalidOperation, TypeError, ValueError):
+                            val_num = None
+                    if val_num is not None and val_text == "":
+                        val_text = str(val_num).rstrip('0').rstrip('.') if '.' in str(val_num) else str(val_num)
+                elif attr_obj.data_type == AttributeDataType.BOOLEAN:
+                    if raw_bool is not None:
+                        val_bool = bool(raw_bool)
+                    elif val_text != "":
+                        low = val_text.lower()
+                        if low in ("yes", "true", "1"):
+                            val_bool = True
+                        elif low in ("no", "false", "0"):
+                            val_bool = False
+                    if val_bool is not None:
+                        val_text = "Yes" if val_bool else "No"
+                else:
+                    if raw_num is not None and not val_text:
+                        val_text = str(raw_num)
+                    elif raw_bool is not None and not val_text:
+                        val_text = "Yes" if raw_bool else "No"
+
+                is_empty = (val_text == "" and val_num is None and val_bool is None)
+
+                if is_empty:
+                    VariantAttributeValue.objects.filter(variant=variant, attribute=attr_obj).delete()
+                    if child_pim:
+                        ProductAttribute.objects.filter(product=child_pim, attribute=attr_obj).delete()
+                else:
+                    VariantAttributeValue.objects.update_or_create(
+                        variant=variant,
+                        attribute=attr_obj,
+                        defaults={
+                            "value_text": val_text,
+                            "value_number": val_num,
+                            "value_boolean": val_bool,
+                        },
+                    )
+                    if child_pim:
+                        ProductAttribute.objects.update_or_create(
+                            product=child_pim,
+                            attribute=attr_obj,
+                            defaults={
+                                "value_text": val_text,
+                                "value_number": val_num,
+                                "value_boolean": val_bool,
+                            },
+                        )
+
+            PIMSyncService.sync_variant_to_operational_product(variant)
+
         variant.refresh_from_db()
         # Re-prefetch for correct serialisation
         variant = ProductVariant.objects.prefetch_related(

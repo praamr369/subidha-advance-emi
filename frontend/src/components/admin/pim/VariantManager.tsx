@@ -155,23 +155,32 @@ function VariantEditPanel({
   onSave: (data: VariantEditState) => Promise<void>;
   onCancel: () => void;
 }) {
-  const [state, setState] = useState<VariantEditState>(() => {
+  const parseVariantToState = useCallback((v: PimVariant): VariantEditState => {
     const attrValues: Record<number, string> = {};
-    for (const av of variant.attribute_values) {
-      attrValues[av.attribute] =
-        av.value_text ?? (av.value_number != null ? String(av.value_number) : av.value_boolean != null ? (av.value_boolean ? "Yes" : "No") : "");
+    for (const av of v.attribute_values) {
+      const displayVal = (av.value_text && av.value_text.trim() !== "")
+        ? av.value_text
+        : (av.value_number != null ? String(av.value_number) : av.value_boolean != null ? (av.value_boolean ? "Yes" : "No") : "");
+      attrValues[av.attribute] = displayVal;
     }
     return {
-      sku: variant.sku,
-      price: variant.price,
-      cost_price: variant.cost_price ?? "",
-      barcode: variant.barcode ?? "",
-      reorder_level: String(variant.reorder_level),
+      sku: v.sku,
+      price: v.price,
+      cost_price: v.cost_price ?? "",
+      barcode: v.barcode ?? "",
+      reorder_level: String(v.reorder_level),
       attrValues,
     };
-  });
+  }, []);
+
+  const [state, setState] = useState<VariantEditState>(() => parseVariantToState(variant));
   const [saving, setSaving] = useState(false);
   const [synced, setSynced] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setState(parseVariantToState(variant));
+  }, [variant, parseVariantToState]);
 
   const set = (key: keyof Omit<VariantEditState, "attrValues">, val: string) =>
     setState((s) => ({ ...s, [key]: val }));
@@ -212,10 +221,14 @@ function VariantEditPanel({
 
   const handleSave = async () => {
     setSaving(true);
+    setSaveError(null);
     try {
       await onSave(state);
       setSynced(true);
       setTimeout(() => setSynced(false), 2500);
+    } catch (err: unknown) {
+      const apiErr = err as { message?: string };
+      setSaveError(apiErr?.message ?? "Failed to save variant attributes");
     } finally {
       setSaving(false);
     }
@@ -236,7 +249,7 @@ function VariantEditPanel({
       return (
         <div className="flex gap-3 mt-1">
           {["Yes", "No"].map((l) => (
-            <label htmlFor="f-setattr-attr-id-l-classname-accent-prima" key={l} className="flex items-center gap-1.5 text-xs cursor-pointer">
+            <label key={l} className="flex items-center gap-1.5 text-xs cursor-pointer">
               <input type="radio" name={`bool-${variant.id}-${effectiveAttr.id}`}
                 checked={val === l} onChange={() => setAttr(effectiveAttr.id, l)} className="accent-primary" />
               {l}
@@ -350,8 +363,8 @@ function VariantEditPanel({
             </div>
           </div>
           <div>
-            <label className="text-xs font-medium">Barcode</label>
-            <input id="f-setattr-attr-id-l-classname-accent-prima" type="text" className="mt-1 w-full rounded-lg border bg-background px-3 py-1.5 text-sm font-mono"
+            <label htmlFor={`f-barcode-${variant.id}`} className="text-xs font-medium">Barcode</label>
+            <input id={`f-barcode-${variant.id}`} type="text" className="mt-1 w-full rounded-lg border bg-background px-3 py-1.5 text-sm font-mono"
               value={state.barcode} onChange={(e) => set("barcode", e.target.value)} placeholder="EAN/UPC" />
           </div>
           <div>
@@ -372,6 +385,12 @@ function VariantEditPanel({
             saving={saving}
             lockedParentVariantSku={variant.sku}
           />
+        </div>
+      )}
+
+      {saveError && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs font-medium text-destructive">
+          {saveError}
         </div>
       )}
 
@@ -598,7 +617,21 @@ export default function VariantManager({ productId, productCode, productName, ba
         quantity_on_hand: Number(form.quantity_on_hand), reorder_level: Number(form.reorder_level),
         attribute_values: Object.entries(form.attrValues)
           .filter(([, v]) => v)
-          .map(([attrId, v]) => ({ attribute: Number(attrId), value_text: v })),
+          .map(([attrIdStr, v]) => {
+            const attrId = Number(attrIdStr);
+            const attrMeta = allAttributes.find((a) => a.id === attrId) || templateAttributes?.find((a) => a.id === attrId);
+            const trimmed = (v ?? "").trim();
+            const item: { attribute: number; value_text: string; value_number?: number | null; value_boolean?: boolean | null } = {
+              attribute: attrId,
+              value_text: trimmed,
+            };
+            if (attrMeta?.data_type === "NUMBER" || attrMeta?.data_type === "DECIMAL") {
+              item.value_number = trimmed ? Number(trimmed) : null;
+            } else if (attrMeta?.data_type === "BOOLEAN") {
+              item.value_boolean = trimmed.toLowerCase() === "yes" ? true : trimmed.toLowerCase() === "no" ? false : null;
+            }
+            return item;
+          }),
       });
       setForm(emptyForm());
       setActivePanel(null);
@@ -646,17 +679,32 @@ export default function VariantManager({ productId, productCode, productName, ba
   };
 
   const handleSaveVariantEdit = useCallback(async (variantId: number, state: VariantEditState) => {
+    const attrPayload = Object.entries(state.attrValues).map(([attrIdStr, v]) => {
+      const attrId = Number(attrIdStr);
+      const attrMeta = allAttributes.find((a) => a.id === attrId) || templateAttributes?.find((a) => a.id === attrId);
+      const trimmed = (v ?? "").trim();
+      const item: { attribute: number; value_text: string; value_number?: number | null; value_boolean?: boolean | null } = {
+        attribute: attrId,
+        value_text: trimmed,
+      };
+      if (attrMeta?.data_type === "NUMBER" || attrMeta?.data_type === "DECIMAL") {
+        item.value_number = trimmed ? Number(trimmed) : null;
+      } else if (attrMeta?.data_type === "BOOLEAN") {
+        item.value_boolean = trimmed.toLowerCase() === "yes" ? true : trimmed.toLowerCase() === "no" ? false : null;
+      }
+      return item;
+    });
+
     await pimService.updateVariantAttributes(variantId, {
       sku: state.sku.trim(),
       price: state.price,
       cost_price: state.cost_price || undefined,
       barcode: state.barcode || undefined,
       reorder_level: state.reorder_level ? Number(state.reorder_level) : undefined,
-      attribute_values: Object.entries(state.attrValues)
-        .map(([attrId, v]) => ({ attribute: Number(attrId), value_text: v })),
+      attribute_values: attrPayload,
     });
     onRefresh();
-  }, [onRefresh]);
+  }, [allAttributes, templateAttributes, onRefresh]);
 
   const handlePreview = useCallback(async () => {
     if (!productCode) return;
@@ -1200,15 +1248,25 @@ export default function VariantManager({ productId, productCode, productName, ba
                         </td>
                         <td className="px-3 py-2 text-xs text-muted-foreground max-w-xs">
                           <div className="flex flex-wrap gap-1">
-                            {v.attribute_values.length > 0
-                              ? v.attribute_values.map((a) => {
-                                  const display = a.value_text || (a.value_number != null ? String(a.value_number) : a.value_boolean != null ? (a.value_boolean ? "Yes" : "No") : "");
-                                  return (
-                                    <span key={a.attribute} className="inline-flex rounded-md bg-muted px-1.5 py-0.5 text-[11px]">{display}</span>
-                                  );
+                            {(() => {
+                              const chips = v.attribute_values
+                                .map((a) => {
+                                  const display = (a.value_text && a.value_text.trim() !== "")
+                                    ? a.value_text
+                                    : (a.value_number != null ? String(a.value_number) : a.value_boolean != null ? (a.value_boolean ? "Yes" : "No") : "");
+                                  return { id: a.attribute, display, name: a.attribute_name };
                                 })
-                              : <span className="text-muted-foreground/40 italic text-[11px]">No attributes mapped</span>
-                            }
+                                .filter((c) => c.display);
+                              return chips.length > 0 ? (
+                                chips.map((c) => (
+                                  <span key={c.id} title={c.name ? `${c.name}: ${c.display}` : c.display} className="inline-flex rounded-md bg-muted px-1.5 py-0.5 text-[11px]">
+                                    {c.display}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-muted-foreground/40 italic text-[11px]">No attributes mapped</span>
+                              );
+                            })()}
                           </div>
                         </td>
                         {/* Price inline edit */}

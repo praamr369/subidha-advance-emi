@@ -168,7 +168,14 @@ class ProductVariantSerializer(serializers.ModelSerializer):
 
     def get_variant_label(self, obj):
         vals = obj.attribute_values.all()
-        parts = [v.value_text or str(v.value_number) for v in vals if (v.value_text or v.value_number)]
+        parts = []
+        for v in vals:
+            if v.value_text:
+                parts.append(v.value_text)
+            elif v.value_number is not None:
+                parts.append(str(v.value_number).rstrip('0').rstrip('.') if '.' in str(v.value_number) else str(v.value_number))
+            elif v.value_boolean is not None:
+                parts.append("Yes" if v.value_boolean else "No")
         return " / ".join(parts) if parts else obj.sku
 
     def get_is_published(self, obj):
@@ -469,21 +476,71 @@ class ProductVariantCreateSerializer(serializers.ModelSerializer):
         model = ProductVariant
         fields = ["id", "sku", "barcode", "price", "cost_price", "image", "video", "quantity_on_hand", "reorder_level", "attribute_values"]
 
+    def _save_attribute_value(self, variant, av):
+        attribute_id = av.get("attribute")
+        if not attribute_id:
+            return
+        try:
+            from .models import CategoryAttribute, AttributeDataType
+            from decimal import Decimal, InvalidOperation
+            attr_obj = CategoryAttribute.objects.get(id=attribute_id)
+        except Exception:
+            return
+
+        raw_text = av.get("value_text")
+        raw_num = av.get("value_number")
+        raw_bool = av.get("value_boolean")
+
+        val_text = str(raw_text).strip() if raw_text is not None else ""
+        val_num = None
+        val_bool = None
+
+        if attr_obj.data_type in (AttributeDataType.NUMBER, AttributeDataType.DECIMAL):
+            if raw_num is not None:
+                try:
+                    val_num = Decimal(str(raw_num))
+                except (InvalidOperation, TypeError, ValueError):
+                    val_num = None
+            elif val_text != "":
+                try:
+                    val_num = Decimal(val_text)
+                except (InvalidOperation, TypeError, ValueError):
+                    val_num = None
+            if val_num is not None and val_text == "":
+                val_text = str(val_num).rstrip('0').rstrip('.') if '.' in str(val_num) else str(val_num)
+        elif attr_obj.data_type == AttributeDataType.BOOLEAN:
+            if raw_bool is not None:
+                val_bool = bool(raw_bool)
+            elif val_text != "":
+                low = val_text.lower()
+                if low in ("yes", "true", "1"):
+                    val_bool = True
+                elif low in ("no", "false", "0"):
+                    val_bool = False
+            if val_bool is not None:
+                val_text = "Yes" if val_bool else "No"
+        else:
+            if raw_num is not None and not val_text:
+                val_text = str(raw_num)
+            elif raw_bool is not None and not val_text:
+                val_text = "Yes" if raw_bool else "No"
+
+        if val_text != "" or val_num is not None or val_bool is not None:
+            VariantAttributeValue.objects.create(
+                variant=variant,
+                attribute=attr_obj,
+                value_text=val_text,
+                value_number=val_num,
+                value_boolean=val_bool,
+            )
+
     def create(self, validated_data):
         av_data = validated_data.pop("attribute_values", [])
         if "barcode" not in validated_data or not validated_data["barcode"]:
             validated_data["barcode"] = validated_data.get("sku")
         variant = super().create(validated_data)
         for av in av_data:
-            attribute_id = av.get("attribute")
-            if attribute_id:
-                VariantAttributeValue.objects.create(
-                    variant=variant,
-                    attribute_id=attribute_id,
-                    value_text=av.get("value_text", ""),
-                    value_number=av.get("value_number"),
-                    value_boolean=av.get("value_boolean"),
-                )
+            self._save_attribute_value(variant, av)
         return variant
 
     def update(self, instance, validated_data):
@@ -495,15 +552,7 @@ class ProductVariantCreateSerializer(serializers.ModelSerializer):
         if av_data is not None:
             VariantAttributeValue.objects.filter(variant=variant).delete()
             for av in av_data:
-                attribute_id = av.get("attribute")
-                if attribute_id:
-                    VariantAttributeValue.objects.create(
-                        variant=variant,
-                        attribute_id=attribute_id,
-                        value_text=av.get("value_text", ""),
-                        value_number=av.get("value_number"),
-                        value_boolean=av.get("value_boolean"),
-                    )
+                self._save_attribute_value(variant, av)
 
         try:
             from products_pim.services.sync_service import PIMSyncService
