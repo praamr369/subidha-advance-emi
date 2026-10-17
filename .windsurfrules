@@ -1,0 +1,20 @@
+# .windsurfrules — Instructions for Windsurf Cascade
+
+You are working on **SUBIDHA CORE – Lucky Plan EMI System**.
+
+## Canonical Rulebooks
+Before writing or modifying any code, consult:
+1. `AGENTS.md` (root directory)
+2. `docs/SUBIDHA_CORE_PROJECT_RULEBOOK.md`
+3. `docs/AGENT_SYNC_LOG.md`
+
+## Invariants
+- Append-only financial ledger (never edit settled payments or EMIs destructively).
+- Solopreneur desktop admin webapp control.
+- Desktop-first for `/admin/*`; mobile-first for `/customer/*`, `/partner/*`, and public routes.
+- Additive merge only for admin page consolidations (never delete existing workflows).
+- Real dev database safety (never wipe `subidha_core`).
+
+## Verification
+- Frontend: `npm --prefix frontend run typecheck`
+- Backend: `backend/venv/bin/python backend/manage.py check`

@@ -1,0 +1,36 @@
+---
+description: SUBIDHA CORE Project Rules, Business Invariants & Architecture
+globs: **/*
+alwaysApply: true
+---
+
+# SUBIDHA CORE — Cursor Agent Rules
+
+## Primary Identity & Canonical Reference
+You are an AI engineer working on **SUBIDHA CORE – Lucky Plan EMI System**.
+
+Before making changes, consult:
+- `AGENTS.md` (root directory)
+- `docs/SUBIDHA_CORE_PROJECT_RULEBOOK.md` (canonical business + technical reference)
+- `docs/AGENT_SYNC_LOG.md` (recent updates by other AI agents)
+
+## Core Architectural Invariants
+1. **Financial Append-Only Ledger**:
+   - Every EMI and payment record is immutable in spirit.
+   - Use reversal/adjustment entries instead of destructive mutation.
+   - Winning a draw waives future unpaid EMIs only; never edit settled payments.
+2. **Solopreneur / Single Admin Rule**:
+   - The business owner operates all modules (finance, inventory, PIM, CRM) from the desktop Admin Webapp.
+3. **UI Principles**:
+   - Admin UI (`/admin/*`) is desktop-first ERP workbench style (dense tables, command bar, right inspector).
+   - Customer & Public UI is mobile-first (touch-friendly cards, bottom nav).
+4. **Duplicate Route Prevention**:
+   - Never create duplicate admin pages. Consolidate additively using tabs; never delete workflows.
+5. **Real Dev Database**:
+   - Read freely from `subidha_core` PostgreSQL, but never run destructive wipe scripts.
+   - Zero cosmetic test data.
+
+## Verification Workflow
+- Frontend changes: `npm --prefix frontend run typecheck`
+- Backend changes: `backend/venv/bin/python backend/manage.py check`
+- Inter-agent sync: `python scripts/agent_sync.py broadcast --agent "Cursor" --type "..." --summary "..."`

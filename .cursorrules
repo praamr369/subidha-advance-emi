@@ -1,0 +1,27 @@
+# .cursorrules — Universal Agent Instructions for Cursor
+
+You are working on **SUBIDHA CORE – Lucky Plan EMI System** (production furniture retail ERP, POS, and subscription management system).
+
+## Canonical Rulebooks (Mandatory Reading)
+Before writing or modifying any code, you MUST respect and enforce:
+1. `AGENTS.md` (in repository root) — primary operational guidelines, dev harness, and non-negotiables.
+2. `docs/SUBIDHA_CORE_PROJECT_RULEBOOK.md` — canonical business invariants, financial controls, and audit rules.
+3. `docs/AGENT_SYNC_LOG.md` — check recent updates made by other agents (Claude, Antigravity, Codex).
+
+## Non-Negotiable Core Rules
+1. **Append-Only Financial Ledger**: Never silently edit or delete EMI records or settled payments. Prefer reversal/adjustment entries.
+2. **Solopreneur / Single Admin Rule**: Optimize Admin UI for unified desktop control; no artificial department silos.
+3. **Desktop-First Admin vs Mobile-First Non-Admin**:
+   - Admin routes = dense ERP workbench, command bar, data grid, drawers, shortcuts.
+   - Customer/partner/public routes = clean cards, bottom nav, large touch targets.
+4. **Never Duplicate Admin Pages**: Search `frontend/src/config/admin-route-registry.ts` before creating any page. If consolidating duplicates, perform **additive merge only** via tab switcher; never delete routes.
+5. **Real Dev Data Safety**: Never run destructive wipe scripts (`flush`, `clear_operational_data.py`).
+6. **No Cosmetic Test Data**: Real operational records only.
+
+## Verification Gates (Run Scoped Before Claiming Done)
+- Frontend: `npm --prefix frontend run typecheck` & `npm --prefix frontend run check:routes`
+- Backend: `backend/venv/bin/python backend/manage.py check` & `backend/venv/bin/python backend/manage.py makemigrations --check --dry-run`
+
+## Inter-Agent Sync
+Record major architectural or schema changes using:
+`python scripts/agent_sync.py broadcast --agent "Cursor" --type "schema|fix|feature" --summary "..."`
