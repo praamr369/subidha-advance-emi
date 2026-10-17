@@ -42,6 +42,7 @@ build/
 .eggs/
 .env
 .env.*
+.venv
 .venv/
 venv/
 media/
