@@ -4,7 +4,7 @@ import {
   Plus, Trash2, Check, X, Search, ChevronLeft, ChevronRight,
   Zap, TrendingUp, Package, AlertTriangle, BarChart3, Settings2,
   RefreshCw, Download, Database, Image as ImageIcon, Upload,
-  ChevronDown, ChevronUp, Pencil, RefreshCcw, CheckCircle2, Layers, Lock, QrCode
+  ChevronDown, ChevronUp, Pencil, RefreshCcw, CheckCircle2, Layers, Lock, QrCode, Sparkles
 } from "lucide-react";
 import { pimService, type PimVariant, type PimCategoryAttribute, type PimAttributeOption } from "@/services/pim";
 import { patchVariantPublishControl } from "@/services/product-pim";
@@ -44,8 +44,14 @@ interface NewVariantForm {
 }
 interface VariantEditState {
   sku: string;
-  price: string; cost_price: string; barcode: string; reorder_level: string;
+  variant_name: string;
+  price: string;
+  cost_price: string;
+  barcode: string;
+  reorder_level: string;
   attrValues: Record<number, string>;
+  activeAttrIds: number[];
+  removedAttrIds: number[];
 }
 
 type SortField = "sku" | "price" | "quantity_on_hand";
@@ -140,6 +146,7 @@ function VariantEditPanel({
   lockedAttributes,
   parentAttrValues,
   productId,
+  productName,
   onSave,
   onCancel,
   onAddOption,
@@ -150,6 +157,7 @@ function VariantEditPanel({
   lockedAttributes?: Set<number>;
   parentAttrValues?: AttributeValues;
   productId?: number;
+  productName?: string;
   onAddOption?: Props["onAddOption"];
   templateAttributes?: PimCategoryAttribute[];
   onSave: (data: VariantEditState) => Promise<void>;
@@ -157,38 +165,49 @@ function VariantEditPanel({
 }) {
   const parseVariantToState = useCallback((v: PimVariant): VariantEditState => {
     const attrValues: Record<number, string> = {};
+    const activeIds: number[] = [];
     for (const av of v.attribute_values) {
       const displayVal = (av.value_text && av.value_text.trim() !== "")
         ? av.value_text
         : (av.value_number != null ? String(av.value_number) : av.value_boolean != null ? (av.value_boolean ? "Yes" : "No") : "");
       attrValues[av.attribute] = displayVal;
+      activeIds.push(av.attribute);
+    }
+    // If no attributes exist on this variant yet, start with variant-defining attributes
+    if (activeIds.length === 0) {
+      for (const a of allAttributes) {
+        if (a.is_variant_defining) activeIds.push(a.id);
+      }
     }
     return {
       sku: v.sku,
+      variant_name: v.variant_name || v.product_name || "",
       price: v.price,
       cost_price: v.cost_price ?? "",
       barcode: v.barcode ?? "",
       reorder_level: String(v.reorder_level),
       attrValues,
+      activeAttrIds: Array.from(new Set(activeIds)),
+      removedAttrIds: [],
     };
-  }, []);
+  }, [allAttributes]);
 
   const [state, setState] = useState<VariantEditState>(() => parseVariantToState(variant));
   const [saving, setSaving] = useState(false);
   const [synced, setSynced] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [addAttrOpen, setAddAttrOpen] = useState(false);
 
   useEffect(() => {
     setState(parseVariantToState(variant));
   }, [variant, parseVariantToState]);
 
-  const set = (key: keyof Omit<VariantEditState, "attrValues">, val: string) =>
+  const set = (key: keyof Omit<VariantEditState, "attrValues" | "activeAttrIds" | "removedAttrIds">, val: string) =>
     setState((s) => ({ ...s, [key]: val }));
   const setAttr = (id: number, val: string) =>
     setState((s) => ({ ...s, attrValues: { ...s.attrValues, [id]: val } }));
 
-  // Split attributes into locked (parent-controlled) and editable.
-  // Also include any attribute present in variant.attribute_values that may not be in allAttributes.
+  // Pool of attributes: category attributes + variant attributes + templates
   const attrMap = new Map<number, PimCategoryAttribute>();
   for (const a of allAttributes) attrMap.set(a.id, a);
   if (templateAttributes) {
@@ -215,9 +234,58 @@ function VariantEditPanel({
     }
   }
   const mergedAttrs = Array.from(attrMap.values());
-  const locked = mergedAttrs.filter((a) => lockedAttributes?.has(a.id));
-  const variantDefining = mergedAttrs.filter((a) => a.is_variant_defining && !lockedAttributes?.has(a.id));
-  const nonDefining = mergedAttrs.filter((a) => !a.is_variant_defining && !lockedAttributes?.has(a.id));
+
+  const activeAttrs = mergedAttrs.filter((a) => state.activeAttrIds.includes(a.id));
+  const locked = activeAttrs.filter((a) => lockedAttributes?.has(a.id));
+  const variantDefining = activeAttrs.filter((a) => a.is_variant_defining && !lockedAttributes?.has(a.id));
+  const nonDefining = activeAttrs.filter((a) => !a.is_variant_defining && !lockedAttributes?.has(a.id));
+  const unassignedAttrs = mergedAttrs.filter(
+    (a) => !state.activeAttrIds.includes(a.id) && !lockedAttributes?.has(a.id)
+  );
+
+  const handleRemoveAttribute = (attrId: number) => {
+    setState((prev) => ({
+      ...prev,
+      activeAttrIds: prev.activeAttrIds.filter((id) => id !== attrId),
+      removedAttrIds: Array.from(new Set([...prev.removedAttrIds, attrId])),
+      attrValues: {
+        ...prev.attrValues,
+        [attrId]: "",
+      },
+    }));
+  };
+
+  const handleAddAttribute = (attrId: number) => {
+    setState((prev) => ({
+      ...prev,
+      activeAttrIds: Array.from(new Set([...prev.activeAttrIds, attrId])),
+      removedAttrIds: prev.removedAttrIds.filter((id) => id !== attrId),
+      attrValues: {
+        ...prev.attrValues,
+        [attrId]: prev.attrValues[attrId] ?? "",
+      },
+    }));
+    setAddAttrOpen(false);
+  };
+
+  const computeStructuredName = useCallback(() => {
+    const base = productName || "Product";
+    const parts: string[] = [];
+    for (const id of state.activeAttrIds) {
+      const val = state.attrValues[id];
+      if (!val || val.trim() === "") continue;
+      const attr = mergedAttrs.find((a) => a.id === id);
+      if (attr) {
+        parts.push(`${attr.name}: ${val.trim()}`);
+      }
+    }
+    return parts.length > 0 ? `${base} (${parts.join(", ")})` : base;
+  }, [productName, state.activeAttrIds, state.attrValues, mergedAttrs]);
+
+  const handleAutoStructureName = () => {
+    const structured = computeStructuredName();
+    set("variant_name", structured);
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -275,11 +343,66 @@ function VariantEditPanel({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Pencil className="h-4 w-4 text-primary" />
-          <span className="font-semibold text-sm">Edit Variant — <span className="font-mono">{variant.sku}</span></span>
+          <div>
+            <span className="font-semibold text-sm">Edit Variant — <span className="font-mono">{variant.sku}</span></span>
+            {state.variant_name && (
+              <div className="text-xs text-muted-foreground font-normal">{state.variant_name}</div>
+            )}
+          </div>
         </div>
         <button aria-label="Close" type="button" onClick={onCancel} className="text-muted-foreground hover:text-foreground">
           <X className="h-4 w-4" />
         </button>
+      </div>
+
+      {/* Product Name Variation Control */}
+      <div className="rounded-lg border border-border/70 bg-background/80 p-3.5 space-y-2">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+            <Pencil className="h-3.5 w-3.5 text-primary" />
+            Variant Product Name / Title
+          </label>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handleAutoStructureName}
+              title="Auto-build structured title from base product name and variant attributes"
+              className="inline-flex items-center gap-1 rounded bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary hover:bg-primary/20 transition-colors"
+            >
+              <Sparkles className="h-3 w-3" /> Auto-structure Name
+            </button>
+            {productName && (
+              <button
+                type="button"
+                onClick={() => set("variant_name", productName)}
+                title="Reset name to match the base product name"
+                className="rounded bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Reset to Base
+              </button>
+            )}
+            {state.variant_name && (
+              <button
+                type="button"
+                onClick={() => set("variant_name", "")}
+                title="Clear custom override (system will auto-generate structured name)"
+                className="rounded px-1.5 py-0.5 text-[11px] text-muted-foreground hover:text-destructive transition-colors"
+              >
+                Clear Override
+              </button>
+            )}
+          </div>
+        </div>
+        <input
+          type="text"
+          className="w-full rounded-lg border bg-background px-3 py-1.5 text-sm font-medium focus:ring-1 focus:ring-primary"
+          value={state.variant_name}
+          onChange={(e) => set("variant_name", e.target.value)}
+          placeholder={computeStructuredName() || "System auto-generates title from attributes..."}
+        />
+        <p className="text-[11px] text-muted-foreground">
+          Custom identity title for this SKU. If blank, system automatically displays: <span className="font-medium text-foreground">{computeStructuredName()}</span>
+        </p>
       </div>
 
       {/* Locked parent attributes — read-only */}
@@ -303,17 +426,30 @@ function VariantEditPanel({
         </div>
       )}
 
-      {/* Variant-defining attributes (identity) — editable */}
+      {/* Variant-defining attributes (identity) — editable with delete control */}
       {variantDefining.length > 0 && (
         <div>
-          <div className="flex items-center gap-1.5 mb-3">
-            <Layers className="h-3.5 w-3.5 text-primary" />
-            <span className="text-xs font-semibold uppercase tracking-wide text-primary">Variant Identity Attributes</span>
+          <div className="flex items-center justify-between gap-1.5 mb-3">
+            <div className="flex items-center gap-1.5">
+              <Layers className="h-3.5 w-3.5 text-primary" />
+              <span className="text-xs font-semibold uppercase tracking-wide text-primary">Variant Identity Attributes</span>
+            </div>
+            <span className="text-[11px] text-muted-foreground">Attributes defining this SKU variant</span>
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {variantDefining.map((attr) => (
-              <div key={attr.id}>
-                <label className="text-xs font-medium text-foreground">{attr.name}</label>
+              <div key={attr.id} className="rounded-lg border border-border/60 bg-background/60 p-2.5 shadow-2xs space-y-1">
+                <div className="flex items-center justify-between gap-1">
+                  <label className="text-xs font-semibold text-foreground truncate" title={attr.name}>{attr.name}</label>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveAttribute(attr.id)}
+                    title={`Remove ${attr.name} from this variant`}
+                    className="text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 p-1 rounded transition-colors"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
                 {renderAttrInput(attr)}
               </div>
             ))}
@@ -321,18 +457,71 @@ function VariantEditPanel({
         </div>
       )}
 
-      {/* Non-defining attributes — editable */}
+      {/* Non-defining attributes — editable with delete control */}
       {nonDefining.length > 0 && (
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Specification Attributes</p>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          <div className="flex items-center justify-between gap-1.5 mb-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Specification Attributes</p>
+            <span className="text-[11px] text-muted-foreground">Additional SKU specifications</span>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {nonDefining.map((attr) => (
-              <div key={attr.id}>
-                <label className="text-xs font-medium text-foreground">{attr.name}</label>
+              <div key={attr.id} className="rounded-lg border border-border/60 bg-background/60 p-2.5 shadow-2xs space-y-1">
+                <div className="flex items-center justify-between gap-1">
+                  <label className="text-xs font-medium text-foreground truncate" title={attr.name}>{attr.name}</label>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveAttribute(attr.id)}
+                    title={`Remove ${attr.name} from this variant`}
+                    className="text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 p-1 rounded transition-colors"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
                 {renderAttrInput(attr)}
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Add Attribute to this Variant control */}
+      {unassignedAttrs.length > 0 && (
+        <div className="pt-1">
+          {addAttrOpen ? (
+            <div className="flex items-center gap-2 max-w-md bg-background border rounded-lg p-2 shadow-xs">
+              <select
+                autoFocus
+                className="flex-1 rounded border bg-background px-2.5 py-1.5 text-xs outline-none"
+                defaultValue=""
+                onChange={(e) => {
+                  if (e.target.value) handleAddAttribute(Number(e.target.value));
+                }}
+              >
+                <option value="" disabled>Choose an attribute to add to this variant...</option>
+                {unassignedAttrs.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name} ({a.is_variant_defining ? "Variant Key" : a.data_type})
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setAddAttrOpen(false)}
+                className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setAddAttrOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-primary/40 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" /> Add Attribute to this Variant
+            </button>
+          )}
         </div>
       )}
 
@@ -679,29 +868,33 @@ export default function VariantManager({ productId, productCode, productName, ba
   };
 
   const handleSaveVariantEdit = useCallback(async (variantId: number, state: VariantEditState) => {
-    const attrPayload = Object.entries(state.attrValues).map(([attrIdStr, v]) => {
-      const attrId = Number(attrIdStr);
-      const attrMeta = allAttributes.find((a) => a.id === attrId) || templateAttributes?.find((a) => a.id === attrId);
-      const trimmed = (v ?? "").trim();
-      const item: { attribute: number; value_text: string; value_number?: number | null; value_boolean?: boolean | null } = {
-        attribute: attrId,
-        value_text: trimmed,
-      };
-      if (attrMeta?.data_type === "NUMBER" || attrMeta?.data_type === "DECIMAL") {
-        item.value_number = trimmed ? Number(trimmed) : null;
-      } else if (attrMeta?.data_type === "BOOLEAN") {
-        item.value_boolean = trimmed.toLowerCase() === "yes" ? true : trimmed.toLowerCase() === "no" ? false : null;
-      }
-      return item;
-    });
+    const attrPayload = Object.entries(state.attrValues)
+      .filter(([attrIdStr]) => state.activeAttrIds.includes(Number(attrIdStr)))
+      .map(([attrIdStr, v]) => {
+        const attrId = Number(attrIdStr);
+        const attrMeta = allAttributes.find((a) => a.id === attrId) || templateAttributes?.find((a) => a.id === attrId);
+        const trimmed = (v ?? "").trim();
+        const item: { attribute: number; value_text: string; value_number?: number | null; value_boolean?: boolean | null } = {
+          attribute: attrId,
+          value_text: trimmed,
+        };
+        if (attrMeta?.data_type === "NUMBER" || attrMeta?.data_type === "DECIMAL") {
+          item.value_number = trimmed ? Number(trimmed) : null;
+        } else if (attrMeta?.data_type === "BOOLEAN") {
+          item.value_boolean = trimmed.toLowerCase() === "yes" ? true : trimmed.toLowerCase() === "no" ? false : null;
+        }
+        return item;
+      });
 
     await pimService.updateVariantAttributes(variantId, {
       sku: state.sku.trim(),
+      variant_name: state.variant_name.trim(),
       price: state.price,
       cost_price: state.cost_price || undefined,
       barcode: state.barcode || undefined,
       reorder_level: state.reorder_level ? Number(state.reorder_level) : undefined,
       attribute_values: attrPayload,
+      remove_attributes: state.removedAttrIds,
     });
     onRefresh();
   }, [allAttributes, templateAttributes, onRefresh]);
@@ -1243,7 +1436,12 @@ export default function VariantManager({ productId, productCode, productName, ba
                           </div>
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap">
-                          <div className="font-mono text-xs">{v.sku}</div>
+                          <div className="font-mono text-xs font-semibold">{v.sku}</div>
+                          {(v.variant_name || v.product_name) && (
+                            <div className="text-[11px] text-foreground font-medium truncate max-w-[220px]" title={v.variant_name || v.product_name}>
+                              {v.variant_name || v.product_name}
+                            </div>
+                          )}
                           {v.barcode && <div className="font-mono text-[10px] text-muted-foreground mt-0.5">{v.barcode}</div>}
                         </td>
                         <td className="px-3 py-2 text-xs text-muted-foreground max-w-xs">
@@ -1342,6 +1540,7 @@ export default function VariantManager({ productId, productCode, productName, ba
                               lockedAttributes={lockedAttributes}
                               parentAttrValues={parentAttrValues}
                               productId={productId}
+                              productName={productName}
                               onSave={(state) => handleSaveVariantEdit(v.id, state)}
                               onCancel={() => setExpandedId(null)}
                               onAddOption={onAddOption}

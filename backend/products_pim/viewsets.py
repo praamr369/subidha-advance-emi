@@ -1174,6 +1174,12 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
                     variant.sku = new_sku
                     dirty_fields.append("sku")
 
+            if "variant_name" in request.data or "name" in request.data or "product_name" in request.data:
+                raw_name = request.data.get("variant_name") if "variant_name" in request.data else (request.data.get("name") if "name" in request.data else request.data.get("product_name"))
+                v_name = str(raw_name).strip() if raw_name is not None and str(raw_name).strip() != "" else None
+                variant.variant_name = v_name
+                dirty_fields.append("variant_name")
+
             if dirty_fields:
                 variant.save(update_fields=dirty_fields)
 
@@ -1193,8 +1199,22 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
                 if "cost_price" in dirty_fields:
                     child_pim.cost_price = variant.cost_price
                     child_dirty.append("cost_price")
+                if "variant_name" in dirty_fields and variant.variant_name:
+                    child_pim.name = variant.variant_name[:255]
+                    child_dirty.append("name")
                 if child_dirty:
                     child_pim.save(update_fields=child_dirty)
+
+            # Explicit removal of attributes for this variant
+            remove_attr_ids = request.data.get("remove_attributes", [])
+            if remove_attr_ids:
+                from .models import VariantAttributeValue
+                VariantAttributeValue.objects.filter(variant=variant, attribute_id__in=remove_attr_ids).delete()
+                if child_pim:
+                    try:
+                        ProductAttribute.objects.filter(product=child_pim, attribute_id__in=remove_attr_ids).delete()
+                    except Exception:
+                        pass
 
             # Attribute values (upsert per attribute id)
             for av in request.data.get("attribute_values", []):

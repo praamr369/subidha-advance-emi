@@ -251,6 +251,12 @@ class ProductVariant(models.Model):
         related_name="pim_variant"
     )
     sku = models.CharField(max_length=150, unique=True)
+    variant_name = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Custom name override for this variant SKU; if blank, auto-derived from product name and attributes",
+    )
     barcode = models.CharField(max_length=100, unique=True, null=True, blank=True)
     price = models.DecimalField(max_digits=14, decimal_places=2, validators=[MinValueValidator(0)])
     cost_price = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)

@@ -163,6 +163,8 @@ class ProductVariantSerializer(serializers.ModelSerializer):
     quantity_on_hand = serializers.SerializerMethodField()
     is_low_stock = serializers.SerializerMethodField()
     variant_label = serializers.SerializerMethodField()
+    variant_name = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    product_name = serializers.SerializerMethodField()
     # Publish status comes from the linked child PimProduct, not the variant itself
     is_published = serializers.SerializerMethodField()
     child_pim_id = serializers.SerializerMethodField()
@@ -171,7 +173,7 @@ class ProductVariantSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductVariant
         fields = [
-            "id", "sku", "barcode", "price", "cost_price", "image", "video",
+            "id", "sku", "variant_name", "product_name", "barcode", "price", "cost_price", "image", "video",
             "quantity_on_hand", "reorder_level", "is_active",
             "attribute_values", "is_low_stock", "variant_label",
             "is_published", "child_pim_id", "operational_product_id",
@@ -213,6 +215,17 @@ class ProductVariantSerializer(serializers.ModelSerializer):
 
     def get_child_pim_id(self, obj):
         return obj.product_id
+
+    def get_product_name(self, obj):
+        if getattr(obj, "variant_name", None) and str(obj.variant_name).strip():
+            return str(obj.variant_name).strip()
+        if obj.operational_product and obj.operational_product.name:
+            return obj.operational_product.name
+        child = PimProduct.objects.filter(code=obj.sku, parent_id=obj.product_id).first()
+        if child and child.name:
+            return child.name
+        from products_pim.services.sync_service import PIMSyncService
+        return PIMSyncService.get_variant_display_name(obj)
 
 
 class PimProductListSerializer(serializers.ModelSerializer):

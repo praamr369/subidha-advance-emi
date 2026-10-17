@@ -5,6 +5,8 @@ from products_core.models import Product, ProductCategoryMaster, ProductSubcateg
 class PIMSyncService:
     @staticmethod
     def get_variant_display_name(variant: ProductVariant) -> str:
+        if getattr(variant, "variant_name", None) and str(variant.variant_name).strip():
+            return str(variant.variant_name).strip()[:255]
         pim_product = variant.product
         attributes = []
         # Prefer variant-defining attributes first so operational titles stay concise (e.g. Size, Color)
@@ -109,6 +111,11 @@ class PIMSyncService:
         core_product.is_active = variant.is_active
         if variant.image:
             core_product.image = variant.image
+            
+        child_pim = PimProduct.objects.filter(code=variant.sku, parent_id=pim_product.id).first()
+        if child_pim:
+            child_pim.name = core_product.name
+            child_pim.save(update_fields=['name', 'updated_at'])
             
         # Sync brand and warranty from PIM Base Product
         core_product.brand = pim_product.brand

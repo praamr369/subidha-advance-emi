@@ -89,6 +89,8 @@ export interface PimVariant {
   attribute_values: PimVariantAttributeValue[];
   is_low_stock: boolean;
   variant_label: string;
+  variant_name?: string | null;
+  product_name?: string;
   image?: string | null;
 }
 
@@ -435,6 +437,8 @@ export const pimService = {
     variantId: number,
     data: {
       attribute_values?: { attribute: number; value_text?: string; value_number?: number | null; value_boolean?: boolean | null }[];
+      remove_attributes?: number[];
+      variant_name?: string;
       sku?: string;
       price?: string;
       cost_price?: string;
