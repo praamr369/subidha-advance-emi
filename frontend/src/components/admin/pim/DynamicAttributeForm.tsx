@@ -185,11 +185,34 @@ export default function DynamicAttributeForm({
           const displayVal = getDisplayValue(attr, val);
           return (
             <div key={attr.id} className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium flex items-center gap-1 flex-wrap">
-                <span>{attr.name}</span>
-                {attr.is_variant_defining && (
-                  <Layers className="h-3 w-3 text-primary shrink-0" />
+              <label className="text-sm font-medium flex items-center gap-1.5 flex-wrap">
+                <span className="font-semibold">{attr.name}</span>
+                {attr.is_required && <span className="text-destructive font-bold">*</span>}
+                {attr.is_active !== false ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 px-2 py-0.5 text-[10px] font-semibold border border-emerald-300 dark:border-emerald-700">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    Active
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-muted text-muted-foreground px-2 py-0.5 text-[10px] font-medium border border-border">
+                    <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground" />
+                    Inactive
+                  </span>
                 )}
+                {attr.is_variant_defining && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-950/50 dark:text-purple-300 px-2 py-0.5 text-[10px] font-semibold border border-purple-300 dark:border-purple-700" title="Variant-defining attribute">
+                    <Layers className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+                    Variant Defining
+                  </span>
+                )}
+                {attr.is_required && (
+                  <span className="inline-flex items-center rounded-full bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-300 px-1.5 py-0.5 text-[10px] font-semibold border border-rose-300 dark:border-rose-700">
+                    Required
+                  </span>
+                )}
+                <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase font-mono text-muted-foreground">
+                  {attr.data_type}
+                </span>
                 {canToggle && (
                   <AttributeLockButton
                     isLocked
@@ -326,12 +349,34 @@ export default function DynamicAttributeForm({
 
         return (
           <div key={attr.id} className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium flex items-center gap-1 flex-wrap">
-              <span>{attr.name}</span>
-              {attr.is_required && <span className="text-destructive">*</span>}
-              {attr.is_variant_defining && (
-                <Layers className="h-3 w-3 text-primary shrink-0" />
+            <label className="text-sm font-medium flex items-center gap-1.5 flex-wrap">
+              <span className="font-semibold">{attr.name}</span>
+              {attr.is_required && <span className="text-destructive font-bold">*</span>}
+              {attr.is_active !== false ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 px-2 py-0.5 text-[10px] font-semibold border border-emerald-300 dark:border-emerald-700">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  Active
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full bg-muted text-muted-foreground px-2 py-0.5 text-[10px] font-medium border border-border">
+                  <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground" />
+                  Inactive
+                </span>
               )}
+              {attr.is_variant_defining && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-950/50 dark:text-purple-300 px-2 py-0.5 text-[10px] font-semibold border border-purple-300 dark:border-purple-700" title="Variant-defining attribute">
+                  <Layers className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+                  Variant Defining
+                </span>
+              )}
+              {attr.is_required && (
+                <span className="inline-flex items-center rounded-full bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-300 px-1.5 py-0.5 text-[10px] font-semibold border border-rose-300 dark:border-rose-700">
+                  Required
+                </span>
+              )}
+              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase font-mono text-muted-foreground">
+                {attr.data_type}
+              </span>
               {canToggle && (
                 <AttributeLockButton
                   isLocked={false}

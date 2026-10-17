@@ -49,7 +49,7 @@ class CategoryAttributeSerializer(serializers.ModelSerializer):
         fields = [
             "id", "category", "subcategory", "name", "slug", "data_type", "is_required",
             "is_variant_defining", "min_value", "max_value",
-            "display_order", "options",
+            "display_order", "is_active", "options",
         ]
         extra_kwargs = {
             "slug": {"read_only": True},
@@ -129,6 +129,7 @@ class ProductAttributeSerializer(serializers.ModelSerializer):
     data_type = serializers.CharField(source="attribute.data_type", read_only=True)
     is_required = serializers.BooleanField(source="attribute.is_required", read_only=True)
     is_variant_defining = serializers.BooleanField(source="attribute.is_variant_defining", read_only=True)
+    is_active = serializers.BooleanField(source="attribute.is_active", read_only=True)
     options = AttributeOptionSerializer(source="attribute.options", many=True, read_only=True)
     display_value = serializers.CharField(read_only=True)
 
@@ -136,7 +137,7 @@ class ProductAttributeSerializer(serializers.ModelSerializer):
         model = ProductAttribute
         fields = [
             "id", "attribute", "attribute_name", "attribute_slug", "data_type",
-            "is_required", "is_variant_defining", "options",
+            "is_required", "is_variant_defining", "is_active", "options",
             "value_text", "value_number", "value_boolean", "value_date", "display_value",
         ]
 
@@ -144,10 +145,17 @@ class ProductAttributeSerializer(serializers.ModelSerializer):
 class VariantAttributeValueSerializer(serializers.ModelSerializer):
     attribute_name = serializers.CharField(source="attribute.name", read_only=True)
     attribute_slug = serializers.CharField(source="attribute.slug", read_only=True)
+    data_type = serializers.CharField(source="attribute.data_type", read_only=True)
+    is_variant_defining = serializers.BooleanField(source="attribute.is_variant_defining", read_only=True)
+    is_active = serializers.BooleanField(source="attribute.is_active", read_only=True)
 
     class Meta:
         model = VariantAttributeValue
-        fields = ["id", "attribute", "attribute_name", "attribute_slug", "value_text", "value_number", "value_boolean"]
+        fields = [
+            "id", "attribute", "attribute_name", "attribute_slug",
+            "data_type", "is_variant_defining", "is_active",
+            "value_text", "value_number", "value_boolean",
+        ]
 
 
 class ProductVariantSerializer(serializers.ModelSerializer):

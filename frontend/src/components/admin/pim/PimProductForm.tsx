@@ -637,21 +637,38 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
     promise.then((fetchedAttrs) => {
         if (!active) return;
         setAttributes(prev => {
-          const categoryAttrIds = new Set(fetchedAttrs.map(a => a.id));
-          const activeFetchedAttrs = fetchedAttrs.filter(a => !removedAttrIds.has(a.id));
-          
-          if (productId && product) {
-            const savedIds = new Set((product.attributes || []).map((a) => a.attribute));
-            const matchedAttrs = fetchedAttrs.filter((a) => savedIds.has(a.id) && !removedAttrIds.has(a.id));
-            
-            const extraAttrs = (product.attributes || [])
-              .filter((a) => !categoryAttrIds.has(a.attribute) && !removedAttrIds.has(a.attribute))
-              .map((a) => {
-                const globalAttr = allAttributes.find((ga) => ga.id === a.attribute);
-                if (globalAttr && globalAttr.options?.length > 0) return globalAttr;
-                const prevAttr = prev.find((p) => p.id === a.attribute);
-                if (prevAttr && prevAttr.options?.length > 0) return prevAttr;
-                return {
+          // 1. All category attributes returned from API
+          const categoryAttrMap = new Map<number, PimCategoryAttribute>();
+          fetchedAttrs.forEach(a => {
+            if (!removedAttrIds.has(a.id)) {
+              categoryAttrMap.set(a.id, a);
+            }
+          });
+
+          // 2. Also check allAttributes for any matching this category/subcategory
+          if (cid) {
+            allAttributes.forEach(ga => {
+              if (ga.category === cid && !removedAttrIds.has(ga.id)) {
+                if (!categoryAttrMap.has(ga.id)) {
+                  categoryAttrMap.set(ga.id, ga);
+                }
+              }
+            });
+          }
+
+          // 3. Any attributes stored directly in product.attributes
+          const extraAttrs: PimCategoryAttribute[] = [];
+          if (product && product.attributes) {
+            for (const a of product.attributes) {
+              if (categoryAttrMap.has(a.attribute) || removedAttrIds.has(a.attribute)) continue;
+              const globalAttr = allAttributes.find((ga) => ga.id === a.attribute);
+              const prevAttr = prev.find((p) => p.id === a.attribute);
+              if (globalAttr) {
+                extraAttrs.push(globalAttr);
+              } else if (prevAttr) {
+                extraAttrs.push(prevAttr);
+              } else {
+                extraAttrs.push({
                   id: a.attribute,
                   name: a.attribute_name,
                   slug: a.attribute_slug,
@@ -661,32 +678,62 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
                   min_value: null,
                   max_value: null,
                   display_order: 999,
-                  options: a.options || (globalAttr?.options ?? []),
-                } as PimCategoryAttribute;
-              });
-              
-            if (product.category === cid && (product.subcategory || null) === (sid || null)) {
-              // MATCH BRANCH: The category is unchanged. We only show saved attributes + manually added ones.
-              // So sessionExtraAttrs must include ALL unsaved attributes from `prev`, even if they belong to the category.
-              const sessionExtraAttrs = prev.filter(a => !savedIds.has(a.id) && !removedAttrIds.has(a.id));
-              
-              // Ensure no duplicates in case a manual addition is somehow in matchedAttrs
-              const finalAttrs = [...matchedAttrs, ...extraAttrs];
-              const finalIds = new Set(finalAttrs.map(a => a.id));
-              sessionExtraAttrs.forEach(a => {
-                if (!finalIds.has(a.id)) finalAttrs.push(a);
-              });
-              return finalAttrs;
-            } else {
-              // MISMATCH BRANCH: Category changed. We show ALL category attributes + old product extra attrs + unsaved manual additions.
-              const sessionExtraAttrs = prev.filter(a => !categoryAttrIds.has(a.id) && !savedIds.has(a.id) && !removedAttrIds.has(a.id));
-              return [...activeFetchedAttrs, ...extraAttrs, ...sessionExtraAttrs];
+                  is_active: a.is_active ?? true,
+                  options: a.options ?? [],
+                });
+              }
             }
-          } else {
-            // NO PRODUCT BRANCH: Creating a new product. Show ALL category attributes + unsaved manual additions.
-            const sessionExtraAttrs = prev.filter(a => !categoryAttrIds.has(a.id) && !removedAttrIds.has(a.id));
-            return [...activeFetchedAttrs, ...sessionExtraAttrs];
           }
+
+          // 4. Any attributes present on the product's variants (ProductVariant attribute_values)
+          const variantAttrs: PimCategoryAttribute[] = [];
+          if (product && product.variants) {
+            for (const v of product.variants) {
+              for (const av of v.attribute_values || []) {
+                const aid = av.attribute;
+                if (!aid || categoryAttrMap.has(aid) || removedAttrIds.has(aid)) continue;
+                if (extraAttrs.some(ea => ea.id === aid) || variantAttrs.some(va => va.id === aid)) continue;
+                const globalAttr = allAttributes.find((ga) => ga.id === aid);
+                const prevAttr = prev.find((p) => p.id === aid);
+                if (globalAttr) {
+                  variantAttrs.push(globalAttr);
+                } else if (prevAttr) {
+                  variantAttrs.push(prevAttr);
+                } else {
+                  variantAttrs.push({
+                    id: aid,
+                    name: av.attribute_name || `Attribute #${aid}`,
+                    slug: av.attribute_slug || `attr-${aid}`,
+                    data_type: (av.data_type || "CHOICE") as PimCategoryAttribute["data_type"],
+                    is_required: false,
+                    is_variant_defining: av.is_variant_defining ?? true,
+                    min_value: null,
+                    max_value: null,
+                    display_order: 999,
+                    is_active: av.is_active ?? true,
+                    options: [],
+                  });
+                }
+              }
+            }
+          }
+
+          // 5. Unsaved manual additions from current session
+          const sessionExtraAttrs = prev.filter(
+            a => !categoryAttrMap.has(a.id) && 
+                 !extraAttrs.some(ea => ea.id === a.id) &&
+                 !variantAttrs.some(va => va.id === a.id) &&
+                 !removedAttrIds.has(a.id)
+          );
+
+          const finalAttrs = [
+            ...Array.from(categoryAttrMap.values()),
+            ...extraAttrs,
+            ...variantAttrs,
+            ...sessionExtraAttrs,
+          ];
+
+          return finalAttrs.sort((a, b) => (a.display_order ?? 999) - (b.display_order ?? 999) || a.name.localeCompare(b.name));
         });
       })
       .catch(() => {});
@@ -831,11 +878,11 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
   }, []);
 
   // Every attribute in the catalogue: same-named attributes' values are offered as
-  // templates in the value dropdowns. Loaded once the product has attributes.
+  // templates in the value dropdowns.
   useEffect(() => {
-    if (attributes.length === 0 || allAttributes.length > 0) return;
+    if (allAttributes.length > 0) return;
     pimService.getAllAttributes().then(setAllAttributes).catch(() => {});
-  }, [attributes.length, allAttributes.length]);
+  }, [allAttributes.length]);
 
   // Quick-add a value from an attribute's dropdown. An existing value (any case)
   // is reused instead of creating a duplicate.
@@ -1401,13 +1448,24 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
         <section className="rounded-lg border p-5 space-y-4">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
-              <h3 className="font-semibold">Product Attributes</h3>
-              {variantDefiningAttrs.length > 0 && (
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  <Layers className="inline h-3 w-3 mr-1 text-primary" />
-                  {variantDefiningAttrs.length} variant-defining · locked attributes are inherited by all variants
-                </p>
-              )}
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-semibold text-base">Product Attributes</h3>
+                <span className="rounded-full bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 text-xs font-semibold">
+                  {attributes.length} defined
+                </span>
+                <span className="rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 px-2 py-0.5 text-xs font-semibold">
+                  {attributes.filter((a) => a.is_active !== false).length} active
+                </span>
+                {variantDefiningAttrs.length > 0 && (
+                  <span className="rounded-full bg-purple-100 text-purple-800 dark:bg-purple-950/50 dark:text-purple-300 border border-purple-300 dark:border-purple-700 px-2 py-0.5 text-xs font-semibold flex items-center gap-1">
+                    <Layers className="h-3 w-3" />
+                    {variantDefiningAttrs.length} variant-defining
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Attributes defined for this product/category. Locked attributes are inherited by all variants; unlocked ones are customizable per variant.
+              </p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               {lockedAttributes.size > 0 && (
@@ -1446,51 +1504,53 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
               </button>
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
                   if (!productId) return;
                   pendingFetchRef.current = null;
                   setLoading(true);
-                  pimService.getProductWithAttributes(productId)
-                    .then((p) => {
-                      setProduct(p);
-                      setCode(p.code);
-                      setBrand(p.brand ?? "");
-                      setName(p.name);
-                      setDescription(p.description ?? "");
-                      setCategoryId(p.category);
-                      setSubcategoryId(p.subcategory ?? "");
-                      setBasePrice(p.base_price);
-                      setCostPrice(p.cost_price ?? "");
-                      setArWidth(p.ar_width_cm ?? "");
-                      setArDepth(p.ar_depth_cm ?? "");
-                      setArHeight(p.ar_height_cm ?? "");
-                      setIsPublished(p.is_published);
-                      setWarrantyEnabled(p.warranty_enabled ?? true);
-                      setWarrantyMonthsManufacturing(p.warranty_months_manufacturing ?? 12);
-                      setWarrantyMonthsStructural(p.warranty_months_structural ?? 36);
-                      setWarrantyMonthsExtendedMax(p.warranty_months_extended_max ?? 12);
-                      setExtendedWarrantyCostPercentage(p.extended_warranty_cost_percentage?.toString() ?? "7.5");
-                      setVariants(p.variants ?? []);
-                      const savedAttrIds = new Set((p.attributes ?? []).map((a) => a.attribute));
-                      const validLocks = (p.locked_attributes ?? []).filter((id) => savedAttrIds.has(id));
-                      setLockedAttributes(new Set(validLocks));
-                      const prefilled: AttributeValues = {};
-                      for (const a of p.attributes ?? []) {
-                        prefilled[a.attribute] = {
-                          value_text: a.value_text ?? "",
-                          value_number: a.value_number ?? "",
-                          value_boolean: a.value_boolean,
-                          value_date: a.value_date ?? "",
-                        };
-                      }
-                      setAttrValues(prefilled);
-                    })
-                    .catch(() => {})
-                    .finally(() => setLoading(false));
+                  try {
+                    const p = await pimService.getProductWithAttributes(productId);
+                    setProduct(p);
+                    setCode(p.code);
+                    setBrand(p.brand ?? "");
+                    setName(p.name);
+                    setDescription(p.description ?? "");
+                    setCategoryId(p.category);
+                    setSubcategoryId(p.subcategory ?? "");
+                    setBasePrice(p.base_price);
+                    setCostPrice(p.cost_price ?? "");
+                    setArWidth(p.ar_width_cm ?? "");
+                    setArDepth(p.ar_depth_cm ?? "");
+                    setArHeight(p.ar_height_cm ?? "");
+                    setIsPublished(p.is_published);
+                    setWarrantyEnabled(p.warranty_enabled ?? true);
+                    setWarrantyMonthsManufacturing(p.warranty_months_manufacturing ?? 12);
+                    setWarrantyMonthsStructural(p.warranty_months_structural ?? 36);
+                    setWarrantyMonthsExtendedMax(p.warranty_months_extended_max ?? 12);
+                    setExtendedWarrantyCostPercentage(p.extended_warranty_cost_percentage?.toString() ?? "7.5");
+                    setVariants(p.variants ?? []);
+                    setLockedAttributes(new Set(p.locked_attributes ?? []));
+                    const prefilled: AttributeValues = {};
+                    for (const a of p.attributes ?? []) {
+                      prefilled[a.attribute] = {
+                        value_text: a.value_text ?? "",
+                        value_number: a.value_number ?? "",
+                        value_boolean: a.value_boolean,
+                        value_date: a.value_date ?? "",
+                      };
+                    }
+                    setAttrValues(prefilled);
+                    const all = await pimService.getAllAttributes();
+                    setAllAttributes(all);
+                  } catch (err) {
+                    console.error("Failed to refresh product", err);
+                  } finally {
+                    setLoading(false);
+                  }
                 }}
                 disabled={saving || loading}
                 className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-                title="Refresh product data"
+                title="Refresh product data and attributes"
               >
                 <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} /> Refresh
               </button>

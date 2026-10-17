@@ -20,11 +20,14 @@ export interface PimSubcategory {
 
 export interface PimCategoryAttribute {
   id: number;
+  category?: number;
+  subcategory?: number | null;
   name: string;
   slug: string;
   data_type: "TEXT" | "NUMBER" | "DECIMAL" | "CHOICE" | "MULTI_CHOICE" | "BOOLEAN" | "DATE";
   is_required: boolean;
   is_variant_defining: boolean;
+  is_active?: boolean;
   min_value: string | null;
   max_value: string | null;
   regex_validation?: string;
@@ -49,6 +52,7 @@ export interface PimProductAttribute {
   data_type: string;
   is_required?: boolean;
   is_variant_defining?: boolean;
+  is_active?: boolean;
   options?: PimAttributeOption[];
   value_text: string;
   value_number: string | null;
@@ -62,6 +66,9 @@ export interface PimVariantAttributeValue {
   attribute: number;
   attribute_name: string;
   attribute_slug: string;
+  data_type?: string;
+  is_variant_defining?: boolean;
+  is_active?: boolean;
   value_text: string;
   value_number: string | null;
   value_boolean: boolean | null;

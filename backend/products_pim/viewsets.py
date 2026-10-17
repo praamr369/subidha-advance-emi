@@ -84,9 +84,16 @@ class ProductSubcategoryViewSet(viewsets.ModelViewSet):
 class CategoryAttributeViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsAdmin]
     serializer_class = CategoryAttributeSerializer
+    pagination_class = AdminListPagination
 
     def get_queryset(self):
-        qs = CategoryAttribute.objects.filter(is_active=True).prefetch_related("options")
+        qs = CategoryAttribute.objects.all().prefetch_related("options")
+        is_active_param = self.request.query_params.get("is_active")
+        if is_active_param is not None:
+            if is_active_param.lower() in ("true", "1"):
+                qs = qs.filter(is_active=True)
+            elif is_active_param.lower() in ("false", "0"):
+                qs = qs.filter(is_active=False)
         category_id = self.request.query_params.get("category")
         subcategory_id = self.request.query_params.get("subcategory")
         if category_id:
