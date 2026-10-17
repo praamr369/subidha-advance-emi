@@ -1,3 +1,4 @@
+from typing import cast
 from django.db.models import Q
 from products_pim.services.sync_service import PIMSyncService
 from rest_framework import viewsets, status
@@ -6,6 +7,8 @@ from django.views.decorators.cache import cache_page
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from rest_framework.request import Request
 from api.v1.pagination import AdminListPagination
 from api.v1.permissions import IsAdmin
 
@@ -19,6 +22,7 @@ from .models import (
     VariantAttributeValue,
     ProductAttribute,
     AttributeDataType,
+    ProductMediaItem,
 )
 from .serializers import (
     ProductCategorySerializer,
@@ -31,16 +35,19 @@ from .serializers import (
     ProductVariantSerializer,
     ProductVariantCreateSerializer,
     VariantAttributeValueSerializer,
+    ProductMediaItemSerializer,
 )
 
 
 class AttributeOptionViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsAdmin]
+    queryset = AttributeOption.objects.all()
     serializer_class = AttributeOptionSerializer
 
     def get_queryset(self):
         qs = AttributeOption.objects.all()
-        attribute_id = self.request.query_params.get("attribute")
+        request = cast(Request, self.request)
+        attribute_id = request.query_params.get("attribute")
         if attribute_id:
             qs = qs.filter(attribute_id=attribute_id)
         return qs.order_by("display_order", "id")
@@ -73,11 +80,13 @@ class ProductCategoryViewSet(viewsets.ModelViewSet):
 
 class ProductSubcategoryViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsAdmin]
+    queryset = ProductSubcategory.objects.all()
     serializer_class = ProductSubcategorySerializer
 
     def get_queryset(self):
         qs = ProductSubcategory.objects.filter(is_active=True).select_related("category").prefetch_related("attributes")
-        category_id = self.request.query_params.get("category")
+        request = cast(Request, self.request)
+        category_id = request.query_params.get("category")
         if category_id:
             qs = qs.filter(category_id=category_id)
         return qs
@@ -85,19 +94,21 @@ class ProductSubcategoryViewSet(viewsets.ModelViewSet):
 
 class CategoryAttributeViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsAdmin]
+    queryset = CategoryAttribute.objects.all()
     serializer_class = CategoryAttributeSerializer
     pagination_class = AdminListPagination
 
     def get_queryset(self):
         qs = CategoryAttribute.objects.all().prefetch_related("options")
-        is_active_param = self.request.query_params.get("is_active")
+        request = cast(Request, self.request)
+        is_active_param = request.query_params.get("is_active")
         if is_active_param is not None:
             if is_active_param.lower() in ("true", "1"):
                 qs = qs.filter(is_active=True)
             elif is_active_param.lower() in ("false", "0"):
                 qs = qs.filter(is_active=False)
-        category_id = self.request.query_params.get("category")
-        subcategory_param = self.request.query_params.get("subcategory")
+        category_id = request.query_params.get("category")
+        subcategory_param = request.query_params.get("subcategory")
         if category_id:
             qs = qs.filter(category_id=category_id)
         if subcategory_param is not None:
@@ -110,6 +121,8 @@ class CategoryAttributeViewSet(viewsets.ModelViewSet):
 
 class PimProductViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsAdmin]
+    queryset = PimProduct.objects.all()
+    serializer_class = PimProductListSerializer
     # The project default paginator ignores ?page_size (always 20 rows), which made
     # the admin PIM tree show only 20 blueprints and broke its page maths.
     pagination_class = AdminListPagination
@@ -164,18 +177,19 @@ class PimProductViewSet(viewsets.ModelViewSet):
             "variants__attribute_values__attribute",
             "child_pim_products",
         )
-        category_id = self.request.query_params.get("category")
-        subcategory_id = self.request.query_params.get("subcategory")
-        search = self.request.query_params.get("search")
-        is_published = self.request.query_params.get("is_published")
-        product_type = self.request.query_params.get("type")
+        request = cast(Request, self.request)
+        category_id = request.query_params.get("category")
+        subcategory_id = request.query_params.get("subcategory")
+        search = request.query_params.get("search")
+        is_published = request.query_params.get("is_published")
+        product_type = request.query_params.get("type")
         # Tree view: page through blueprints only (?roots_only=true), then load their
         # variant SKUs with ?parent=<id>,<id>,… so every blueprint is reachable page by page.
         roots_only = (
-            self.request.query_params.get("roots_only", "").lower() == "true"
+            request.query_params.get("roots_only", "").lower() == "true"
             or self.action == "tree_summary"
         )
-        parent_ids = [p for p in (self.request.query_params.get("parent") or "").split(",") if p.isdigit()]
+        parent_ids = [p for p in (request.query_params.get("parent") or "").split(",") if p.isdigit()]
         if product_type:
             # Variants inherit product_type from base blueprint, but checking parent__product_type is safe too
             qs = qs.filter(Q(product_type=product_type) | Q(parent__product_type=product_type))
@@ -1001,10 +1015,13 @@ class PimProductViewSet(viewsets.ModelViewSet):
 
 class ProductVariantViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsAdmin]
+    queryset = ProductVariant.objects.all()
+    serializer_class = ProductVariantSerializer
 
     def get_queryset(self):
         qs = ProductVariant.objects.select_related("product").prefetch_related("attribute_values__attribute")
-        product_id = self.request.query_params.get("product")
+        request = cast(Request, self.request)
+        product_id = request.query_params.get("product")
         if product_id:
             qs = qs.filter(product_id=product_id)
         return qs
@@ -1328,23 +1345,16 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
 class ProductMediaItemViewSet(viewsets.ModelViewSet):
     """CRUD for product media gallery items (images + videos)."""
     permission_classes = [IsAuthenticated, IsAdmin]
-    parser_classes_override = None
-
-    def get_parser_classes(self):
-        from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-        return [MultiPartParser, FormParser, JSONParser]
-
-    @property
-    def parser_classes(self):
-        from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-        return [MultiPartParser, FormParser, JSONParser]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    queryset = ProductMediaItem.objects.all()
+    serializer_class = ProductMediaItemSerializer
 
     def get_queryset(self):
-        from .models import ProductMediaItem
         qs = ProductMediaItem.objects.select_related("variant")
-        product_id = self.request.query_params.get("product")
-        variant_id = self.request.query_params.get("variant")
-        kind = self.request.query_params.get("kind")
+        request = cast(Request, self.request)
+        product_id = request.query_params.get("product")
+        variant_id = request.query_params.get("variant")
+        kind = request.query_params.get("kind")
         if product_id:
             qs = qs.filter(product_id=product_id)
         if variant_id:
@@ -1352,11 +1362,6 @@ class ProductMediaItemViewSet(viewsets.ModelViewSet):
         if kind:
             qs = qs.filter(kind=kind)
         return qs
-
-    def get_serializer_class(self):
-        from .serializers import ProductMediaItemSerializer
-        return ProductMediaItemSerializer
-
 
     def _handle_file_uploads(self, request):
         data = request.data.copy() if hasattr(request.data, "copy") else request.data
@@ -1405,10 +1410,8 @@ class ProductMediaItemViewSet(viewsets.ModelViewSet):
 
         Kind-scoped so choosing the primary 3D model never un-stars the hero photo.
         """
-        from .models import ProductMediaItem
         item = self.get_object()
         ProductMediaItem.objects.filter(product=item.product, kind=item.kind, is_hero=True).update(is_hero=False)
         item.is_hero = True
         item.save(update_fields=["is_hero"])
-        from .serializers import ProductMediaItemSerializer
         return Response(ProductMediaItemSerializer(item, context={"request": request}).data)
