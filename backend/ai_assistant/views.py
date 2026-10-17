@@ -108,6 +108,7 @@ class AIAssistantQueryView(AIAssistantBaseView):
         query = serializer.validated_data["query"]
         scope = serializer.validated_data.get("scope")
         top_k = serializer.validated_data.get("top_k") or 5
+        requested_retrieval_mode = serializer.validated_data.get("retrieval_mode") or "AUTO"
         # 1. First attempt to route query through n8n AI agent (if configured)
         n8n_result = query_n8n_ai(
             query=query,
