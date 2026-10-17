@@ -71,3 +71,28 @@ class VariantAttributeScopeTests(APITestCase):
         rows = {row["name"]: row for row in response.data["attributes"]}
         self.assertEqual(set(rows), {"Size", "Finish"})
         self.assertTrue(rows["Size"]["is_selected_for_variants"])
+
+    def test_variant_update_attributes_endpoint(self):
+        admin = create_admin_user(username="scope_admin_patch", phone="9011000952")
+        self.client.force_authenticate(user=admin)
+        from products_pim.models import ProductVariant, VariantAttributeValue
+        variant = ProductVariant.objects.create(
+            product=self.product,
+            sku="SCOPE-BED-5X6-M",
+            price=Decimal("12000.00"),
+        )
+        url = f"/api/v1/pim/variants/{variant.id}/update_attributes/"
+        payload = {
+            "attribute_values": [
+                {
+                    "attribute": self.size.id,
+                    "value_text": "5x6",
+                }
+            ]
+        }
+        response = self.client.patch(url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        vav = VariantAttributeValue.objects.filter(variant=variant, attribute=self.size).first()
+        self.assertIsNotNone(vav)
+        self.assertEqual(vav.value_text, "5x6")
+

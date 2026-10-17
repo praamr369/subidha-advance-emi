@@ -43,3 +43,4 @@ class InternalServiceAuthentication(BaseAuthentication):
             raise AuthenticationFailed("No active admin user available for internal service.")
 
         return (admin_user, service_token)
+

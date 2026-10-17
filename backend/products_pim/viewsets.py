@@ -17,6 +17,8 @@ from .models import (
     PimProduct,
     ProductVariant,
     VariantAttributeValue,
+    ProductAttribute,
+    AttributeDataType,
 )
 from .serializers import (
     ProductCategorySerializer,
@@ -1124,7 +1126,6 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
         """Update variant attributes, pricing, and barcode; syncs to operational product and child PIM product."""
         from decimal import Decimal, InvalidOperation
         from django.db import transaction
-        from .models import AttributeDataType, ProductAttribute
 
         with transaction.atomic():
             variant = self.get_object()
@@ -1208,7 +1209,6 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
             # Explicit removal of attributes for this variant
             remove_attr_ids = request.data.get("remove_attributes", [])
             if remove_attr_ids:
-                from .models import VariantAttributeValue
                 VariantAttributeValue.objects.filter(variant=variant, attribute_id__in=remove_attr_ids).delete()
                 if child_pim:
                     try:
