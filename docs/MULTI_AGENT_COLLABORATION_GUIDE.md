@@ -99,3 +99,4 @@ Before any agent claims a task is complete, it must run the scoped verification 
   backend/venv/bin/python backend/manage.py makemigrations --check --dry-run
   backend/venv/bin/python backend/manage.py test <target.app>
   ```
+

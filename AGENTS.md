@@ -1,5 +1,18 @@
 # AGENTS.md
 
+## 🚨 STRICT AI AGENT GUARDRAILS (ZERO-TOLERANCE ENFORCEMENT)
+
+All AI agents (Antigravity, Gemini, Claude, Cursor, Copilot, Codex, Windsurf) MUST strictly obey these 5 rules:
+1. **DON'T EXECUTE ANYTHING WITHOUT EXPLICIT PERMISSION**: Never execute commands that change system state, reboot daemons, or deploy without explicit user approval. Always explain and wait for consent.
+2. **NO AUTONOMOUS GIT/GITHUB ACCESS**: No AI agent may run `git push`, `git commit`, `git reset`, `git rebase`, or GitHub CLI commands without explicit permission.
+3. **NO DIRECT DATABASE MUTATION & NEVER USE DELETE**: Never use `DELETE`, `DROP`, `TRUNCATE`, `flush`, or raw SQL mutations. Financial records and business history are strictly append-only.
+4. **NOTHING DELETED WITHOUT EXPLICIT PERMISSION**: Never delete any file, component, service, route, or test (`rm`, `git rm`, unlink) without explicit user consent. Consolidations are additive (tabs) only.
+5. **NOTHING ADDED WITHOUT EXPLICIT PERMISSION**: Never add unrequested packages, libraries, files, or new routes without explicit approval. Keep diffs focused and minimal.
+
+Full specification: `docs/STRICT_GUARDRAILS.md`.
+
+---
+
 ## Project Identity
 
 This repository contains the production system for **SUBIDHA CORE – Lucky Plan EMI System**.

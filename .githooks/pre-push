@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# .githooks/pre-push — SUBIDHA CORE Strict Guardrail Enforcement
+# Prevents automated or silent AI agent git pushes to GitHub without user permission.
+
+set -e
+
+echo "🔒 [Guardrail] Running pre-push validation..."
+
+# Check if push was explicitly authorized by user
+if [ "$ALLOW_GIT_PUSH" != "true" ]; then
+    echo "❌ [Guardrail ERROR] Remote push blocked by strict guardrail."
+    echo "Rule 2 violation: No AI agent may execute git push commands without explicit user permission."
+    echo ""
+    echo "To push your changes after reviewing, run:"
+    echo "  ALLOW_GIT_PUSH=true git push <remote> <branch>"
+    exit 1
+fi
+
+echo "✅ [Guardrail] Git push authorized by user (ALLOW_GIT_PUSH=true)."
+exit 0
+

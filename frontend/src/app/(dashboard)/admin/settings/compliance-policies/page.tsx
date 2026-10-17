@@ -8,6 +8,7 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
 import { InternalComplianceProofs } from "@/components/admin/settings/compliance-policies/InternalComplianceProofs";
 import { PublicPolicyGovernance } from "@/components/admin/settings/compliance-policies/PublicPolicyGovernance";
+import { SystemGuardrailsPanel } from "@/components/admin/settings/compliance-policies/SystemGuardrailsPanel";
 import { getBusinessProfile, type BusinessProfile } from "@/services/business-setup";
 import { getBrandDirectProfile, type BrandDirectProfile } from "@/services/brand-data";
 
@@ -27,7 +28,7 @@ function SummaryField({ label, value }: { label: string; value?: string | null }
 }
 
 export default function CompliancePoliciesPage() {
-  const [activeTab, setActiveTab] = useState<"internal" | "public">("internal");
+  const [activeTab, setActiveTab] = useState<"internal" | "public" | "guardrails">("internal");
   const [bp, setBp] = useState<BusinessProfile | null>(null);
   const [brand, setBrand] = useState<BrandDirectProfile | null>(null);
 
@@ -48,7 +49,7 @@ export default function CompliancePoliciesPage() {
     <ERPPageShell
       eyebrow="Settings · Legal & Compliance"
       title="Compliance & Policy Governance"
-      subtitle="Manage internal legal proofs, identity documents, and public-facing policies."
+      subtitle="Manage internal legal proofs, identity documents, public-facing policies, and system guardrails."
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Settings", href: ROUTES.admin.settings },
@@ -145,10 +146,22 @@ export default function CompliancePoliciesPage() {
         >
           Public Policy Governance
         </button>
+        <button
+          onClick={() => setActiveTab("guardrails")}
+          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${
+            activeTab === "guardrails"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          AI & System Guardrails
+        </button>
       </div>
 
       <div className="min-h-[400px]">
-        {activeTab === "internal" ? <InternalComplianceProofs /> : <PublicPolicyGovernance />}
+        {activeTab === "internal" && <InternalComplianceProofs />}
+        {activeTab === "public" && <PublicPolicyGovernance />}
+        {activeTab === "guardrails" && <SystemGuardrailsPanel />}
       </div>
     </ERPPageShell>
   );

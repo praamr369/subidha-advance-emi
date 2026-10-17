@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# .githooks/pre-commit — SUBIDHA CORE Strict Guardrail Enforcement
+# Blocks destructive database operations, forbidden SQL, and unauthorized file deletions.
+
+set -e
+
+echo "🔒 [Guardrail] Running pre-commit validation..."
+
+# 1. Block forbidden destructive database commands in staged files
+DESTRUCTIVE_PATTERNS='(DROP\s+TABLE|TRUNCATE\s+TABLE|manage\.py\s+flush|clear_operational_data|migrate\s+zero)'
+STAGED_DIFF=$(git diff --cached -S"flush" -S"DROP TABLE" -S"TRUNCATE" -G"$DESTRUCTIVE_PATTERNS" 2>/dev/null || true)
+
+if [ -n "$STAGED_DIFF" ]; then
+    # Exclude the guardrail files themselves from pattern matching
+    VIOLATIONS=$(git diff --cached -G"$DESTRUCTIVE_PATTERNS" --name-only | grep -v "docs/STRICT_GUARDRAILS" | grep -v ".githooks" || true)
+    if [ -n "$VIOLATIONS" ]; then
+        echo "❌ [Guardrail ERROR] Destructive database operations detected in staged files:"
+        echo "$VIOLATIONS"
+        echo "Rule 3 violation: Never execute DELETE, DROP, TRUNCATE, or flush on databases."
+        exit 1
+    fi
+fi
+
+# 2. Block unauthorized file deletions
+DELETED_FILES=$(git diff --cached --diff-filter=D --name-only || true)
+if [ -n "$DELETED_FILES" ]; then
+    if [ "$ALLOW_FILE_DELETE" != "true" ]; then
+        echo "❌ [Guardrail ERROR] File deletion detected without explicit authorization:"
+        echo "$DELETED_FILES"
+        echo "Rule 4 violation: Nothing may be deleted without explicit user permission."
+        echo "To confirm this deletion was requested by the user, export ALLOW_FILE_DELETE=true and retry."
+        exit 1
+    else
+        echo "⚠️  [Guardrail NOTICE] File deletion authorized via ALLOW_FILE_DELETE=true."
+    fi
+fi
+
+echo "✅ [Guardrail] Pre-commit checks passed successfully."
+exit 0
+

@@ -58,6 +58,21 @@ The system must remain suitable for today’s Lucky Plan EMI, Rent, Lease, and D
 | No destructive schema changes without explicit approval | Project rule | Do not drop fields/tables or rewrite enums without migration/backfill/approval. |
 | Preserve Lucky Plan EMI behavior | Project rule | Product base price, batch/lucky ID assignment, deterministic EMI schedule, payment collection, and future EMI waiver behavior must remain stable. |
 
+### 4.1. Strict AI Agent Guardrails (Zero-Tolerance Enforcement)
+
+All AI agents (Antigravity, Gemini, Claude, Cursor, GitHub Copilot, Codex, Windsurf) working in this repository must strictly adhere to the following 5 guardrails:
+
+| Rule | Title | Enforcement & Practical Meaning |
+|---|---|---|
+| **1** | **No Execution Without Permission** | Never execute commands that change system state, start daemons, reboot servers, or deploy without explicit user consent. |
+| **2** | **No Autonomous Git/GitHub Access** | AI agents must never run `git push`, `git commit`, `git reset`, or `git rebase` without explicit approval. Git pushes are guarded by `.githooks/pre-push`. |
+| **3** | **No Direct Database Mutation & Never Use DELETE** | Destructive database operations (`DELETE`, `DROP`, `TRUNCATE`, `flush`, `migrate zero`) are strictly forbidden. Financial records and business history are strictly append-only. |
+| **4** | **Nothing Deleted Without Permission** | Never delete any file, component, service, route, or test (`rm`, `git rm`, unlink). Route consolidations are strictly additive (tabs). Guarded by `.githooks/pre-commit`. |
+| **5** | **Nothing Added Without Permission** | Never introduce unrequested third-party packages, libraries, microservices, or new route hierarchies without explicit approval. Keep diffs focused and minimal. |
+
+Full technical guardrail specification is maintained in [`docs/STRICT_GUARDRAILS.md`](STRICT_GUARDRAILS.md).
+Inter-agent coordination and audit ledger are maintained in [`docs/AGENT_SYNC_LOG.md`](AGENT_SYNC_LOG.md) and [`scripts/agent_sync.py`](../scripts/agent_sync.py).
+
 ## 5. Core business invariants
 
 ### Portal pricing and request visibility
