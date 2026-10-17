@@ -81,3 +81,4 @@ def search_products_by_spec_text(queryset: QuerySet, search_term: str) -> QueryS
 
     # In PostgreSQL, JSONField text search works across keys and values
     return queryset.filter(base_specs__icontains=term)
+

@@ -160,3 +160,4 @@ def get_authoritative_contract_terms(subscription) -> dict:
         "sku": product.get("sku") or (subscription.product.sku if subscription.product else ""),
         "base_specs": product.get("base_specs") or (subscription.product.base_specs if subscription.product else {}),
     }
+
