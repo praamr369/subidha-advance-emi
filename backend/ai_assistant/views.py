@@ -22,6 +22,7 @@ from ai_assistant.services.answer_service import answer_query
 from ai_assistant.services.audit_service import log_ai_ingestion, log_ai_query
 from ai_assistant.services.bi_explanation_service import explain_bi_summary
 from ai_assistant.services.ingestion_service import AIIngestionError, ingest_source
+from ai_assistant.services.n8n_ai_service import is_n8n_ai_configured, query_n8n_ai
 from ai_assistant.services.retrieval_service import execute_retrieval
 
 
@@ -31,7 +32,12 @@ class AIAssistantBaseView(APIView):
 
 class AIAssistantHealthView(AIAssistantBaseView):
     def get(self, request):
-        return Response({"detail": "AI assistant ingestion controls are active"})
+        return Response(
+            {
+                "detail": "AI assistant ingestion controls are active",
+                "n8n_ai_configured": is_n8n_ai_configured(),
+            }
+        )
 
 
 class AIKnowledgeSourceListCreateView(AIAssistantBaseView):
@@ -102,8 +108,48 @@ class AIAssistantQueryView(AIAssistantBaseView):
         query = serializer.validated_data["query"]
         scope = serializer.validated_data.get("scope")
         top_k = serializer.validated_data.get("top_k") or 5
-        requested_retrieval_mode = serializer.validated_data.get("retrieval_mode") or "AUTO"
+        # 1. First attempt to route query through n8n AI agent (if configured)
+        n8n_result = query_n8n_ai(
+            query=query,
+            user=request.user,
+            scope=scope,
+        )
+        if n8n_result is not None:
+            latency_ms = int((time.monotonic() - started) * 1000)
+            query_log = log_ai_query(
+                user=request.user,
+                query=query,
+                metadata={"scope": scope, "engine": "n8n_ai", "top_k": top_k},
+                retrieved_chunk_ids=[],
+                answer_preview=n8n_result["answer"],
+                latency_ms=latency_ms,
+                denied_reason=None,
+                requested_retrieval_mode=requested_retrieval_mode,
+                actual_retrieval_mode="N8N_AI_AGENT",
+                degraded=False,
+                degraded_reason="",
+            )
+            return Response(
+                {
+                    "answer": n8n_result["answer"],
+                    "citations": n8n_result.get("citations", []),
+                    "confidence": n8n_result.get("confidence", "HIGH"),
+                    "retrieval_mode": "N8N_AI_AGENT",
+                    "requested_retrieval_mode": requested_retrieval_mode,
+                    "degraded": False,
+                    "degraded_reason": "",
+                    "query_log_id": query_log.id,
+                    "engine": "n8n_ai",
+                    "safety": {
+                        "actionable_financial_instruction": False,
+                        "permission_filtered": True,
+                        "source_grounded": bool(n8n_result.get("citations")),
+                    },
+                },
+                status=status.HTTP_200_OK,
+            )
 
+        # 2. Seamless fallback: Internal document retrieval & reasoning
         retrieval = execute_retrieval(
             user=request.user,
             query=query,

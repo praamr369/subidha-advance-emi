@@ -20,12 +20,13 @@ export type AiQueryResponse = {
   answer: string;
   citations: AiCitation[];
   confidence: AiConfidence;
-  retrievalMode: "KEYWORD" | "VECTOR" | "HYBRID";
+  retrievalMode: "KEYWORD" | "VECTOR" | "HYBRID" | "N8N_AI_AGENT" | string;
   requestedRetrievalMode: "AUTO" | "KEYWORD" | "VECTOR" | "HYBRID";
   degraded: boolean;
   degradedReason: string;
   queryLogId: number | null;
   safety: AiSafety;
+  engine?: "n8n_ai" | "internal" | string;
 };
 
 export type AiKnowledgeSource = {

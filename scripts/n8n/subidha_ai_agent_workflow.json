@@ -1,0 +1,144 @@
+{
+  "name": "SUBIDHA CORE - AI Assistant Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "subidha-ai-query",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "1",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "webhookId": "subidha-ai-query"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.body.query }}",
+        "options": {
+          "systemMessage": "You are the executive AI Copilot for SUBIDHA CORE, an ERP for a furniture retail business operating in India with Lucky Plan EMI schemes. The business is operated by a single owner/admin (solopreneur). Your job is to analyze real-time business metrics, answer questions about collections, overdue EMIs, inventory stock, customer status, and store operations. Always provide answers with concrete numbers in INR (₹) when data is available. Be concise, highly professional, and provide clear summaries."
+        }
+      },
+      "id": "2",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-1.5-flash",
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "3",
+      "name": "Google Gemini (Free Tier)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [420, 520]
+    },
+    {
+      "parameters": {
+        "name": "get_live_erp_summary",
+        "description": "Call this tool to get current business KPIs, total collections today, overdue accounts, pending deliveries, and operational cash desk numbers.",
+        "url": "https://subidhafurnitureasansol.com/api/v1/admin/erp/summary/",
+        "authentication": "none"
+      },
+      "id": "4",
+      "name": "ERP Live Summary Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [640, 520]
+    },
+    {
+      "parameters": {
+        "name": "search_customer_or_record",
+        "description": "Call this tool with a search query string (customer name, phone number, subscription number, or invoice) to retrieve matching business records.",
+        "url": "=https://subidhafurnitureasansol.com/api/v1/admin/global-search/?q={{ encodeURIComponent($fromAI('search_query')) }}",
+        "authentication": "none"
+      },
+      "id": "5",
+      "name": "Universal Search Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [820, 520]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"answer\": {{ JSON.stringify($json.output) }},\n  \"confidence\": \"HIGH\",\n  \"engine\": \"n8n_ai\",\n  \"model\": \"gemini-1.5-flash\",\n  \"citations\": [\n    {\n      \"source_id\": 1,\n      \"source_title\": \"Live SUBIDHA ERP Ledger\",\n      \"chunk_id\": 1,\n      \"heading\": \"Real-time Operations\",\n      \"excerpt\": \"Data retrieved dynamically via n8n AI Agent\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "6",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini (Free Tier)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ERP Live Summary Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Universal Search Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

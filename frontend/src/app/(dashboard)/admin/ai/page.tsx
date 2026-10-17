@@ -12,7 +12,7 @@ export default function AdminAiAssistantPage() {
     <ERPPageShell
       eyebrow="Command Center"
       title="AI Assistant"
-      subtitle="Internal knowledge assistant (read-only)"
+      subtitle="Intelligent solopreneur control center powered by n8n AI & grounded ERP analytics"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "AI Assistant" },

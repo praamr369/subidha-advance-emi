@@ -461,6 +461,9 @@ AI_VECTOR_SEARCH_ENABLED = _parse_bool(
     os.getenv("AI_VECTOR_SEARCH_ENABLED"),
     default=False,
 )
+N8N_AI_WEBHOOK_URL = (os.getenv("N8N_AI_WEBHOOK_URL") or "").strip()
+N8N_AI_AUTH_TOKEN = (os.getenv("N8N_AI_AUTH_TOKEN") or "").strip()
+N8N_AI_TIMEOUT_SECONDS = int(os.getenv("N8N_AI_TIMEOUT_SECONDS") or "15")
 
 INSTALLED_APPS = [
     "unfold",
