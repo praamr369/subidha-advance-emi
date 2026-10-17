@@ -44,18 +44,43 @@ def query_n8n_ai(
             "role": getattr(user, "role", "ADMIN"),
         }
 
+    erp_summary = {}
+    metrics_summary = []
+    try:
+        from subscriptions.services.admin_erp_service import get_cached_admin_erp_summary
+        erp_summary = get_cached_admin_erp_summary() or {}
+        for item in erp_summary.get("business_health", []):
+            label = item.get("label", item.get("key"))
+            val = item.get("value")
+            if val is not None:
+                metrics_summary.append(f"- {label}: ₹{val} (count: {item.get('count', 0)})")
+            else:
+                metrics_summary.append(f"- {label}: {item.get('count', 0)}")
+        for item in erp_summary.get("today_work", []):
+            label = item.get("label", item.get("key"))
+            cnt = item.get("count", 0)
+            metrics_summary.append(f"- {label}: {cnt}")
+    except Exception as exc:
+        logger.warning("Could not fetch cached admin erp summary for n8n AI: %s", exc)
+
+    live_metrics_text = "\n".join(metrics_summary) if metrics_summary else "No live summary available."
+
     payload = {
         "query": query,
         "scope": scope or "ALL",
         "user": user_data,
         "timestamp": timezone.now().isoformat(),
+        "live_metrics_text": live_metrics_text,
+        "live_erp_summary": erp_summary,
         "system_context": {
             "system_name": "SUBIDHA CORE - Furniture Retail & Lucky Plan EMI",
             "admin_mode": "Solopreneur Universal Control Center",
             "currency": "INR (₹)",
+            "live_metrics_summary": live_metrics_text,
             "knowledge_guidelines": [
                 "Read-only financial analysis; no silent data mutations",
                 "Concise, actionable business summaries for store owner",
+                "Always refer to the provided live metrics summary for current collections, dues, and overdue numbers",
             ],
         },
     }

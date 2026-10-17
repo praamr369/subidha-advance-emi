@@ -18,9 +18,9 @@
     {
       "parameters": {
         "promptType": "define",
-        "text": "={{ $json.body.query }}",
+        "text": "=User Question:\n{{ $json.body.query }}\n\nLive Store ERP Summary Metrics:\n{{ $json.body.live_metrics_text }}\n\nTimestamp: {{ $json.body.timestamp }}",
         "options": {
-          "systemMessage": "You are the executive AI Copilot for SUBIDHA CORE, an ERP for a furniture retail business operating in India with Lucky Plan EMI schemes. The business is operated by a single owner/admin (solopreneur). Your job is to analyze real-time business metrics, answer questions about collections, overdue EMIs, inventory stock, customer status, and store operations. Always provide answers with concrete numbers in INR (₹) when data is available. Be concise, highly professional, and provide clear summaries."
+          "systemMessage": "You are the executive AI Copilot for SUBIDHA CORE, an ERP for a furniture retail business operating in India with Lucky Plan EMI schemes. The business is operated by a single owner/admin (solopreneur). Your job is to analyze real-time business metrics, answer questions about collections, overdue EMIs, inventory stock, customer status, and store operations. Always provide answers with concrete numbers in INR (₹) using the provided Live Store ERP Summary Metrics. Be concise, highly professional, and provide clear summaries."
         }
       },
       "id": "2",
@@ -47,7 +47,16 @@
         "name": "get_live_erp_summary",
         "description": "Call this tool to get current business KPIs, total collections today, overdue accounts, pending deliveries, and operational cash desk numbers.",
         "url": "https://subidhafurnitureasansol.com/api/v1/admin/erp/summary/",
-        "authentication": "none"
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Internal-Service-Key",
+              "value": "subidha-internal-n8n-key-2026"
+            }
+          ]
+        }
       },
       "id": "4",
       "name": "ERP Live Summary Tool",
@@ -60,7 +69,16 @@
         "name": "search_customer_or_record",
         "description": "Call this tool with a search query string (customer name, phone number, subscription number, or invoice) to retrieve matching business records.",
         "url": "=https://subidhafurnitureasansol.com/api/v1/admin/global-search/?q={{ encodeURIComponent($fromAI('search_query')) }}",
-        "authentication": "none"
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Internal-Service-Key",
+              "value": "subidha-internal-n8n-key-2026"
+            }
+          ]
+        }
       },
       "id": "5",
       "name": "Universal Search Tool",
