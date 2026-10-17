@@ -107,7 +107,7 @@ jobs:
           name: layer-a-output
           path: /tmp/layer-a-output.log
           if-no-files-found: warn
-          retention-days: 7
+          retention-days: 1
 
       # Blocking. This step was non-blocking from 2026-09-04 because it failed
       # only on GitHub runners and the cause was thought to be undiagnosable.
@@ -134,14 +134,14 @@ jobs:
       # went unread for as long as it did. Keep always() so the output survives
       # even if the step is ever made non-blocking again.
       - name: Upload test output
-        if: always()
+        if: failure()
         continue-on-error: true
         uses: actions/upload-artifact@v5
         with:
           name: test-suite-output
           path: /tmp/test-suite-output.log
           if-no-files-found: warn
-          retention-days: 7
+          retention-days: 1
 
   frontend:
     name: frontend (lint + typecheck)

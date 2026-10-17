@@ -6,6 +6,7 @@ from api.v1.permissions import IsAdmin
 from subscriptions.services.admin_erp_service import (
     build_admin_crm_workspace,
     build_admin_erp_summary,
+    get_cached_admin_erp_summary,
     build_admin_global_search,
 )
 
@@ -13,16 +14,20 @@ from subscriptions.services.admin_erp_service import (
 class _AdminErpBase(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
+    @staticmethod
+    def _is_force_refresh(request) -> bool:
+        return request.query_params.get("refresh") in {"1", "true", "True"}
+
 
 class AdminErpSummaryView(_AdminErpBase):
     def get(self, request):
-        payload = build_admin_erp_summary()
+        payload = get_cached_admin_erp_summary(force_refresh=self._is_force_refresh(request))
         return Response(payload)
 
 
 class AdminErpTodayWorkView(_AdminErpBase):
     def get(self, request):
-        payload = build_admin_erp_summary()
+        payload = get_cached_admin_erp_summary(force_refresh=self._is_force_refresh(request))
         return Response(
             {
                 "as_of": payload["as_of"],
@@ -39,37 +44,37 @@ class AdminCrmWorkspaceView(_AdminErpBase):
 
 class AdminSalesWorkspaceView(_AdminErpBase):
     def get(self, request):
-        payload = build_admin_erp_summary()
+        payload = get_cached_admin_erp_summary(force_refresh=self._is_force_refresh(request))
         return Response({"as_of": payload["as_of"], **payload["sales_workspace"]})
 
 
 class AdminProductOperationsWorkspaceView(_AdminErpBase):
     def get(self, request):
-        payload = build_admin_erp_summary()
+        payload = get_cached_admin_erp_summary(force_refresh=self._is_force_refresh(request))
         return Response({"as_of": payload["as_of"], **payload["product_workspace"]})
 
 
 class AdminInventoryWorkspaceView(_AdminErpBase):
     def get(self, request):
-        payload = build_admin_erp_summary()
+        payload = get_cached_admin_erp_summary(force_refresh=self._is_force_refresh(request))
         return Response({"as_of": payload["as_of"], **payload["inventory_workspace"]})
 
 
 class AdminFinanceWorkspaceView(_AdminErpBase):
     def get(self, request):
-        payload = build_admin_erp_summary()
+        payload = get_cached_admin_erp_summary(force_refresh=self._is_force_refresh(request))
         return Response({"as_of": payload["as_of"], **payload["finance_workspace"]})
 
 
 class AdminDeliveryWorkspaceView(_AdminErpBase):
     def get(self, request):
-        payload = build_admin_erp_summary()
+        payload = get_cached_admin_erp_summary(force_refresh=self._is_force_refresh(request))
         return Response({"as_of": payload["as_of"], **payload["delivery_workspace"]})
 
 
 class AdminPartnerOperationsWorkspaceView(_AdminErpBase):
     def get(self, request):
-        payload = build_admin_erp_summary()
+        payload = get_cached_admin_erp_summary(force_refresh=self._is_force_refresh(request))
         return Response({"as_of": payload["as_of"], **payload["partner_workspace"]})
 
 

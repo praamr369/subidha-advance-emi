@@ -32,21 +32,11 @@ jobs:
         env:
           NODE_OPTIONS: '--max-old-space-size=7168'
 
-      - name: Create artifact
-        continue-on-error: true
-        uses: actions/upload-artifact@v5
-        with:
-          name: next-build
-          path: frontend/.next
-          retention-days: 1
-
       # Deploy is best-effort — a missing/expired VPS_SSH_KEY secret or
-      # temporary VPS unreachability should not fail the whole workflow when the
-      # build artifact is already uploaded and available for manual deploy.
-      # A red deploy still shows on the run page for the owner to investigate.
+      # temporary VPS unreachability should not fail the whole workflow.
       - name: Deploy to VPS
         continue-on-error: true
-        if: always()
+        if: success()
         env:
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
         run: |
@@ -60,9 +50,12 @@ jobs:
           ssh-keyscan -H 93.127.195.203 >> ~/.ssh/known_hosts
 
           # Upload .next folder
-          rsync -avz -e ssh frontend/.next/ root@93.127.195.203:/var/www/subidha/app/frontend/.next/
+          rsync -avz --delete -e ssh frontend/.next/ root@93.127.195.203:/var/www/subidha/app/frontend/.next/
 
-          # Start Node.js service
-          ssh root@93.127.195.203 'pkill -f "npm start" || true; cd /var/www/subidha/app/frontend && nohup npm start -- -p 3000 -H 127.0.0.1 > /tmp/npm.log 2>&1 &'
+          # Hand ownership to subidha service user if present
+          ssh root@93.127.195.203 'if id subidha >/dev/null 2>&1; then chown -R subidha:subidha /var/www/subidha/app/frontend/.next 2>/dev/null || true; fi'
+
+          # Restart Next.js service via systemd if installed, otherwise nohup fallback
+          ssh root@93.127.195.203 'systemctl restart subidha-frontend 2>/dev/null || { pkill -f "npm start" || true; cd /var/www/subidha/app/frontend && nohup npm start -- -p 3000 -H 127.0.0.1 > /tmp/npm.log 2>&1 & }'
 
           echo "✓ Frontend deployed to VPS"

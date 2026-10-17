@@ -62,45 +62,70 @@ export type AdminGlobalSearchResult = {
   deep_link: string;
 };
 
-export async function getAdminErpSummary(): Promise<ErpSummary> {
-  return apiFetch<ErpSummary>("/admin/erp/summary/");
+export async function getAdminErpSummary(options?: { refresh?: boolean }): Promise<ErpSummary> {
+  const query = options?.refresh ? "?refresh=1" : "";
+  return apiFetch<ErpSummary>(`/admin/erp/summary/${query}`);
 }
 
-export async function getAdminTodayWork(): Promise<{ as_of: string; results: ErpCard[]; quick_actions: Array<{ label: string; href: string }> }> {
-  return apiFetch("/admin/erp/today-work/");
+export async function getAdminTodayWork(options?: { refresh?: boolean }): Promise<{ as_of: string; results: ErpCard[]; quick_actions: Array<{ label: string; href: string }> }> {
+  const query = options?.refresh ? "?refresh=1" : "";
+  return apiFetch(`/admin/erp/today-work/${query}`);
 }
 
 export async function getAdminCrmWorkspace(): Promise<CrmWorkspacePayload> {
   return apiFetch<CrmWorkspacePayload>("/admin/crm/workspace/");
 }
 
-export async function getAdminSalesWorkspace(): Promise<WorkspacePayload> {
-  return apiFetch<WorkspacePayload>("/admin/sales/workspace/");
+export async function getAdminSalesWorkspace(options?: { refresh?: boolean }): Promise<WorkspacePayload> {
+  const query = options?.refresh ? "?refresh=1" : "";
+  return apiFetch<WorkspacePayload>(`/admin/sales/workspace/${query}`);
 }
 
-export async function getAdminProductWorkspace(): Promise<WorkspacePayload> {
-  return apiFetch<WorkspacePayload>("/admin/product-operations/workspace/");
+export async function getAdminProductWorkspace(options?: { refresh?: boolean }): Promise<WorkspacePayload> {
+  const query = options?.refresh ? "?refresh=1" : "";
+  return apiFetch<WorkspacePayload>(`/admin/product-operations/workspace/${query}`);
 }
 
-export async function getAdminInventoryWorkspace(): Promise<WorkspacePayload> {
-  return apiFetch<WorkspacePayload>("/admin/inventory/workspace/");
+export async function getAdminInventoryWorkspace(options?: { refresh?: boolean }): Promise<WorkspacePayload> {
+  const query = options?.refresh ? "?refresh=1" : "";
+  return apiFetch<WorkspacePayload>(`/admin/inventory/workspace/${query}`);
 }
 
-export async function getAdminFinanceWorkspace(): Promise<WorkspacePayload> {
-  return apiFetch<WorkspacePayload>("/admin/finance/workspace/");
+export async function getAdminFinanceWorkspace(options?: { refresh?: boolean }): Promise<WorkspacePayload> {
+  const query = options?.refresh ? "?refresh=1" : "";
+  return apiFetch<WorkspacePayload>(`/admin/finance/workspace/${query}`);
 }
 
-export async function getAdminDeliveryWorkspace(): Promise<WorkspacePayload> {
-  return apiFetch<WorkspacePayload>("/admin/delivery/workspace/");
+export async function getAdminDeliveryWorkspace(options?: { refresh?: boolean }): Promise<WorkspacePayload> {
+  const query = options?.refresh ? "?refresh=1" : "";
+  return apiFetch<WorkspacePayload>(`/admin/delivery/workspace/${query}`);
 }
 
-export async function getAdminPartnerWorkspace(): Promise<WorkspacePayload> {
-  return apiFetch<WorkspacePayload>("/admin/partner-operations/workspace/");
+export async function getAdminPartnerWorkspace(options?: { refresh?: boolean }): Promise<WorkspacePayload> {
+  const query = options?.refresh ? "?refresh=1" : "";
+  return apiFetch<WorkspacePayload>(`/admin/partner-operations/workspace/${query}`);
 }
 
-export async function searchAdminGlobal(query: string): Promise<{ count: number; results: AdminGlobalSearchResult[] }> {
-  const encoded = encodeURIComponent(query);
-  return apiFetch<{ count: number; results: AdminGlobalSearchResult[] }>(`/admin/global-search/?q=${encoded}`);
+const _adminSearchCache = new Map<string, { data: { count: number; results: AdminGlobalSearchResult[] }; timestamp: number }>();
+const SEARCH_CACHE_TTL_MS = 30_000;
+
+export async function searchAdminGlobal(
+  query: string,
+  options?: { bypassCache?: boolean }
+): Promise<{ count: number; results: AdminGlobalSearchResult[] }> {
+  const normalized = query.trim().toLowerCase();
+  const now = Date.now();
+  if (!options?.bypassCache) {
+    const cached = _adminSearchCache.get(normalized);
+    if (cached && now - cached.timestamp < SEARCH_CACHE_TTL_MS) {
+      return cached.data;
+    }
+  }
+
+  const encoded = encodeURIComponent(query.trim());
+  const res = await apiFetch<{ count: number; results: AdminGlobalSearchResult[] }>(`/admin/global-search/?q=${encoded}`);
+  _adminSearchCache.set(normalized, { data: res, timestamp: now });
+  return res;
 }
 
 export type WorkbenchEntityType = "customer" | "lead" | "ticket" | "request";

@@ -22,7 +22,17 @@ STAMP="$(date +%Y%m%d-%H%M%S)"
 
 echo "==> [1/7] Checking for a new release"
 cd "$APP_DIR"
-git fetch origin
+if ! git fetch origin; then
+  echo ""
+  echo "!!! 'git fetch origin' failed on the server."
+  echo "    If you see 'Permission denied (publickey)':"
+  echo "    1. View the VPS public SSH key:"
+  echo "       cat ~/.ssh/id_ed25519.pub 2>/dev/null || cat ~/.ssh/id_rsa.pub"
+  echo "    2. Add that key as a Deploy Key on GitHub:"
+  echo "       https://github.com/praamr369/subidha-advance-emi/settings/keys"
+  echo "    3. Or switch origin to HTTPS with personal access token or test: ssh -T git@github.com"
+  exit 1
+fi
 NEW_COMMIT="$(git rev-parse origin/main)"
 OLD_COMMIT="$(git rev-parse HEAD)"
 if [ "$NEW_COMMIT" = "$OLD_COMMIT" ]; then

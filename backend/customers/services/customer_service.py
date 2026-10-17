@@ -132,7 +132,10 @@ def search_customers(
         exact_qs = qs.filter(phone=norm)
         if exact_qs.exists():
             return exact_qs[:limit]
-        # Fall back to partial phone match
+        # Fall back to indexed phone prefix match before full substring scan
+        prefix_qs = qs.filter(phone__startswith=norm)
+        if prefix_qs.exists():
+            return prefix_qs[:limit]
         qs = qs.filter(phone__icontains=norm)
         return qs[:limit]
 
