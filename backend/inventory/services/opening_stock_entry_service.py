@@ -243,6 +243,16 @@ def post_opening_stock_entry(*, entry_id: int, posted_by=None) -> tuple[OpeningS
         posted_by=posted_by,
     )
 
+    # Sync linked ProductVariant quantity if present
+    try:
+        core_prod = entry.inventory_item.product
+        if core_prod and hasattr(core_prod, "pim_variant") and core_prod.pim_variant:
+            from products_pim.models import ProductVariant
+            new_qty = int(entry.inventory_item.current_stock_quantity())
+            ProductVariant.objects.filter(pk=core_prod.pim_variant.pk).update(quantity_on_hand=new_qty)
+    except Exception:
+        pass
+
     # Coordinate opening stock value into the General Ledger so the opening
     # balance sheet includes inventory alongside cash/bank/receivable/payable.
     opening_journal = _post_opening_stock_journal(entry=entry, valuation=valuation, posted_by=posted_by)

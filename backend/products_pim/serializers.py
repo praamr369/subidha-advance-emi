@@ -152,7 +152,8 @@ class VariantAttributeValueSerializer(serializers.ModelSerializer):
 
 class ProductVariantSerializer(serializers.ModelSerializer):
     attribute_values = VariantAttributeValueSerializer(many=True, read_only=True)
-    is_low_stock = serializers.BooleanField(read_only=True)
+    quantity_on_hand = serializers.SerializerMethodField()
+    is_low_stock = serializers.SerializerMethodField()
     variant_label = serializers.SerializerMethodField()
     # Publish status comes from the linked child PimProduct, not the variant itself
     is_published = serializers.SerializerMethodField()
@@ -167,6 +168,25 @@ class ProductVariantSerializer(serializers.ModelSerializer):
             "attribute_values", "is_low_stock", "variant_label",
             "is_published", "child_pim_id", "operational_product_id",
         ]
+
+    def get_quantity_on_hand(self, obj):
+        if obj.operational_product_id:
+            try:
+                op = obj.operational_product
+                if op and hasattr(op, "inventory_profile") and op.inventory_profile:
+                    live_qty = int(op.inventory_profile.current_stock_quantity())
+                    if obj.quantity_on_hand != live_qty:
+                        ProductVariant.objects.filter(pk=obj.pk).update(quantity_on_hand=live_qty)
+                        obj.quantity_on_hand = live_qty
+                    return live_qty
+            except Exception:
+                pass
+        return obj.quantity_on_hand or 0
+
+    def get_is_low_stock(self, obj):
+        qty = self.get_quantity_on_hand(obj)
+        reorder = obj.reorder_level or 0
+        return qty <= reorder
 
     def get_variant_label(self, obj):
         vals = obj.attribute_values.all()

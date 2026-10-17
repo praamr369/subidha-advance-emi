@@ -114,6 +114,17 @@ def post_movement(
     )
     entry.full_clean()
     entry.save()
+
+    # Sync linked ProductVariant quantity if present
+    try:
+        core_prod = inventory_item.product
+        if core_prod and hasattr(core_prod, "pim_variant") and core_prod.pim_variant:
+            from products_pim.models import ProductVariant
+            new_qty = int(inventory_item.current_stock_quantity())
+            ProductVariant.objects.filter(pk=core_prod.pim_variant.pk).update(quantity_on_hand=new_qty)
+    except Exception:
+        pass
+
     return entry
 
 

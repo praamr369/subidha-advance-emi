@@ -69,6 +69,7 @@ def build_stock_ledger_list(
             | Q(inventory_item__product__product_code__icontains=search_query)
             | Q(inventory_item__sku__icontains=search_query)
             | Q(inventory_item__barcode__icontains=search_query)
+            | Q(inventory_item__product__pim_variant__sku__icontains=search_query)
             | Q(warehouse_name__icontains=search_query)
             | Q(reference_model__icontains=search_query)
         )
@@ -125,13 +126,20 @@ def build_stock_ledger_list(
         elif item:
             product_name = item.inventory_code
 
+        sku = (item.sku if item and item.sku else "")
+        if not sku and product:
+            if hasattr(product, "pim_variant") and product.pim_variant and product.pim_variant.sku:
+                sku = product.pim_variant.sku
+            elif product.product_code:
+                sku = product.product_code
+
         results.append(
             {
                 "id": row.id,
                 "product_id": product.id if product else None,
                 "product_name": product_name,
                 "product_code": product.product_code if product else "",
-                "sku": item.sku if item else "",
+                "sku": sku,
                 "barcode": item.barcode if item else "",
                 "movement_type": row.movement_type,
                 "quantity_in": str(row.quantity_in or Decimal("0")),

@@ -1066,6 +1066,34 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
             variant.reorder_level = int(reorder)
         variant.save(update_fields=["quantity_on_hand", "reorder_level"])
         PIMSyncService.sync_variant_to_operational_product(variant)
+
+        # Synchronize with inventory stock ledger if inventory profile exists
+        if qty is not None and variant.operational_product:
+            try:
+                op = variant.operational_product
+                inv = getattr(op, "inventory_profile", None)
+                if inv and inv.stock_tracking_enabled:
+                    current_live = int(inv.current_stock_quantity())
+                    target_qty = int(qty)
+                    diff = target_qty - current_live
+                    if diff != 0:
+                        from decimal import Decimal
+                        from inventory.models import StockMovementType
+                        from inventory.services.stock_movement_service import post_movement
+                        mov_type = StockMovementType.ADJUSTMENT_IN if diff > 0 else StockMovementType.ADJUSTMENT_OUT
+                        post_movement(
+                            inventory_item=inv,
+                            movement_type=mov_type,
+                            quantity=Decimal(str(abs(diff))),
+                            reference_model="PIMVariantUpdate",
+                            reference_id=variant.id,
+                            posted_by=request.user if request.user.is_authenticated else None,
+                            notes=f"Stock updated via PIM to {target_qty} units",
+                        )
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning("Failed to sync stock to inventory ledger: %s", e)
+
         return Response(ProductVariantSerializer(variant).data)
 
     @action(detail=True, methods=["patch"])

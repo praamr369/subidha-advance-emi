@@ -56,6 +56,7 @@ export default function StockLedgerPanel({ productId, search, title = "Stock Led
         <thead>
           <tr className="border-b border-border bg-muted/20">
             <th className="px-4 py-3 font-medium text-muted-foreground">Date</th>
+            <th className="px-4 py-3 font-medium text-muted-foreground">SKU / Item</th>
             <th className="px-4 py-3 font-medium text-muted-foreground">Movement Type</th>
             <th className="px-4 py-3 font-medium text-muted-foreground">Reference</th>
             <th className="px-4 py-3 font-medium text-muted-foreground">Location</th>
@@ -67,6 +68,14 @@ export default function StockLedgerPanel({ productId, search, title = "Stock Led
           {data.map((row) => (
             <tr key={row.id} className="transition-colors hover:bg-muted/10">
               <td className="px-4 py-3 whitespace-nowrap">{accountingDate(row.movement_date) || "—"}</td>
+              <td className="px-4 py-3">
+                <div className="font-mono text-xs font-semibold">{row.sku || row.product_code || "—"}</div>
+                {row.product_name && (
+                  <div className="text-[11px] text-muted-foreground line-clamp-1 max-w-[240px]" title={row.product_name}>
+                    {row.product_name}
+                  </div>
+                )}
+              </td>
               <td className="px-4 py-3">
                 <span className="inline-flex items-center rounded bg-muted/50 px-2 py-0.5 text-[11px] font-medium tracking-wide">
                   {row.movement_type.replaceAll("_", " ")}
