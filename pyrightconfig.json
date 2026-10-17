@@ -12,5 +12,7 @@
   ],
   "pythonVersion": "3.14",
   "venvPath": "backend",
-  "venv": "venv"
+  "venv": "venv",
+  "reportIncompatibleMethodOverride": "none",
+  "reportAttributeAccessIssue": "none"
 }

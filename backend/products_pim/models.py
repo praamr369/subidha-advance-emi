@@ -135,6 +135,10 @@ class PimProduct(models.Model):
         blank=True,
         db_index=True,
     )
+    category_id: int
+    subcategory_id: int | None
+    parent_id: int | None
+    source_product_id: int | None
     name = models.CharField(max_length=300)
     description = models.TextField(blank=True)
     category = models.ForeignKey(ProductCategory, on_delete=models.PROTECT, related_name="products")
@@ -250,6 +254,8 @@ class ProductVariant(models.Model):
         blank=True,
         related_name="pim_variant"
     )
+    product_id: int
+    operational_product_id: int | None
     sku = models.CharField(max_length=150, unique=True)
     variant_name = models.CharField(
         max_length=255,

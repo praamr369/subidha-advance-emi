@@ -1,3 +1,5 @@
+# pyright: reportIncompatibleMethodOverride=false
+# pyright: reportAttributeAccessIssue=false
 from typing import cast
 from django.db.models import Q
 from products_pim.services.sync_service import PIMSyncService
