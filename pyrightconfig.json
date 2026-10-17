@@ -4,12 +4,13 @@
   ],
   "exclude": [
     "**/node_modules",
-    "**/__pycache__",
-    "backend/venv"
+    "**/__pycache__"
   ],
   "extraPaths": [
-    "backend"
+    "backend",
+    "backend/venv/lib/python3.14/site-packages"
   ],
+  "pythonVersion": "3.14",
   "venvPath": "backend",
   "venv": "venv"
 }
