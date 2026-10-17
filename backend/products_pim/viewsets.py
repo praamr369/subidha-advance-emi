@@ -95,11 +95,14 @@ class CategoryAttributeViewSet(viewsets.ModelViewSet):
             elif is_active_param.lower() in ("false", "0"):
                 qs = qs.filter(is_active=False)
         category_id = self.request.query_params.get("category")
-        subcategory_id = self.request.query_params.get("subcategory")
+        subcategory_param = self.request.query_params.get("subcategory")
         if category_id:
             qs = qs.filter(category_id=category_id)
-        if subcategory_id:
-            qs = qs.filter(Q(subcategory_id=subcategory_id) | Q(subcategory__isnull=True))
+        if subcategory_param is not None:
+            if subcategory_param.lower() in ("none", "null", "0", ""):
+                qs = qs.filter(subcategory__isnull=True)
+            else:
+                qs = qs.filter(Q(subcategory_id=subcategory_param) | Q(subcategory__isnull=True))
         return qs
 
 

@@ -645,22 +645,16 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
             }
           });
 
-          // 2. Also check allAttributes for any matching this category/subcategory
-          if (cid) {
-            allAttributes.forEach(ga => {
-              if (ga.category === cid && !removedAttrIds.has(ga.id)) {
-                if (!categoryAttrMap.has(ga.id)) {
-                  categoryAttrMap.set(ga.id, ga);
-                }
-              }
-            });
-          }
-
-          // 3. Any attributes stored directly in product.attributes
+          // 2. Any attributes stored directly in product.attributes that actually have values
           const extraAttrs: PimCategoryAttribute[] = [];
           if (product && product.attributes) {
             for (const a of product.attributes) {
               if (categoryAttrMap.has(a.attribute) || removedAttrIds.has(a.attribute)) continue;
+              const hasVal = (a.value_text && a.value_text.trim() !== "") ||
+                             (a.value_number !== null && a.value_number !== undefined) ||
+                             (a.value_boolean !== null && a.value_boolean !== undefined) ||
+                             (a.value_date && a.value_date.trim() !== "");
+              if (!hasVal) continue; // Ignore empty phantom rows
               const globalAttr = allAttributes.find((ga) => ga.id === a.attribute);
               const prevAttr = prev.find((p) => p.id === a.attribute);
               if (globalAttr) {
@@ -813,6 +807,34 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
       return next;
     });
   }, []);
+
+  const handleToggleVariantDefining = useCallback(async (attrId: number) => {
+    const target = attributes.find((a) => a.id === attrId);
+    if (!target) return;
+    const nextVal = !target.is_variant_defining;
+
+    // 1. Optimistically update local attributes
+    setAttributes((prev) =>
+      prev.map((a) => (a.id === attrId ? { ...a, is_variant_defining: nextVal } : a))
+    );
+    setAllAttributes((prev) =>
+      prev.map((a) => (a.id === attrId ? { ...a, is_variant_defining: nextVal } : a))
+    );
+
+    // 2. Persist to backend category attribute
+    try {
+      await pimService.patchAttribute(attrId, { is_variant_defining: nextVal });
+    } catch (err: unknown) {
+      // Revert on failure
+      setAttributes((prev) =>
+        prev.map((a) => (a.id === attrId ? { ...a, is_variant_defining: !nextVal } : a))
+      );
+      setAllAttributes((prev) =>
+        prev.map((a) => (a.id === attrId ? { ...a, is_variant_defining: !nextVal } : a))
+      );
+      setError((err as { message?: string })?.message ?? "Failed to update variant-defining setting");
+    }
+  }, [attributes]);
 
   // Open panel + load all attributes for the "existing" tab
   const openAttrPanel = useCallback((tab: "create" | "existing" = "create") => {
@@ -1574,6 +1596,7 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
             onRemove={handleRemoveAttribute}
             onAddOption={handleQuickAddOption}
             templateAttributes={allAttributes}
+            onToggleVariantDefining={handleToggleVariantDefining}
           />
 
           {/* Inline attribute panel */}

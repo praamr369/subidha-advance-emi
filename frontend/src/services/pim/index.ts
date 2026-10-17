@@ -277,13 +277,23 @@ export const pimService = {
     const params = new URLSearchParams();
     params.set("page_size", "500");
     if (categoryId) params.set("category", String(categoryId));
-    if (subcategoryId) params.set("subcategory", String(subcategoryId));
+    if (subcategoryId) {
+      params.set("subcategory", String(subcategoryId));
+    } else if (categoryId) {
+      params.set("subcategory", "none");
+    }
     return request<PaginatedOrArray<PimCategoryAttribute>>(`${BASE}/attributes/?${params}`).then(unwrap);
   },
 
   getAllAttributes: (): Promise<PimCategoryAttribute[]> => {
     return request<PaginatedOrArray<PimCategoryAttribute>>(`${BASE}/attributes/?page_size=1000`).then(unwrap);
   },
+
+  patchAttribute: (attributeId: number, data: Partial<PimCategoryAttribute>): Promise<PimCategoryAttribute> =>
+    request<PimCategoryAttribute>(`${BASE}/attributes/${attributeId}/`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
 
   createAttribute: (data: {
     category: number;

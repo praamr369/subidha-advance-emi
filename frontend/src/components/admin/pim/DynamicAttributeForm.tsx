@@ -27,6 +27,8 @@ interface Props {
   onAddOption?: (attr: PimCategoryAttribute, value: string) => Promise<PimAttributeOption>;
   /** Every attribute in the catalogue — values of same-named attributes in other categories are offered as templates. */
   templateAttributes?: PimCategoryAttribute[];
+  /** Called when operator toggles an attribute's variant-defining flag */
+  onToggleVariantDefining?: (attributeId: number) => void;
 }
 
 export type { AttributeValues };
@@ -121,6 +123,7 @@ export default function DynamicAttributeForm({
   onRemove,
   onAddOption,
   templateAttributes,
+  onToggleVariantDefining,
 }: Props) {
   // Quick-add state: which attribute's inline "new value" box is open, and per-attribute busy/errors.
   const [addingFor, setAddingFor] = useState<number | null>(null);
@@ -199,11 +202,35 @@ export default function DynamicAttributeForm({
                     Inactive
                   </span>
                 )}
-                {attr.is_variant_defining && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-950/50 dark:text-purple-300 px-2 py-0.5 text-[10px] font-semibold border border-purple-300 dark:border-purple-700" title="Variant-defining attribute">
-                    <Layers className="h-3 w-3 text-purple-600 dark:text-purple-400" />
-                    Variant Defining
-                  </span>
+                {onToggleVariantDefining ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onToggleVariantDefining(attr.id);
+                    }}
+                    title={
+                      attr.is_variant_defining
+                        ? "Variant-defining attribute (Click to switch to Standard Attribute)"
+                        : "Standard attribute (Click to enable Variant-Defining)"
+                    }
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold border transition-all cursor-pointer ${
+                      attr.is_variant_defining
+                        ? "bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border-purple-300 dark:border-purple-700 hover:bg-purple-200 dark:hover:bg-purple-900/50 shadow-sm"
+                        : "bg-muted/70 text-muted-foreground border-border hover:bg-muted hover:text-foreground"
+                    }`}
+                  >
+                    <Layers className={`h-3 w-3 ${attr.is_variant_defining ? "text-purple-600 dark:text-purple-400" : "text-muted-foreground"}`} />
+                    {attr.is_variant_defining ? "Variant Defining" : "Standard (Make Variant)"}
+                  </button>
+                ) : (
+                  attr.is_variant_defining && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-950/50 dark:text-purple-300 px-2 py-0.5 text-[10px] font-semibold border border-purple-300 dark:border-purple-700" title="Variant-defining attribute">
+                      <Layers className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+                      Variant Defining
+                    </span>
+                  )
                 )}
                 {attr.is_required && (
                   <span className="inline-flex items-center rounded-full bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-300 px-1.5 py-0.5 text-[10px] font-semibold border border-rose-300 dark:border-rose-700">
@@ -363,11 +390,35 @@ export default function DynamicAttributeForm({
                   Inactive
                 </span>
               )}
-              {attr.is_variant_defining && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-950/50 dark:text-purple-300 px-2 py-0.5 text-[10px] font-semibold border border-purple-300 dark:border-purple-700" title="Variant-defining attribute">
-                  <Layers className="h-3 w-3 text-purple-600 dark:text-purple-400" />
-                  Variant Defining
-                </span>
+              {onToggleVariantDefining ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onToggleVariantDefining(attr.id);
+                  }}
+                  title={
+                    attr.is_variant_defining
+                      ? "Variant-defining attribute (Click to switch to Standard Attribute)"
+                      : "Standard attribute (Click to enable Variant-Defining)"
+                  }
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold border transition-all cursor-pointer ${
+                    attr.is_variant_defining
+                      ? "bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border-purple-300 dark:border-purple-700 hover:bg-purple-200 dark:hover:bg-purple-900/50 shadow-sm"
+                      : "bg-muted/70 text-muted-foreground border-border hover:bg-muted hover:text-foreground"
+                  }`}
+                >
+                  <Layers className={`h-3 w-3 ${attr.is_variant_defining ? "text-purple-600 dark:text-purple-400" : "text-muted-foreground"}`} />
+                  {attr.is_variant_defining ? "Variant Defining" : "Standard (Make Variant)"}
+                </button>
+              ) : (
+                attr.is_variant_defining && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-950/50 dark:text-purple-300 px-2 py-0.5 text-[10px] font-semibold border border-purple-300 dark:border-purple-700" title="Variant-defining attribute">
+                    <Layers className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+                    Variant Defining
+                  </span>
+                )
               )}
               {attr.is_required && (
                 <span className="inline-flex items-center rounded-full bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-300 px-1.5 py-0.5 text-[10px] font-semibold border border-rose-300 dark:border-rose-700">

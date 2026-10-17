@@ -388,16 +388,25 @@ class PimProductCreateUpdateSerializer(serializers.ModelSerializer):
             attribute_id = attr_data.get("attribute")
             if not attribute_id:
                 continue
-            ProductAttribute.objects.update_or_create(
-                product=product,
-                attribute_id=attribute_id,
-                defaults={
-                    "value_text": attr_data.get("value_text", ""),
-                    "value_number": attr_data.get("value_number"),
-                    "value_boolean": attr_data.get("value_boolean"),
-                    "value_date": attr_data.get("value_date"),
-                },
-            )
+            v_text = (attr_data.get("value_text") or "").strip()
+            v_num = attr_data.get("value_number")
+            v_bool = attr_data.get("value_boolean")
+            v_date = attr_data.get("value_date")
+            has_val = bool(v_text) or (v_num is not None) or (v_bool is not None) or bool(v_date)
+
+            if has_val:
+                ProductAttribute.objects.update_or_create(
+                    product=product,
+                    attribute_id=attribute_id,
+                    defaults={
+                        "value_text": v_text,
+                        "value_number": v_num,
+                        "value_boolean": v_bool,
+                        "value_date": v_date,
+                    },
+                )
+            else:
+                ProductAttribute.objects.filter(product=product, attribute_id=attribute_id).delete()
 
     def _clean_locked_attributes(self, product):
         """Remove any locked_attributes IDs that are not actually mapped to the product."""
