@@ -4,23 +4,22 @@ This guide shows how to run **n8n** self-hosted on your Hostinger VPS and connec
 
 ---
 
-## 1. Quick Start: Run n8n on Your VPS (Docker)
+## 1. Quick Start: n8n on Your VPS (Docker & Nginx)
 
-n8n runs in a lightweight Docker container (~250MB–350MB RAM):
+n8n is running in Docker and reverse-proxied over HTTPS:
+👉 **URL**: `https://subidhafurnitureasansol.com/n8n/`
 
 ```bash
 # On your VPS (srv1391250)
 sudo docker run -d \
   --name n8n \
-  --restart unless-stopped \
-  -p 5678:5678 \
-  -e N8N_HOST="n8n.subidhafurnitureasansol.com" \
-  -e WEBHOOK_URL="https://n8n.subidhafurnitureasansol.com/" \
-  -v ~/.n8n:/home/node/.n8n \
-  n8nio/n8n
+  --restart always \
+  -p 127.0.0.1:5678:5678 \
+  -e N8N_PATH="/n8n/" \
+  -e WEBHOOK_URL="https://subidhafurnitureasansol.com/n8n/" \
+  -v /var/n8n_data:/home/node/.n8n \
+  n8nio/n8n:latest
 ```
-
-*(Or access directly via `http://93.127.195.203:5678` during initial setup).*
 
 ---
 
@@ -34,17 +33,15 @@ sudo docker run -d \
 
 ---
 
-## 3. Import the Pre-Built Workflow into n8n
+## 3. Workflow Configuration in n8n
 
-1. Open your n8n interface in your browser (`http://YOUR_VPS_IP:5678`).
-2. Click **Workflows** $\rightarrow$ **Add Workflow** $\rightarrow$ **... (menu)** $\rightarrow$ **Import from File**.
-3. Select `scripts/n8n/subidha_ai_agent_workflow.json`.
-4. Double-click the **Google Gemini** node:
+1. Open your n8n interface: `https://subidhafurnitureasansol.com/n8n/`.
+2. Open **SUBIDHA CORE - AI Assistant Workflow**.
+3. Double-click the **Google Gemini (Free Tier)** node:
    * Select **Create New Credential**.
    * Paste your free Google AI Studio API key.
-5. Click **Save** and toggle the workflow to **Active**.
-6. Copy the Production Webhook URL from the **Webhook Trigger** node:
-   e.g., `https://n8n.subidhafurnitureasansol.com/webhook/subidha-ai-query` (or `http://93.127.195.203:5678/webhook/subidha-ai-query`).
+4. Click **Save** and toggle the workflow to **Active**.
+5. The production Webhook URL is: `http://127.0.0.1:5678/webhook/subidha-ai-query`.
 
 ---
 
@@ -72,3 +69,4 @@ sudo systemctl reload-or-restart subidha-gunicorn
    * ⚠️ *List customers with overdue EMIs and highest collection risk.*
    * 📦 *Check warehouse inventory items running low on stock.*
 3. You will see the **⚡ n8n AI Agent** badge with a live, real-time natural language briefing generated from your live store database!
+

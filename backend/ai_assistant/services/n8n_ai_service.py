@@ -126,3 +126,4 @@ def query_n8n_ai(
     except Exception as exc:
         logger.exception("Unexpected error querying n8n AI webhook: %s", exc)
         return None
+
