@@ -426,7 +426,7 @@ export default function AdminAccountingPage() {
     }
   }, [query.data]);
 
-  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
+  const loadPage = useCallback(async (_mode: "initial" | "refresh" = "initial") => {
     await query.refetch();
   }, [query]);
 

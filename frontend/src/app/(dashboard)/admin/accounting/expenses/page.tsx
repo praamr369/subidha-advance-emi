@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { ArrowRight, FileText, CheckCircle2, Clock, AlertCircle } from "lucide-react";
+import { ArrowRight, FileText, CheckCircle2, Clock } from "lucide-react";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
@@ -89,7 +89,7 @@ export default function AccountingExpensesPage() {
     }
   }, [query.data]);
 
-  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
+  const loadPage = useCallback(async (_mode: "initial" | "refresh" = "initial") => {
     await query.refetch();
   }, [query]);
 
@@ -571,7 +571,7 @@ export default function AccountingExpensesPage() {
                           <div className="mt-2 flex flex-col gap-1 text-xs text-muted-foreground">
                             <span className="font-medium text-foreground">{expense.expense_account_name || expense.expense_account_code}</span>
                             <span>{expense.branch_code ? `Branch: ${expense.branch_code}` : "HQ"} · {expense.payment_mode} · {formatDate(expense.expense_date)}</span>
-                            {expense.notes && <span className="italic mt-1">"{expense.notes}"</span>}
+                            {expense.notes && <span className="italic mt-1">&ldquo;{expense.notes}&rdquo;</span>}
                           </div>
                         </div>
                         <div className="text-right">

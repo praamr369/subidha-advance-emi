@@ -70,6 +70,7 @@ class Phase8CmsPublicContentControlTests(APITestCase):
             # schemes a product can be bought on is the point of the field; the
             # raw is_*_enabled booleans stay private (asserted below).
             "scheme_pricing",
+            "rent_yield_estimates",
         }
         self.assertEqual(set(row.keys()), allowed)
 
@@ -103,6 +104,7 @@ class Phase8CmsPublicContentControlTests(APITestCase):
                     "available_schemes",
                     "schemes",
                     "rules",
+                    "has_active_batches",
                 },
             )
             for scheme in pricing["schemes"].values():

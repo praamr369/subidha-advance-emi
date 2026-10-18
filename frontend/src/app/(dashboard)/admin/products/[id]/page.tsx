@@ -208,7 +208,7 @@ export default function AdminProductDetailPage() {
 
   const loading = query.isLoading && !!productId;
   const refreshing = query.isFetching && !query.isLoading;
-  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
+  const loadPage = useCallback(async (_mode: "initial" | "refresh" = "initial") => {
     if (!productId) return;
     await query.refetch();
   }, [query, productId]);

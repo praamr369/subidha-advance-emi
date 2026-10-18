@@ -417,7 +417,7 @@ export default function AdminBatchDetailPage() {
 
   const loading = query.isLoading && !!batchId;
   const refreshing = query.isFetching && !query.isLoading;
-  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
+  const loadPage = useCallback(async (_mode: "initial" | "refresh" = "initial") => {
     if (!batchId) return;
     await query.refetch();
   }, [query, batchId]);

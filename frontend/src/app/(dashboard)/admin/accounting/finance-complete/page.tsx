@@ -7,7 +7,6 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
 import {
   leaseCalculateROU,
-  leaseGenerateSchedule,
   getCostCentrePL,
   getCashFlowStatement,
   getFundFlowStatement,
@@ -36,7 +35,6 @@ export default function FinanceCompletePage() {
 
   // Lease state
   const [leaseSubId, setLeaseSubId] = useState("");
-  const [leaseDiscountRate, setLeaseDiscountRate] = useState("8.5");
   const [leaseCalc, setLeaseCalc] = useState<any>(null);
   const [leaseContracts, setLeaseContracts] = useState<LeaseContractRecord[]>([]);
   const [leaseCreateBusy, setLeaseCreateBusy] = useState(false);

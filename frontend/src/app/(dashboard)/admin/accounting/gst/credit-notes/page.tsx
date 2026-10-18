@@ -60,7 +60,7 @@ export default function AccountingCreditNotesPage() {
   const pageError = query.error ? accountingErrorMessage(query.error, "Failed to load credit notes.") : null;
   const error = pageError || actionError;
 
-  const loadPage = useCallback(async (mode?: "initial" | "refresh") => {
+  const loadPage = useCallback(async (_mode?: "initial" | "refresh") => {
     await query.refetch();
   }, [query]);
 

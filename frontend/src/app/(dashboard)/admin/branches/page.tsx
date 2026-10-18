@@ -94,7 +94,7 @@ export default function AdminBranchesPage() {
 
   const loading = query.isLoading;
   const refreshing = query.isFetching && !query.isLoading;
-  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
+  const loadPage = useCallback(async (_mode: "initial" | "refresh" = "initial") => {
     await query.refetch();
   }, [query]);
 
