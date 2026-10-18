@@ -30,6 +30,7 @@ import {
   listSalaryPayments,
   listSalarySheetsSafe as listSalarySheets,
   postSalarySheetSafe as postSalarySheet,
+  type PayrollPeriod,
 } from "@/services/accounting";
 
 function toErrorMessage(error: unknown): string {

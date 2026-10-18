@@ -24,6 +24,7 @@ import {
   type CostCentrePL,
   type LeaseContractRecord,
   type FixedAssetRecord,
+  type LeaseROUCalculation,
 } from "@/services/finance-complete";
 
 type Tab = "lease" | "depreciation" | "cost-centre" | "cash-flow" | "fund-flow" | "ratios" | "deferred-tax";
@@ -35,7 +36,7 @@ export default function FinanceCompletePage() {
 
   // Lease state
   const [leaseSubId, setLeaseSubId] = useState("");
-  const [leaseCalc, setLeaseCalc] = useState<any>(null);
+  const [leaseCalc, setLeaseCalc] = useState<LeaseROUCalculation | null>(null);
   const [leaseContracts, setLeaseContracts] = useState<LeaseContractRecord[]>([]);
   const [leaseCreateBusy, setLeaseCreateBusy] = useState(false);
   const [leaseCreateMsg, setLeaseCreateMsg] = useState("");
@@ -624,11 +625,11 @@ export default function FinanceCompletePage() {
             <div className="space-y-4">
               <h3 className="text-sm font-bold">Financial Ratios & Intelligence</h3>
               <div className="grid grid-cols-2 gap-3">
-                {Object.entries(ratios).filter(([k]) => k !== 'alerts').map(([category, values]: any) => (
+                {(Object.entries(ratios).filter(([k]) => k !== "alerts") as [string, Record<string, number>][]).map(([category, values]) => (
                   <div key={category} className="border border-border/50 rounded-lg p-3">
                     <div className="text-xs font-semibold text-muted-foreground mb-2 capitalize">{category.replace(/_/g, " ")}</div>
                     <div className="space-y-1 text-xs">
-                      {Object.entries(values as Record<string, number>).map(([key, val]) => (
+                      {Object.entries(values).map(([key, val]) => (
                         <div key={key} className="flex justify-between">
                           <span className="text-muted-foreground capitalize">{key.replace(/_/g, " ")}:</span>
                           <span className="font-medium">{typeof val === 'number' ? val.toFixed(2) : val}</span>

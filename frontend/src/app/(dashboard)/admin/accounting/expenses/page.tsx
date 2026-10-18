@@ -89,7 +89,7 @@ export default function AccountingExpensesPage() {
     }
   }, [query.data]);
 
-  const loadPage = useCallback(async (_mode: "initial" | "refresh" = "initial") => {
+  const loadPage = useCallback(async () => {
     await query.refetch();
   }, [query]);
 
