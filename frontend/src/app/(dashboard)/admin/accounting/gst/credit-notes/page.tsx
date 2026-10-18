@@ -1,7 +1,7 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useState, type FormEvent } from "react";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
@@ -24,8 +24,6 @@ import {
   listCreditNotes,
   listTaxInvoices,
   postCreditNote,
-  type GstNote,
-  type TaxInvoice,
 } from "@/services/accounting";
 import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 
@@ -34,8 +32,6 @@ const today = new Date().toISOString().slice(0, 10);
 export default function AccountingCreditNotesPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [notes, setNotes] = useState<GstNote[]>([]);
-  const [invoices, setInvoices] = useState<TaxInvoice[]>([]);
   const [form, setForm] = useState({
     original_invoice: "",
     note_date: today,
@@ -60,19 +56,12 @@ export default function AccountingCreditNotesPage() {
   const pageError = query.error ? accountingErrorMessage(query.error, "Failed to load credit notes.") : null;
   const error = pageError || actionError;
 
-  const loadPage = useCallback(async (_mode?: "initial" | "refresh") => {
+  const loadPage = useCallback(async () => {
     await query.refetch();
   }, [query]);
 
-  useEffect(() => {
-    if (query.data) {
-      setNotes(query.data.notes);
-      setInvoices(query.data.invoices);
-    } else if (query.isError) {
-      setNotes([]);
-      setInvoices([]);
-    }
-  }, [query.data, query.isError]);
+  const notes = query.data?.notes ?? [];
+  const invoices = query.data?.invoices ?? [];
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useMemo, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import EmptyState from "@/components/feedback/EmptyState";
@@ -30,11 +30,6 @@ import {
   listSalaryPayments,
   listSalarySheetsSafe as listSalarySheets,
   postSalarySheetSafe as postSalarySheet,
-  type EmployeeProfile,
-  type FinanceAccount,
-  type PayrollPeriod,
-  type SalaryPayment,
-  type SalarySheet,
 } from "@/services/accounting";
 
 function toErrorMessage(error: unknown): string {
@@ -43,11 +38,6 @@ function toErrorMessage(error: unknown): string {
 
 export default function AccountingSalaryPage() {
   const [notice, setNotice] = useState<string | null>(null);
-  const [employees, setEmployees] = useState<EmployeeProfile[]>([]);
-  const [salarySheets, setSalarySheets] = useState<SalarySheet[]>([]);
-  const [salaryPayments, setSalaryPayments] = useState<SalaryPayment[]>([]);
-  const [financeAccounts, setFinanceAccounts] = useState<FinanceAccount[]>([]);
-  const [payrollPeriods, setPayrollPeriods] = useState<PayrollPeriod[]>([]);
 
   const query = useQuery({
     queryKey: ["salaryPageData"],
@@ -75,19 +65,15 @@ export default function AccountingSalaryPage() {
   const error = query.error ? toErrorMessage(query.error) : null;
   const [actionError, setActionError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (query.data) {
-      setEmployees(query.data.employees);
-      setSalarySheets(query.data.salarySheets);
-      setSalaryPayments(query.data.salaryPayments);
-      setFinanceAccounts(query.data.financeAccounts);
-      setPayrollPeriods(query.data.payrollPeriods);
-    }
-  }, [query.data]);
-
-  const loadPage = useCallback(async (_mode: "initial" | "refresh" = "initial") => {
+  const loadPage = useCallback(async () => {
     await query.refetch();
   }, [query]);
+
+  const employees = useMemo(() => query.data?.employees ?? [], [query.data?.employees]);
+  const salarySheets = useMemo(() => query.data?.salarySheets ?? [], [query.data?.salarySheets]);
+  const salaryPayments = useMemo(() => query.data?.salaryPayments ?? [], [query.data?.salaryPayments]);
+  const financeAccounts = useMemo(() => query.data?.financeAccounts ?? [], [query.data?.financeAccounts]);
+  const payrollPeriods = useMemo(() => query.data?.payrollPeriods ?? [], [query.data?.payrollPeriods]);
 
   const [salaryForm, setSalaryForm] = useState({
     employee: "",

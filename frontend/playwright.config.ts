@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
-import os from "node:os";
+import * as os from "node:os";
 
 import { defineConfig, devices } from "@playwright/test";
 
