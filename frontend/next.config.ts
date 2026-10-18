@@ -196,6 +196,7 @@ const nextConfig: NextConfig = {
   compress: true,
   poweredByHeader: false,
   experimental: {
+    cpus: process.env.NEXT_BUILD_CPUS ? parseInt(process.env.NEXT_BUILD_CPUS, 10) : 1,
     staleTimes: {
       dynamic: 0,
       // Next.js 16 requires static stale times to be at least 30 seconds.
