@@ -612,7 +612,7 @@ class PimProductViewSet(viewsets.ModelViewSet):
         errors = []
 
         # Cache parent PimProduct objects so variants can inherit category/subcategory
-        parent_cache: dict[int, PimProduct] = {}
+        parent_cache: dict[int, PimProduct | None] = {}
 
         for sp in sub_qs:
             try:
