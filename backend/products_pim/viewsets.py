@@ -1146,10 +1146,11 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
         from decimal import Decimal, InvalidOperation
         from django.db import transaction
 
-        with transaction.atomic():
-            variant = self.get_object()
-            old_sku = variant.sku
-            dirty_fields = []
+        try:
+            with transaction.atomic():
+                variant = self.get_object()
+                old_sku = variant.sku
+                dirty_fields = []
 
             # Scalar fields with robust type coercion
             if "price" in request.data:
@@ -1174,7 +1175,7 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
 
             if "barcode" in request.data:
                 raw_bc = request.data.get("barcode")
-                variant.barcode = str(raw_bc).strip() if raw_bc and str(raw_bc).strip() != "" else None
+                variant.barcode = str(raw_bc).strip()[:100] if raw_bc and str(raw_bc).strip() != "" else None
                 dirty_fields.append("barcode")
 
             if "reorder_level" in request.data:
@@ -1189,7 +1190,7 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
                 dirty_fields.append("reorder_level")
 
             if request.data.get("sku") is not None:
-                new_sku = str(request.data.get("sku")).strip()
+                new_sku = str(request.data.get("sku")).strip()[:150]
                 if new_sku and new_sku != variant.sku:
                     variant.sku = new_sku
                     dirty_fields.append("sku")
@@ -1197,6 +1198,8 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
             if "variant_name" in request.data or "name" in request.data or "product_name" in request.data:
                 raw_name = request.data.get("variant_name") if "variant_name" in request.data else (request.data.get("name") if "name" in request.data else request.data.get("product_name"))
                 v_name = str(raw_name).strip() if raw_name is not None and str(raw_name).strip() != "" else None
+                if v_name and len(v_name) > 255:
+                    v_name = v_name[:252] + "..."
                 variant.variant_name = v_name
                 dirty_fields.append("variant_name")
 
@@ -1336,12 +1339,20 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
                 from rest_framework.exceptions import ValidationError
                 raise ValidationError({"detail": f"Failed to sync operational product: {str(e)}"})
 
-        variant.refresh_from_db()
-        # Re-prefetch for correct serialisation
-        variant = ProductVariant.objects.prefetch_related(
-            "attribute_values__attribute"
-        ).get(pk=variant.pk)
-        return Response(ProductVariantSerializer(variant).data)
+            variant.refresh_from_db()
+            # Re-prefetch for correct serialisation
+            variant = ProductVariant.objects.prefetch_related(
+                "attribute_values__attribute"
+            ).get(pk=variant.pk)
+            return Response(ProductVariantSerializer(variant).data)
+        except Exception as exc:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.exception("Failed to update variant attributes for variant %s: %s", pk, exc)
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
 
 class ProductMediaItemViewSet(viewsets.ModelViewSet):

@@ -286,6 +286,12 @@ class ProductVariant(models.Model):
         return self.quantity_on_hand <= self.reorder_level
 
     def save(self, *args, **kwargs):
+        if self.variant_name and len(self.variant_name) > 255:
+            self.variant_name = self.variant_name[:252] + "..."
+        if self.sku and len(self.sku) > 150:
+            self.sku = self.sku[:150]
+        if self.barcode and len(self.barcode) > 100:
+            self.barcode = self.barcode[:100]
         if not self.barcode:
             import random
             while True:

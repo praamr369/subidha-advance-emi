@@ -96,3 +96,24 @@ class VariantAttributeScopeTests(APITestCase):
         self.assertIsNotNone(vav)
         self.assertEqual(vav.value_text, "5x6")
 
+    def test_variant_update_attributes_with_long_variant_name(self):
+        admin = create_admin_user(username="scope_admin_patch_long", phone="9011000953")
+        self.client.force_authenticate(user=admin)
+        from products_pim.models import ProductVariant
+        variant = ProductVariant.objects.create(
+            product=self.product,
+            sku="SCOPE-BED-LONG-NAME",
+            price=Decimal("12000.00"),
+        )
+        url = f"/api/v1/pim/variants/{variant.id}/update_attributes/"
+        long_name = "Bed Product Title " + ("Long Attribute Value " * 20)  # > 400 characters
+        payload = {
+            "variant_name": long_name,
+        }
+        response = self.client.patch(url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        variant.refresh_from_db()
+        self.assertIsNotNone(variant.variant_name)
+        self.assertLessEqual(len(variant.variant_name), 255)
+
+

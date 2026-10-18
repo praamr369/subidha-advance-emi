@@ -269,22 +269,40 @@ function VariantEditPanel({
   };
 
   const computeStructuredName = useCallback(() => {
-    const base = productName || "Product";
+    const base = (productName || "Product").trim();
+
+    // Map active non-locked attributes
+    const activeAttrsList = state.activeAttrIds
+      .map((id) => mergedAttrs.find((a) => a.id === id))
+      .filter((a): a is PimCategoryAttribute => !!a && !lockedAttributes?.has(a.id));
+
+    // Prefer variant-defining attributes if any have non-empty values
+    const definingWithValues = activeAttrsList.filter(
+      (a) => a.is_variant_defining && (state.attrValues[a.id] ?? "").trim() !== ""
+    );
+    const candidateList = definingWithValues.length > 0
+      ? definingWithValues
+      : activeAttrsList.filter((a) => (state.attrValues[a.id] ?? "").trim() !== "");
+
     const parts: string[] = [];
-    for (const id of state.activeAttrIds) {
-      const val = state.attrValues[id];
-      if (!val || val.trim() === "") continue;
-      const attr = mergedAttrs.find((a) => a.id === id);
-      if (attr) {
-        parts.push(`${attr.name}: ${val.trim()}`);
-      }
+    for (const attr of candidateList) {
+      const val = (state.attrValues[attr.id] ?? "").trim();
+      if (!val) continue;
+      parts.push(`${attr.name}: ${val}`);
     }
-    return parts.length > 0 ? `${base} (${parts.join(", ")})` : base;
-  }, [productName, state.activeAttrIds, state.attrValues, mergedAttrs]);
+
+    if (parts.length === 0) return base.slice(0, 255);
+
+    let structured = `${base} (${parts.join(", ")})`;
+    if (structured.length > 255) {
+      structured = structured.slice(0, 252).trim() + "...";
+    }
+    return structured;
+  }, [productName, state.activeAttrIds, state.attrValues, mergedAttrs, lockedAttributes]);
 
   const handleAutoStructureName = () => {
     const structured = computeStructuredName();
-    set("variant_name", structured);
+    set("variant_name", structured.slice(0, 255));
   };
 
   const handleSave = async () => {
@@ -295,8 +313,12 @@ function VariantEditPanel({
       setSynced(true);
       setTimeout(() => setSynced(false), 2500);
     } catch (err: unknown) {
-      const apiErr = err as { message?: string };
-      setSaveError(apiErr?.message ?? "Failed to save variant attributes");
+      const apiErr = err as { message?: string; detail?: string };
+      const rawMsg = apiErr?.detail || apiErr?.message || "Failed to save variant attributes";
+      const cleanMsg = rawMsg.includes("<html") || rawMsg.includes("<!doctype") || rawMsg.includes("Server Error (500)")
+        ? "Server encountered an error saving variant. Please verify attribute values and try again."
+        : rawMsg;
+      setSaveError(cleanMsg);
     } finally {
       setSaving(false);
     }
@@ -395,9 +417,10 @@ function VariantEditPanel({
         </div>
         <input
           type="text"
+          maxLength={255}
           className="w-full rounded-lg border bg-background px-3 py-1.5 text-sm font-medium focus:ring-1 focus:ring-primary"
           value={state.variant_name}
-          onChange={(e) => set("variant_name", e.target.value)}
+          onChange={(e) => set("variant_name", e.target.value.slice(0, 255))}
           placeholder={computeStructuredName() || "System auto-generates title from attributes..."}
         />
         <p className="text-[11px] text-muted-foreground">
@@ -887,11 +910,11 @@ export default function VariantManager({ productId, productCode, productName, ba
       });
 
     await pimService.updateVariantAttributes(variantId, {
-      sku: state.sku.trim(),
-      variant_name: state.variant_name.trim(),
+      sku: state.sku.trim().slice(0, 150),
+      variant_name: state.variant_name ? state.variant_name.trim().slice(0, 255) : undefined,
       price: state.price,
       cost_price: state.cost_price || undefined,
-      barcode: state.barcode || undefined,
+      barcode: state.barcode ? state.barcode.trim().slice(0, 100) : undefined,
       reorder_level: state.reorder_level ? Number(state.reorder_level) : undefined,
       attribute_values: attrPayload,
       remove_attributes: state.removedAttrIds,
