@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import EmptyState from "@/components/feedback/EmptyState";
@@ -27,7 +27,6 @@ const today = new Date().toISOString().slice(0, 10);
 
 export default function AccountingItrPackPage() {
   const [notice, setNotice] = useState<string | null>(null);
-  const [jobs, setJobs] = useState<ExportPackJob[]>([]);
   const [form, setForm] = useState({
     financial_year: "",
     start_date: today.slice(0, 5) + "04-01",
@@ -41,16 +40,12 @@ export default function AccountingItrPackPage() {
     },
   });
 
+  const jobs: ExportPackJob[] = query.data ?? [];
+
   const loading = query.isLoading;
   const refreshing = query.isFetching && !query.isLoading;
   const error = query.error ? accountingErrorMessage(query.error, "Failed to load ITR export packs.") : null;
   const [actionError, setActionError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (query.data) {
-      setJobs(query.data);
-    }
-  }, [query.data]);
 
   const loadPage = useCallback(async () => {
     await query.refetch();

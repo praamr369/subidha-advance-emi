@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { ArrowRight, FileText, CheckCircle2, Clock } from "lucide-react";
@@ -51,11 +51,6 @@ export default function AccountingExpensesPage() {
   const [activeTab, setActiveTab] = useState("overview");
   const [notice, setNotice] = useState<string | null>(null);
 
-  const [expenses, setExpenses] = useState<ExpenseVoucher[]>([]);
-  const [expenseAccounts, setExpenseAccounts] = useState<ChartOfAccount[]>([]);
-  const [financeAccounts, setFinanceAccounts] = useState<FinanceAccount[]>([]);
-  const [branches, setBranches] = useState<BranchRecord[]>([]);
-
   const query = useQuery({
     queryKey: ["expensesPageData"],
     queryFn: async () => {
@@ -75,19 +70,15 @@ export default function AccountingExpensesPage() {
     },
   });
 
+  const expenses: ExpenseVoucher[] = query.data?.expenses ?? [];
+  const expenseAccounts: ChartOfAccount[] = query.data?.expenseAccounts ?? [];
+  const financeAccounts: FinanceAccount[] = query.data?.financeAccounts ?? [];
+  const branches: BranchRecord[] = query.data?.branches ?? [];
+
   const loading = query.isLoading;
   const refreshing = query.isFetching && !query.isLoading;
   const error = query.error ? toErrorMessage(query.error) : null;
   const [actionError, setActionError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (query.data) {
-      setExpenses(query.data.expenses);
-      setExpenseAccounts(query.data.expenseAccounts);
-      setFinanceAccounts(query.data.financeAccounts);
-      setBranches(query.data.branches);
-    }
-  }, [query.data]);
 
   const loadPage = useCallback(async () => {
     await query.refetch();

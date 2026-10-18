@@ -2,7 +2,6 @@
 import { useQuery } from "@tanstack/react-query";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
@@ -13,13 +12,6 @@ import { accountingErrorMessage } from "@/components/accounting/shared";
 import { listCreditNotes, listDebitNotes, listTaxInvoices } from "@/services/accounting";
 
 export default function AccountingGstHubPage() {
-  const [stats, setStats] = useState({
-    invoices: 0,
-    postedInvoices: 0,
-    creditNotes: 0,
-    debitNotes: 0,
-  });
-
   const query = useQuery({
     queryKey: ['adminGstStats'],
     queryFn: async () => {
@@ -37,14 +29,15 @@ export default function AccountingGstHubPage() {
     }
   });
 
+  const stats = query.data ?? {
+    invoices: 0,
+    postedInvoices: 0,
+    creditNotes: 0,
+    debitNotes: 0,
+  };
+
   const loading = query.isLoading;
   const error = query.error ? accountingErrorMessage(query.error, "Failed to load GST document controls.") : null;
-
-  useEffect(() => {
-    if (query.data) {
-      setStats(query.data);
-    }
-  }, [query.data]);
 
   return (
     <ERPPageShell

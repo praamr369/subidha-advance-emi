@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
@@ -397,8 +397,6 @@ function ModuleCard({ module, setupBlocked, setupBlockers, readiness }: { module
 }
 
 export default function AdminAccountingPage() {
-  const [data, setData] = useState<CockpitData | null>(null);
-
   const query = useQuery({
     queryKey: ["accountingCockpitData"],
     queryFn: async () => {
@@ -416,15 +414,11 @@ export default function AdminAccountingPage() {
     },
   });
 
+  const data: CockpitData | null = query.data ?? null;
+
   const loading = query.isLoading;
   const refreshing = query.isFetching && !query.isLoading;
   const error = query.error ? toErrorMessage(query.error) : null;
-
-  useEffect(() => {
-    if (query.data) {
-      setData(query.data);
-    }
-  }, [query.data]);
 
   const loadPage = useCallback(async () => {
     await query.refetch();

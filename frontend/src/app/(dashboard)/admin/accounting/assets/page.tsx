@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
@@ -34,10 +34,6 @@ import {
 const today = new Date().toISOString().slice(0, 10);
 
 export default function AccountingAssetsPage() {
-  const [categories, setCategories] = useState<AssetCategory[]>([]);
-  const [assets, setAssets] = useState<Asset[]>([]);
-  const [vendors, setVendors] = useState<Vendor[]>([]);
-  const [purchaseBills, setPurchaseBills] = useState<AccountingPurchaseBill[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [categoryForm, setCategoryForm] = useState({
@@ -77,19 +73,14 @@ export default function AccountingAssetsPage() {
     },
   });
 
+  const categories: AssetCategory[] = query.data?.categories ?? [];
+  const assets: Asset[] = query.data?.assets ?? [];
+  const vendors: Vendor[] = query.data?.vendors ?? [];
+  const purchaseBills: AccountingPurchaseBill[] = query.data?.purchaseBills ?? [];
+
   const loading = query.isLoading;
   const refreshing = query.isRefetching && !query.isLoading;
   const error = (query.error ? accountingErrorMessage(query.error, "Failed to load asset registers.") : null) || actionError;
-
-  useEffect(() => {
-    if (query.data) {
-      setCategories(query.data.categories);
-      setAssets(query.data.assets);
-      setVendors(query.data.vendors);
-      setPurchaseBills(query.data.purchaseBills);
-      setActionError(null);
-    }
-  }, [query.data]);
 
   const loadPage = useCallback(async () => {
     await query.refetch();

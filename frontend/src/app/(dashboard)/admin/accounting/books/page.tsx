@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useMemo, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import EmptyState from "@/components/feedback/EmptyState";
@@ -59,8 +59,6 @@ function badgeClass(tone: "green" | "amber" | "red" | "blue" | "slate") {
 
 export default function AccountingBooksPage() {
   const [notice, setNotice] = useState<string | null>(null);
-  const [readiness, setReadiness] = useState<AccountingBooksReadiness | null>(null);
-  const [moneyMovements, setMoneyMovements] = useState<MoneyMovement[]>([]);
   
   const query = useQuery({
     queryKey: ["accountingBooksData"],
@@ -73,17 +71,13 @@ export default function AccountingBooksPage() {
     },
   });
 
+  const readiness: AccountingBooksReadiness | null = query.data?.readiness ?? null;
+  const moneyMovements: MoneyMovement[] = query.data?.moneyMovements ?? [];
+
   const loading = query.isLoading;
   const refreshing = query.isFetching && !query.isLoading;
   const error = query.error ? toErrorMessage(query.error) : null;
   const [actionError, setActionError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (query.data) {
-      setReadiness(query.data.readiness);
-      setMoneyMovements(query.data.moneyMovements);
-    }
-  }, [query.data]);
 
   const loadPage = useCallback(async () => {
     await query.refetch();

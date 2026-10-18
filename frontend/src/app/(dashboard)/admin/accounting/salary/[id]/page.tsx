@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import EmptyState from "@/components/feedback/EmptyState";
@@ -33,8 +33,6 @@ export default function AdminSalarySheetDetailPage() {
   const params = useParams<{ id: string }>();
   const salarySheetId = params?.id;
 
-  const [salarySheet, setSalarySheet] = useState<SalarySheet | null>(null);
-  const [payments, setPayments] = useState<SalaryPayment[]>([]);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -51,16 +49,12 @@ export default function AdminSalarySheetDetailPage() {
     enabled: !!salarySheetId,
   });
 
+  const salarySheet: SalarySheet | null = query.data?.sheet ?? null;
+  const payments: SalaryPayment[] = query.data?.payments ?? [];
+
   const loading = query.isLoading;
   const error = query.error ? toErrorMessage(query.error) : null;
   const [actionError, setActionError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (query.data) {
-      setSalarySheet(query.data.sheet);
-      setPayments(query.data.payments);
-    }
-  }, [query.data]);
 
   const loadPage = useCallback(async () => {
     await query.refetch();

@@ -1,7 +1,7 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
@@ -26,8 +26,6 @@ import {
 } from "@/services/accounting";
 
 export default function AccountingStaffLedgerPage() {
-  const [employees, setEmployees] = useState<EmployeeProfile[]>([]);
-  const [report, setReport] = useState<StaffLedgerReport | null>(null);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
 
   const query = useQuery({
@@ -41,6 +39,9 @@ export default function AccountingStaffLedgerPage() {
     }
   });
 
+  const employees: EmployeeProfile[] = query.data?.employees ?? [];
+  const report: StaffLedgerReport | null = query.data?.ledger ?? null;
+
   const loading = query.isLoading;
   const refreshing = query.isFetching && !query.isLoading;
   const error = query.error ? accountingErrorMessage(query.error, "Failed to load staff ledger.") : null;
@@ -52,16 +53,6 @@ export default function AccountingStaffLedgerPage() {
       await query.refetch();
     }
   }, [selectedEmployeeId, query]);
-
-  useEffect(() => {
-    if (query.data) {
-      setEmployees(query.data.employees);
-      setReport(query.data.ledger);
-    } else if (query.isError) {
-      setEmployees([]);
-      setReport(null);
-    }
-  }, [query.data, query.isError]);
 
   const columns: EnterpriseColumnDef<StaffLedgerRow>[] = [
     {

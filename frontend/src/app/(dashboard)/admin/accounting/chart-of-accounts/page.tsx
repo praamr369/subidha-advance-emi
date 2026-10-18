@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import ChartAccountCreateDrawer from "@/components/accounting/ChartAccountCreateDrawer";
@@ -31,8 +31,6 @@ function metric(payload: AccountingSetupStatusPayload | null, key: string, fallb
 }
 
 export default function AccountingChartOfAccountsPage() {
-  const [chartAccounts, setChartAccounts] = useState<ChartOfAccount[]>([]);
-  const [setupStatus, setSetupStatus] = useState<AccountingSetupStatusPayload | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [selectedChartAccountId, setSelectedChartAccountId] = useState<number | null>(null);
@@ -55,16 +53,11 @@ export default function AccountingChartOfAccountsPage() {
     },
   });
 
+  const chartAccounts: ChartOfAccount[] = query.data?.chartAccounts ?? [];
+  const setupStatus: AccountingSetupStatusPayload | null = query.data?.setupStatus ?? null;
+
   const loading = query.isLoading;
   const error = (query.error ? accountingErrorMessage(query.error, "Failed to load chart of accounts.") : null) || actionError;
-
-  useEffect(() => {
-    if (query.data) {
-      setChartAccounts(query.data.chartAccounts);
-      setSetupStatus(query.data.setupStatus);
-      setActionError(null);
-    }
-  }, [query.data]);
 
   const loadPage = useCallback(async () => {
     await query.refetch();
