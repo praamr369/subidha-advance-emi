@@ -18,7 +18,7 @@ from api.v1.views.public_policy_site import (
     PublicPolicyPageDetailView,
     PublicPolicyPageListView,
 )
-from api.v1.views.public_site import PublicBusinessProfileView
+from api.v1.views.public_site import PublicAnnouncementsView, PublicBusinessProfileView
 from subscriptions.models import (
     AuditLog,
     Batch,
@@ -650,6 +650,7 @@ from api.v1.views.whatsapp_catalog import WhatsAppCatalogFeedView  # noqa: E402
 urlpatterns = [
     path("stats/", PublicStatsView.as_view(), name="public-stats"),
     path("business-profile/", PublicBusinessProfileView.as_view(), name="public-business-profile"),
+    path("announcements/", PublicAnnouncementsView.as_view(), name="public-announcements"),
     path("policies/", PublicPolicyPageListView.as_view(), name="public-policy-list"),
     path("policies/<slug:slug>/", PublicPolicyPageDetailView.as_view(), name="public-policy-detail"),
     path("business-compliance/summary/", PublicBusinessComplianceSummaryView.as_view(), name="public-business-compliance-summary"),

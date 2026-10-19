@@ -3,7 +3,7 @@ from urllib.parse import urlparse
 from rest_framework import serializers
 
 from api.v1.serializers.business_setup import BusinessSetupModelSerializer
-from subscriptions.models_business_setup import PublicBusinessProfile
+from subscriptions.models_business_setup import PublicBusinessProfile, PublicAnnouncementBanner
 
 
 def _validate_https_url(value: str, field_name: str) -> str:
@@ -108,5 +108,67 @@ class PublicBusinessProfilePublicSerializer(serializers.ModelSerializer):
             "business_hours",
             "public_logo_url",
             "updated_at",
+        ]
+        read_only_fields = fields
+
+
+class PublicAnnouncementBannerSerializer(serializers.ModelSerializer):
+    """Admin-only serializer for managing announcement banners, offers, and news."""
+
+    class Meta:
+        model = PublicAnnouncementBanner
+        fields = [
+            "id",
+            "title",
+            "message",
+            "banner_type",
+            "badge_text",
+            "action_label",
+            "action_url",
+            "priority",
+            "is_active",
+            "image_url",
+            "image_aspect_ratio",
+            "display_placement",
+            "start_date",
+            "end_date",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ("id", "created_at", "updated_at")
+
+    def validate_title(self, value: str) -> str:
+        cleaned = (value or "").strip()
+        if not cleaned:
+            raise serializers.ValidationError("Title cannot be blank.")
+        return cleaned
+
+    def validate(self, attrs):
+        start = attrs.get("start_date") or (self.instance.start_date if self.instance else None)
+        end = attrs.get("end_date") or (self.instance.end_date if self.instance else None)
+        if start and end and start > end:
+            raise serializers.ValidationError({"end_date": "End date cannot be earlier than start date."})
+        return attrs
+
+
+class PublicAnnouncementBannerPublicSerializer(serializers.ModelSerializer):
+    """Safe, read-only serializer for public visitors on the home page."""
+
+    class Meta:
+        model = PublicAnnouncementBanner
+        fields = [
+            "id",
+            "title",
+            "message",
+            "banner_type",
+            "badge_text",
+            "action_label",
+            "action_url",
+            "priority",
+            "image_url",
+            "image_aspect_ratio",
+            "display_placement",
+            "start_date",
+            "end_date",
         ]
         read_only_fields = fields

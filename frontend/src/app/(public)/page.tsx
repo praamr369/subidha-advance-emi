@@ -14,9 +14,11 @@ import HomeSectionHeading from "@/components/public/home/HomeSectionHeading";
 import HomeVision from "@/components/public/home/HomeVision";
 import EMICalculatorWidget from "@/components/public/ui/EMICalculatorWidget";
 import WhatsAppFab from "@/components/public/ui/WhatsAppFab";
+import HomeAnnouncementBanner from "@/components/public/home/HomeAnnouncementBanner";
 import { asLocale, getPublicDictionary, getText, publicContent } from "@/lib/public-i18n";
 import { getPublicLanguage } from "@/lib/public-i18n.server";
 import { getPublicLatestWinner, getPublicStats, listPublicProducts } from "@/lib/public-api";
+import { getPublicAnnouncements } from "@/services/public-site";
 import { getResolvedPublicBusinessProfile } from "@/lib/public-profile";
 import { buildPublicMetadata } from "@/lib/public-seo";
 
@@ -33,9 +35,10 @@ const LIVE_DATA_CACHE = { revalidate: 60 } as const;
 const FEATURED_PRODUCT_COUNT = 8;
 
 export default async function PublicHome() {
-  const [language, profile, [statsResult, latestWinnerResult, productsResult]] = await Promise.all([
+  const [language, profile, announcements, [statsResult, latestWinnerResult, productsResult]] = await Promise.all([
     getPublicLanguage(),
     getResolvedPublicBusinessProfile(),
+    getPublicAnnouncements(LIVE_DATA_CACHE),
     Promise.allSettled([
       getPublicStats(LIVE_DATA_CACHE),
       getPublicLatestWinner(LIVE_DATA_CACHE),
@@ -56,13 +59,16 @@ export default async function PublicHome() {
     <PublicMarketingShell
       className="mx-auto w-full max-w-[1280px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8"
       hero={
-        <HomeHero
-          copy={copy.hero}
-          title={getText(publicContent.homeHero.title, language)}
-          subtitle={getText(publicContent.homeHero.subtitle, language)}
-          companyName={profile.resolved_display_name}
-          stats={stats}
-        />
+        <>
+          <HomeAnnouncementBanner announcements={announcements} />
+          <HomeHero
+            copy={copy.hero}
+            title={getText(publicContent.homeHero.title, language)}
+            subtitle={getText(publicContent.homeHero.subtitle, language)}
+            companyName={profile.resolved_display_name}
+            stats={stats}
+          />
+        </>
       }
       sections={
         <>

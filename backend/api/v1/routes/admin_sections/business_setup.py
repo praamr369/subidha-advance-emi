@@ -36,7 +36,12 @@ from api.v1.views.admin_policy_site import AdminPolicyPageDetailView
 from api.v1.views.admin_policy_site import AdminPolicyPageListCreateView
 from api.v1.views.admin_policy_site import AdminPolicyPagePublishView
 from api.v1.views.admin_policy_site import AdminPolicySeedDefaultsView
-from api.v1.views.admin_public_site import AdminPublicBusinessProfileView
+from api.v1.views.admin_public_site import (
+    AdminPublicAnnouncementDetailView,
+    AdminPublicAnnouncementListCreateView,
+    AdminPublicBannerImageUploadView,
+    AdminPublicBusinessProfileView,
+)
 from api.v1.views.admin_server_backups import AdminServerBackupDownloadView
 from api.v1.views.admin_server_backups import AdminServerBackupsView
 
@@ -48,6 +53,9 @@ urlpatterns = [
     path("settings/email-smtp/", AdminEmailSmtpSettingsView.as_view()),
     path("settings/email-smtp/test/", AdminEmailSmtpTestView.as_view()),
     path("public-site/profile/", AdminPublicBusinessProfileView.as_view()),
+    path("public-site/announcements/", AdminPublicAnnouncementListCreateView.as_view()),
+    path("public-site/announcements/upload/", AdminPublicBannerImageUploadView.as_view()),
+    path("public-site/announcements/<int:pk>/", AdminPublicAnnouncementDetailView.as_view()),
     path("public-site/policies/", AdminPolicyPageListCreateView.as_view()),
     path("public-site/policies/seed-defaults/", AdminPolicySeedDefaultsView.as_view()),
     path("public-site/policies/by-slug/<slug:slug>/", AdminPolicyPageBySlugView.as_view()),

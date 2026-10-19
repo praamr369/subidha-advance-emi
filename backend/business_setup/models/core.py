@@ -468,6 +468,89 @@ class PublicBusinessProfile(BusinessSetupTimeStampedModel):
         return self.display_name or "Public Business Profile"
 
 
+class PublicAnnouncementBanner(BusinessSetupTimeStampedModel):
+    """
+    Public-facing banners, offers, alerts, and news bulletins for the home page.
+    Governed by Admin CMS controls.
+    """
+
+    class BannerType(models.TextChoices):
+        OFFER = "OFFER", "Offer / Promotion"
+        NEWS = "NEWS", "News / Announcement"
+        ALERT = "ALERT", "Important Alert / Notice"
+        GENERAL = "GENERAL", "General Update"
+
+    title = models.CharField(max_length=255)
+    message = models.TextField(blank=True, default="")
+    banner_type = models.CharField(
+        max_length=20,
+        choices=BannerType.choices,
+        default=BannerType.OFFER,
+        db_index=True,
+    )
+    badge_text = models.CharField(max_length=64, blank=True, default="", help_text="e.g. 20% OFF, NEW, NOTICE")
+    action_label = models.CharField(max_length=64, blank=True, default="", help_text="e.g. Claim Offer, View Details")
+    action_url = models.CharField(max_length=255, blank=True, default="", help_text="Relative path (e.g. /products) or external URL")
+    priority = models.PositiveIntegerField(default=0, help_text="Higher priority displays first")
+    is_active = models.BooleanField(default=True, db_index=True)
+    image_url = models.CharField(max_length=500, blank=True, default="", help_text="Promotional banner photo / advertisement image URL")
+    image_aspect_ratio = models.CharField(
+        max_length=20,
+        default="BANNER",
+        choices=[
+            ("BANNER", "Wide Banner (16:9 / 3:1)"),
+            ("POSTER", "Vertical Poster / Ad (4:5 / 1:1)"),
+            ("HERO", "Full Hero Background"),
+        ],
+    )
+    display_placement = models.CharField(
+        max_length=30,
+        default="TOP_BANNER",
+        choices=[
+            ("TOP_BANNER", "Top Home Banner"),
+            ("PROMO_CARD", "Promotional Ad Card"),
+            ("POPUP_MODAL", "Welcome Offer Popup"),
+        ],
+    )
+    start_date = models.DateTimeField(null=True, blank=True, db_index=True)
+    end_date = models.DateTimeField(null=True, blank=True, db_index=True)
+
+    class Meta:
+        db_table = "public_announcement_banners"
+        ordering = ["-priority", "-created_at"]
+
+    def clean(self):
+        errors = {}
+        if self.start_date and self.end_date and self.start_date > self.end_date:
+            errors["end_date"] = "End date cannot be earlier than start date."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.title = (self.title or "").strip()
+        self.message = (self.message or "").strip()
+        self.badge_text = (self.badge_text or "").strip()
+        self.action_label = (self.action_label or "").strip()
+        self.action_url = (self.action_url or "").strip()
+        self.image_url = (self.image_url or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    @property
+    def is_currently_effective(self) -> bool:
+        if not self.is_active:
+            return False
+        now = timezone.now()
+        if self.start_date and self.start_date > now:
+            return False
+        if self.end_date and self.end_date < now:
+            return False
+        return True
+
+    def __str__(self):
+        return f"[{self.banner_type}] {self.title}"
+
+
 class PolicyCategory(models.TextChoices):
     GENERAL = "GENERAL", "General"
     PRIVACY = "PRIVACY", "Privacy"

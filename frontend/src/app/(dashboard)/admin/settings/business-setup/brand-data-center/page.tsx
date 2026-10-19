@@ -200,12 +200,20 @@ export default function BrandDataCenterPage() {
             server .env settings.
           </p>
         </div>
-        <Link
-          href={ROUTES.admin.reviews ?? "/admin/reviews"}
-          className="text-sm font-medium text-blue-600 hover:underline"
-        >
-          Open Reviews Manager →
-        </Link>
+        <div className="flex flex-wrap items-center gap-4">
+          <Link
+            href="/admin/settings/compliance-policies?tab=announcements"
+            className="text-sm font-medium text-amber-600 dark:text-amber-400 hover:underline"
+          >
+            📢 Public Banners & Offers (CMS) →
+          </Link>
+          <Link
+            href={ROUTES.admin.reviews ?? "/admin/reviews"}
+            className="text-sm font-medium text-blue-600 hover:underline"
+          >
+            Open Reviews Manager →
+          </Link>
+        </div>
       </div>
 
       {loading ? (

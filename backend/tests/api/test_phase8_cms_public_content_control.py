@@ -178,3 +178,83 @@ class Phase8CmsPublicContentControlTests(APITestCase):
         for url in endpoints:
             response = self.client.get(url)
             self.assertEqual(response.status_code, status.HTTP_200_OK, f"url={url} {response.data}")
+
+    def test_admin_can_create_update_and_delete_announcements(self):
+        self.client.force_authenticate(self.admin)
+
+        # 1. Create announcement
+        create_res = self.client.post(
+            "/api/v1/admin/public-site/announcements/",
+            {
+                "title": "Diwali Special Offer",
+                "message": "Get flat 15% off on all Advance EMI plans.",
+                "banner_type": "OFFER",
+                "badge_text": "15% OFF",
+                "action_label": "Claim Now",
+                "action_url": "/products",
+                "priority": 10,
+                "is_active": True,
+            },
+            format="json",
+        )
+        self.assertEqual(create_res.status_code, status.HTTP_201_CREATED, create_res.data)
+        banner_id = create_res.data["id"]
+
+        # 2. List announcements in admin
+        list_res = self.client.get("/api/v1/admin/public-site/announcements/")
+        self.assertEqual(list_res.status_code, status.HTTP_200_OK)
+        self.assertTrue(any(b["id"] == banner_id for b in list_res.data["announcements"]))
+
+        # 3. Patch announcement
+        patch_res = self.client.patch(
+            f"/api/v1/admin/public-site/announcements/{banner_id}/",
+            {"badge_text": "MEGA OFFER", "priority": 20},
+            format="json",
+        )
+        self.assertEqual(patch_res.status_code, status.HTTP_200_OK)
+        self.assertEqual(patch_res.data["badge_text"], "MEGA OFFER")
+        self.assertEqual(patch_res.data["priority"], 20)
+
+        # 4. Delete announcement
+        del_res = self.client.delete(f"/api/v1/admin/public-site/announcements/{banner_id}/")
+        self.assertEqual(del_res.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_public_announcements_anonymous_access_and_filtering(self):
+        from subscriptions.models_business_setup import PublicAnnouncementBanner
+
+        active_banner = PublicAnnouncementBanner.objects.create(
+            title="Active News",
+            message="Store will remain open on Sunday.",
+            banner_type="NEWS",
+            is_active=True,
+            priority=5,
+        )
+        inactive_banner = PublicAnnouncementBanner.objects.create(
+            title="Old Offer",
+            message="Expired offer message.",
+            banner_type="OFFER",
+            is_active=False,
+            priority=1,
+        )
+
+        self.client.logout()
+        res = self.client.get("/api/v1/public/announcements/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        ids = [b["id"] for b in res.data["announcements"]]
+        self.assertIn(active_banner.id, ids)
+        self.assertNotIn(inactive_banner.id, ids)
+
+    def test_announcements_admin_endpoints_forbidden_for_non_admins(self):
+        payload = {
+            "title": "Unauthorized Banner",
+            "message": "Should not be created",
+            "banner_type": "ALERT",
+        }
+        for user in (self.customer, self.partner, self.cashier, self.vendor):
+            self.client.force_authenticate(user)
+            res = self.client.post("/api/v1/admin/public-site/announcements/", payload, format="json")
+            self.assertEqual(
+                res.status_code,
+                status.HTTP_403_FORBIDDEN,
+                f"role={user.role} should be forbidden from posting announcements",
+            )

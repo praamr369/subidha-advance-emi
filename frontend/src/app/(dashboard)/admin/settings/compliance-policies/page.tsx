@@ -6,8 +6,10 @@ import { Building2, ExternalLink, Info } from "lucide-react";
 
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
+import { useSearchParams } from "next/navigation";
 import { InternalComplianceProofs } from "@/components/admin/settings/compliance-policies/InternalComplianceProofs";
 import { PublicPolicyGovernance } from "@/components/admin/settings/compliance-policies/PublicPolicyGovernance";
+import { PublicAnnouncementsManager } from "@/components/admin/settings/compliance-policies/PublicAnnouncementsManager";
 import { SystemGuardrailsPanel } from "@/components/admin/settings/compliance-policies/SystemGuardrailsPanel";
 import { getBusinessProfile, type BusinessProfile } from "@/services/business-setup";
 import { getBrandDirectProfile, type BrandDirectProfile } from "@/services/brand-data";
@@ -28,7 +30,9 @@ function SummaryField({ label, value }: { label: string; value?: string | null }
 }
 
 export default function CompliancePoliciesPage() {
-  const [activeTab, setActiveTab] = useState<"internal" | "public" | "guardrails">("internal");
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get("tab") === "announcements" ? "announcements" : "internal";
+  const [activeTab, setActiveTab] = useState<"internal" | "public" | "announcements" | "guardrails">(initialTab);
   const [bp, setBp] = useState<BusinessProfile | null>(null);
   const [brand, setBrand] = useState<BrandDirectProfile | null>(null);
 
@@ -147,6 +151,16 @@ export default function CompliancePoliciesPage() {
           Public Policy Governance
         </button>
         <button
+          onClick={() => setActiveTab("announcements")}
+          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${
+            activeTab === "announcements"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Public Announcements & Offers
+        </button>
+        <button
           onClick={() => setActiveTab("guardrails")}
           className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${
             activeTab === "guardrails"
@@ -161,6 +175,7 @@ export default function CompliancePoliciesPage() {
       <div className="min-h-[400px]">
         {activeTab === "internal" && <InternalComplianceProofs />}
         {activeTab === "public" && <PublicPolicyGovernance />}
+        {activeTab === "announcements" && <PublicAnnouncementsManager />}
         {activeTab === "guardrails" && <SystemGuardrailsPanel />}
       </div>
     </ERPPageShell>
