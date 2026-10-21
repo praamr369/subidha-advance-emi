@@ -56,6 +56,23 @@ export const AMENDMENT_FIELD_SCHEMA: Partial<Record<AmendmentType, AmendmentFiel
   SCHEDULE_CORRECTION: [
     { key: "note", label: "Schedule correction needed", type: "textarea", placeholder: "Which date/instalment needs correcting and why.", required: true },
   ],
+  TENURE_EXTENSION: [
+    {
+      key: "requested_tenure_extension_months",
+      label: "Additional tenure extension (months)",
+      type: "number",
+      placeholder: "e.g. 3, 6, 12",
+      help: "How many additional months you wish to extend the rental or lease contract.",
+      required: true,
+    },
+    {
+      key: "note",
+      label: "Extension reason / payment preference",
+      type: "textarea",
+      placeholder: "Specify why you want to extend this contract and any payment terms.",
+      required: true,
+    },
+  ],
 };
 
 export function amendmentFieldsFor(type: AmendmentType): AmendmentField[] {

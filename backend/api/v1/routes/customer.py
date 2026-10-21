@@ -59,6 +59,7 @@ from api.v1.views.crm_workbench import (
     CustomerWorkbenchDetailView,
 )
 from api.v1.views.customer_support_tickets import (
+    CustomerSupportTicketAttachmentUploadView,
     CustomerSupportTicketCommentView,
     CustomerSupportTicketDetailView,
     CustomerSupportTicketListCreateView,
@@ -127,6 +128,7 @@ urlpatterns = [
     path("support/tickets/<int:pk>/", CustomerSupportTicketDetailView.as_view()),
     path("support/tickets/<int:pk>/comment/", CustomerSupportTicketCommentView.as_view()),
     path("support/tickets/<int:pk>/reopen/", CustomerSupportTicketReopenView.as_view()),
+    path("support/tickets/<int:pk>/attachments/", CustomerSupportTicketAttachmentUploadView.as_view()),
     path("support-requests/", CustomerSupportRequestListCreateView.as_view()),
     path("support-requests/<int:pk>/", CustomerSupportRequestDetailView.as_view()),
     # Approved product catalog (browse by purpose: EMI / rent / lease / sale)

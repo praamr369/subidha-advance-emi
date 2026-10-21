@@ -112,6 +112,7 @@ async function submitTicket(payload: {
 }
 
 const CATEGORIES = [
+  { value: "SERVICE", label: "Furniture Service / Repair / Polishing" },
   { value: "PAYMENT", label: "Payment Issue" },
   { value: "COMMISSION", label: "Commission Query" },
   { value: "CUSTOMER", label: "Customer Problem" },
@@ -119,6 +120,41 @@ const CATEGORIES = [
   { value: "KYC", label: "KYC / Documents" },
   { value: "ACCOUNT", label: "My Account" },
   { value: "OTHER", label: "Other" },
+];
+
+const PARTNER_SERVICE_PRESETS = [
+  {
+    id: "polishing",
+    title: "Furniture Polishing",
+    subtitle: "PU, Melamine & buffing restoration",
+    category: "SERVICE",
+    subject: "[Partner Service] Furniture Polishing & Refinishing Request",
+    description: `Service: Furniture Polishing\nCustomer Name / Phone:\nItem & Finish Type:\nPickup / On-site details:`,
+  },
+  {
+    id: "installation",
+    title: "Assembly & Installation",
+    subtitle: "Bed/wardrobe assembly & fitting",
+    category: "SERVICE",
+    subject: "[Partner Service] Assembly & Installation Request",
+    description: `Service: Assembly & Installation\nCustomer Name / Phone:\nItem(s) to install:\nLocation / Address:`,
+  },
+  {
+    id: "repairs",
+    title: "Repairs & Refurbishment",
+    subtitle: "Structural, joinery & upholstery repair",
+    category: "SERVICE",
+    subject: "[Partner Service] Furniture Repair & Refurbishment",
+    description: `Service: Repair & Refurbishment\nCustomer Name / Phone:\nProblem details:\nUrgency:`,
+  },
+  {
+    id: "hardware",
+    title: "Hardware Replacement",
+    subtitle: "Hinges, channels, locks & hydraulics",
+    category: "SERVICE",
+    subject: "[Partner Service] Hardware Replacement Request",
+    description: `Service: Hardware Replacement\nCustomer Name / Phone:\nComponent Needed:\nQuantity:`,
+  },
 ];
 
 const PRIORITIES = [
@@ -233,6 +269,32 @@ export default function PartnerServiceDeskPage() {
           <Notice tone={notice.tone}>{notice.msg}</Notice>
         </div>
       ) : null}
+
+      {/* Quick Service Presets */}
+      <div className="mb-6 rounded-3xl border border-border bg-card p-4 sm:p-5 shadow-sm">
+        <div className="mb-3">
+          <h2 className="text-sm font-bold text-foreground">Customer Service & Maintenance Presets</h2>
+          <p className="text-xs text-muted-foreground">Quickly request repair, polishing, or installation services for your customers</p>
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {PARTNER_SERVICE_PRESETS.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => {
+                setShowForm(true);
+                setCategory(p.category);
+                setSubject(p.subject);
+                setDescription(p.description);
+              }}
+              className="flex flex-col items-start gap-1 rounded-2xl border border-border bg-background p-3 text-left transition hover:border-primary/50 hover:bg-muted/40"
+            >
+              <div className="text-xs font-bold text-foreground">{p.title}</div>
+              <div className="text-[11px] text-muted-foreground leading-tight">{p.subtitle}</div>
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* New request button / form */}
       {!showForm ? (

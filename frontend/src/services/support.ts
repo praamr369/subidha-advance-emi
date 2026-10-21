@@ -50,6 +50,12 @@ export type SupportTicketDetail = SupportTicketListItem & {
     created_at: string;
   }>;
   timeline: Array<Record<string, unknown>>;
+  attachments?: Array<{
+    id: number;
+    file?: string | null;
+    original_name: string;
+    created_at: string;
+  }>;
   operational_context: Record<string, unknown>;
 };
 
@@ -94,6 +100,18 @@ export async function createCustomerSupportTicket(payload: {
 
 export async function getCustomerSupportTicket(id: number): Promise<SupportTicketDetail> {
   return apiFetch(`/api/v1/customer/support/tickets/${id}/`);
+}
+
+export async function uploadCustomerSupportTicketAttachment(
+  id: number,
+  file: File
+): Promise<{ attachments: Array<{ id: number; file?: string | null; original_name: string; created_at: string }> }> {
+  const formData = new FormData();
+  formData.append("file", file);
+  return apiFetch(`/api/v1/customer/support/tickets/${id}/attachments/`, {
+    method: "POST",
+    body: formData,
+  });
 }
 
 export async function commentCustomerSupportTicket(

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from django.shortcuts import get_object_or_404
 from rest_framework import permissions, serializers, status
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -15,6 +16,7 @@ from api.v1.serializers.support_tickets import (
 from api.v1.views.customer import _get_customer_or_404_response
 from service_desk.support_ticket_models import (
     SupportTicket,
+    SupportTicketAttachment,
     SupportTicketPriority,
     SupportTicketStatus,
 )
@@ -68,6 +70,15 @@ def _detail_payload(ticket: SupportTicket, *, customer):
             include_internal=False,
             include_internal_events=False,
         ),
+        "attachments": [
+            {
+                "id": a.id,
+                "file": a.file.url if a.file else None,
+                "original_name": a.original_name,
+                "created_at": a.created_at.isoformat(),
+            }
+            for a in ticket.attachments.all()
+        ],
         "operational_context": build_ticket_operational_context(ticket),
     }
 
@@ -190,3 +201,32 @@ class CustomerSupportTicketReopenView(APIView):
             raise serializers.ValidationError(str(exc)) from exc
         ticket.refresh_from_db()
         return Response(_detail_payload(ticket, customer=customer))
+
+
+class CustomerSupportTicketAttachmentUploadView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsCustomer]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request, pk):
+        customer, err = _get_customer_or_404_response(request)
+        if err:
+            return err
+        ticket = get_object_or_404(_customer_ticket_queryset(customer), pk=pk)
+        files = request.FILES.getlist("file") or ([request.FILES["file"]] if "file" in request.FILES else [])
+        if not files:
+            return Response({"file": ["No file provided."]}, status=status.HTTP_400_BAD_REQUEST)
+        created = []
+        for f in files:
+            att = SupportTicketAttachment.objects.create(
+                ticket=ticket,
+                file=f,
+                original_name=getattr(f, "name", "")[:255],
+                uploaded_by=request.user,
+            )
+            created.append({
+                "id": att.id,
+                "file": att.file.url if att.file else None,
+                "original_name": att.original_name,
+                "created_at": att.created_at.isoformat(),
+            })
+        return Response({"attachments": created}, status=status.HTTP_201_CREATED)

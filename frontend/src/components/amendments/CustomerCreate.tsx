@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import AmendmentSafetyNotice from "@/components/amendments/SafetyNotice";
@@ -27,12 +27,25 @@ function optionFromSubscription(row: CustomerSubscription): Option {
 
 export default function CustomerAmendmentCreate() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const paramSourceId = searchParams?.get("source_id") || searchParams?.get("subscription_id") || "";
+  const paramContractType = (searchParams?.get("contract_type") || "").toUpperCase() as AmendmentContractType;
+  const paramAmendmentType = (searchParams?.get("amendment_type") || "").toUpperCase() as AmendmentType;
+
   const [contracts, setContracts] = useState<Option[]>([]);
   const [loadingContracts, setLoadingContracts] = useState(true);
-  const [contractType, setContractType] = useState<AmendmentContractType>("EMI_SUBSCRIPTION");
-  const [sourceId, setSourceId] = useState("");
-  const [amendmentType, setAmendmentType] = useState<AmendmentType>("ADDRESS_CHANGE");
-  const [reason, setReason] = useState("");
+  const [contractType, setContractType] = useState<AmendmentContractType>(
+    paramContractType === "RENT_LEASE" ? "RENT_LEASE" : "EMI_SUBSCRIPTION"
+  );
+  const [sourceId, setSourceId] = useState(paramSourceId);
+  const [amendmentType, setAmendmentType] = useState<AmendmentType>(
+    paramAmendmentType || "ADDRESS_CHANGE"
+  );
+  const [reason, setReason] = useState(
+    paramAmendmentType === "TENURE_EXTENSION"
+      ? "Requesting extension of active rental / lease contract tenure."
+      : ""
+  );
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,9 +57,19 @@ export default function CustomerAmendmentCreate() {
       try {
         const payload = await listCustomerSubscriptionsRegister({ pageSize: 100 });
         if (alive) {
-          setContracts(
-            payload.results.map(optionFromSubscription).filter((row) => ["EMI", "RENT", "LEASE"].includes(row.planType))
-          );
+          const list = payload.results.map(optionFromSubscription).filter((row) => ["EMI", "RENT", "LEASE"].includes(row.planType));
+          setContracts(list);
+          if (paramSourceId) {
+            const matched = list.find((c) => String(c.id) === paramSourceId);
+            if (matched) {
+              setSourceId(String(matched.id));
+              if (matched.planType === "RENT" || matched.planType === "LEASE") {
+                setContractType("RENT_LEASE");
+              } else {
+                setContractType("EMI_SUBSCRIPTION");
+              }
+            }
+          }
         }
       } catch (err) {
         if (alive) setError(err instanceof Error ? err.message : "Failed to load eligible contracts.");
@@ -58,7 +81,7 @@ export default function CustomerAmendmentCreate() {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [paramSourceId]);
 
   const eligibleContracts = useMemo(
     () =>

@@ -116,11 +116,11 @@ function ContractCard({ sub }: { sub: CustomerSubscription }) {
         </div>
       ) : null}
 
-      <div className="mt-3 flex gap-2">
+      <div className="mt-3 flex flex-wrap gap-2">
         <Link
           href={`/customer/subscriptions/${sub.id}`}
           onClick={(e) => e.stopPropagation()}
-          className="flex-1 rounded-xl border border-border bg-background py-2 text-center text-xs font-semibold hover:bg-muted"
+          className="flex-1 min-w-[90px] rounded-xl border border-border bg-background py-2 text-center text-xs font-semibold hover:bg-muted"
         >
           View Detail
         </Link>
@@ -130,7 +130,7 @@ function ContractCard({ sub }: { sub: CustomerSubscription }) {
             target="_blank"
             rel="noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="flex-1 rounded-xl border border-border bg-background py-2 text-center text-xs font-semibold hover:bg-muted"
+            className="flex-1 min-w-[90px] rounded-xl border border-border bg-background py-2 text-center text-xs font-semibold hover:bg-muted"
           >
             Contract PDF
           </a>
@@ -141,10 +141,19 @@ function ContractCard({ sub }: { sub: CustomerSubscription }) {
             target="_blank"
             rel="noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="flex-1 rounded-xl border border-border bg-background py-2 text-center text-xs font-semibold hover:bg-muted"
+            className="flex-1 min-w-[90px] rounded-xl border border-border bg-background py-2 text-center text-xs font-semibold hover:bg-muted"
           >
             Contract PDF
           </a>
+        ) : null}
+        {pt === "RENT" || pt === "LEASE" ? (
+          <Link
+            href={`/customer/contract-amendments/new?source_id=${sub.id}&contract_type=RENT_LEASE&amendment_type=TENURE_EXTENSION`}
+            onClick={(e) => e.stopPropagation()}
+            className="flex-1 min-w-[90px] rounded-xl border border-primary/40 bg-primary/10 text-primary py-2 text-center text-xs font-bold hover:bg-primary/20 transition active:scale-95"
+          >
+            Extend Tenure
+          </Link>
         ) : null}
       </div>
     </CPageCard>

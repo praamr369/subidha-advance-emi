@@ -26,7 +26,6 @@ import { formatPlanTypeLabel } from "@/lib/plan-labels";
 import {
   getCustomerSubscription,
   listCustomerSubscriptions,
-  type CustomerSubscription,
   type CustomerEmi,
 } from "@/services/customer";
 
@@ -110,7 +109,7 @@ export default function CustomerSubscriptionDetailPage() {
   const refreshing = query.isFetching && !query.isLoading;
   const error = query.error ? (query.error as Error).message : null;
 
-  const loadPage = useCallback(async (mode?: string) => { await query.refetch(); }, [query]);
+  const loadPage = useCallback(async () => { await query.refetch(); }, [query]);
 
   const emis = useMemo<CustomerEmi[]>(() => (
     Array.isArray(subscription?.emis) ? (subscription?.emis as CustomerEmi[]) : []
@@ -229,6 +228,14 @@ export default function CustomerSubscriptionDetailPage() {
               >
                 View Deliveries
               </Link>
+              {subscription.plan_type === "RENT" || subscription.plan_type === "LEASE" ? (
+                <Link
+                  href={`/customer/contract-amendments/new?source_id=${subscription.id}&contract_type=RENT_LEASE&amendment_type=TENURE_EXTENSION`}
+                  className="col-span-2 flex h-10 items-center justify-center rounded-xl border border-primary/40 bg-primary/10 text-xs font-bold text-primary transition hover:bg-primary/20 active:scale-95"
+                >
+                  Extend Contract Tenure
+                </Link>
+              ) : null}
             </div>
           </CPageSection>
 
