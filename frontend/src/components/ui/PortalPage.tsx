@@ -11,7 +11,8 @@ import { buildAdminCustomerAccountStatementPrintRoute } from "@/lib/route-builde
 import { cn } from "@/lib/utils";
 
 type PortalAction = {
-  href: string;
+  href?: string;
+  onClick?: () => void;
   label: string;
   variant?: "primary" | "secondary" | "ghost" | "danger";
 };
@@ -304,18 +305,32 @@ export default function PortalPage({
 
                 {resolvedActions.length > 0 ? (
                   <div className="portal-page-actions workspace-action-bar flex min-w-0 w-full max-w-full flex-wrap items-center gap-2 p-2 sm:justify-end">
-                    {resolvedActions.map((action) => (
-                      <Link
-                        key={`${action.href}-${action.label}`}
-                        href={action.href}
-                        className={cn(
-                          "inline-flex h-10 items-center rounded-xl border px-4 text-sm font-semibold tracking-[0.01em] transition duration-200",
-                          getActionClassName(action.variant)
-                        )}
-                      >
-                        {action.label}
-                      </Link>
-                    ))}
+                    {resolvedActions.map((action, idx) =>
+                      action.href ? (
+                        <Link
+                          key={`${action.href}-${action.label}-${idx}`}
+                          href={action.href}
+                          className={cn(
+                            "inline-flex h-10 items-center rounded-xl border px-4 text-sm font-semibold tracking-[0.01em] transition duration-200",
+                            getActionClassName(action.variant)
+                          )}
+                        >
+                          {action.label}
+                        </Link>
+                      ) : (
+                        <button
+                          key={`btn-${action.label}-${idx}`}
+                          type="button"
+                          onClick={action.onClick}
+                          className={cn(
+                            "inline-flex h-10 items-center rounded-xl border px-4 text-sm font-semibold tracking-[0.01em] transition duration-200 cursor-pointer",
+                            getActionClassName(action.variant)
+                          )}
+                        >
+                          {action.label}
+                        </button>
+                      )
+                    )}
                   </div>
                 ) : null}
               </div>
@@ -353,18 +368,32 @@ export default function PortalPage({
                   actions={
                     resolvedActions.length > 0 ? (
                       <div className="portal-page-actions workspace-action-bar flex min-w-0 w-full max-w-full flex-wrap items-center gap-2 p-2 sm:justify-end">
-                        {resolvedActions.map((action) => (
-                          <Link
-                            key={`${action.href}-${action.label}`}
-                            href={action.href}
-                            className={cn(
-                              "inline-flex h-10 items-center rounded-xl border px-4 text-sm font-semibold tracking-[0.01em] transition duration-200",
-                              getActionClassName(action.variant)
-                            )}
-                          >
-                            {action.label}
-                          </Link>
-                        ))}
+                        {resolvedActions.map((action, idx) =>
+                          action.href ? (
+                            <Link
+                              key={`${action.href}-${action.label}-${idx}`}
+                              href={action.href}
+                              className={cn(
+                                "inline-flex h-10 items-center rounded-xl border px-4 text-sm font-semibold tracking-[0.01em] transition duration-200",
+                                getActionClassName(action.variant)
+                              )}
+                            >
+                              {action.label}
+                            </Link>
+                          ) : (
+                            <button
+                              key={`btn-${action.label}-${idx}`}
+                              type="button"
+                              onClick={action.onClick}
+                              className={cn(
+                                "inline-flex h-10 items-center rounded-xl border px-4 text-sm font-semibold tracking-[0.01em] transition duration-200 cursor-pointer",
+                                getActionClassName(action.variant)
+                              )}
+                            >
+                              {action.label}
+                            </button>
+                          )
+                        )}
                       </div>
                     ) : null
                   }
@@ -427,18 +456,32 @@ export default function PortalPage({
 
                   {resolvedActions.length > 0 ? (
                     <div className="portal-page-actions workspace-action-bar flex min-w-0 w-full max-w-full flex-wrap items-center gap-2 p-2 sm:justify-end">
-                      {resolvedActions.map((action) => (
-                        <Link
-                          key={`${action.href}-${action.label}`}
-                          href={action.href}
-                          className={cn(
-                            "inline-flex h-10 items-center rounded-xl border px-4 text-sm font-semibold tracking-[0.01em] transition duration-200",
-                            getActionClassName(action.variant)
-                          )}
-                        >
-                          {action.label}
-                        </Link>
-                      ))}
+                      {resolvedActions.map((action, idx) =>
+                        action.href ? (
+                          <Link
+                            key={`${action.href}-${action.label}-${idx}`}
+                            href={action.href}
+                            className={cn(
+                              "inline-flex h-10 items-center rounded-xl border px-4 text-sm font-semibold tracking-[0.01em] transition duration-200",
+                              getActionClassName(action.variant)
+                            )}
+                          >
+                            {action.label}
+                          </Link>
+                        ) : (
+                          <button
+                            key={`btn-${action.label}-${idx}`}
+                            type="button"
+                            onClick={action.onClick}
+                            className={cn(
+                              "inline-flex h-10 items-center rounded-xl border px-4 text-sm font-semibold tracking-[0.01em] transition duration-200 cursor-pointer",
+                              getActionClassName(action.variant)
+                            )}
+                          >
+                            {action.label}
+                          </button>
+                        )
+                      )}
                     </div>
                   ) : null}
                 </div>

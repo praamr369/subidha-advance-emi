@@ -3,6 +3,7 @@
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { MessageCircle } from "lucide-react";
 
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
@@ -21,6 +22,7 @@ import type { ReceiptDocument } from "@/services/billing";
 import { listReceiptDocuments, voidReceiptDocument } from "@/services/billing";
 import { apiFetch } from "@/lib/api";
 import CustomerPostureToggle from "@/components/customers/CustomerPostureToggle";
+import { openWhatsAppDirectModal } from "@/components/whatsapp/WhatsAppDirectSenderModal";
 
 // Rent/lease money never becomes a ReceiptDocument (those are retail / Advance
 // EMI only), so it is listed from its own source rows: monthly collections and
@@ -205,6 +207,33 @@ export default function BillingReceiptsPage() {
           <ActionButton href={buildAdminBillingReceiptPrintRoute(row.id)} variant="primary">
             Print / Save PDF
           </ActionButton>
+          <button
+            type="button"
+            onClick={() => {
+              const printUrl =
+                typeof window !== "undefined"
+                  ? `${window.location.origin}${buildAdminBillingReceiptPrintRoute(row.id)}`
+                  : "";
+              openWhatsAppDirectModal({
+                phone: row.customer_phone_snapshot || "",
+                name: row.customer_name_snapshot || "",
+                customerId: row.customer || null,
+                eventType: "PAYMENT_RECEIPT",
+                amount: row.amount,
+                receipt: row.receipt_no || `#${row.id}`,
+                ref: row.receipt_no || `#${row.id}`,
+                date: row.receipt_date || "",
+                docUrl: printUrl,
+                sourceModel: "ReceiptDocument",
+                sourceId: String(row.id),
+              });
+            }}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[#25D366]/40 bg-[#25D366]/10 hover:bg-[#25D366]/20 px-2.5 py-1 text-xs font-semibold text-emerald-800 dark:text-emerald-300 transition cursor-pointer"
+            title="Send receipt to customer via WhatsApp Web / App without saving contact"
+          >
+            <MessageCircle className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span>WhatsApp</span>
+          </button>
           {row.billing_invoice ? (
             <ActionButton href={buildAdminBillingDocumentRoute(row.billing_invoice)} variant="outline">
               Billing Detail
@@ -253,6 +282,11 @@ export default function BillingReceiptsPage() {
         { label: "Receipts" },
       ]}
       actions={[
+        {
+          label: "WhatsApp Receipt Sender",
+          onClick: () => openWhatsAppDirectModal({ eventType: "PAYMENT_RECEIPT" }),
+          variant: "primary",
+        },
         { href: ROUTES.admin.billingRegister, label: "Document Register", variant: "secondary" },
         { href: ROUTES.admin.billingInvoices, label: "Invoices", variant: "secondary" },
       ]}

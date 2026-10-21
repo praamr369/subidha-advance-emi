@@ -44,6 +44,7 @@ import ProductPostureCard, {
   type ProductPosture,
 } from "@/components/customers/ProductPostureCard";
 import type { CollectionPrimaryAction } from "@/services/receivables";
+import { openWhatsAppDirectModal } from "@/components/whatsapp/WhatsAppDirectSenderModal";
 
 // =====================================================
 // TYPES
@@ -1620,7 +1621,8 @@ export default function AdminCustomerDetailPage() {
 
   const actions = useMemo(() => {
     const nextActions: Array<{
-      href: string;
+      href?: string;
+      onClick?: () => void;
       label: string;
       variant?: "primary" | "secondary" | "ghost" | "danger";
     }> = [
@@ -1637,6 +1639,20 @@ export default function AdminCustomerDetailPage() {
     ];
 
     if (customer) {
+      nextActions.push({
+        onClick: () => {
+          openWhatsAppDirectModal({
+            customerId: customer.id,
+            name: customer.name,
+            phone: customer.phone,
+            eventType: "CRM_FOLLOW_UP",
+            sourceModel: "Customer",
+            sourceId: String(customer.id),
+          });
+        },
+        label: "WhatsApp Direct",
+        variant: "primary",
+      });
       nextActions.push({
         href: `/admin/subscriptions/advance-emi/create?customer=${customer.id}`,
         label: "Create Subscription",

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
 import type { NavigationRole } from "@/config/navigation";
@@ -78,6 +79,7 @@ export default function BusinessSetupWorkflowBanner({
   role: NavigationRole;
   pathname: string;
 }) {
+  const [minimized, setMinimized] = useState(false);
   const adminScope = role === "ADMIN" ? resolveAdminScope(pathname) : null;
   const showCashierBanner = role === "CASHIER" && isCashierSensitivePath(pathname);
   const shouldFetchChecklist = Boolean(adminScope);
@@ -148,6 +150,20 @@ export default function BusinessSetupWorkflowBanner({
     return null;
   }
 
+  if (minimized) {
+    return (
+      <button
+        type="button"
+        onClick={() => setMinimized(false)}
+        className="fixed bottom-4 right-4 z-50 inline-flex items-center gap-2 rounded-full border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 shadow-lg transition hover:bg-amber-100"
+        title="Setup incomplete for live operations. Click to expand."
+      >
+        <span className="size-2 rounded-full bg-amber-500 animate-pulse" />
+        Setup Incomplete
+      </button>
+    );
+  }
+
   const topMissingItems = missingRequiredItems.slice(0, 3);
   const primaryActionHref = topMissingItems[0]?.route || ROUTES.admin.settingsBusinessSetupChecklist;
 
@@ -156,7 +172,17 @@ export default function BusinessSetupWorkflowBanner({
       className="pointer-events-none fixed bottom-4 right-4 z-50 w-[calc(100%-2rem)] max-w-md rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900 shadow-xl [&>*]:pointer-events-auto"
       data-testid="business-setup-readiness-banner"
     >
-      <div className="text-sm font-semibold">Setup incomplete for live operations</div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-sm font-semibold">Setup incomplete for live operations</div>
+        <button
+          type="button"
+          onClick={() => setMinimized(true)}
+          className="rounded p-1 text-amber-800/70 hover:bg-amber-200/60 hover:text-amber-950 transition"
+          title="Minimize notification"
+        >
+          <ChevronDown className="size-4" />
+        </button>
+      </div>
       <div className="mt-1 flex flex-col gap-1 text-sm leading-6">
         <p>{adminScope.label} is available, but required first-run setup is still incomplete.</p>
         <p>Proceed carefully for review, and complete blockers before live financial posting.</p>

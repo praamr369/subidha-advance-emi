@@ -35,6 +35,28 @@ TEMPLATES: dict[str, str] = {
         "Dear {name}, your {plan_label} instalment of ₹{amount} for {ref} is due on {date}. "
         "Please pay on time to keep your plan in good standing. — {company}"
     ),
+    WhatsAppEventType.BILL_INVOICE: (
+        "Dear {name}, here is your bill/invoice {ref} from {company}. "
+        "Total Amount: ₹{amount}. View invoice: {doc_url}. Thank you for shopping with us! — {company}"
+    ),
+    WhatsAppEventType.OUTSTANDING_REMINDER: (
+        "Dear {name}, this is a gentle reminder from {company}. "
+        "You have an outstanding balance of ₹{amount} on your account {ref}. "
+        "Please clear the payment at the earliest. For assistance or UPI payment, reply to this chat. — {company}"
+    ),
+    WhatsAppEventType.BROCHURE_CATALOG: (
+        "Hello {name}, greetings from {company}! "
+        "Here is the product brochure & catalog: {doc_url}. "
+        "Browse our latest collections with easy EMI and rent/lease plans. Contact us for any inquiries. — {company}"
+    ),
+    WhatsAppEventType.OFFER_PROMOTION: (
+        "Exciting offers at {company}! {offer_text} "
+        "Visit our store or check catalog: {doc_url}. Grab the best deals today! — {company}"
+    ),
+    WhatsAppEventType.CRM_FOLLOW_UP: (
+        "Hello {name}, following up regarding your inquiry with {company} for {product}. "
+        "We are here to assist you with the best plans and quick delivery. Let us know if you have any questions! — {company}"
+    ),
     WhatsAppEventType.DELIVERY_SCHEDULED: (
         "Dear {name}, delivery of your {product} ({ref}) is scheduled for {date}. "
         "Our team will call before arriving. — {company}"
@@ -134,6 +156,10 @@ def build_wa_me_link(phone_e164: str, body: str) -> str:
     return f"https://wa.me/{phone_e164}?text={quote(body)}"
 
 
+def build_whatsapp_web_link(phone_e164: str, body: str) -> str:
+    return f"https://web.whatsapp.com/send?phone={phone_e164}&text={quote(body)}"
+
+
 def queue_whatsapp_message(
     *,
     event_type: str,
@@ -203,6 +229,7 @@ def open_message(*, message: WhatsAppMessage, performed_by=None) -> dict:
     return {
         "id": message.pk,
         "link": build_wa_me_link(message.phone_e164, message.body),
+        "web_link": build_whatsapp_web_link(message.phone_e164, message.body),
         "phone_e164": message.phone_e164,
         "body": message.body,
         "status": message.status,

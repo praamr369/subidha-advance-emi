@@ -27,6 +27,7 @@ import {
 } from "@/lib/documents/formatters";
 import { apiFetch } from "@/lib/api";
 import type { ReceiptDocument } from "@/services/billing";
+import { openWhatsAppDirectModal } from "@/components/whatsapp/WhatsAppDirectSenderModal";
 
 type ReceiptPrintPayload = ReceiptDocument & {
   payment_method?: string | null;
@@ -128,7 +129,26 @@ export default function BillingReceiptPrintPage() {
 
   return (
     <>
-      <PrintToolbar copyLabel={copyLabel} onCopyLabelChange={setCopyLabel} backHref={backHref} />
+      <PrintToolbar
+        copyLabel={copyLabel}
+        onCopyLabelChange={setCopyLabel}
+        backHref={backHref}
+        onWhatsAppShare={() => {
+          openWhatsAppDirectModal({
+            phone: receipt.customer_phone_snapshot || "",
+            name: receipt.customer_name_snapshot || "",
+            customerId: receipt.customer || null,
+            eventType: "PAYMENT_RECEIPT",
+            amount: receipt.amount,
+            receipt: receipt.receipt_no || `#${receipt.id}`,
+            ref: receipt.receipt_no || `#${receipt.id}`,
+            docUrl: typeof window !== "undefined" ? window.location.href : "",
+            date: receipt.receipt_date || "",
+            sourceModel: "ReceiptDocument",
+            sourceId: String(receipt.id),
+          });
+        }}
+      />
       <DocumentPage watermark={watermark}>
         <DocumentHeader
           copyLabel={copyLabel}

@@ -6,12 +6,13 @@ import { cn } from "@/lib/utils";
 type PortalShellProps = {
   sidebar?: ReactNode;
   header?: ReactNode;
+  footer?: ReactNode;
   children: ReactNode;
   className?: string;
   mainClassName?: string;
 };
 
-export default function PortalShell({ sidebar, header, children, className, mainClassName }: PortalShellProps) {
+export default function PortalShell({ sidebar, header, footer, children, className, mainClassName }: PortalShellProps) {
   return (
     <div
       className={cn(
@@ -33,6 +34,7 @@ export default function PortalShell({ sidebar, header, children, className, main
               <div className="route-content-fade relative z-[1] min-w-0">{children}</div>
             </div>
           </main>
+          {footer}
         </div>
       </div>
     </div>

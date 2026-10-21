@@ -76,6 +76,9 @@ class User(AbstractUser):
         self.email = (self.email or "").strip()
         self.phone = (self.phone or "").strip()
 
+        if self.is_superuser and self.role == UserRole.CUSTOMER:
+            self.role = UserRole.ADMIN
+
         if self.role != UserRole.PARTNER:
             self.commission_rate = Decimal("0.00")
 

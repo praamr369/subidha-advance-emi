@@ -213,6 +213,11 @@ class WhatsAppMessageStatus(models.TextChoices):
 class WhatsAppEventType(models.TextChoices):
     PAYMENT_RECEIPT = "PAYMENT_RECEIPT", "Payment receipt"
     DUE_REMINDER = "DUE_REMINDER", "EMI / rent due reminder"
+    BILL_INVOICE = "BILL_INVOICE", "Bill / Tax invoice"
+    OUTSTANDING_REMINDER = "OUTSTANDING_REMINDER", "Outstanding dues reminder"
+    BROCHURE_CATALOG = "BROCHURE_CATALOG", "Brochure & product catalog"
+    OFFER_PROMOTION = "OFFER_PROMOTION", "Special offer / advertisement"
+    CRM_FOLLOW_UP = "CRM_FOLLOW_UP", "CRM lead follow-up"
     DELIVERY_SCHEDULED = "DELIVERY_SCHEDULED", "Delivery scheduled"
     OUT_FOR_DELIVERY = "OUT_FOR_DELIVERY", "Out for delivery"
     DELIVERED = "DELIVERED", "Delivered / handed over"

@@ -27,6 +27,7 @@ import {
   safeDocumentText,
 } from "@/lib/documents/formatters";
 import { buildAdminCustomerRoute } from "@/lib/route-builders";
+import { openWhatsAppDirectModal } from "@/components/whatsapp/WhatsAppDirectSenderModal";
 
 type CustomerRecord = {
   id: number;
@@ -263,7 +264,23 @@ export default function AdminCustomerAccountStatementPrintPage() {
 
   return (
     <>
-      <PrintToolbar copyLabel={copyLabel} onCopyLabelChange={setCopyLabel} backHref={buildAdminCustomerRoute(customer.id)} />
+      <PrintToolbar
+        copyLabel={copyLabel}
+        onCopyLabelChange={setCopyLabel}
+        backHref={buildAdminCustomerRoute(customer.id)}
+        onWhatsAppShare={() => {
+          openWhatsAppDirectModal({
+            phone: customer.phone || "",
+            name: customer.name || "",
+            customerId: customer.id,
+            eventType: "CUSTOM",
+            text: `Dear ${customer.name || "Customer"},\nHere is your Customer Account Statement from Subidha Furniture:\n📄 View Statement: ${typeof window !== "undefined" ? window.location.href : ""}\n\nThank you for choosing Subidha Furniture!`,
+            docUrl: typeof window !== "undefined" ? window.location.href : "",
+            sourceModel: "CustomerStatement",
+            sourceId: String(customer.id),
+          });
+        }}
+      />
       <DocumentPage watermark={unsafeCustomer ? documentStatusWatermark(status) : null}>
         <DocumentHeader copyLabel={copyLabel} documentNo={`CUST-STMT-${customer.id}`} documentDate={formatDocumentDate(generatedAt)} />
 

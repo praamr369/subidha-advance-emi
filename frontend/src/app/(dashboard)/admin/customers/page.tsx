@@ -12,7 +12,7 @@ import {
   type ChangeEvent,
   type FormEvent,
 } from "react";
-import { Download, RefreshCw, Search, ShieldCheck, UserPlus, Users } from "lucide-react";
+import { Download, MessageCircle, RefreshCw, Search, ShieldCheck, UserPlus, Users } from "lucide-react";
 
 import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
@@ -41,6 +41,7 @@ import PaginationControls from "@/components/ui/PaginationControls";
 import { downloadCsv } from "@/lib/export/csv";
 import { ROUTES } from "@/lib/routes";
 import { formatRupee } from "@/lib/utils/currency";
+import { openWhatsAppDirectModal } from "@/components/whatsapp/WhatsAppDirectSenderModal";
 
 type CustomerStatus = "ACTIVE" | "INACTIVE" | "UNKNOWN";
 type KycStatus =
@@ -762,6 +763,46 @@ export default function AdminCustomersPage() {
         sortAccessor: (row) => Date.parse(row.created_at || "") || 0,
         render: (row) => formatDateTime(row.created_at),
       },
+      {
+        key: "actions",
+        title: "Actions",
+        render: (row) => {
+          const totalDue =
+            Number(row.active_subscription_due || 0) +
+            Number(row.rent_lease_due || 0) +
+            Number(row.active_direct_sale_outstanding || 0) +
+            Number(row.active_invoice_outstanding || 0);
+          return (
+            <div className="flex items-center gap-1.5">
+              <Link
+                href={`/admin/customers/${row.id}`}
+                className="inline-flex items-center rounded-lg border border-border bg-background px-2 py-1 text-xs font-medium text-foreground hover:bg-muted transition"
+              >
+                Profile
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  openWhatsAppDirectModal({
+                    customerId: row.id,
+                    name: row.name,
+                    phone: row.phone,
+                    eventType: totalDue > 0 ? "OUTSTANDING_REMINDER" : "CRM_FOLLOW_UP",
+                    amount: totalDue > 0 ? totalDue : undefined,
+                    sourceModel: "Customer",
+                    sourceId: String(row.id),
+                  });
+                }}
+                className="inline-flex items-center gap-1 rounded-lg border border-[#25D366]/40 bg-[#25D366]/10 hover:bg-[#25D366]/20 px-2 py-1 text-xs font-semibold text-emerald-800 dark:text-emerald-300 transition cursor-pointer"
+                title="Send WhatsApp message directly without saving contact"
+              >
+                <MessageCircle className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span>WhatsApp</span>
+              </button>
+            </div>
+          );
+        },
+      },
     ],
     []
   );
@@ -778,7 +819,12 @@ export default function AdminCustomersPage() {
         { label: "Customers" },
       ]}
       actions={[
-        { href: "/admin/customers/create", label: "Create Customer", variant: "primary" },
+        {
+          label: "WhatsApp Direct Message",
+          onClick: () => openWhatsAppDirectModal(),
+          variant: "primary",
+        },
+        { href: "/admin/customers/create", label: "Create Customer", variant: "secondary" },
         { href: "/admin/subscriptions", label: "View Subscriptions", variant: "secondary" },
         { href: ROUTES.admin.outstandings, label: "Outstandings (Finance)", variant: "secondary" },
         { href: ROUTES.admin.financeCollect, label: "Collection Workspace", variant: "secondary" },

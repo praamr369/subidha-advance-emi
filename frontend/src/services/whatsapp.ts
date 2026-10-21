@@ -15,6 +15,8 @@ export type WhatsAppMessage = {
   phone: string;
   phone_e164: string;
   body: string;
+  wa_link?: string;
+  web_link?: string;
   opted_in_snapshot: boolean;
   source_model: string;
   source_id: string;
@@ -37,6 +39,7 @@ export type WhatsAppOutboxSummary = {
 export type WhatsAppOpenResult = {
   id: number;
   link: string;
+  web_link?: string;
   phone_e164: string;
   body: string;
   status: WhatsAppMessageStatus;
@@ -87,4 +90,53 @@ export function composeWhatsAppMessage(customerId: number, text: string) {
     method: "POST",
     body: JSON.stringify({ customer: customerId, text }),
   });
+}
+
+export type DirectWhatsAppComposePayload = {
+  customer?: number | null;
+  phone?: string;
+  name?: string;
+  event_type?: string;
+  text?: string;
+  amount?: string | number;
+  ref?: string;
+  receipt?: string;
+  date?: string;
+  product?: string;
+  doc_url?: string;
+  offer_text?: string;
+  source_model?: string;
+  source_id?: string;
+};
+
+export function composeWhatsAppDirect(payload: DirectWhatsAppComposePayload) {
+  return apiFetch<WhatsAppMessage & { link?: string; web_link?: string }>("/reminders/whatsapp/compose/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function normalizePhone(raw: string | undefined | null): string {
+  if (!raw) return "";
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length === 10) return `91${digits}`;
+  if (digits.length === 11 && digits.startsWith("0")) return `91${digits.slice(1)}`;
+  return digits;
+}
+
+export function buildClientDirectWhatsAppUrl({
+  phone,
+  text,
+  target = "web",
+}: {
+  phone: string;
+  text: string;
+  target?: "web" | "app";
+}): string {
+  const norm = normalizePhone(phone);
+  const encoded = encodeURIComponent(text.trim());
+  if (target === "web") {
+    return `https://web.whatsapp.com/send?phone=${norm}&text=${encoded}`;
+  }
+  return `https://wa.me/${norm}?text=${encoded}`;
 }

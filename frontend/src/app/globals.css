@@ -333,6 +333,169 @@ html.dark {
   color-scheme: dark;
 }
 
+/* ---------------------------------------------------------------------------
+ * Desktop Application Scaling for Admin ERP routes (80% default resolution)
+ * Delivers clean, compact ERP control-room layout on desktop/laptop displays
+ * --------------------------------------------------------------------------- */
+@media (min-width: 768px) {
+  html.admin-desktop-view {
+    zoom: var(--admin-desktop-zoom, 0.8);
+  }
+
+  /* Sleek custom 6px desktop scrollbars */
+  html.admin-desktop-view ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  html.admin-desktop-view ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  html.admin-desktop-view ::-webkit-scrollbar-thumb {
+    background: color-mix(in oklab, var(--muted-foreground) 26%, transparent);
+    border-radius: 9999px;
+  }
+
+  html.admin-desktop-view ::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in oklab, var(--muted-foreground) 48%, transparent);
+  }
+
+  /* Desktop high-density data tables */
+  html.admin-desktop-view table {
+    font-variant-numeric: tabular-nums;
+  }
+
+  html.admin-desktop-view table thead th {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0.5rem 0.75rem;
+    background: color-mix(in oklab, var(--surface-muted) 65%, var(--card) 35%);
+    border-bottom: 1.5px solid var(--border);
+    white-space: nowrap;
+    user-select: none;
+  }
+
+  html.admin-desktop-view table tbody td {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.82rem;
+    border-bottom: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
+  }
+
+  html.admin-desktop-view table tbody tr:hover td {
+    background: color-mix(in oklab, var(--accent) 22%, var(--card) 78%);
+  }
+
+  /* Desktop tactile button feel */
+  html.admin-desktop-view button:active:not(:disabled),
+  html.admin-desktop-view [role="button"]:active:not([aria-disabled="true"]) {
+    transform: translateY(0.5px) scale(0.988);
+  }
+
+  /* Desktop Top Route Progress Sweep */
+  .desktop-progress-indicator {
+    animation: desktop-progress-sweep 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    transform-origin: 0% 50%;
+  }
+
+  @keyframes desktop-progress-sweep {
+    0% {
+      transform: scaleX(0);
+      opacity: 1;
+    }
+    60% {
+      transform: scaleX(0.85);
+      opacity: 1;
+    }
+    90% {
+      transform: scaleX(1);
+      opacity: 1;
+    }
+    100% {
+      transform: scaleX(1);
+      opacity: 0;
+    }
+  }
+
+  /* Desktop ERP Panels & Cards: Crisp 1px border with subtle bevel highlight */
+  html.admin-desktop-view .surface-card,
+  html.admin-desktop-view .surface-panel-elevated,
+  html.admin-desktop-view .workspace-header-panel,
+  html.admin-desktop-view [class*="rounded-[1.7rem]"],
+  html.admin-desktop-view [class*="rounded-[1.5rem]"] {
+    border-radius: 0.875rem !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  }
+
+  .dark html.admin-desktop-view .surface-card,
+  .dark html.admin-desktop-view .surface-panel-elevated,
+  .dark html.admin-desktop-view .workspace-header-panel,
+  .dark html.admin-desktop-view [class*="rounded-[1.7rem]"],
+  .dark html.admin-desktop-view [class*="rounded-[1.5rem]"] {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  /* Desktop Action Buttons: Bevel, crisp border & hover elevation */
+  html.admin-desktop-view .workspace-action-bar a,
+  html.admin-desktop-view .workspace-action-bar button,
+  html.admin-desktop-view button.btn-primary,
+  html.admin-desktop-view .portal-page-actions a,
+  html.admin-desktop-view .portal-page-actions button {
+    border-radius: 0.625rem;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    transition: all 0.1s ease-in-out;
+  }
+
+  html.admin-desktop-view .workspace-action-bar a:hover,
+  html.admin-desktop-view .workspace-action-bar button:hover,
+  html.admin-desktop-view .portal-page-actions a:hover,
+  html.admin-desktop-view .portal-page-actions button:hover {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  }
+
+  /* Desktop Input Fields: Inset feel and crisp focus ring */
+  html.admin-desktop-view input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+  html.admin-desktop-view select,
+  html.admin-desktop-view textarea {
+    border-radius: 0.625rem !important;
+    border-color: var(--input);
+    box-shadow: inset 0 1px 1.5px rgba(0, 0, 0, 0.05);
+    transition: border-color 0.12s ease, box-shadow 0.12s ease;
+  }
+
+  html.admin-desktop-view input:focus,
+  html.admin-desktop-view select:focus,
+  html.admin-desktop-view textarea:focus {
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--primary) 35%, transparent), inset 0 1px 1.5px rgba(0, 0, 0, 0.04);
+  }
+
+  /* Desktop Modal Window Animations */
+  html.admin-desktop-view .workflow-modal-panel,
+  html.admin-desktop-view [role="dialog"] {
+    animation: desktop-dialog-pop 0.14s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    box-shadow: 0 20px 48px -12px rgba(0, 0, 0, 0.28), 0 0 0 1px var(--border);
+  }
+
+  @keyframes desktop-dialog-pop {
+    from {
+      opacity: 0;
+      transform: scale(0.97) translateY(-3px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+}
+
+@media print {
+  html.admin-desktop-view {
+    zoom: 1 !important;
+  }
+}
+
 * {
   border-color: var(--border);
 }

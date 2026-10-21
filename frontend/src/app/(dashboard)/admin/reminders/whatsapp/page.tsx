@@ -11,6 +11,7 @@ import { API_BASE_URL } from "@/lib/constants";
 import { ROUTES } from "@/lib/routes";
 import type { WhatsAppMessage, WhatsAppOutboxSummary } from "@/services/whatsapp";
 import {
+  buildClientDirectWhatsAppUrl,
   composeWhatsAppMessage,
   getWhatsAppOutboxSummary,
   listWhatsAppMessages,
@@ -18,6 +19,7 @@ import {
   openWhatsAppMessage,
   skipWhatsAppMessage,
 } from "@/services/whatsapp";
+import { openWhatsAppDirectModal } from "@/components/whatsapp/WhatsAppDirectSenderModal";
 
 const STATUS_TABS = [
   { value: "PENDING", label: "To send" },
@@ -89,20 +91,34 @@ export default function WhatsAppOutboxPage() {
     }
   }
 
-  async function handleOpen(row: WhatsAppMessage) {
+  async function handleOpen(row: WhatsAppMessage, target: "web" | "app" = "web") {
     // Open the tab synchronously so the browser does not treat it as a popup.
     const tab = typeof window !== "undefined" ? window.open("", "_blank") : null;
     setBusyId(row.id);
     setError(null);
     try {
       const result = await openWhatsAppMessage(row.id);
+      let targetUrl = result.link;
+      if (target === "web") {
+        targetUrl =
+          result.web_link ||
+          buildClientDirectWhatsAppUrl({
+            phone: row.phone_e164,
+            text: row.body,
+            target: "web",
+          });
+      }
       if (tab) {
         tab.opener = null;
-        tab.location.href = result.link;
+        tab.location.href = targetUrl;
       } else {
-        window.location.href = result.link;
+        window.location.href = targetUrl;
       }
-      setMessage("Opened in WhatsApp. Tap Send there, then click Mark sent here.");
+      setMessage(
+        target === "web"
+          ? "Opened in WhatsApp Web. Send the message there, then mark as sent."
+          : "Opened in WhatsApp. Tap Send there, then click Mark sent here."
+      );
       await load();
     } catch (err) {
       tab?.close();
@@ -170,10 +186,20 @@ export default function WhatsAppOutboxPage() {
                 <button
                   type="button"
                   disabled={busyId === row.id}
-                  onClick={() => void handleOpen(row)}
-                  className="inline-flex items-center rounded-lg bg-[#25D366] px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-95 disabled:opacity-50"
+                  onClick={() => void handleOpen(row, "web")}
+                  className="inline-flex items-center rounded-lg bg-[#25D366] px-2.5 py-1.5 text-xs font-semibold text-white transition hover:opacity-95 disabled:opacity-50"
+                  title="Open directly in WhatsApp Web browser tab"
                 >
-                  Open in WhatsApp
+                  WhatsApp Web
+                </button>
+                <button
+                  type="button"
+                  disabled={busyId === row.id}
+                  onClick={() => void handleOpen(row, "app")}
+                  className={BUTTON}
+                  title="Open in WhatsApp Desktop or Mobile App"
+                >
+                  App
                 </button>
                 <button
                   type="button"
@@ -222,6 +248,13 @@ export default function WhatsAppOutboxPage() {
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Reminders", href: ROUTES.admin.reminders },
         { label: "WhatsApp Outbox" },
+      ]}
+      actions={[
+        {
+          label: "Direct WhatsApp (No Save Needed)",
+          onClick: () => openWhatsAppDirectModal(),
+          variant: "primary",
+        },
       ]}
       stats={[
         { label: "To send", value: summary?.pending ?? 0, tone: (summary?.pending ?? 0) > 0 ? "warning" : "success" },
@@ -329,9 +362,21 @@ export default function WhatsAppOutboxPage() {
                 className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
               />
             </div>
-            <div>
+            <div className="flex items-center gap-2">
               <button type="button" onClick={() => void handleCompose()} className={BUTTON}>
                 Queue message
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  openWhatsAppDirectModal({
+                    customerId: Number(composeCustomer) || undefined,
+                    text: composeText,
+                  })
+                }
+                className="inline-flex items-center rounded-lg bg-[#25D366] px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-95"
+              >
+                Open Full WhatsApp Direct Sender
               </button>
             </div>
           </div>

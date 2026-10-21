@@ -32,6 +32,7 @@ import {
   safeDocumentText,
 } from "@/lib/documents/formatters";
 import { buildAdminSubscriptionRoute } from "@/lib/route-builders";
+import { openWhatsAppDirectModal } from "@/components/whatsapp/WhatsAppDirectSenderModal";
 
 type FinancialSummary = {
   total_amount?: string;
@@ -224,6 +225,8 @@ export default function AdminSubscriptionContractPrintPage() {
   const watermark = documentStatusWatermark(status);
   const productPrice =
     subscription.product_base_price ?? financialSummary?.total_amount ?? subscription.total_amount;
+  const customerDisplayName = subscription.customer_name || customer?.name || "";
+  const customerDisplayPhone = subscription.customer_phone || customer?.phone || "";
 
   return (
     <>
@@ -231,6 +234,20 @@ export default function AdminSubscriptionContractPrintPage() {
         copyLabel={copyLabel}
         onCopyLabelChange={setCopyLabel}
         backHref={buildAdminSubscriptionRoute(subscription.id)}
+        onWhatsAppShare={() => {
+          openWhatsAppDirectModal({
+            phone: customerDisplayPhone,
+            name: customerDisplayName,
+            customerId: subscription.customer || null,
+            eventType: "CUSTOM",
+            text: `Dear ${customerDisplayName || "Customer"},\nHere is your Lucky Plan Subscription Agreement (${reference}) from Subidha Furniture:\n📄 View Agreement: ${typeof window !== "undefined" ? window.location.href : ""}\n\nThank you for choosing Subidha Furniture!`,
+            ref: reference,
+            amount: subscription.monthly_amount ?? undefined,
+            docUrl: typeof window !== "undefined" ? window.location.href : "",
+            sourceModel: "Subscription",
+            sourceId: String(subscription.id),
+          });
+        }}
       />
       <DocumentPage watermark={watermark}>
         <DocumentHeader

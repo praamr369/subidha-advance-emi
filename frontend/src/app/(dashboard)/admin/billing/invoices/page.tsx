@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
+import { MessageCircle } from "lucide-react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
@@ -27,6 +28,7 @@ import {
   postBillingInvoice,
 } from "@/services/billing";
 import { buildAdminBillingDocumentRoute } from "@/lib/route-builders";
+import { openWhatsAppDirectModal } from "@/components/whatsapp/WhatsAppDirectSenderModal";
 
 export default function BillingInvoicesPage() {
   const searchParams = useSearchParams();
@@ -160,6 +162,32 @@ export default function BillingInvoicesPage() {
           <ActionButton href={buildAdminBillingDocumentRoute(row.id)} variant="outline">
             Open Detail
           </ActionButton>
+          <button
+            type="button"
+            onClick={() => {
+              const docUrl =
+                typeof window !== "undefined"
+                  ? `${window.location.origin}${buildAdminBillingDocumentRoute(row.id)}`
+                  : "";
+              openWhatsAppDirectModal({
+                phone: row.customer_phone_snapshot || "",
+                name: row.customer_name_snapshot || "",
+                customerId: row.customer || null,
+                eventType: "BILL_INVOICE",
+                amount: row.grand_total,
+                ref: row.document_no || `INV-${row.id}`,
+                docUrl: docUrl,
+                date: row.invoice_date || "",
+                sourceModel: "BillingInvoice",
+                sourceId: String(row.id),
+              });
+            }}
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-[#25D366]/40 bg-[#25D366]/10 hover:bg-[#25D366]/20 px-3 text-xs font-semibold text-emerald-800 dark:text-emerald-300 transition cursor-pointer"
+            title="Send Invoice to customer via WhatsApp Web / App"
+          >
+            <MessageCircle className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span>WhatsApp</span>
+          </button>
           {row.direct_sale &&
           row.status === "POSTED" &&
           !["VOID", "CANCELLED", "REVERSED", "CREDITED_FULLY"].includes(String(row.status || "").toUpperCase()) &&
@@ -197,6 +225,11 @@ export default function BillingInvoicesPage() {
         { label: "Invoices" },
       ]}
       actions={[
+        {
+          label: "WhatsApp Invoice Sender",
+          onClick: () => openWhatsAppDirectModal({ eventType: "BILL_INVOICE" }),
+          variant: "primary",
+        },
         { href: ROUTES.admin.billingRegister, label: "Document Register", variant: "secondary" },
         { href: ROUTES.admin.billingDirectSales, label: "Direct Sales", variant: "secondary" },
       ]}

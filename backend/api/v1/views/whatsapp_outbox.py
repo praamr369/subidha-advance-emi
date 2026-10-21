@@ -11,6 +11,8 @@ from api.v1.permissions import IsCashierOrAdmin
 from customers.models import Customer
 from reminders.models import WhatsAppEventType, WhatsAppMessage, WhatsAppMessageStatus
 from reminders.services.whatsapp_outbox_service import (
+    build_wa_me_link,
+    build_whatsapp_web_link,
     mark_sent,
     open_message,
     queue_whatsapp_message,
@@ -26,6 +28,14 @@ class WhatsAppMessageSerializer(serializers.ModelSerializer):
         source="subscription.subscription_number", read_only=True, default=""
     )
     sent_by_username = serializers.CharField(source="sent_by.username", read_only=True, default="")
+    wa_link = serializers.SerializerMethodField()
+    web_link = serializers.SerializerMethodField()
+
+    def get_wa_link(self, obj):
+        return build_wa_me_link(obj.phone_e164, obj.body)
+
+    def get_web_link(self, obj):
+        return build_whatsapp_web_link(obj.phone_e164, obj.body)
 
     class Meta:
         model = WhatsAppMessage
@@ -42,6 +52,8 @@ class WhatsAppMessageSerializer(serializers.ModelSerializer):
             "phone",
             "phone_e164",
             "body",
+            "wa_link",
+            "web_link",
             "opted_in_snapshot",
             "source_model",
             "source_id",
@@ -125,21 +137,59 @@ class WhatsAppMessageViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=False, methods=["post"], url_path="compose")
     def compose(self, request):
-        """Queue a free-text message to any customer (for interactions with no template)."""
+        """Queue a direct message to a customer or direct phone number."""
         text = str(request.data.get("text") or "").strip()
-        if not text:
-            return Response({"text": "Message text is required."}, status=status.HTTP_400_BAD_REQUEST)
-        customer = get_object_or_404(Customer, pk=request.data.get("customer"))
-        message = queue_whatsapp_message(
-            event_type=WhatsAppEventType.CUSTOM,
-            customer=customer,
-            context={"text": text},
-            source_model="Customer",
-            source_id=customer.pk,
-        )
-        if message is None:
+        customer_id = request.data.get("customer")
+        phone = str(request.data.get("phone") or "").strip()
+        recipient_name = str(request.data.get("name") or request.data.get("recipient_name") or "").strip()
+        event_type = str(request.data.get("event_type") or WhatsAppEventType.CUSTOM).strip()
+
+        customer = None
+        if customer_id:
+            customer = Customer.objects.filter(pk=customer_id).first()
+
+        if not customer and not phone:
             return Response(
-                {"detail": "This customer has no valid mobile number for WhatsApp."},
+                {"detail": "Either an existing customer or a mobile phone number is required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        return Response(self.get_serializer(message).data, status=status.HTTP_201_CREATED)
+
+        target_phone = phone or (customer.phone if customer else "")
+        if not target_phone:
+            return Response(
+                {"detail": "A valid phone number is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        context_data = dict(request.data.get("context") or {})
+        if text:
+            context_data["text"] = text
+        if recipient_name:
+            context_data["name"] = recipient_name
+        elif customer:
+            context_data.setdefault("name", customer.name)
+
+        # Context fields for rich templates
+        for field in ("amount", "ref", "receipt", "date", "product", "doc_url", "offer_text"):
+            if field in request.data:
+                context_data[field] = str(request.data[field])
+
+        message = queue_whatsapp_message(
+            event_type=event_type,
+            customer=customer,
+            phone=target_phone,
+            context=context_data,
+            source_model=str(request.data.get("source_model") or "WhatsAppDirect"),
+            source_id=str(request.data.get("source_id") or ""),
+        )
+
+        if message is None:
+            return Response(
+                {"detail": "Could not queue WhatsApp message. Check phone number format."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        data = self.get_serializer(message).data
+        data["link"] = build_wa_me_link(message.phone_e164, message.body)
+        data["web_link"] = build_whatsapp_web_link(message.phone_e164, message.body)
+        return Response(data, status=status.HTTP_201_CREATED)

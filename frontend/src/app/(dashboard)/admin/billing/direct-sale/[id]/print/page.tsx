@@ -27,6 +27,7 @@ import {
   safeDocumentText,
 } from "@/lib/documents/formatters";
 import { getDirectSale, type DirectSale } from "@/services/billing";
+import { openWhatsAppDirectModal } from "@/components/whatsapp/WhatsAppDirectSenderModal";
 
 function lineTaxTotal(line: DirectSale["lines"][number]): string {
   const total =
@@ -123,7 +124,25 @@ export default function DirectSaleInvoicePrintPage() {
 
   return (
     <>
-      <PrintToolbar copyLabel={copyLabel} onCopyLabelChange={setCopyLabel} backHref={backHref} />
+      <PrintToolbar
+        copyLabel={copyLabel}
+        onCopyLabelChange={setCopyLabel}
+        backHref={backHref}
+        onWhatsAppShare={() => {
+          openWhatsAppDirectModal({
+            phone: sale.customer_phone_snapshot || "",
+            name: sale.customer_name_snapshot || sale.customer_name || "",
+            customerId: sale.customer || null,
+            eventType: "BILL_INVOICE",
+            amount: sale.grand_total,
+            ref: sale.billing_invoice_no || sale.sale_no || `Sale #${sale.id}`,
+            docUrl: typeof window !== "undefined" ? window.location.href : "",
+            date: sale.sale_date || "",
+            sourceModel: "DirectSale",
+            sourceId: String(sale.id),
+          });
+        }}
+      />
       <DocumentPage watermark={watermark}>
         <DocumentHeader
           copyLabel={copyLabel}
