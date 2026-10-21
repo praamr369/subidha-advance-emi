@@ -8,23 +8,32 @@ import {
   Building2,
   Calendar,
   Check,
+  CheckCircle2,
   CheckSquare,
   Clock,
   Coins,
   Copy,
   CreditCard,
   ExternalLink,
+  Eye,
+  FileCheck,
   FileSpreadsheet,
   FileText,
+  FolderOpen,
   Gift,
   Handshake,
+  Image as ImageIcon,
   MessageCircle,
+  Paperclip,
   Phone,
   Receipt,
+  RefreshCw,
   Search,
   Send,
   Sparkles,
+  Trash2,
   Truck,
+  UploadCloud,
   User,
   Users,
   X,
@@ -42,8 +51,38 @@ import {
 import { searchCustomers, type CustomerRecord } from "@/services/customers";
 import { listVendors, type Vendor } from "@/services/vendors";
 import { listHrStaff, type HrStaff } from "@/services/admin-hr";
+import { listBillingInvoices, listReceiptDocuments, type BillingInvoice, type ReceiptDocument } from "@/services/billing";
+import { listSubscriptions, type SubscriptionRecord } from "@/services/subscriptions";
+import { listOutstandings, type OutstandingRow } from "@/services/outstandings";
+import { uploadDocument, documentDownloadUrl, type DocumentCategory, type DocumentRecord } from "@/services/documents";
+import {
+  buildAdminBillingDocumentRoute,
+  buildAdminBillingReceiptPrintRoute,
+  buildAdminSubscriptionContractPrintRoute,
+  buildAdminRentLeaseContractPrintRoute,
+} from "@/lib/route-builders";
 
 export type PartyCategory = "CUSTOMER" | "VENDOR" | "PARTNER" | "STAFF" | "DIRECT";
+
+export type CustomerDocKind = "INVOICE" | "RECEIPT" | "CONTRACT_EMI" | "CONTRACT_RENT_LEASE" | "OUTSTANDING";
+
+export type CustomerDocItem = {
+  id: string;
+  kind: CustomerDocKind;
+  categoryLabel: string;
+  documentNo: string;
+  date: string;
+  amount: string;
+  balance?: string;
+  status: string;
+  title: string;
+  docUrl: string;
+  previewUrl: string;
+  recommendedTemplate: string;
+  amountToApply: string;
+  refToApply: string;
+  receiptToApply?: string;
+};
 
 export type WhatsAppDirectInitialData = {
   partyType?: PartyCategory;
@@ -300,6 +339,355 @@ export default function WhatsAppDirectSenderModal({
     text: string;
   } | null>(null);
 
+  // Customer Auto-Fetched Bills, Receipts, Contracts & Outstandings
+  const [customerDocs, setCustomerDocs] = useState<CustomerDocItem[]>([]);
+  const [isLoadingDocs, setIsLoadingDocs] = useState(false);
+  const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
+  const [docFilter, setDocFilter] = useState<"ALL" | "INVOICES" | "RECEIPTS" | "RENT_LEASE" | "EMI" | "OUTSTANDINGS">("ALL");
+
+  // Attachment state (PDF / Images / Docs)
+  const [attachedFile, setAttachedFile] = useState<File | null>(null);
+  const [attachedFilePreview, setAttachedFilePreview] = useState<string | null>(null);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const [isCopyingImage, setIsCopyingImage] = useState(false);
+  const [uploadedDoc, setUploadedDoc] = useState<DocumentRecord | null>(null);
+  const [imageCopiedNotice, setImageCopiedNotice] = useState(false);
+
+  // Filtered customer documents based on active category pill
+  const filteredDocs = useMemo(() => {
+    if (docFilter === "ALL") return customerDocs;
+    if (docFilter === "INVOICES") return customerDocs.filter((d) => d.kind === "INVOICE");
+    if (docFilter === "RECEIPTS") return customerDocs.filter((d) => d.kind === "RECEIPT");
+    if (docFilter === "RENT_LEASE") return customerDocs.filter((d) => d.kind === "CONTRACT_RENT_LEASE");
+    if (docFilter === "EMI") return customerDocs.filter((d) => d.kind === "CONTRACT_EMI");
+    if (docFilter === "OUTSTANDINGS") return customerDocs.filter((d) => d.kind === "OUTSTANDING");
+    return customerDocs;
+  }, [customerDocs, docFilter]);
+
+  const invoicesCount = useMemo(() => customerDocs.filter((d) => d.kind === "INVOICE").length, [customerDocs]);
+  const receiptsCount = useMemo(() => customerDocs.filter((d) => d.kind === "RECEIPT").length, [customerDocs]);
+  const rentLeaseCount = useMemo(() => customerDocs.filter((d) => d.kind === "CONTRACT_RENT_LEASE").length, [customerDocs]);
+  const emiCount = useMemo(() => customerDocs.filter((d) => d.kind === "CONTRACT_EMI").length, [customerDocs]);
+  const outstandingsCount = useMemo(() => customerDocs.filter((d) => d.kind === "OUTSTANDING").length, [customerDocs]);
+
+  const activeSelectedDoc = useMemo(() => {
+    if (!selectedDocId) return null;
+    return customerDocs.find((d) => d.id === selectedDocId) || null;
+  }, [customerDocs, selectedDocId]);
+
+  // Fetch customer documents (Bills, Invoices, Receipts, Contracts, Outstandings)
+  const fetchCustomerDocuments = useCallback(async () => {
+    if (partyCategory !== "CUSTOMER" || !selectedParty?.id) {
+      setCustomerDocs([]);
+      setSelectedDocId(null);
+      return;
+    }
+
+    setIsLoadingDocs(true);
+    const custId = selectedParty.id;
+    const custName = selectedParty.name;
+    const custPhone = selectedParty.phone;
+
+    try {
+      const [invoicesRes, receiptsRes, subsRes, outstandingsRes] = await Promise.allSettled([
+        listBillingInvoices({ customer: custId, page_size: 25 }),
+        listReceiptDocuments({ customer: custId, page_size: 25 }),
+        listSubscriptions({ q: custPhone || custName }),
+        listOutstandings({ customer: custName, q: custPhone }),
+      ]);
+
+      const items: CustomerDocItem[] = [];
+
+      // 1. Invoices & Bills
+      if (invoicesRes.status === "fulfilled" && invoicesRes.value?.results) {
+        for (const inv of invoicesRes.value.results) {
+          const docRoute = buildAdminBillingDocumentRoute(inv.id);
+          const fullDocUrl = typeof window !== "undefined" ? `${window.location.origin}${docRoute}` : "";
+          const docNo = inv.document_no || `INV-${inv.id}`;
+          const isDirect = Boolean(inv.direct_sale);
+          const label = inv.document_type === "PROFORMA" ? "Proforma Bill" : isDirect ? "Direct Sale Bill" : "Tax Invoice";
+
+          items.push({
+            id: `inv-${inv.id}`,
+            kind: "INVOICE",
+            categoryLabel: label,
+            documentNo: docNo,
+            date: inv.invoice_date || "",
+            amount: inv.grand_total || "0",
+            balance: Number(inv.balance_total || 0) > 0 ? inv.balance_total : undefined,
+            status: inv.status || "POSTED",
+            title: inv.lines?.map((l) => l.description).filter(Boolean).join(", ") || (isDirect ? `Direct Sale #${inv.direct_sale_no || inv.direct_sale}` : `Invoice ${docNo}`),
+            docUrl: fullDocUrl,
+            previewUrl: docRoute,
+            recommendedTemplate: "BILL_INVOICE",
+            amountToApply: inv.grand_total || "0",
+            refToApply: docNo,
+          });
+        }
+      }
+
+      // 2. Payment & Retail Receipts
+      if (receiptsRes.status === "fulfilled" && receiptsRes.value?.results) {
+        for (const rec of receiptsRes.value.results) {
+          const printRoute = buildAdminBillingReceiptPrintRoute(rec.id);
+          const fullPrintUrl = typeof window !== "undefined" ? `${window.location.origin}${printRoute}` : "";
+          const rcptNo = rec.receipt_no || `REC-${rec.id}`;
+          const isEmi = rec.receipt_type === "EMI_PAYMENT_RECEIPT";
+
+          items.push({
+            id: `rec-${rec.id}`,
+            kind: "RECEIPT",
+            categoryLabel: isEmi ? "EMI Payment Receipt" : "Retail Receipt",
+            documentNo: rcptNo,
+            date: rec.receipt_date || "",
+            amount: rec.amount || "0",
+            status: rec.status || "POSTED",
+            title: rec.notes || (isEmi ? `Advance EMI Payment Receipt ${rcptNo}` : `Retail Cash Receipt ${rcptNo}`),
+            docUrl: fullPrintUrl,
+            previewUrl: printRoute,
+            recommendedTemplate: "PAYMENT_RECEIPT",
+            amountToApply: rec.amount || "0",
+            refToApply: rcptNo,
+            receiptToApply: rcptNo,
+          });
+        }
+      }
+
+      // 3. Subscriptions & Contracts (Rent, Lease, EMI)
+      if (subsRes.status === "fulfilled" && subsRes.value?.results) {
+        for (const sub of subsRes.value.results) {
+          if (sub.customer && sub.customer !== custId) continue;
+
+          const isRentLease = sub.plan_type === "RENT" || sub.plan_type === "LEASE";
+          const printRoute = isRentLease
+            ? buildAdminRentLeaseContractPrintRoute(sub.id)
+            : buildAdminSubscriptionContractPrintRoute(sub.id);
+          const fullPrintUrl = typeof window !== "undefined" ? `${window.location.origin}${printRoute}` : "";
+          const subRef = sub.contract_reference || sub.subscription_number || `SUB-${sub.id}`;
+          const planLabel = isRentLease ? `${sub.plan_type} Contract` : "EMI / Lucky Plan";
+
+          items.push({
+            id: `sub-${sub.id}`,
+            kind: isRentLease ? "CONTRACT_RENT_LEASE" : "CONTRACT_EMI",
+            categoryLabel: planLabel,
+            documentNo: subRef,
+            date: sub.start_date || (sub.created_at ? sub.created_at.slice(0, 10) : ""),
+            amount: sub.total_amount || sub.monthly_amount || "0",
+            balance: sub.outstanding_amount || undefined,
+            status: sub.status || "ACTIVE",
+            title: `${sub.product_name || "Contract"} (${sub.plan_type || "Plan"})${sub.lucky_number ? ` · Lucky #${sub.lucky_number}` : ""}`,
+            docUrl: fullPrintUrl,
+            previewUrl: printRoute,
+            recommendedTemplate: isRentLease ? "BILL_INVOICE" : "DUE_REMINDER",
+            amountToApply: sub.monthly_amount || sub.total_amount || "0",
+            refToApply: subRef,
+          });
+        }
+      }
+
+      // 4. Outstandings & Overdues
+      if (outstandingsRes.status === "fulfilled" && outstandingsRes.value?.results) {
+        for (const out of outstandingsRes.value.results) {
+          const outRef = out.document_no || out.contract_reference || `OUT-${out.source_id}`;
+          const fullDetailUrl = typeof window !== "undefined" && out.detail_url ? `${window.location.origin}${out.detail_url}` : "";
+
+          items.push({
+            id: `out-${out.id || out.source_id}`,
+            kind: "OUTSTANDING",
+            categoryLabel: out.overdue_days > 0 ? `Overdue (${out.overdue_days}d)` : "Outstanding Balance",
+            documentNo: outRef,
+            date: out.due_date || "",
+            amount: out.outstanding_amount || "0",
+            balance: out.outstanding_amount,
+            status: out.status || (out.overdue_days > 0 ? "OVERDUE" : "PENDING"),
+            title: `${out.product_summary || out.operation_type} · Overdue Due`,
+            docUrl: fullDetailUrl,
+            previewUrl: out.detail_url || "",
+            recommendedTemplate: "OUTSTANDING_REMINDER",
+            amountToApply: out.outstanding_amount || "0",
+            refToApply: outRef,
+          });
+        }
+      }
+
+      setCustomerDocs(items);
+    } catch (err) {
+      console.warn("Failed to fetch customer documents:", err);
+    } finally {
+      setIsLoadingDocs(false);
+    }
+  }, [partyCategory, selectedParty]);
+
+  useEffect(() => {
+    void fetchCustomerDocuments();
+  }, [fetchCustomerDocuments]);
+
+  // Handler: Select a customer document
+  const handleSelectCustomerDoc = (doc: CustomerDocItem) => {
+    setSelectedDocId(doc.id);
+    setEventType(doc.recommendedTemplate);
+    setAmount(doc.amountToApply);
+    setRefNo(doc.refToApply);
+    if (doc.receiptToApply) {
+      setReceiptNo(doc.receiptToApply);
+    }
+    setDocUrl(doc.docUrl);
+    if (doc.date) {
+      setDateStr(doc.date);
+    }
+    setIsBodyManuallyEdited(false);
+    setStatusMessage({
+      type: "success",
+      text: `Loaded ${doc.categoryLabel} (${doc.documentNo}). WhatsApp message details updated!`,
+    });
+  };
+
+  const handleClearSelectedDoc = () => {
+    setSelectedDocId(null);
+  };
+
+  // Handler: Select and preview file attachment
+  const handleFileSelected = (file: File) => {
+    setAttachedFile(file);
+    setUploadedDoc(null);
+    setImageCopiedNotice(false);
+
+    if (file.type.startsWith("image/")) {
+      const previewUrl = URL.createObjectURL(file);
+      setAttachedFilePreview(previewUrl);
+    } else {
+      setAttachedFilePreview(null);
+    }
+  };
+
+  // Handler: Remove attachment
+  const handleRemoveAttachment = () => {
+    if (attachedFilePreview) {
+      URL.revokeObjectURL(attachedFilePreview);
+    }
+    setAttachedFile(null);
+    setAttachedFilePreview(null);
+    setUploadedDoc(null);
+    setImageCopiedNotice(false);
+  };
+
+  // Handler: Upload file to Document records and link in WhatsApp message
+  const handleUploadAttachment = async () => {
+    if (!attachedFile) return;
+    setIsUploadingFile(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", attachedFile);
+      formData.append("title", attachedFile.name);
+
+      let cat: DocumentCategory = "other";
+      if (eventType === "BILL_INVOICE") cat = "invoice";
+      else if (eventType === "PAYMENT_RECEIPT") cat = "receipt";
+      else if (eventType === "DUE_REMINDER" || eventType === "OUTSTANDING_REMINDER") cat = "contract";
+
+      formData.append("category", cat);
+      formData.append("description", `Attached via WhatsApp Direct Connect for ${recipientName || "recipient"}`);
+
+      const res = await uploadDocument(formData);
+      setUploadedDoc(res);
+
+      const downloadUrl = typeof window !== "undefined"
+        ? `${window.location.origin}${documentDownloadUrl(res.id)}`
+        : documentDownloadUrl(res.id);
+
+      setDocUrl(downloadUrl);
+      setIsBodyManuallyEdited(false);
+
+      setStatusMessage({
+        type: "success",
+        text: `Uploaded "${attachedFile.name}"! Downloadable link attached to WhatsApp message.`,
+      });
+    } catch (err) {
+      console.error("Document upload error:", err);
+      setStatusMessage({
+        type: "error",
+        text: "Failed to upload document. Please check file format and try again.",
+      });
+    } finally {
+      setIsUploadingFile(false);
+    }
+  };
+
+  // Handler: Copy image to clipboard for instant Ctrl+V into WhatsApp Web
+  const handleCopyImageToClipboard = async () => {
+    if (!attachedFile || !attachedFile.type.startsWith("image/")) {
+      setStatusMessage({
+        type: "error",
+        text: "Please attach an image (PNG/JPG) to copy to clipboard.",
+      });
+      return;
+    }
+
+    setIsCopyingImage(true);
+    try {
+      let pngBlob: Blob | null = null;
+
+      if (attachedFile.type === "image/png") {
+        pngBlob = attachedFile;
+      } else {
+        const img = new Image();
+        const objectUrl = URL.createObjectURL(attachedFile);
+        await new Promise<void>((resolve, reject) => {
+          img.onload = () => resolve();
+          img.onerror = () => reject(new Error("Image decode failed"));
+          img.src = objectUrl;
+        });
+
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+          pngBlob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+        }
+        URL.revokeObjectURL(objectUrl);
+      }
+
+      if (!pngBlob) {
+        throw new Error("Could not process image blob");
+      }
+
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "image/png": pngBlob,
+        }),
+      ]);
+
+      setImageCopiedNotice(true);
+      setStatusMessage({
+        type: "success",
+        text: "Image copied to clipboard! In WhatsApp Web, simply press Ctrl+V to attach it directly to the chat.",
+      });
+    } catch (err) {
+      console.warn("Clipboard copy failed:", err);
+      setStatusMessage({
+        type: "error",
+        text: "Could not copy image automatically. You can drag and drop it into WhatsApp Web directly.",
+      });
+    } finally {
+      setIsCopyingImage(false);
+    }
+  };
+
+  // Handler: Download file locally so user can drag & drop it into WhatsApp Web
+  const handleDownloadLocalAttachment = () => {
+    if (!attachedFile) return;
+    const url = URL.createObjectURL(attachedFile);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = attachedFile.name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   // Filter templates for current party category
   const availableTemplates = useMemo(() => {
     if (partyCategory === "DIRECT") {
@@ -317,6 +705,12 @@ export default function WhatsAppDirectSenderModal({
     setSearchQuery("");
     setSearchResults([]);
     setIsBodyManuallyEdited(false);
+    setCustomerDocs([]);
+    setSelectedDocId(null);
+    setAttachedFile(null);
+    setAttachedFilePreview(null);
+    setUploadedDoc(null);
+    setImageCopiedNotice(false);
 
     if (cat === "CUSTOMER") {
       setEventType("BILL_INVOICE");
@@ -838,7 +1232,7 @@ export default function WhatsAppDirectSenderModal({
       open={isOpen}
       onClose={handleClose}
       title="Universal Party WhatsApp Communicator"
-      panelClassName="w-full max-w-5xl max-h-[92vh] flex flex-col p-0 overflow-hidden bg-background border border-border shadow-2xl rounded-2xl"
+      panelClassName="w-full max-w-5xl xl:max-w-6xl max-h-[94vh] flex flex-col p-0 overflow-hidden bg-background border border-border shadow-2xl rounded-2xl"
     >
       {/* Modal Header */}
       <div className="flex items-center justify-between border-b border-border bg-[linear-gradient(180deg,color-mix(in_oklab,var(--surface-muted)_95%,#25D366_5%),var(--surface-card))] px-5 py-3">
@@ -871,7 +1265,7 @@ export default function WhatsAppDirectSenderModal({
       {/* Main Content Layout: Two-Column Workbench */}
       <div className="grid grid-cols-1 md:grid-cols-12 flex-1 overflow-y-auto divide-y md:divide-y-0 md:divide-x divide-border">
         {/* Left Column: Party Selector, Directory Search & Template Form (7 cols) */}
-        <div className="md:col-span-7 p-4 sm:p-5 space-y-4 overflow-y-auto max-h-[75vh]">
+        <div className="md:col-span-7 p-4 sm:p-5 space-y-4 overflow-y-auto max-h-[82vh]">
           {/* Party Category Tabs */}
           <div>
             <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-1.5">
@@ -1079,6 +1473,278 @@ export default function WhatsAppDirectSenderModal({
               ) : null}
             </div>
           )}
+
+          {/* Customer Documents, Bills, Contracts & Outstandings Workbench */}
+          {partyCategory === "CUSTOMER" && selectedParty ? (
+            <div className="rounded-xl border border-border bg-card p-3.5 space-y-3 shadow-xs">
+              {/* Header with counts and refresh */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="flex size-7 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
+                    <FolderOpen className="size-4" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-semibold text-foreground">
+                      Customer Bills, Contracts &amp; Outstandings
+                    </span>
+                    <span className="ml-2 text-[10px] rounded-full bg-muted px-2 py-0.5 font-medium text-muted-foreground font-mono">
+                      {customerDocs.length} Total
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void fetchCustomerDocuments()}
+                  disabled={isLoadingDocs}
+                  className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground transition disabled:opacity-50"
+                  title="Refresh customer bills and documents"
+                >
+                  <RefreshCw className={cn("size-3", isLoadingDocs && "animate-spin")} />
+                  <span>{isLoadingDocs ? "Fetching…" : "Refresh"}</span>
+                </button>
+              </div>
+
+              {/* Active Selection Banner if any */}
+              {activeSelectedDoc ? (
+                <div className="flex items-center justify-between rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs">
+                  <div className="flex items-center gap-2 min-w-0 pr-2">
+                    <CheckCircle2 className="size-4 text-emerald-600 shrink-0" />
+                    <div className="truncate">
+                      <span className="font-semibold text-foreground">
+                        {activeSelectedDoc.categoryLabel}: {activeSelectedDoc.documentNo}
+                      </span>
+                      <span className="ml-2 text-emerald-800 dark:text-emerald-300 font-mono font-medium">
+                        ₹{activeSelectedDoc.amount}
+                      </span>
+                      {activeSelectedDoc.balance ? (
+                        <span className="ml-2 text-amber-700 dark:text-amber-400 font-mono text-[11px]">
+                          (Due: ₹{activeSelectedDoc.balance})
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {activeSelectedDoc.previewUrl ? (
+                      <a
+                        href={activeSelectedDoc.previewUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+                        title="View printable PDF document in a new tab"
+                      >
+                        <Eye className="size-3" />
+                        <span>View PDF</span>
+                      </a>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={handleClearSelectedDoc}
+                      className="text-[11px] text-muted-foreground hover:text-destructive underline"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Filter Tabs */}
+              <div className="flex flex-wrap items-center gap-1 border-b border-border pb-2 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => setDocFilter("ALL")}
+                  className={cn(
+                    "rounded-md px-2 py-1 font-medium transition",
+                    docFilter === "ALL"
+                      ? "bg-primary text-primary-foreground font-semibold"
+                      : "text-muted-foreground hover:bg-muted"
+                  )}
+                >
+                  All ({customerDocs.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDocFilter("INVOICES")}
+                  className={cn(
+                    "rounded-md px-2 py-1 font-medium transition",
+                    docFilter === "INVOICES"
+                      ? "bg-primary text-primary-foreground font-semibold"
+                      : "text-muted-foreground hover:bg-muted"
+                  )}
+                >
+                  Bills &amp; Invoices ({invoicesCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDocFilter("RECEIPTS")}
+                  className={cn(
+                    "rounded-md px-2 py-1 font-medium transition",
+                    docFilter === "RECEIPTS"
+                      ? "bg-primary text-primary-foreground font-semibold"
+                      : "text-muted-foreground hover:bg-muted"
+                  )}
+                >
+                  Receipts ({receiptsCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDocFilter("RENT_LEASE")}
+                  className={cn(
+                    "rounded-md px-2 py-1 font-medium transition",
+                    docFilter === "RENT_LEASE"
+                      ? "bg-primary text-primary-foreground font-semibold"
+                      : "text-muted-foreground hover:bg-muted"
+                  )}
+                >
+                  Rent &amp; Lease ({rentLeaseCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDocFilter("EMI")}
+                  className={cn(
+                    "rounded-md px-2 py-1 font-medium transition",
+                    docFilter === "EMI"
+                      ? "bg-primary text-primary-foreground font-semibold"
+                      : "text-muted-foreground hover:bg-muted"
+                  )}
+                >
+                  EMI Plans ({emiCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDocFilter("OUTSTANDINGS")}
+                  className={cn(
+                    "rounded-md px-2 py-1 font-medium transition",
+                    docFilter === "OUTSTANDINGS"
+                      ? "bg-amber-500 text-slate-950 font-semibold"
+                      : "text-amber-600 dark:text-amber-400 hover:bg-muted font-medium"
+                  )}
+                >
+                  Outstandings ({outstandingsCount})
+                </button>
+              </div>
+
+              {/* Document List */}
+              {isLoadingDocs ? (
+                <div className="py-6 text-center text-xs text-muted-foreground flex flex-col items-center justify-center gap-2">
+                  <RefreshCw className="size-4 animate-spin text-primary" />
+                  <span>Fetching bills, receipts, contracts &amp; outstandings from system...</span>
+                </div>
+              ) : filteredDocs.length === 0 ? (
+                <div className="py-4 text-center text-xs text-muted-foreground bg-muted/20 rounded-lg border border-dashed border-border p-3">
+                  No documents found in this category for {recipientName}. You can type details manually below or attach a PDF / image.
+                </div>
+              ) : (
+                <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                  {filteredDocs.map((doc) => {
+                    const isSelected = selectedDocId === doc.id;
+                    return (
+                      <div
+                        key={doc.id}
+                        onClick={() => handleSelectCustomerDoc(doc)}
+                        className={cn(
+                          "group relative flex items-center justify-between p-2.5 rounded-lg border text-xs cursor-pointer transition",
+                          isSelected
+                            ? "border-emerald-500 bg-emerald-500/10 shadow-sm"
+                            : "border-border bg-background hover:border-primary/50 hover:bg-muted/40"
+                        )}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                          <div
+                            className={cn(
+                              "flex size-7 shrink-0 items-center justify-center rounded-md font-semibold text-[11px]",
+                              doc.kind === "INVOICE"
+                                ? "bg-blue-500/10 text-blue-600"
+                                : doc.kind === "RECEIPT"
+                                ? "bg-emerald-500/10 text-emerald-600"
+                                : doc.kind === "OUTSTANDING"
+                                ? "bg-amber-500/10 text-amber-600"
+                                : "bg-purple-500/10 text-purple-600"
+                            )}
+                          >
+                            {doc.kind === "INVOICE" ? (
+                              <FileText className="size-3.5" />
+                            ) : doc.kind === "RECEIPT" ? (
+                              <Receipt className="size-3.5" />
+                            ) : doc.kind === "OUTSTANDING" ? (
+                              <AlertCircle className="size-3.5" />
+                            ) : (
+                              <Coins className="size-3.5" />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-semibold text-foreground truncate">
+                                {doc.documentNo}
+                              </span>
+                              <span className="text-[10px] rounded px-1.5 py-0.5 bg-muted text-muted-foreground uppercase font-mono">
+                                {doc.categoryLabel}
+                              </span>
+                              {doc.status ? (
+                                <span
+                                  className={cn(
+                                    "text-[9px] rounded px-1.5 py-0.2 font-semibold uppercase",
+                                    doc.status === "POSTED" || doc.status === "ACTIVE" || doc.status === "PAID"
+                                      ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                                      : doc.status === "OVERDUE"
+                                      ? "bg-red-500/10 text-red-600"
+                                      : "bg-amber-500/10 text-amber-700"
+                                  )}
+                                >
+                                  {doc.status}
+                                </span>
+                              ) : null}
+                            </div>
+                            <p className="text-[11px] text-muted-foreground truncate max-w-[280px]">
+                              {doc.title} {doc.date ? `· ${doc.date}` : ""}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <div className="text-right">
+                            <div className="font-semibold font-mono text-foreground text-xs">
+                              ₹{doc.amount}
+                            </div>
+                            {doc.balance ? (
+                              <div className="text-[10px] text-amber-600 dark:text-amber-400 font-mono font-medium">
+                                Due: ₹{doc.balance}
+                              </div>
+                            ) : null}
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            {doc.previewUrl ? (
+                              <a
+                                href={doc.previewUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted"
+                                title="View PDF / Printable Document"
+                              >
+                                <Eye className="size-3.5" />
+                              </a>
+                            ) : null}
+                            <button
+                              type="button"
+                              className={cn(
+                                "rounded px-2 py-1 text-[11px] font-semibold transition",
+                                isSelected
+                                  ? "bg-emerald-600 text-white"
+                                  : "bg-muted text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground"
+                              )}
+                            >
+                              {isSelected ? "Selected" : "Select"}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : null}
 
           {/* Template Selection */}
           <div>
@@ -1649,6 +2315,126 @@ export default function WhatsAppDirectSenderModal({
               </div>
             )}
           </div>
+
+          {/* Attach & Send PDF / Image / Document Hub */}
+          <div className="rounded-xl border border-border bg-card p-3.5 space-y-3 shadow-xs">
+            <div className="text-xs font-semibold text-foreground flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Paperclip className="size-3.5 text-primary" />
+                <span>Attach PDF, Bill Scan or Image</span>
+              </div>
+              <span className="text-[11px] font-normal text-muted-foreground">
+                Fast WhatsApp Web integration
+              </span>
+            </div>
+
+            {!attachedFile ? (
+              <label className="flex flex-col items-center justify-center border-2 border-dashed border-border hover:border-primary/60 rounded-xl p-4 cursor-pointer bg-background/50 hover:bg-muted/30 transition text-center group">
+                <input
+                  type="file"
+                  accept=".pdf,.png,.jpg,.jpeg,.webp"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleFileSelected(file);
+                  }}
+                  className="hidden"
+                />
+                <UploadCloud className="size-6 text-muted-foreground group-hover:text-primary transition mb-1.5" />
+                <span className="text-xs font-medium text-foreground">
+                  Click or drag &amp; drop to attach Bill, Receipt, or Doc
+                </span>
+                <span className="text-[10px] text-muted-foreground mt-0.5">
+                  Supports PDF, PNG, JPG, JPEG, WEBP (Max 15MB)
+                </span>
+              </label>
+            ) : (
+              <div className="rounded-xl border border-border bg-background p-3 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    {attachedFilePreview ? (
+                      <img
+                        src={attachedFilePreview}
+                        alt="Preview"
+                        className="size-11 rounded-lg object-cover border border-border shrink-0 shadow-xs"
+                      />
+                    ) : (
+                      <div className="flex size-11 items-center justify-center rounded-lg bg-red-500/10 text-red-600 font-bold text-xs shrink-0">
+                        PDF
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold text-foreground truncate max-w-[220px]">
+                        {attachedFile.name}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground font-mono">
+                        {(attachedFile.size / 1024).toFixed(1)} KB · {attachedFile.type || "Document"}
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleRemoveAttachment}
+                    className="p-1 rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition"
+                    title="Remove attachment"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                </div>
+
+                {/* Action buttons for attached file */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 pt-1 border-t border-border">
+                  {/* If image, offer Copy Image (Ctrl+V) */}
+                  {attachedFile.type.startsWith("image/") ? (
+                    <button
+                      type="button"
+                      onClick={handleCopyImageToClipboard}
+                      disabled={isCopyingImage}
+                      className="flex items-center justify-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 py-1.5 px-2 text-xs font-semibold text-emerald-800 dark:text-emerald-300 transition cursor-pointer"
+                      title="Copies image to clipboard so you can press Ctrl+V directly in WhatsApp Web to attach it"
+                    >
+                      <Copy className="size-3" />
+                      <span>{imageCopiedNotice ? "Copied! (Ctrl+V)" : "Copy Image"}</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleDownloadLocalAttachment}
+                      className="flex items-center justify-center gap-1.5 rounded-lg border border-border bg-background hover:bg-muted py-1.5 px-2 text-xs font-medium text-foreground transition cursor-pointer"
+                      title="Download locally to drag & drop into WhatsApp Web"
+                    >
+                      <ExternalLink className="size-3" />
+                      <span>Save / Drag</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleUploadAttachment}
+                    disabled={isUploadingFile || Boolean(uploadedDoc)}
+                    className="sm:col-span-2 flex items-center justify-center gap-1.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground py-1.5 px-2 text-xs font-semibold transition disabled:opacity-50 cursor-pointer"
+                    title="Uploads to system documents and sets public link into WhatsApp message text"
+                  >
+                    <UploadCloud className="size-3.5" />
+                    <span>
+                      {isUploadingFile
+                        ? "Uploading…"
+                        : uploadedDoc
+                        ? "✓ Uploaded & Linked"
+                        : "Upload & Insert Link in Chat"}
+                    </span>
+                  </button>
+                </div>
+
+                <div className="rounded-lg bg-emerald-500/5 border border-emerald-500/20 px-2.5 py-1.5 text-[11px] text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+                  <Sparkles className="size-3 shrink-0 text-emerald-600" />
+                  <span>
+                    <strong>WhatsApp Web Tip:</strong> You can click <em>Copy Image</em> and press <kbd className="rounded bg-black/10 dark:bg-white/10 px-1 py-0.2 font-mono">Ctrl+V</kbd> directly inside your WhatsApp Web chat, or drag &amp; drop PDFs!
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Right Column: Live Message Preview & Send Actions (5 cols) */}
@@ -1706,6 +2492,53 @@ export default function WhatsAppDirectSenderModal({
               </div>
             </div>
 
+            {/* Active Attachment / Link Info Box */}
+            {(docUrl || attachedFile || activeSelectedDoc) ? (
+              <div className="rounded-xl border border-border bg-card p-2.5 text-xs space-y-1.5 shadow-xs">
+                <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  <span>Linked Document &amp; Media</span>
+                  {activeSelectedDoc ? (
+                    <span className="text-emerald-600 font-mono text-[10px]">Active Record</span>
+                  ) : null}
+                </div>
+
+                {activeSelectedDoc ? (
+                  <div className="flex items-center justify-between text-xs font-medium">
+                    <span className="truncate text-foreground font-semibold">
+                      {activeSelectedDoc.documentNo} ({activeSelectedDoc.categoryLabel})
+                    </span>
+                    <span className="font-mono text-emerald-700 dark:text-emerald-300">
+                      ₹{activeSelectedDoc.amount}
+                    </span>
+                  </div>
+                ) : null}
+
+                {docUrl ? (
+                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground font-mono truncate">
+                    <FileText className="size-3 shrink-0 text-primary" />
+                    <span className="truncate">{docUrl}</span>
+                  </div>
+                ) : null}
+
+                {attachedFile ? (
+                  <div className="flex items-center justify-between text-[11px] pt-1 border-t border-border">
+                    <span className="text-foreground truncate max-w-[180px]">
+                      📎 {attachedFile.name}
+                    </span>
+                    {imageCopiedNotice ? (
+                      <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 rounded px-1.5 py-0.5">
+                        Copied to Clipboard! (Ctrl+V)
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-muted-foreground font-mono">
+                        {(attachedFile.size / 1024).toFixed(0)} KB
+                      </span>
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
             {/* Status / Feedback Alert */}
             {statusMessage && (
               <div
@@ -1728,6 +2561,12 @@ export default function WhatsAppDirectSenderModal({
 
           {/* Action Buttons */}
           <div className="space-y-2 pt-2 border-t border-border">
+            {imageCopiedNotice ? (
+              <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 p-2 text-center text-xs text-emerald-800 dark:text-emerald-300 font-semibold animate-pulse">
+                📸 Image ready on clipboard! Once WhatsApp Web opens, press <kbd className="rounded bg-black/10 dark:bg-white/10 px-1 py-0.5 font-mono">Ctrl+V</kbd> to attach it.
+              </div>
+            ) : null}
+
             {/* Primary Action: WhatsApp Web Direct */}
             <button
               type="button"
