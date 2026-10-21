@@ -72,7 +72,6 @@ import SidebarLiveStatusWidget from "@/components/layout/SidebarLiveStatusWidget
 import BusinessSetupWorkflowBanner from "@/components/admin/business-setup/BusinessSetupWorkflowBanner";
 import WorkflowProvider from "@/components/workflows/WorkflowProvider";
 import AdminWorkspaceMenubar from "@/components/layout/AdminWorkspaceMenubar";
-import AdminDesktopStatusBar from "@/components/layout/AdminDesktopStatusBar";
 import { WorkspaceBrandMark } from "@/components/brand/WorkspaceBrandMark";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { getStoredSession } from "@/lib/auth/session";
@@ -1686,14 +1685,6 @@ export default function DashboardShell({ children }: DashboardShellProps) {
                   onOpenQuickActions={() => setQuickActionsOpen(true)}
                 />
               </Fragment>
-            }
-            footer={
-              role === "ADMIN" ? (
-                <AdminDesktopStatusBar
-                  onOpenCommandPalette={openCommandPalette}
-                  onOpenQuickActions={() => setQuickActionsOpen(true)}
-                />
-              ) : null
             }
           >
             <>

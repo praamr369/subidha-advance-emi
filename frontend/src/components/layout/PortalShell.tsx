@@ -16,7 +16,7 @@ export default function PortalShell({ sidebar, header, footer, children, classNa
   return (
     <div
       className={cn(
-        "dashboard-app min-h-screen overflow-hidden text-foreground",
+        "dashboard-app min-h-screen h-screen overflow-hidden text-foreground",
         "h-[100dvh] supports-[height:100dvh]:h-[100dvh]",
         className
       )}

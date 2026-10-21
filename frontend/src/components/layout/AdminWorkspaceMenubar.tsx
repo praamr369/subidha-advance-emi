@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Check, CircleHelp, MessageCircle, Monitor, Settings } from "lucide-react";
+import { CircleHelp, MessageCircle, Settings } from "lucide-react";
 
 import {
   Menubar,
@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/menubar";
 import type { NavigationRole } from "@/config/navigation";
 import { ROUTES } from "@/lib/routes";
-import { useAdminDesktopZoom } from "@/lib/admin-desktop-zoom";
 import { openWhatsAppDirectModal } from "@/components/whatsapp/WhatsAppDirectSenderModal";
 
 type AdminWorkspaceMenubarProps = {
@@ -28,13 +27,9 @@ export default function AdminWorkspaceMenubar({
   onOpenCommandPalette,
   onOpenQuickActions,
 }: AdminWorkspaceMenubarProps) {
-  const { zoom, changeZoom, options } = useAdminDesktopZoom();
-
   if (role !== "ADMIN") {
     return null;
   }
-
-  const activeOptionLabel = options.find((opt) => opt.value === zoom)?.label ?? `${Math.round(Number(zoom) * 100)}%`;
 
   return (
     <Menubar className="hidden rounded-none border-b border-[var(--topbar-border)] bg-[linear-gradient(180deg,color-mix(in_oklab,var(--topbar-control)_92%,white_8%),color-mix(in_oklab,var(--topbar-control)_82%,var(--surface-muted)_18%))] px-2 py-1 lg:flex items-center justify-between">
@@ -85,20 +80,6 @@ export default function AdminWorkspaceMenubar({
           <MenubarItem asChild>
             <Link href={ROUTES.admin.dashboard}>Dashboard overview</Link>
           </MenubarItem>
-          <MenubarSeparator />
-          <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            Desktop UI Density
-          </div>
-          {options.map((opt) => (
-            <MenubarItem
-              key={opt.value}
-              onClick={() => changeZoom(opt.value)}
-              className="flex items-center justify-between gap-4 text-xs font-medium"
-            >
-              <span>{opt.label}</span>
-              {zoom === opt.value ? <Check className="size-3.5 text-primary" /> : null}
-            </MenubarItem>
-          ))}
         </MenubarContent>
       </MenubarMenu>
 
@@ -185,10 +166,6 @@ export default function AdminWorkspaceMenubar({
           <MessageCircle className="size-3.5 fill-current" />
           <span>WhatsApp Web</span>
         </button>
-        <div className="flex items-center gap-1.5 pl-1 text-[11px] text-muted-foreground border-l border-border">
-          <Monitor className="size-3 text-muted-foreground/70" />
-          <span className="font-semibold text-foreground/80">{activeOptionLabel.split("—")[0].trim()}</span>
-        </div>
       </div>
     </Menubar>
   );

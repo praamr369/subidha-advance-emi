@@ -338,10 +338,6 @@ html.dark {
  * Delivers clean, compact ERP control-room layout on desktop/laptop displays
  * --------------------------------------------------------------------------- */
 @media (min-width: 768px) {
-  html.admin-desktop-view {
-    zoom: var(--admin-desktop-zoom, 0.8);
-  }
-
   /* Sleek custom 6px desktop scrollbars */
   html.admin-desktop-view ::-webkit-scrollbar {
     width: 6px;
@@ -487,12 +483,6 @@ html.dark {
       opacity: 1;
       transform: scale(1) translateY(0);
     }
-  }
-}
-
-@media print {
-  html.admin-desktop-view {
-    zoom: 1 !important;
   }
 }
 

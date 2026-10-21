@@ -36,16 +36,16 @@ export function setStoredAdminZoom(value: string): void {
   } catch {
     // ignore local storage errors
   }
-  applyAdminDesktopScale(true, value);
+  applyAdminDesktopScale(true);
   window.dispatchEvent(new CustomEvent(ADMIN_ZOOM_EVENT, { detail: value }));
 }
 
-export function applyAdminDesktopScale(active: boolean, zoom = getStoredAdminZoom()): void {
+export function applyAdminDesktopScale(active: boolean): void {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
   if (active) {
     root.classList.add("admin-desktop-view");
-    root.style.setProperty("--admin-desktop-zoom", zoom);
+    root.style.removeProperty("--admin-desktop-zoom");
   } else {
     root.classList.remove("admin-desktop-view");
     root.style.removeProperty("--admin-desktop-zoom");
