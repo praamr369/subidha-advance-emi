@@ -105,6 +105,15 @@ export type DirectWhatsAppComposePayload = {
   product?: string;
   doc_url?: string;
   offer_text?: string;
+  delivery_date?: string;
+  payment_mode?: string;
+  balance?: string | number;
+  recovered_amount?: string | number;
+  present_days?: string | number;
+  absent_days?: string | number;
+  overtime_hours?: string | number;
+  customer_name?: string;
+  period?: string;
   source_model?: string;
   source_id?: string;
 };

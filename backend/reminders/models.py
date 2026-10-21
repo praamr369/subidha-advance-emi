@@ -228,6 +228,21 @@ class WhatsAppEventType(models.TextChoices):
     CONTRACT_ACTIVATED = "CONTRACT_ACTIVATED", "Contract activated"
     CUSTOM = "CUSTOM", "Custom message"
 
+    # Vendor events
+    VENDOR_PO = "VENDOR_PO", "Vendor purchase order"
+    VENDOR_LEDGER = "VENDOR_LEDGER", "Vendor ledger & outstanding"
+    VENDOR_PAYMENT = "VENDOR_PAYMENT", "Vendor payment advice"
+
+    # Partner events
+    PARTNER_COMMISSION = "PARTNER_COMMISSION", "Partner commission payout"
+    PARTNER_LEDGER = "PARTNER_LEDGER", "Partner ledger & balance"
+    PARTNER_REFERRAL = "PARTNER_REFERRAL", "Partner customer enrollment"
+
+    # Staff events
+    STAFF_SALARY = "STAFF_SALARY", "Staff salary slip"
+    STAFF_ATTENDANCE = "STAFF_ATTENDANCE", "Staff attendance record"
+    STAFF_ADVANCE = "STAFF_ADVANCE", "Staff advance balance"
+
 
 class WhatsAppMessage(ReminderTimeStampedModel):
     """A customer message waiting to be sent from the business WhatsApp.

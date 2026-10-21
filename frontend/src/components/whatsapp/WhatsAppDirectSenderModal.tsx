@@ -4,23 +4,35 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
   AlertCircle,
+  Briefcase,
+  Building2,
+  Calendar,
   Check,
+  CheckSquare,
+  Clock,
+  Coins,
   Copy,
+  CreditCard,
   ExternalLink,
+  FileSpreadsheet,
   FileText,
   Gift,
+  Handshake,
   MessageCircle,
   Phone,
   Receipt,
   Search,
   Send,
   Sparkles,
+  Truck,
   User,
+  Users,
   X,
 } from "lucide-react";
 
 import ModalShell from "@/components/ui/ModalShell";
 import { cn } from "@/lib/utils";
+import { apiFetch } from "@/lib/api";
 import {
   buildClientDirectWhatsAppUrl,
   composeWhatsAppDirect,
@@ -28,8 +40,13 @@ import {
   type DirectWhatsAppComposePayload,
 } from "@/services/whatsapp";
 import { searchCustomers, type CustomerRecord } from "@/services/customers";
+import { listVendors, type Vendor } from "@/services/vendors";
+import { listHrStaff, type HrStaff } from "@/services/admin-hr";
+
+export type PartyCategory = "CUSTOMER" | "VENDOR" | "PARTNER" | "STAFF" | "DIRECT";
 
 export type WhatsAppDirectInitialData = {
+  partyType?: PartyCategory;
   phone?: string;
   name?: string;
   customerId?: number | null;
@@ -42,6 +59,15 @@ export type WhatsAppDirectInitialData = {
   date?: string;
   offerText?: string;
   text?: string;
+  deliveryDate?: string;
+  paymentMode?: string;
+  balance?: string | number;
+  recoveredAmount?: string | number;
+  presentDays?: string | number;
+  absentDays?: string | number;
+  overtimeHours?: string | number;
+  customerName?: string;
+  period?: string;
   sourceModel?: string;
   sourceId?: string;
 };
@@ -64,58 +90,148 @@ type EventTemplateOption = {
   label: string;
   icon: typeof FileText;
   description: string;
+  category: PartyCategory | "ALL";
 };
 
 const TEMPLATE_OPTIONS: EventTemplateOption[] = [
+  // --- Customer Templates ---
   {
     value: "BILL_INVOICE",
     label: "Bill / Invoice",
     icon: FileText,
     description: "Send sales bill, retail invoice, or delivery invoice with link.",
+    category: "CUSTOMER",
   },
   {
     value: "PAYMENT_RECEIPT",
     label: "Payment Receipt",
     icon: Receipt,
     description: "Send payment confirmation and receipt link for Advance EMI or direct sale.",
+    category: "CUSTOMER",
   },
   {
     value: "OUTSTANDING_REMINDER",
     label: "Outstanding / Overdue",
     icon: AlertCircle,
     description: "Send friendly reminder of unpaid overdue balance with UPI instructions.",
+    category: "CUSTOMER",
   },
   {
     value: "DUE_REMINDER",
     label: "Instalment Due",
-    icon: MessageCircle,
+    icon: Clock,
     description: "Upcoming monthly instalment due date reminder.",
+    category: "CUSTOMER",
   },
   {
     value: "BROCHURE_CATALOG",
     label: "Brochure & Catalog",
     icon: Sparkles,
     description: "Share online digital product catalog and furniture collection link.",
+    category: "CUSTOMER",
   },
   {
     value: "OFFER_PROMOTION",
-    label: "Offer & Ad Promotion",
+    label: "Offer & Promo",
     icon: Gift,
     description: "Seasonal discount, festive offer, or special promotional message.",
+    category: "CUSTOMER",
   },
   {
     value: "CRM_FOLLOW_UP",
     label: "CRM Follow-up",
     icon: User,
     description: "Follow up on customer inquiries, plan quotations, or showroom visits.",
+    category: "CUSTOMER",
   },
+
+  // --- Vendor Templates ---
+  {
+    value: "VENDOR_PO",
+    label: "Purchase Order (PO)",
+    icon: Truck,
+    description: "Send formal Purchase Order with PO number, items, delivery date & link.",
+    category: "VENDOR",
+  },
+  {
+    value: "VENDOR_LEDGER",
+    label: "Vendor Ledger & Balance",
+    icon: FileSpreadsheet,
+    description: "Send outstanding balance statement and ledger link to supplier.",
+    category: "VENDOR",
+  },
+  {
+    value: "VENDOR_PAYMENT",
+    label: "Payment Advice",
+    icon: CreditCard,
+    description: "Send payment voucher advice (NEFT/RTGS/UPI/Cheque) to vendor.",
+    category: "VENDOR",
+  },
+
+  // --- Partner Templates ---
+  {
+    value: "PARTNER_COMMISSION",
+    label: "Commission Payout",
+    icon: Coins,
+    description: "Send monthly partner commission statement, payout amount & link.",
+    category: "PARTNER",
+  },
+  {
+    value: "PARTNER_LEDGER",
+    label: "Partner Ledger & Balance",
+    icon: FileSpreadsheet,
+    description: "Send partner ledger summary and current balance statement.",
+    category: "PARTNER",
+  },
+  {
+    value: "PARTNER_REFERRAL",
+    label: "Customer Enrollment",
+    icon: CheckSquare,
+    description: "Notify partner of new customer subscription, plan, and Lucky ID.",
+    category: "PARTNER",
+  },
+
+  // --- Staff Templates ---
+  {
+    value: "STAFF_SALARY",
+    label: "Salary Slip & Outstanding",
+    icon: Coins,
+    description: "Send monthly salary slip, net pay, and pending salary balance.",
+    category: "STAFF",
+  },
+  {
+    value: "STAFF_ATTENDANCE",
+    label: "Attendance Report",
+    icon: Calendar,
+    description: "Send monthly attendance record (present, absent, overtime hours).",
+    category: "STAFF",
+  },
+  {
+    value: "STAFF_ADVANCE",
+    label: "Staff Advance & Balance",
+    icon: CreditCard,
+    description: "Send advance sanctioned, deduction, and remaining advance balance.",
+    category: "STAFF",
+  },
+
+  // --- Universal ---
   {
     value: "CUSTOM",
     label: "Custom Message",
     icon: Send,
     description: "Write any custom message to send immediately without saving contact.",
+    category: "ALL",
   },
 ];
+
+type UnifiedPartyItem = {
+  id: number;
+  name: string;
+  phone: string;
+  code?: string;
+  role: PartyCategory;
+  subtitle?: string;
+};
 
 type Props = {
   open?: boolean;
@@ -139,14 +255,21 @@ export default function WhatsAppDirectSenderModal({
     }
   }, [controlledOnClose]);
 
-  // Recipient state
-  const [recipientMode, setRecipientMode] = useState<"direct" | "saved">("direct");
+  // Recipient / Party selection
+  const [partyCategory, setPartyCategory] = useState<PartyCategory>("CUSTOMER");
   const [phone, setPhone] = useState("");
-  const [customerName, setCustomerName] = useState("");
-  const [customerId, setCustomerId] = useState<number | null>(null);
+  const [recipientName, setRecipientName] = useState("");
+  const [selectedParty, setSelectedParty] = useState<UnifiedPartyItem | null>(null);
 
-  // Template & details state
+  // Search state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<UnifiedPartyItem[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+
+  // Template & message type
   const [eventType, setEventType] = useState("BILL_INVOICE");
+
+  // Template details state
   const [amount, setAmount] = useState("");
   const [refNo, setRefNo] = useState("");
   const [receiptNo, setReceiptNo] = useState("");
@@ -155,36 +278,77 @@ export default function WhatsAppDirectSenderModal({
   const [dateStr, setDateStr] = useState("");
   const [offerText, setOfferText] = useState("");
   const [customText, setCustomText] = useState("");
+  const [deliveryDate, setDeliveryDate] = useState("");
+  const [paymentMode, setPaymentMode] = useState("UPI / Bank Transfer");
+  const [balance, setBalance] = useState("");
+  const [recoveredAmount, setRecoveredAmount] = useState("");
+  const [presentDays, setPresentDays] = useState("");
+  const [absentDays, setAbsentDays] = useState("");
+  const [overtimeHours, setOvertimeHours] = useState("");
+  const [referredCustomerName, setReferredCustomerName] = useState("");
+  const [period, setPeriod] = useState("");
 
   // Source attribution
-  const [sourceModel, setSourceModel] = useState("WhatsAppDirect");
+  const [sourceModel, setSourceModel] = useState("Customer");
   const [sourceId, setSourceId] = useState("");
-
-  // Customer search state
-  const [customerSearchQuery, setCustomerSearchQuery] = useState("");
-  const [customerResults, setCustomerResults] = useState<CustomerRecord[]>([]);
-  const [isSearchingCustomer, setIsSearchingCustomer] = useState(false);
 
   // Status feedback
   const [copied, setCopied] = useState(false);
-  const [isLogging, startLoggingTransition] = useTransition();
+  const [, startLoggingTransition] = useTransition();
   const [statusMessage, setStatusMessage] = useState<{
     type: "success" | "error";
     text: string;
   } | null>(null);
 
+  // Filter templates for current party category
+  const availableTemplates = useMemo(() => {
+    if (partyCategory === "DIRECT") {
+      return TEMPLATE_OPTIONS;
+    }
+    return TEMPLATE_OPTIONS.filter(
+      (opt) => opt.category === "ALL" || opt.category === partyCategory
+    );
+  }, [partyCategory]);
+
+  // When party category changes, pick sensible default template
+  const handleSelectPartyCategory = (cat: PartyCategory) => {
+    setPartyCategory(cat);
+    setSelectedParty(null);
+    setSearchQuery("");
+    setSearchResults([]);
+    setIsBodyManuallyEdited(false);
+
+    if (cat === "CUSTOMER") {
+      setEventType("BILL_INVOICE");
+      setSourceModel("Customer");
+    } else if (cat === "VENDOR") {
+      setEventType("VENDOR_PO");
+      setSourceModel("Vendor");
+    } else if (cat === "PARTNER") {
+      setEventType("PARTNER_COMMISSION");
+      setSourceModel("Partner");
+    } else if (cat === "STAFF") {
+      setEventType("STAFF_SALARY");
+      setSourceModel("Staff");
+    } else {
+      setEventType("CUSTOM");
+      setSourceModel("WhatsAppDirect");
+    }
+  };
+
   // Reset or load initial data
   const applyInitialData = useCallback((data?: WhatsAppDirectInitialData) => {
     if (!data) return;
-    if (data.phone) setPhone(data.phone);
-    if (data.name) setCustomerName(data.name);
-    if (data.customerId) {
-      setCustomerId(data.customerId);
-      setRecipientMode("saved");
-    } else {
-      setCustomerId(null);
-      if (data.phone) setRecipientMode("direct");
+    if (data.partyType) {
+      setPartyCategory(data.partyType);
+    } else if (data.customerId) {
+      setPartyCategory("CUSTOMER");
+    } else if (data.phone) {
+      setPartyCategory("DIRECT");
     }
+
+    if (data.phone) setPhone(data.phone);
+    if (data.name) setRecipientName(data.name);
     if (data.eventType) setEventType(data.eventType);
     if (data.amount !== undefined) setAmount(String(data.amount));
     if (data.ref) setRefNo(data.ref);
@@ -194,10 +358,27 @@ export default function WhatsAppDirectSenderModal({
     if (data.date) setDateStr(data.date);
     if (data.offerText) setOfferText(data.offerText);
     if (data.text) setCustomText(data.text);
+    if (data.deliveryDate) setDeliveryDate(data.deliveryDate);
+    if (data.paymentMode) setPaymentMode(data.paymentMode);
+    if (data.balance !== undefined) setBalance(String(data.balance));
+    if (data.recoveredAmount !== undefined) setRecoveredAmount(String(data.recoveredAmount));
+    if (data.presentDays !== undefined) setPresentDays(String(data.presentDays));
+    if (data.absentDays !== undefined) setAbsentDays(String(data.absentDays));
+    if (data.overtimeHours !== undefined) setOvertimeHours(String(data.overtimeHours));
+    if (data.customerName) setReferredCustomerName(data.customerName);
+    if (data.period) setPeriod(data.period);
     if (data.sourceModel) setSourceModel(data.sourceModel);
     if (data.sourceId) setSourceId(data.sourceId);
 
-    // Default dates if empty
+    if (data.customerId) {
+      setSelectedParty({
+        id: data.customerId,
+        name: data.name || "Customer",
+        phone: data.phone || "",
+        role: "CUSTOMER",
+      });
+    }
+
     if (!data.date) {
       const today = new Date().toISOString().split("T")[0];
       setDateStr(today);
@@ -227,28 +408,107 @@ export default function WhatsAppDirectSenderModal({
     };
   }, [applyInitialData]);
 
-  // Search customers when query changes in saved mode
+  // Search parties across customer, vendor, partner, staff directories
   useEffect(() => {
-    if (recipientMode !== "saved" || !customerSearchQuery.trim()) {
-      setCustomerResults([]);
+    if (partyCategory === "DIRECT" || !searchQuery.trim()) {
+      setSearchResults([]);
       return;
     }
+
     const timer = setTimeout(async () => {
-      setIsSearchingCustomer(true);
+      setIsSearching(true);
+      const query = searchQuery.trim();
       try {
-        const results = await searchCustomers(customerSearchQuery);
-        setCustomerResults(results);
-      } catch {
-        setCustomerResults([]);
+        if (partyCategory === "CUSTOMER") {
+          const custs = await searchCustomers(query);
+          setSearchResults(
+            custs.map((c: CustomerRecord) => ({
+              id: c.id,
+              name: c.name,
+              phone: c.phone || "",
+              code: c.customer_code,
+              role: "CUSTOMER",
+              subtitle: c.city ? `Customer · ${c.city}` : "Customer",
+            }))
+          );
+        } else if (partyCategory === "VENDOR") {
+          const res = await listVendors({ search: query });
+          const vendorsList: Vendor[] = Array.isArray(res) ? res : res.results || [];
+          setSearchResults(
+            vendorsList.map((v: Vendor) => ({
+              id: v.id,
+              name: v.name || v.display_name,
+              phone: v.phone || v.whatsapp || "",
+              code: v.vendor_code,
+              role: "VENDOR",
+              subtitle: v.contact_person
+                ? `Supplier · Contact: ${v.contact_person}`
+                : "Supplier / Vendor",
+            }))
+          );
+        } else if (partyCategory === "PARTNER") {
+          // Query CRM party list filtered by PARTNER role
+          const res = await apiFetch<{ results?: Array<{ id: number; display_name: string; primary_phone: string; party_no: string }> }>(
+            `/crm/parties/?role_type=PARTNER&q=${encodeURIComponent(query)}`
+          );
+          const partnersList = res.results || [];
+          setSearchResults(
+            partnersList.map((p) => ({
+              id: p.id,
+              name: p.display_name,
+              phone: p.primary_phone,
+              code: p.party_no,
+              role: "PARTNER",
+              subtitle: "Partner / Franchise",
+            }))
+          );
+        } else if (partyCategory === "STAFF") {
+          const res = await listHrStaff({ q: query });
+          const staffList = res.results || [];
+          setSearchResults(
+            staffList.map((s: HrStaff) => ({
+              id: s.id,
+              name: s.name,
+              phone: s.phone || "",
+              code: s.employee_code,
+              role: "STAFF",
+              subtitle: s.designation
+                ? `${s.designation} · ${s.department || "Staff"}`
+                : "Staff / Employee",
+            }))
+          );
+        }
+      } catch (err) {
+        console.warn("Party search error:", err);
+        setSearchResults([]);
       } finally {
-        setIsSearchingCustomer(false);
+        setIsSearching(false);
       }
     }, 280);
 
     return () => clearTimeout(timer);
-  }, [customerSearchQuery, recipientMode]);
+  }, [searchQuery, partyCategory]);
 
-  // Default document URL to public catalog if brochure/catalog is chosen and docUrl is empty
+  // Select party from search dropdown
+  const handleSelectParty = (party: UnifiedPartyItem) => {
+    setSelectedParty(party);
+    setRecipientName(party.name);
+    setPhone(party.phone || "");
+    setSearchResults([]);
+    setSearchQuery("");
+    setSourceId(String(party.id));
+    setSourceModel(
+      party.role === "CUSTOMER"
+        ? "Customer"
+        : party.role === "VENDOR"
+        ? "Vendor"
+        : party.role === "PARTNER"
+        ? "Partner"
+        : "Staff"
+    );
+  };
+
+  // Default document URL to public catalog if brochure/catalog is chosen
   useEffect(() => {
     if (eventType === "BROCHURE_CATALOG" && !docUrl) {
       if (typeof window !== "undefined") {
@@ -259,21 +519,22 @@ export default function WhatsAppDirectSenderModal({
 
   // Generated message body based on current fields
   const generatedBody = useMemo(() => {
-    const name = customerName.trim() || "Customer";
+    const name = recipientName.trim() || (partyCategory === "VENDOR" ? "Supplier" : partyCategory === "PARTNER" ? "Partner" : partyCategory === "STAFF" ? "Staff" : "Customer");
     const company = "Subidha Furniture";
-    const ref = refNo.trim() || "Order";
+    const ref = refNo.trim() || "REF-001";
     const amt = amount.trim() || "0";
     const date = dateStr.trim() || new Date().toISOString().split("T")[0];
     const doc = docUrl.trim();
     const docLinkText = doc ? `\n\n📄 View Document: ${doc}` : "";
 
     switch (eventType) {
+      // --- Customer Templates ---
       case "BILL_INVOICE":
         return `Dear ${name},\nHere is your bill/invoice (${ref}) from ${company}.\nTotal Amount: ₹${amt}.${docLinkText}\n\nThank you for shopping with us! — ${company}`;
 
       case "PAYMENT_RECEIPT": {
         const rcpt = receiptNo.trim() || ref;
-        return `Dear ${name},\nWe have received your payment of ₹${amt} on ${date} for ${ref}.\nReceipt: ${rcpt}.${docLinkText}\n\nThank you for paying on time. — ${company}`;
+        return `Dear ${name},\nWe have received your payment of ₹${amt} on ${date} for ${ref}.\nReceipt No: ${rcpt}.${docLinkText}\n\nThank you for paying on time. — ${company}`;
       }
 
       case "OUTSTANDING_REMINDER":
@@ -284,11 +545,11 @@ export default function WhatsAppDirectSenderModal({
 
       case "BROCHURE_CATALOG": {
         const catUrl = doc || (typeof window !== "undefined" ? `${window.location.origin}/products` : "https://subidha.com");
-        return `Hello ${name},\nGreetings from ${company}!\n\nHere is our latest furniture collection brochure & digital catalog:\n👉 ${catUrl}\n\nExplore our latest living, bedroom, and office collections with easy EMI and rent/lease plans. Feel free to reply to this chat for any questions! — ${company}`;
+        return `Hello ${name},\nGreetings from ${company}!\n\nHere is our latest furniture collection brochure & digital catalog:\n👉 ${catUrl}\n\nExplore our living, bedroom, and office collections with easy EMI and rent/lease plans. Feel free to reply to this chat for any questions! — ${company}`;
       }
 
       case "OFFER_PROMOTION": {
-        const offer = offerText.trim() || "Special seasonal discount on our best-selling furniture!";
+        const offer = offerText.trim() || "Special seasonal discount on our best-selling furniture collections!";
         const link = doc ? `\nExplore offers: ${doc}` : "";
         return `🎉 Exciting Offers at ${company}!\n\n${offer}${link}\n\nVisit our showroom or reply to this chat to book your offer today! — ${company}`;
       }
@@ -298,13 +559,71 @@ export default function WhatsAppDirectSenderModal({
         return `Hello ${name},\nFollowing up from ${company} regarding your inquiry for ${product}.\nWe are here to assist you with the best prices, instant EMI options, and fast doorstep delivery. Let us know how we can help you today! — ${company}`;
       }
 
+      // --- Vendor Templates ---
+      case "VENDOR_PO": {
+        const dDate = deliveryDate.trim() || date;
+        const items = productName.trim() ? `\nItems: ${productName.trim()}` : "";
+        return `Dear ${name},\nPlease find Purchase Order #${ref} from ${company}.\nOrder Date: ${date}\nTotal Amount: ₹${amt}\nExpected Delivery: ${dDate}${items}${docLinkText}\n\nPlease confirm receipt and dispatch schedule. Thank you! — ${company}`;
+      }
+
+      case "VENDOR_LEDGER": {
+        const note = refNo.trim() ? `\nRef: ${refNo.trim()}` : "";
+        return `Dear ${name},\nHere is your account ledger & outstanding statement from ${company} as of ${date}.\nTotal Outstanding Payable: ₹${amt}${note}${docLinkText}\n\nFor reconciliation or payment inquiries, please reply directly to this chat. Thank you! — ${company}`;
+      }
+
+      case "VENDOR_PAYMENT": {
+        const mode = paymentMode.trim() || "NEFT / UPI";
+        const utr = receiptNo.trim() ? `\nUTR / Ref: ${receiptNo.trim()}` : "";
+        return `Dear ${name},\nWe have processed a payment of ₹${amt} against Voucher #${ref} via ${mode} on ${date}.${utr}${docLinkText}\n\nThank you for your business! — ${company}`;
+      }
+
+      // --- Partner Templates ---
+      case "PARTNER_COMMISSION": {
+        const pMonth = period.trim() || date;
+        const voucher = refNo.trim() ? `\nVoucher: #${refNo.trim()}` : "";
+        return `Dear Partner ${name},\nYour commission payout statement for ${pMonth} from ${company} has been generated.\nNet Commission Payable: ₹${amt}${voucher}${docLinkText}\n\nThank you for your active partnership! — ${company}`;
+      }
+
+      case "PARTNER_LEDGER": {
+        return `Dear Partner ${name},\nHere is your current partner ledger summary from ${company} as of ${date}.\nCurrent Ledger Balance: ₹${amt}${docLinkText}\n\nPlease reply if you have any questions or reconciliation queries. Thank you! — ${company}`;
+      }
+
+      case "PARTNER_REFERRAL": {
+        const cust = referredCustomerName.trim() || "New Customer";
+        const plan = productName.trim() || "Lucky Plan EMI";
+        const lucky = receiptNo.trim() ? `\nLucky ID: ${receiptNo.trim()}` : "";
+        return `Dear Partner ${name},\nCustomer enrollment update under your code from ${company}:\nCustomer: ${cust}\nPlan: ${plan}\nContract: #${ref}${lucky}\nMonthly Installment: ₹${amt}\n\nKeep up the great work! — ${company}`;
+      }
+
+      // --- Staff Templates ---
+      case "STAFF_SALARY": {
+        const sMonth = period.trim() || date;
+        const outBal = balance.trim() ? `\nOutstanding Balance: ₹${balance.trim()}` : "";
+        return `Dear ${name},\nYour salary statement for ${sMonth} from ${company} is ready.\nNet Salary: ₹${amt}${outBal}${docLinkText}\n\nFor payroll inquiries, please contact HR/Accounts. Thank you! — ${company}`;
+      }
+
+      case "STAFF_ATTENDANCE": {
+        const sMonth = period.trim() || date;
+        const pDays = presentDays.trim() || "0";
+        const aDays = absentDays.trim() || "0";
+        const ot = overtimeHours.trim() ? ` | Overtime: ${overtimeHours.trim()} hrs` : "";
+        return `Dear ${name},\nMonthly attendance report for ${sMonth} from ${company}:\nPresent Days: ${pDays} | Absent Days: ${aDays}${ot}${docLinkText}\n\nPlease verify with the HR desk if there are any discrepancies. Thank you! — ${company}`;
+      }
+
+      case "STAFF_ADVANCE": {
+        const rec = recoveredAmount.trim() ? `\nRecovered this cycle: ₹${recoveredAmount.trim()}` : "";
+        const rem = balance.trim() ? `\nRemaining Advance Balance: ₹${balance.trim()}` : "";
+        return `Dear ${name},\nStaff advance ledger update from ${company} as of ${date}:\nSanctioned Advance: ₹${amt}${rec}${rem}${docLinkText}\n\nThank you! — ${company}`;
+      }
+
       case "CUSTOM":
       default:
         return customText;
     }
   }, [
     eventType,
-    customerName,
+    recipientName,
+    partyCategory,
     refNo,
     amount,
     dateStr,
@@ -313,13 +632,22 @@ export default function WhatsAppDirectSenderModal({
     offerText,
     productName,
     customText,
+    deliveryDate,
+    paymentMode,
+    balance,
+    recoveredAmount,
+    presentDays,
+    absentDays,
+    overtimeHours,
+    referredCustomerName,
+    period,
   ]);
 
-  // Actual editable text
+  // Actual editable text in preview
   const [editableBody, setEditableBody] = useState("");
   const [isBodyManuallyEdited, setIsBodyManuallyEdited] = useState(false);
 
-  // Synchronize generated body into editableBody unless the user manually edited it
+  // Synchronize generated body into editableBody unless manually modified
   useEffect(() => {
     if (!isBodyManuallyEdited) {
       setEditableBody(generatedBody);
@@ -342,12 +670,12 @@ export default function WhatsAppDirectSenderModal({
     return normalizedPhone.length >= 10 && normalizedPhone.length <= 15;
   }, [normalizedPhone]);
 
-  // Perform background logging and get outbox record
+  // Log message to backend Outbox for audit trail
   const logMessageToOutbox = useCallback(async () => {
     const payload: DirectWhatsAppComposePayload = {
       phone: normalizedPhone,
-      customer: customerId,
-      name: customerName.trim(),
+      customer: partyCategory === "CUSTOMER" && selectedParty ? selectedParty.id : null,
+      name: recipientName.trim(),
       event_type: eventType,
       text: editableBody.trim(),
       amount: amount || undefined,
@@ -357,6 +685,15 @@ export default function WhatsAppDirectSenderModal({
       product: productName || undefined,
       doc_url: docUrl || undefined,
       offer_text: offerText || undefined,
+      delivery_date: deliveryDate || undefined,
+      payment_mode: paymentMode || undefined,
+      balance: balance || undefined,
+      recovered_amount: recoveredAmount || undefined,
+      present_days: presentDays || undefined,
+      absent_days: absentDays || undefined,
+      overtime_hours: overtimeHours || undefined,
+      customer_name: referredCustomerName || undefined,
+      period: period || undefined,
       source_model: sourceModel,
       source_id: sourceId,
     };
@@ -370,8 +707,9 @@ export default function WhatsAppDirectSenderModal({
     }
   }, [
     normalizedPhone,
-    customerId,
-    customerName,
+    partyCategory,
+    selectedParty,
+    recipientName,
     eventType,
     editableBody,
     amount,
@@ -381,6 +719,15 @@ export default function WhatsAppDirectSenderModal({
     productName,
     docUrl,
     offerText,
+    deliveryDate,
+    paymentMode,
+    balance,
+    recoveredAmount,
+    presentDays,
+    absentDays,
+    overtimeHours,
+    referredCustomerName,
+    period,
     sourceModel,
     sourceId,
   ]);
@@ -390,7 +737,7 @@ export default function WhatsAppDirectSenderModal({
     if (!isValidPhone) {
       setStatusMessage({
         type: "error",
-        text: "Please enter a valid 10-digit phone number.",
+        text: "Please enter a valid 10-digit mobile number.",
       });
       return;
     }
@@ -408,7 +755,6 @@ export default function WhatsAppDirectSenderModal({
       target: "web",
     });
 
-    // Synchronously open tab to avoid browser popup blocker
     const tab = typeof window !== "undefined" ? window.open("", "_blank") : null;
     if (tab) {
       tab.opener = null;
@@ -421,7 +767,7 @@ export default function WhatsAppDirectSenderModal({
       await logMessageToOutbox();
       setStatusMessage({
         type: "success",
-        text: `Opened in WhatsApp Web for +${normalizedPhone} and logged to Outbox!`,
+        text: `Opened in WhatsApp Web for +${normalizedPhone} and logged into Outbox!`,
       });
     });
   };
@@ -431,7 +777,7 @@ export default function WhatsAppDirectSenderModal({
     if (!isValidPhone) {
       setStatusMessage({
         type: "error",
-        text: "Please enter a valid 10-digit phone number.",
+        text: "Please enter a valid 10-digit mobile number.",
       });
       return;
     }
@@ -461,7 +807,7 @@ export default function WhatsAppDirectSenderModal({
       await logMessageToOutbox();
       setStatusMessage({
         type: "success",
-        text: `Opened WhatsApp App for +${normalizedPhone} and logged to Outbox!`,
+        text: `Opened WhatsApp App for +${normalizedPhone} and logged into Outbox!`,
       });
     });
   };
@@ -485,39 +831,30 @@ export default function WhatsAppDirectSenderModal({
     }
   };
 
-  // Select customer from search results
-  const handleSelectCustomer = (cust: CustomerRecord) => {
-    setCustomerId(cust.id);
-    setCustomerName(cust.name);
-    setPhone(cust.phone || "");
-    setCustomerResults([]);
-    setCustomerSearchQuery("");
-  };
-
   if (!isOpen) return null;
 
   return (
     <ModalShell
       open={isOpen}
       onClose={handleClose}
-      title="WhatsApp Direct Sender (No Saved Contact Needed)"
-      panelClassName="w-full max-w-4xl max-h-[92vh] flex flex-col p-0 overflow-hidden bg-background border border-border shadow-2xl rounded-2xl"
+      title="Universal Party WhatsApp Communicator"
+      panelClassName="w-full max-w-5xl max-h-[92vh] flex flex-col p-0 overflow-hidden bg-background border border-border shadow-2xl rounded-2xl"
     >
       {/* Modal Header */}
-      <div className="flex items-center justify-between border-b border-border bg-[linear-gradient(180deg,color-mix(in_oklab,var(--surface-muted)_95%,#25D366_5%),var(--surface-card))] px-5 py-3.5">
+      <div className="flex items-center justify-between border-b border-border bg-[linear-gradient(180deg,color-mix(in_oklab,var(--surface-muted)_95%,#25D366_5%),var(--surface-card))] px-5 py-3">
         <div className="flex items-center gap-2.5">
           <div className="flex size-9 items-center justify-center rounded-xl bg-[#25D366]/15 text-[#25D366]">
             <MessageCircle className="size-5" />
           </div>
           <div>
             <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-              WhatsApp Direct Connect
+              WhatsApp Direct Connect · Party Hub
               <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-                100% Free · WhatsApp Web
+                100% Free · No API Fees
               </span>
             </h2>
             <p className="text-xs text-muted-foreground">
-              Send bills, receipts, brochures, offers, and reminders directly without saving contacts.
+              Instant communication for Customers, Vendors, Partners, and Staff without saving contacts.
             </p>
           </div>
         </div>
@@ -533,45 +870,88 @@ export default function WhatsAppDirectSenderModal({
 
       {/* Main Content Layout: Two-Column Workbench */}
       <div className="grid grid-cols-1 md:grid-cols-12 flex-1 overflow-y-auto divide-y md:divide-y-0 md:divide-x divide-border">
-        {/* Left Column: Form & Inputs (7 cols) */}
-        <div className="md:col-span-7 p-5 space-y-4 overflow-y-auto max-h-[75vh]">
-          {/* Recipient Mode Tabs */}
+        {/* Left Column: Party Selector, Directory Search & Template Form (7 cols) */}
+        <div className="md:col-span-7 p-4 sm:p-5 space-y-4 overflow-y-auto max-h-[75vh]">
+          {/* Party Category Tabs */}
           <div>
             <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-1.5">
-              Target Recipient
+              Select Recipient Party Category
             </label>
-            <div className="grid grid-cols-2 gap-1 rounded-lg border border-border bg-muted/40 p-1">
+            <div className="grid grid-cols-5 gap-1 rounded-lg border border-border bg-muted/40 p-1">
               <button
                 type="button"
-                onClick={() => setRecipientMode("direct")}
+                onClick={() => handleSelectPartyCategory("CUSTOMER")}
                 className={cn(
-                  "flex items-center justify-center gap-2 rounded-md py-1.5 text-xs font-medium transition",
-                  recipientMode === "direct"
+                  "flex items-center justify-center gap-1.5 rounded-md py-1.5 px-2 text-xs font-medium transition",
+                  partyCategory === "CUSTOMER"
                     ? "bg-background text-foreground shadow-sm font-semibold"
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                <Phone className="size-3.5" />
-                Direct Phone (Unsaved)
+                <Users className="size-3.5 text-blue-500" />
+                <span className="hidden sm:inline">Customer</span>
               </button>
+
               <button
                 type="button"
-                onClick={() => setRecipientMode("saved")}
+                onClick={() => handleSelectPartyCategory("VENDOR")}
                 className={cn(
-                  "flex items-center justify-center gap-2 rounded-md py-1.5 text-xs font-medium transition",
-                  recipientMode === "saved"
+                  "flex items-center justify-center gap-1.5 rounded-md py-1.5 px-2 text-xs font-medium transition",
+                  partyCategory === "VENDOR"
                     ? "bg-background text-foreground shadow-sm font-semibold"
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                <User className="size-3.5" />
-                Existing Customer
+                <Building2 className="size-3.5 text-amber-500" />
+                <span className="hidden sm:inline">Vendor</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSelectPartyCategory("PARTNER")}
+                className={cn(
+                  "flex items-center justify-center gap-1.5 rounded-md py-1.5 px-2 text-xs font-medium transition",
+                  partyCategory === "PARTNER"
+                    ? "bg-background text-foreground shadow-sm font-semibold"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <Handshake className="size-3.5 text-purple-500" />
+                <span className="hidden sm:inline">Partner</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSelectPartyCategory("STAFF")}
+                className={cn(
+                  "flex items-center justify-center gap-1.5 rounded-md py-1.5 px-2 text-xs font-medium transition",
+                  partyCategory === "STAFF"
+                    ? "bg-background text-foreground shadow-sm font-semibold"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <Briefcase className="size-3.5 text-emerald-500" />
+                <span className="hidden sm:inline">Staff</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSelectPartyCategory("DIRECT")}
+                className={cn(
+                  "flex items-center justify-center gap-1.5 rounded-md py-1.5 px-2 text-xs font-medium transition",
+                  partyCategory === "DIRECT"
+                    ? "bg-background text-foreground shadow-sm font-semibold"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <Phone className="size-3.5 text-sky-500" />
+                <span className="hidden sm:inline">Direct</span>
               </button>
             </div>
           </div>
 
-          {/* Recipient Inputs */}
-          {recipientMode === "direct" ? (
+          {/* Recipient Inputs / Directory Search */}
+          {partyCategory === "DIRECT" ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-foreground mb-1">
@@ -590,7 +970,7 @@ export default function WhatsAppDirectSenderModal({
                   />
                 </div>
                 <p className="mt-1 text-[11px] text-muted-foreground">
-                  Works even if number is not saved in phone contacts!
+                  Works even if unsaved in contacts!
                 </p>
               </div>
               <div>
@@ -600,8 +980,8 @@ export default function WhatsAppDirectSenderModal({
                 <input
                   type="text"
                   placeholder="e.g. Rahul Sharma"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
+                  value={recipientName}
+                  onChange={(e) => setRecipientName(e.target.value)}
                   className="w-full px-3 py-1.5 text-sm rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none"
                 />
               </div>
@@ -609,58 +989,89 @@ export default function WhatsAppDirectSenderModal({
           ) : (
             <div className="space-y-2">
               <label className="block text-xs font-medium text-foreground">
-                Search Customer
+                Search{" "}
+                {partyCategory === "CUSTOMER"
+                  ? "Customer Directory (Name, Phone, Code)"
+                  : partyCategory === "VENDOR"
+                  ? "Vendor / Supplier (Name, Code, Contact)"
+                  : partyCategory === "PARTNER"
+                  ? "Partner / Franchise (Name, Phone, Code)"
+                  : "Staff / Employee (Name, Employee ID, Role)"}
               </label>
+
               <div className="relative">
                 <Search className="size-3.5 absolute left-3 top-2.5 text-muted-foreground" />
                 <input
                   type="text"
-                  placeholder="Type name or phone number..."
-                  value={customerSearchQuery}
-                  onChange={(e) => setCustomerSearchQuery(e.target.value)}
+                  placeholder={`Search ${partyCategory.toLowerCase()}...`}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-9 pr-3 py-1.5 text-sm rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none"
                 />
-                {isSearchingCustomer && (
+                {isSearching && (
                   <div className="absolute right-3 top-2.5 text-xs text-muted-foreground">
                     Searching…
                   </div>
                 )}
               </div>
 
-              {/* Customer search results dropdown */}
-              {customerResults.length > 0 && (
-                <div className="rounded-lg border border-border bg-background shadow-lg max-h-40 overflow-y-auto divide-y divide-border">
-                  {customerResults.map((cust) => (
+              {/* Search results dropdown */}
+              {searchResults.length > 0 && (
+                <div className="rounded-lg border border-border bg-background shadow-lg max-h-48 overflow-y-auto divide-y divide-border">
+                  {searchResults.map((item) => (
                     <button
-                      key={cust.id}
+                      key={`${item.role}-${item.id}`}
                       type="button"
-                      onClick={() => handleSelectCustomer(cust)}
+                      onClick={() => handleSelectParty(item)}
                       className="w-full text-left px-3 py-2 text-xs hover:bg-muted/60 flex items-center justify-between"
                     >
-                      <span className="font-medium text-foreground">{cust.name}</span>
-                      <span className="font-mono text-muted-foreground">+{cust.phone}</span>
+                      <div>
+                        <span className="font-semibold text-foreground">{item.name}</span>
+                        {item.subtitle ? (
+                          <span className="ml-2 text-[11px] text-muted-foreground">
+                            ({item.subtitle})
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="text-right">
+                        <span className="font-mono text-xs text-foreground/80">
+                          {item.phone ? `+${item.phone}` : "No phone"}
+                        </span>
+                        {item.code ? (
+                          <div className="text-[10px] text-muted-foreground font-mono">
+                            {item.code}
+                          </div>
+                        ) : null}
+                      </div>
                     </button>
                   ))}
                 </div>
               )}
 
-              {/* Selected Customer Card */}
-              {customerId ? (
+              {/* Selected Party Banner */}
+              {selectedParty ? (
                 <div className="flex items-center justify-between rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-xs">
                   <div>
                     <span className="font-semibold text-emerald-800 dark:text-emerald-300">
-                      {customerName}
+                      {recipientName}
                     </span>
-                    <span className="ml-2 font-mono text-muted-foreground">+{phone}</span>
+                    {selectedParty.code ? (
+                      <span className="ml-1.5 font-mono text-[10px] text-muted-foreground">
+                        [{selectedParty.code}]
+                      </span>
+                    ) : null}
+                    <span className="ml-2 font-mono text-muted-foreground">
+                      {phone ? `+${phone}` : "No number specified"}
+                    </span>
                   </div>
                   <button
                     type="button"
                     onClick={() => {
-                      setCustomerId(null);
-                      setCustomerName("");
+                      setSelectedParty(null);
+                      setRecipientName("");
                       setPhone("");
                     }}
-                    className="text-xs text-destructive hover:underline"
+                    className="text-xs text-destructive hover:underline font-medium"
                   >
                     Change
                   </button>
@@ -672,10 +1083,10 @@ export default function WhatsAppDirectSenderModal({
           {/* Template Selection */}
           <div>
             <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-1.5">
-              Template & Message Type
+              Select Message Preset
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-              {TEMPLATE_OPTIONS.map((opt) => {
+              {availableTemplates.map((opt) => {
                 const Icon = opt.icon;
                 const isSelected = eventType === opt.value;
                 return (
@@ -702,7 +1113,7 @@ export default function WhatsAppDirectSenderModal({
             </div>
           </div>
 
-          {/* Dynamic Template Fields */}
+          {/* Dynamic Template Details Form */}
           <div className="rounded-xl border border-border bg-muted/20 p-3.5 space-y-3">
             <div className="text-xs font-semibold text-foreground flex items-center justify-between">
               <span>Template Details</span>
@@ -711,7 +1122,7 @@ export default function WhatsAppDirectSenderModal({
               </span>
             </div>
 
-            {/* Bill / Receipt / Due / Outstanding Fields */}
+            {/* Customer Bill / Receipt / Due / Outstanding */}
             {(eventType === "BILL_INVOICE" ||
               eventType === "PAYMENT_RECEIPT" ||
               eventType === "OUTSTANDING_REMINDER" ||
@@ -750,11 +1161,11 @@ export default function WhatsAppDirectSenderModal({
                 </div>
                 <div className="sm:col-span-2">
                   <label className="block text-[11px] font-medium text-foreground mb-1">
-                    Document / PDF Link (Customer can tap to view/download)
+                    Document / PDF Link
                   </label>
                   <input
                     type="text"
-                    placeholder="https://.../portal/receipt/123 or PDF link"
+                    placeholder="https://.../portal/receipt/123 or invoice link"
                     value={docUrl}
                     onChange={(e) => setDocUrl(e.target.value)}
                     className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none font-mono"
@@ -763,30 +1174,63 @@ export default function WhatsAppDirectSenderModal({
               </div>
             )}
 
-            {/* Brochure / Offer Fields */}
-            {(eventType === "BROCHURE_CATALOG" || eventType === "OFFER_PROMOTION") && (
-              <div className="space-y-3">
-                {eventType === "OFFER_PROMOTION" && (
-                  <div>
-                    <label className="block text-[11px] font-medium text-foreground mb-1">
-                      Offer Headline / Promotional Details
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Flat 15% OFF on Living Room Sets this Festive Season!"
-                      value={offerText}
-                      onChange={(e) => setOfferText(e.target.value)}
-                      className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none"
-                    />
-                  </div>
-                )}
+            {/* Vendor Purchase Order (PO) */}
+            {eventType === "VENDOR_PO" && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-medium text-foreground mb-1">
-                    Catalog / Brochure Web Link
+                    PO Number / Ref
                   </label>
                   <input
                     type="text"
-                    placeholder="https://.../products or catalog PDF"
+                    placeholder="e.g. PO-2026-081"
+                    value={refNo}
+                    onChange={(e) => setRefNo(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    Total Order Value (₹)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 85,000"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    Expected Delivery Date
+                  </label>
+                  <input
+                    type="date"
+                    value={deliveryDate}
+                    onChange={(e) => setDeliveryDate(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    Items / Remarks
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 5x Teak Dining Sets (4-seater)"
+                    value={productName}
+                    onChange={(e) => setProductName(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    PO Document / PDF Link
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="https://.../portal/purchases/po/81 or document link"
                     value={docUrl}
                     onChange={(e) => setDocUrl(e.target.value)}
                     className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none font-mono"
@@ -795,19 +1239,397 @@ export default function WhatsAppDirectSenderModal({
               </div>
             )}
 
-            {/* CRM Follow-up Fields */}
-            {eventType === "CRM_FOLLOW_UP" && (
-              <div>
-                <label className="block text-[11px] font-medium text-foreground mb-1">
-                  Product / Plan of Interest
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Teak Wood Dining Table or Lucky Plan EMI"
-                  value={productName}
-                  onChange={(e) => setProductName(e.target.value)}
-                  className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none"
-                />
+            {/* Vendor Ledger & Outstanding */}
+            {eventType === "VENDOR_LEDGER" && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    Outstanding Payable (₹)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 45,200"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    Statement Date
+                  </label>
+                  <input
+                    type="date"
+                    value={dateStr}
+                    onChange={(e) => setDateStr(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    Ledger Statement / Reconciliation Link
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="https://.../portal/ledger/vendor/12 or statement PDF"
+                    value={docUrl}
+                    onChange={(e) => setDocUrl(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none font-mono"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Vendor Payment Advice */}
+            {eventType === "VENDOR_PAYMENT" && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    Amount Paid (₹)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 35,000"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    Payment Mode
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. NEFT / RTGS / UPI"
+                    value={paymentMode}
+                    onChange={(e) => setPaymentMode(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    Voucher / Bill Ref
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. VCH-2026-104"
+                    value={refNo}
+                    onChange={(e) => setRefNo(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    UTR / Cheque Ref No
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. UTR-HDFC98427189"
+                    value={receiptNo}
+                    onChange={(e) => setReceiptNo(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Partner Commission Payout */}
+            {eventType === "PARTNER_COMMISSION" && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    Commission Period / Month
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. October 2026"
+                    value={period}
+                    onChange={(e) => setPeriod(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    Net Commission Payable (₹)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 14,500"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    Commission Statement / Payout Slip Link
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="https://.../portal/partner/payouts/52 or statement link"
+                    value={docUrl}
+                    onChange={(e) => setDocUrl(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none font-mono"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Partner Ledger & Balance */}
+            {eventType === "PARTNER_LEDGER" && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    Current Partner Balance (₹)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 22,800"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    Statement Date
+                  </label>
+                  <input
+                    type="date"
+                    value={dateStr}
+                    onChange={(e) => setDateStr(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    Partner Ledger Statement Link
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="https://.../portal/partner/ledger or statement PDF"
+                    value={docUrl}
+                    onChange={(e) => setDocUrl(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none font-mono"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Partner Customer Referral */}
+            {eventType === "PARTNER_REFERRAL" && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    Referred Customer Name
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Amit Sengupta"
+                    value={referredCustomerName}
+                    onChange={(e) => setReferredCustomerName(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    Contract / Subscription No
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. SUB-2026-089"
+                    value={refNo}
+                    onChange={(e) => setRefNo(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    Plan / Scheme Name
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Lucky Plan Diamond (₹5,000/mo)"
+                    value={productName}
+                    onChange={(e) => setProductName(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    Lucky ID / Unit No
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. #042"
+                    value={receiptNo}
+                    onChange={(e) => setReceiptNo(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Staff Salary Slip & Outstanding */}
+            {eventType === "STAFF_SALARY" && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    Salary Period / Month
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. October 2026"
+                    value={period}
+                    onChange={(e) => setPeriod(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    Net Salary Amount (₹)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 24,000"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    Pending / Outstanding Salary (₹)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 0 or pending amount"
+                    value={balance}
+                    onChange={(e) => setBalance(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    Pay Slip Link (Online)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="https://.../portal/staff/payroll/12 or slip PDF"
+                    value={docUrl}
+                    onChange={(e) => setDocUrl(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none font-mono"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Staff Attendance Report */}
+            {eventType === "STAFF_ATTENDANCE" && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    Present Days
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 26"
+                    value={presentDays}
+                    onChange={(e) => setPresentDays(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    Absent Days
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 2"
+                    value={absentDays}
+                    onChange={(e) => setAbsentDays(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    Overtime (Hours)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 8.5"
+                    value={overtimeHours}
+                    onChange={(e) => setOvertimeHours(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+                <div className="sm:col-span-3">
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    Attendance Calendar / Sheet Link
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="https://.../portal/staff/attendance or report link"
+                    value={docUrl}
+                    onChange={(e) => setDocUrl(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none font-mono"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Staff Advance & Balance */}
+            {eventType === "STAFF_ADVANCE" && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    Sanctioned Advance (₹)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 10,000"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    Recovered This Cycle (₹)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 2,500"
+                    value={recoveredAmount}
+                    onChange={(e) => setRecoveredAmount(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    Remaining Balance (₹)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 7,500"
+                    value={balance}
+                    onChange={(e) => setBalance(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+                <div className="sm:col-span-3">
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    Advance Ledger Link
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="https://.../portal/staff/advances or statement link"
+                    value={docUrl}
+                    onChange={(e) => setDocUrl(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none font-mono"
+                  />
+                </div>
               </div>
             )}
 
@@ -815,7 +1637,7 @@ export default function WhatsAppDirectSenderModal({
             {eventType === "CUSTOM" && (
               <div>
                 <label className="block text-[11px] font-medium text-foreground mb-1">
-                  Custom Text Content
+                  Custom Message Content
                 </label>
                 <textarea
                   rows={4}
@@ -830,7 +1652,7 @@ export default function WhatsAppDirectSenderModal({
         </div>
 
         {/* Right Column: Live Message Preview & Send Actions (5 cols) */}
-        <div className="md:col-span-5 p-5 bg-muted/10 flex flex-col justify-between space-y-4">
+        <div className="md:col-span-5 p-4 sm:p-5 bg-muted/10 flex flex-col justify-between space-y-4">
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
@@ -860,7 +1682,7 @@ export default function WhatsAppDirectSenderModal({
                 </div>
                 <div className="leading-none">
                   <div className="font-semibold text-xs text-foreground">
-                    {customerName || "Customer"}
+                    {recipientName || (partyCategory === "VENDOR" ? "Vendor / Supplier" : partyCategory === "PARTNER" ? "Partner / Franchise" : partyCategory === "STAFF" ? "Staff / Employee" : "Customer")}
                   </div>
                   <div className="text-[10px] text-muted-foreground font-mono">
                     {normalizedPhone ? `+${normalizedPhone}` : "No number specified"}
@@ -906,36 +1728,38 @@ export default function WhatsAppDirectSenderModal({
 
           {/* Action Buttons */}
           <div className="space-y-2 pt-2 border-t border-border">
-            {/* Primary Action: Open in WhatsApp Web */}
+            {/* Primary Action: WhatsApp Web Direct */}
             <button
               type="button"
               onClick={handleOpenWhatsAppWeb}
-              disabled={!isValidPhone || !editableBody.trim() || isLogging}
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#25D366] hover:bg-[#22c35e] text-white py-2.5 px-4 text-xs font-semibold shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              disabled={!isValidPhone || !editableBody.trim()}
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#25D366] hover:bg-[#22c35e] text-slate-950 font-bold py-2.5 px-4 shadow-lg shadow-[#25D366]/20 transition disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
             >
               <ExternalLink className="size-4" />
               <span>Open in WhatsApp Web</span>
-              <span className="rounded bg-black/20 px-1.5 py-0.5 text-[10px]">
+              <span className="text-[10px] bg-slate-950/15 text-slate-950 rounded px-1.5 py-0.5 ml-1">
                 Direct Chat
               </span>
             </button>
 
-            {/* Secondary Action: Open in Native App or Copy */}
+            {/* Secondary Actions: wa.me and Copy */}
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={handleOpenWhatsAppApp}
-                disabled={!isValidPhone || !editableBody.trim() || isLogging}
-                className="flex items-center justify-center gap-1.5 rounded-lg border border-border bg-background hover:bg-muted py-2 px-3 text-xs font-medium text-foreground transition disabled:opacity-50"
+                disabled={!isValidPhone || !editableBody.trim()}
+                className="flex items-center justify-center gap-1.5 rounded-lg border border-border bg-background hover:bg-muted py-2 text-xs font-semibold text-foreground transition disabled:opacity-50"
+                title="Open directly in WhatsApp Desktop or Mobile App"
               >
-                <Send className="size-3.5 text-emerald-600" />
+                <MessageCircle className="size-3.5 text-[#25D366]" />
                 <span>WhatsApp App</span>
               </button>
+
               <button
                 type="button"
                 onClick={handleCopyMessage}
                 disabled={!editableBody.trim()}
-                className="flex items-center justify-center gap-1.5 rounded-lg border border-border bg-background hover:bg-muted py-2 px-3 text-xs font-medium text-foreground transition disabled:opacity-50"
+                className="flex items-center justify-center gap-1.5 rounded-lg border border-border bg-background hover:bg-muted py-2 text-xs font-semibold text-foreground transition disabled:opacity-50"
               >
                 {copied ? (
                   <>
@@ -951,55 +1775,12 @@ export default function WhatsAppDirectSenderModal({
               </button>
             </div>
 
-            <p className="text-center text-[10px] text-muted-foreground pt-1">
+            <p className="text-[11px] text-center text-muted-foreground pt-1">
               Zero paid API charges. Logs into Outbox automatically.
             </p>
           </div>
         </div>
       </div>
     </ModalShell>
-  );
-}
-
-/**
- * Convenient drop-in trigger button that can be embedded anywhere
- */
-export function WhatsAppDirectTriggerButton({
-  initialData,
-  className,
-  variant = "outline",
-  children,
-}: {
-  initialData?: WhatsAppDirectInitialData;
-  className?: string;
-  variant?: "primary" | "outline" | "ghost";
-  children?: React.ReactNode;
-}) {
-  const handleClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    openWhatsAppDirectModal(initialData);
-  };
-
-  const variantStyles = {
-    primary: "bg-[#25D366] text-white hover:bg-[#20b858] font-semibold border-transparent",
-    outline: "border border-border bg-background hover:bg-muted text-foreground",
-    ghost: "hover:bg-muted text-foreground",
-  };
-
-  return (
-    <button
-      type="button"
-      onClick={handleClick}
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition cursor-pointer",
-        variantStyles[variant],
-        className
-      )}
-      title="Open WhatsApp Direct Sender"
-    >
-      <MessageCircle className="size-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-      {children || <span>WhatsApp</span>}
-    </button>
   );
 }

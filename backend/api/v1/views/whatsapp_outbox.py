@@ -170,7 +170,24 @@ class WhatsAppMessageViewSet(viewsets.ReadOnlyModelViewSet):
             context_data.setdefault("name", customer.name)
 
         # Context fields for rich templates
-        for field in ("amount", "ref", "receipt", "date", "product", "doc_url", "offer_text"):
+        for field in (
+            "amount",
+            "ref",
+            "receipt",
+            "date",
+            "product",
+            "doc_url",
+            "offer_text",
+            "delivery_date",
+            "payment_mode",
+            "balance",
+            "recovered_amount",
+            "present_days",
+            "absent_days",
+            "overtime_hours",
+            "customer_name",
+            "period",
+        ):
             if field in request.data:
                 context_data[field] = str(request.data[field])
 

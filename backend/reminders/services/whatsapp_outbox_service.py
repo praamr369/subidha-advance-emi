@@ -88,6 +88,59 @@ TEMPLATES: dict[str, str] = {
         "Dear {name}, your {plan_label} contract {ref} for {product} is now active. "
         "Monthly amount: ₹{amount}. — {company}"
     ),
+    # Vendor Templates
+    WhatsAppEventType.VENDOR_PO: (
+        "Dear {name},\nPlease find Purchase Order #{ref} from {company}.\n"
+        "Total Amount: ₹{amount}.\nExpected Delivery: {delivery_date}.\n"
+        "📄 View Order: {doc_url}\n\n"
+        "Please confirm receipt and dispatch schedule. Thank you! — {company}"
+    ),
+    WhatsAppEventType.VENDOR_LEDGER: (
+        "Dear {name},\nHere is your account ledger & outstanding statement from {company} as of {date}.\n"
+        "Outstanding Balance: ₹{amount}.\n"
+        "📄 View Statement: {doc_url}\n\n"
+        "For reconciliation or queries, reply to this chat. Thank you! — {company}"
+    ),
+    WhatsAppEventType.VENDOR_PAYMENT: (
+        "Dear {name},\nWe have processed payment of ₹{amount} against Voucher #{ref} via {payment_mode} on {date}.\n"
+        "Reference / Receipt: {receipt}.\n\n"
+        "Thank you! — {company}"
+    ),
+    # Partner Templates
+    WhatsAppEventType.PARTNER_COMMISSION: (
+        "Dear Partner {name},\nYour commission payout statement for {date} from {company} is ready.\n"
+        "Net Payable Commission: ₹{amount}.\n"
+        "📄 View Statement: {doc_url}\n\n"
+        "Thank you for your partnership! — {company}"
+    ),
+    WhatsAppEventType.PARTNER_LEDGER: (
+        "Dear Partner {name},\nHere is your partner ledger statement from {company} as of {date}.\n"
+        "Current Balance: ₹{amount}.\n"
+        "📄 View Statement: {doc_url}\n\n"
+        "Thank you! — {company}"
+    ),
+    WhatsAppEventType.PARTNER_REFERRAL: (
+        "Dear Partner {name},\nCustomer enrollment update from {company}:\n"
+        "Customer: {customer_name}\nPlan: {product}\nContract: #{ref}\nMonthly: ₹{amount}.\n\n"
+        "Thank you! — {company}"
+    ),
+    # Staff Templates
+    WhatsAppEventType.STAFF_SALARY: (
+        "Dear {name},\nYour salary statement for {date} from {company} is ready.\n"
+        "Net Salary: ₹{amount}.\nOutstanding Balance: ₹{balance}.\n"
+        "📄 View Pay Slip: {doc_url}\n\n"
+        "Thank you! — {company}"
+    ),
+    WhatsAppEventType.STAFF_ATTENDANCE: (
+        "Dear {name},\nMonthly attendance report for {date} from {company}:\n"
+        "Present: {present_days} days | Absent: {absent_days} days | Overtime: {overtime_hours} hrs.\n\n"
+        "Please verify with HR for any queries. Thank you! — {company}"
+    ),
+    WhatsAppEventType.STAFF_ADVANCE: (
+        "Dear {name},\nStaff advance ledger update from {company}:\n"
+        "Sanctioned Advance: ₹{amount}\nRecovered this cycle: ₹{recovered_amount}\nRemaining Balance: ₹{balance}.\n\n"
+        "Thank you! — {company}"
+    ),
     WhatsAppEventType.CUSTOM: "{text}",
 }
 
