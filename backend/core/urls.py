@@ -8,6 +8,8 @@ from drf_spectacular.views import (
     SpectacularRedocView,
     SpectacularSwaggerView,
 )
+from rest_framework.authentication import SessionAuthentication
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from api.v1.permissions import IsAdmin
 from api.v1.views.health import PublicLivenessView, PublicReadinessView
@@ -17,6 +19,7 @@ from api.v1.views.health import PublicLivenessView, PublicReadinessView
 # docs are admin-only. The Swagger/Redoc HTML pages default to AllowAny in
 # drf-spectacular, so we must set permission_classes on each view explicitly —
 # the SPECTACULAR_SETTINGS "SERVE_PERMISSIONS" only guards the raw schema view.
+_DOCS_AUTH = [SessionAuthentication, JWTAuthentication]
 _DOCS_PERMISSIONS = [IsAdmin]
 
 urlpatterns = [
@@ -26,17 +29,28 @@ urlpatterns = [
     # OpenAPI 3 schema + interactive docs (drf-spectacular) — admin-only.
     path(
         "api/schema/",
-        SpectacularAPIView.as_view(permission_classes=_DOCS_PERMISSIONS),
+        SpectacularAPIView.as_view(
+            authentication_classes=_DOCS_AUTH,
+            permission_classes=_DOCS_PERMISSIONS,
+        ),
         name="schema",
     ),
     path(
         "api/docs/",
-        SpectacularSwaggerView.as_view(url_name="schema", permission_classes=_DOCS_PERMISSIONS),
+        SpectacularSwaggerView.as_view(
+            url_name="schema",
+            authentication_classes=_DOCS_AUTH,
+            permission_classes=_DOCS_PERMISSIONS,
+        ),
         name="swagger-ui",
     ),
     path(
         "api/redoc/",
-        SpectacularRedocView.as_view(url_name="schema", permission_classes=_DOCS_PERMISSIONS),
+        SpectacularRedocView.as_view(
+            url_name="schema",
+            authentication_classes=_DOCS_AUTH,
+            permission_classes=_DOCS_PERMISSIONS,
+        ),
         name="redoc",
     ),
     path("api/v1/", include("api.v1.urls")),
