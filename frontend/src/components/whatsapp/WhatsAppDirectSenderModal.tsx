@@ -16,13 +16,11 @@ import {
   CreditCard,
   ExternalLink,
   Eye,
-  FileCheck,
   FileSpreadsheet,
   FileText,
   FolderOpen,
   Gift,
   Handshake,
-  Image as ImageIcon,
   MessageCircle,
   Paperclip,
   Phone,
@@ -51,9 +49,9 @@ import {
 import { searchCustomers, type CustomerRecord } from "@/services/customers";
 import { listVendors, type Vendor } from "@/services/vendors";
 import { listHrStaff, type HrStaff } from "@/services/admin-hr";
-import { listBillingInvoices, listReceiptDocuments, type BillingInvoice, type ReceiptDocument } from "@/services/billing";
-import { listSubscriptions, type SubscriptionRecord } from "@/services/subscriptions";
-import { listOutstandings, type OutstandingRow } from "@/services/outstandings";
+import { listBillingInvoices, listReceiptDocuments } from "@/services/billing";
+import { listSubscriptions } from "@/services/subscriptions";
+import { listOutstandings } from "@/services/outstandings";
 import { uploadDocument, documentDownloadUrl, type DocumentCategory, type DocumentRecord } from "@/services/documents";
 import {
   buildAdminBillingDocumentRoute,
@@ -2352,6 +2350,7 @@ export default function WhatsAppDirectSenderModal({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5 min-w-0">
                     {attachedFilePreview ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
                       <img
                         src={attachedFilePreview}
                         alt="Preview"
