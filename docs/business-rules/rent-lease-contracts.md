@@ -1,39 +1,89 @@
-# Rent/Lease Contracts (Current Code)
+# Rent/Lease Contracts: Stock-on-Hand, Customer KYC, Supporting Documents, and Contract Activation Gating
 
-This document describes the **current implemented behavior** in this repository.
+This document is the canonical business and operational rulebook for **Furniture Rent and Lease Contracts** in SUBIDHA CORE. It serves as the single source of truth for operators, developers, and AI agents.
 
-## Confirmed current implementation
-- Rent and lease are first-class contract types using `Subscription.plan_type` = `RENT` or `LEASE`.
-- Contract creation runs through service-layer workflows:
-  - `subscriptions.services.rent_lease_contract_service.create_rent_contract`
-  - `subscriptions.services.rent_lease_contract_service.create_lease_contract`
-- Rent/lease profile models are separate and additive:
-  - `RentSubscriptionProfile`
-  - `LeaseSubscriptionProfile`
-- Security deposit percent is validated to 20%–30%.
-- Rent/lease contract creation creates:
-  - subscription row
-  - rent/lease profile row
-  - contract number/reference
-  - product possession record
-  - audit log event
+---
 
-## Contract lifecycle and operations
-- Admin APIs exist for:
-  - contract create (rent/lease)
-  - contract PDF
-  - possession create/handover/return-initiate
-  - return inspection create/record/approve
-- Return inspection approval triggers append-only deposit deduction/refund workflows where amounts are provided.
+## 1. Core Business Invariants & Lifecycle Scenario
 
-## Financial separation (current behavior)
-- Rent/lease monthly demand rows and security deposit demand rows are separate (`RentLeaseBillingDemand`).
-- Deposit transactions are append-only (`RentLeaseDepositTransaction`) and include deduction/refund events.
-- Unified cashier/admin receivable collection intentionally does **not** post rent/lease monthly collections yet; it is view-only with explicit disabled reason.
+### 1.1 Product & Stock-on-Hand Prerequisite
+- A Rent or Lease contract cannot exist in isolation; it represents the operational custody transfer of real furniture assets.
+- **Product Eligibility**:
+  - The product must have `is_rent_enabled = True` for Rent contracts.
+  - The product must have `is_lease_enabled = True` for Lease contracts.
+- **Stock-on-Hand Verification**:
+  - Stock must exist in the showroom / warehouse, loaded through verified Purchase Orders (PO) from approved furniture vendors.
+  - Units must be received and recorded in the Stock Ledger before physical possession / delivery handover.
+  - Active Rent/Lease contracts block direct-sale finalization on the same asset units to prevent selling items currently under rental custody.
 
-## Direct-sale compatibility rule (current hardening)
-- Direct-sale creation/update now blocks products with active rent/lease possession records (non-`CLOSED`) to prevent selling assets currently under rent/lease custody.
+### 1.2 Customer KYC & Supporting Document Taxonomy
+Rent and lease plans involve ongoing operational risk (the furniture leaves the store without immediate full payment). Therefore, strict identity and premises verification is mandatory:
 
-## Proposed future additive work (not implemented here)
-- Dedicated rent/lease monthly collection posting bridge with controlled accounting entries.
-- Unit/serial-level asset identity for multi-unit products to avoid product-level blocking limits.
+| Document Key | Category | Requirement Level | Purpose |
+| :--- | :--- | :--- | :--- |
+| **Masked Aadhaar / PAN / Voter ID / Passport / DL** | `ID_PROOF` | **MANDATORY for Activation** | Primary identity verification. Per DPDP Act, Aadhaar numbers are masked; full numbers are never stored in plaintext. |
+| **Address Proof (Aadhaar / Utility Bill / Voter ID)** | `ADDRESS_PROOF` | **MANDATORY for Activation** | Verifies permanent / communication residence of the customer. |
+| **Rent Agreement / Tenancy Proof** | `SUPPORTING_DOC` | **MANDATORY for Activation** | Verifies the physical premises (residential or commercial) where the rented/leased furniture will be placed and utilized. |
+| **Customer Photo & Signature** | `IDENTITY_PROOF` | **MANDATORY for Onboarding** | Visual biometric & signature confirmation for contract creation. |
+| **Security Deposit Receipt** | `DEPOSIT_RECEIPT` | **MANDATORY for Handover** | Confirms 20%–30% security deposit collected into the deposit ledger. |
+| **Asset Handover Note / Acknowledgement** | `HANDOVER_PROOF` | **MANDATORY for Delivery** | Delivery staff and customer co-sign condition note upon physical handover. |
+
+---
+
+## 2. Strict State Machine & Activation Gating
+
+```
+[ DRAFT ]  --( Upload KYC & Supporting Docs + Collect Deposit )-->  [ APPROVED / ACTIVE ]  --( Delivery & Handover )-->  [ HANDED OVER ]
+    |
+    +--> Staff can register customer & pricing as DRAFT even if documents are pending.
+    |
+    X--> CANNOT transition to ACTIVE without Verified KYC + Supporting Documents.
+    X--> CANNOT transition to HANDED OVER without Deposit Receipt + Handover Proof.
+```
+
+### 2.1 The `DRAFT` State Rule
+- Store operators **can always create and save a contract as `DRAFT`** (`status = DRAFT`).
+- Draft creation does **not** hard-block on missing KYC or missing rent agreements.
+- This allows sales staff to capture customer intent, lock tenure (e.g., 12 months) and yield rates (e.g., 5.00%), and issue draft quotes while the customer gathers their documents.
+
+### 2.2 The `ACTIVE` State Gate (Hard-Block Invariant)
+A contract **CANNOT be Activated** (`status = ACTIVE`) unless all of the following conditions are met:
+1. Customer `kyc_status` is `VERIFIED`, `APPROVED`, or `EXCEPTION_APPROVED`.
+2. A verified primary ID proof (`AADHAAR`, `PAN`, `VOTER_ID`, `PASSPORT`, or `DRIVING_LICENSE`) is on file.
+3. Customer address proof and supporting Rent Agreement / premises usage proof are uploaded to the customer profile or contract vault.
+4. Security deposit is computed within the mandatory 20.00% to 30.00% range.
+5. In the backend, `enforce_contract_kyc_gate(plan_type=RENT|LEASE, stage="activate")` and `assert_contract_activation_ready(subscription)` strictly reject activation with a controlled `HTTP 400 (KYC_REQUIRED / CONTRACT_ACTIVATION_NOT_READY)` if any requirement is unfulfilled.
+
+### 2.3 The `DELIVERY / HANDOVER` Gate
+- Physical dispatch from the warehouse/showroom is strictly blocked until:
+  - Contract is in `ACTIVE` status.
+  - Security deposit payment is confirmed in the deposit ledger (`RentLeaseDepositTransaction`).
+  - Signed Asset Handover Acknowledgement is generated and uploaded.
+
+---
+
+## 3. Data Privacy, In-House Security & Future Paid API Architecture
+
+### 3.1 Privacy-First & Zero-Data-Leakage Design (Current System)
+- SUBIDHA CORE operates an **in-house, secure verification vault**:
+  - Customer PII and identity documents are stored in secure, access-controlled media roots.
+  - All document views, downloads, approvals, and rejections are strictly recorded in the tamper-evident `AuditLog`.
+  - Operator UI masks identity documents to comply with the Digital Personal Data Protection (DPDP) Act 2023.
+
+### 3.2 Future Paid KYC API Integration (Roadmap)
+- In the future, SUBIDHA CORE will support automated verification via paid identity APIs (e.g., Digilocker, Karza, Cashfree, Surepass, IDfy):
+  - **Bridge Pattern**: The automated API will fetch customer-authorized Aadhaar/PAN records via OTP and deposit the verified payload directly into `CustomerKycDocument`.
+  - **No Bypass of Core Rules**: Whether verified manually by store admin or automatically via paid API, the contract activation gate remains identical—`kyc_status` must transition to `VERIFIED` and the supporting premises proof must be present.
+  - **Data Sovereignty**: Third-party API credentials and response tokens are ephemeral; customer documents remain securely encapsulated within SUBIDHA CORE's PostgreSQL and media storage.
+
+---
+
+## 4. Frontend Creation Workflow & Workfield Integration
+
+- The Admin Contract Creation workspace (`/admin/subscriptions/advance-emi/create`) includes a dedicated **Rent & Lease Document Verification Workfield**:
+  - Real-time badge display of customer's current KYC status (`VERIFIED` vs `ACTION REQUIRED`).
+  - Integrated ID Document uploader (Aadhaar, PAN, Voter ID, Passport, Driving License) that directly updates the customer profile upon contract submission.
+  - Integrated Supporting Document uploader for Rent Agreement / Tenancy Deed.
+  - Dual action buttons:
+    - **"Activate Contract"**: Enabled only when KYC and all required documents are satisfied.
+    - **"Save as Draft"**: Always accessible to save progress without blocking sales operations.

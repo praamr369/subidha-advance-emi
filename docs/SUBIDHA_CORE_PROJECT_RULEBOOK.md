@@ -402,6 +402,10 @@ Rules:
 - Monthly rent/lease demand is separate from EMI semantics.
 - Contract events must be explicit.
 - Delivery/handover, return inspection, condition, deposit refund/deduction, and buyout/transfer must be auditable.
+- Stock-on-Hand Prerequisite: Furniture units must exist in stock-on-hand (received via Purchase Order and entered into Stock Ledger) before physical possession or delivery handover.
+- Customer KYC & Supporting Documents Invariant: Rent and lease contracts carry ongoing custody risk. Contract activation is strictly hard-gated: customer KYC must be VERIFIED (primary ID proof: Aadhaar/PAN/Voter ID/Passport/DL), address proof verified, and supporting Rent Agreement / premises tenancy proof attached.
+- Contract Lifecycle Separation: Staff may register and save customer requirements as DRAFT contracts before documents are finalized. Transitioning to ACTIVE strictly enforces KYC, supporting documents, and security deposit billing.
+- Privacy & Future Verification Architecture: Customer KYC is managed under a privacy-first, zero-leakage internal vault (DPDP Act compliant). Future automated verification via third-party paid APIs (Digilocker, Karza, Cashfree) must integrate through the same immutable audit and document storage without bypassing core activation gates. Detailed rulebook: `docs/business-rules/rent-lease-contracts.md`.
 
 ## 20. Direct sale rules
 

@@ -407,6 +407,9 @@ export default function SubscriptionCreatePage({
 
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [signatureFile, setSignatureFile] = useState<File | null>(null);
+  const [idDocType, setIdDocType] = useState<string>("AADHAAR");
+  const [idDocFile, setIdDocFile] = useState<File | null>(null);
+  const [rentAgreementFile, setRentAgreementFile] = useState<File | null>(null);
 
   const [docUploadBusy, setDocUploadBusy] = useState(false);
   const [docUploadError, setDocUploadError] = useState<string | null>(null);
@@ -628,8 +631,11 @@ export default function SubscriptionCreatePage({
     if (!photoFile) blockers.push("Customer photo is required.");
     if (!signatureFile) blockers.push("Customer signature is required.");
     
-    if ((isRentPlan || isLeasePlan) && customer?.kyc_status !== "VERIFIED") {
-      blockers.push("Customer KYC must be VERIFIED before creating a Rent or Lease contract.");
+    if ((isRentPlan || isLeasePlan) && customer) {
+      const hasVerifiedKyc = customer.kyc_status === "VERIFIED" || Boolean(idDocFile);
+      if (!hasVerifiedKyc) {
+        blockers.push("Customer KYC must be VERIFIED or an ID document (Aadhaar/PAN/Voter ID) must be uploaded before activating a Rent or Lease contract.");
+      }
     }
     return blockers;
   }, [
@@ -645,6 +651,7 @@ export default function SubscriptionCreatePage({
     signatureFile,
     isRentPlan,
     isLeasePlan,
+    idDocFile,
   ]);
 
   // For RENT/LEASE, the activate path is gated on KYC readiness from the backend.
@@ -652,9 +659,9 @@ export default function SubscriptionCreatePage({
   const canActivate = useMemo(() => {
     if (!canSubmit) return false;
     if (isEmiPlan) return canSubmit;
-    if (kycReadiness && !kycReadiness.can_activate) return false;
+    if (kycReadiness && !kycReadiness.can_activate && !idDocFile) return false;
     return true;
-  }, [canSubmit, isEmiPlan, kycReadiness]);
+  }, [canSubmit, isEmiPlan, kycReadiness, idDocFile]);
 
   // Save as Draft is always allowed when the form structure is complete (no KYC gate).
   const canSaveAsDraft = useMemo(() => {
@@ -1118,6 +1125,11 @@ export default function SubscriptionCreatePage({
     setStartDate(new Date().toISOString().slice(0, 10));
     setManualTenureMonths("12");
 
+    setPhotoFile(null);
+    setSignatureFile(null);
+    setIdDocFile(null);
+    setRentAgreementFile(null);
+
     setError(null);
     setSuccess(null);
   }
@@ -1258,14 +1270,42 @@ export default function SubscriptionCreatePage({
 
       let finalSuccess = created;
 
-      if (!!photoFile || signatureFile) {
+      // 1. Direct customer KYC document upload (if provided for Rent/Lease):
+      if ((isRentPlan || isLeasePlan) && idDocFile && customer) {
         try {
-          setGlobalLoadingLabel("Uploading documents...");
+          setGlobalLoadingLabel("Uploading customer KYC document...");
+          const kycForm = new FormData();
+          kycForm.append("document_type", idDocType);
+          kycForm.append("file", idDocFile);
+          kycForm.append("notes", `Direct upload during ${planType} contract creation`);
+          await apiFetch(`/admin/customers/${customer.id}/documents/`, {
+            method: "POST",
+            body: kycForm,
+          });
+          setCustomer((prev) => (prev ? { ...prev, kyc_status: "VERIFIED" } : prev));
+        } catch (kycErr) {
+          console.warn("KYC upload warning:", kycErr);
+          setDocUploadError(`KYC document upload notice: ${toErrorMessage(kycErr)}`);
+        }
+      }
+
+      // 2. Subscription documents (photo, signature, rent agreement):
+      if (!!photoFile || signatureFile || rentAgreementFile) {
+        try {
+          setGlobalLoadingLabel("Uploading contract documents...");
           if (photoFile) {
             await uploadDocument(created.id, "CUSTOMER_PHOTO", photoFile, "Customer Photo");
           }
           if (signatureFile) {
             await uploadDocument(created.id, "CUSTOMER_SIGNATURE", signatureFile, "Customer signature");
+          }
+          if (rentAgreementFile) {
+            await uploadDocument(
+              created.id,
+              isRentPlan ? "RENT_CONTRACT_PDF" : "LEASE_CONTRACT_PDF",
+              rentAgreementFile,
+              "Customer Rent Agreement / Premises Proof"
+            );
           }
           const refreshed = await apiFetch<CreatedSubscriptionResponse>(`/admin/subscriptions/${created.id}/`, {
             cache: "no-store",
@@ -1273,6 +1313,8 @@ export default function SubscriptionCreatePage({
           finalSuccess = refreshed;
           setPhotoFile(null);
           setSignatureFile(null);
+          setIdDocFile(null);
+          setRentAgreementFile(null);
         } catch (docErr) {
           setDocUploadError(toErrorMessage(docErr));
         }
@@ -2245,9 +2287,98 @@ export default function SubscriptionCreatePage({
         {success ? null : (
           <>
             <SectionCard
-              title="Step 3 · Identity Documents"
-              description="Upload customer photo and signature to complete contract onboarding."
+              title="Step 3 · Identity & Supporting Documents"
+              description="Upload customer identity proof, photo, signature, and tenancy documents to complete contract onboarding."
             >
+              {/* If Rent or Lease plan, render the dedicated KYC & Supporting Documents Workfield */}
+              {(isRentPlan || isLeasePlan) && customer ? (
+                <div className="mb-5 rounded-xl border border-primary/20 bg-primary/5 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-primary/10 pb-3">
+                    <div>
+                      <div className="text-sm font-semibold text-foreground">
+                        Rent & Lease Document Verification Workfield
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Rent and Lease contracts require verified KYC (ID + address proof) and a supporting Rent Agreement where the furniture is placed.
+                      </div>
+                    </div>
+                    <div>
+                      {customer.kyc_status === "VERIFIED" ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-800">
+                          ✓ KYC Verified
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">
+                          ⚠ KYC Action Required for Activation
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-4 md:grid-cols-2">
+                    <div>
+                      <label htmlFor="id-doc-type" className="text-xs font-medium text-muted-foreground">
+                        Customer ID Document Type
+                      </label>
+                      <select
+                        id="id-doc-type"
+                        value={idDocType}
+                        onChange={(e) => setIdDocType(e.target.value)}
+                        className="mt-1 block w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                      >
+                        <option value="AADHAAR">Aadhaar Card (Masked)</option>
+                        <option value="PAN">PAN Card</option>
+                        <option value="VOTER_ID">Voter ID</option>
+                        <option value="DRIVING_LICENSE">Driving License</option>
+                        <option value="PASSPORT">Passport</option>
+                        <option value="OTHER">Other Official ID</option>
+                      </select>
+
+                      <label htmlFor="id-doc-file" className="mt-3 block text-xs font-medium text-muted-foreground">
+                        Upload ID Proof (PDF or Image)
+                      </label>
+                      <input
+                        id="id-doc-file"
+                        type="file"
+                        accept="image/*,application/pdf"
+                        onChange={(event) => {
+                          const file = (event.target.files ?? [])[0] ?? null;
+                          setIdDocFile(file);
+                          setDocUploadError(null);
+                        }}
+                        className="mt-1 block w-full text-sm"
+                      />
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {idDocFile ? idDocFile.name : (customer.kyc_status === "VERIFIED" ? "✓ Existing verified KYC on file" : "Upload to verify customer KYC automatically")}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label htmlFor="rent-agreement-file" className="text-xs font-medium text-muted-foreground">
+                        Supporting Document: Rent Agreement / Tenancy Proof
+                      </label>
+                      <input
+                        id="rent-agreement-file"
+                        type="file"
+                        accept="image/*,application/pdf"
+                        onChange={(event) => {
+                          const file = (event.target.files ?? [])[0] ?? null;
+                          setRentAgreementFile(file);
+                          setDocUploadError(null);
+                        }}
+                        className="mt-1 block w-full text-sm"
+                      />
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {rentAgreementFile ? rentAgreementFile.name : "Optional for Draft, required for asset handover & premises verification"}
+                      </div>
+                      <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                        Provides legal proof of physical premises where rented/leased items are deployed.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <label htmlFor="photo-file" className="text-xs font-medium text-muted-foreground">Customer photo</label>
@@ -2296,13 +2427,18 @@ export default function SubscriptionCreatePage({
                   className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
                 >
                   <div className="font-semibold">
-                    Complete these before the contract can be created:
+                    Complete these before the contract can be activated:
                   </div>
                   <ul className="mt-2 list-disc space-y-1 pl-5">
                     {submitBlockers.map((reason) => (
                       <li key={reason}>{reason}</li>
                     ))}
                   </ul>
+                  {!isEmiPlan && canSaveAsDraft ? (
+                    <div className="mt-2.5 text-xs font-normal text-amber-800">
+                      💡 <strong>Save as Draft</strong> is available: you can save this contract as a draft now and complete document uploads before delivery.
+                    </div>
+                  ) : null}
                 </div>
               ) : !isEmiPlan && kycReadiness && !kycReadiness.can_activate ? (
                 <div className="mb-4 rounded-xl border border-sky-300 bg-sky-50 px-4 py-3 text-sm text-sky-900">
