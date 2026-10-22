@@ -501,3 +501,82 @@ class AuthApiTests(APITestCase):
             msg=f"Unexpected logout response with valid refresh: {response.status_code} {response.data}",
         )
         self.assertEqual(response.data["detail"], "Logout completed.")
+
+    # -------------------------------------------------
+    # LAYER 3: TOKEN EXPIRATION, REFRESH, AND SESSIONS
+    # -------------------------------------------------
+
+    def test_expired_jwt_access_token_returns_401(self):
+        from datetime import timedelta
+        from rest_framework_simplejwt.tokens import AccessToken
+        
+        token = AccessToken.for_user(self.partner)
+        token.set_exp(lifetime=-timedelta(minutes=5))
+        
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {str(token)}")
+        response = self.client.get("/api/v1/auth/me/")
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.data.get("code"), "token_not_valid")
+
+    def test_refresh_token_with_invalid_or_expired_token_returns_401(self):
+        # Invalid signature
+        response = self.client.post(
+            "/api/v1/auth/refresh/",
+            {"refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.invalid.signature"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        # Expired refresh token
+        from datetime import timedelta
+        from rest_framework_simplejwt.tokens import RefreshToken
+        expired_refresh = RefreshToken.for_user(self.partner)
+        expired_refresh.set_exp(lifetime=-timedelta(days=1))
+        
+        response = self.client.post(
+            "/api/v1/auth/refresh/",
+            {"refresh": str(expired_refresh)},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_multi_device_session_tracking_and_revocation(self):
+        # Device A Login
+        res_a = self.client.post(
+            "/api/v1/auth/login/",
+            {"username": "auth_partner", "password": "PartnerPass123!", "device_name": "Device A (Chrome)"},
+            format="json",
+        )
+        self.assertEqual(res_a.status_code, status.HTTP_200_OK)
+        token_a = res_a.data["access"]
+        
+        # Device B Login
+        res_b = self.client.post(
+            "/api/v1/auth/login/",
+            {"username": "auth_partner", "password": "PartnerPass123!", "device_name": "Device B (Safari Mobile)"},
+            format="json",
+        )
+        self.assertEqual(res_b.status_code, status.HTTP_200_OK)
+        token_b = res_b.data["access"]
+
+        # View active sessions
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token_a}")
+        sessions_res = self.client.get("/api/v1/auth/sessions/")
+        self.assertEqual(sessions_res.status_code, status.HTTP_200_OK)
+        active_sessions = sessions_res.data
+        self.assertGreaterEqual(len(active_sessions), 2)
+        
+        device_names = [s["device_name"] for s in active_sessions]
+        self.assertIn("Device A (Chrome)", device_names)
+        self.assertIn("Device B (Safari Mobile)", device_names)
+
+        # Revoke Device A's session from Device B
+        session_a_id = next(s["id"] for s in active_sessions if s["device_name"] == "Device A (Chrome)")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token_b}")
+        revoke_res = self.client.post(f"/api/v1/auth/sessions/{session_a_id}/revoke/")
+        self.assertEqual(revoke_res.status_code, status.HTTP_200_OK)
+        
+        # Verify Session A is no longer active
+        sessions_after = self.client.get("/api/v1/auth/sessions/")
+        remaining_ids = [s["id"] for s in sessions_after.data]
+        self.assertNotIn(session_a_id, remaining_ids)

@@ -196,6 +196,7 @@ const nextConfig: NextConfig = {
   compress: true,
   poweredByHeader: false,
   experimental: {
+    optimizePackageImports: ["lucide-react", "date-fns"],
     cpus: process.env.NEXT_BUILD_CPUS ? parseInt(process.env.NEXT_BUILD_CPUS, 10) : 1,
     staleTimes: {
       dynamic: 0,

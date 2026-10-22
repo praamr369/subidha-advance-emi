@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
+import { MessageCircle } from "lucide-react";
 
 import { prepareProductInventoryProfile, updateProduct } from "@/services/products";
+import { openWhatsAppDirectModal } from "@/components/whatsapp/WhatsAppDirectSenderModal";
 import { createPortal } from "react-dom";
 
 type QuickProduct = {
@@ -190,6 +192,27 @@ export default function ProductQuickActions({ product, mode = "compact", onChang
 
   return (
     <div className="flex flex-wrap gap-2" onClick={(event) => event.stopPropagation()}>
+      <button
+        type="button"
+        onClick={() => {
+          const price = Number(product.base_price || 0);
+          const monthlyEmi = price > 0 ? Math.round(price / 12) : 1000;
+          openWhatsAppDirectModal({
+            partyType: "CUSTOMER",
+            eventType: "CUSTOM",
+            product: product.name,
+            amount: price,
+            ref: product.sku || product.product_code || `#${product.id}`,
+            docUrl: typeof window !== "undefined" ? window.location.href : "",
+            text: `Hello! Greetings from Subidha Furniture, Asansol.\n\nHere are the details for *${product.name}*:\n💰 Price: ₹${price > 0 ? price.toLocaleString("en-IN") : "Best Offer"}\n⭐ 0% Lucky Plan Advance EMI: Just ₹${monthlyEmi.toLocaleString("en-IN")}/month!\n\nView details: ${typeof window !== "undefined" ? window.location.href : ""}\n\nVisit our showroom or reply to this chat to reserve your Lucky ID!`,
+          });
+        }}
+        className="inline-flex items-center gap-1.5 rounded-md border border-[#25D366]/40 bg-[#25D366]/10 px-3 py-1.5 text-sm font-semibold text-emerald-800 shadow-sm transition hover:bg-[#25D366]/20 dark:text-emerald-300"
+        title="Share product specs and 0% EMI quote on WhatsApp"
+      >
+        <MessageCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+        Share on WhatsApp
+      </button>
       <button type="button" onClick={() => setEditOpen(true)} className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted">Quick Edit</button>
       <button type="button" onClick={() => setPrepareOpen(true)} className="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-800 shadow-sm transition hover:bg-emerald-100">Prepare Inventory</button>
       <Link href={`/admin/products/${product.id}`} className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted">Open</Link>

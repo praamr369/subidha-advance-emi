@@ -27,7 +27,9 @@
     "playwright:check": "node scripts/check-playwright-env.mjs",
     "test:dashboard-presets": "node scripts/run-dashboard-widget-board-tests.mjs",
     "test:kyc-frontend": "node scripts/run-kyc-frontend-tests.mjs",
-    "test:invoice-delivery": "node scripts/run-invoice-delivery-tests.mjs"
+    "test:invoice-delivery": "node scripts/run-invoice-delivery-tests.mjs",
+    "test:production-fix": "node scripts/run-production-fix-tests.mjs",
+    "test:unit": "npm run test:kyc-frontend && npm run test:dashboard-presets && npm run test:invoice-delivery && npm run test:production-fix"
   },
   "dependencies": {
     "@google/model-viewer": "^4.3.1",

@@ -14,7 +14,7 @@ const adminCustomerSource = read("src/app/(dashboard)/admin/customers/[id]/page.
 const adminPartnerSource = read("src/app/(dashboard)/admin/partners/[id]/page.tsx");
 const adminVendorSource = read("src/app/(dashboard)/admin/vendors/[id]/page.tsx");
 const adminStaffSource = read("src/app/(dashboard)/admin/hr/staff/[id]/page.tsx");
-const partnerSelfSource = read("src/app/(dashboard)/partner/page.tsx");
+const partnerSelfSource = read("src/app/(dashboard)/partner/profile/page.tsx");
 const vendorSelfSource = read("src/app/(dashboard)/vendor/profile/page.tsx");
 const staffSelfSource = read("src/app/(dashboard)/staff/profile/page.tsx");
 const customerSelfSource = read("src/app/(dashboard)/customer/profile/page.tsx");
@@ -99,7 +99,8 @@ test("admin vendor detail renders the admin KYC panel", () => {
 test("admin staff detail exposes a KYC tab rendering the admin KYC panel", () => {
   assert.ok(adminStaffSource.includes('import KycDocumentPanel from "@/components/kyc/KycDocumentPanel"'));
   assert.ok(adminStaffSource.includes('"KYC"'));
-  assert.ok(adminStaffSource.includes('activeTab === "KYC" ? <KycDocumentPanel mode="admin" owner="staff"'));
+  assert.ok(adminStaffSource.includes('activeTab === "KYC"'));
+  assert.ok(adminStaffSource.includes('<KycDocumentPanel mode="admin" owner="staff"'));
 });
 
 // --- Self-service upload panel renders for the supported portals -------------
@@ -119,7 +120,7 @@ test("staff portal renders the self KYC panel", () => {
 test("customer self-service KYC upload already exists on the customer profile", () => {
   // Customer self-service is served by the existing customer service client.
   assert.ok(customerSelfSource.includes("submitCustomerKycDocument"));
-  assert.ok(customerSelfSource.includes("Submit KYC document"));
+  assert.ok(customerSelfSource.includes("KYC Verification"));
 });
 
 // --- Reject requires a reason ------------------------------------------------

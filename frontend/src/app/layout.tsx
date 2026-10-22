@@ -8,6 +8,7 @@ import { PUBLIC_LANG_BOOTSTRAP_SCRIPT } from "@/lib/public-i18n";
 import "./globals.css";
 import AppProviders from "@/providers/AppProviders";
 import SkipNav from "@/components/ui/SkipNav";
+import { OfflineNetworkBanner } from "@/components/common/OfflineNetworkBanner";
 
 const publicLogoSrc = brandConfig.publicLogoSrc || undefined;
 
@@ -38,6 +39,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           {PUBLIC_LANG_BOOTSTRAP_SCRIPT}
         </Script>
         <SkipNav />
+        <OfflineNetworkBanner />
         <AppProviders>{children}</AppProviders>
       </body>
     </html>

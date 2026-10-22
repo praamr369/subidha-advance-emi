@@ -1,5 +1,6 @@
 from django.urls import path
 
+from api.v1.views.accounting_phase2 import CaMonthlyExportPackView
 from api.v1.views.admin_accounting_export_reports import (
     AdminAccountingBridgeAuditExportView,
     AdminAccountingExportIndexView,
@@ -12,6 +13,7 @@ from api.v1.views.admin_accounting_export_reports import (
 
 urlpatterns = [
     path("accounting/exports/", AdminAccountingExportIndexView.as_view()),
+    path("accounting/exports/ca-monthly-pack/", CaMonthlyExportPackView.as_view()),
     path("accounting/exports/trial-balance/", AdminAccountingTrialBalanceExportView.as_view()),
     path("accounting/exports/journals/", AdminAccountingJournalExportView.as_view()),
     path("accounting/exports/ledgers/", AdminAccountingLedgerExportView.as_view()),

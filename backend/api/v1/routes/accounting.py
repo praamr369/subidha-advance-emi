@@ -42,6 +42,7 @@ from api.v1.views.accounting_period_actions import AccountingGenerateCurrentPeri
 from api.v1.views.accounting_phase2 import (
     BalanceSheetReportView,
     BridgeRunView,
+    CaMonthlyExportPackView,
     CashbookReportView,
     CreditNoteViewSet,
     DebitNoteViewSet,
@@ -135,6 +136,7 @@ urlpatterns = [
     path("exports/itr-pack/<int:pk>/", ItrExportPackDetailView.as_view()),
     path("exports/itr-pack/<int:pk>/download/", ItrExportPackDownloadView.as_view()),
     path("exports/gst-pack/", GstExportPackListCreateView.as_view()),
+    path("exports/ca-monthly-pack/", CaMonthlyExportPackView.as_view(), name="ca-monthly-export-pack"),
     path("imports/chart-of-accounts/preview/", ChartOfAccountsImportPreviewView.as_view()),
     path("imports/chart-of-accounts/post/", ChartOfAccountsImportPostView.as_view()),
     path("imports/employees/preview/", EmployeeImportPreviewView.as_view()),

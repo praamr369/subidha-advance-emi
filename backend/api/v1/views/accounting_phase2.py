@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 
-from django.http import FileResponse, Http404
+from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import permissions, status, viewsets
@@ -20,6 +20,7 @@ from accounting.services.bridge_run_service import run_bridge_postings
 from accounting.services.export_pack_service import (
     create_gst_export_pack_job,
     create_itr_export_pack_job,
+    generate_ca_month_end_pack,
     generate_gst_export_pack,
     generate_itr_export_pack,
 )
@@ -376,6 +377,24 @@ class ItrExportPackDownloadView(AdminAccountingReportView):
             as_attachment=True,
             filename=os.path.basename(job.file_path),
         )
+
+
+class CaMonthlyExportPackView(AdminAccountingReportView):
+    @require_capability("reports.export")
+    def get(self, request):
+        try:
+            year = int(request.query_params.get("year", timezone.localdate().year))
+            month = int(request.query_params.get("month", timezone.localdate().month))
+            if not (1 <= month <= 12 and 2000 <= year <= 2100):
+                raise ValueError("Invalid year or month")
+        except (TypeError, ValueError) as exc:
+            raise ValidationError({"detail": "Valid year (YYYY) and month (1-12) are required."}) from exc
+
+        filename, zip_bytes = generate_ca_month_end_pack(year=year, month=month, created_by=request.user)
+        response = HttpResponse(zip_bytes, content_type="application/zip")
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        response["Content-Length"] = len(zip_bytes)
+        return response
 
 
 class BridgeRunView(AdminAccountingReportView):

@@ -2532,6 +2532,14 @@ export async function downloadAccountingExportCsv(
   );
 }
 
+export async function downloadCaMonthEndPack(year: number, month: number): Promise<void> {
+  const period = `${year}_${String(month).padStart(2, "0")}`;
+  return downloadAuthenticatedFile(
+    `/admin/accounting/exports/ca-monthly-pack/?year=${year}&month=${month}`,
+    `Subidha_CA_Pack_${period}.zip`
+  );
+}
+
 
 // ── Fixed assets ──────────────────────────────────────────────────────────────
 

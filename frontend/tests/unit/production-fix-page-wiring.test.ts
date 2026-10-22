@@ -14,25 +14,25 @@ const adjustmentsPageSource = readFileSync(
   "utf8"
 );
 
-test("collect page builds the EMI dropdown label from the installment helper", () => {
-  assert.ok(collectPageSource.includes("emiInstallmentLabel"));
-  assert.ok(collectPageSource.includes("getEmiLabel(emi, selectedSubscription)"));
+test("collect page wires UnifiedReceivableSearchPanel and AdminUniversalCollectForm", () => {
+  assert.ok(collectPageSource.includes("<UnifiedReceivableSearchPanel"));
+  assert.ok(collectPageSource.includes("<AdminUniversalCollectForm"));
 });
 
-test("selected EMI card shows Installment label, not the raw db id", () => {
-  assert.ok(collectPageSource.includes('label="Installment"'));
-  assert.ok(collectPageSource.includes("value={selectedEmiLabel}"));
-  // The raw "#id" primary label for the selected EMI must be gone.
-  assert.ok(!collectPageSource.includes("value={selectedEmi ? `#${selectedEmi.id}` : \"—\"}"));
+test("collect page wires ReceivableDetailCard and ReceivableWorkbenchPanel", () => {
+  assert.ok(collectPageSource.includes("<ReceivableDetailCard"));
+  assert.ok(collectPageSource.includes("<ReceivableWorkbenchPanel"));
 });
 
-test("payment payload still submits the real emi_id", () => {
-  assert.ok(collectPageSource.includes("emi: Number(form.emi_id)"));
+test("collect page handles successful collection and exposes receipt download action", () => {
+  assert.ok(collectPageSource.includes("Payment Collected Successfully"));
+  assert.ok(collectPageSource.includes("downloadAuthenticatedFile"));
+  assert.ok(collectPageSource.includes("Download Receipt PDF"));
 });
 
-test("PAID/WAIVED EMIs are blocked from collection", () => {
-  assert.ok(collectPageSource.includes("isEmiCollectible(emi)"));
-  assert.ok(collectPageSource.includes("disabled={!isEmiCollectible(emi)}"));
+test("collect page filters finance accounts to active ones for payment collection", () => {
+  assert.ok(collectPageSource.includes('for_payment_collection: "true"'));
+  assert.ok(collectPageSource.includes("account.is_active"));
 });
 
 test("adjustments register separates load errors from posting/validation errors", () => {

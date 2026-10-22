@@ -67,6 +67,8 @@ test("derives total installments from subscription tenure when emi omits it", ()
   assert.equal(
     emiInstallmentLabel(emi({ id: 16, month_no: 2 }), {
       id: 1,
+      subscription_number: "SUB-0001",
+      customer_name: "Test Customer",
       tenure_months: 15,
     }),
     "2nd EMI of 15"

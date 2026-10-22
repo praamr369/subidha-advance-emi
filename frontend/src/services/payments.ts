@@ -42,6 +42,7 @@ export interface AdminSubscriptionCollectionCandidate {
 
 export interface AdminEmiCollectionCandidate {
   id: number
+  subscription?: number | null
   status: string
   due_date?: string
   amount?: string | number | null
@@ -210,7 +211,7 @@ class PaymentService {
   }
 
   async downloadReceipt(paymentId: string): Promise<void> {
-    const { downloadAuthenticatedFile } = await import("@/lib/export/auth-download");
+    const { downloadAuthenticatedFile } = await import("../lib/export/auth-download.js");
     await downloadAuthenticatedFile(
       `/customer/receipts/${paymentId}/pdf/`,
       `receipt-${paymentId}.pdf`,

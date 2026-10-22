@@ -35,6 +35,14 @@ These run **on the VPS**, not on the dev machine. They implement
    ```
    - Optional AES-256 encryption: export `BACKUP_PASSPHRASE="your-secret-key"` in environment.
 
+5. Weekly Database Maintenance & Reindexing:
+
+   Non-blocking VACUUM ANALYZE and B-Tree index optimization for append-only financial records.
+   - Run manually or add to weekly Sunday cron:
+   ```cron
+   30 3 * * 0 /var/www/subidha/app/scripts/server/db-maintenance.sh >> /var/log/subidha-db-maintenance.log 2>&1
+   ```
+
 ## Background jobs (Celery)
 
 `subidha-celery.service` and `subidha-celery-beat.service` in this directory run

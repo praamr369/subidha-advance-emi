@@ -37,6 +37,7 @@ const resolvePythonExecutable = () => {
   }
 
   const candidates = [
+    path.resolve(__dirname, "../backend/venv/bin/python"),
     path.resolve(__dirname, "../.venv/bin/python"),
     path.resolve(__dirname, "../backend/.venv/bin/python"),
     path.resolve(__dirname, "../../.venv/bin/python"),

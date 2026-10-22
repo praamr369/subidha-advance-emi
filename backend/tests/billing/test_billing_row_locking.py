@@ -265,3 +265,170 @@ class DirectSaleCollectionLockingRegressionTests(TestCase):
                 collected_by=self.admin,
                 finance_account_id=self.cash_account.id,
             )
+
+    # -------------------------------------------------
+    # LAYER 2: ATOMIC ROLLBACKS, IDEMPOTENCY & HTTP CODES
+    # -------------------------------------------------
+
+    def test_atomic_transaction_rollback_prevents_orphaned_records(self):
+        from billing.models import DirectSale, DirectSaleLine
+        from django.db import transaction
+
+        initial_sale_count = DirectSale.objects.count()
+        initial_line_count = DirectSaleLine.objects.count()
+        initial_inv_count = BillingInvoice.objects.count()
+
+        payload = self._partial_paid_sale_payload()
+
+        with self.assertRaises(RuntimeError):
+            with transaction.atomic():
+                sale = create_direct_sale(payload=payload, created_by=self.admin)
+                self.assertIsNotNone(sale.id)
+                # Force failure halfway through multi-step operation
+                raise RuntimeError("Simulated failure after step 1; triggering rollback")
+
+        # Clean rollback: exactly 0 orphaned sales, lines, or invoices created
+        self.assertEqual(DirectSale.objects.count(), initial_sale_count)
+        self.assertEqual(DirectSaleLine.objects.count(), initial_line_count)
+        self.assertEqual(BillingInvoice.objects.count(), initial_inv_count)
+
+    def test_idempotency_double_submit_protection(self):
+        import uuid
+        from billing.models import DirectSale
+        from rest_framework.test import APIClient
+        from rest_framework import status
+
+        client = APIClient()
+        client.force_authenticate(user=self.admin)
+        idempotency_key = f"TEST-IDEMP-{uuid.uuid4()}"
+
+        payload = {
+            "sale_date": "2026-04-21",
+            "customer": self.customer.id,
+            "tax_mode": "NON_GST",
+            "finance_account": self.cash_account.id,
+            "delivery_required": False,
+            "customer_name_snapshot": self.customer.name,
+            "customer_phone_snapshot": self.customer.phone,
+            "subtotal": "12000.00",
+            "discount_total": "0.00",
+            "taxable_total": "12000.00",
+            "tax_total": "0.00",
+            "grand_total": "12000.00",
+            "received_total": "5000.00",
+            "balance_total": "7000.00",
+            "lines": [
+                {
+                    "product": self.product.id,
+                    "description": "Idempotent item",
+                    "quantity": "1.000",
+                    "unit_price": "12000.00",
+                    "taxable_value": "12000.00",
+                    "line_total": "12000.00",
+                }
+            ],
+        }
+
+        # Request 1 (First click)
+        res1 = client.post(
+            "/api/v1/billing/direct-sales/",
+            payload,
+            format="json",
+            HTTP_IDEMPOTENCY_KEY=idempotency_key,
+        )
+        self.assertEqual(res1.status_code, status.HTTP_201_CREATED)
+        sale_id_1 = res1.data["id"]
+
+        # Request 2 (Duplicate click within 200ms with identical idempotency key)
+        res2 = client.post(
+            "/api/v1/billing/direct-sales/",
+            payload,
+            format="json",
+            HTTP_IDEMPOTENCY_KEY=idempotency_key,
+        )
+        self.assertEqual(res2.status_code, status.HTTP_200_OK)
+        self.assertEqual(res2.data["id"], sale_id_1)
+
+        # Verify only 1 sale exists in database for this idempotency key
+        self.assertEqual(DirectSale.objects.filter(idempotency_key=idempotency_key).count(), 1)
+
+    def test_idempotency_payload_mismatch_returns_409_conflict(self):
+        import uuid
+        from rest_framework.test import APIClient
+        from rest_framework import status
+
+        client = APIClient()
+        client.force_authenticate(user=self.admin)
+        idempotency_key = f"TEST-IDEMP-MISMATCH-{uuid.uuid4()}"
+
+        payload1 = {
+            "sale_date": "2026-04-21",
+            "customer": self.customer.id,
+            "tax_mode": "NON_GST",
+            "finance_account": self.cash_account.id,
+            "delivery_required": False,
+            "customer_name_snapshot": self.customer.name,
+            "customer_phone_snapshot": self.customer.phone,
+            "subtotal": "12000.00",
+            "discount_total": "0.00",
+            "taxable_total": "12000.00",
+            "tax_total": "0.00",
+            "grand_total": "12000.00",
+            "received_total": "5000.00",
+            "balance_total": "7000.00",
+            "lines": [
+                {
+                    "product": self.product.id,
+                    "description": "Original item",
+                    "quantity": "1.000",
+                    "unit_price": "12000.00",
+                    "taxable_value": "12000.00",
+                    "line_total": "12000.00",
+                }
+            ],
+        }
+        res1 = client.post(
+            "/api/v1/billing/direct-sales/",
+            payload1,
+            format="json",
+            HTTP_IDEMPOTENCY_KEY=idempotency_key,
+        )
+        self.assertEqual(res1.status_code, status.HTTP_201_CREATED)
+
+        # Altered payload with same idempotency key
+        payload2 = dict(payload1)
+        payload2["grand_total"] = "15000.00"
+        res2 = client.post(
+            "/api/v1/billing/direct-sales/",
+            payload2,
+            format="json",
+            HTTP_IDEMPOTENCY_KEY=idempotency_key,
+        )
+        self.assertEqual(res2.status_code, status.HTTP_409_CONFLICT)
+
+    def test_http_status_codes_adherence(self):
+        from rest_framework.test import APIClient
+        from rest_framework import status
+        from tests.helpers import create_customer_user
+
+        client = APIClient()
+
+        # 401 Unauthenticated
+        res = client.get("/api/v1/customer/direct-sales/")
+        self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        # 403 Forbidden (cross-role)
+        cust_user = create_customer_user(username="cust_status_role", phone="9444000001")
+        client.force_authenticate(user=cust_user)
+        res = client.get("/api/v1/admin/payments/")
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+        # 404 Not Found
+        res = client.get("/api/v1/customer/direct-sales/9999999/")
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+
+        # 400 Bad Request (Validation failure)
+        client.force_authenticate(user=self.admin)
+        res = client.post("/api/v1/billing/direct-sales/", {"invalid_field": 123}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertNotEqual(res.status_code, 500)

@@ -3,29 +3,52 @@
 import { MessageCircle } from "lucide-react";
 import { documentCopyLabels, type DocumentCopyLabel } from "@/lib/documents/document-theme";
 
+export type PrintDocumentFormat = "A4" | "THERMAL_80MM";
+
 export function PrintToolbar({
   copyLabel,
   onCopyLabelChange,
   backHref,
   onWhatsAppShare,
+  format = "A4",
+  onFormatChange,
 }: {
   copyLabel: DocumentCopyLabel;
   onCopyLabelChange: (value: DocumentCopyLabel) => void;
   backHref?: string;
   onWhatsAppShare?: () => void;
+  format?: PrintDocumentFormat;
+  onFormatChange?: (format: PrintDocumentFormat) => void;
 }) {
   return (
     <div className="print-toolbar fixed inset-x-0 top-0 z-[1100] border-b border-border bg-background/95 px-4 py-3 backdrop-blur print:hidden">
       <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3">
         <div>
           <div className="text-sm font-semibold text-foreground">Document Preview</div>
-          <div className="text-xs text-muted-foreground">Use Print to save as PDF from your browser or send via WhatsApp.</div>
+          <div className="text-xs text-muted-foreground">
+            {format === "THERMAL_80MM"
+              ? "Previewing 80mm thermal receipt roll. Print directly to your POS counter printer."
+              : "Use Print to save as PDF from your browser or send via WhatsApp."}
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {backHref ? (
             <a href={backHref} className="inline-flex h-10 items-center rounded-xl border border-border bg-card px-4 text-sm font-semibold text-foreground hover:bg-muted">
               Back
             </a>
+          ) : null}
+          {onFormatChange ? (
+            <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              Layout
+              <select
+                value={format}
+                onChange={(event) => onFormatChange(event.target.value as PrintDocumentFormat)}
+                className="h-10 rounded-xl border border-border bg-card px-2.5 text-xs font-semibold text-foreground"
+              >
+                <option value="A4">A4 Standard</option>
+                <option value="THERMAL_80MM">80mm POS Slip</option>
+              </select>
+            </label>
           ) : null}
           <label className="flex items-center gap-2 text-sm text-muted-foreground">
             Copy

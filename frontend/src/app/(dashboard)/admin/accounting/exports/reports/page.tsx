@@ -9,6 +9,7 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { ROUTES } from "@/lib/routes";
 import {
+  downloadCaMonthEndPack,
   type AccountingExportReportMeta,
 } from "@/services/accounting";
 import {
@@ -59,6 +60,8 @@ export default function AccountingExportReportsPage() {
   const [reportError, setReportError] = useState<Record<string, string | null>>({});
   const [csvLoading, setCsvLoading] = useState<Record<string, boolean>>({});
   const [csvError, setCsvError] = useState<Record<string, string | null>>({});
+  const [caZipLoading, setCaZipLoading] = useState(false);
+  const [caZipError, setCaZipError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -124,6 +127,18 @@ export default function AccountingExportReportsPage() {
       }));
     } finally {
       setCsvLoading((prev) => ({ ...prev, [reportKey]: false }));
+    }
+  }
+
+  async function handleDownloadCaPack() {
+    setCaZipLoading(true);
+    setCaZipError(null);
+    try {
+      await downloadCaMonthEndPack(year, month);
+    } catch (err: unknown) {
+      setCaZipError(err instanceof Error ? err.message : "Failed to download CA month-end pack.");
+    } finally {
+      setCaZipLoading(false);
     }
   }
 
@@ -196,6 +211,34 @@ export default function AccountingExportReportsPage() {
               ))}
             </select>
           </label>
+        </div>
+      </ERPSectionShell>
+
+      <ERPSectionShell
+        title="Chartered Accountant (CA) Month-End Pack"
+        description="Download an all-in-one ZIP archive for your CA containing GSTR-1 Sales, GSTR-2 Purchases, Cash/Bank/UPI Books, and Trial Balance for the selected month."
+      >
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-xl border border-primary/20 bg-primary/5 p-4">
+          <div className="space-y-1">
+            <div className="font-semibold text-foreground flex items-center gap-2">
+              <span>Month-End Tax Filing Pack</span>
+              <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                {monthOptions.find(([m]) => m === month)?.[1]} {year}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Includes GSTR1_Sales_{year}_{String(month).padStart(2, "0")}.csv, GSTR2_Purchases_{year}_{String(month).padStart(2, "0")}.csv, Cash_Bank_Book_{year}_{String(month).padStart(2, "0")}.csv, Trial_Balance_{year}_{String(month).padStart(2, "0")}.csv, and README summary.
+            </p>
+            {caZipError && <p className="text-xs text-destructive">{caZipError}</p>}
+          </div>
+          <button
+            type="button"
+            disabled={caZipLoading}
+            onClick={() => void handleDownloadCaPack()}
+            className="inline-flex shrink-0 items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90 disabled:opacity-50 transition"
+          >
+            {caZipLoading ? "Generating ZIP…" : "Download CA Month-End Pack (.zip)"}
+          </button>
         </div>
       </ERPSectionShell>
 
