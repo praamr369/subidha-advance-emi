@@ -6,8 +6,8 @@ import {
   isEmiCollectible,
   ordinal,
   resolveOutstandingAmount,
+  type AdminEmiCollectionCandidate,
 } from "../../src/lib/emi-installment";
-import type { AdminEmiCollectionCandidate } from "../../src/services/payments";
 
 function emi(
   overrides: Partial<AdminEmiCollectionCandidate>

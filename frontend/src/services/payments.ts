@@ -25,35 +25,16 @@ export interface Receipt {
 }
 
 // ── EMI Collection types ───────────────────────────────────────────────────────
+import type {
+  AdminEmiCollectionCandidate,
+  AdminSubscriptionCollectionCandidate,
+} from '@/lib/emi-installment'
+
 export type PaymentMethod = 'CASH' | 'UPI' | 'TRANSFER' | 'CHEQUE' | 'DEPOSIT' | 'BANK' | 'CARD'
 
-export interface AdminSubscriptionCollectionCandidate {
-  id: number
-  subscription_number: string
-  customer_name: string
-  customer_phone?: string | null
-  product_name?: string | null
-  status?: string
-  outstanding_amount?: string | number | null
-  batch_code?: string | null
-  monthly_amount?: string | number | null
-  tenure_months?: number | null
-}
-
-export interface AdminEmiCollectionCandidate {
-  id: number
-  subscription?: number | null
-  status: string
-  due_date?: string
-  amount?: string | number | null
-  outstanding_amount?: string | number | null
-  paid_amount?: string | number | null
-  installment_number?: number | null
-  total_installments?: number | null
-  installment_no?: number | null
-  month_no?: number | null
-  waived_amount?: string | number | null
-  installment_label?: string | null
+export type {
+  AdminEmiCollectionCandidate,
+  AdminSubscriptionCollectionCandidate,
 }
 
 export interface PaymentCollectionResult {
@@ -211,7 +192,7 @@ class PaymentService {
   }
 
   async downloadReceipt(paymentId: string): Promise<void> {
-    const { downloadAuthenticatedFile } = await import("../lib/export/auth-download.js");
+    const { downloadAuthenticatedFile } = await import("@/lib/export/auth-download");
     await downloadAuthenticatedFile(
       `/customer/receipts/${paymentId}/pdf/`,
       `receipt-${paymentId}.pdf`,

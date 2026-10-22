@@ -1,7 +1,32 @@
-import type {
-  AdminEmiCollectionCandidate,
-  AdminSubscriptionCollectionCandidate,
-} from "@/services/payments";
+export interface AdminSubscriptionCollectionCandidate {
+  id: number;
+  subscription_number: string;
+  customer_name?: string;
+  customer_phone?: string | null;
+  product_name?: string | null;
+  status?: string;
+  outstanding_amount?: string | number | null;
+  batch_code?: string | null;
+  monthly_amount?: string | number | null;
+  tenure_months?: number | null;
+}
+
+export interface AdminEmiCollectionCandidate {
+  id: number;
+  subscription?: number | null;
+  status: string;
+  due_date?: string;
+  amount?: string | number | null;
+  outstanding_amount?: string | number | null;
+  paid_amount?: string | number | null;
+  installment_label?: string | null;
+  installment_number?: number | null;
+  total_installments?: number | null;
+  installment_no?: number | null;
+  month_no?: number | null;
+  sequence?: number | null;
+  waived_amount?: string | number | null;
+}
 
 /**
  * Operator-facing EMI installment display helpers.
