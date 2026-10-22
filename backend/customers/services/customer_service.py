@@ -210,6 +210,13 @@ def find_or_create_customer(
     email: str = "",
     address: str = "",
     city: str = "",
+    district: str = "",
+    state: str = "",
+    pincode: str = "",
+    whatsapp_opted_in: bool = False,
+    preferred_reminder_channel: str = "",
+    customer_code: str = "",
+    kyc_status: str = "",
     source: str = CustomerSource.ADMIN,
     created_by=None,
     created_by_partner=None,
@@ -242,19 +249,31 @@ def find_or_create_customer(
         first_name=norm_name,
     )
 
-    customer_code = _generate_customer_code(norm_name, norm_phone)
+    final_customer_code = (customer_code or "").strip() or _generate_customer_code(norm_name, norm_phone)
 
-    customer = Customer.objects.create(
-        user=user,
-        name=norm_name,
-        phone=norm_phone,
-        address=(address or "").strip(),
-        city=(city or "").strip(),
-        customer_source=source,
-        created_by_user=created_by,
-        created_by_partner_user=created_by_partner if _is_partner(created_by_partner) else None,
-        customer_code=customer_code,
-    )
+    create_kwargs = {
+        "user": user,
+        "name": norm_name,
+        "phone": norm_phone,
+        "address": (address or "").strip(),
+        "city": (city or "").strip(),
+        "district": (district or "").strip(),
+        "state": (state or "").strip(),
+        "pincode": (pincode or "").strip(),
+        "whatsapp_opted_in": bool(whatsapp_opted_in),
+        "preferred_reminder_channel": (preferred_reminder_channel or "").strip(),
+        "customer_source": source,
+        "created_by_user": created_by,
+        "created_by_partner_user": created_by_partner if _is_partner(created_by_partner) else None,
+        "customer_code": final_customer_code,
+    }
+    if kyc_status and kyc_status in KycStatus.values:
+        create_kwargs["kyc_status"] = kyc_status
+        if kyc_status in (KycStatus.VERIFIED, KycStatus.APPROVED):
+            create_kwargs["kyc_reviewed_by"] = created_by if getattr(created_by, "is_authenticated", False) else None
+            create_kwargs["kyc_reviewed_at"] = timezone.now()
+
+    customer = Customer.objects.create(**create_kwargs)
 
     AuditLog.objects.create(
         action_type=AuditLog.ActionType.CUSTOMER_CREATED,

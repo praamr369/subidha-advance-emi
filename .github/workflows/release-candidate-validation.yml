@@ -68,6 +68,8 @@ jobs:
 
       - name: Frontend release-candidate validation
         run: bash scripts/validate-release-candidate.sh
+        env:
+          NODE_OPTIONS: '--max-old-space-size=7168'
 
   frontend-release-smoke:
     runs-on: ubuntu-22.04

@@ -1276,11 +1276,20 @@ export default function SubscriptionCreatePage({
           setGlobalLoadingLabel("Uploading customer KYC document...");
           const kycForm = new FormData();
           kycForm.append("document_type", idDocType);
+          kycForm.append("category", "IDENTITY");
           kycForm.append("file", idDocFile);
-          kycForm.append("notes", `Direct upload during ${planType} contract creation`);
-          await apiFetch(`/admin/customers/${customer.id}/documents/`, {
+          kycForm.append("notes", `Direct walk-in ID verification during ${planType} contract creation`);
+          await apiFetch(`/admin/customers/${customer.id}/kyc-documents/upload/`, {
             method: "POST",
             body: kycForm,
+          });
+          // Formally set customer KYC profile to VERIFIED
+          await apiFetch(`/admin/customers/${customer.id}/kyc-decision/`, {
+            method: "POST",
+            body: JSON.stringify({
+              status: "VERIFIED",
+              reason: `Walk-in physical ID verified during ${planType} contract creation`,
+            }),
           });
           setCustomer((prev) => (prev ? { ...prev, kyc_status: "VERIFIED" } : prev));
         } catch (kycErr) {

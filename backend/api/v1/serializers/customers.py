@@ -45,6 +45,9 @@ class CustomerSearchSerializer(serializers.ModelSerializer):
             "email",
             "address",
             "city",
+            "district",
+            "state",
+            "pincode",
             "kyc_status",
             "status",
             "customer_source",
@@ -90,6 +93,13 @@ class CustomerQuickCreateSerializer(serializers.Serializer):
     email = serializers.EmailField(required=False, allow_blank=True, default="")
     address = serializers.CharField(required=False, allow_blank=True, default="")
     city = serializers.CharField(max_length=100, required=False, allow_blank=True, default="")
+    district = serializers.CharField(max_length=100, required=False, allow_blank=True, default="")
+    state = serializers.CharField(max_length=100, required=False, allow_blank=True, default="")
+    pincode = serializers.CharField(max_length=10, required=False, allow_blank=True, default="")
+    whatsapp_opted_in = serializers.BooleanField(required=False, default=False)
+    preferred_reminder_channel = serializers.CharField(max_length=16, required=False, allow_blank=True, default="")
+    customer_code = serializers.CharField(max_length=40, required=False, allow_blank=True, default="")
+    kyc_status = serializers.CharField(max_length=20, required=False, allow_blank=True, default="PENDING")
     source = serializers.ChoiceField(
         choices=CustomerSource.choices,
         default=CustomerSource.ADMIN,

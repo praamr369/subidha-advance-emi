@@ -9,6 +9,11 @@ export type CustomerRecord = {
   status?: string;
   address?: string;
   city?: string;
+  district?: string;
+  state?: string;
+  pincode?: string;
+  whatsapp_opted_in?: boolean;
+  preferred_reminder_channel?: string;
   email?: string;
   user_username?: string;
   active_subscription_count?: number;
@@ -32,6 +37,13 @@ export type CustomerQuickCreatePayload = {
   email?: string;
   address?: string;
   city?: string;
+  district?: string;
+  state?: string;
+  pincode?: string;
+  whatsapp_opted_in?: boolean;
+  preferred_reminder_channel?: string;
+  customer_code?: string;
+  kyc_status?: string;
   source?: "ADMIN" | "PARTNER" | "PUBLIC" | "IMPORT";
 };
 
@@ -67,6 +79,11 @@ function normalizeCustomer(row: Record<string, unknown>): CustomerRecord {
     status: typeof row.status === "string" ? row.status : undefined,
     address: typeof row.address === "string" ? row.address : undefined,
     city: typeof row.city === "string" ? row.city : undefined,
+    district: typeof row.district === "string" ? row.district : undefined,
+    state: typeof row.state === "string" ? row.state : undefined,
+    pincode: typeof row.pincode === "string" ? row.pincode : undefined,
+    whatsapp_opted_in: typeof row.whatsapp_opted_in === "boolean" ? row.whatsapp_opted_in : undefined,
+    preferred_reminder_channel: typeof row.preferred_reminder_channel === "string" ? row.preferred_reminder_channel : undefined,
     email: typeof row.email === "string" ? row.email : undefined,
     gstin: typeof row.gstin === "string" ? row.gstin : undefined,
     user_username:

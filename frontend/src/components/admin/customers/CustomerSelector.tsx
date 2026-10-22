@@ -17,7 +17,20 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Search, UserCheck, UserPlus, AlertTriangle, X, Phone, Mail, MapPin } from "lucide-react";
+import {
+  Search,
+  UserCheck,
+  UserPlus,
+  AlertTriangle,
+  X,
+  Phone,
+  Mail,
+  MapPin,
+  Building2,
+  ShieldCheck,
+  Users,
+  CheckCircle2,
+} from "lucide-react";
 
 import type { CustomerRecord } from "@/services/customers";
 import {
@@ -26,6 +39,7 @@ import {
   createCustomerQuick,
 } from "@/services/customers";
 import StatusBadge from "@/components/ui/status-badge";
+import PincodeField from "@/components/forms/PincodeField";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -161,12 +175,47 @@ export default function CustomerSelector({
   const [exactMatch, setExactMatch] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
 
-  // Inline quick-create state
+  // Inline Customer Onboarding Workbench state
   const [showCreate, setShowCreate] = useState(false);
+  const [createMode, setCreateMode] = useState<"workbench" | "quick">("workbench");
+  const [activeTab, setActiveTab] = useState<"identity" | "address" | "family" | "preferences">("identity");
+
+  // 1. Identity & Contact
   const [createName, setCreateName] = useState("");
   const [createPhone, setCreatePhone] = useState("");
+  const [createWhatsappPhone, setCreateWhatsappPhone] = useState("");
+  const [sameAsPhone, setSameAsPhone] = useState(true);
   const [createEmail, setCreateEmail] = useState("");
+  const [customerCode, setCustomerCode] = useState("");
+
+  // 2. Personal & Family
+  const [guardianName, setGuardianName] = useState("");
+  const [gender, setGender] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
+
+  // 3. Location & Premises
   const [createAddress, setCreateAddress] = useState("");
+  const [landmark, setLandmark] = useState("");
+  const [createPincode, setCreatePincode] = useState("");
+  const [createCity, setCreateCity] = useState("Asansol");
+  const [createDistrict, setCreateDistrict] = useState("Paschim Bardhaman");
+  const [createState, setCreateState] = useState("West Bengal");
+  const [addressType, setAddressType] = useState("HOME");
+
+  // 4. Reference & Nominee
+  const [nomineeName, setNomineeName] = useState("");
+  const [nomineeRelation, setNomineeRelation] = useState("Spouse");
+  const [nomineePhone, setNomineePhone] = useState("");
+
+  // 5. Work & KYC Preferences
+  const [occupation, setOccupation] = useState("");
+  const [employerName, setEmployerName] = useState("");
+  const [whatsappOptedIn, setWhatsappOptedIn] = useState(true);
+  const [preferredReminderChannel, setPreferredReminderChannel] = useState("WHATSAPP");
+  const [idDocType, setIdDocType] = useState("AADHAAR");
+  const [idNumber, setIdNumber] = useState("");
+  const [initialKycStatus, setInitialKycStatus] = useState("PENDING");
+
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
@@ -179,8 +228,11 @@ export default function CustomerSelector({
     const looksLikePhone = /^\d{8,}$/.test(query.replace(/\D/g, ""));
     if (looksLikePhone) {
       setCreatePhone(query.trim());
+      if (sameAsPhone) {
+        setCreateWhatsappPhone(query.trim());
+      }
     }
-  }, [showCreate, query]);
+  }, [showCreate, query, sameAsPhone]);
 
   const runSearch = useCallback(async (term: string) => {
     if (!term.trim()) {
@@ -242,10 +294,36 @@ export default function CustomerSelector({
 
   const handleShowCreate = () => {
     setShowCreate(true);
+    setCreateMode("workbench");
+    setActiveTab("identity");
     setCreateName("");
-    setCreatePhone(query.trim());
+    const cleanedDigits = query.replace(/\D/g, "");
+    const initialP = cleanedDigits.length >= 8 ? query.trim() : "";
+    setCreatePhone(initialP);
+    setCreateWhatsappPhone(initialP);
+    setSameAsPhone(true);
     setCreateEmail("");
+    setCustomerCode("");
+    setGuardianName("");
+    setGender("");
+    setDateOfBirth("");
     setCreateAddress("");
+    setLandmark("");
+    setCreatePincode("");
+    setCreateCity("Asansol");
+    setCreateDistrict("Paschim Bardhaman");
+    setCreateState("West Bengal");
+    setAddressType("HOME");
+    setNomineeName("");
+    setNomineeRelation("Spouse");
+    setNomineePhone("");
+    setOccupation("");
+    setEmployerName("");
+    setWhatsappOptedIn(true);
+    setPreferredReminderChannel("WHATSAPP");
+    setIdDocType("AADHAAR");
+    setIdNumber("");
+    setInitialKycStatus("PENDING");
     setCreateError(null);
   };
 
@@ -253,18 +331,54 @@ export default function CustomerSelector({
     const nameVal = createName.trim();
     const phoneVal = createPhone.trim();
     if (!nameVal || !phoneVal) {
-      setCreateError("Name and phone are required.");
+      setCreateError("Name and primary mobile number are required.");
+      setActiveTab("identity");
       return;
     }
 
     setCreating(true);
     setCreateError(null);
     try {
+      const addressParts: string[] = [];
+      if (createAddress.trim()) {
+        addressParts.push(createAddress.trim());
+      }
+      if (landmark.trim()) {
+        addressParts.push(`Landmark: ${landmark.trim()}`);
+      }
+      if (guardianName.trim()) {
+        addressParts.push(`S/O / W/O: ${guardianName.trim()}`);
+      }
+      if (nomineeName.trim()) {
+        addressParts.push(
+          `Nominee: ${nomineeName.trim()} (${nomineeRelation || "Relative"}${nomineePhone.trim() ? ", Ph: " + nomineePhone.trim() : ""})`
+        );
+      }
+      if (occupation.trim()) {
+        addressParts.push(`Occupation: ${occupation.trim()}${employerName.trim() ? " at " + employerName.trim() : ""}`);
+      }
+      if (idNumber.trim()) {
+        addressParts.push(`${idDocType}: ${idNumber.trim()}`);
+      }
+      if (addressType && addressType !== "HOME") {
+        addressParts.push(`Premises: ${addressType}`);
+      }
+
+      const fullAddress = addressParts.join(" | ");
+
       const response = await createCustomerQuick({
         name: nameVal,
         phone: phoneVal,
         email: createEmail.trim() || undefined,
-        address: createAddress.trim() || undefined,
+        address: fullAddress || undefined,
+        city: createCity.trim() || undefined,
+        district: createDistrict.trim() || undefined,
+        state: createState.trim() || undefined,
+        pincode: createPincode.trim() || undefined,
+        whatsapp_opted_in: whatsappOptedIn,
+        preferred_reminder_channel: preferredReminderChannel,
+        customer_code: customerCode.trim() || undefined,
+        kyc_status: initialKycStatus,
         source: mode === "partner" ? "PARTNER" : "ADMIN",
       });
 
@@ -398,105 +512,711 @@ export default function CustomerSelector({
           </div>
         )}
 
-      {/* Inline quick-create form */}
+      {/* Inline Customer Onboarding Workbench */}
       {showCreate && (
-        <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h4 className="text-sm font-semibold">Create new customer</h4>
-            <button
-              type="button"
-              onClick={() => setShowCreate(false)}
-              className="rounded-lg p-1 text-muted-foreground hover:bg-muted"
-            >
-              <X className="h-4 w-4" />
-            </button>
+        <div className="rounded-2xl border border-primary/25 bg-card p-5 shadow-md space-y-4">
+          {/* Workbench Header */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-3.5">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <Building2 className="h-5 w-5" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
+                  Customer Onboarding Workbench
+                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                    Full Profile
+                  </span>
+                </h4>
+                <p className="text-xs text-muted-foreground">
+                  Record complete customer identity, premises location, family reference, and KYC readiness.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="inline-flex rounded-lg border border-border bg-muted/30 p-0.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setCreateMode("workbench")}
+                  className={`rounded-md px-2.5 py-1 font-medium transition ${
+                    createMode === "workbench"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  🏢 Full Workbench
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCreateMode("quick")}
+                  className={`rounded-md px-2.5 py-1 font-medium transition ${
+                    createMode === "quick"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  ⚡ Fast Feed
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowCreate(false)}
+                className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition"
+                title="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
 
           {createError && (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-              {createError}
+            <div className="flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-xs font-medium text-destructive">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <span>{createError}</span>
             </div>
           )}
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1">
-              <label htmlFor="f-name" className="text-xs font-medium text-foreground">
-                Name <span className="text-destructive">*</span>
-              </label>
-              <input id="f-name"
-                type="text"
-                value={createName}
-                onChange={(e) => setCreateName(e.target.value)}
-                placeholder="Customer name"
-                className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:border-ring"
-                autoFocus
-              />
-            </div>
-            <div className="space-y-1">
-              <label htmlFor="f-phone" className="text-xs font-medium text-foreground">
-                Phone <span className="text-destructive">*</span>
-              </label>
-              <input id="f-phone"
-                type="tel"
-                value={createPhone}
-                onChange={(e) => setCreatePhone(e.target.value)}
-                placeholder="10-digit mobile number"
-                className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:border-ring"
-              />
-            </div>
-            <div className="space-y-1">
-              <label htmlFor="f-email-optional" className="text-xs font-medium text-muted-foreground">
-                Email <span className="text-xs opacity-60">(optional)</span>
-              </label>
-              <input id="f-email-optional"
-                type="email"
-                value={createEmail}
-                onChange={(e) => setCreateEmail(e.target.value)}
-                placeholder="customer@email.com"
-                className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:border-ring"
-              />
-            </div>
-            <div className="space-y-1">
-              <label htmlFor="f-address-optional" className="text-xs font-medium text-muted-foreground">
-                Address <span className="text-xs opacity-60">(optional)</span>
-              </label>
-              <input id="f-address-optional"
-                type="text"
-                value={createAddress}
-                onChange={(e) => setCreateAddress(e.target.value)}
-                placeholder="Address / city"
-                className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:border-ring"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 justify-end pt-1">
-            <button
-              type="button"
-              onClick={() => setShowCreate(false)}
-              className="rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-muted"
-              disabled={creating}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleCreate()}
-              disabled={creating || !createName.trim() || !createPhone.trim()}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-            >
-              {creating ? (
-                <>
-                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-border border-t-white" />
-                  Creating…
-                </>
-              ) : (
-                <>
+          {createMode === "workbench" ? (
+            <div className="space-y-4">
+              {/* Tab Navigation */}
+              <div className="flex flex-wrap gap-1.5 border-b border-border/40 pb-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("identity")}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-semibold transition ${
+                    activeTab === "identity"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "bg-muted/40 text-muted-foreground hover:bg-muted"
+                  }`}
+                >
                   <UserPlus className="h-3.5 w-3.5" />
-                  Create &amp; Select
-                </>
+                  1. Identity &amp; Contact
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("address")}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-semibold transition ${
+                    activeTab === "address"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "bg-muted/40 text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  <MapPin className="h-3.5 w-3.5" />
+                  2. Address &amp; Location
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("family")}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-semibold transition ${
+                    activeTab === "family"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "bg-muted/40 text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  <Users className="h-3.5 w-3.5" />
+                  3. Family &amp; Nominee
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("preferences")}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-semibold transition ${
+                    activeTab === "preferences"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "bg-muted/40 text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  4. KYC &amp; Reminders
+                </button>
+              </div>
+
+              {/* Tab 1: Identity & Contact */}
+              {activeTab === "identity" && (
+                <div className="grid gap-3.5 sm:grid-cols-2">
+                  <div className="space-y-1 sm:col-span-2">
+                    <label htmlFor="wb-name" className="text-xs font-semibold text-foreground">
+                      Full Legal Name <span className="text-destructive">*</span>
+                    </label>
+                    <input
+                      id="wb-name"
+                      type="text"
+                      value={createName}
+                      onChange={(e) => setCreateName(e.target.value)}
+                      placeholder="e.g. Rajesh Kumar Sharma"
+                      className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition focus:border-ring focus:ring-1 focus:ring-ring"
+                      autoFocus
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label htmlFor="wb-phone" className="text-xs font-semibold text-foreground">
+                      Primary Mobile Number <span className="text-destructive">*</span>
+                    </label>
+                    <input
+                      id="wb-phone"
+                      type="tel"
+                      value={createPhone}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setCreatePhone(val);
+                        if (sameAsPhone) {
+                          setCreateWhatsappPhone(val);
+                        }
+                      }}
+                      placeholder="10-digit mobile number"
+                      className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition focus:border-ring focus:ring-1 focus:ring-ring"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <label htmlFor="wb-whatsapp" className="text-xs font-semibold text-foreground">
+                        WhatsApp Number
+                      </label>
+                      <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={sameAsPhone}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setSameAsPhone(checked);
+                            if (checked) setCreateWhatsappPhone(createPhone);
+                          }}
+                          className="rounded border-input text-primary focus:ring-primary h-3.5 w-3.5"
+                        />
+                        Same as mobile
+                      </label>
+                    </div>
+                    <input
+                      id="wb-whatsapp"
+                      type="tel"
+                      value={sameAsPhone ? createPhone : createWhatsappPhone}
+                      onChange={(e) => {
+                        setCreateWhatsappPhone(e.target.value);
+                        setSameAsPhone(false);
+                      }}
+                      placeholder="WhatsApp contact"
+                      disabled={sameAsPhone}
+                      className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition focus:border-ring focus:ring-1 focus:ring-ring disabled:bg-muted/40 disabled:text-muted-foreground"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label htmlFor="wb-email" className="text-xs font-medium text-muted-foreground">
+                      Email Address <span className="text-xs opacity-60">(optional)</span>
+                    </label>
+                    <input
+                      id="wb-email"
+                      type="email"
+                      value={createEmail}
+                      onChange={(e) => setCreateEmail(e.target.value)}
+                      placeholder="customer@email.com"
+                      className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition focus:border-ring focus:ring-1 focus:ring-ring"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label htmlFor="wb-code" className="text-xs font-medium text-muted-foreground">
+                      Customer Code / Passbook ID <span className="text-xs opacity-60">(auto if blank)</span>
+                    </label>
+                    <input
+                      id="wb-code"
+                      type="text"
+                      value={customerCode}
+                      onChange={(e) => setCustomerCode(e.target.value)}
+                      placeholder="e.g. CUST-2026-0042"
+                      className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition focus:border-ring focus:ring-1 focus:ring-ring"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2 flex justify-end pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("address")}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-muted px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted/80"
+                    >
+                      Next: Address &amp; Location ➔
+                    </button>
+                  </div>
+                </div>
               )}
-            </button>
+
+              {/* Tab 2: Address & Location */}
+              {activeTab === "address" && (
+                <div className="grid gap-3.5 sm:grid-cols-2">
+                  <div className="space-y-1 sm:col-span-2">
+                    <label htmlFor="wb-address" className="text-xs font-semibold text-foreground">
+                      Street Address / House / Flat No. <span className="text-destructive">*</span>
+                    </label>
+                    <input
+                      id="wb-address"
+                      type="text"
+                      value={createAddress}
+                      onChange={(e) => setCreateAddress(e.target.value)}
+                      placeholder="e.g. 14/B G.T. Road, Near Bus Stand, Ushagram"
+                      className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition focus:border-ring focus:ring-1 focus:ring-ring"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label htmlFor="wb-landmark" className="text-xs font-medium text-muted-foreground">
+                      Landmark / Area Identifier
+                    </label>
+                    <input
+                      id="wb-landmark"
+                      type="text"
+                      value={landmark}
+                      onChange={(e) => setLandmark(e.target.value)}
+                      placeholder="e.g. Opp. State Bank of India"
+                      className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition focus:border-ring focus:ring-1 focus:ring-ring"
+                    />
+                  </div>
+
+                  <div>
+                    <PincodeField
+                      id="wb-pincode"
+                      label="Postal PIN Code"
+                      value={createPincode}
+                      onChange={setCreatePincode}
+                      onResolved={(opt) => {
+                        if (opt.city) setCreateCity(opt.city);
+                        if (opt.district) setCreateDistrict(opt.district);
+                        if (opt.state) setCreateState(opt.state);
+                      }}
+                      placeholder="e.g. 713301"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label htmlFor="wb-city" className="text-xs font-semibold text-foreground">
+                      City / Town
+                    </label>
+                    <input
+                      id="wb-city"
+                      type="text"
+                      value={createCity}
+                      onChange={(e) => setCreateCity(e.target.value)}
+                      placeholder="e.g. Asansol"
+                      className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition focus:border-ring focus:ring-1 focus:ring-ring"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label htmlFor="wb-district" className="text-xs font-medium text-muted-foreground">
+                      District
+                    </label>
+                    <input
+                      id="wb-district"
+                      type="text"
+                      value={createDistrict}
+                      onChange={(e) => setCreateDistrict(e.target.value)}
+                      placeholder="e.g. Paschim Bardhaman"
+                      className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition focus:border-ring focus:ring-1 focus:ring-ring"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label htmlFor="wb-state" className="text-xs font-medium text-muted-foreground">
+                      State
+                    </label>
+                    <input
+                      id="wb-state"
+                      type="text"
+                      value={createState}
+                      onChange={(e) => setCreateState(e.target.value)}
+                      placeholder="e.g. West Bengal"
+                      className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition focus:border-ring focus:ring-1 focus:ring-ring"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label htmlFor="wb-addr-type" className="text-xs font-medium text-muted-foreground">
+                      Premises Type
+                    </label>
+                    <select
+                      id="wb-addr-type"
+                      value={addressType}
+                      onChange={(e) => setAddressType(e.target.value)}
+                      className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition focus:border-ring focus:ring-1 focus:ring-ring"
+                    >
+                      <option value="HOME">Owned Residential Home</option>
+                      <option value="RENTED">Rented House / Flat</option>
+                      <option value="OFFICE">Commercial Office</option>
+                      <option value="SHOP">Retail Shop / Showroom</option>
+                      <option value="OTHER">Other Premises</option>
+                    </select>
+                  </div>
+
+                  <div className="sm:col-span-2 flex justify-between pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("identity")}
+                      className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted"
+                    >
+                      ⬅ Back
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("family")}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-muted px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted/80"
+                    >
+                      Next: Family &amp; Nominee ➔
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab 3: Family & Nominee */}
+              {activeTab === "family" && (
+                <div className="grid gap-3.5 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <label htmlFor="wb-guardian" className="text-xs font-medium text-foreground">
+                      Father&apos;s / Husband&apos;s Name (S/O or W/O)
+                    </label>
+                    <input
+                      id="wb-guardian"
+                      type="text"
+                      value={guardianName}
+                      onChange={(e) => setGuardianName(e.target.value)}
+                      placeholder="e.g. Late Ramprasad Sharma"
+                      className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition focus:border-ring focus:ring-1 focus:ring-ring"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label htmlFor="wb-gender" className="text-xs font-medium text-muted-foreground">
+                      Gender
+                    </label>
+                    <select
+                      id="wb-gender"
+                      value={gender}
+                      onChange={(e) => setGender(e.target.value)}
+                      className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition focus:border-ring focus:ring-1 focus:ring-ring"
+                    >
+                      <option value="">Select gender (optional)</option>
+                      <option value="MALE">Male</option>
+                      <option value="FEMALE">Female</option>
+                      <option value="OTHER">Other</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label htmlFor="wb-dob" className="text-xs font-medium text-muted-foreground">
+                      Date of Birth / Age
+                    </label>
+                    <input
+                      id="wb-dob"
+                      type="text"
+                      value={dateOfBirth}
+                      onChange={(e) => setDateOfBirth(e.target.value)}
+                      placeholder="DD/MM/YYYY or Approx Age"
+                      className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition focus:border-ring focus:ring-1 focus:ring-ring"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label htmlFor="wb-nominee-rel" className="text-xs font-medium text-muted-foreground">
+                      Nominee / Guarantor Relationship
+                    </label>
+                    <select
+                      id="wb-nominee-rel"
+                      value={nomineeRelation}
+                      onChange={(e) => setNomineeRelation(e.target.value)}
+                      className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition focus:border-ring focus:ring-1 focus:ring-ring"
+                    >
+                      <option value="Spouse">Spouse (Wife / Husband)</option>
+                      <option value="Father">Father</option>
+                      <option value="Mother">Mother</option>
+                      <option value="Brother">Brother</option>
+                      <option value="Sister">Sister</option>
+                      <option value="Son">Son</option>
+                      <option value="Daughter">Daughter</option>
+                      <option value="Friend">Friend / Colleague</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label htmlFor="wb-nominee-name" className="text-xs font-medium text-foreground">
+                      Nominee / Reference Person Name
+                    </label>
+                    <input
+                      id="wb-nominee-name"
+                      type="text"
+                      value={nomineeName}
+                      onChange={(e) => setNomineeName(e.target.value)}
+                      placeholder="e.g. Sunita Sharma"
+                      className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition focus:border-ring focus:ring-1 focus:ring-ring"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label htmlFor="wb-nominee-phone" className="text-xs font-medium text-foreground">
+                      Nominee / Reference Phone Number
+                    </label>
+                    <input
+                      id="wb-nominee-phone"
+                      type="tel"
+                      value={nomineePhone}
+                      onChange={(e) => setNomineePhone(e.target.value)}
+                      placeholder="10-digit contact"
+                      className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition focus:border-ring focus:ring-1 focus:ring-ring"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2 flex justify-between pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("address")}
+                      className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted"
+                    >
+                      ⬅ Back
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("preferences")}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-muted px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted/80"
+                    >
+                      Next: KYC &amp; Reminders ➔
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab 4: Preferences & KYC */}
+              {activeTab === "preferences" && (
+                <div className="grid gap-3.5 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <label htmlFor="wb-id-type" className="text-xs font-medium text-foreground">
+                      Primary Government ID Type
+                    </label>
+                    <select
+                      id="wb-id-type"
+                      value={idDocType}
+                      onChange={(e) => setIdDocType(e.target.value)}
+                      className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition focus:border-ring focus:ring-1 focus:ring-ring"
+                    >
+                      <option value="AADHAAR">Aadhaar Card</option>
+                      <option value="PAN">PAN Card</option>
+                      <option value="VOTER_ID">Voter ID Card</option>
+                      <option value="DRIVING_LICENSE">Driving License</option>
+                      <option value="PASSPORT">Passport</option>
+                      <option value="OTHER">Other Official Document</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label htmlFor="wb-id-num" className="text-xs font-medium text-foreground">
+                      ID Document Number / Reference
+                    </label>
+                    <input
+                      id="wb-id-num"
+                      type="text"
+                      value={idNumber}
+                      onChange={(e) => setIdNumber(e.target.value)}
+                      placeholder="e.g. XXXX-XXXX-1234 or ABCDE1234F"
+                      className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition focus:border-ring focus:ring-1 focus:ring-ring"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label htmlFor="wb-kyc-status" className="text-xs font-medium text-foreground">
+                      Initial KYC Verification State
+                    </label>
+                    <select
+                      id="wb-kyc-status"
+                      value={initialKycStatus}
+                      onChange={(e) => setInitialKycStatus(e.target.value)}
+                      className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition focus:border-ring focus:ring-1 focus:ring-ring"
+                    >
+                      <option value="PENDING">Pending (Collect physical proof later)</option>
+                      <option value="VERIFIED">Verified (Physical ID inspected on spot)</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label htmlFor="wb-occupation" className="text-xs font-medium text-muted-foreground">
+                      Occupation / Business Type
+                    </label>
+                    <select
+                      id="wb-occupation"
+                      value={occupation}
+                      onChange={(e) => setOccupation(e.target.value)}
+                      className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition focus:border-ring focus:ring-1 focus:ring-ring"
+                    >
+                      <option value="">Select occupation (optional)</option>
+                      <option value="Salaried">Salaried (Private / Govt)</option>
+                      <option value="Business">Retail / Trader / Business</option>
+                      <option value="Self-Employed">Self-Employed Professional</option>
+                      <option value="Homemaker">Homemaker</option>
+                      <option value="Retired">Retired</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label htmlFor="wb-employer" className="text-xs font-medium text-muted-foreground">
+                      Employer / Business Firm Name
+                    </label>
+                    <input
+                      id="wb-employer"
+                      type="text"
+                      value={employerName}
+                      onChange={(e) => setEmployerName(e.target.value)}
+                      placeholder="e.g. Eastern Coalfields Ltd / Shop name"
+                      className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition focus:border-ring focus:ring-1 focus:ring-ring"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label htmlFor="wb-remind-ch" className="text-xs font-medium text-muted-foreground">
+                      Preferred Reminder Channel
+                    </label>
+                    <select
+                      id="wb-remind-ch"
+                      value={preferredReminderChannel}
+                      onChange={(e) => setPreferredReminderChannel(e.target.value)}
+                      className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition focus:border-ring focus:ring-1 focus:ring-ring"
+                    >
+                      <option value="WHATSAPP">WhatsApp Message</option>
+                      <option value="SMS">SMS Text Message</option>
+                      <option value="CALL">Phone Call</option>
+                      <option value="EMAIL">Email</option>
+                    </select>
+                  </div>
+
+                  <div className="sm:col-span-2 pt-1">
+                    <label className="flex items-center gap-2 rounded-xl border border-border/80 bg-muted/20 p-3 text-xs text-foreground cursor-pointer hover:bg-muted/30">
+                      <input
+                        type="checkbox"
+                        checked={whatsappOptedIn}
+                        onChange={(e) => setWhatsappOptedIn(e.target.checked)}
+                        className="rounded border-input text-primary focus:ring-primary h-4 w-4"
+                      />
+                      <div>
+                        <span className="font-semibold">Opt-in for WhatsApp EMI &amp; Contract Alerts</span>
+                        <p className="text-[11px] text-muted-foreground">
+                          Sends automated draw announcements, monthly EMI schedule receipts, and contract notices.
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+
+                  <div className="sm:col-span-2 flex justify-start pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("family")}
+                      className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted"
+                    >
+                      ⬅ Back
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* Quick Feed Mode */
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <label htmlFor="f-name" className="text-xs font-medium text-foreground">
+                  Name <span className="text-destructive">*</span>
+                </label>
+                <input
+                  id="f-name"
+                  type="text"
+                  value={createName}
+                  onChange={(e) => setCreateName(e.target.value)}
+                  placeholder="Customer name"
+                  className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:border-ring"
+                  autoFocus
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label htmlFor="f-phone" className="text-xs font-medium text-foreground">
+                  Phone <span className="text-destructive">*</span>
+                </label>
+                <input
+                  id="f-phone"
+                  type="tel"
+                  value={createPhone}
+                  onChange={(e) => setCreatePhone(e.target.value)}
+                  placeholder="10-digit mobile number"
+                  className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:border-ring"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label htmlFor="f-email-optional" className="text-xs font-medium text-muted-foreground">
+                  Email <span className="text-xs opacity-60">(optional)</span>
+                </label>
+                <input
+                  id="f-email-optional"
+                  type="email"
+                  value={createEmail}
+                  onChange={(e) => setCreateEmail(e.target.value)}
+                  placeholder="customer@email.com"
+                  className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:border-ring"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label htmlFor="f-address-optional" className="text-xs font-medium text-muted-foreground">
+                  Address <span className="text-xs opacity-60">(optional)</span>
+                </label>
+                <input
+                  id="f-address-optional"
+                  type="text"
+                  value={createAddress}
+                  onChange={(e) => setCreateAddress(e.target.value)}
+                  placeholder="Address / city"
+                  className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:border-ring"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Workbench Footer Action Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-3.5">
+            <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+              <span>
+                {createName.trim() && createPhone.trim()
+                  ? "Identity ready for contract enrollment"
+                  : "Name and phone are required to onboard customer"}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowCreate(false)}
+                className="rounded-xl border border-border px-3.5 py-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition"
+                disabled={creating}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleCreate()}
+                disabled={creating || !createName.trim() || !createPhone.trim()}
+                className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50 transition"
+              >
+                {creating ? (
+                  <>
+                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-border border-t-white" />
+                    Creating Customer Profile…
+                  </>
+                ) : (
+                  <>
+                    <UserPlus className="h-3.5 w-3.5" />
+                    Save &amp; Select Customer
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
