@@ -58,20 +58,20 @@ class DeployRehearsalTests(SimpleTestCase):
         self.assertIn('REHEARSAL_DB_PORT="${REHEARSAL_DB_PORT:-5432}"', self.source)
         self.assertNotIn("REHEARSAL_DB_PORT:-6432", self.source)
 
-    def test_production_is_backed_up_before_the_code_is_fetched(self):
+    def test_production_is_backed_up_before_the_code_is_checked_out(self):
         """The rollback point has to predate the change it rolls back.
 
         Ordering, not presence, is the property: a backup taken after the new
         code is checked out is not a rollback point for that deploy.
         """
         backup_at = self.source.find("backup.sh")
-        fetch_at = self.source.find("git fetch")
+        checkout_at = self.source.find("git checkout")
         self.assertNotEqual(backup_at, -1, "the pre-update backup step is gone")
-        self.assertNotEqual(fetch_at, -1, "the code fetch step is gone")
+        self.assertNotEqual(checkout_at, -1, "the code checkout step is gone")
         self.assertLess(
             backup_at,
-            fetch_at,
-            "the backup must be taken before new code is fetched, or the "
+            checkout_at,
+            "the backup must be taken before new code is checked out, or the "
             "rollback point belongs to the wrong version",
         )
 

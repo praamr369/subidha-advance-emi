@@ -24,6 +24,17 @@ These run **on the VPS**, not on the dev machine. They implement
    30 2 * * * /var/www/subidha/app/scripts/server/backup.sh scheduled >> /var/log/subidha-backup.log 2>&1
    ```
 
+4. Automated offsite backup (100% Free Disaster Recovery to Google Drive):
+
+   Uses open-source `rclone` and Google Drive 15GB free tier or any S3/cloud storage.
+   - Install rclone: `sudo apt install -y rclone`
+   - Setup remote: `rclone config` (select Google Drive, name it `gdrive`)
+   - Run manually or add to nightly cron:
+   ```cron
+   0 3 * * * /var/www/subidha/app/scripts/server/backup-offsite.sh >> /var/log/subidha-offsite.log 2>&1
+   ```
+   - Optional AES-256 encryption: export `BACKUP_PASSPHRASE="your-secret-key"` in environment.
+
 ## Background jobs (Celery)
 
 `subidha-celery.service` and `subidha-celery-beat.service` in this directory run

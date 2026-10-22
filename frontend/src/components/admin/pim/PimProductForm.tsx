@@ -1,14 +1,25 @@
 "use client";
 import { useEffect, useState, useCallback, useRef } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { Save, ArrowLeft, Layers, Box, Send, CheckCircle2, X, Plus, Search, Trash2, Factory, Wrench, ChevronDown, ChevronRight, RefreshCw, Check } from "lucide-react";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import DynamicAttributeForm, { type AttributeValues } from "./DynamicAttributeForm";
-import VariantManager from "./VariantManager";
-import RelatedProductsSection from "../products/RelatedProductsSection";
+
+const VariantManager = dynamic(() => import("./VariantManager"), {
+  loading: () => <ERPLoadingState label="Loading variant manager..." />,
+  ssr: false,
+});
+const RelatedProductsSection = dynamic(() => import("../products/RelatedProductsSection"), {
+  loading: () => <ERPLoadingState label="Loading related products..." />,
+  ssr: false,
+});
+const StockLedgerPanel = dynamic(() => import("@/components/inventory/StockLedgerPanel"), {
+  loading: () => <ERPLoadingState label="Loading stock ledger..." />,
+  ssr: false,
+});
 import PimProductAccessoriesPanel from "./PimProductAccessoriesPanel";
 import ProductMediaGallery from "./ProductMediaGallery";
-import StockLedgerPanel from "@/components/inventory/StockLedgerPanel";
 import {
   pimService,
   type PimCategory,

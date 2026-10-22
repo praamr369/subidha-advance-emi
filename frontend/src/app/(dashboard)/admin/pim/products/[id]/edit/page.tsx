@@ -1,11 +1,16 @@
 "use client";
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, GitBranch, ExternalLink } from "lucide-react";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
-import PimProductForm from "@/components/admin/pim/PimProductForm";
+
+const PimProductForm = dynamic(() => import("@/components/admin/pim/PimProductForm"), {
+  loading: () => <ERPLoadingState label="Loading product editor…" />,
+  ssr: false,
+});
 import { pimService, type PimProduct } from "@/services/pim";
 import { ROUTES } from "@/lib/routes";
 
@@ -131,7 +136,7 @@ export default function PimEditProductPage() {
                   setLoading(true);
                   await pimService.updateProduct(Number(params.id), { parent: null });
                   window.location.reload();
-                } catch (err) {
+                } catch {
                   alert("Failed to detach product.");
                   setLoading(false);
                 }

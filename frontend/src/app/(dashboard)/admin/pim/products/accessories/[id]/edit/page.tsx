@@ -1,7 +1,12 @@
 "use client";
+import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
-import PimProductForm from "@/components/admin/pim/PimProductForm";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
+
+const PimProductForm = dynamic(() => import("@/components/admin/pim/PimProductForm"), {
+  loading: () => <ERPLoadingState label="Loading product editor…" />,
+  ssr: false,
+});
 
 export default function PimAccessoryEditPage() {
   const params = useParams<{ id: string }>();

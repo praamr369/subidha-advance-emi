@@ -170,6 +170,7 @@ export default function CommandPalette({ open, onClose, role, sessionId, current
   const { openWorkflow } = useWorkflowLauncher();
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
+  const [activeCategory, setActiveCategory] = useState<string>("ALL");
   const [globalResults, setGlobalResults] = useState<AdminGlobalSearchResult[]>([]);
   const [globalLoading, setGlobalLoading] = useState(false);
   const favoritesSnapshot = useSyncExternalStore(
@@ -294,6 +295,33 @@ export default function CommandPalette({ open, onClose, role, sessionId, current
     if (!normalized) return matches;
     return uniqueByKindHrefLabel([...(canSearchGlobal ? globalMatches : []), ...matches, ...registryMatches]);
   }, [canSearchGlobal, globalMatches, matches, normalized, registryMatches]);
+
+  const availableCategories = useMemo(() => {
+    if (!normalized) return [];
+    const types = new Set<string>();
+    for (const item of displayedMatches) {
+      if (item.kind === "global") {
+        types.add(item.type.toUpperCase());
+      } else if (item.kind === "workflow") {
+        types.add("WORKFLOW");
+      } else if (item.kind === "nav") {
+        types.add("NAV");
+      }
+    }
+    return types.size > 1 ? ["ALL", ...Array.from(types)] : [];
+  }, [displayedMatches, normalized]);
+
+  const filteredMatches = useMemo(() => {
+    if (activeCategory === "ALL" || !availableCategories.includes(activeCategory)) {
+      return displayedMatches;
+    }
+    return displayedMatches.filter((item) => {
+      if (activeCategory === "WORKFLOW") return item.kind === "workflow";
+      if (activeCategory === "NAV") return item.kind === "nav";
+      if (item.kind === "global") return item.type.toUpperCase() === activeCategory;
+      return false;
+    });
+  }, [activeCategory, availableCategories, displayedMatches]);
 
   const favoriteItems = useMemo(
     () =>
@@ -460,7 +488,10 @@ export default function CommandPalette({ open, onClose, role, sessionId, current
               <input
                 ref={inputRef}
                 value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setActiveCategory("ALL");
+                }}
                 placeholder="Search operations, registers, workflows…"
                 aria-describedby="command-palette-search-hint"
                 className="h-11 w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] pl-10 pr-[7.25rem] text-sm font-medium text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] outline-none transition focus:border-border focus:ring-2 focus:ring-[var(--ring)]/35"
@@ -487,6 +518,39 @@ export default function CommandPalette({ open, onClose, role, sessionId, current
             </div>
           </div>
         </div>
+
+        {availableCategories.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 border-t border-border bg-muted/30 px-5 py-2">
+            <span className="mr-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Filter:</span>
+            {availableCategories.map((cat) => {
+              const count =
+                cat === "ALL"
+                  ? displayedMatches.length
+                  : displayedMatches.filter((m) =>
+                      cat === "WORKFLOW"
+                        ? m.kind === "workflow"
+                        : cat === "NAV"
+                        ? m.kind === "nav"
+                        : m.kind === "global" && m.type.toUpperCase() === cat
+                    ).length;
+              return (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setActiveCategory(cat)}
+                  className={cn(
+                    "rounded-md px-2.5 py-0.5 text-xs font-medium transition",
+                    activeCategory === cat
+                      ? "bg-amber-900 text-white shadow-sm"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  )}
+                >
+                  {cat} {cat !== "ALL" && `(${count})`}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         <div className="workflow-panel-body workflow-scroll-area min-h-0 flex-1 overflow-y-auto px-5 pb-6">
           {!normalized && favoriteItems.length > 0 ? (
@@ -519,12 +583,12 @@ export default function CommandPalette({ open, onClose, role, sessionId, current
                 Searching customers, subscriptions, invoices, receipts, products, partners, and payments…
               </div>
             ) : null}
-            {displayedMatches.length === 0 ? (
+            {filteredMatches.length === 0 ? (
               <div className="rounded-xl border border-border bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
-                No matches for &quot;{query.trim()}&quot;.
+                No matches for &quot;{query.trim()}&quot;{activeCategory !== "ALL" ? ` in ${activeCategory}` : ""}.
               </div>
             ) : (
-              <div className="grid gap-2">{displayedMatches.slice(0, 20).map(renderRow)}</div>
+              <div className="grid gap-2">{filteredMatches.slice(0, 30).map(renderRow)}</div>
             )}
           </section>
         </div>

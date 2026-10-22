@@ -44,6 +44,11 @@ def daily_emi_due_reminders(self):
 
     def body(log):
         summary = generate_emi_due_reminders_for_date(on_date=today, performed_by=None)
+        try:
+            from reminders.services.whatsapp_outbox_service import queue_upcoming_emi_reminders
+            summary["whatsapp_outbox"] = queue_upcoming_emi_reminders(days_ahead=2)
+        except Exception:
+            pass
         if summary["created_count"] > 0:
             notify_all_active_admins(
                 module="billing",

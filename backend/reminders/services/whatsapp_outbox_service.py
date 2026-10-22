@@ -406,3 +406,70 @@ def queue_contract_activated(subscription) -> WhatsAppMessage | None:
     except Exception:  # pragma: no cover
         logger.exception("WhatsApp contract queue failed")
         return None
+
+
+def queue_upcoming_emi_reminders(*, days_ahead: int = 2, on_date: timezone.datetime.date | None = None) -> dict:
+    """Queue click-to-send WhatsApp due reminders for EMIs coming due in `days_ahead` days.
+
+    Staff open these from the WhatsApp Outbox workbench to send with 1-click on wa.me / WhatsApp Web.
+    Idempotent via dedupe_key=f"emi_due_{emi.id}_{emi.due_date}".
+    """
+    from datetime import timedelta
+    from subscriptions.models import Emi, EmiStatus, SubscriptionStatus
+
+    target_date = on_date if on_date is not None else (timezone.localdate() + timedelta(days=days_ahead))
+    excluded_statuses = [
+        SubscriptionStatus.CANCELLED,
+        SubscriptionStatus.CLOSED,
+        SubscriptionStatus.WON,
+        SubscriptionStatus.COMPLETED,
+    ]
+
+    emis = (
+        Emi.objects.select_related("subscription", "subscription__customer", "subscription__product")
+        .filter(
+            status=EmiStatus.PENDING,
+            due_date=target_date,
+        )
+        .exclude(subscription__status__in=excluded_statuses)
+    )
+
+    queued = 0
+    skipped = 0
+    for emi in emis:
+        try:
+            sub = emi.subscription
+            cust = getattr(sub, "customer", None) if sub else None
+            phone = getattr(cust, "phone", "") or ""
+            if not phone:
+                skipped += 1
+                continue
+
+            msg = queue_whatsapp_message(
+                event_type=WhatsAppEventType.DUE_REMINDER,
+                customer=cust,
+                subscription=sub,
+                context={
+                    "amount": _money(emi.amount),
+                    "date": emi.due_date.strftime("%d %b %Y"),
+                    "product": getattr(getattr(sub, "product", None), "name", "") or "Lucky Plan",
+                },
+                source_model="Emi",
+                source_id=emi.pk,
+                dedupe_key=f"emi_due_{emi.id}_{emi.due_date}",
+            )
+            if msg:
+                queued += 1
+            else:
+                skipped += 1
+        except Exception:
+            logger.exception("Failed queueing upcoming EMI reminder for EMI %s", emi.id)
+            skipped += 1
+
+    return {
+        "target_date": target_date.isoformat(),
+        "queued_count": queued,
+        "skipped_count": skipped,
+        "total_checked": len(emis),
+    }
+

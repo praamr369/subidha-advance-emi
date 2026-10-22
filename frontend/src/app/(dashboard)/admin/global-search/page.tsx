@@ -9,6 +9,7 @@ import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ActionButton from "@/components/ui/ActionButton";
+import { CommandSearch } from "@/components/admin/erp/CommandSearch";
 import { GlobalSearchOperationalWorkspace } from "@/components/workspace/GlobalSearchOperationalWorkspace";
 import { ROUTES } from "@/lib/routes";
 import { searchAdminGlobal, type AdminGlobalSearchResult } from "@/services/admin-erp";
@@ -100,6 +101,9 @@ export default function AdminGlobalSearchPage() {
 
         {loading ? <ERPLoadingState label="Searching admin records..." /> : null}
         {!loading && error ? <ERPErrorState title="Search failed" description={error} /> : null}
+        {!loading && !error && submittedQuery.trim().length < 2 ? (
+          <CommandSearch />
+        ) : null}
         {!loading && !error && submittedQuery.trim().length >= 2 && results.length === 0 ? (
           <ERPEmptyState
             title="No records found"
