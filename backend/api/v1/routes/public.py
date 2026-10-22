@@ -661,6 +661,7 @@ urlpatterns = [
         name="public-whatsapp-catalog-feed",
     ),
     path("product-categories/", PublicProductCategoriesView.as_view(), name="public-product-categories"),
+    path("categories/", PublicProductCategoriesView.as_view(), name="public-categories"),
     path("products/<str:slug>/", PublicProductDetailView.as_view(), name="public-product-detail"),
     path("products/by-id/<int:id>/", PublicProductDetailView.as_view(), name="public-product-detail-by-id"),
     path("leads/", PublicLeadView.as_view(), name="public-leads"),

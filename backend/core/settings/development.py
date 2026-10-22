@@ -36,3 +36,13 @@ DEBUG = True
 SECURE_SSL_REDIRECT = False
 SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False
+
+# Relax throttling in development to allow high-concurrency load/stress testing
+if "REST_FRAMEWORK" in globals():
+    REST_FRAMEWORK.setdefault("DEFAULT_THROTTLE_RATES", {})
+    REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["anon"] = os.environ.get(
+        "DJANGO_THROTTLE_ANON", "100000/minute"
+    )
+    REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["auth_login"] = os.environ.get(
+        "DJANGO_THROTTLE_AUTH_LOGIN", "10000/minute"
+    )

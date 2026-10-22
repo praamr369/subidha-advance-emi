@@ -180,6 +180,7 @@ def _storage_writable_check() -> tuple[bool, dict]:
 class PublicLivenessView(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
+    throttle_classes = []
 
     def get(self, request):
         return Response(
@@ -196,6 +197,7 @@ class PublicLivenessView(APIView):
 class PublicReadinessView(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
+    throttle_classes = []
 
     def get(self, request):
         alias = _db_alias()

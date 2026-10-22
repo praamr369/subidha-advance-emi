@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from typing import Any, cast
 
 from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404
@@ -117,11 +118,12 @@ class TaxInvoiceViewSet(AdminAccountingPhase2ViewSet):
     def cancel_document(self, request, pk=None):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        data = cast(dict[str, Any], serializer.validated_data)
         try:
             invoice, updated = cancel_tax_invoice(
                 tax_invoice_id=int(pk),
                 performed_by=request.user,
-                reason=serializer.validated_data["reason"],
+                reason=data["reason"],
             )
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)}) from exc
@@ -180,11 +182,12 @@ class CreditNoteViewSet(AdminAccountingPhase2ViewSet):
     def cancel_document(self, request, pk=None):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        data = cast(dict[str, Any], serializer.validated_data)
         try:
             note, updated = cancel_credit_note(
                 credit_note_id=int(pk),
                 performed_by=request.user,
-                reason=serializer.validated_data["reason"],
+                reason=data["reason"],
             )
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)}) from exc
@@ -243,11 +246,12 @@ class DebitNoteViewSet(AdminAccountingPhase2ViewSet):
     def cancel_document(self, request, pk=None):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        data = cast(dict[str, Any], serializer.validated_data)
         try:
             note, updated = cancel_debit_note(
                 debit_note_id=int(pk),
                 performed_by=request.user,
-                reason=serializer.validated_data["reason"],
+                reason=data["reason"],
             )
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)}) from exc
@@ -263,21 +267,34 @@ class TrialBalanceReportView(AdminAccountingReportView):
     def get(self, request):
         serializer = AccountingDateRangeQuerySerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
-        return Response(build_trial_balance(**serializer.validated_data))
+        data = cast(dict[str, Any], serializer.validated_data)
+        return Response(
+            build_trial_balance(
+                start_date=data.get("start_date"),
+                end_date=data.get("end_date"),
+            )
+        )
 
 
 class ProfitLossReportView(AdminAccountingReportView):
     def get(self, request):
         serializer = AccountingDateRangeQuerySerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
-        return Response(build_profit_loss(**serializer.validated_data))
+        data = cast(dict[str, Any], serializer.validated_data)
+        return Response(
+            build_profit_loss(
+                start_date=data.get("start_date"),
+                end_date=data.get("end_date"),
+            )
+        )
 
 
 class BalanceSheetReportView(AdminAccountingReportView):
     def get(self, request):
         serializer = BalanceSheetQuerySerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
-        as_of = serializer.validated_data.get("as_of") or timezone.localdate()
+        data = cast(dict[str, Any], serializer.validated_data)
+        as_of = data.get("as_of") or timezone.localdate()
         return Response(build_balance_sheet(as_of=as_of))
 
 
@@ -285,14 +302,29 @@ class GeneralLedgerReportView(AdminAccountingReportView):
     def get(self, request):
         serializer = GeneralLedgerQuerySerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
-        return Response(build_general_ledger(**serializer.validated_data))
+        data = cast(dict[str, Any], serializer.validated_data)
+        return Response(
+            build_general_ledger(
+                account_id=data["account_id"],
+                start_date=data.get("start_date"),
+                end_date=data.get("end_date"),
+                category=data.get("category"),
+            )
+        )
 
 
 class CashbookReportView(AdminAccountingReportView):
     def get(self, request):
         serializer = CashbookQuerySerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
-        return Response(build_cashbook(**serializer.validated_data))
+        data = cast(dict[str, Any], serializer.validated_data)
+        return Response(
+            build_cashbook(
+                finance_account_id=data["finance_account_id"],
+                start_date=data.get("start_date"),
+                end_date=data.get("end_date"),
+            )
+        )
 
 
 class ItrExportPackListCreateView(AdminAccountingReportView):
@@ -305,10 +337,11 @@ class ItrExportPackListCreateView(AdminAccountingReportView):
     def post(self, request):
         serializer = ItrExportPackCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        data = cast(dict[str, Any], serializer.validated_data)
         job = create_itr_export_pack_job(
-            financial_year=serializer.validated_data.get("financial_year", ""),
-            start_date=serializer.validated_data.get("start_date"),
-            end_date=serializer.validated_data.get("end_date"),
+            financial_year=data.get("financial_year", ""),
+            start_date=data.get("start_date"),
+            end_date=data.get("end_date"),
             created_by=request.user,
         )
         job = generate_itr_export_pack(job_id=job.id)
@@ -318,9 +351,9 @@ class ItrExportPackListCreateView(AdminAccountingReportView):
             performed_by=request.user,
             metadata={
                 "event": "ITR_EXPORT_PACK_GENERATED",
-                "financial_year": serializer.validated_data.get("financial_year", ""),
-                "start_date": str(serializer.validated_data.get("start_date")),
-                "end_date": str(serializer.validated_data.get("end_date")),
+                "financial_year": data.get("financial_year", ""),
+                "start_date": str(data.get("start_date")),
+                "end_date": str(data.get("end_date")),
             },
         )
         payload = ExportPackJobSerializer(job)
@@ -337,10 +370,11 @@ class GstExportPackListCreateView(AdminAccountingReportView):
     def post(self, request):
         serializer = GstExportPackCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        data = cast(dict[str, Any], serializer.validated_data)
         job = create_gst_export_pack_job(
-            financial_year=serializer.validated_data.get("financial_year", ""),
-            start_date=serializer.validated_data.get("start_date"),
-            end_date=serializer.validated_data.get("end_date"),
+            financial_year=data.get("financial_year", ""),
+            start_date=data.get("start_date"),
+            end_date=data.get("end_date"),
             created_by=request.user,
         )
         job = generate_gst_export_pack(job_id=job.id)
@@ -350,9 +384,9 @@ class GstExportPackListCreateView(AdminAccountingReportView):
             performed_by=request.user,
             metadata={
                 "event": "GST_EXPORT_PACK_GENERATED",
-                "financial_year": serializer.validated_data.get("financial_year", ""),
-                "start_date": str(serializer.validated_data.get("start_date")),
-                "end_date": str(serializer.validated_data.get("end_date")),
+                "financial_year": data.get("financial_year", ""),
+                "start_date": str(data.get("start_date")),
+                "end_date": str(data.get("end_date")),
             },
         )
         payload = ExportPackJobSerializer(job)
@@ -401,28 +435,29 @@ class BridgeRunView(AdminAccountingReportView):
     def post(self, request):
         serializer = BridgeRunSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        data = cast(dict[str, Any], serializer.validated_data)
         try:
             result = run_bridge_postings(
-                start_date=serializer.validated_data["start_date"],
-                end_date=serializer.validated_data["end_date"],
-                purposes=serializer.validated_data.get("purposes"),
-                dry_run=serializer.validated_data.get("dry_run", False),
+                start_date=data["start_date"],
+                end_date=data["end_date"],
+                purposes=data.get("purposes"),
+                dry_run=data.get("dry_run", False),
                 performed_by=request.user,
             )
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)}) from exc
 
         # Dry runs post nothing, so they are not recorded as state changes.
-        if not serializer.validated_data.get("dry_run", False):
+        if not data.get("dry_run", False):
             log_audit(
                 action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
                 instance=request.user,
                 performed_by=request.user,
                 metadata={
                     "event": "ACCOUNTING_BRIDGE_POSTINGS_RUN",
-                    "start_date": str(serializer.validated_data["start_date"]),
-                    "end_date": str(serializer.validated_data["end_date"]),
-                    "purposes": serializer.validated_data.get("purposes"),
+                    "start_date": str(data["start_date"]),
+                    "end_date": str(data["end_date"]),
+                    "purposes": data.get("purposes"),
                     "result": result,
                 },
             )

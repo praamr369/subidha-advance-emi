@@ -97,3 +97,21 @@ test("PAID and WAIVED EMIs are not collectible", () => {
   assert.equal(isEmiCollectible(emi({ status: "PAID" })), false);
   assert.equal(isEmiCollectible(emi({ status: "WAIVED" })), false);
 });
+
+test("truthy, falsy and numeric boundary handling in emi display logic", () => {
+  // Falsy inputs
+  assert.equal(isEmiCollectible(null as unknown as AdminEmiCollectionCandidate), false);
+  assert.equal(isEmiCollectible(undefined as unknown as AdminEmiCollectionCandidate), false);
+  assert.equal(isEmiCollectible({} as unknown as AdminEmiCollectionCandidate), false);
+
+  // Numeric boundaries in ordinal helper
+  assert.equal(ordinal(0), "0");
+  assert.equal(ordinal(-5), "-5");
+  assert.equal(ordinal(100.7), "100th");
+  assert.equal(ordinal(1000000), "1000000th");
+
+  // Empty string vs explicit zero outstanding
+  assert.equal(resolveOutstandingAmount(emi({ amount: "", outstanding_amount: "" })), null);
+  assert.equal(resolveOutstandingAmount(emi({ amount: "", outstanding_amount: null })), null);
+  assert.equal(resolveOutstandingAmount(emi({ amount: "", outstanding_amount: undefined })), null);
+});

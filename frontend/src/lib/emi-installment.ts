@@ -110,7 +110,10 @@ export function resolveOutstandingAmount(
 }
 
 /** True when this EMI must not be collected against (already settled). */
-export function isEmiCollectible(emi: AdminEmiCollectionCandidate): boolean {
+export function isEmiCollectible(emi: AdminEmiCollectionCandidate | null | undefined): boolean {
+  if (!emi || typeof emi !== "object" || !emi.status) {
+    return false;
+  }
   const status = (emi.status || "").toUpperCase();
   return status !== "PAID" && status !== "WAIVED";
 }

@@ -403,3 +403,164 @@ class DirectSaleApiTests(APITestCase):
         need.refresh_from_db()
         self.assertEqual(need.status, PurchaseNeedStatus.CANCELLED)
         self.assertIn("linked direct sale was cancelled", (need.note or "").lower())
+
+
+class BusinessLogicEdgeCaseAndBoundaryTests(APITestCase):
+    """
+    Layer 1: Truthy, Falsy, and Boundary Matrix Tests
+    Validates proper True vs proper False handling, strict rejection of falsy/empty/corrupted
+    inputs, numeric bounds, type coercion, and injection safety across billing and sales.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.admin = create_admin_user(
+            username="edge_case_admin",
+            phone="9388000099",
+        )
+        self.client.force_authenticate(user=self.admin)
+        ensure_test_accounting_posting_prerequisites(date(2026, 4, 1), performed_by=self.admin)
+        ensure_document_numbering_profile_for_date(DocumentType.DIRECT_SALE, date(2026, 4, 16), performed_by=self.admin)
+        ensure_document_numbering_profile_for_date(DocumentType.TAX_INVOICE, date(2026, 4, 16), performed_by=self.admin)
+        self.customer = create_customer_profile(
+            name="Edge Case Customer",
+            phone="7388000099",
+        )
+        self.product = create_product(
+            name="Edge Case Product",
+            product_code="EDGE-CASE-001",
+            base_price=Decimal("5000.00"),
+        )
+        self.inventory_item = InventoryItem.objects.create(
+            product=self.product,
+            sku="EDGE-CASE-SKU-001",
+            opening_stock_qty=Decimal("10.000"),
+            reorder_level_qty=Decimal("1.000"),
+            standard_unit_cost=Decimal("3000.00"),
+        )
+        cash_chart = ChartOfAccount.objects.create(
+            code="EDGE-CASH-001",
+            name="Edge Case Cash",
+            account_type=ChartOfAccountType.ASSET,
+        )
+        self.cash_account = FinanceAccount.objects.create(
+            name="Edge Case Counter",
+            kind=FinanceAccountKind.CASH,
+            chart_account=cash_chart,
+            opening_balance=Decimal("0.00"),
+        )
+        ensure_test_collection_purpose_mapping(finance_account=self.cash_account)
+
+    def _valid_base_payload(self):
+        return {
+            "sale_date": date(2026, 4, 16),
+            "customer": self.customer.id,
+            "tax_mode": "NON_GST",
+            "finance_account": self.cash_account.id,
+            "delivery_required": False,
+            "customer_name_snapshot": self.customer.name,
+            "customer_phone_snapshot": self.customer.phone,
+            "subtotal": "5000.00",
+            "discount_total": "0.00",
+            "taxable_total": "5000.00",
+            "tax_total": "0.00",
+            "grand_total": "5000.00",
+            "received_total": "0.00",
+            "balance_total": "5000.00",
+            "lines": [
+                {
+                    "product": self.product.id,
+                    "inventory_item": self.inventory_item.id,
+                    "description": "Standard edge line",
+                    "quantity": "1.000",
+                    "unit_price": "5000.00",
+                    "discount_amount": "0.00",
+                    "taxable_value": "5000.00",
+                    "line_total": "5000.00",
+                }
+            ],
+        }
+
+    # 1. Empty / Falsy Inputs
+    def test_empty_payload_and_falsy_inputs_return_400_never_500(self):
+        for val in [{}, {"lines": []}, {"lines": None}, {"lines": ""}, {"lines": 0}, {"lines": False}]:
+            res = self.client.post("/api/v1/billing/direct-sales/", val, format="json")
+            self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST, f"Failed for {val}")
+            self.assertNotEqual(res.status_code, 500, "Server crashed with 500 on falsy input")
+
+    # 2. Numeric Boundaries
+    def test_negative_numbers_and_invalid_quantities_strictly_rejected(self):
+        # Negative quantity
+        p_neg_qty = self._valid_base_payload()
+        p_neg_qty["lines"][0]["quantity"] = "-1.000"
+        res = self.client.post("/api/v1/billing/direct-sales/", p_neg_qty, format="json")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertNotEqual(res.status_code, 500)
+
+        # Zero quantity
+        p_zero_qty = self._valid_base_payload()
+        p_zero_qty["lines"][0]["quantity"] = "0.000"
+        res = self.client.post("/api/v1/billing/direct-sales/", p_zero_qty, format="json")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertNotEqual(res.status_code, 500)
+
+        # Negative unit price
+        p_neg_price = self._valid_base_payload()
+        p_neg_price["lines"][0]["unit_price"] = "-500.00"
+        res = self.client.post("/api/v1/billing/direct-sales/", p_neg_price, format="json")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertNotEqual(res.status_code, 500)
+
+    # 3. Floating-Point Precision & Rounding
+    def test_floating_point_precision_and_exact_decimal_rounding(self):
+        p_float = self._valid_base_payload()
+        p_float["subtotal"] = "5000.30"
+        p_float["taxable_total"] = "5000.30"
+        p_float["grand_total"] = "5000.30"
+        p_float["balance_total"] = "5000.30"
+        p_float["lines"][0]["unit_price"] = "5000.30"
+        p_float["lines"][0]["taxable_value"] = "5000.30"
+        p_float["lines"][0]["line_total"] = "5000.30"
+
+        res = self.client.post("/api/v1/billing/direct-sales/", p_float, format="json")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED, res.data)
+        sale_data = res.data
+        self.assertEqual(Decimal(str(sale_data["grand_total"])), Decimal("5000.30"))
+
+    # 4. Type Coercion & SQL Injection Resilience
+    def test_type_coercion_and_sql_injection_resilience(self):
+        # String numbers coerced cleanly
+        p_string_nums = self._valid_base_payload()
+        p_string_nums["lines"][0]["quantity"] = "2.000"
+        p_string_nums["lines"][0]["unit_price"] = "2500.00"
+        p_string_nums["lines"][0]["line_total"] = "5000.00"
+        res = self.client.post("/api/v1/billing/direct-sales/", p_string_nums, format="json")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+
+        # SQL Injection attempt in customer_name_snapshot and notes
+        p_injection = self._valid_base_payload()
+        malicious_input = "'; DROP TABLE billing_directsale; -- ' OR 1=1"
+        p_injection["customer_name_snapshot"] = malicious_input
+        p_injection["notes"] = "<script>alert('xss')</script> -- union select null"
+
+        res = self.client.post("/api/v1/billing/direct-sales/", p_injection, format="json")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        from billing.models import DirectSale
+        sale = DirectSale.objects.get(id=res.data["id"])
+        self.assertEqual(sale.customer_name_snapshot, malicious_input)
+        self.assertTrue(DirectSale.objects.exists())
+
+    # 5. Required vs. Optional Fields
+    def test_missing_required_keys_gives_clean_validation_error(self):
+        # Missing 'lines'
+        payload = self._valid_base_payload()
+        del payload["lines"]
+        res = self.client.post("/api/v1/billing/direct-sales/", payload, format="json")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("lines", res.data)
+
+        # Missing required line field 'product'
+        payload2 = self._valid_base_payload()
+        del payload2["lines"][0]["product"]
+        res2 = self.client.post("/api/v1/billing/direct-sales/", payload2, format="json")
+        self.assertEqual(res2.status_code, status.HTTP_400_BAD_REQUEST)

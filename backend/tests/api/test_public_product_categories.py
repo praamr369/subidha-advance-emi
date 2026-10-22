@@ -63,6 +63,14 @@ class PublicProductCategoriesApiTests(APITestCase):
         response = self.client.get("/api/v1/public/product-categories/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+    def test_public_categories_alias_route(self):
+        self._category("Chairs Public")
+        # Test alias route /api/v1/public/categories/
+        response = self.client.get("/api/v1/public/categories/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        names = {row["name"] for row in response.data["results"]}
+        self.assertIn("Chairs Public", names)
+
     def test_product_serializer_exposes_category_slug(self):
         category = self._category("Furniture Master")
         product = create_product(name="Slug Sofa", product_code="SLUG-PROD-001")

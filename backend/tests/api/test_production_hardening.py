@@ -48,6 +48,12 @@ class ProductionHardeningTests(TestCase):
         self.assertIn("database", deep.data["checks"])
         self.assertIn("cache", deep.data["checks"])
 
+        # Liveness probe /healthz/ endpoint (unauthenticated, unthrottled)
+        anon_client = APIClient()
+        liveness = anon_client.get("/healthz/")
+        self.assertEqual(liveness.status_code, status.HTTP_200_OK)
+        self.assertEqual(liveness.data["status"], "ok")
+
     def test_permission_denial_is_logged(self):
         with patch("api.v1.views.reports_center.security_logger.warning") as mocked_log, patch(
             "api.v1.views.reports_center.user_has_capability", return_value=False
