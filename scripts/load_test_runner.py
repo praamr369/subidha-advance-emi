@@ -20,7 +20,7 @@ BASE_URL = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8000"
 ENDPOINTS = [
     ("/healthz/", "GET"),
     ("/readyz/", "GET"),
-    ("/api/v1/public/categories/", "GET"),
+    ("/api/v1/public/product-categories/", "GET"),
     ("/api/v1/public/products/", "GET"),
     ("/api/v1/public/stats/", "GET"),
 ]

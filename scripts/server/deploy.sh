@@ -135,11 +135,25 @@ done
 
 echo "==> [7/7] Smoke check"
 sleep 5
-if curl -fsSk "$HEALTH_URL" > /dev/null; then
+HEALTH_OK=false
+for attempt in 1 2 3; do
+  if curl -fsSk "$HEALTH_URL" > /dev/null; then
+    HEALTH_OK=true
+    break
+  fi
+  echo "    Health check attempt $attempt/3 failed, retrying in 3s..."
+  sleep 3
+done
+
+if [ "$HEALTH_OK" = "true" ]; then
   echo "    Health check OK."
 else
-  echo "!!! Health check FAILED. Roll back with:"
-  echo "    $SCRIPT_DIR/restore.sh $LATEST_BACKUP"
+  echo "!!! Health check FAILED after deployment."
+  echo "    Initiating automated self-healing rollback to $LATEST_BACKUP..."
+  if [ -x "$SCRIPT_DIR/restore.sh" ] && [ -n "${LATEST_BACKUP:-}" ]; then
+    RESTORE_FORCE=true "$SCRIPT_DIR/restore.sh" "$LATEST_BACKUP" || true
+    echo "    Automated rollback to $LATEST_BACKUP completed."
+  fi
   exit 1
 fi
 

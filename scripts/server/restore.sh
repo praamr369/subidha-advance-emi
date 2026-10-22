@@ -9,17 +9,25 @@ DB_USER="${DB_USER:-subidha}"
 APP_DIR="${APP_DIR:-/var/www/subidha/app}"
 MEDIA_ROOT="${MEDIA_ROOT:-/var/www/subidha/media}"
 SERVICE="${SERVICE:-subidha-gunicorn}"
+FRONTEND_SERVICE="${FRONTEND_SERVICE:-subidha-frontend}"
+CELERY_SERVICES="${CELERY_SERVICES:-subidha-celery subidha-celery-beat}"
+RESTORE_FORCE="${RESTORE_FORCE:-false}"
 
 BACKUP_DIR="${1:?Usage: ./restore.sh <backup-folder>}"
 [ -f "$BACKUP_DIR/db.dump" ] || { echo "No db.dump in $BACKUP_DIR"; exit 1; }
 
 echo "!!! This restores '$DB_NAME' to the state in: $BACKUP_DIR"
 echo "!!! Everything written AFTER that backup will be LOST from the live DB."
-read -r -p "Type RESTORE to continue: " CONFIRM
-[ "$CONFIRM" = "RESTORE" ] || { echo "Aborted."; exit 1; }
+if [ "$RESTORE_FORCE" != "true" ] && [ "${2:-}" != "--force" ]; then
+  read -r -p "Type RESTORE to continue: " CONFIRM
+  [ "$CONFIRM" = "RESTORE" ] || { echo "Aborted."; exit 1; }
+else
+  echo "    Running in non-interactive / forced restore mode."
+fi
 
 echo "==> [1/5] Stopping app (no writes during restore)"
 sudo systemctl stop "$SERVICE"
+sudo systemctl stop "$FRONTEND_SERVICE" 2>/dev/null || true
 
 echo "==> [2/5] Safety: dumping CURRENT (bad) state before overwriting"
 STAMP="$(date +%Y%m%d-%H%M%S)"
@@ -32,10 +40,17 @@ sudo -u postgres createdb -O "$DB_USER" "$DB_NAME"
 sudo -u postgres pg_restore -d "$DB_NAME" "$BACKUP_DIR/db.dump"
 
 if [ -f "$BACKUP_DIR/media.tar.gz" ]; then
-  read -r -p "Also restore media files? (y/N): " MEDIA_ANS
-  if [ "$MEDIA_ANS" = "y" ]; then
-    echo "==> Restoring media"
-    tar -xzf "$BACKUP_DIR/media.tar.gz" -C "$MEDIA_ROOT"
+  if [ "$RESTORE_FORCE" = "true" ]; then
+    if [ "${RESTORE_MEDIA:-false}" = "true" ]; then
+      echo "==> Restoring media"
+      tar -xzf "$BACKUP_DIR/media.tar.gz" -C "$MEDIA_ROOT"
+    fi
+  else
+    read -r -p "Also restore media files? (y/N): " MEDIA_ANS
+    if [ "$MEDIA_ANS" = "y" ]; then
+      echo "==> Restoring media"
+      tar -xzf "$BACKUP_DIR/media.tar.gz" -C "$MEDIA_ROOT"
+    fi
   fi
 fi
 
@@ -49,4 +64,10 @@ fi
 
 echo "==> [5/5] Restarting"
 sudo systemctl start "$SERVICE"
+sudo systemctl start "$FRONTEND_SERVICE" 2>/dev/null || true
+for unit in $CELERY_SERVICES; do
+  if systemctl list-unit-files "$unit.service" --no-legend 2>/dev/null | grep -q .; then
+    sudo systemctl restart "$unit" 2>/dev/null || true
+  fi
+done
 echo "==> Restore complete. Run your smoke checks now (login, dashboard, EMI register)."
