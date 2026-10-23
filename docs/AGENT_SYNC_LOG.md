@@ -6,6 +6,18 @@
 
 ## Recent Updates
 
+### 2026-10-23 14:06 — 4 Operational & Legal Flaw Fixes (Prepayment, Title Retention, Deposit Guard, 404 Redirect)
+- **Agent**: Antigravity (Gemini)
+- **Type**: `fix` / `compliance` / `routes`
+- **Summary**: Implemented solutions for all 4 operational, legal, and UX flaws across backend, contracts, and frontend.
+- **Details**:
+  - **Flaw 1 (Dynamic Prepayment Provision)**: Updated `backend/api/v1/views/admin_prepayment.py` so `prepayment_calculate_view` and `prepayment_unlock_delivery_view` accept and validate dynamic `threshold_percentage` (60% to 80%, default 80%).
+  - **Flaw 2 (Hire-Purchase Title Retention)**: Added explicit title retention and 30-day default repossession clauses in `backend/contracts/services/document_print_settings_service.py` and `docs/SUBIDHA_CORE_PROJECT_RULEBOOK.md`.
+  - **Flaw 3 (Rent/Lease Deposit 45-Day Arrears Cutoff)**: Added mandatory 45-day arrears cutoff rule in `backend/contracts/services/rent_lease_contract_service.py` and rulebook §19 to protect security deposits from total exhaustion.
+  - **Flaw 4 & UX (Customer Communication & 404 Auto-Redirect)**: Formalized upfront customer disclosure in rulebook §21 and added `frontend/src/app/(dashboard)/admin/recovery-cases/page.tsx` redirecting to `/admin/recovery-cases/settlement`.
+- **Verification**: `npm run check:routes` (630 routes passed), `npm run typecheck` (exit code 0), `manage.py check` (0 issues), `makemigrations --check --dry-run` (clean).
+
+
 ### 2026-10-23 13:07 — Advance EMI Prepayment & Same-Day Delivery Rulebook Lock
 - **Agent**: Antigravity (Gemini)
 - **Type**: `business-rule` / `compliance`

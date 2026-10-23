@@ -47,8 +47,24 @@ def prepayment_calculate_view(request, subscription_id):
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    # Calculate threshold (60% minimum)
-    threshold_percentage = 60
+    # Calculate threshold (configurable 60%–80%, default 80% for same-day delivery)
+    raw_threshold = request.query_params.get("threshold_percentage")
+    if raw_threshold is not None:
+        try:
+            threshold_percentage = int(raw_threshold)
+            if not (60 <= threshold_percentage <= 80):
+                return Response(
+                    {"error": "Threshold percentage must be between 60% and 80%."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        except (ValueError, TypeError):
+            return Response(
+                {"error": "Invalid threshold percentage."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+    else:
+        threshold_percentage = 80
+
     threshold_emis = max(1, int(remaining_emis * Decimal(threshold_percentage) / Decimal("100")))
     prepayment_required = threshold_emis * sub.monthly_amount
 
@@ -128,12 +144,26 @@ def prepayment_unlock_delivery_view(request, subscription_id):
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    threshold_emis = max(1, int(remaining_emis * Decimal("60") / Decimal("100")))
+    raw_threshold = request.data.get("threshold_percentage", 80)
+    try:
+        threshold_percentage = int(raw_threshold)
+        if not (60 <= threshold_percentage <= 80):
+            return Response(
+                {"error": "Threshold percentage must be between 60% and 80%."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+    except (ValueError, TypeError):
+        return Response(
+            {"error": "Invalid threshold percentage."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    threshold_emis = max(1, int(remaining_emis * Decimal(threshold_percentage) / Decimal("100")))
     minimum_required = threshold_emis * sub.monthly_amount
 
     if amount < minimum_required:
         return Response(
-            {"error": f"Minimum prepayment required: ₹{minimum_required}. You entered: ₹{amount}"},
+            {"error": f"Minimum prepayment required ({threshold_percentage}%): ₹{minimum_required}. You entered: ₹{amount}"},
             status=status.HTTP_400_BAD_REQUEST
         )
 
@@ -158,11 +188,12 @@ def prepayment_unlock_delivery_view(request, subscription_id):
     return Response({
         "success": True,
         "subscription_id": sub.id,
+        "threshold_percentage": threshold_percentage,
         "prepayment_amount": str(amount),
         "prepayment_date": sub.prepayment_date.isoformat(),
         "advance_delivery_unlocked": True,
         "delivery_id": delivery.id,
-        "message": "Prepayment processed. Advance delivery unlocked.",
+        "message": f"Prepayment processed ({threshold_percentage}%). Advance delivery unlocked.",
     })
 
 

@@ -406,6 +406,7 @@ Rules:
 - Customer KYC & Supporting Documents Invariant: Rent and lease contracts carry ongoing custody risk. Contract activation is strictly hard-gated: customer KYC must be VERIFIED (primary ID proof: Aadhaar/PAN/Voter ID/Passport/DL), address proof verified, and supporting Rent Agreement / premises tenancy proof attached.
 - Contract Lifecycle Separation: Staff may register and save customer requirements as DRAFT contracts before documents are finalized. Transitioning to ACTIVE strictly enforces KYC, supporting documents, and security deposit billing.
 - Privacy & Future Verification Architecture: Customer KYC is managed under a privacy-first, zero-leakage internal vault (DPDP Act compliant). Future automated verification via third-party paid APIs (Digilocker, Karza, Cashfree) must integrate through the same immutable audit and document storage without bypassing core activation gates. Detailed rulebook: `docs/business-rules/rent-lease-contracts.md`.
+- Security Deposit Protection & 45-Day Arrears Cutoff: Rent/lease deposits (20%–30%) provide a finite buffer covering roughly 4 to 6 months of rent. Staff must not allow rent arrears to exceed 45 days (1.5 months). When arrears exceed 45 days, return pickup / repossession must be initiated to bring the furniture back before the deposit is exhausted, ensuring remaining deposit funds cover unpaid rent, transport, and physical inspection deductions.
 
 ## 20. Direct sale rules
 
@@ -457,6 +458,8 @@ Eligibility is **payment-milestone-based**, not time-based. Backend check: `is_w
   - The customer retains full ownership of the already-delivered product.
   - Contract transitions to `WON` with zero remaining receivable balance.
   - This structure protects the business under the Prize Chits and Money Circulation Schemes (Banning) Act, 1978, the BUDS Act, 2019, and Section 15 of the CGST Act.
+- **Hire-Purchase Title Retention & Repossession Invariant**: Contracts with advance delivery are legally classified as Hire-Purchase agreements. Title, legal ownership, and property rights in the delivered goods remain strictly with Subidha Furniture until 100% of the contract value is settled (either by completing all remaining EMIs or via an audited waiver benefit). In case of payment default exceeding 30 days, the company reserves the enforceable legal right to repossess the goods.
+- **Customer Communication & Advance Benefit Framing**: Sales staff and enrollment contracts must transparently communicate that the advance down payment (60% to 80%) grants the exclusive privilege of immediate, same-day possession. Winning the monthly lucky draw waives remaining future installments only and never triggers a cash refund of settled down payments.
 
 ### Admin override delivery (force-release)
 

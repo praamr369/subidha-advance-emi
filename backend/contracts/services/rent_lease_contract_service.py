@@ -50,6 +50,7 @@ def _default_terms_snapshot(*, plan_type: str) -> str:
         "Key clauses summary:\n"
         "- Security deposit is refundable subject to return-condition assessment and deductions.\n"
         "- Final refund amount depends on documented inspection notes and recorded deductions.\n"
+        "- Rent arrears exceeding 45 days trigger repossession; unpaid rent and recovery costs are deducted from security deposit.\n"
         "- This document is an operational template for internal use and lawyer review.\n"
         "- It does not claim legal enforceability.\n"
     )

@@ -7,8 +7,16 @@ DEFAULT_PRINT_TERMS = {
     "invoice_terms": "All amounts and balances are shown from posted business records only.\nThis invoice does not settle payment unless backend receipt/payment records confirm collection.",
     "receipt_terms": "This receipt only confirms the amount shown as received in the system record.\nVoided, cancelled, or reversed receipts are preserved for audit and are not proof of active payment.",
     "delivery_challan_terms": "This challan confirms delivery handling only and does not confirm payment settlement.\nStock, receivable, accounting, and payment records remain governed by backend posted records.",
-    "subscription_contract_terms": "Lucky Plan / Advance EMI terms are displayed from backend contract records only.\nWinner benefit, where applicable, waives only eligible future EMI rows as recorded by backend waiver records.",
-    "rent_lease_contract_terms": "Rent/lease values are displayed from backend contract records only.\nDeposit refund, deduction, and return condition remain governed by backend deposit and return-inspection controls.",
+    "subscription_contract_terms": (
+        "Lucky Plan / Advance EMI terms are governed by backend contract records.\n"
+        "Winner benefit, where applicable, waives only eligible future unpaid EMI rows as recorded by backend waiver records; advance down payments grant early possession privilege and are non-refundable in cash.\n"
+        "Title and legal ownership of goods delivered prior to contract completion remain strictly with Subidha Furniture until 100% of the contract value is settled (via completed EMIs or audited waiver benefit). In case of payment default exceeding 30 days, the company reserves the legal right to repossess the goods."
+    ),
+    "rent_lease_contract_terms": (
+        "Rent/lease values are displayed from backend contract records only.\n"
+        "Security deposit refund, deduction, and return condition remain governed by backend deposit and return-inspection controls.\n"
+        "Rent arrears exceeding 45 days trigger immediate contract cancellation and asset repossession; unpaid rent and recovery expenses are deducted from the held security deposit."
+    ),
     "purchase_bill_terms": "This purchase bill copy is generated from backend vendor bill records only.\nVendor payable and stock/accounting effects remain governed by posted backend workflows.",
     "vendor_voucher_terms": "This vendor voucher copy is generated from backend vendor payment records only.\nIt does not create, approve, post, reverse, or settle vendor payable records.",
     "account_statement_terms": "This statement is generated from existing backend report or customer/account records only.\nMissing opening balances, running balances, reconciliation status, or customer totals are not inferred in print views.",
