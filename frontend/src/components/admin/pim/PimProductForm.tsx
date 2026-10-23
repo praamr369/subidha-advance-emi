@@ -2,9 +2,10 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { Save, ArrowLeft, Layers, Box, Send, CheckCircle2, X, Plus, Search, Trash2, Factory, Wrench, ChevronDown, ChevronRight, RefreshCw, Check } from "lucide-react";
+import { Save, ArrowLeft, Layers, Box, Send, CheckCircle2, X, Plus, Search, Trash2, Factory, Wrench, ChevronDown, ChevronRight, RefreshCw, Check, FolderCog, Settings2 } from "lucide-react";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import DynamicAttributeForm, { type AttributeValues } from "./DynamicAttributeForm";
+import CategoryManageWorkbench from "./CategoryManageWorkbench";
 
 const VariantManager = dynamic(() => import("./VariantManager"), {
   loading: () => <ERPLoadingState label="Loading variant manager..." />,
@@ -580,6 +581,16 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
   const [createAttrError, setCreateAttrError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  // Manage Categories & Attributes Workbench modal
+  const [manageWorkbenchOpen, setManageWorkbenchOpen] = useState(false);
+  const [refreshingTaxonomy, setRefreshingTaxonomy] = useState(false);
+  const [taxonomyNotice, setTaxonomyNotice] = useState<string | null>(null);
+
+  // Session draft auto-save and recovery
+  const draftKey = `pim_draft_${productId ?? "new"}`;
+  const [draftRestored, setDraftRestored] = useState(false);
+  const draftSavedRef = useRef<NodeJS.Timeout | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -847,6 +858,135 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
     }
   }, [attributes]);
 
+  // Quick refresh taxonomy & presets without wiping unsaved form edits
+  const quickRefreshTaxonomy = useCallback(async (msg?: string) => {
+    setRefreshingTaxonomy(true);
+    try {
+      const [cats, allAttrs] = await Promise.all([
+        pimService.getCategories(),
+        pimService.getAllAttributes(),
+      ]);
+      setCategories(cats);
+      setAllAttributes(allAttrs);
+
+      const cid = categoryId ? Number(categoryId) : undefined;
+      const sid = subcategoryId ? Number(subcategoryId) : undefined;
+      if (cid) {
+        const subcats = await pimService.getSubcategories(cid);
+        setSubcategories(subcats);
+
+        const fetchedAttrs = await pimService.getAttributes(cid, sid);
+        setAttributes((prev) => {
+          // Update existing attributes with fresh options and data type
+          const updatedPrev = prev.map((p) => {
+            const fresh = fetchedAttrs.find((f) => f.id === p.id) || allAttrs.find((a) => a.id === p.id);
+            if (fresh) {
+              return {
+                ...p,
+                options: fresh.options && fresh.options.length > 0 ? fresh.options : p.options,
+                data_type: fresh.data_type || p.data_type,
+                name: fresh.name || p.name,
+              };
+            }
+            return p;
+          });
+          // Add any newly created attributes from fetchedAttrs that weren't in prev
+          const newOnes = fetchedAttrs.filter(
+            (f) => !prev.some((p) => p.id === f.id) && !removedAttrIds.has(f.id)
+          );
+          return [...updatedPrev, ...newOnes];
+        });
+      }
+      setTaxonomyNotice(msg || "Categories, attributes & presets synchronized");
+      setTimeout(() => setTaxonomyNotice(null), 3500);
+    } catch (err) {
+      console.error("Failed to quick-refresh taxonomy:", err);
+    } finally {
+      setRefreshingTaxonomy(false);
+    }
+  }, [categoryId, subcategoryId, removedAttrIds]);
+
+  // Auto-save form inputs to sessionStorage (debounced)
+  useEffect(() => {
+    if (loading) return;
+    if (draftSavedRef.current) clearTimeout(draftSavedRef.current);
+
+    draftSavedRef.current = setTimeout(() => {
+      try {
+        const draft = {
+          code,
+          brand,
+          name,
+          description,
+          categoryId,
+          subcategoryId,
+          basePrice,
+          costPrice,
+          rentYieldPercent,
+          leaseYieldPercent,
+          arWidth,
+          arDepth,
+          arHeight,
+          warrantyEnabled,
+          warrantyMonthsManufacturing,
+          warrantyMonthsStructural,
+          warrantyMonthsExtendedMax,
+          extendedWarrantyCostPercentage,
+          attrValues,
+          timestamp: Date.now(),
+        };
+        sessionStorage.setItem(draftKey, JSON.stringify(draft));
+      } catch {
+        /* storage full or unavailable */
+      }
+    }, 400);
+
+    return () => {
+      if (draftSavedRef.current) clearTimeout(draftSavedRef.current);
+    };
+  }, [
+    draftKey, loading, code, brand, name, description, categoryId, subcategoryId,
+    basePrice, costPrice, rentYieldPercent, leaseYieldPercent, arWidth, arDepth,
+    arHeight, warrantyEnabled, warrantyMonthsManufacturing, warrantyMonthsStructural,
+    warrantyMonthsExtendedMax, extendedWarrantyCostPercentage, attrValues,
+  ]);
+
+  // Restore draft on initial load if available
+  useEffect(() => {
+    if (loading) return;
+    try {
+      const raw = sessionStorage.getItem(draftKey);
+      if (!raw) return;
+      const draft = JSON.parse(raw);
+      if (draft && draft.timestamp) {
+        let restoredAny = false;
+        if (draft.code && draft.code !== code) { setCode(draft.code); restoredAny = true; }
+        if (draft.brand !== undefined && draft.brand !== brand) { setBrand(draft.brand); restoredAny = true; }
+        if (draft.name && draft.name !== name) { setName(draft.name); restoredAny = true; }
+        if (draft.description !== undefined && draft.description !== description) { setDescription(draft.description); restoredAny = true; }
+        if (draft.basePrice !== undefined && draft.basePrice !== basePrice) { setBasePrice(draft.basePrice); restoredAny = true; }
+        if (draft.costPrice !== undefined && draft.costPrice !== costPrice) { setCostPrice(draft.costPrice); restoredAny = true; }
+        if (draft.attrValues && Object.keys(draft.attrValues).length > 0) {
+          setAttrValues((prev) => ({ ...prev, ...draft.attrValues }));
+          restoredAny = true;
+        }
+        if (restoredAny) setDraftRestored(true);
+      }
+    } catch {
+      /* ignore corrupted draft */
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey, loading]);
+
+  const clearDraft = useCallback(() => {
+    try {
+      sessionStorage.removeItem(draftKey);
+      setDraftRestored(false);
+    } catch {
+      /* silent */
+    }
+  }, [draftKey]);
+
   // Open panel + load all attributes for the "existing" tab
   const openAttrPanel = useCallback((tab: "create" | "existing" = "create") => {
     setAttrPanelTab(tab);
@@ -887,13 +1027,21 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
           extra_cost: opt.extra_cost ? Number(opt.extra_cost) : 0,
         });
       }
-      // Reload attributes for this category/subcategory to include the new one
-      const refreshed = await pimService.getAttributes(
-        Number(categoryId),
-        subcategoryId ? Number(subcategoryId) : undefined,
-      );
-      setAttributes(refreshed);
-      setAllAttributes([]);   // force reload next open
+      // Reload attributes for this category/subcategory and merge without wiping existing
+      const [refreshed, freshAll] = await Promise.all([
+        pimService.getAttributes(
+          Number(categoryId),
+          subcategoryId ? Number(subcategoryId) : undefined,
+        ),
+        pimService.getAllAttributes(),
+      ]);
+      setAllAttributes(freshAll);
+      setAttributes((prev) => {
+        const freshMap = new Map(refreshed.map((r) => [r.id, r]));
+        const updated = prev.map((p) => freshMap.get(p.id) || p);
+        const newOnes = refreshed.filter((r) => !prev.some((p) => p.id === r.id));
+        return [...updated, ...newOnes];
+      });
       resetCreateForm();
       setAttrPanelOpen(false);
     } catch (err: unknown) {
@@ -979,6 +1127,7 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
       };
       if (isEdit && productId) {
         await pimService.updateProduct(productId, payload);
+        clearDraft();
         const updatedProduct = await pimService.getProductWithAttributes(productId);
         setProduct(updatedProduct);
         await refreshVariants();
@@ -988,6 +1137,7 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
         return;
       } else {
         const created = await pimService.createProduct(payload);
+        clearDraft();
         const typeSlug = defaultProductType === "ACCESSORY" ? "accessories"
           : defaultProductType === "SERVICE" ? "services"
           : "finished-goods";
@@ -1143,6 +1293,87 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
               </div>
             )}
           </div>
+
+          {/* Quick Taxonomy Management Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t mt-3">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setManageWorkbenchOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted shadow-sm transition-colors"
+                title="Manage categories, subcategories, attributes, and preset options directly without leaving this page"
+              >
+                <FolderCog className="h-3.5 w-3.5 text-primary" /> Manage Categories & Attributes
+              </button>
+              <button
+                type="button"
+                onClick={() => void quickRefreshTaxonomy()}
+                disabled={refreshingTaxonomy}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted shadow-sm transition-colors disabled:opacity-50"
+                title="Non-destructively sync categories, attributes, and option presets without losing your in-progress inputs"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${refreshingTaxonomy ? "animate-spin text-primary" : "text-muted-foreground"}`} />
+                {refreshingTaxonomy ? "Syncing Presets…" : "Sync Presets"}
+              </button>
+            </div>
+            <div className="text-[11px] text-muted-foreground">
+              Editing taxonomy updates live presets while keeping your in-progress draft safe.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Product Mode Quick Bar */}
+      {!isEdit && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-5 py-3">
+          <div>
+            <h3 className="text-sm font-semibold text-foreground">New Product Blueprint</h3>
+            <p className="text-xs text-muted-foreground">Configure product details, categories, and attributes</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setManageWorkbenchOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted shadow-sm transition-colors"
+              title="Manage categories, subcategories, attributes, and preset options"
+            >
+              <FolderCog className="h-3.5 w-3.5 text-primary" /> Manage Categories & Attributes
+            </button>
+            <button
+              type="button"
+              onClick={() => void quickRefreshTaxonomy()}
+              disabled={refreshingTaxonomy}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted shadow-sm transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${refreshingTaxonomy ? "animate-spin text-primary" : "text-muted-foreground"}`} />
+              {refreshingTaxonomy ? "Syncing…" : "Sync Presets"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Taxonomy Notification */}
+      {taxonomyNotice && (
+        <div className="rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2 text-xs font-medium text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 flex items-center gap-2 animate-in fade-in">
+          <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          <span>{taxonomyNotice}</span>
+        </div>
+      )}
+
+      {/* Draft Restored Banner */}
+      {draftRestored && (
+        <div className="rounded-lg border border-blue-300 bg-blue-50 px-4 py-2 text-xs font-medium text-blue-800 dark:border-blue-700 dark:bg-blue-950/40 dark:text-blue-300 flex items-center justify-between gap-2 animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold">Auto-Restored:</span>
+            <span>Your unsaved changes from the current session have been preserved.</span>
+          </div>
+          <button
+            type="button"
+            onClick={clearDraft}
+            className="underline hover:no-underline text-[11px] font-semibold text-blue-900 dark:text-blue-200"
+          >
+            Discard Draft
+          </button>
         </div>
       )}
 
@@ -1537,56 +1768,77 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
               </button>
               <button
                 type="button"
-                onClick={async () => {
-                  if (!productId) return;
-                  pendingFetchRef.current = null;
-                  setLoading(true);
-                  try {
-                    const p = await pimService.getProductWithAttributes(productId);
-                    setProduct(p);
-                    setCode(p.code);
-                    setBrand(p.brand ?? "");
-                    setName(p.name);
-                    setDescription(p.description ?? "");
-                    setCategoryId(p.category);
-                    setSubcategoryId(p.subcategory ?? "");
-                    setBasePrice(p.base_price);
-                    setCostPrice(p.cost_price ?? "");
-                    setArWidth(p.ar_width_cm ?? "");
-                    setArDepth(p.ar_depth_cm ?? "");
-                    setArHeight(p.ar_height_cm ?? "");
-                    setIsPublished(p.is_published);
-                    setWarrantyEnabled(p.warranty_enabled ?? true);
-                    setWarrantyMonthsManufacturing(p.warranty_months_manufacturing ?? 12);
-                    setWarrantyMonthsStructural(p.warranty_months_structural ?? 36);
-                    setWarrantyMonthsExtendedMax(p.warranty_months_extended_max ?? 12);
-                    setExtendedWarrantyCostPercentage(p.extended_warranty_cost_percentage?.toString() ?? "7.5");
-                    setVariants(p.variants ?? []);
-                    setLockedAttributes(new Set(p.locked_attributes ?? []));
-                    const prefilled: AttributeValues = {};
-                    for (const a of p.attributes ?? []) {
-                      prefilled[a.attribute] = {
-                        value_text: a.value_text ?? "",
-                        value_number: a.value_number ?? "",
-                        value_boolean: a.value_boolean,
-                        value_date: a.value_date ?? "",
-                      };
-                    }
-                    setAttrValues(prefilled);
-                    const all = await pimService.getAllAttributes();
-                    setAllAttributes(all);
-                  } catch (err) {
-                    console.error("Failed to refresh product", err);
-                  } finally {
-                    setLoading(false);
-                  }
-                }}
-                disabled={saving || loading}
+                onClick={() => setManageWorkbenchOpen(true)}
                 className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-                title="Refresh product data and attributes"
+                title="Manage Categories, Subcategories & Attributes workbench"
               >
-                <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} /> Refresh
+                <FolderCog className="h-3 w-3 text-primary" /> Manage Taxonomy
               </button>
+              <button
+                type="button"
+                onClick={() => void quickRefreshTaxonomy()}
+                disabled={refreshingTaxonomy}
+                className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                title="Non-destructively reload categories, attributes, and options without discarding your in-progress inputs"
+              >
+                <RefreshCw className={`h-3 w-3 ${refreshingTaxonomy ? "animate-spin text-primary" : ""}`} /> {refreshingTaxonomy ? "Syncing…" : "Sync Presets"}
+              </button>
+              {isEdit && productId && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!productId) return;
+                    if (!window.confirm("Discard unsaved changes and reload product from server?")) return;
+                    pendingFetchRef.current = null;
+                    setLoading(true);
+                    try {
+                      const p = await pimService.getProductWithAttributes(productId);
+                      setProduct(p);
+                      setCode(p.code);
+                      setBrand(p.brand ?? "");
+                      setName(p.name);
+                      setDescription(p.description ?? "");
+                      setCategoryId(p.category);
+                      setSubcategoryId(p.subcategory ?? "");
+                      setBasePrice(p.base_price);
+                      setCostPrice(p.cost_price ?? "");
+                      setArWidth(p.ar_width_cm ?? "");
+                      setArDepth(p.ar_depth_cm ?? "");
+                      setArHeight(p.ar_height_cm ?? "");
+                      setIsPublished(p.is_published);
+                      setWarrantyEnabled(p.warranty_enabled ?? true);
+                      setWarrantyMonthsManufacturing(p.warranty_months_manufacturing ?? 12);
+                      setWarrantyMonthsStructural(p.warranty_months_structural ?? 36);
+                      setWarrantyMonthsExtendedMax(p.warranty_months_extended_max ?? 12);
+                      setExtendedWarrantyCostPercentage(p.extended_warranty_cost_percentage?.toString() ?? "7.5");
+                      setVariants(p.variants ?? []);
+                      setLockedAttributes(new Set(p.locked_attributes ?? []));
+                      const prefilled: AttributeValues = {};
+                      for (const a of p.attributes ?? []) {
+                        prefilled[a.attribute] = {
+                          value_text: a.value_text ?? "",
+                          value_number: a.value_number ?? "",
+                          value_boolean: a.value_boolean,
+                          value_date: a.value_date ?? "",
+                        };
+                      }
+                      setAttrValues(prefilled);
+                      const all = await pimService.getAllAttributes();
+                      setAllAttributes(all);
+                      clearDraft();
+                    } catch (err) {
+                      console.error("Failed to refresh product", err);
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  disabled={saving || loading}
+                  className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-xs font-medium text-muted-foreground hover:text-destructive hover:border-destructive/30 transition-colors"
+                  title="Discard unsaved changes and reload database state"
+                >
+                  Reset
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => openAttrPanel("create")}
@@ -1978,6 +2230,41 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
           <ArrowLeft className="h-4 w-4" /> Back
         </button>
       </div>
+
+      {/* Global Category & Attribute Management Modal */}
+      {manageWorkbenchOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto">
+          <div className="relative w-full max-w-5xl rounded-2xl border border-border bg-card shadow-2xl overflow-hidden max-h-[92vh] flex flex-col my-auto animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b px-6 py-4 bg-muted/40 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="rounded-lg bg-primary/10 p-2 text-primary">
+                  <FolderCog className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-base text-foreground">Categories, Subcategories & Attributes Manager</h3>
+                  <p className="text-xs text-muted-foreground">Manage taxonomy and preset options without leaving this product</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setManageWorkbenchOpen(false)}
+                className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                title="Close manager"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              <CategoryManageWorkbench
+                initialSelectedCategoryId={categoryId ? Number(categoryId) : undefined}
+                onDataChanged={() => {
+                  void quickRefreshTaxonomy("Taxonomy synchronized from manager");
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </form>
   );
 }
