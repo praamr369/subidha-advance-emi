@@ -443,11 +443,20 @@ A customer's delivery window opens ONLY when one of these conditions is met:
 
 1. **Draw winner** — subscription status is `WON`. Delivery eligible immediately after draw result.
 2. **EMI completed** — all EMIs paid, subscription status is `COMPLETED`.
-3. **Advance-paid threshold (70-80%)** — customer has paid 70-80% of total EMI months (e.g., 10+ months out of 15-month tenure). Covers customers who pay multiple EMIs in advance.
+3. **Advance-paid threshold (Manual provision 60%–80%)** — customer has paid the contract's required prepayment threshold (admin-configurable per sale contract between 60% and 80%, default 80%, e.g., 10 to 12 months out of a 15-month tenure). This unlocks **Same-Day Enrollment & Same-Day Delivery**.
 
 Customers who have NOT met any of these three conditions are **not eligible for delivery**.
 
-Eligibility is **payment-milestone-based**, not time-based. Backend check: `is_winner OR is_completed OR (paid_emi_count / total_emi_count >= 0.70)`.
+Eligibility is **payment-milestone-based**, not time-based. Backend check: `is_winner OR is_completed OR (paid_emi_amount / total_amount >= contract_prepayment_threshold)`.
+
+#### Advance Delivery & Winner Waiver Invariants (Strict Legal Invariants)
+- **Same-Day Delivery Facility**: Only customers who satisfy the contract's provisioned prepayment threshold (60% to 80% paid upfront at enrollment) qualify for same-day stock out and delivery. Physical handover requires mandatory Proof of Delivery (POD) image, signature, driver details, and GPS coordinates.
+- **Winner Benefit on Advance Delivery Subscriptions**: If an advance-delivery customer is selected in any monthly lucky draw:
+  - The remaining unpaid balance (the remaining 20% to 40% future EMIs) is **100% WAIVED**.
+  - **Zero Cash Refund**: Under no circumstances is any part of the 60%–80% advance payment already collected refunded in cash or bank transfer. Already-paid money remains settled and append-only.
+  - The customer retains full ownership of the already-delivered product.
+  - Contract transitions to `WON` with zero remaining receivable balance.
+  - This structure protects the business under the Prize Chits and Money Circulation Schemes (Banning) Act, 1978, the BUDS Act, 2019, and Section 15 of the CGST Act.
 
 ### Admin override delivery (force-release)
 

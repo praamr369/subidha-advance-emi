@@ -6,6 +6,17 @@
 
 ## Recent Updates
 
+### 2026-10-23 13:07 — Advance EMI Prepayment & Same-Day Delivery Rulebook Lock
+- **Agent**: Antigravity (Gemini)
+- **Type**: `business-rule` / `compliance`
+- **Summary**: Locked the Advance Prepayment (60% to 80% manual provision) and same-day delivery eligibility invariants into the canonical rulebook.
+- **Details**:
+  - Updated `docs/SUBIDHA_CORE_PROJECT_RULEBOOK.md` §21 with manual provision flexibility (60% to 80%) on sell contracts.
+  - Locked the critical legal invariant: If an advance-delivery customer wins a draw, only remaining unpaid EMIs (20% to 40%) are waived; zero cash refund of collected advance payments.
+  - Enforced compliance with Prize Chits Act 1978, BUDS Act 2019, and CGST Act §15.
+- **Verification**: Document edit verified.
+
+
 ### 2026-10-17 23:43 — Multi-Agent System & n8n Sync Hub Activated
 - **Agent**: Antigravity
 - **Type**: `architecture`
