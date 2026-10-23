@@ -5,7 +5,9 @@ const isSmokeBuild = process.argv.includes("--smoke");
 const buildDir = new URL("../.next", import.meta.url);
 fs.rmSync(buildDir, { recursive: true, force: true });
 
-const childEnv = { ...process.env, NODE_OPTIONS: `${process.env.NODE_OPTIONS || ""} --max-old-space-size=4096`.trim() };
+const nodeOptions = process.env.NODE_OPTIONS || "";
+const memoryFlag = nodeOptions.includes("--max-old-space-size") ? "" : "--max-old-space-size=4096";
+const childEnv = { ...process.env, NODE_OPTIONS: `${nodeOptions} ${memoryFlag}`.trim() };
 
 if (isSmokeBuild && !childEnv.NEXT_PUBLIC_API_BASE_URL) {
   childEnv.NEXT_PUBLIC_API_BASE_URL =

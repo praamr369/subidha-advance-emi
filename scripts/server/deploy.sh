@@ -85,7 +85,7 @@ echo "==> [5/7] Building frontend"
 cd "$APP_DIR/frontend"
 cp "$FRONTEND_ENV" .env.production
 npm ci --no-audit --no-fund > /tmp/npm-deploy.log 2>&1
-NODE_OPTIONS='--max-old-space-size=6144' npm run build > /tmp/next-build-deploy.log 2>&1 \
+NEXT_BUILD_CPUS=1 NODE_OPTIONS='--max-old-space-size=4096' npm run build > /tmp/next-build-deploy.log 2>&1 \
   || { echo "!!! Frontend build FAILED:"; tail -20 /tmp/next-build-deploy.log; git -C "$APP_DIR" checkout -q "$OLD_COMMIT"; exit 1; }
 
 echo "==> [6/7] Restarting services"
