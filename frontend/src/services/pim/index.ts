@@ -454,6 +454,27 @@ export const pimService = {
   deleteVariant: (variantId: number): Promise<void> =>
     request<void>(`${BASE}/variants/${variantId}/`, { method: "DELETE" }),
 
+  copyVariantData: (
+    targetVariantId: number,
+    data: {
+      source_variant_id?: number;
+      source_sku?: string;
+      copy_attributes?: boolean;
+      copy_relations?: boolean;
+      copy_pricing?: boolean;
+      overwrite_attributes?: boolean;
+    }
+  ): Promise<{
+    message: string;
+    copied_attributes_count: number;
+    copied_relations_count: number;
+    variant: PimVariant;
+  }> =>
+    request(`${BASE}/variants/${targetVariantId}/copy-from/`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
   // Workbench (variant generation / bulk ops — uses product CODE as lookup)
   getWorkbenchAttributes: (code: string): Promise<{
     category: string;

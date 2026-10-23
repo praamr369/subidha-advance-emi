@@ -4,7 +4,8 @@ import {
   Plus, Trash2, Check, X, Search, ChevronLeft, ChevronRight,
   Zap, TrendingUp, Package, AlertTriangle, BarChart3, Settings2,
   RefreshCw, Download, Database, Image as ImageIcon, Upload,
-  ChevronDown, ChevronUp, Pencil, RefreshCcw, CheckCircle2, Layers, Lock, QrCode, Sparkles
+  ChevronDown, ChevronUp, Pencil, RefreshCcw, CheckCircle2, Layers, Lock, QrCode, Sparkles,
+  Copy, ArrowRight
 } from "lucide-react";
 import { pimService, type PimVariant, type PimCategoryAttribute, type PimAttributeOption } from "@/services/pim";
 import { patchVariantPublishControl } from "@/services/product-pim";
@@ -139,6 +140,270 @@ function LockedAttrDisplay({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** Modal dialog to copy attributes and relations between variants */
+function CopyVariantModal({
+  targetVariant: initialTarget,
+  allVariants,
+  onClose,
+  onSuccess,
+}: {
+  targetVariant?: PimVariant;
+  allVariants: PimVariant[];
+  onClose: () => void;
+  onSuccess: (updatedVariant: PimVariant) => void;
+}) {
+  const [targetId, setTargetId] = useState<number | "">(initialTarget?.id ?? (allVariants[0]?.id ?? ""));
+  const [sourceId, setSourceId] = useState<number | "">(() => {
+    const other = allVariants.find((v) => v.id !== initialTarget?.id);
+    return other ? other.id : "";
+  });
+
+  const [copyAttributes, setCopyAttributes] = useState(true);
+  const [copyRelations, setCopyRelations] = useState(true);
+  const [copyPricing, setCopyPricing] = useState(false);
+  const [overwriteAttrs, setOverwriteAttrs] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  const target = allVariants.find((v) => v.id === targetId);
+  const source = allVariants.find((v) => v.id === sourceId);
+
+  const handleCopy = async () => {
+    if (!targetId || !sourceId) return;
+    if (targetId === sourceId) {
+      setError("Source and target variants must be different.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await pimService.copyVariantData(Number(targetId), {
+        source_variant_id: Number(sourceId),
+        copy_attributes: copyAttributes,
+        copy_relations: copyRelations,
+        copy_pricing: copyPricing,
+        overwrite_attributes: overwriteAttrs,
+      });
+      setSuccessMsg(res.message);
+      setTimeout(() => {
+        onSuccess(res.variant);
+        onClose();
+      }, 1000);
+    } catch (err: unknown) {
+      const apiErr = err as { message?: string; detail?: string };
+      setError(apiErr?.detail || apiErr?.message || "Failed to copy variant data.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+      <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150">
+        <div className="flex items-center justify-between pb-3 border-b">
+          <div className="flex items-center gap-2">
+            <div className="rounded-lg bg-amber-500/10 p-2 text-amber-600 dark:text-amber-400">
+              <Copy className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-semibold text-foreground">Copy Variant Attributes & Relations</h3>
+              <p className="text-xs text-muted-foreground">Duplicate specifications and accessories between variants</p>
+            </div>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-lg p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {error && (
+          <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-xs font-medium text-destructive flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        {successMsg && (
+          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-2.5 text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            <span>{successMsg}</span>
+          </div>
+        )}
+
+        {/* Source -> Target Mapping Card */}
+        <div className="rounded-xl border bg-muted/40 p-4 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+            {/* Source */}
+            <div>
+              <label className="text-xs font-semibold text-foreground mb-1 block">Source Variant (Copy from)</label>
+              <select
+                className="w-full rounded-lg border bg-background px-3 py-2 text-xs font-medium focus:ring-1 focus:ring-primary outline-none"
+                value={sourceId}
+                onChange={(e) => {
+                  setSourceId(e.target.value ? Number(e.target.value) : "");
+                  setError(null);
+                }}
+              >
+                <option value="" disabled>Select source variant...</option>
+                {allVariants.map((v) => (
+                  <option key={v.id} value={v.id} disabled={v.id === targetId}>
+                    {v.sku} {v.variant_name ? `(${v.variant_name})` : ""} — {v.attribute_values.length} attrs
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Target */}
+            <div>
+              <label className="text-xs font-semibold text-foreground mb-1 block">Target Variant (Copy to)</label>
+              <select
+                className="w-full rounded-lg border bg-background px-3 py-2 text-xs font-medium focus:ring-1 focus:ring-primary outline-none"
+                value={targetId}
+                onChange={(e) => {
+                  setTargetId(e.target.value ? Number(e.target.value) : "");
+                  setError(null);
+                }}
+              >
+                <option value="" disabled>Select target variant...</option>
+                {allVariants.map((v) => (
+                  <option key={v.id} value={v.id} disabled={v.id === sourceId}>
+                    {v.sku} {v.variant_name ? `(${v.variant_name})` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Direction Banner */}
+          {source && target && (
+            <div className="flex items-center justify-center gap-2 text-xs font-medium text-muted-foreground pt-1">
+              <span className="font-mono bg-background border px-2 py-0.5 rounded text-foreground">{source.sku}</span>
+              <ArrowRight className="h-3.5 w-3.5 text-primary" />
+              <span className="font-mono bg-background border px-2 py-0.5 rounded text-foreground">{target.sku}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Source Attributes Preview */}
+        {source && (
+          <div className="rounded-xl border border-border/80 bg-background p-3.5 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                <Layers className="h-3.5 w-3.5 text-primary" />
+                Attributes to Copy ({source.attribute_values.length})
+              </span>
+              <span className="text-[11px] text-muted-foreground font-mono">₹{Number(source.price).toLocaleString("en-IN")}</span>
+            </div>
+            {source.attribute_values.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pr-1">
+                {source.attribute_values.map((av) => (
+                  <span
+                    key={av.attribute}
+                    className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-[11px] font-medium text-foreground"
+                  >
+                    <span className="text-muted-foreground mr-1">{av.attribute_name}:</span>
+                    {av.value_text || av.value_number || (av.value_boolean ? "Yes" : "No")}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-amber-600 dark:text-amber-400 italic">
+                Source variant has no attributes defined yet.
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Copy Checkboxes / Options */}
+        <div className="space-y-2.5 pt-1 text-xs">
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={copyAttributes}
+              onChange={(e) => setCopyAttributes(e.target.checked)}
+              className="mt-0.5 accent-primary h-3.5 w-3.5 rounded"
+            />
+            <div>
+              <span className="font-medium text-foreground">Copy Attributes</span>
+              <p className="text-[11px] text-muted-foreground">Clone variant identity and specification attribute values</p>
+            </div>
+          </label>
+
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={copyRelations}
+              onChange={(e) => setCopyRelations(e.target.checked)}
+              className="mt-0.5 accent-primary h-3.5 w-3.5 rounded"
+            />
+            <div>
+              <span className="font-medium text-foreground">Copy Relations & Add-ons</span>
+              <p className="text-[11px] text-muted-foreground">Clone attached accessories, raw materials, and relations linked to SKU</p>
+            </div>
+          </label>
+
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={overwriteAttrs}
+              disabled={!copyAttributes}
+              onChange={(e) => setOverwriteAttrs(e.target.checked)}
+              className="mt-0.5 accent-primary h-3.5 w-3.5 rounded disabled:opacity-50"
+            />
+            <div>
+              <span className="font-medium text-foreground">Overwrite existing attributes on target</span>
+              <p className="text-[11px] text-muted-foreground">Cleanly replaces attributes so target matches source</p>
+            </div>
+          </label>
+
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={copyPricing}
+              onChange={(e) => setCopyPricing(e.target.checked)}
+              className="mt-0.5 accent-primary h-3.5 w-3.5 rounded"
+            />
+            <div>
+              <span className="font-medium text-foreground">Also Copy Price & Cost Price</span>
+              <p className="text-[11px] text-muted-foreground">Overwrites target selling price ({target ? `₹${Number(target.price).toLocaleString("en-IN")}` : ""}) with source price</p>
+            </div>
+          </label>
+        </div>
+
+        {/* Footer Actions */}
+        <div className="flex items-center justify-end gap-2.5 pt-3 border-t">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="rounded-xl border px-4 py-2 text-xs font-semibold hover:bg-muted transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleCopy}
+            disabled={busy || !sourceId || !targetId || sourceId === targetId || (!copyAttributes && !copyRelations && !copyPricing)}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+          >
+            {busy ? (
+              <>
+                <RefreshCcw className="h-3.5 w-3.5 animate-spin" />
+                Copying...
+              </>
+            ) : (
+              <>
+                <Copy className="h-3.5 w-3.5" />
+                Copy Attributes & Relations
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Inline expandable editor panel for a single variant row */
 function VariantEditPanel({
   variant,
@@ -151,6 +416,8 @@ function VariantEditPanel({
   onCancel,
   onAddOption,
   templateAttributes,
+  onOpenCopyModal,
+  relationsKey = 0,
 }: {
   variant: PimVariant;
   allAttributes: PimCategoryAttribute[];
@@ -162,6 +429,8 @@ function VariantEditPanel({
   templateAttributes?: PimCategoryAttribute[];
   onSave: (data: VariantEditState) => Promise<void>;
   onCancel: () => void;
+  onOpenCopyModal?: (variant: PimVariant) => void;
+  relationsKey?: number;
 }) {
   const parseVariantToState = useCallback((v: PimVariant): VariantEditState => {
     const attrValues: Record<number, string> = {};
@@ -362,7 +631,7 @@ function VariantEditPanel({
   return (
     <div className="rounded-xl border border-primary/20 bg-primary/3 p-5 space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <Pencil className="h-4 w-4 text-primary" />
           <div>
@@ -372,9 +641,21 @@ function VariantEditPanel({
             )}
           </div>
         </div>
-        <button aria-label="Close" type="button" onClick={onCancel} className="text-muted-foreground hover:text-foreground">
-          <X className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-2">
+          {onOpenCopyModal && (
+            <button
+              type="button"
+              onClick={() => onOpenCopyModal(variant)}
+              title="Copy defined attributes and relations from another variant"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/30 bg-amber-50 dark:bg-amber-950/30 px-2.5 py-1 text-xs font-semibold text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors shadow-2xs"
+            >
+              <Copy className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" /> Copy From Variant...
+            </button>
+          )}
+          <button aria-label="Close" type="button" onClick={onCancel} className="text-muted-foreground hover:text-foreground">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       {/* Product Name Variation Control */}
@@ -384,7 +665,17 @@ function VariantEditPanel({
             <Pencil className="h-3.5 w-3.5 text-primary" />
             Variant Product Name / Title
           </label>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {onOpenCopyModal && (
+              <button
+                type="button"
+                onClick={() => onOpenCopyModal(variant)}
+                title="Copy defined attributes and relations from another variant"
+                className="inline-flex items-center gap-1 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 px-2 py-0.5 text-[11px] font-semibold hover:bg-amber-500/20 transition-colors"
+              >
+                <Copy className="h-3 w-3" /> Copy From Variant...
+              </button>
+            )}
             <button
               type="button"
               onClick={handleAutoStructureName}
@@ -592,6 +883,7 @@ function VariantEditPanel({
         <div className="border-t border-border mt-2 pt-4">
           <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Relations & Add-ons</h4>
           <RelatedProductsSection
+            key={`${variant.sku}-${relationsKey}`}
             productId={productId}
             productName={variant.variant_label || variant.sku}
             saving={saving}
@@ -632,6 +924,8 @@ export default function VariantManager({ productId, productCode, productName, ba
 
   // Expanded/editing variant
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [copyModalTarget, setCopyModalTarget] = useState<PimVariant | null>(null);
+  const [relationsKey, setRelationsKey] = useState(0);
 
   useEffect(() => {
     if (activePanel === "generate" && productCode) {
@@ -1100,6 +1394,12 @@ export default function VariantManager({ productId, productCode, productName, ba
             <Download className="h-4 w-4" />
           </button>
         )}
+        {variants.length >= 2 && (
+          <button type="button" onClick={() => setCopyModalTarget(variants[0])}
+            className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium text-foreground hover:bg-muted transition" title="Copy attributes and relations between variants">
+            <Copy className="h-4 w-4 text-amber-600 dark:text-amber-400" /> Copy Attributes
+          </button>
+        )}
         {selected.size > 0 && (
           <button type="button" onClick={handleBulkPrintQR}
             className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium text-foreground hover:bg-muted transition">
@@ -1541,6 +1841,12 @@ export default function VariantManager({ productId, productCode, productName, ba
                               className={`rounded-md border px-2 py-1 text-xs font-medium transition ${expandedId === v.id ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}>
                               {expandedId === v.id ? <ChevronUp className="h-3.5 w-3.5" /> : <><Pencil className="inline h-3 w-3 mr-0.5" /><ChevronDown className="inline h-3 w-3" /></>}
                             </button>
+                            <button type="button"
+                              title="Copy attributes & relations from another variant"
+                              onClick={() => setCopyModalTarget(v)}
+                              className="rounded-md border p-1 text-muted-foreground hover:bg-muted hover:text-amber-600 transition">
+                              <Copy className="h-3.5 w-3.5" />
+                            </button>
                             <button type="button" title="Print QR label"
                               onClick={() => setPrintItem(variantToLabel(v))}
                               className="rounded-md border p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition">
@@ -1568,6 +1874,8 @@ export default function VariantManager({ productId, productCode, productName, ba
                               onCancel={() => setExpandedId(null)}
                               onAddOption={onAddOption}
                               templateAttributes={templateAttributes}
+                              onOpenCopyModal={(tgt) => setCopyModalTarget(tgt)}
+                              relationsKey={relationsKey}
                             />
                           </td>
                         </tr>
@@ -1597,6 +1905,18 @@ export default function VariantManager({ productId, productCode, productName, ba
 
       {printItem && (
         <QRLabelPrintModal item={printItem} onClose={() => setPrintItem(null)} />
+      )}
+
+      {copyModalTarget && (
+        <CopyVariantModal
+          targetVariant={copyModalTarget}
+          allVariants={variants}
+          onClose={() => setCopyModalTarget(null)}
+          onSuccess={(updatedVariant) => {
+            onRefresh();
+            setRelationsKey((k) => k + 1);
+          }}
+        />
       )}
     </div>
   );

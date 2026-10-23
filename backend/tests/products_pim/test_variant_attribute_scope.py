@@ -116,4 +116,74 @@ class VariantAttributeScopeTests(APITestCase):
         self.assertIsNotNone(variant.variant_name)
         self.assertLessEqual(len(variant.variant_name), 255)
 
+    def test_copy_from_variant_attributes_and_relations(self):
+        admin = create_admin_user(username="scope_admin_copy", phone="9011000954")
+        self.client.force_authenticate(user=admin)
+        from products_pim.models import ProductVariant, VariantAttributeValue
+        from products_core.models import Product, ProductRelationship
+
+        # Create source variant with attributes
+        v1 = ProductVariant.objects.create(
+            product=self.product,
+            sku="SCOPE-BED-V1",
+            price=Decimal("15000.00"),
+        )
+        VariantAttributeValue.objects.create(variant=v1, attribute=self.size, value_text="6x6")
+        VariantAttributeValue.objects.create(variant=v1, attribute=self.finish, value_text="Gloss")
+
+        # Create related product & relationship attached to v1
+        base_core = Product.objects.create(name="Scope Base Bed", product_code="SCOPE-BASE-1", base_price=Decimal("15000.00"))
+        acc = Product.objects.create(name="Bed Pillow Addon", product_code="BED-PIL-1", base_price=Decimal("500.00"))
+        rel = ProductRelationship.objects.create(
+            product=base_core,
+            related_product=acc,
+            relationship_type="ACCESSORY",
+            parent_variant_sku=v1.sku,
+            quantity=Decimal("2.0"),
+            is_price_included_in_parent=True,
+        )
+
+        # Create target variant with no attributes
+        v2 = ProductVariant.objects.create(
+            product=self.product,
+            sku="SCOPE-BED-V2",
+            price=Decimal("14000.00"),
+        )
+
+        url = f"/api/v1/pim/variants/{v2.id}/copy-from/"
+        payload = {
+            "source_variant_id": v1.id,
+            "copy_attributes": True,
+            "copy_relations": True,
+            "copy_pricing": False,
+        }
+        response = self.client.post(url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["copied_attributes_count"], 2)
+        self.assertEqual(response.data["copied_relations_count"], 1)
+
+        # Check attributes copied to v2
+        v2_attrs = {
+            vav.attribute_id: vav.value_text
+            for vav in VariantAttributeValue.objects.filter(variant=v2)
+        }
+        self.assertEqual(v2_attrs.get(self.size.id), "6x6")
+        self.assertEqual(v2_attrs.get(self.finish.id), "Gloss")
+
+        # Check relationship copied with v2.sku
+        copied_rel = ProductRelationship.objects.filter(parent_variant_sku=v2.sku).first()
+        self.assertIsNotNone(copied_rel)
+        self.assertEqual(copied_rel.related_product_id, acc.id)
+        self.assertEqual(copied_rel.quantity, Decimal("2.0"))
+        self.assertTrue(copied_rel.is_price_included_in_parent)
+
+        # Price was not copied because copy_pricing was False
+        v2.refresh_from_db()
+        self.assertEqual(v2.price, Decimal("14000.00"))
+
+        # Test copying to itself returns 400
+        bad_response = self.client.post(url, {"source_variant_id": v2.id}, format="json")
+        self.assertEqual(bad_response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
 

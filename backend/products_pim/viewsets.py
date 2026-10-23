@@ -1354,6 +1354,182 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+    @action(detail=True, methods=["post"], url_path="copy-from")
+    def copy_from(self, request, pk=None):
+        """
+        Copy defined attributes (VariantAttributeValue) and/or attached relations
+        (ProductRelationship accessories, add-ons, etc.) from a source variant
+        directly to this target variant.
+        """
+        from django.db import transaction
+        from products_core.models import ProductRelationship
+
+        target_variant = self.get_object()
+        source_variant_id = request.data.get("source_variant_id")
+        source_sku = request.data.get("source_sku")
+        copy_attributes = request.data.get("copy_attributes", True)
+        copy_relations = request.data.get("copy_relations", True)
+        copy_pricing = request.data.get("copy_pricing", False)
+        overwrite_attributes = request.data.get("overwrite_attributes", True)
+
+        if not source_variant_id and not source_sku:
+            return Response(
+                {"detail": "source_variant_id or source_sku is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        source_variant = None
+        if source_variant_id:
+            source_variant = ProductVariant.objects.filter(pk=source_variant_id).first()
+        elif source_sku:
+            source_variant = ProductVariant.objects.filter(sku=source_sku).first()
+
+        if not source_variant:
+            return Response(
+                {"detail": f"Source variant with id '{source_variant_id}' or sku '{source_sku}' not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if source_variant.id == target_variant.id:
+            return Response(
+                {"detail": "Source and target variants cannot be the same."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            with transaction.atomic():
+                copied_attrs_count = 0
+                copied_relations_count = 0
+
+                # 1. Copy Attributes
+                if copy_attributes:
+                    target_child_pim = PimProduct.objects.filter(
+                        code=target_variant.sku, parent_id=target_variant.product_id
+                    ).first()
+
+                    source_attr_vals = list(
+                        VariantAttributeValue.objects.filter(variant=source_variant).select_related("attribute")
+                    )
+
+                    source_attr_ids = {sav.attribute_id for sav in source_attr_vals}
+
+                    if overwrite_attributes:
+                        # Remove existing attributes on target that aren't in source
+                        VariantAttributeValue.objects.filter(variant=target_variant).exclude(
+                            attribute_id__in=source_attr_ids
+                        ).delete()
+                        if target_child_pim:
+                            try:
+                                ProductAttribute.objects.filter(product=target_child_pim).exclude(
+                                    attribute_id__in=source_attr_ids
+                                ).delete()
+                            except Exception:
+                                pass
+
+                    for sav in source_attr_vals:
+                        VariantAttributeValue.objects.update_or_create(
+                            variant=target_variant,
+                            attribute=sav.attribute,
+                            defaults={
+                                "value_text": sav.value_text,
+                                "value_number": sav.value_number,
+                                "value_boolean": sav.value_boolean,
+                            },
+                        )
+                        copied_attrs_count += 1
+
+                        if target_child_pim:
+                            try:
+                                ProductAttribute.objects.update_or_create(
+                                    product=target_child_pim,
+                                    attribute=sav.attribute,
+                                    defaults={
+                                        "value_text": sav.value_text,
+                                        "value_number": sav.value_number,
+                                        "value_boolean": sav.value_boolean,
+                                    },
+                                )
+                            except Exception:
+                                pass
+
+                    try:
+                        PIMSyncService.sync_variant_to_operational_product(target_variant)
+                    except Exception as e:
+                        import logging
+                        logging.getLogger(__name__).warning("PIMSyncService error during copy_from: %s", e)
+
+                # 2. Copy Relations & Add-ons
+                if copy_relations:
+                    source_rels = ProductRelationship.objects.filter(
+                        parent_variant_sku=source_variant.sku
+                    ).select_related("product", "related_product")
+
+                    if not source_rels.exists() and hasattr(source_variant, "operational_product") and source_variant.operational_product:
+                        source_rels = ProductRelationship.objects.filter(
+                            product=source_variant.operational_product
+                        ).select_related("product", "related_product")
+
+                    for srel in source_rels:
+                        t_product = srel.product
+                        if hasattr(source_variant, "operational_product") and srel.product_id == source_variant.operational_product_id:
+                            if hasattr(target_variant, "operational_product") and target_variant.operational_product:
+                                t_product = target_variant.operational_product
+
+                        existing_rel = ProductRelationship.objects.filter(
+                            product=t_product,
+                            related_product=srel.related_product,
+                            relationship_type=srel.relationship_type,
+                            parent_variant_sku=target_variant.sku,
+                            related_variant=srel.related_variant,
+                        ).first()
+
+                        if existing_rel:
+                            existing_rel.quantity = srel.quantity
+                            existing_rel.is_price_included_in_parent = srel.is_price_included_in_parent
+                            existing_rel.notes = srel.notes
+                            existing_rel.related_variant_sku = srel.related_variant_sku
+                            existing_rel.save()
+                        else:
+                            ProductRelationship.objects.create(
+                                product=t_product,
+                                parent_variant_sku=target_variant.sku,
+                                related_product=srel.related_product,
+                                related_variant=srel.related_variant,
+                                related_variant_sku=srel.related_variant_sku,
+                                relationship_type=srel.relationship_type,
+                                quantity=srel.quantity,
+                                is_price_included_in_parent=srel.is_price_included_in_parent,
+                                notes=srel.notes,
+                            )
+                        copied_relations_count += 1
+
+                # 3. Optional pricing copy
+                if copy_pricing:
+                    target_variant.price = source_variant.price
+                    if source_variant.cost_price is not None:
+                        target_variant.cost_price = source_variant.cost_price
+                    target_variant.save(update_fields=["price", "cost_price"])
+
+                target_variant.refresh_from_db()
+                target_variant = ProductVariant.objects.prefetch_related(
+                    "attribute_values__attribute"
+                ).get(pk=target_variant.pk)
+
+                return Response({
+                    "message": f"Successfully copied from {source_variant.sku} to {target_variant.sku}.",
+                    "copied_attributes_count": copied_attrs_count,
+                    "copied_relations_count": copied_relations_count,
+                    "variant": ProductVariantSerializer(target_variant).data,
+                })
+        except Exception as exc:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.exception("Failed to copy variant data: %s", exc)
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
 
 class ProductMediaItemViewSet(viewsets.ModelViewSet):
     """CRUD for product media gallery items (images + videos)."""
