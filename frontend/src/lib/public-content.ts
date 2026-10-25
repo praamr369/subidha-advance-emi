@@ -627,7 +627,13 @@ export const RULEBOOK_SECTIONS = [
     rules: [
       "Delivery window unlocks ONLY upon: (1) Draw Winner, OR (2) Completed Tenure, OR (3) 60%–80% Advance Prepayment threshold.",
       "Admin Override deliveries for ineligible subscriptions require executive sign-off and permanently carry a visible Admin Override audit badge.",
-      "Physical handover requires complete Proof of Delivery: co-signed physical note, installed item photographs, and driver GPS confirmation.",
+      "Secure Mobile Handover Link: Store admin generates a tamper-proof, time-limited request link (valid 7 days) sent to the delivery driver or customer via WhatsApp/SMS without sharing admin credentials.",
+      "Mandatory Quality Proof (Rule CTRL-RENT-2): Delivery cannot transition to DELIVERED status without an attached Proof of Delivery (POD) record.",
+      "Photo 1 (Product Quality Capture): Driver must take an in-room photo of the assembled furniture displaying finish, woodwork, upholstery, and serial tag to establish baseline quality.",
+      "Photo 2 (Recipient Handover Photo): Delivery crew takes a photo of the customer/recipient standing with the furniture at their premises.",
+      "Digital Touchscreen Signature: Recipient signs directly on the smartphone screen using an interactive digital signature pad.",
+      "Geotagged Delivery GPS: Exact GPS coordinates (latitude/longitude) and timestamp are recorded automatically to verify the physical delivery address.",
+      "Return & Deposit Protection: For rent and lease, this handover photo evidence serves as the legal baseline during end-of-tenure return inspections to distinguish pre-existing condition from customer damage.",
       "Customers must verify that building doorways, stairwells, and passages permit passage of assembled furniture.",
     ],
   },
@@ -880,12 +886,16 @@ export const HOW_IT_WORKS_JOURNEY_E = [
     description: "Physical goods verified in warehouse Stock Ledger and allocated to the dispatch manifest.",
   },
   {
-    title: "5. Transit & Co-Signed Handover (POD)",
-    description: "Delivery crew conducts joint condition inspection, captures room photographs, and obtains co-signed POD.",
+    title: "5. Mobile Handover Link & Quality Photos",
+    description: "Admin shares secure WhatsApp link. Driver opens mobile screen and snaps Photo 1 (furniture assembly & finish) and Photo 2 (customer with item).",
   },
   {
-    title: "6. Fulfillment Closure in Core System",
-    description: "Delivery status updates to DELIVERED, closing fulfillment desk queues and updating Customer 360 profile.",
+    title: "6. On-Screen Touchscreen Signature & GPS Tag",
+    description: "Customer draws their signature directly on the phone screen. Exact delivery GPS coordinates and timestamp are tagged automatically.",
+  },
+  {
+    title: "7. Fulfillment Closure & Asset Custody",
+    description: "System verifies POD, updates delivery to DELIVERED (Rule CTRL-RENT-2), and activates custody in Customer Portal.",
   },
 ] as const;
 

@@ -407,6 +407,16 @@ Rules:
 - Contract Lifecycle Separation: Staff may register and save customer requirements as DRAFT contracts before documents are finalized. Transitioning to ACTIVE strictly enforces KYC, supporting documents, and security deposit billing.
 - Privacy & Future Verification Architecture: Customer KYC is managed under a privacy-first, zero-leakage internal vault (DPDP Act compliant). Future automated verification via third-party paid APIs (Digilocker, Karza, Cashfree) must integrate through the same immutable audit and document storage without bypassing core activation gates. Detailed rulebook: `docs/business-rules/rent-lease-contracts.md`.
 - Security Deposit Protection & 45-Day Arrears Cutoff: Rent/lease deposits (20%–30%) provide a finite buffer covering roughly 4 to 6 months of rent. Staff must not allow rent arrears to exceed 45 days (1.5 months). When arrears exceed 45 days, return pickup / repossession must be initiated to bring the furniture back before the deposit is exhausted, ensuring remaining deposit funds cover unpaid rent, transport, and physical inspection deductions.
+- Multi-Product Furniture Basket for RENT & LEASE:
+  - In single Rental (`PlanType.RENT`) and Lease (`PlanType.LEASE`) contracts, a customer can attach multiple furniture products (e.g., Bedroom Set: 1 Double Bed + 2 Mattresses + 1 Wardrobe + 2 Side Tables) under a single unified contract.
+  - Individual items are tracked via `ContractItem` records with quantities, unit base prices, total line values, monthly yield rates, line monthly amounts, product-specific security deposit percentages, and allocated security deposits.
+  - Product-Wise Manual Yield & Security Deposit Setup: Admin can manually configure product-specific monthly yield rate (e.g., 5%, 7.5%) and product-specific security deposit percentage/amount for each item individually on the contract creation page, allowing non-uniform pricing across mixed inventory packages.
+  - The contract's total monthly billing demand equals the sum of all line item monthly amounts; contract security deposit equals the sum of all itemized security deposits (with effective deposit percentage computed dynamically).
+  - Single-product Rent/Lease contracts remain 100% backward-compatible, creating an initial `ContractItem` line automatically.
+- STRICT ADVANCE EMI ISOLATION (ZERO RULE CHANGE):
+  - Lucky Plan Advance EMI (`PlanType.EMI`) MUST remain strictly 1 product per subscription contract.
+  - Advance EMI contracts require batch duration, batch slot, unique Lucky ID allocation, deterministic EMI installment schedules, and draw waiver logic.
+  - Attaching multiple products or `ContractItem` records to an EMI contract is strictly forbidden and rejected at the model and API levels.
 
 ## 20. Direct sale rules
 
@@ -460,6 +470,17 @@ Eligibility is **payment-milestone-based**, not time-based. Backend check: `is_w
   - This structure protects the business under the Prize Chits and Money Circulation Schemes (Banning) Act, 1978, the BUDS Act, 2019, and Section 15 of the CGST Act.
 - **Hire-Purchase Title Retention & Repossession Invariant**: Contracts with advance delivery are legally classified as Hire-Purchase agreements. Title, legal ownership, and property rights in the delivered goods remain strictly with Subidha Furniture until 100% of the contract value is settled (either by completing all remaining EMIs or via an audited waiver benefit). In case of payment default exceeding 30 days, the company reserves the enforceable legal right to repossess the goods.
 - **Customer Communication & Advance Benefit Framing**: Sales staff and enrollment contracts must transparently communicate that the advance down payment (60% to 80%) grants the exclusive privilege of immediate, same-day possession. Winning the monthly lucky draw waives remaining future installments only and never triggers a cash refund of settled down payments.
+
+#### Proof of Delivery (POD) & Mobile Field Handover Invariants (Rule CTRL-RENT-2)
+- **Mandatory Handover Gate (Rule CTRL-RENT-2)**: No delivery record can transition to `DELIVERED` without an attached `ProofOfDelivery` (POD) record containing verified photos, customer signature, and driver identification.
+- **Secure Mobile Handover Request Links**: Store admins generate a tamper-proof, time-limited handover token (`TimestampSigner`, 7-day validity) sent to delivery staff or customers via WhatsApp/SMS (`/delivery-handover/[token]`). Delivery personnel must never be given direct login credentials to the Admin ERP workbench.
+- **Product Quality Photo Invariant (Photo 1 & Photo 2)**:
+  - **Photo 1 (Furniture Quality Baseline)**: Mandatory photo of the assembled furniture placed inside the customer's room, capturing woodwork polish, joints, upholstery, and serial/asset tags.
+  - **Photo 2 (Recipient Handover)**: Photo of the receiving customer/representative standing with the delivered furniture at their premises.
+- **Interactive Touchscreen Signature**: Customer must sign directly on the mobile screen using an interactive digital signature pad. The signature is captured as an immutable PNG image.
+- **Geotagged Delivery Verification**: Mobile browser captures exact GPS coordinates (latitude/longitude) and timestamps to prevent phantom or misrouted delivery claims.
+- **Return Inspection & Deposit Protection**: For rent and lease plans, this delivery-day POD record serves as the irrefutable baseline during technical return inspections. Normal wear and tear is accepted; unrecorded structural damage or missing hardware justifies itemized security deposit deductions under Rule CTRL-RENT-5.
+- **Compliance Archival**: All POD media, customer signatures, and metadata are maintained in the system and exportable in batch ZIP format for legal, tax, and audit compliance.
 
 ### Admin override delivery (force-release)
 

@@ -477,7 +477,7 @@ from lucky_plan.models import Batch, LuckyId, DrawEligibilitySnapshot, DrawCommi
 from customers.models import Customer, CustomerReferral, CustomerKycDocument, CustomerRiskProfile, CustomerDispute, PartnerCustomerKycRequest, CustomerSupportRequest, Address, KycReviewAction, PartnerKycDocument
 
 # contracts
-from contracts.models import Subscription, RentSubscriptionProfile, LeaseSubscriptionProfile, ContractReferenceSequence, ContractReference, SubscriptionDocument, DocumentAccessLog, OperationalCancellation, ContractAmendment, ContractRecontractEvent, ContractRecontractScheduleLine, ContractRecontractFinancialImpactPreview, SubscriptionGuarantor
+from contracts.models import Subscription, RentSubscriptionProfile, LeaseSubscriptionProfile, ContractItem, ContractReferenceSequence, ContractReference, SubscriptionDocument, DocumentAccessLog, OperationalCancellation, ContractAmendment, ContractRecontractEvent, ContractRecontractScheduleLine, ContractRecontractFinancialImpactPreview, SubscriptionGuarantor
 
 # payments
 from payments.models import UnifiedCollectionIdempotency, RentLeaseBillingDemand, RentLeaseDepositTransaction, Emi, Payment, CustomerAdvance, CustomerAdvanceAllocation, PaymentReconciliation, PaymentReconciliationEvent, PartnerCollectionRequest, FinancialLedger, RecoveryCase, EMIScheme, EmiWaiverSettlement, DepositForfeitureTaxInvoice, CashDeskTimeStampedModel, CashCounterSession, DailyCloseRun, CustomerAdvanceRefund, RentLeaseCollection

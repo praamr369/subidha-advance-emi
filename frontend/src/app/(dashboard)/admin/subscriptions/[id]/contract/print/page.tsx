@@ -63,6 +63,20 @@ type WinnerSummary = {
   waiver_scope?: string | null;
 };
 
+type ContractItemRecord = {
+  id: number;
+  product_id?: number | null;
+  product_name?: string | null;
+  product_code?: string | null;
+  quantity?: number;
+  unit_base_price?: string | null;
+  total_base_price?: string | null;
+  monthly_yield_percent?: string | null;
+  monthly_amount?: string | null;
+  security_deposit_percent?: string | null;
+  security_deposit_amount?: string | null;
+};
+
 type SubscriptionContractRecord = {
   id: number;
   subscription_number?: string | null;
@@ -90,6 +104,7 @@ type SubscriptionContractRecord = {
   winner_summary?: WinnerSummary | null;
   fulfillment_status?: string | null;
   delivery_status?: string | null;
+  contract_items?: ContractItemRecord[] | null;
 };
 
 type CustomerRecord = {
@@ -294,27 +309,77 @@ export default function AdminSubscriptionContractPrintPage() {
           ]}
         />
 
-        <section className="document-card my-4 rounded-xl border border-border bg-card p-4">
-          <div className="text-[11px] font-black uppercase tracking-[0.12em] text-[#8a5a22]">Product / Contract Item</div>
-          <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <div>
-              <div className="text-[10px] font-black uppercase tracking-[0.12em] text-[#8a7255]">Product</div>
-              <div className="mt-1 text-sm font-semibold text-[#2f2418]">{safeDocumentText(subscription.product_name)}</div>
+        {subscription.contract_items && subscription.contract_items.length > 0 ? (
+          <section className="document-card my-4 rounded-xl border border-border bg-card p-4">
+            <div className="flex items-center justify-between">
+              <div className="text-[11px] font-black uppercase tracking-[0.12em] text-[#8a5a22]">
+                Attached Furniture Products ({subscription.contract_items.length} items)
+              </div>
+              <div className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                Multi-Product Furniture Package
+              </div>
             </div>
-            <div>
-              <div className="text-[10px] font-black uppercase tracking-[0.12em] text-[#8a7255]">Model / Code</div>
-              <div className="mt-1 text-sm font-semibold text-[#2f2418]">{safeDocumentText(subscription.product_code)}</div>
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-[#e6dbc9] text-[10px] uppercase tracking-wider text-[#8a7255]">
+                    <th className="py-1.5 pr-2 font-bold">#</th>
+                    <th className="py-1.5 px-2 font-bold">Product Item</th>
+                    <th className="py-1.5 px-2 font-bold text-center">Qty</th>
+                    <th className="py-1.5 px-2 font-bold text-right">Unit Price</th>
+                    <th className="py-1.5 px-2 font-bold text-right">Total Base</th>
+                    <th className="py-1.5 px-2 font-bold text-right">Monthly Dues</th>
+                    <th className="py-1.5 pl-2 font-bold text-right">Deposit</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#f2ebd9]">
+                  {subscription.contract_items.map((item, idx) => (
+                    <tr key={item.id || idx}>
+                      <td className="py-2 pr-2 font-semibold text-[#8a7255]">{idx + 1}</td>
+                      <td className="py-2 px-2">
+                        <div className="font-semibold text-[#2f2418]">{safeDocumentText(item.product_name)}</div>
+                        <div className="text-[10px] text-[#8a7255] font-mono">{safeDocumentText(item.product_code)}</div>
+                      </td>
+                      <td className="py-2 px-2 text-center font-medium text-[#2f2418]">{item.quantity || 1}</td>
+                      <td className="py-2 px-2 text-right font-medium text-[#2f2418]">{formatDocumentMoney(item.unit_base_price)}</td>
+                      <td className="py-2 px-2 text-right font-semibold text-[#2f2418]">{formatDocumentMoney(item.total_base_price)}</td>
+                      <td className="py-2 px-2 text-right font-semibold text-[#2f2418]">
+                        {formatDocumentMoney(item.monthly_amount)}
+                        {item.monthly_yield_percent ? <span className="ml-1 text-[10px] text-[#8a7255]">({item.monthly_yield_percent}%)</span> : null}
+                      </td>
+                      <td className="py-2 pl-2 text-right font-semibold text-[#2f2418]">
+                        {formatDocumentMoney(item.security_deposit_amount)}
+                        {item.security_deposit_percent ? <span className="ml-1 text-[10px] text-[#8a7255]">({item.security_deposit_percent}%)</span> : null}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <div>
-              <div className="text-[10px] font-black uppercase tracking-[0.12em] text-[#8a7255]">Contract Price</div>
-              <div className="mt-1 text-sm font-semibold text-[#2f2418]">{formatDocumentMoney(productPrice)}</div>
+          </section>
+        ) : (
+          <section className="document-card my-4 rounded-xl border border-border bg-card p-4">
+            <div className="text-[11px] font-black uppercase tracking-[0.12em] text-[#8a5a22]">Product / Contract Item</div>
+            <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-[0.12em] text-[#8a7255]">Product</div>
+                <div className="mt-1 text-sm font-semibold text-[#2f2418]">{safeDocumentText(subscription.product_name)}</div>
+              </div>
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-[0.12em] text-[#8a7255]">Model / Code</div>
+                <div className="mt-1 text-sm font-semibold text-[#2f2418]">{safeDocumentText(subscription.product_code)}</div>
+              </div>
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-[0.12em] text-[#8a7255]">Contract Price</div>
+                <div className="mt-1 text-sm font-semibold text-[#2f2418]">{formatDocumentMoney(productPrice)}</div>
+              </div>
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-[0.12em] text-[#8a7255]">Monthly EMI</div>
+                <div className="mt-1 text-sm font-semibold text-[#2f2418]">{formatDocumentMoney(subscription.monthly_amount)}</div>
+              </div>
             </div>
-            <div>
-              <div className="text-[10px] font-black uppercase tracking-[0.12em] text-[#8a7255]">Monthly EMI</div>
-              <div className="mt-1 text-sm font-semibold text-[#2f2418]">{formatDocumentMoney(subscription.monthly_amount)}</div>
-            </div>
-          </div>
-        </section>
+          </section>
+        )}
 
         <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
           <section className="document-card rounded-xl border border-border bg-card p-4">

@@ -28,6 +28,17 @@ Rent and lease plans involve ongoing operational risk (the furniture leaves the 
 | **Security Deposit Receipt** | `DEPOSIT_RECEIPT` | **MANDATORY for Handover** | Confirms 20%–30% security deposit collected into the deposit ledger. |
 | **Asset Handover Note / Acknowledgement** | `HANDOVER_PROOF` | **MANDATORY for Delivery** | Delivery staff and customer co-sign condition note upon physical handover. |
 
+### 1.3 Multi-Product Furniture Basket (Rent & Lease Only)
+- In real furniture showroom operations, customers frequently rent or lease entire room sets (e.g., Bedroom Package: 1 Double Bed + 2 Mattresses + 1 Wardrobe + 2 Side Tables).
+- RENT and LEASE contracts support attaching **multiple furniture products** under a single unified customer agreement.
+- Line items are modeled through `ContractItem` records:
+  - Each item carries `product`, `quantity`, `unit_base_price`, `total_base_price`, `monthly_yield_percent`, `monthly_amount`, `security_deposit_percent`, and allocated `security_deposit_amount`.
+  - Admin can manually configure product-specific monthly yield rate (e.g., 5%, 7.5%) and product-specific security deposit percentage/fixed amount for each item individually on the contract creation page, allowing non-uniform pricing across mixed inventory packages.
+  - Overall recurring contract monthly billing demand equals the sum of all line item monthly amounts.
+  - Overall security deposit equals the sum of all itemized security deposits (with effective deposit percentage computed dynamically).
+  - Legacy or single-product Rent/Lease contracts remain 100% backward compatible, automatically generating an initial `ContractItem` line.
+- **Strict Invariant**: Lucky Plan Advance EMI (`PlanType.EMI`) is strictly isolated and single-product (1 contract = 1 product = 1 Lucky ID = 1 batch slot); multi-product basket attachment is exclusively for RENT and LEASE.
+
 ---
 
 ## 2. Strict State Machine & Activation Gating

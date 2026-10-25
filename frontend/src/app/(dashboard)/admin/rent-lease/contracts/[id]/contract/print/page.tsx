@@ -59,10 +59,26 @@ type FinancialSummary = {
   outstanding_amount?: string | null;
 };
 
+type ContractItemRecord = {
+  id: number;
+  product_id: number;
+  product_name: string;
+  product_code?: string;
+  sku?: string;
+  category?: string;
+  quantity: number;
+  unit_base_price: string;
+  total_base_price: string;
+  monthly_yield_percent: string;
+  monthly_amount: string;
+  security_deposit_amount: string;
+};
+
 type SubscriptionContractRecord = {
   id: number;
   subscription_number?: string | null;
   contract_reference?: string | null;
+  contract_items?: ContractItemRecord[] | null;
   customer?: number | null;
   customer_id?: number | null;
   customer_name?: string | null;
@@ -304,25 +320,65 @@ export default function AdminRentLeaseContractPrintPage() {
         />
 
         <section className="document-card my-4 rounded-xl border border-border bg-card p-4">
-          <div className="text-[11px] font-black uppercase tracking-[0.12em] text-[#8a5a22]">Asset / Product</div>
-          <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <div>
-              <div className="text-[10px] font-black uppercase tracking-[0.12em] text-[#8a7255]">Asset / Product</div>
-              <div className="mt-1 text-sm font-semibold text-[#2f2418]">{safeDocumentText(subscription.product_name)}</div>
-            </div>
-            <div>
-              <div className="text-[10px] font-black uppercase tracking-[0.12em] text-[#8a7255]">Code</div>
-              <div className="mt-1 text-sm font-semibold text-[#2f2418]">{safeDocumentText(subscription.product_code)}</div>
-            </div>
-            <div>
-              <div className="text-[10px] font-black uppercase tracking-[0.12em] text-[#8a7255]">Serial / Identifier</div>
-              <div className="mt-1 text-sm font-semibold text-[#2f2418]">{safeDocumentText(possession?.serial_number)}</div>
-            </div>
-            <div>
-              <div className="text-[10px] font-black uppercase tracking-[0.12em] text-[#8a7255]">Expected Return</div>
-              <div className="mt-1 text-sm font-semibold text-[#2f2418]">{formatDocumentDate(possession?.expected_return_date)}</div>
-            </div>
+          <div className="text-[11px] font-black uppercase tracking-[0.12em] text-[#8a5a22]">
+            {subscription.contract_items && subscription.contract_items.length > 1
+              ? `Attached Furniture Items (${subscription.contract_items.length})`
+              : "Asset / Product"}
           </div>
+          {subscription.contract_items && subscription.contract_items.length > 1 ? (
+            <div className="mt-2 overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-border text-[10px] font-black uppercase tracking-[0.1em] text-[#8a7255]">
+                    <th className="py-1.5 px-2">Item</th>
+                    <th className="py-1.5 px-2">Code</th>
+                    <th className="py-1.5 px-2 text-center">Qty</th>
+                    <th className="py-1.5 px-2 text-right">Unit Price</th>
+                    <th className="py-1.5 px-2 text-right">Line Total</th>
+                    <th className="py-1.5 px-2 text-right">Monthly {planType === "RENT" ? "Rent" : "Lease"}</th>
+                    <th className="py-1.5 px-2 text-right">Deposit Share</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {subscription.contract_items.map((itm) => (
+                    <tr key={itm.id} className="text-[#2f2418]">
+                      <td className="py-2 px-2 font-semibold">{itm.product_name}</td>
+                      <td className="py-2 px-2 font-mono text-[11px]">{itm.product_code || "—"}</td>
+                      <td className="py-2 px-2 text-center font-semibold">{itm.quantity}</td>
+                      <td className="py-2 px-2 text-right font-mono">{formatDocumentMoney(itm.unit_base_price)}</td>
+                      <td className="py-2 px-2 text-right font-mono font-semibold">{formatDocumentMoney(itm.total_base_price)}</td>
+                      <td className="py-2 px-2 text-right font-mono font-bold text-[#8a5a22]">
+                        {formatDocumentMoney(itm.monthly_amount)}
+                        <span className="ml-1 text-[10px] font-normal text-muted-foreground">({itm.monthly_yield_percent}%)</span>
+                      </td>
+                      <td className="py-2 px-2 text-right font-mono font-semibold text-[#8a5a22]">
+                        {formatDocumentMoney(itm.security_deposit_amount)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-[0.12em] text-[#8a7255]">Asset / Product</div>
+                <div className="mt-1 text-sm font-semibold text-[#2f2418]">{safeDocumentText(subscription.product_name)}</div>
+              </div>
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-[0.12em] text-[#8a7255]">Code</div>
+                <div className="mt-1 text-sm font-semibold text-[#2f2418]">{safeDocumentText(subscription.product_code)}</div>
+              </div>
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-[0.12em] text-[#8a7255]">Serial / Identifier</div>
+                <div className="mt-1 text-sm font-semibold text-[#2f2418]">{safeDocumentText(possession?.serial_number)}</div>
+              </div>
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-[0.12em] text-[#8a7255]">Expected Return</div>
+                <div className="mt-1 text-sm font-semibold text-[#2f2418]">{formatDocumentDate(possession?.expected_return_date)}</div>
+              </div>
+            </div>
+          )}
         </section>
 
         <div className="grid gap-4 lg:grid-cols-[1fr_360px]">

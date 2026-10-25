@@ -42,6 +42,7 @@ export interface PODCapture {
   customer_signature_name: string;
   photo_1: File;
   photo_2?: File;
+  furniture_photos?: File[];
   signature_image: File;
   gps_latitude?: string;
   gps_longitude?: string;
@@ -70,6 +71,9 @@ export function capturePOD(deliveryId: number, payload: PODCapture): Promise<POD
   formData.append("customer_signature_name", payload.customer_signature_name);
   formData.append("photo_1", payload.photo_1);
   if (payload.photo_2) formData.append("photo_2", payload.photo_2);
+  if (payload.furniture_photos && payload.furniture_photos.length > 0) {
+    payload.furniture_photos.forEach((file) => formData.append("furniture_photos", file));
+  }
   formData.append("signature_image", payload.signature_image);
   if (payload.gps_latitude) formData.append("gps_latitude", payload.gps_latitude);
   if (payload.gps_longitude) formData.append("gps_longitude", payload.gps_longitude);
@@ -99,5 +103,65 @@ export function exportPODYear(year: number): Promise<Blob> {
   }).then((res) => {
     if (res instanceof Blob) return res;
     return new Blob([JSON.stringify(res)], { type: "application/json" });
+  });
+}
+
+export interface HandoverLinkResponse {
+  success: boolean;
+  delivery_id: number;
+  handover_token: string;
+  handover_url: string;
+  customer_name: string;
+  customer_phone: string;
+  product_name: string;
+  plan_type: string;
+  status: string;
+  is_delivered: boolean;
+  expires_in_days: number;
+}
+
+export interface PublicHandoverInfo {
+  delivery_id: number;
+  delivery_reference: string;
+  contract_reference: string;
+  customer_name: string;
+  customer_phone: string;
+  delivery_address: string;
+  product_name: string;
+  plan_type: string;
+  driver_name: string;
+  driver_phone: string;
+  status: string;
+  is_completed: boolean;
+  delivered_date: string | null;
+}
+
+export function getDeliveryHandoverLink(deliveryId: number): Promise<HandoverLinkResponse> {
+  return apiFetch(`/admin/delivery/${deliveryId}/handover-link/`);
+}
+
+export function getPublicHandoverInfo(token: string): Promise<PublicHandoverInfo> {
+  return apiFetch(`/public/delivery/handover/${encodeURIComponent(token)}/`);
+}
+
+export function submitPublicHandoverPOD(token: string, payload: PODCapture): Promise<PODCaptureResult> {
+  const formData = new FormData();
+  formData.append("delivery_date", payload.delivery_date);
+  formData.append("driver_name", payload.driver_name);
+  formData.append("driver_phone", payload.driver_phone || "");
+  formData.append("customer_signature_name", payload.customer_signature_name);
+  formData.append("photo_1", payload.photo_1);
+  if (payload.photo_2) formData.append("photo_2", payload.photo_2);
+  if (payload.furniture_photos && payload.furniture_photos.length > 0) {
+    payload.furniture_photos.forEach((file) => formData.append("furniture_photos", file));
+  }
+  formData.append("signature_image", payload.signature_image);
+  if (payload.gps_latitude) formData.append("gps_latitude", payload.gps_latitude);
+  if (payload.gps_longitude) formData.append("gps_longitude", payload.gps_longitude);
+  formData.append("notes", payload.notes || "");
+
+  return apiFetch(`/public/delivery/handover/${encodeURIComponent(token)}/`, {
+    method: "POST",
+    body: formData,
   });
 }

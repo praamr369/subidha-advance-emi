@@ -57,6 +57,7 @@ from api.v1.views.admin_partial_payment import partial_payment_split_view
 from api.v1.views.admin_pod import pod_capture_view
 from api.v1.views.admin_pod import pod_detail_view
 from api.v1.views.admin_pod import pod_export_year_view
+from api.v1.views.admin_pod import pod_handover_link_view
 from api.v1.views.admin_pod import pod_list_view
 from api.v1.views.admin_prepayment import prepayment_calculate_view
 from api.v1.views.admin_prepayment import prepayment_list_view
@@ -136,6 +137,7 @@ urlpatterns = [
 
     # ── Proof of Delivery (POD) ───────────────────────────────────────────────
     path("delivery/<int:delivery_id>/pod/capture/", pod_capture_view),
+    path("delivery/<int:delivery_id>/handover-link/", pod_handover_link_view),
     path("delivery/pod/", pod_list_view),
     path("delivery/pod/<int:pod_id>/", pod_detail_view),
     path("delivery/pod/export/", pod_export_year_view),

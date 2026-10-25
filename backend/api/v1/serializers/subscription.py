@@ -5,7 +5,7 @@ from rest_framework import serializers
 
 from api.v1.serializers.delivery import CustomerSubscriptionDeliveryReadSerializer
 from api.v1.serializers.media import serialize_media_url
-from subscriptions.models import Emi, Payment, Subscription
+from subscriptions.models import Emi, Payment, PlanType, Subscription
 from deliveries.services.delivery_service import (
     get_current_subscription_delivery,
 )
@@ -109,6 +109,7 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
 
     last_payment_date = serializers.SerializerMethodField()
     next_due_date = serializers.SerializerMethodField()
+    contract_items = serializers.SerializerMethodField()
 
     class Meta:
         model = Subscription
@@ -128,6 +129,7 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
             "product_code",
             "product_image",
             "product_base_price",
+            "contract_items",
             "batch",
             "batch_id",
             "batch_code",
@@ -181,6 +183,31 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
             return "NOT_REQUIRED"
         except Exception:
             return "UNKNOWN"
+
+    def get_contract_items(self, obj):
+        if obj.plan_type not in (PlanType.RENT, PlanType.LEASE):
+            return []
+        items = obj.contract_items.select_related("product").all()
+        return [
+            {
+                "id": it.id,
+                "product": it.product_id,
+                "product_id": it.product_id,
+                "product_name": it.product.name,
+                "product_code": it.product.product_code,
+                "sku": getattr(it.product, "sku", ""),
+                "category": getattr(it.product, "category", ""),
+                "quantity": it.quantity,
+                "unit_base_price": str(it.unit_base_price),
+                "total_base_price": str(it.total_base_price),
+                "monthly_yield_percent": str(it.monthly_yield_percent),
+                "monthly_amount": str(it.monthly_amount),
+                "security_deposit_percent": str(getattr(it, "security_deposit_percent", "20.00")),
+                "security_deposit_amount": str(it.security_deposit_amount),
+                "product_snapshot": it.product_snapshot,
+            }
+            for it in items
+        ]
 
     def get_product_image(self, obj):
         return serialize_media_url(

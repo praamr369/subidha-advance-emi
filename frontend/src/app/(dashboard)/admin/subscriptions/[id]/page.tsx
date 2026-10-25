@@ -215,10 +215,27 @@ type RentLeaseDemandRow = {
   reversed_amount: string;
 };
 
+type ContractItemRecord = {
+  id: number;
+  product_id: number;
+  product_name: string;
+  product_code?: string;
+  sku?: string;
+  category?: string;
+  quantity: number;
+  unit_base_price: string;
+  total_base_price: string;
+  monthly_yield_percent: string;
+  monthly_amount: string;
+  security_deposit_percent?: string;
+  security_deposit_amount: string;
+};
+
 type SubscriptionDetailRecord = {
   id: number;
   subscription_number?: string;
   contract_reference?: string;
+  contract_items?: ContractItemRecord[];
   customer_id: number | null;
   customer_name: string;
   customer_phone: string;
@@ -687,6 +704,20 @@ function normalizeSubscriptionDetail(
       normalizeDeliveryRecord
     ),
     emis: toArray<Record<string, unknown>>(raw.emis).map(normalizeEmiRow),
+    contract_items: toArray<Record<string, unknown>>(raw.contract_items).map((it) => ({
+      id: Number(it.id),
+      product_id: Number(it.product_id || it.product),
+      product_name: String(it.product_name || "Product"),
+      product_code: it.product_code ? String(it.product_code) : undefined,
+      sku: it.sku ? String(it.sku) : undefined,
+      category: it.category ? String(it.category) : undefined,
+      quantity: Number(it.quantity || 1),
+      unit_base_price: String(it.unit_base_price ?? "0.00"),
+      total_base_price: String(it.total_base_price ?? "0.00"),
+      monthly_yield_percent: String(it.monthly_yield_percent ?? "5.00"),
+      monthly_amount: String(it.monthly_amount ?? "0.00"),
+      security_deposit_amount: String(it.security_deposit_amount ?? "0.00"),
+    })),
     rent_lease_demands: toArray<Record<string, unknown>>(raw.rent_lease_demands).map(normalizeRentLeaseDemandRow),
     rent_lease_collections: toArray<Record<string, unknown>>(raw.rent_lease_collections).map(
       normalizeRentLeaseReceiptRow
@@ -1376,6 +1407,57 @@ export default function AdminSubscriptionDetailPage() {
                   <DetailValue label="Created At" value={formatDateTime(subscription.created_at)} />
                 </div>
               </DetailPanel>
+
+              {subscription.contract_items && subscription.contract_items.length > 0 && !isEmiSubscription ? (
+                <DetailPanel
+                  title={`Attached Furniture Products (${subscription.contract_items.length})`}
+                  description="Individual furniture line items attached to this rental/lease agreement."
+                  className="rounded-[28px]"
+                >
+                  <div className="overflow-x-auto rounded-xl border border-border bg-card/60">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-border bg-muted/40 font-medium text-muted-foreground">
+                          <th className="px-3 py-2.5">Product</th>
+                          <th className="px-3 py-2.5">Qty</th>
+                          <th className="px-3 py-2.5">Unit Base</th>
+                          <th className="px-3 py-2.5">Line Base Total</th>
+                          <th className="px-3 py-2.5">Yield Rate</th>
+                          <th className="px-3 py-2.5">Monthly Demand</th>
+                          <th className="px-3 py-2.5">Deposit Share</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {subscription.contract_items.map((itm) => (
+                          <tr key={itm.id} className="hover:bg-muted/20 transition-colors">
+                            <td className="px-3 py-2.5">
+                              <div className="font-semibold text-foreground">{itm.product_name}</div>
+                              <div className="text-[11px] text-muted-foreground font-mono">
+                                {itm.product_code || "—"} {itm.category ? `· ${itm.category}` : ""}
+                              </div>
+                            </td>
+                            <td className="px-3 py-2.5 font-semibold">{itm.quantity}</td>
+                            <td className="px-3 py-2.5 font-mono">
+                              ₹{Number(itm.unit_base_price).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="px-3 py-2.5 font-semibold font-mono text-foreground">
+                              ₹{Number(itm.total_base_price).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="px-3 py-2.5 font-mono">{itm.monthly_yield_percent}%</td>
+                            <td className="px-3 py-2.5 font-semibold font-mono text-primary">
+                              ₹{Number(itm.monthly_amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="px-3 py-2.5 font-mono text-muted-foreground">
+                              ₹{Number(itm.security_deposit_amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                              {itm.security_deposit_percent ? ` (${itm.security_deposit_percent}%)` : ""}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </DetailPanel>
+              ) : null}
 
               {isEmiSubscription ? (
                 <DetailPanel

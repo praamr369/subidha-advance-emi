@@ -48,6 +48,16 @@ type ProductOption = {
   stock_status?: "IN_STOCK" | "LOW_STOCK" | "OUT_OF_STOCK" | "FULLY_RESERVED";
 };
 
+export type ContractBasketItem = {
+  id: string;
+  product: ProductOption;
+  quantity: number;
+  unit_base_price: string;
+  monthly_yield_percent: string;
+  security_deposit_percent: string;
+  security_deposit_amount?: string;
+};
+
 type BatchOption = {
   id: number;
   batch_code?: string;
@@ -394,9 +404,90 @@ export default function SubscriptionCreatePage({
 
   const [customer, setCustomer] = useState<CustomerOption | null>(null);
   const [product, setProduct] = useState<ProductOption | null>(null);
+  const [contractItems, setContractItems] = useState<ContractBasketItem[]>([]);
+  const [addingProduct, setAddingProduct] = useState(false);
   const [batch, setBatch] = useState<BatchOption | null>(null);
   const [luckyId, setLuckyId] = useState<LuckyIdOption | null>(null);
   const [partner, setPartner] = useState<PartnerOption | null>(null);
+
+  function addProductToBasket(item: ProductOption) {
+    setContractItems((prev) => {
+      const existingIndex = prev.findIndex((p) => p.product.id === item.id);
+      if (existingIndex >= 0) {
+        return prev.map((p, idx) =>
+          idx === existingIndex ? { ...p, quantity: p.quantity + 1 } : p
+        );
+      }
+      const newItem: ContractBasketItem = {
+        id: `item-${item.id}-${Date.now()}`,
+        product: item,
+        quantity: 1,
+        unit_base_price: item.base_price || "0.00",
+        monthly_yield_percent: yieldRatePercent || "5.00",
+        security_deposit_percent: securityDepositPercent || "20.00",
+      };
+      return [...prev, newItem];
+    });
+    if (!product) {
+      setProduct(item);
+    }
+    setAddingProduct(false);
+  }
+
+  function removeProductFromBasket(id: string) {
+    setContractItems((prev) => {
+      const next = prev.filter((it) => it.id !== id);
+      if (next.length > 0) {
+        setProduct(next[0].product);
+      } else {
+        setProduct(null);
+      }
+      return next;
+    });
+  }
+
+  function updateBasketQuantity(id: string, qty: number) {
+    const clamped = Math.max(1, qty);
+    setContractItems((prev) =>
+      prev.map((it) => (it.id === id ? { ...it, quantity: clamped } : it))
+    );
+  }
+
+  function updateBasketUnitPrice(id: string, price: string) {
+    setContractItems((prev) =>
+      prev.map((it) => (it.id === id ? { ...it, unit_base_price: price } : it))
+    );
+  }
+
+  function updateBasketYield(id: string, yieldPct: string) {
+    setContractItems((prev) =>
+      prev.map((it) => (it.id === id ? { ...it, monthly_yield_percent: yieldPct } : it))
+    );
+  }
+
+  function updateBasketDepositPercent(id: string, depositPct: string) {
+    setContractItems((prev) =>
+      prev.map((it) => (it.id === id ? { ...it, security_deposit_percent: depositPct, security_deposit_amount: undefined } : it))
+    );
+  }
+
+  function updateBasketDepositAmount(id: string, depositAmt: string) {
+    setContractItems((prev) =>
+      prev.map((it) => (it.id === id ? { ...it, security_deposit_amount: depositAmt } : it))
+    );
+  }
+
+  function applyGlobalYieldToAll(yieldPct: string) {
+    setContractItems((prev) =>
+      prev.map((it) => ({ ...it, monthly_yield_percent: yieldPct }))
+    );
+  }
+
+  function applyGlobalDepositToAll(depositPct: string) {
+    setContractItems((prev) =>
+      prev.map((it) => ({ ...it, security_deposit_percent: depositPct, security_deposit_amount: undefined }))
+    );
+  }
 
   const [securityDepositPercent, setSecurityDepositPercent] = useState("20");
   const [leaseBuyoutAmount, setLeaseBuyoutAmount] = useState("");
@@ -519,19 +610,50 @@ export default function SubscriptionCreatePage({
     return Number(manualTenureMonths || 0);
   }, [isEmiPlan, batch?.duration_months, manualTenureMonths]);
 
-  const totalAmount = useMemo(() => Number(product?.base_price ?? 0), [product?.base_price]);
+  const totalProductBaseValue = useMemo(() => {
+    if ((isRentPlan || isLeasePlan) && contractItems.length > 0) {
+      return contractItems.reduce(
+        (acc, it) => acc + it.quantity * (Number(it.unit_base_price) || 0),
+        0
+      );
+    }
+    return Number(product?.base_price ?? 0);
+  }, [isRentPlan, isLeasePlan, contractItems, product?.base_price]);
 
   const monthlyAmount = useMemo(() => {
     if (!tenureMonths || tenureMonths <= 0) return "0.00";
     if (isRentPlan || isLeasePlan) {
+      if (contractItems.length > 0) {
+        const totalRent = contractItems.reduce((acc, it) => {
+          const yieldPct =
+            Number(it.monthly_yield_percent) || Number(yieldRatePercent) || 5.0;
+          const lineBase = it.quantity * (Number(it.unit_base_price) || 0);
+          return acc + (lineBase * yieldPct) / 100;
+        }, 0);
+        return totalRent.toFixed(2);
+      }
       const yieldRateNumber = Number(yieldRatePercent);
       if (Number.isFinite(yieldRateNumber) && yieldRateNumber > 0) {
-        return ((totalAmount * yieldRateNumber) / 100).toFixed(2);
+        return ((totalProductBaseValue * yieldRateNumber) / 100).toFixed(2);
       }
       return "0.00";
     }
-    return (totalAmount / tenureMonths).toFixed(2);
-  }, [totalAmount, tenureMonths, isRentPlan, isLeasePlan, yieldRatePercent]);
+    return (totalProductBaseValue / tenureMonths).toFixed(2);
+  }, [
+    totalProductBaseValue,
+    tenureMonths,
+    isRentPlan,
+    isLeasePlan,
+    yieldRatePercent,
+    contractItems,
+  ]);
+
+  const totalAmount = useMemo(() => {
+    if (isRentPlan || isLeasePlan) {
+      return Number(monthlyAmount) * tenureMonths;
+    }
+    return totalProductBaseValue;
+  }, [isRentPlan, isLeasePlan, monthlyAmount, tenureMonths, totalProductBaseValue]);
 
   const depositPercentNumber = useMemo(() => {
     const parsed = Number(securityDepositPercent);
@@ -539,10 +661,36 @@ export default function SubscriptionCreatePage({
   }, [securityDepositPercent]);
 
   const securityDepositAmount = useMemo(() => {
+    if (isRentPlan || isLeasePlan) {
+      if (contractItems.length > 0) {
+        const totalDeposit = contractItems.reduce((acc, it) => {
+          const lineBase = it.quantity * (Number(it.unit_base_price) || 0);
+          if (it.security_deposit_amount && !isNaN(Number(it.security_deposit_amount))) {
+            return acc + Number(it.security_deposit_amount);
+          }
+          const depPct = Number(it.security_deposit_percent) || Number(securityDepositPercent) || 20.0;
+          return acc + (lineBase * depPct) / 100;
+        }, 0);
+        return totalDeposit.toFixed(2);
+      }
+    }
     const percent = depositPercentNumber;
     if (!percent || percent <= 0) return "0.00";
-    return (totalAmount * percent / 100).toFixed(2);
-  }, [depositPercentNumber, totalAmount]);
+    return ((totalProductBaseValue * percent) / 100).toFixed(2);
+  }, [
+    isRentPlan,
+    isLeasePlan,
+    contractItems,
+    securityDepositPercent,
+    depositPercentNumber,
+    totalProductBaseValue,
+  ]);
+
+  const effectiveDepositPercent = useMemo(() => {
+    if (totalProductBaseValue <= 0) return securityDepositPercent;
+    const depAmt = Number(securityDepositAmount) || 0;
+    return ((depAmt / totalProductBaseValue) * 100).toFixed(1);
+  }, [totalProductBaseValue, securityDepositAmount, securityDepositPercent]);
 
   const productModes = useMemo(() => enabledPlanModes(product), [product]);
   const luckyPreviewLabel = useMemo(() => {
@@ -572,26 +720,51 @@ export default function SubscriptionCreatePage({
 
   const canSubmit = useMemo(() => {
     if (!planType) return false;
-    if (!customer || !product || !startDate) return false;
+    if (!customer || !startDate) return false;
     if (!tenureMonths || tenureMonths <= 0) return false;
-    if (isEmiPlan && !batch) return false;
-    if (!isEmiPlan) {
-      if (depositPercentNumber < 20 || depositPercentNumber > 30) return false;
-      const yieldRateNumber = Number(yieldRatePercent);
-      if (!Number.isFinite(yieldRateNumber) || yieldRateNumber <= 0) return false;
-      if (isRentPlan && !product.is_rent_enabled) return false;
-      if (isLeasePlan && !product.is_lease_enabled) return false;
+    if (isEmiPlan) {
+      if (!product || !batch) return false;
+    } else {
+      const hasProducts = contractItems.length > 0 || Boolean(product);
+      if (!hasProducts) return false;
+      if (contractItems.length > 0) {
+        const effDep = Number(effectiveDepositPercent) || 0;
+        if (effDep < 0 || effDep > 100) return false;
+        const anyDisabled = contractItems.some((it) =>
+          isRentPlan ? !it.product.is_rent_enabled : !it.product.is_lease_enabled
+        );
+        if (anyDisabled) return false;
+        const anyInvalid = contractItems.some((it) => {
+          const y = Number(it.monthly_yield_percent);
+          const d = Number(it.security_deposit_percent);
+          return isNaN(y) || y <= 0 || isNaN(d) || d < 0;
+        });
+        if (anyInvalid) return false;
+      } else {
+        if (depositPercentNumber < 0 || depositPercentNumber > 100) return false;
+        const yieldRateNumber = Number(yieldRatePercent);
+        if (!Number.isFinite(yieldRateNumber) || yieldRateNumber <= 0) return false;
+        if (product) {
+          if (isRentPlan && !product.is_rent_enabled) return false;
+          if (isLeasePlan && !product.is_lease_enabled) return false;
+        }
+      }
     }
     return true;
   }, [
     planType,
     customer,
-    product,
     startDate,
     tenureMonths,
     isEmiPlan,
+    product,
     batch,
+    contractItems,
+    effectiveDepositPercent,
     depositPercentNumber,
+    yieldRatePercent,
+    isRentPlan,
+    isLeasePlan,
   ]);
 
   /**
@@ -603,54 +776,85 @@ export default function SubscriptionCreatePage({
     const blockers: string[] = [];
     if (!planType) blockers.push("Choose a plan type.");
     if (!customer) blockers.push("Select a customer.");
-    if (!product) {
-      blockers.push("Select a product.");
-    } else if (isRentPlan && !product.is_rent_enabled) {
-      blockers.push(
-        `"${product.name}" is not enabled for RENT. Turn on Rent for this product in the product master, or choose a rent-enabled product.`
-      );
-    } else if (isLeasePlan && !product.is_lease_enabled) {
-      blockers.push(
-        `"${product.name}" is not enabled for LEASE. Turn on Lease for this product in the product master, or choose a lease-enabled product.`
-      );
+    if (isEmiPlan) {
+      if (!product) {
+        blockers.push("Select a product for EMI.");
+      }
+      if (!batch) blockers.push("Select an EMI batch.");
+    } else {
+      if (contractItems.length === 0 && !product) {
+        blockers.push(
+          `Attach at least one furniture product for this ${isRentPlan ? "RENT" : "LEASE"} contract.`
+        );
+      } else if (contractItems.length > 0) {
+        contractItems.forEach((it) => {
+          if (isRentPlan && !it.product.is_rent_enabled) {
+            blockers.push(`"${it.product.name}" is not enabled for RENT.`);
+          }
+          if (isLeasePlan && !it.product.is_lease_enabled) {
+            blockers.push(`"${it.product.name}" is not enabled for LEASE.`);
+          }
+          const y = Number(it.monthly_yield_percent);
+          if (isNaN(y) || y <= 0) {
+            blockers.push(`"${it.product.name}" has an invalid yield rate (must be > 0%).`);
+          }
+          const d = Number(it.security_deposit_percent);
+          if (isNaN(d) || d < 0) {
+            blockers.push(`"${it.product.name}" has an invalid deposit % (cannot be negative).`);
+          }
+        });
+        const effDep = Number(effectiveDepositPercent) || 0;
+        if (effDep < 0 || effDep > 100) {
+          blockers.push(`Effective security deposit must be between 0% and 100% (currently ${effDep}%).`);
+        }
+      } else if (product) {
+        if (isRentPlan && !product.is_rent_enabled) {
+          blockers.push(`"${product.name}" is not enabled for RENT.`);
+        }
+        if (isLeasePlan && !product.is_lease_enabled) {
+          blockers.push(`"${product.name}" is not enabled for LEASE.`);
+        }
+        if (depositPercentNumber < 0 || depositPercentNumber > 100) {
+          blockers.push(
+            `Security deposit must be between 0% and 100% (currently ${depositPercentNumber || 0}%).`
+          );
+        }
+        const yieldRateNumber = Number(yieldRatePercent);
+        if (!Number.isFinite(yieldRateNumber) || yieldRateNumber <= 0) {
+          blockers.push("Yield rate must be greater than zero.");
+        }
+      }
     }
     if (!startDate) blockers.push("Set a start date.");
     if (!tenureMonths || tenureMonths <= 0) blockers.push("Tenure must be at least 1 month.");
-    if (isEmiPlan && !batch) blockers.push("Select an EMI batch.");
-    if (!isEmiPlan) {
-      if (depositPercentNumber < 20 || depositPercentNumber > 30) {
-        blockers.push(
-          `Security deposit must be between 20% and 30% (currently ${depositPercentNumber || 0}%).`
-        );
-      }
-      const yieldRateNumber = Number(yieldRatePercent);
-      if (!Number.isFinite(yieldRateNumber) || yieldRateNumber <= 0) {
-        blockers.push("Yield rate must be greater than zero.");
-      }
-    }
     if (!photoFile) blockers.push("Customer photo is required.");
     if (!signatureFile) blockers.push("Customer signature is required.");
-    
+
     if ((isRentPlan || isLeasePlan) && customer) {
       const hasVerifiedKyc = customer.kyc_status === "VERIFIED" || Boolean(idDocFile);
       if (!hasVerifiedKyc) {
-        blockers.push("Customer KYC must be VERIFIED or an ID document (Aadhaar/PAN/Voter ID) must be uploaded before activating a Rent or Lease contract.");
+        blockers.push(
+          "Customer KYC must be VERIFIED or an ID document (Aadhaar/PAN/Voter ID) must be uploaded before activating a Rent or Lease contract."
+        );
       }
     }
     return blockers;
   }, [
     planType,
     customer,
-    product,
-    startDate,
-    tenureMonths,
     isEmiPlan,
+    product,
     batch,
-    depositPercentNumber,
-    photoFile,
-    signatureFile,
+    contractItems,
+    effectiveDepositPercent,
     isRentPlan,
     isLeasePlan,
+    depositPercentNumber,
+    yieldRatePercent,
+    startDate,
+    tenureMonths,
+    photoFile,
+    signatureFile,
     idDocFile,
   ]);
 
@@ -666,19 +870,36 @@ export default function SubscriptionCreatePage({
   // Save as Draft is always allowed when the form structure is complete (no KYC gate).
   const canSaveAsDraft = useMemo(() => {
     if (isEmiPlan) return false;
-    if (!customer || !product || !startDate) return false;
+    if (!customer || !startDate) return false;
+    if (contractItems.length === 0 && !product) return false;
     if (!tenureMonths || tenureMonths <= 0) return false;
-    if (depositPercentNumber < 20 || depositPercentNumber > 30) return false;
-    if (isRentPlan && !product.is_rent_enabled) return false;
-    if (isLeasePlan && !product.is_lease_enabled) return false;
+    if (contractItems.length > 0) {
+      const anyDisabled = contractItems.some((it) =>
+        isRentPlan ? !it.product.is_rent_enabled : !it.product.is_lease_enabled
+      );
+      if (anyDisabled) return false;
+      const anyInvalid = contractItems.some((it) => {
+        const y = Number(it.monthly_yield_percent);
+        const d = Number(it.security_deposit_percent);
+        return isNaN(y) || y <= 0 || isNaN(d) || d < 0;
+      });
+      if (anyInvalid) return false;
+    } else if (product) {
+      if (isRentPlan && !product.is_rent_enabled) return false;
+      if (isLeasePlan && !product.is_lease_enabled) return false;
+      if (depositPercentNumber < 0 || depositPercentNumber > 100) return false;
+    }
     return true;
   }, [
     isEmiPlan,
     customer,
-    product,
     startDate,
+    contractItems,
+    product,
     tenureMonths,
     depositPercentNumber,
+    isRentPlan,
+    isLeasePlan,
   ]);
 
   function nextLuckyRequestToken(): number {
@@ -1177,9 +1398,20 @@ export default function SubscriptionCreatePage({
       return;
     }
 
-    if (!product) {
-      setError("Product is required.");
-      return;
+    if (isEmiPlan) {
+      if (!product) {
+        setError("Product is required for EMI subscription.");
+        return;
+      }
+      if (!batch) {
+        setError("Batch is required for EMI subscription.");
+        return;
+      }
+    } else {
+      if (contractItems.length === 0 && !product) {
+        setError(`Please attach at least one furniture product for this ${planType} contract.`);
+        return;
+      }
     }
 
     if (!startDate) {
@@ -1192,14 +1424,12 @@ export default function SubscriptionCreatePage({
       return;
     }
 
-    if (isEmiPlan && !batch) {
-      setError("Batch is required for EMI subscription.");
-      return;
-    }
-
-    if (!isEmiPlan && (depositPercentNumber < 20 || depositPercentNumber > 30)) {
-      setError("Security deposit percent must be between 20 and 30.");
-      return;
+    if (!isEmiPlan) {
+      const depCheck = contractItems.length > 0 ? Number(effectiveDepositPercent) : depositPercentNumber;
+      if (depCheck < 0 || depCheck > 100) {
+        setError(`Security deposit percent must be between 0 and 100 (currently ${depCheck}%).`);
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -1217,7 +1447,7 @@ export default function SubscriptionCreatePage({
       if (isEmiPlan) {
         const body: Record<string, unknown> = {
           customer: customer.id,
-          product: product.id,
+          product: product!.id,
           partner: partner?.id ?? null,
           plan_type: planType ?? "EMI",
           tenure_months: tenureMonths,
@@ -1231,13 +1461,27 @@ export default function SubscriptionCreatePage({
           body: JSON.stringify(body),
         });
       } else if (isRentPlan) {
+        const primaryProd = contractItems.length > 0 ? contractItems[0].product : product!;
+        const itemsPayload =
+          contractItems.length > 0
+            ? contractItems.map((it) => ({
+                product: it.product.id,
+                quantity: it.quantity,
+                unit_base_price: it.unit_base_price,
+                monthly_yield_percent: it.monthly_yield_percent || yieldRatePercent,
+                security_deposit_percent: it.security_deposit_percent || securityDepositPercent,
+                security_deposit_amount: it.security_deposit_amount || undefined,
+              }))
+            : undefined;
+
         const body: Record<string, unknown> = {
           customer: customer.id,
-          product: product.id,
+          product: primaryProd.id,
+          items: itemsPayload,
           tenure_months: tenureMonths,
           start_date: startDate,
-          security_deposit_percent: depositPercentNumber,
-          monthly_yield_percent: Number(yieldRatePercent) || 5.00,
+          security_deposit_percent: Number(effectiveDepositPercent) || depositPercentNumber,
+          monthly_yield_percent: Number(yieldRatePercent) || 5.0,
           handover_notes: handoverNotes || "",
           contract_terms_snapshot: contractTermsSnapshot || "",
           save_as_draft: asDraft,
@@ -1248,13 +1492,27 @@ export default function SubscriptionCreatePage({
           body: JSON.stringify(body),
         });
       } else {
+        const primaryProd = contractItems.length > 0 ? contractItems[0].product : product!;
+        const itemsPayload =
+          contractItems.length > 0
+            ? contractItems.map((it) => ({
+                product: it.product.id,
+                quantity: it.quantity,
+                unit_base_price: it.unit_base_price,
+                monthly_yield_percent: it.monthly_yield_percent || yieldRatePercent,
+                security_deposit_percent: it.security_deposit_percent || securityDepositPercent,
+                security_deposit_amount: it.security_deposit_amount || undefined,
+              }))
+            : undefined;
+
         const body: Record<string, unknown> = {
           customer: customer.id,
-          product: product.id,
+          product: primaryProd.id,
+          items: itemsPayload,
           tenure_months: tenureMonths,
           start_date: startDate,
-          security_deposit_percent: depositPercentNumber,
-          monthly_yield_percent: Number(yieldRatePercent) || 5.00,
+          security_deposit_percent: Number(effectiveDepositPercent) || depositPercentNumber,
+          monthly_yield_percent: Number(yieldRatePercent) || 5.0,
           buyout_amount: leaseBuyoutAmount.trim() ? leaseBuyoutAmount.trim() : null,
           ownership_transfer_allowed: ownershipTransferAllowed,
           handover_notes: handoverNotes || "",
@@ -1519,32 +1777,273 @@ export default function SubscriptionCreatePage({
                 placeholder="Search customer by phone, name, or code…"
               />
             </div>
-            <div className="space-y-1.5">
-              <div className="text-sm font-medium">Product</div>
-              <div className="text-xs text-muted-foreground mb-2">
-                Search by product name or code.
+            {isRentPlan || isLeasePlan ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-medium text-foreground">
+                      Attached Furniture Items ({contractItems.length})
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Attach single or multiple furniture items under this {isRentPlan ? "Rental" : "Lease"} contract.
+                    </div>
+                  </div>
+                  {!addingProduct && contractItems.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setAddingProduct(true)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors"
+                    >
+                      <span>+ Add Another Product</span>
+                    </button>
+                  )}
+                </div>
+
+                {contractItems.length > 0 ? (
+                  <div className="space-y-2">
+                    <div className="overflow-x-auto rounded-xl border border-border bg-card/60">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="border-b border-border bg-muted/40 font-medium text-muted-foreground">
+                            <th className="px-3 py-2.5">Product</th>
+                            <th className="px-3 py-2.5 w-20">Qty</th>
+                            <th className="px-3 py-2.5 w-28">Unit Base (₹)</th>
+                            <th className="px-3 py-2.5 w-28">Line Base</th>
+                            <th className="px-3 py-2.5 w-24">Yield %</th>
+                            <th className="px-3 py-2.5 w-28">Monthly {isRentPlan ? "Rent" : "Lease"}</th>
+                            <th className="px-3 py-2.5 w-24">Deposit %</th>
+                            <th className="px-3 py-2.5 w-28">Deposit (₹)</th>
+                            <th className="px-3 py-2.5 text-right w-12">Remove</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {contractItems.map((itm) => {
+                            const lineBase = itm.quantity * (Number(itm.unit_base_price) || 0);
+                            const yieldPct =
+                              Number(itm.monthly_yield_percent) || Number(yieldRatePercent) || 5.0;
+                            const lineMonthly = (lineBase * yieldPct) / 100;
+                            const depPct =
+                              Number(itm.security_deposit_percent) || Number(securityDepositPercent) || 20.0;
+                            const lineDeposit = itm.security_deposit_amount
+                              ? Number(itm.security_deposit_amount)
+                              : (lineBase * depPct) / 100;
+                            return (
+                              <tr key={itm.id} className="hover:bg-muted/20 transition-colors">
+                                <td className="px-3 py-2.5">
+                                  <div className="font-semibold text-foreground">{itm.product.name}</div>
+                                  <div className="text-[11px] text-muted-foreground font-mono">
+                                    {itm.product.product_code || "—"}{" "}
+                                    {itm.product.category ? `· ${itm.product.category}` : ""}
+                                  </div>
+                                </td>
+                                <td className="px-3 py-2.5">
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => updateBasketQuantity(itm.id, itm.quantity - 1)}
+                                      className="h-6 w-6 rounded border border-border bg-background text-center text-xs font-bold hover:bg-muted"
+                                    >
+                                      -
+                                    </button>
+                                    <span className="w-7 text-center font-semibold">{itm.quantity}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => updateBasketQuantity(itm.id, itm.quantity + 1)}
+                                      className="h-6 w-6 rounded border border-border bg-background text-center text-xs font-bold hover:bg-muted"
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                </td>
+                                <td className="px-3 py-2.5">
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={itm.unit_base_price}
+                                    onChange={(e) => updateBasketUnitPrice(itm.id, e.target.value)}
+                                    className="h-7 w-24 rounded border border-border bg-background px-2 text-xs font-mono"
+                                  />
+                                </td>
+                                <td className="px-3 py-2.5 font-semibold font-mono text-foreground">
+                                  ₹
+                                  {lineBase.toLocaleString("en-IN", {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}
+                                </td>
+                                <td className="px-3 py-2.5">
+                                  <div className="flex items-center gap-1">
+                                    <input
+                                      type="number"
+                                      step="0.1"
+                                      min="0.01"
+                                      value={itm.monthly_yield_percent}
+                                      onChange={(e) => updateBasketYield(itm.id, e.target.value)}
+                                      className="h-7 w-16 rounded border border-border bg-background px-1.5 text-xs font-mono"
+                                      title="Custom yield rate % for this product"
+                                    />
+                                    <span className="text-[11px] text-muted-foreground">%</span>
+                                  </div>
+                                </td>
+                                <td className="px-3 py-2.5 font-semibold font-mono text-primary">
+                                  ₹
+                                  {lineMonthly.toLocaleString("en-IN", {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}
+                                </td>
+                                <td className="px-3 py-2.5">
+                                  <div className="flex items-center gap-1">
+                                    <input
+                                      type="number"
+                                      step="0.5"
+                                      min="0"
+                                      max="100"
+                                      value={itm.security_deposit_percent}
+                                      onChange={(e) => updateBasketDepositPercent(itm.id, e.target.value)}
+                                      className="h-7 w-16 rounded border border-border bg-background px-1.5 text-xs font-mono"
+                                      title="Custom security deposit % for this product"
+                                    />
+                                    <span className="text-[11px] text-muted-foreground">%</span>
+                                  </div>
+                                </td>
+                                <td className="px-3 py-2.5 font-semibold font-mono text-amber-700 dark:text-amber-400">
+                                  ₹
+                                  {lineDeposit.toLocaleString("en-IN", {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}
+                                </td>
+                                <td className="px-3 py-2.5 text-right">
+                                  <button
+                                    type="button"
+                                    onClick={() => removeProductFromBasket(itm.id)}
+                                    className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                                    title="Remove product"
+                                  >
+                                    ✕
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 p-2.5 text-xs">
+                      <div className="flex flex-wrap items-center gap-4">
+                        <div>
+                          <span className="text-muted-foreground">Total Base:</span>{" "}
+                          <span className="font-bold text-foreground font-mono">
+                            ₹
+                            {totalProductBaseValue.toLocaleString("en-IN", {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Monthly Total:</span>{" "}
+                          <span className="font-bold text-primary font-mono">
+                            ₹
+                            {Number(monthlyAmount).toLocaleString("en-IN", {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Total Deposit:</span>{" "}
+                          <span className="font-bold text-amber-700 dark:text-amber-400 font-mono">
+                            ₹
+                            {Number(securityDepositAmount).toLocaleString("en-IN", {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </span>
+                          <span className="ml-1 text-[11px] text-muted-foreground">
+                            (effective {effectiveDepositPercent}%)
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] text-muted-foreground">Quick set:</span>
+                        <button
+                          type="button"
+                          onClick={() => applyGlobalYieldToAll(yieldRatePercent)}
+                          className="rounded border border-border bg-background px-2 py-0.5 text-[11px] font-medium hover:bg-muted"
+                          title="Apply default yield % to all products"
+                        >
+                          Yield {yieldRatePercent}%
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => applyGlobalDepositToAll(securityDepositPercent)}
+                          className="rounded border border-border bg-background px-2 py-0.5 text-[11px] font-medium hover:bg-muted"
+                          title="Apply default deposit % to all products"
+                        >
+                          Deposit {securityDepositPercent}%
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                {(contractItems.length === 0 || addingProduct) && (
+                  <div className="rounded-xl border border-dashed border-primary/40 bg-primary/5 p-3 space-y-2">
+                    <div className="flex items-center justify-between text-xs font-medium text-primary">
+                      <span>
+                        {contractItems.length === 0
+                          ? "Select Initial Product for Contract"
+                          : "Search & Add Another Product to Contract"}
+                      </span>
+                      {addingProduct && (
+                        <button
+                          type="button"
+                          onClick={() => setAddingProduct(false)}
+                          className="text-xs text-muted-foreground hover:text-foreground"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                    </div>
+                    <ProductSelector
+                      selected={null}
+                      onSelect={(item) => addProductToBasket(item)}
+                      onClear={() => {}}
+                    />
+                  </div>
+                )}
               </div>
-              <ProductSelector
-                selected={product}
-                onSelect={(item) => {
-                  nextLuckyRequestToken();
-                  setProduct(item);
-                  setError(null);
-                  setSuccess(null);
-                }}
-                onClear={() => {
-                  nextLuckyRequestToken();
-                  setProduct(null);
-                  setBatch(null);
-                  setLuckyId(null);
-                  setBatchQuery("");
-                  setLuckyQuery("");
-                  setBatchResults([]);
-                  setLuckyResults([]);
-                  setAvailableLuckyCount(null);
-                }}
-              />
-            </div>
+            ) : (
+              <div className="space-y-1.5">
+                <div className="text-sm font-medium">Product</div>
+                <div className="text-xs text-muted-foreground mb-2">
+                  Search by product name or code for Lucky Plan Advance EMI.
+                </div>
+                <ProductSelector
+                  selected={product}
+                  onSelect={(item) => {
+                    nextLuckyRequestToken();
+                    setProduct(item);
+                    setError(null);
+                    setSuccess(null);
+                  }}
+                  onClear={() => {
+                    nextLuckyRequestToken();
+                    setProduct(null);
+                    setBatch(null);
+                    setLuckyId(null);
+                    setBatchQuery("");
+                    setLuckyQuery("");
+                    setBatchResults([]);
+                    setLuckyResults([]);
+                    setAvailableLuckyCount(null);
+                  }}
+                />
+              </div>
+            )}
             {isEmiPlan ? (
               <div className="space-y-1.5">
                 <div className="text-sm font-medium">Partner (optional)</div>
@@ -1586,10 +2085,26 @@ export default function SubscriptionCreatePage({
                       type="button"
                       onClick={() => {
                         setPlanType(pt);
-                        if (pt !== "EMI") {
+                        if (pt === "EMI") {
+                          if (contractItems.length > 1) {
+                            setContractItems(contractItems.slice(0, 1));
+                          }
+                        } else {
                           nextLuckyRequestToken();
                           setBatch(null);
                           setLuckyId(null);
+                          if (product && contractItems.length === 0) {
+                            setContractItems([
+                              {
+                                id: `item-${product.id}`,
+                                product,
+                                quantity: 1,
+                                unit_base_price: product.base_price || "0.00",
+                                monthly_yield_percent: yieldRatePercent || "5.00",
+                                security_deposit_percent: securityDepositPercent || "20.00",
+                              },
+                            ]);
+                          }
                         }
                       }}
                       className={[
@@ -1781,22 +2296,24 @@ export default function SubscriptionCreatePage({
                 <div className="rounded-xl border border-border bg-background p-4">
                   <div className="space-y-1">
                     <h3 className="text-sm font-semibold text-foreground">
-                      Security deposit (required)
+                      Security deposit &amp; Yield structure
                     </h3>
                     <p className="text-xs text-muted-foreground">
-                      Deposit must be between 20% and 30% of contract value. Refund is processed after return-condition assessment.
+                      {contractItems.length > 1
+                        ? `Custom rates are configured per product in Step 1. You can also sync uniform rates across all ${contractItems.length} items below.`
+                        : "Configure security deposit and monthly yield rate for this contract."}
                     </p>
                   </div>
 
                   <div className="mt-4 grid gap-3 md:grid-cols-2">
                     <div>
                       <label className="text-xs font-medium text-muted-foreground">
-                        Deposit percent
+                        {contractItems.length > 1 ? "Default / Global Deposit %" : "Deposit percent (%)"}
                       </label>
                       <input
                         type="number"
-                        min="20"
-                        max="30"
+                        min="0"
+                        max="100"
                         step="0.5"
                         value={securityDepositPercent}
                         onChange={(event) => {
@@ -1806,18 +2323,31 @@ export default function SubscriptionCreatePage({
                         }}
                         className="mt-2 h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
                       />
-                      <p className="mt-2 text-xs text-muted-foreground">Allowed range: 20 to 30</p>
+                      <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                        <span>Effective rate: {effectiveDepositPercent}%</span>
+                        {contractItems.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => applyGlobalDepositToAll(securityDepositPercent)}
+                            className="font-semibold text-primary hover:underline"
+                          >
+                            Apply to all {contractItems.length} items
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     <div className="rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3">
                       <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                         Deposit amount
                       </div>
-                      <div className="mt-2 text-sm font-semibold text-foreground">
+                      <div className="mt-2 text-sm font-semibold text-amber-700 dark:text-amber-400 font-mono">
                         {money(securityDepositAmount)}
                       </div>
                       <div className="mt-1 text-xs text-muted-foreground">
-                        Computed from base price {money(totalAmount)}
+                        {contractItems.length > 1
+                          ? `Sum of itemized product deposits (effective ${effectiveDepositPercent}%)`
+                          : `Computed from base price ${money(totalProductBaseValue)}`}
                       </div>
                     </div>
                   </div>
@@ -1825,7 +2355,7 @@ export default function SubscriptionCreatePage({
                   <div className="mt-4 grid gap-3 md:grid-cols-2">
                     <div>
                       <label className="text-xs font-medium text-muted-foreground">
-                        Yield rate (%)
+                        {contractItems.length > 1 ? "Default / Global Yield %" : "Yield rate (%)"}
                       </label>
                       <input
                         type="number"
@@ -1839,20 +2369,31 @@ export default function SubscriptionCreatePage({
                         }}
                         className="mt-2 h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
                       />
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        Monthly yield on base price
-                      </p>
+                      <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                        <span>Monthly yield on base price</span>
+                        {contractItems.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => applyGlobalYieldToAll(yieldRatePercent)}
+                            className="font-semibold text-primary hover:underline"
+                          >
+                            Apply to all {contractItems.length} items
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     <div className="rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3">
                       <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                        Monthly rent amount
+                        Monthly {isRentPlan ? "Rent" : "Lease"} Amount
                       </div>
-                      <div className="mt-2 text-sm font-semibold text-foreground">
+                      <div className="mt-2 text-sm font-semibold text-foreground font-mono">
                         {money(monthlyAmount)}
                       </div>
                       <div className="mt-1 text-xs text-muted-foreground">
-                        Computed from base price {money(totalAmount)}
+                        {contractItems.length > 1
+                          ? `Sum of monthly dues across ${contractItems.length} products`
+                          : `Computed from base price ${money(totalProductBaseValue)}`}
                       </div>
                     </div>
                   </div>
@@ -2005,17 +2546,32 @@ export default function SubscriptionCreatePage({
               value={customer ? `${customer.name} (${customer.phone})` : "—"}
             />
             <DetailValue
-              label="Product"
+              label={
+                isRentPlan || isLeasePlan
+                  ? `Attached Products (${contractItems.length || (product ? 1 : 0)})`
+                  : "Product"
+              }
               value={
-                product
+                (isRentPlan || isLeasePlan) && contractItems.length > 0
+                  ? contractItems
+                      .map((c) => `${c.quantity}x ${c.product.name}`)
+                      .join(", ")
+                  : product
                   ? `${product.name}${product.product_code ? ` (${product.product_code})` : ""}`
                   : "—"
               }
             />
-            <DetailValue
-              label="Enabled Modes"
-              value={productModes.length > 0 ? productModes.join(" / ") : "—"}
-            />
+            {isRentPlan || isLeasePlan ? (
+              <DetailValue
+                label="Combined Base Value"
+                value={money(totalProductBaseValue)}
+              />
+            ) : (
+              <DetailValue
+                label="Enabled Modes"
+                value={productModes.length > 0 ? productModes.join(" / ") : "—"}
+              />
+            )}
             <DetailValue
               label="Batch"
               value={

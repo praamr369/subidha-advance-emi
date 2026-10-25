@@ -4,6 +4,7 @@ import { useState } from "react";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
 import { capturePOD } from "@/services/pod";
+import SignatureCanvas from "@/components/forms/SignatureCanvas";
 
 export default function PODCapturePage() {
   const [deliveryId, setDeliveryId] = useState("");
@@ -218,21 +219,37 @@ export default function PODCapturePage() {
           </div>
 
           <div>
-            <label className="text-xs text-muted-foreground">Signature *</label>
-            <div className="flex gap-2 mt-1">
-              <label className="flex-1 h-20 rounded-xl border-2 border-dashed border-border flex items-center justify-center cursor-pointer hover:bg-muted/20 bg-muted/10">
-                {previewSig ? (
-                  <img src={previewSig} alt="preview" className="w-full h-full object-cover rounded" />
-                ) : (
-                  <span className="text-xs text-muted-foreground">✍️ Click to upload</span>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-semibold text-muted-foreground">Signature *</label>
+              <span className="text-[11px] text-muted-foreground">Sign on screen or upload image</span>
+            </div>
+
+            <div className="space-y-3">
+              <SignatureCanvas
+                height={150}
+                label="Touchscreen Signature Pad"
+                onChange={(file, dataUrl) => {
+                  setSignature(file);
+                  setPreviewSig(dataUrl);
+                }}
+              />
+
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-muted-foreground">Or upload image file:</span>
+                <label className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-border bg-muted/20 hover:bg-muted/40 text-xs font-medium cursor-pointer">
+                  <span>📁</span>
+                  <span>{signature ? "Replace file" : "Choose signature file"}</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleFileChange(e.target.files?.[0] || null, setSignature, setPreviewSig)}
+                    className="hidden"
+                  />
+                </label>
+                {previewSig && (
+                  <span className="text-xs text-emerald-600 font-medium">✓ Signature loaded</span>
                 )}
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => handleFileChange(e.target.files?.[0] || null, setSignature, setPreviewSig)}
-                  className="hidden"
-                />
-              </label>
+              </div>
             </div>
           </div>
         </div>
