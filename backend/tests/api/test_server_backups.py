@@ -103,3 +103,54 @@ class ServerBackupApiTests(APITestCase):
         self.assertEqual(self.client.post(BASE, {}, format="json").status_code, status.HTTP_403_FORBIDDEN)
         response, _ = self._download("manual-20260101-000000", "media.tar.gz")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_cloud_storage_settings_get_and_patch(self):
+        self.client.force_authenticate(self.admin)
+        get_res = self.client.get("/api/v1/admin/business-setup/cloud-storage/")
+        self.assertEqual(get_res.status_code, status.HTTP_200_OK)
+        data = get_res.json()
+        self.assertIn("provider", data)
+        self.assertIn("has_secret_access_key", data)
+        self.assertNotIn("secret_access_key", data)
+
+        patch_res = self.client.patch(
+            "/api/v1/admin/business-setup/cloud-storage/",
+            {
+                "provider": "CLOUDFLARE_R2",
+                "endpoint_url": "https://test-account.r2.cloudflarestorage.com",
+                "bucket_name": "my-test-bucket",
+                "access_key_id": "test-key-id",
+                "secret_access_key": "super-secret-key-123",
+                "is_enabled": True,
+            },
+            format="json",
+        )
+        self.assertEqual(patch_res.status_code, status.HTTP_200_OK)
+        updated = patch_res.json()
+        self.assertEqual(updated["bucket_name"], "my-test-bucket")
+        self.assertTrue(updated["has_secret_access_key"])
+        self.assertNotIn("secret_access_key", updated)
+
+    def test_storage_maintenance_stats_and_cleanup(self):
+        self.client.force_authenticate(self.admin)
+        stats_res = self.client.get("/api/v1/admin/business-setup/storage-maintenance/")
+        self.assertEqual(stats_res.status_code, status.HTTP_200_OK)
+        stats_data = stats_res.json()
+        self.assertIn("expired_tokens_count", stats_data)
+        self.assertIn("database", stats_data)
+
+        cleanup_res = self.client.post(
+            "/api/v1/admin/business-setup/storage-maintenance/",
+            {"prune_tokens": True, "prune_sessions": True, "run_vacuum": False},
+            format="json",
+        )
+        self.assertEqual(cleanup_res.status_code, status.HTTP_200_OK)
+        self.assertTrue(cleanup_res.json()["success"])
+        self.assertIn("actions_taken", cleanup_res.json())
+
+    def test_batch_archives_endpoint(self):
+        self.client.force_authenticate(self.admin)
+        res = self.client.get("/api/v1/admin/business-setup/batch-archives/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIsInstance(res.json(), list)
+

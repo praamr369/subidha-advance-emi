@@ -42,8 +42,16 @@ from api.v1.views.admin_public_site import (
     AdminPublicBannerImageUploadView,
     AdminPublicBusinessProfileView,
 )
-from api.v1.views.admin_server_backups import AdminServerBackupDownloadView
-from api.v1.views.admin_server_backups import AdminServerBackupsView
+from api.v1.views.admin_server_backups import (
+    AdminBatchArchiveDownloadView,
+    AdminBatchArchiveExportView,
+    AdminCloudStorageSettingsView,
+    AdminCloudStorageTestView,
+    AdminServerBackupCloudSyncView,
+    AdminServerBackupDownloadView,
+    AdminServerBackupsView,
+    AdminStorageMaintenanceView,
+)
 
 urlpatterns = [
 
@@ -90,6 +98,13 @@ urlpatterns = [
         "business-setup/server-backups/<str:name>/download/<str:filename>/",
         AdminServerBackupDownloadView.as_view(),
     ),
+    path("business-setup/server-backups/cloud-sync/", AdminServerBackupCloudSyncView.as_view()),
+    path("business-setup/cloud-storage/", AdminCloudStorageSettingsView.as_view()),
+    path("business-setup/cloud-storage/test/", AdminCloudStorageTestView.as_view()),
+    path("business-setup/storage-maintenance/", AdminStorageMaintenanceView.as_view()),
+    path("business-setup/batch-archives/", AdminBatchArchiveExportView.as_view()),
+    path("business-setup/batch-archives/<str:filename>/download/", AdminBatchArchiveDownloadView.as_view()),
+
     path("business-setup/restore/preview/", BusinessSetupRestorePreviewView.as_view()),
     path("business-setup/restore/", BusinessSetupRestoreExecuteView.as_view()),
     path("business-setup/restore-jobs/", BusinessSetupRestoreJobsView.as_view()),
