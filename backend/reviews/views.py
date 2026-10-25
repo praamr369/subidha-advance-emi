@@ -15,6 +15,7 @@ from reviews.services import (
     fetch_youtube_comments,
     get_review_links,
     invalidate_config_cache,
+    test_whatsapp_connection,
 )
 
 
@@ -125,10 +126,12 @@ class AdminReviewRefreshCacheView(APIView):
         g = fetch_google_reviews(force_refresh=True)
         f = fetch_facebook_reviews(force_refresh=True)
         y = fetch_youtube_comments(force_refresh=True)
+        w = test_whatsapp_connection()
         return Response({
             "google": {"fetched": len(g.get("reviews", [])), "error": g.get("error")},
             "facebook": {"fetched": len(f.get("reviews", [])), "error": f.get("error")},
             "youtube": {"fetched": len(y.get("reviews", [])), "error": y.get("error")},
+            "whatsapp": {"status": w.get("status"), "error": w.get("error")},
         })
 
 
@@ -139,11 +142,18 @@ CONFIG_FIELDS = (
     "facebook_page_access_token",
     "youtube_api_key",
     "youtube_channel_id",
+    "whatsapp_phone_number_id",
+    "whatsapp_business_account_id",
+    "whatsapp_access_token",
+    "google_analytics_id",
+    "google_site_verification",
+    "meta_catalog_id",
 )
 SECRET_FIELDS = {
     "google_places_api_key",
     "facebook_page_access_token",
     "youtube_api_key",
+    "whatsapp_access_token",
 }
 ENV_FALLBACKS = {
     "google_places_api_key": "GOOGLE_PLACES_API_KEY",
@@ -152,6 +162,12 @@ ENV_FALLBACKS = {
     "facebook_page_access_token": "FACEBOOK_PAGE_ACCESS_TOKEN",
     "youtube_api_key": "YOUTUBE_API_KEY",
     "youtube_channel_id": "YOUTUBE_CHANNEL_ID",
+    "whatsapp_phone_number_id": "WHATSAPP_PHONE_NUMBER_ID",
+    "whatsapp_business_account_id": "WHATSAPP_BUSINESS_ACCOUNT_ID",
+    "whatsapp_access_token": "WHATSAPP_BUSINESS_TOKEN",
+    "google_analytics_id": "NEXT_PUBLIC_GA_MEASUREMENT_ID",
+    "google_site_verification": "GOOGLE_SITE_VERIFICATION",
+    "meta_catalog_id": "META_CATALOG_ID",
 }
 
 

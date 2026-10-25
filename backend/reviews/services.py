@@ -35,6 +35,12 @@ def _config():
             "facebook_page_access_token": obj.facebook_page_access_token,
             "youtube_api_key": obj.youtube_api_key,
             "youtube_channel_id": obj.youtube_channel_id,
+            "whatsapp_phone_number_id": getattr(obj, "whatsapp_phone_number_id", ""),
+            "whatsapp_business_account_id": getattr(obj, "whatsapp_business_account_id", ""),
+            "whatsapp_access_token": getattr(obj, "whatsapp_access_token", ""),
+            "google_analytics_id": getattr(obj, "google_analytics_id", ""),
+            "google_site_verification": getattr(obj, "google_site_verification", ""),
+            "meta_catalog_id": getattr(obj, "meta_catalog_id", ""),
         }
     except Exception:  # table missing during migrate, etc.
         values = {}
@@ -47,6 +53,7 @@ def invalidate_config_cache():
     cache.delete(GOOGLE_CACHE_KEY)
     cache.delete(FACEBOOK_CACHE_KEY)
     cache.delete(YOUTUBE_CACHE_KEY)
+    cache.delete("reviews:whatsapp")
 
 
 def _cred(db_field, env_var):
@@ -70,6 +77,24 @@ def _youtube_api_key():
 def _youtube_channel_id():
     return _cred("youtube_channel_id", "YOUTUBE_CHANNEL_ID")
 
+def _whatsapp_phone_number_id():
+    return _cred("whatsapp_phone_number_id", "WHATSAPP_PHONE_NUMBER_ID")
+
+def _whatsapp_access_token():
+    return _cred("whatsapp_access_token", "WHATSAPP_BUSINESS_TOKEN")
+
+def _whatsapp_waba_id():
+    return _cred("whatsapp_business_account_id", "WHATSAPP_BUSINESS_ACCOUNT_ID")
+
+def _google_analytics_id():
+    return _cred("google_analytics_id", "NEXT_PUBLIC_GA_MEASUREMENT_ID")
+
+def _google_site_verification():
+    return _cred("google_site_verification", "GOOGLE_SITE_VERIFICATION")
+
+def _meta_catalog_id():
+    return _cred("meta_catalog_id", "META_CATALOG_ID")
+
 
 # ── public URL helpers ────────────────────────────────────────────────────────
 
@@ -78,6 +103,22 @@ def get_review_links():
     place_id = _google_place_id()
     fb_page_id = _facebook_page_id()
     channel_id = _youtube_channel_id()
+    catalog_id = _meta_catalog_id()
+    phone_id = _whatsapp_phone_number_id()
+
+    # Calculate live eligible published products count for catalog feed
+    eligible_count = 0
+    try:
+        from products_core.models import Product
+        from django.db.models import Q
+        eligible_count = (
+            Product.objects.filter(is_active=True, item_type="FINISHED_GOOD", base_price__gt=0)
+            .filter(Q(pim__isnull=True) | Q(pim__is_published=True))
+            .count()
+        )
+    except Exception:
+        pass
+
     return {
         "google_write_url": (
             f"https://search.google.com/local/writereview?placeid={place_id}"
@@ -91,7 +132,44 @@ def get_review_links():
             f"https://www.youtube.com/channel/{channel_id}"
             if channel_id else None
         ),
+        "meta_commerce_manager_url": (
+            f"https://business.facebook.com/commerce/{catalog_id}/"
+            if catalog_id else "https://business.facebook.com/commerce/"
+        ),
+        "whatsapp_catalog_feed_path": "/api/v1/public/catalog/whatsapp-feed.csv",
+        "catalog_eligible_products_count": eligible_count,
+        "whatsapp_phone_configured": bool(phone_id),
     }
+
+
+def test_whatsapp_connection():
+    """Test WhatsApp Cloud API connectivity by inspecting phone number status."""
+    token = _whatsapp_access_token()
+    phone_id = _whatsapp_phone_number_id()
+    if not token or not phone_id:
+        return {"error": "WhatsApp phone number ID or token not configured.", "status": None}
+
+    url = f"https://graph.facebook.com/v19.0/{phone_id}?access_token={token}"
+    req = urllib.request.Request(url, headers={"Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            display_phone = data.get("display_phone_number", "")
+            verified_name = data.get("verified_name", "")
+            quality = data.get("quality_rating", "UNKNOWN")
+            return {
+                "error": None,
+                "status": f"Connected ({display_phone or phone_id} - {verified_name or 'Verified'} - Quality: {quality})",
+            }
+    except urllib.error.HTTPError as exc:
+        try:
+            err_data = json.loads(exc.read().decode("utf-8"))
+            msg = err_data.get("error", {}).get("message", exc.reason)
+        except Exception:
+            msg = str(exc)
+        return {"error": f"WhatsApp API: {msg}", "status": None}
+    except Exception as exc:
+        return {"error": f"Connection error: {exc}", "status": None}
 
 
 # ── Google Places API ─────────────────────────────────────────────────────────
