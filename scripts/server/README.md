@@ -143,6 +143,47 @@ database password** (PgBouncer needs plaintext to authenticate outward under
 scram-sha-256; a stored verifier only checks incoming clients). It is written
 `0600 postgres:postgres` and never printed.
 
+## High-Concurrency Server Preparation (1,000+ Users)
+
+To scale the single-server deployment to support 1,000+ concurrent users with low latency:
+
+1. **Kernel and OS Tuning:**
+   ```bash
+   sudo ./scripts/server/tune-server-os.sh --apply
+   ```
+   Increases socket backlog (`somaxconn` = 65535), TCP syn backlog, ephemeral port range, and file descriptor limits (`nofile` = 65535).
+
+2. **PgBouncer Connection Multiplexing:**
+   ```bash
+   sudo ./scripts/server/setup-pgbouncer.sh --cutover
+   ```
+   Uses `scripts/server/pgbouncer.ini` (sized for `max_client_conn = 1000`, `default_pool_size = 40`, `max_db_connections = 60`).
+
+3. **Install Gunicorn & Frontend High-Concurrency Units:**
+   ```bash
+   sudo cp scripts/server/subidha-gunicorn.service /etc/systemd/system/
+   sudo cp scripts/server/subidha-frontend.service /etc/systemd/system/
+   sudo systemctl daemon-reload
+   sudo systemctl restart subidha-gunicorn subidha-frontend
+   ```
+
+4. **Nginx High-Concurrency Reverse Proxy:**
+   ```bash
+   sudo cp scripts/server/nginx-subidha-high-concurrency.conf /etc/nginx/sites-available/subidha-core
+   sudo ln -sf /etc/nginx/sites-available/subidha-core /etc/nginx/sites-enabled/
+   sudo nginx -t
+   sudo systemctl reload nginx
+   ```
+   Directly serves `/_next/static/` (365d cache), `/static/` (30d cache), and `/media/` directly from disk; connects to backend/frontend via persistent keepalive upstream pools (64 idle sockets each).
+
+5. **Redis Cache (for Throttling & Session State):**
+   In `/etc/subidha/backend.env`, ensure Redis is configured:
+   ```bash
+   CACHE_REDIS_URL=redis://127.0.0.1:6379/1
+   CELERY_BROKER_URL=redis://127.0.0.1:6379/0
+   ```
+
+
 ## Read replica — optional
 
 `setup-replica.sh` provisions a streaming standby on port 5433.

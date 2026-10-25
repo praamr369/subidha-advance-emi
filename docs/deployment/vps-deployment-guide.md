@@ -98,14 +98,16 @@ cd /srv/subidha-core/backend
 set -a
 . /etc/subidha-core/backend.env
 set +a
-gunicorn core.wsgi:application --bind 127.0.0.1:8000 --workers 3 --worker-class gthread --threads 16 --timeout 120
+gunicorn core.wsgi:application --bind 127.0.0.1:8000 --workers 4 --worker-class gthread --threads 32 --backlog 2048 --max-requests 2000 --max-requests-jitter 200 --timeout 120
 ```
 
-Note: `--worker-class gthread --threads 16` is required. The realtime SSE
+Note: `--worker-class gthread --threads 32` is required. The realtime SSE
 stream (`/api/v1/realtime/stream/`, used by the notification bell and admin
 navigation badges) holds a connection open for ~50 seconds per browser tab;
 with default sync workers a handful of open dashboards would occupy every
-worker and block the entire API.
+worker and block the entire API. With 4 workers and 32 threads, 128 concurrent
+requests are handled simultaneously. Under heavy loads (1,000+ users), ensure
+PgBouncer is active (`scripts/server/setup-pgbouncer.sh --cutover`).
 
 ## 6) Frontend Deployment Commands
 
@@ -139,9 +141,10 @@ User=www-data
 Group=www-data
 WorkingDirectory=/srv/subidha-core/backend
 EnvironmentFile=/etc/subidha-core/backend.env
-ExecStart=/srv/subidha-core/backend/.venv/bin/gunicorn core.wsgi:application --bind 127.0.0.1:8000 --workers 3 --worker-class gthread --threads 16 --timeout 120
+ExecStart=/srv/subidha-core/backend/.venv/bin/gunicorn core.wsgi:application --bind 127.0.0.1:8000 --workers 4 --worker-class gthread --threads 32 --backlog 2048 --max-requests 2000 --max-requests-jitter 200 --timeout 120
 Restart=always
 RestartSec=5
+LimitNOFILE=65535
 
 [Install]
 WantedBy=multi-user.target

@@ -639,30 +639,30 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.AnonRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
-        "auth_login": "10/minute",
-        "auth_registration": "10/hour",
-        "forgot_password": "10/hour",
-        "resend_password_reset_otp": "10/hour",
-        "reset_password": "20/hour",
-        "payment_mutation": "60/minute",
-        "username_change_self": "5/hour",
+        "auth_login": os.getenv("DJANGO_THROTTLE_AUTH_LOGIN", "10/minute"),
+        "auth_registration": os.getenv("DJANGO_THROTTLE_AUTH_REGISTRATION", "10/hour"),
+        "forgot_password": os.getenv("DJANGO_THROTTLE_FORGOT_PASSWORD", "10/hour"),
+        "resend_password_reset_otp": os.getenv("DJANGO_THROTTLE_RESEND_OTP", "10/hour"),
+        "reset_password": os.getenv("DJANGO_THROTTLE_RESET_PASSWORD", "20/hour"),
+        "payment_mutation": os.getenv("DJANGO_THROTTLE_PAYMENT_MUTATION", "60/minute"),
+        "username_change_self": os.getenv("DJANGO_THROTTLE_USERNAME_CHANGE", "5/hour"),
         # Unauthenticated lead submission. The global anon rate would allow
         # 7,200/hour per IP, which is no limit at all for an endpoint that
         # writes a row and lands it in a human worklist. Generous for a real
         # person filling in the form more than once; useless for flooding.
-        "public_lead": "20/hour",
+        "public_lead": os.getenv("DJANGO_THROTTLE_PUBLIC_LEAD", "20/hour"),
         # Anonymous baseline.
-        "anon": "120/minute",
+        "anon": os.getenv("DJANGO_THROTTLE_ANON", "120/minute"),
         # Role-aware per-user baselines (generous — a cap on abuse, not normal
         # use). Admin/staff run bulk dashboards and hit many endpoints, so they
         # get much higher ceilings than partner/customer portals. Tune per env.
-        "role_admin": "6000/minute",
-        "role_staff": "3000/minute",
-        "role_cashier": "3000/minute",
-        "role_partner": "600/minute",
-        "role_vendor": "600/minute",
-        "role_customer": "300/minute",
-        "role_default": "300/minute",
+        "role_admin": os.getenv("DJANGO_THROTTLE_ROLE_ADMIN", "6000/minute"),
+        "role_staff": os.getenv("DJANGO_THROTTLE_ROLE_STAFF", "3000/minute"),
+        "role_cashier": os.getenv("DJANGO_THROTTLE_ROLE_CASHIER", "3000/minute"),
+        "role_partner": os.getenv("DJANGO_THROTTLE_ROLE_PARTNER", "600/minute"),
+        "role_vendor": os.getenv("DJANGO_THROTTLE_ROLE_VENDOR", "600/minute"),
+        "role_customer": os.getenv("DJANGO_THROTTLE_ROLE_CUSTOMER", "300/minute"),
+        "role_default": os.getenv("DJANGO_THROTTLE_ROLE_DEFAULT", "300/minute"),
     },
 }
 

@@ -8,11 +8,13 @@ Group=subidha
 WorkingDirectory=/var/www/subidha/app/frontend
 EnvironmentFile=-/etc/subidha/frontend.env
 Environment=NODE_ENV=production
+Environment="NODE_OPTIONS=--max-old-space-size=2048"
 ExecStart=/usr/bin/npm run start -- --hostname 127.0.0.1 --port 3000
 Restart=always
 RestartSec=5
 KillSignal=SIGINT
 TimeoutStopSec=20
+LimitNOFILE=65535
 
 [Install]
 WantedBy=multi-user.target

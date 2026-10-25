@@ -1,0 +1,31 @@
+[Unit]
+Description=SUBIDHA CORE Django Backend (Gunicorn High-Concurrency)
+After=network.target postgresql.service pgbouncer.service redis.service
+Wants=postgresql.service redis.service
+
+[Service]
+Type=simple
+User=subidha
+Group=subidha
+WorkingDirectory=/var/www/subidha/app/backend
+EnvironmentFile=-/etc/subidha/backend.env
+ExecStart=/var/www/subidha/app/backend/.venv/bin/gunicorn core.wsgi:application \
+    --bind 127.0.0.1:8000 \
+    --workers 4 \
+    --worker-class gthread \
+    --threads 32 \
+    --backlog 2048 \
+    --max-requests 2000 \
+    --max-requests-jitter 200 \
+    --timeout 120 \
+    --access-logfile - \
+    --error-logfile -
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=30
+Restart=always
+RestartSec=3
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
