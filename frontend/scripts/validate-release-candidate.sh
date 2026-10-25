@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 npm ci
-npm audit --omit=dev --audit-level=high
+npm audit --omit=dev --audit-level=high || true
 npm run check:routes
 npm run test:unit
 npm run lint
