@@ -1,8 +1,11 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { usePathname } from "next/navigation";
+import { CircleHelp } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { openAdminHelp } from "@/components/admin/help/AdminHelpDrawer";
 
 type ERPPageHeaderProps = {
   eyebrow?: string;
@@ -25,6 +28,9 @@ export default function ERPPageHeader({
   actions,
   className,
 }: ERPPageHeaderProps) {
+  const pathname = usePathname() || "";
+  const isAdminRoute = pathname.startsWith("/admin");
+
   return (
     <div
       className={cn(
@@ -34,9 +40,20 @@ export default function ERPPageHeader({
     >
       <div className="min-w-0">
         {eyebrow ? <p className="enterprise-eyebrow">{eyebrow}</p> : null}
-        <div className="flex flex-wrap items-start gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <h1 className="enterprise-title text-2xl">{title}</h1>
           {status ? <div className="mt-0.5">{status}</div> : null}
+          {isAdminRoute ? (
+            <button
+              type="button"
+              onClick={() => openAdminHelp()}
+              className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary hover:bg-primary/20 transition cursor-pointer"
+              title="Open Workflow & Setup Guide (F1)"
+            >
+              <CircleHelp className="size-3.5" />
+              <span>Guide</span>
+            </button>
+          ) : null}
         </div>
         {description ? (
           <div className="mt-1 text-sm leading-6 text-muted-foreground">

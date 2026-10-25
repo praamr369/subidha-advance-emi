@@ -9,6 +9,7 @@ import PublicDisclaimerBox from "@/components/public/PublicDisclaimerBox";
 import PublicPageShell from "@/components/public/PublicPageShell";
 import { listPublicPolicies } from "@/lib/public-api";
 import { PUBLIC_LEGAL_DISCLAIMER_POINTS } from "@/lib/public-content";
+import { listCodifiedPolicies } from "@/lib/public-policies-data";
 import { buildPublicMetadata } from "@/lib/public-seo";
 import { ROUTES } from "@/lib/routes";
 
@@ -38,7 +39,25 @@ const routeMap: Record<string, string> = {
 
 export default async function PublicPoliciesPage() {
   const payload = await listPublicPolicies().catch(() => ({ count: 0, results: [] }));
-  const policies = Array.isArray(payload.results) ? payload.results : [];
+  const remotePolicies = Array.isArray(payload.results) ? payload.results : [];
+
+  const remoteSlugSet = new Set(remotePolicies.map((p) => p.slug));
+  const codified = listCodifiedPolicies();
+
+  const combinedPolicies = [
+    ...remotePolicies,
+    ...codified
+      .filter((c) => !remoteSlugSet.has(c.slug))
+      .map((c) => ({
+        slug: c.slug,
+        title: c.title,
+        category: c.category,
+        version: c.version,
+        summary: c.summary,
+        effective_date: c.effectiveDate,
+        published_at: c.effectiveDate,
+      })),
+  ];
 
   return (
     <PublicPageShell
@@ -59,45 +78,39 @@ export default async function PublicPoliciesPage() {
 
       <section className="public-surface p-6">
         <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Published legal pages</div>
-        <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">Admin-published policy pages</h2>
+        <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">Comprehensive policy library</h2>
         <p className="mt-3 max-w-4xl text-sm leading-7 text-muted-foreground sm:text-base">
-          These pages are published through the legal/policy workflow. Draft or archived legal text is not publicly visible.
+          These policies govern all commercial, sales, purchasing, installment, rental, lease, delivery, warranty, and accounting operations across Subidha Furniture.
         </p>
 
-        {policies.length === 0 ? (
-          <div className="mt-5 rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground">
-            Policy pages are being reviewed and will be published soon. Until then, use the rule summaries above and contact the branch for transaction-specific clarification.
-          </div>
-        ) : (
-          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {policies.map((policy) => {
-              const href = routeMap[policy.slug] || `/policies/${policy.slug}`;
-              return (
-                <article key={`${policy.slug}-${policy.version}`} className="public-card public-card-animated p-5">
-                  <div className="flex flex-wrap gap-2 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                    <span>{policy.category.replace(/_/g, " ")}</span>
-                    <span>v{policy.version}</span>
-                  </div>
-                  <h3 className="mt-2 text-lg font-semibold text-foreground">{policy.title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    {policy.summary || "Published policy page"}
-                  </p>
-                  <div className="mt-3 text-xs text-muted-foreground">
-                    {policy.effective_date ? `Effective: ${policy.effective_date}` : "Effective date will be shown after publish review."}
-                  </div>
-                  <div className="mt-4">
-                    <Link
-                      href={href}
-                      className="inline-flex rounded-xl border border-border bg-card px-3.5 py-2 text-sm font-semibold text-foreground transition hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2"
-                    >
-                      Read policy
-                    </Link>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        )}
+        <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {combinedPolicies.map((policy) => {
+            const href = routeMap[policy.slug] || `/policies/${policy.slug}`;
+            return (
+              <article key={`${policy.slug}-${policy.version}`} className="public-card public-card-animated p-5">
+                <div className="flex flex-wrap gap-2 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                  <span>{policy.category.replace(/_/g, " ")}</span>
+                  <span>v{policy.version}</span>
+                </div>
+                <h3 className="mt-2 text-lg font-semibold text-foreground">{policy.title}</h3>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  {policy.summary || "Published policy page"}
+                </p>
+                <div className="mt-3 text-xs text-muted-foreground">
+                  {policy.effective_date ? `Effective: ${policy.effective_date}` : "Effective date published"}
+                </div>
+                <div className="mt-4">
+                  <Link
+                    href={href}
+                    className="inline-flex rounded-xl border border-border bg-card px-3.5 py-2 text-sm font-semibold text-foreground transition hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2"
+                  >
+                    Read policy
+                  </Link>
+                </div>
+              </article>
+            );
+          })}
+        </div>
       </section>
 
       <PublicDisclaimerBox title="Public legal notice" points={PUBLIC_LEGAL_DISCLAIMER_POINTS} />

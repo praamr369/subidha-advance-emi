@@ -5,7 +5,8 @@ import { formatRupee } from "@/lib/utils/currency";
 import Link from "next/link";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Download, RefreshCw, Search, SlidersHorizontal, X, Layers, ExternalLink, ChevronRight, ChevronDown, GitBranch, CheckCircle2, AlertCircle, Star, Package2 } from "lucide-react";
+import { Download, RefreshCw, Search, SlidersHorizontal, X, Layers, ExternalLink, ChevronRight, ChevronDown, GitBranch, CheckCircle2, AlertCircle, Star, Package2, CircleHelp } from "lucide-react";
+import PimHelpGuideTab from "@/components/admin/help/PimHelpGuideTab";
 import { pimService, type PimProduct, type PimCategory, type PimTreeSummary } from "@/services/pim";
 
 import ProductQuickActions from "@/components/admin/products/ProductQuickActions";
@@ -609,8 +610,10 @@ export default function AdminProductsPage() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState<"subscription" | "pim">(() => {
-    return searchParams.get("tab") === "pim" ? "pim" : "subscription";
+  const [activeTab, setActiveTab] = useState<"subscription" | "pim" | "help">(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam === "help") return "help";
+    return tabParam === "pim" ? "pim" : "subscription";
   });
   const [catalogOptions, setCatalogOptions] = useState<ProductCatalogOptions>(() => emptyCatalogOptions());
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -837,6 +840,7 @@ export default function AdminProductsPage() {
       actions={[
         { href: "/admin/products/create", label: "Create Product", variant: "primary" },
         { href: "/admin/products/masters", label: "Manage Masters", variant: "secondary" },
+        { onClick: () => setActiveTab("help"), label: "PIM Guide", variant: "secondary" },
         { href: "/admin/subscriptions/advance-emi/create", label: "Create Subscription", variant: "secondary" },
       ]}
       stats={[
@@ -858,7 +862,7 @@ export default function AdminProductsPage() {
         ]} />
 
         {/* Tab switcher */}
-        <div className="flex gap-1 p-1 rounded-xl bg-muted w-fit">
+        <div className="flex gap-1 p-1 rounded-xl bg-muted w-fit flex-wrap">
           <button
             type="button"
             onClick={() => setActiveTab("subscription")}
@@ -873,7 +877,17 @@ export default function AdminProductsPage() {
           >
             <Layers className="h-4 w-4" /> PIM Blueprints
           </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("help")}
+            className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === "help" ? "bg-background shadow-sm text-foreground font-semibold" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            <CircleHelp className="size-4 text-primary" /> PIM &amp; Workflow Guide
+          </button>
         </div>
+
+        {/* Help panel */}
+        {activeTab === "help" && <PimHelpGuideTab />}
 
         {/* PIM panel */}
         {activeTab === "pim" && <PimPanel />}

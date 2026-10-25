@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CircleHelp, MessageCircle, Settings } from "lucide-react";
+import { BookOpen, CircleHelp, MessageCircle, Settings } from "lucide-react";
 
 import {
   Menubar,
@@ -14,6 +14,7 @@ import {
 import type { NavigationRole } from "@/config/navigation";
 import { ROUTES } from "@/lib/routes";
 import { openWhatsAppDirectModal } from "@/components/whatsapp/WhatsAppDirectSenderModal";
+import { openAdminHelp } from "@/components/admin/help/AdminHelpDrawer";
 
 type AdminWorkspaceMenubarProps = {
   role: NavigationRole;
@@ -117,13 +118,46 @@ export default function AdminWorkspaceMenubar({
 
       <div className="mx-1 hidden h-6 w-px shrink-0 bg-border lg:block" aria-hidden />
 
-      {/* Help */}
+      {/* Help & Workflows */}
       <MenubarMenu>
-        <MenubarTrigger className="gap-1.5">
+        <MenubarTrigger className="gap-1.5 font-medium text-primary">
           <CircleHelp className="size-3.5 shrink-0" aria-hidden />
-          Help
+          Help &amp; Workflows
         </MenubarTrigger>
-        <MenubarContent align="start">
+        <MenubarContent align="start" className="min-w-64">
+          <MenubarItem
+            onClick={() => openAdminHelp()}
+            className="gap-2 font-semibold text-primary focus:bg-primary/10 cursor-pointer"
+          >
+            <BookOpen className="size-3.5 text-primary" />
+            <span className="flex-1">Page Workflow &amp; Setup Guide</span>
+            <span className="rounded border border-border bg-[var(--surface-card-elevated)] px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
+              F1
+            </span>
+          </MenubarItem>
+          <MenubarSeparator />
+          <MenubarItem onClick={() => openAdminHelp("pim-products")} className="cursor-pointer">
+            PIM &amp; Products Guide
+          </MenubarItem>
+          <MenubarItem onClick={() => openAdminHelp("collections")} className="cursor-pointer">
+            Collections &amp; Payments Guide
+          </MenubarItem>
+          <MenubarItem onClick={() => openAdminHelp("sales-contracts")} className="cursor-pointer">
+            Contracts &amp; Direct Sales Guide
+          </MenubarItem>
+          <MenubarItem onClick={() => openAdminHelp("manufacturing")} className="cursor-pointer">
+            BOM &amp; Manufacturing Guide
+          </MenubarItem>
+          <MenubarItem onClick={() => openAdminHelp("inventory")} className="cursor-pointer">
+            Inventory &amp; Stock Ledger Guide
+          </MenubarItem>
+          <MenubarItem onClick={() => openAdminHelp("purchases-vendors")} className="cursor-pointer">
+            Purchases &amp; Vendors Guide
+          </MenubarItem>
+          <MenubarItem onClick={() => openAdminHelp("accounting-finance")} className="cursor-pointer">
+            Accounting &amp; Financial Setup Guide
+          </MenubarItem>
+          <MenubarSeparator />
           <MenubarItem asChild>
             <Link href={ROUTES.admin.operationsCommandCenter}>Operations command center</Link>
           </MenubarItem>

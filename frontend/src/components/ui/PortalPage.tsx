@@ -3,12 +3,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { AlertTriangle, CheckCircle2, ChevronRight, Info, ShieldAlert } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronRight, CircleHelp, Info, ShieldAlert } from "lucide-react";
 import type { ReactNode } from "react";
 
 import ERPPageHeader from "@/components/erp/ERPPageHeader";
 import { buildAdminCustomerAccountStatementPrintRoute } from "@/lib/route-builders";
 import { cn } from "@/lib/utils";
+import { openAdminHelp } from "@/components/admin/help/AdminHelpDrawer";
 
 type PortalAction = {
   href?: string;
@@ -276,6 +277,18 @@ export default function PortalPage({
                     </span>
                   ) : null}
 
+                  {pathname?.startsWith("/admin") ? (
+                    <button
+                      type="button"
+                      onClick={() => openAdminHelp()}
+                      className="ml-2 mt-2 inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/20 transition cursor-pointer"
+                      title="Open Workflow & Setup Guide (F1)"
+                    >
+                      <CircleHelp className="size-3.5" />
+                      <span>Guide</span>
+                    </button>
+                  ) : null}
+
                   {subtitle ? (
                     <p
                       className={cn(
@@ -429,6 +442,18 @@ export default function PortalPage({
                           })()}
                           {statusBadge.label}
                         </span>
+                      ) : null}
+
+                      {pathname?.startsWith("/admin") ? (
+                        <button
+                          type="button"
+                          onClick={() => openAdminHelp()}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary hover:bg-primary/20 transition cursor-pointer"
+                          title="Open Workflow & Setup Guide (F1)"
+                        >
+                          <CircleHelp className="size-3.5" />
+                          <span>Guide</span>
+                        </button>
                       ) : null}
                     </div>
 

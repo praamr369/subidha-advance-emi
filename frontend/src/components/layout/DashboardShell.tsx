@@ -26,6 +26,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleDollarSign,
+  CircleHelp,
   ClipboardList,
   CreditCard,
   Factory,
@@ -105,6 +106,11 @@ const WhatsAppDirectSenderModal = dynamic(
   () => import("@/components/whatsapp/WhatsAppDirectSenderModal"),
   { ssr: false }
 );
+const AdminHelpDrawer = dynamic(
+  () => import("@/components/admin/help/AdminHelpDrawer"),
+  { ssr: false }
+);
+import { openAdminHelp } from "@/components/admin/help/AdminHelpDrawer";
 
 const DashboardShellContext = createContext(false);
 
@@ -1466,6 +1472,18 @@ function Topbar({
               <span className="hidden sm:inline">New</span>
             </button>
 
+            {/* Help & Workflow Guide button */}
+            <button
+              type="button"
+              onClick={() => openAdminHelp()}
+              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-[var(--topbar-border)] bg-[var(--topbar-control)] px-2.5 text-xs font-semibold text-foreground transition hover:border-primary/50 hover:bg-primary/10 hover:text-primary cursor-pointer"
+              aria-label="Workflow & Setup Guide (F1)"
+              title="Workflow & Setup Guide (F1)"
+            >
+              <CircleHelp className="h-3.5 w-3.5 text-primary shrink-0" />
+              <span className="hidden md:inline">Help</span>
+            </button>
+
             <ThemeToggle variant="dashboard" />
             <NotificationBellDropdown role={role} />
             <UserDropdown displayName={displayName} role={role} onLogout={onLogout} isLoggingOut={isLoggingOut} />
@@ -1740,7 +1758,12 @@ export default function DashboardShell({ children }: DashboardShellProps) {
             sessionId={sessionId}
             currentPathname={pathname}
           />
-          {role === "ADMIN" ? <WhatsAppDirectSenderModal /> : null}
+          {role === "ADMIN" ? (
+            <>
+              <WhatsAppDirectSenderModal />
+              <AdminHelpDrawer />
+            </>
+          ) : null}
         </div>
       </WorkflowProvider>
     </DashboardShellContext.Provider>

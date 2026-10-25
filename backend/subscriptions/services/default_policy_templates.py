@@ -836,23 +836,12 @@ Subidha Furniture delivers furniture products to customers within its service ar
 
 ## 1. Delivery Eligibility
 
+Delivery is initiated after satisfying plan-specific milestone gates:
 
-
-
-
-Delivery is initiated after:
-
-
-- Payment of the required amount is confirmed (full payment for direct sale; first EMI and any advance for Lucky Plan; security deposit and first month rent for rent/lease)
-
-
-- KYC and address verification is complete
-
-
-- Product is available and prepared for dispatch
-
-
-- Delivery date and time is confirmed with the customer
+- **Direct Sale**: Full payment (100%) confirmed and receipted, or approved contract with title retention.
+- **Lucky Plan EMI Subscriptions**: Delivery window unlocks ONLY upon: (1) Draw winner (status=WON), (2) All scheduled EMIs completed (status=COMPLETED), or (3) Provisioned advance prepayment threshold (60% to 80% upfront) settled at enrollment for same-day delivery under Hire-Purchase title retention. Subscriptions not meeting these criteria require an explicit, audited Admin Override.
+- **Rent and Lease**: Product physically verified in warehouse Stock Ledger, customer KYC & premises tenancy proof verified, and 20% to 30% refundable security deposit cleared into deposit ledger.
+- **Verification & Scheduling**: KYC and address verification complete, and delivery date/time confirmed with the customer.
 
 
 
@@ -1950,10 +1939,10 @@ To enroll in the Lucky Plan, you must:
 - Execute a Lucky Plan Subscription Contract (specifying product, tenure, EMI amount, Lucky ID batch, and terms)
 
 
-- Pay the first EMI (and any initial advance or security, if required)
+- Pay the scheduled first advance EMI (or the provisioned 60%–80% advance prepayment threshold if opting for immediate same-day delivery under Hire-Purchase title retention)
 
 
-- Receive delivery or possession of the subscribed product
+- Qualify for delivery upon draw win, tenure completion, or verified advance prepayment threshold clearance
 
 
 
