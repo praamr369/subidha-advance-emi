@@ -159,6 +159,29 @@ def sync_delivery_success_state(*, delivery: Delivery, delivery_date, customer_s
         },
     )
 
+    # 6. Notify customer and admin of confirmed POD handover
+    try:
+        from subscriptions.services.operational_notification_service import (
+            schedule_pod_completed_notification,
+        )
+        sub = delivery.subscription
+        cust = getattr(sub, "customer", None)
+        prod = getattr(sub, "product", None)
+        del_date_str = (
+            delivery_date.strftime("%d %b %Y, %I:%M %p")
+            if hasattr(delivery_date, "strftime")
+            else str(delivery_date)
+        )
+        schedule_pod_completed_notification(
+            delivery_id=delivery.id,
+            customer_user_id=getattr(cust, "user_id", None),
+            product_name=getattr(prod, "name", "Furniture") or "Furniture",
+            delivery_ref=f"DLV-{delivery.id}",
+            delivery_date_str=del_date_str,
+        )
+    except Exception:
+        pass
+
 
 
 @api_view(['POST'])
@@ -266,6 +289,21 @@ def pod_handover_link_view(request, delivery_id):
     sub = delivery.subscription
     customer = getattr(sub, "customer", None)
     product = getattr(sub, "product", None)
+
+    if delivery.status != DeliveryOrderStatus.DELIVERED:
+        try:
+            from subscriptions.services.operational_notification_service import (
+                schedule_pod_handover_ready_notification,
+            )
+            schedule_pod_handover_ready_notification(
+                delivery_id=delivery.id,
+                customer_user_id=getattr(customer, "user_id", None),
+                product_name=getattr(product, "name", "Furniture") or "Furniture",
+                delivery_ref=f"DLV-{delivery.id}",
+                handover_url=f"/delivery-handover/{token}",
+            )
+        except Exception:
+            pass
 
     return Response({
         "success": True,

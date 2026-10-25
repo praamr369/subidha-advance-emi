@@ -213,13 +213,24 @@ export async function listAvailableRentalAssets(
   );
 }
 
+/** Fetch the recommended next sequential asset code for a product. */
+export async function fetchNextRentalAssetCode(
+  productId?: number | null
+): Promise<{ suggested_asset_code: string; product_id?: number | null; product_name?: string | null }> {
+  const query = productId ? `?product=${productId}` : "";
+  return apiFetch<{ suggested_asset_code: string; product_id?: number | null; product_name?: string | null }>(
+    `/admin/rental-assets/next-code/${query}`
+  );
+}
+
 /** Register a physical unit as a rental asset, ideally from its inventory item. */
 export async function createRentalAsset(payload: {
-  asset_code: string;
+  asset_code?: string;
   inventory_item?: number | null;
   product?: number | null;
   serial_no?: string;
   purchase_cost?: string;
+  condition_grade?: string;
 }): Promise<RentalAssetRecord> {
   return apiFetch<RentalAssetRecord>("/admin/rental-assets/", {
     method: "POST",

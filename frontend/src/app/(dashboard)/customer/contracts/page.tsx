@@ -63,6 +63,15 @@ function ContractCard({ sub }: { sub: CustomerSubscription }) {
             <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${planBadgeClass(sub.plan_type ?? "")}`}>
               {planLabel(sub.plan_type ?? "")}
             </span>
+            {sub.has_customer_signature ? (
+              <span className="rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-[10px] font-bold">
+                ✓ Signed
+              </span>
+            ) : (
+              <span className="rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-[10px] font-bold">
+                ⏳ Sign Pending
+              </span>
+            )}
             {isWinner ? (
               <span className="rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-[10px] font-bold flex items-center gap-1">
                 <Star className="size-2.5" /> Winner
@@ -124,6 +133,15 @@ function ContractCard({ sub }: { sub: CustomerSubscription }) {
         >
           View Detail
         </Link>
+        {!sub.has_customer_signature && sub.signing_path ? (
+          <Link
+            href={sub.signing_path}
+            onClick={(e) => e.stopPropagation()}
+            className="flex-1 min-w-[90px] rounded-xl bg-sky-600 text-white py-2 text-center text-xs font-bold hover:bg-sky-700 transition active:scale-95 shadow-sm"
+          >
+            ✍ Sign Contract
+          </Link>
+        ) : null}
         {pt === "RENT" ? (
           <a
             href={customerRentContractPdfUrl(sub.id)}

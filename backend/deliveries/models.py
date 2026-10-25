@@ -58,6 +58,11 @@ class SubscriptionDelivery(TimeStampedModel):
         related_name="overridden_deliveries",
     )
     admin_override_at = models.DateTimeField(null=True, blank=True)
+    batch_number = models.PositiveIntegerField(
+        default=1,
+        db_index=True,
+        help_text="Sequential delivery batch number for partial or multi-item fulfillment.",
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -79,6 +84,7 @@ class SubscriptionDelivery(TimeStampedModel):
         ordering = ["-created_at", "-id"]
         indexes = [
             models.Index(fields=["subscription", "status"]),
+            models.Index(fields=["subscription", "batch_number"]),
             models.Index(fields=["status", "created_at"]),
             models.Index(fields=["scheduled_date"]),
             models.Index(fields=["delivered_at"]),
@@ -86,7 +92,7 @@ class SubscriptionDelivery(TimeStampedModel):
         ]
         constraints = [
             models.UniqueConstraint(
-                fields=["subscription"],
+                fields=["subscription", "batch_number"],
                 condition=Q(
                     status__in=[
                         DeliveryStatus.PENDING,
@@ -96,7 +102,7 @@ class SubscriptionDelivery(TimeStampedModel):
                         DeliveryStatus.RETURN_REQUESTED,
                     ]
                 ),
-                name="uq_active_subscription_delivery_per_subscription",
+                name="uq_active_sub_delivery_batch",
             ),
         ]
 
@@ -185,7 +191,43 @@ class SubscriptionDelivery(TimeStampedModel):
         return self.status in self.ACTIVE_STATUSES
 
     def __str__(self):
-        return f"{self.delivery_reference} - Subscription {self.subscription_id}"
+        return f"{self.delivery_reference} - Subscription {self.subscription_id} (Batch #{self.batch_number})"
+
+
+class SubscriptionDeliveryItem(TimeStampedModel):
+    """Specific line item and quantity fulfilled in a delivery batch."""
+    delivery = models.ForeignKey(
+        SubscriptionDelivery,
+        on_delete=models.CASCADE,
+        related_name="delivery_items",
+    )
+    product = models.ForeignKey(
+        'products_core.Product',
+        on_delete=models.PROTECT,
+        related_name="subscription_delivery_items",
+    )
+    quantity = models.PositiveIntegerField(
+        default=1,
+        validators=[MinValueValidator(1)],
+    )
+    contract_item = models.ForeignKey(
+        'contracts.ContractItem',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="delivery_batch_items",
+    )
+    notes = models.CharField(max_length=255, blank=True, default="")
+
+    class Meta:
+        db_table = "subscription_delivery_items"
+        ordering = ["id"]
+        indexes = [
+            models.Index(fields=["delivery", "product"]),
+        ]
+
+    def __str__(self):
+        return f"Delivery #{self.delivery_id} - {self.product.name} (Qty: {self.quantity})"
 
 
 # =====================================================

@@ -99,6 +99,14 @@ type SubscriptionContractRecord = {
   financial_summary?: FinancialSummary | null;
   rent_profile?: RentLeaseProfile | null;
   lease_profile?: RentLeaseProfile | null;
+  documents?: Array<{
+    id: number;
+    document_type: string;
+    verification_status?: string | null;
+    file_url?: string | null;
+    notes?: string | null;
+    created_at?: string | null;
+  }> | null;
 };
 
 type CustomerRecord = {
@@ -187,6 +195,20 @@ export default function AdminRentLeaseContractPrintPage() {
           { cache: "no-store" }
         );
 
+        if (!subscriptionPayload.documents || subscriptionPayload.documents.length === 0) {
+          try {
+            const docsRes = await apiFetch<{ results?: SubscriptionContractRecord["documents"] }>(
+              `/admin/subscriptions/${contractId}/documents/`,
+              { cache: "no-store" }
+            );
+            if (docsRes?.results?.length) {
+              subscriptionPayload.documents = docsRes.results;
+            }
+          } catch {
+            // Secondary document fetch failed; proceed with payload documents
+          }
+        }
+
         let customerPayload: CustomerRecord | null = null;
         let possessionPayload: ProductPossessionRecord | null = null;
         const customerId = subscriptionPayload.customer_id ?? subscriptionPayload.customer;
@@ -267,6 +289,30 @@ export default function AdminRentLeaseContractPrintPage() {
     subscription.financial_summary?.pending_amount;
   const watermark = documentStatusWatermark(status);
 
+  const customerSignatureDoc = useMemo(() => {
+    if (!subscription?.documents?.length) return null;
+    return (
+      subscription.documents.find(
+        (doc) => doc.document_type === "CUSTOMER_SIGNATURE" && doc.file_url
+      ) || null
+    );
+  }, [subscription?.documents]);
+
+  const customerPhotoDoc = useMemo(() => {
+    if (!subscription?.documents?.length) return null;
+    return (
+      subscription.documents.find(
+        (doc) => doc.document_type === "CUSTOMER_PHOTO" && doc.file_url
+      ) || null
+    );
+  }, [subscription?.documents]);
+
+  const customerSignatureUrl = customerSignatureDoc?.file_url ?? null;
+  const customerPhotoUrl = customerPhotoDoc?.file_url ?? null;
+  const customerSignatureTimestamp = customerSignatureDoc?.created_at
+    ? formatDocumentDateTime(customerSignatureDoc.created_at)
+    : null;
+
   return (
     <>
       <PrintToolbar
@@ -308,6 +354,7 @@ export default function AdminRentLeaseContractPrintPage() {
               phone: subscription.customer_phone || customer?.phone,
               email: customer?.email,
               address: customerAddress(customer),
+              photoUrl: customerPhotoUrl,
             },
             {
               title: "Business",
@@ -497,6 +544,8 @@ export default function AdminRentLeaseContractPrintPage() {
             subidhaDocumentTheme.signatureLabels.customer,
             subidhaDocumentTheme.signatureLabels.authorized,
           ]}
+          customerSignatureUrl={customerSignatureUrl}
+          customerSignatureTimestamp={customerSignatureTimestamp}
         />
 
         <div className="document-screen-only mt-5 flex justify-between gap-4 text-xs text-[#7c6a56]">

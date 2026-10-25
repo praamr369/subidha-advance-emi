@@ -112,6 +112,7 @@ class ProductRequestStatus(models.TextChoices):
 
 class FulfillmentStatus(models.TextChoices):
     PENDING = "PENDING", "Pending"
+    PARTIALLY_DELIVERED = "PARTIALLY_DELIVERED", "Partially Delivered"
     DELIVERED = "DELIVERED", "Delivered"
     RETURN_REQUESTED = "RETURN_REQUESTED", "Return Requested"
     RETURNED = "RETURNED", "Returned"

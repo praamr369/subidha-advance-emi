@@ -64,7 +64,18 @@ def approved_catalog_queryset() -> QuerySet[Product]:
         .exclude(lifecycle_status="DISCONTINUED")
         .exclude(inventory_profile__stock_item_type__in=["RAW_MATERIAL", "ACCESSORY"])
         .select_related("category_master", "subcategory_master")
-        .prefetch_related("pim", "pim_variant")
+        .prefetch_related(
+            "pim",
+            "pim__media_items",
+            "pim__parent",
+            "pim__parent__media_items",
+            "pim__attributes__attribute",
+            "pim_variant",
+            "pim_variant__product",
+            "pim_variant__product__media_items",
+            "pim_variant__product__attributes__attribute",
+            "pim_variant__attribute_values__attribute",
+        )
         .distinct()
         .order_by("category", "name", "id")
     )
@@ -144,17 +155,30 @@ def _resolve_catalog_image(product: Product, request=None) -> str | None:
         if own_v:
             base_pim = own_v.product
         else:
-            pim = product.pim.first()
+            if hasattr(product, "_prefetched_objects_cache") and "pim" in product._prefetched_objects_cache:
+                pim_list = list(product.pim.all())
+                pim = pim_list[0] if pim_list else None
+            else:
+                pim = product.pim.first()
             if pim:
                 base_pim = pim.parent if pim.parent_id else pim
                 
         if base_pim:
-            qs = ProductMediaItem.objects.filter(product=base_pim, kind="IMAGE")
-            if own_v:
-                qs = qs.filter(Q(scope="ALL_VARIANTS") | Q(scope="VARIANT", variant=own_v))
+            if hasattr(base_pim, "_prefetched_objects_cache") and "media_items" in base_pim._prefetched_objects_cache:
+                items = [it for it in base_pim.media_items.all() if it.kind == "IMAGE"]
+                if own_v:
+                    items = [it for it in items if it.scope == "ALL_VARIANTS" or (it.scope == "VARIANT" and it.variant_id == own_v.id)]
+                else:
+                    items = [it for it in items if it.scope == "ALL_VARIANTS"]
+                items.sort(key=lambda it: (not it.is_hero, it.display_order, it.created_at or 0))
+                item = items[0] if items else None
             else:
-                qs = qs.filter(scope="ALL_VARIANTS")
-            item = qs.order_by("-is_hero", "display_order", "-created_at").first()
+                qs = ProductMediaItem.objects.filter(product=base_pim, kind="IMAGE")
+                if own_v:
+                    qs = qs.filter(Q(scope="ALL_VARIANTS") | Q(scope="VARIANT", variant=own_v))
+                else:
+                    qs = qs.filter(scope="ALL_VARIANTS")
+                item = qs.order_by("-is_hero", "display_order", "-created_at").first()
             if item and item.file:
                 return serialize_media_url(request, item.file)
 
@@ -181,18 +205,31 @@ def _resolve_catalog_media(product: Product, request=None) -> list[dict]:
         if own_v:
             base_pim = own_v.product
         else:
-            pim = product.pim.first()
+            if hasattr(product, "_prefetched_objects_cache") and "pim" in product._prefetched_objects_cache:
+                pim_list = list(product.pim.all())
+                pim = pim_list[0] if pim_list else None
+            else:
+                pim = product.pim.first()
             if pim:
                 base_pim = pim.parent if pim.parent_id else pim
                 
         if base_pim:
-            qs = ProductMediaItem.objects.filter(product=base_pim)
-            if own_v:
-                qs = qs.filter(Q(scope="ALL_VARIANTS") | Q(scope="VARIANT", variant=own_v))
+            if hasattr(base_pim, "_prefetched_objects_cache") and "media_items" in base_pim._prefetched_objects_cache:
+                items = list(base_pim.media_items.all())
+                if own_v:
+                    items = [it for it in items if it.scope == "ALL_VARIANTS" or (it.scope == "VARIANT" and it.variant_id == own_v.id)]
+                else:
+                    items = [it for it in items if it.scope == "ALL_VARIANTS"]
+                items.sort(key=lambda it: (not it.is_hero, it.display_order, it.created_at or 0))
             else:
-                qs = qs.filter(scope="ALL_VARIANTS")
+                qs = ProductMediaItem.objects.filter(product=base_pim)
+                if own_v:
+                    qs = qs.filter(Q(scope="ALL_VARIANTS") | Q(scope="VARIANT", variant=own_v))
+                else:
+                    qs = qs.filter(scope="ALL_VARIANTS")
+                items = list(qs.order_by("-is_hero", "display_order", "-created_at"))
             
-            for item in qs.order_by("-is_hero", "display_order", "-created_at"):
+            for item in items:
                 if item.file:
                     media.append({
                         "url": serialize_media_url(request, item.file),
@@ -232,7 +269,11 @@ def serialize_catalog_product(product: Product, request=None) -> dict:
     # Catalog detail can be opened from either a base operational product or
     # a generated variant SKU. Resolve both to the base PIM blueprint so the
     # portal receives the complete attribute/variant matrix in either case.
-    pim = product.pim.first()
+    if hasattr(product, "_prefetched_objects_cache") and "pim" in product._prefetched_objects_cache:
+        pim_list = list(product.pim.all())
+        pim = pim_list[0] if pim_list else None
+    else:
+        pim = product.pim.first()
     if pim is not None and pim.parent_id:
         pim = pim.parent
     if pim is None:
@@ -246,7 +287,8 @@ def serialize_catalog_product(product: Product, request=None) -> dict:
     pim_variants = []
     pim_specs = {}
     if pim:
-        for value in pim.attributes.select_related("attribute"):
+        attrs = pim.attributes.all() if (hasattr(pim, "_prefetched_objects_cache") and "attributes" in pim._prefetched_objects_cache) else pim.attributes.select_related("attribute")
+        for value in attrs:
             if value.display_value:
                 pim_specs[value.attribute.name] = value.display_value
         pim_attributes = [{"name": name, "value": value} for name, value in pim_specs.items()]
@@ -259,7 +301,8 @@ def serialize_catalog_product(product: Product, request=None) -> dict:
         except Exception:
             own_variant = None
         if own_variant and own_variant.product_id == pim.id:
-            for value in own_variant.attribute_values.select_related("attribute"):
+            vals = own_variant.attribute_values.all() if (hasattr(own_variant, "_prefetched_objects_cache") and "attribute_values" in own_variant._prefetched_objects_cache) else own_variant.attribute_values.select_related("attribute")
+            for value in vals:
                 display = value.value_text
                 if not display and value.value_number is not None:
                     display = str(value.value_number)

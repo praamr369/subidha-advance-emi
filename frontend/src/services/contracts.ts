@@ -344,9 +344,12 @@ export async function recordReturnInspection(
   });
 }
 
-export async function approveReturnInspection(subscriptionId: number): Promise<ReturnInspection> {
+export async function approveReturnInspection(
+  subscriptionId: number,
+  payload?: { asset_code?: string }
+): Promise<ReturnInspection> {
   return apiFetch<ReturnInspection>(`/admin/contracts/${subscriptionId}/return-inspection/approve/`, {
     method: "POST",
-    body: "{}",
+    body: JSON.stringify(payload || {}),
   });
 }

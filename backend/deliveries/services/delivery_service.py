@@ -296,17 +296,137 @@ def _generate_delivery_reference() -> str:
     return f"DLV-{timestamp}-{get_random_string(6).upper()}"
 
 
-def _next_fulfillment_status(delivery: SubscriptionDelivery | None) -> str:
-    if delivery is None:
-        return FulfillmentStatus.PENDING
+def get_subscription_item_delivery_progress(subscription: Subscription) -> dict:
+    """Calculate item-level delivery progress across all delivery batches for a subscription."""
+    from deliveries.models import SubscriptionDeliveryItem
 
-    if delivery.status == DeliveryStatus.DELIVERED:
-        return FulfillmentStatus.DELIVERED
-    if delivery.status == DeliveryStatus.RETURN_REQUESTED:
-        return FulfillmentStatus.RETURN_REQUESTED
-    if delivery.status == DeliveryStatus.RETURNED:
+    contract_items = (
+        list(subscription.contract_items.select_related("product").all())
+        if hasattr(subscription, "contract_items") and subscription.contract_items.exists()
+        else []
+    )
+
+    all_deliveries = list(
+        SubscriptionDelivery.objects.filter(subscription=subscription)
+        .prefetch_related("delivery_items", "delivery_items__product")
+        .order_by("batch_number", "id")
+    )
+
+    max_batch = max((getattr(d, "batch_number", 1) for d in all_deliveries), default=0)
+    next_batch_number = max_batch + 1
+
+    delivered_qty_by_prod: dict[int, int] = {}
+    in_transit_qty_by_prod: dict[int, int] = {}
+
+    for d in all_deliveries:
+        is_delivered = d.status == DeliveryStatus.DELIVERED
+        is_in_transit = d.status in (
+            DeliveryStatus.PENDING,
+            DeliveryStatus.SCHEDULED,
+            DeliveryStatus.DISPATCHED,
+            DeliveryStatus.OUT_FOR_DELIVERY,
+        )
+        if not (is_delivered or is_in_transit):
+            continue
+
+        d_items = list(d.delivery_items.all())
+        if d_items:
+            for item in d_items:
+                pid = item.product_id
+                if is_delivered:
+                    delivered_qty_by_prod[pid] = delivered_qty_by_prod.get(pid, 0) + item.quantity
+                elif is_in_transit:
+                    in_transit_qty_by_prod[pid] = in_transit_qty_by_prod.get(pid, 0) + item.quantity
+        else:
+            pid = subscription.product_id
+            if pid:
+                if is_delivered:
+                    delivered_qty_by_prod[pid] = delivered_qty_by_prod.get(pid, 0) + 1
+                elif is_in_transit:
+                    in_transit_qty_by_prod[pid] = in_transit_qty_by_prod.get(pid, 0) + 1
+
+    item_rows = []
+    total_ordered = 0
+    total_delivered = 0
+    total_in_transit = 0
+    total_remaining = 0
+
+    if contract_items:
+        for c_item in contract_items:
+            p = c_item.product
+            ordered = c_item.quantity
+            delivered = delivered_qty_by_prod.get(p.id, 0)
+            in_transit = in_transit_qty_by_prod.get(p.id, 0)
+            remaining = max(0, ordered - (delivered + in_transit))
+
+            total_ordered += ordered
+            total_delivered += delivered
+            total_in_transit += in_transit
+            total_remaining += remaining
+
+            item_rows.append({
+                "contract_item_id": c_item.id,
+                "product_id": p.id,
+                "product_name": p.name,
+                "product_code": getattr(p, "product_code", "") or "",
+                "ordered_quantity": ordered,
+                "delivered_quantity": delivered,
+                "in_transit_quantity": in_transit,
+                "remaining_quantity": remaining,
+            })
+    elif subscription.product:
+        p = subscription.product
+        ordered = 1
+        delivered = delivered_qty_by_prod.get(p.id, 0)
+        in_transit = in_transit_qty_by_prod.get(p.id, 0)
+        remaining = max(0, ordered - (delivered + in_transit))
+
+        total_ordered = ordered
+        total_delivered = delivered
+        total_in_transit = in_transit
+        total_remaining = remaining
+
+        item_rows.append({
+            "contract_item_id": None,
+            "product_id": p.id,
+            "product_name": p.name,
+            "product_code": getattr(p, "product_code", "") or "",
+            "ordered_quantity": ordered,
+            "delivered_quantity": delivered,
+            "in_transit_quantity": in_transit,
+            "remaining_quantity": remaining,
+        })
+
+    if total_ordered > 0 and total_delivered >= total_ordered:
+        fulfillment_status = FulfillmentStatus.DELIVERED
+    elif total_delivered > 0:
+        fulfillment_status = FulfillmentStatus.PARTIALLY_DELIVERED
+    else:
+        fulfillment_status = FulfillmentStatus.PENDING
+
+    return {
+        "items": item_rows,
+        "total_ordered": total_ordered,
+        "total_delivered": total_delivered,
+        "total_in_transit": total_in_transit,
+        "total_remaining": total_remaining,
+        "fulfillment_status": fulfillment_status,
+        "next_batch_number": next_batch_number,
+        "is_multi_item": len(item_rows) > 1 or total_ordered > 1,
+        "has_remaining": total_remaining > 0,
+        "batches_count": len(all_deliveries),
+    }
+
+
+def _next_fulfillment_status(subscription: Subscription, delivery: SubscriptionDelivery | None = None) -> str:
+    all_deliveries = list(subscription.deliveries.all())
+    if any(d.status == DeliveryStatus.RETURNED for d in all_deliveries):
         return FulfillmentStatus.RETURNED
-    return FulfillmentStatus.PENDING
+    if any(d.status == DeliveryStatus.RETURN_REQUESTED for d in all_deliveries):
+        return FulfillmentStatus.RETURN_REQUESTED
+
+    progress = get_subscription_item_delivery_progress(subscription)
+    return progress["fulfillment_status"]
 
 
 def _get_prefetched_deliveries(subscription: Subscription) -> list[SubscriptionDelivery] | None:
@@ -339,8 +459,7 @@ def sync_subscription_fulfillment_status(subscription: Subscription) -> Subscrip
     if isinstance(prefetched, dict):
         prefetched.pop("deliveries", None)
 
-    current_delivery = get_current_subscription_delivery(subscription)
-    next_status = _next_fulfillment_status(current_delivery)
+    next_status = _next_fulfillment_status(subscription)
 
     if subscription.fulfillment_status != next_status:
         subscription.fulfillment_status = next_status
@@ -356,11 +475,29 @@ def serialize_delivery_record(
 ) -> dict:
     subscription = delivery.subscription if include_subscription else None
 
+    d_items = (
+        [
+            {
+                "id": it.id,
+                "product_id": it.product_id,
+                "product_name": it.product.name,
+                "product_code": getattr(it.product, "product_code", "") or "",
+                "quantity": it.quantity,
+                "contract_item_id": it.contract_item_id,
+                "notes": it.notes,
+            }
+            for it in delivery.delivery_items.select_related("product").all()
+        ]
+        if hasattr(delivery, "delivery_items")
+        else []
+    )
+
     return {
         "id": delivery.id,
         "subscription": delivery.subscription_id,
         "subscription_id": delivery.subscription_id,
         "subscription_number": _subscription_number(subscription),
+        "batch_number": getattr(delivery, "batch_number", 1),
         "customer_id": getattr(subscription, "customer_id", None),
         "customer_name": getattr(getattr(subscription, "customer", None), "name", None),
         "customer_phone": getattr(getattr(subscription, "customer", None), "phone", None),
@@ -398,6 +535,7 @@ def serialize_delivery_record(
         "is_terminal": delivery.is_terminal,
         "is_active_delivery": delivery.is_active_delivery,
         "fulfillment_status": getattr(subscription, "fulfillment_status", None),
+        "delivery_items": d_items,
     }
 
 
@@ -504,17 +642,63 @@ def create_subscription_delivery(
     notes: str = "",
     admin_override: bool = False,
     admin_override_reason: str = "",
+    batch_number: int | None = None,
+    items: list[dict] | None = None,
 ):
-    if _active_delivery_for_subscription(subscription) is not None:
-        raise ValueError("An active delivery already exists for this subscription.")
-    if SubscriptionDelivery.objects.filter(
-        subscription=subscription,
-        status=DeliveryStatus.DELIVERED,
-    ).exists():
+    progress = get_subscription_item_delivery_progress(subscription)
+    if progress["total_remaining"] <= 0:
+        if progress["total_delivered"] >= progress["total_ordered"] and progress["total_ordered"] > 0:
+            raise ValueError(
+                "All items for this subscription are already delivered. Use the audited return workflow "
+                "instead of creating another delivery."
+            )
         raise ValueError(
-            "This subscription is already delivered. Use the audited return workflow "
-            "instead of creating another delivery."
+            "All remaining items for this subscription are already scheduled or in transit."
         )
+
+    # Determine batch number
+    if batch_number is not None and int(batch_number) > 0:
+        batch_num = int(batch_number)
+        if SubscriptionDelivery.objects.filter(subscription=subscription, batch_number=batch_num).exists():
+            raise ValueError(f"Delivery batch #{batch_num} already exists for this subscription.")
+    else:
+        batch_num = progress["next_batch_number"]
+
+    # Validate or compute items to include in this delivery batch
+    target_items = []
+    if items:
+        for it in items:
+            p_id = it.get("product_id")
+            qty = int(it.get("quantity", 0))
+            if qty <= 0:
+                continue
+            matching = next((r for r in progress["items"] if r["product_id"] == p_id), None)
+            if not matching:
+                raise ValueError(f"Product ID {p_id} does not belong to this subscription contract.")
+            if qty > matching["remaining_quantity"]:
+                raise ValueError(
+                    f"Requested quantity ({qty}) for {matching['product_name']} exceeds remaining "
+                    f"undelivered quantity ({matching['remaining_quantity']})."
+                )
+            target_items.append({
+                "product_id": p_id,
+                "quantity": qty,
+                "contract_item_id": it.get("contract_item_id") or matching.get("contract_item_id"),
+                "notes": it.get("notes", "") or "",
+            })
+    else:
+        # Default: auto-populate all remaining items
+        for r in progress["items"]:
+            if r["remaining_quantity"] > 0:
+                target_items.append({
+                    "product_id": r["product_id"],
+                    "quantity": r["remaining_quantity"],
+                    "contract_item_id": r.get("contract_item_id"),
+                    "notes": "",
+                })
+
+    if not target_items:
+        raise ValueError("No items selected or available for this delivery batch.")
 
     _enforce_delivery_kyc_gate(
         subscription, delivery_address_snapshot=delivery_address_snapshot
@@ -543,6 +727,7 @@ def create_subscription_delivery(
 
     delivery = SubscriptionDelivery.objects.create(
         subscription=subscription,
+        batch_number=batch_num,
         status=normalized_status,
         delivery_reference=(delivery_reference or _generate_delivery_reference()),
         scheduled_date=scheduled_date,
@@ -558,6 +743,16 @@ def create_subscription_delivery(
         updated_by=performed_by,
     )
 
+    from deliveries.models import SubscriptionDeliveryItem
+    for it in target_items:
+        SubscriptionDeliveryItem.objects.create(
+            delivery=delivery,
+            product_id=it["product_id"],
+            quantity=it["quantity"],
+            contract_item_id=it.get("contract_item_id"),
+            notes=it.get("notes", ""),
+        )
+
     sync_subscription_fulfillment_status(subscription)
 
     _write_delivery_audit(
@@ -567,6 +762,8 @@ def create_subscription_delivery(
         metadata={
             "status": delivery.status,
             "scheduled_date": _date(delivery.scheduled_date),
+            "batch_number": delivery.batch_number,
+            "items_count": len(target_items),
         },
     )
     append_business_event(
@@ -581,6 +778,7 @@ def create_subscription_delivery(
             "delivery_id": delivery.id,
             "status": delivery.status,
             "delivery_reference": delivery.delivery_reference,
+            "batch_number": delivery.batch_number,
         },
     )
 

@@ -182,31 +182,75 @@ export default function ProductMediaSlideshow({
   );
 }
 
+function getYouTubeEmbedUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase();
+    let videoId: string | null = null;
+    if (host.includes("youtube.com")) {
+      if (parsed.pathname.startsWith("/shorts/")) {
+        videoId = parsed.pathname.split("/shorts/")[1]?.split("/")[0] ?? null;
+      } else if (parsed.pathname.startsWith("/embed/")) {
+        videoId = parsed.pathname.split("/embed/")[1]?.split("/")[0] ?? null;
+      } else {
+        videoId = parsed.searchParams.get("v");
+      }
+    } else if (host.includes("youtu.be")) {
+      videoId = parsed.pathname.slice(1).split("/")[0] ?? null;
+    }
+    if (videoId) {
+      return `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&loop=1&playlist=${videoId}&controls=0&modestbranding=1&rel=0`;
+    }
+  } catch {
+    // not a URL
+  }
+  return null;
+}
+
 function VideoSlide({ src, label, play }: { src: string; label: string; play: boolean }) {
   const ref = useRef<HTMLVideoElement>(null);
   // Attach the source only once the slide is first shown, so cards never download video up front.
   const [armed, setArmed] = useState(false);
   if (play && !armed) setArmed(true);
 
+  const youtubeUrl = getYouTubeEmbedUrl(src);
+
   useEffect(() => {
+    if (youtubeUrl) return;
     const video = ref.current;
     if (!video) return;
     if (play) void video.play().catch(() => undefined);
     else video.pause();
-  }, [play, armed]);
+  }, [play, armed, youtubeUrl]);
 
   return (
     <div className="absolute inset-0 bg-slate-950">
-      <video
-        ref={ref}
-        src={armed ? src : undefined}
-        muted
-        loop
-        playsInline
-        preload="none"
-        aria-label={label}
-        className="h-full w-full object-cover"
-      />
+      {youtubeUrl ? (
+        armed && play ? (
+          <iframe
+            src={youtubeUrl}
+            title={label}
+            className="h-full w-full border-0 pointer-events-none"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            loading="lazy"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-slate-900 text-white/70">
+            <Play className="h-8 w-8 opacity-80" />
+          </div>
+        )
+      ) : (
+        <video
+          ref={ref}
+          src={armed ? src : undefined}
+          muted
+          loop
+          playsInline
+          preload="none"
+          aria-label={label}
+          className="h-full w-full object-cover"
+        />
+      )}
       <span className="pointer-events-none absolute right-2 top-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-950/70 text-white">
         <Play className="ml-px h-3 w-3" aria-hidden="true" />
       </span>

@@ -15,8 +15,45 @@ export type DeliveryStatus =
 
 export type DeliveryBucket = "" | "PENDING" | "DELIVERED" | "READY_DISPATCH";
 
+export type DeliveryBatchItem = {
+  id?: number;
+  product_id: number;
+  product_name?: string;
+  product_code?: string;
+  quantity: number;
+  contract_item_id?: number | null;
+  notes?: string;
+};
+
+export type DeliveryItemProgress = {
+  contract_item_id: number | null;
+  product_id: number;
+  product_name: string;
+  product_code: string;
+  ordered_quantity: number;
+  delivered_quantity: number;
+  in_transit_quantity: number;
+  remaining_quantity: number;
+};
+
+export type SubscriptionDeliveryProgress = {
+  items: DeliveryItemProgress[];
+  total_ordered: number;
+  total_delivered: number;
+  total_in_transit: number;
+  total_remaining: number;
+  fulfillment_status: string;
+  next_batch_number: number;
+  is_multi_item: boolean;
+  has_remaining: boolean;
+  batches_count: number;
+};
+
 export type DeliveryRecord = {
   id: number;
+  batch_number?: number;
+  delivery_items?: DeliveryBatchItem[];
+  delivery_progress?: SubscriptionDeliveryProgress | null;
   record_kind?: "SUBSCRIPTION_DELIVERY" | "DIRECT_SALE_CASE" | "DIRECT_SALE_DELIVERY";
   source_type?: "SUBSCRIPTION" | "DIRECT_SALE";
   source_label?: string | null;
@@ -183,11 +220,13 @@ export type DeliverySourceSubscriptionsResponse = {
 
 export type DeliverySourceSubscriptionPrefill = {
   source: DeliverySourceSubscription;
+  progress?: SubscriptionDeliveryProgress;
   defaults: {
     receiver_name?: string;
     receiver_phone?: string;
     delivery_address_snapshot?: string;
     notes?: string;
+    batch_number?: number;
   };
 };
 
@@ -423,6 +462,9 @@ export function normalizeDeliveryRecord(payload: unknown): DeliveryRecord {
     payment_exception_reason: toStringOrNull(row.payment_exception_reason),
     payment_exception_acknowledged: row.payment_exception_acknowledged === true,
     payment_exception_outstanding_amount_snapshot: toStringOrNull(row.payment_exception_outstanding_amount_snapshot),
+    batch_number: typeof row.batch_number === "number" ? row.batch_number : 1,
+    delivery_items: Array.isArray(row.delivery_items) ? (row.delivery_items as DeliveryBatchItem[]) : [],
+    delivery_progress: (row.delivery_progress as SubscriptionDeliveryProgress) || null,
   };
 }
 
@@ -647,6 +689,13 @@ export async function createAdminDelivery(
         notes?: string;
         admin_override?: boolean;
         admin_override_reason?: string;
+        batch_number?: number;
+        items?: {
+          product_id: number;
+          quantity: number;
+          contract_item_id?: number | null;
+          notes?: string;
+        }[];
       }
     | { direct_sale: number }
 ): Promise<DeliveryRecord> {

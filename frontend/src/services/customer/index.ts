@@ -84,6 +84,11 @@ export type CustomerSubscription = {
   delivery_summary?: DeliveryRecord | null;
   deliveries?: DeliveryRecord[];
   emis?: CustomerEmi[];
+
+  has_customer_signature?: boolean;
+  customer_signature_signed_at?: string | null;
+  customer_signature_url?: string | null;
+  signing_path?: string | null;
 };
 
 export type CustomerDashboardResponse = {
@@ -542,6 +547,11 @@ export function normalizeCustomerSubscription(item: unknown): CustomerSubscripti
         : normalizeDeliveryRecord(row.delivery_summary),
     deliveries: toArray(row.deliveries).map(normalizeDeliveryRecord),
     emis: toArray(row.emis).map(normalizeCustomerEmi),
+
+    has_customer_signature: Boolean(row.has_customer_signature),
+    customer_signature_signed_at: toStringOrUndefined(row.customer_signature_signed_at) ?? null,
+    customer_signature_url: toStringOrUndefined(row.customer_signature_url) ?? null,
+    signing_path: toStringOrUndefined(row.signing_path) ?? null,
   };
 }
 

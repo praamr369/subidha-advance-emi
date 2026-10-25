@@ -88,6 +88,46 @@ def _require_rent_or_lease(subscription: Subscription, operation: str) -> None:
 # Public API
 # ---------------------------------------------------------------------------
 
+def generate_next_rental_asset_code(product=None, prefix: str = "RA") -> str:
+    """Generate a clean, collision-free sequential asset code like RA-SOFA01-001 or RA-001.
+
+    Guarantees uniqueness across all RentalAsset records.
+    """
+    import re
+    from products_core.models import RentalAsset
+
+    base_prefix = prefix
+    if product:
+        p_code = getattr(product, "product_code", None) or getattr(product, "sku", None) or ""
+        clean_code = re.sub(r"[^A-Za-z0-9]", "", str(p_code)).strip().upper()
+        if clean_code:
+            base_prefix = f"{prefix}-{clean_code[:12]}"
+
+    search_prefix = f"{base_prefix}-"
+    existing_codes = list(
+        RentalAsset.objects.filter(asset_code__startswith=search_prefix).values_list("asset_code", flat=True)
+    )
+
+    max_num = 0
+    pattern = re.compile(rf"^{re.escape(search_prefix)}(\d+)$")
+    for code in existing_codes:
+        m = pattern.match(code)
+        if m:
+            try:
+                num = int(m.group(1))
+                if num > max_num:
+                    max_num = num
+            except ValueError:
+                pass
+
+    next_num = max_num + 1
+    while True:
+        candidate = f"{search_prefix}{next_num:03d}"
+        if not RentalAsset.objects.filter(asset_code=candidate).exists():
+            return candidate
+        next_num += 1
+
+
 @transaction.atomic
 def create_rental_asset_from_inventory(
     *,

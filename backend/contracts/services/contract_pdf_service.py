@@ -215,6 +215,9 @@ def generate_contract_pdf_for_subscription(*, subscription: Subscription, perfor
         sig_doc = subscription.documents.filter(document_type="CUSTOMER_SIGNATURE").order_by("-id").first()
         if sig_doc and sig_doc.file:
             c.drawImage(ImageReader(sig_doc.file.path), 60 * mm, sig_y_start - 10 * mm, width=40*mm, height=15*mm, preserveAspectRatio=True)
+            if getattr(sig_doc, "created_at", None):
+                c.setFont("Helvetica", 7)
+                c.drawString(60 * mm, sig_y_start - 14 * mm, f"Signed on {sig_doc.created_at.strftime('%d %b %Y, %I:%M %p')}")
     except Exception:
         pass
 
@@ -409,6 +412,9 @@ def generate_advance_emi_contract_pdf(
         sig_doc = subscription.documents.filter(document_type="CUSTOMER_SIGNATURE").order_by("-id").first()
         if sig_doc and sig_doc.file:
             c.drawImage(ImageReader(sig_doc.file.path), 60 * mm, sig_y_start - 10 * mm, width=40*mm, height=15*mm, preserveAspectRatio=True)
+            if getattr(sig_doc, "created_at", None):
+                c.setFont("Helvetica", 7)
+                c.drawString(60 * mm, sig_y_start - 14 * mm, f"Signed on {sig_doc.created_at.strftime('%d %b %Y, %I:%M %p')}")
     except Exception:
         pass
 

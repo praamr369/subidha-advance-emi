@@ -152,6 +152,33 @@ def _render_contract_pdf(*, subscription, profile, contract_kind: str) -> bytes:
     line(f"Return/Inspection Note: {profile.return_inspection_notes or 'Subject to return inspection and recorded condition.'}", size=10)
     line(f"Handover/Return Policy: {profile.handover_notes or 'Handover and return logs are audit-tracked.'}", size=10)
 
+    rule()
+    line("SIGNATURES", size=11, lead=15)
+    sig_y_start = cy
+    line("Customer Signature: _____________________________", size=10)
+    cy -= 6
+    line("Date: _______________", size=10)
+    line("Authorized Signatory: __________________________", size=10)
+    cy -= 6
+    line("Date: _______________", size=10)
+    rule()
+
+    try:
+        from reportlab.lib.utils import ImageReader
+
+        photo_doc = subscription.documents.filter(document_type="CUSTOMER_PHOTO").order_by("-id").first()
+        if photo_doc and photo_doc.file:
+            c.drawImage(ImageReader(photo_doc.file.path), 140 * mm, sig_y_start - 30 * mm, width=35 * mm, height=35 * mm, preserveAspectRatio=True)
+
+        sig_doc = subscription.documents.filter(document_type="CUSTOMER_SIGNATURE").order_by("-id").first()
+        if sig_doc and sig_doc.file:
+            c.drawImage(ImageReader(sig_doc.file.path), 60 * mm, sig_y_start - 10 * mm, width=40 * mm, height=15 * mm, preserveAspectRatio=True)
+            if getattr(sig_doc, "created_at", None):
+                c.setFont("Helvetica", 7)
+                c.drawString(60 * mm, sig_y_start - 14 * mm, f"Signed on {sig_doc.created_at.strftime('%d %b %Y, %I:%M %p')}")
+    except Exception:
+        pass
+
     c.showPage()
     c.save()
     data = buf.getvalue()

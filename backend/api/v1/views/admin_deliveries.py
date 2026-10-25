@@ -297,6 +297,8 @@ class AdminDeliveryListCreateView(APIView):
                 notes=validated.get("notes", ""),
                 admin_override=validated.get("admin_override", False),
                 admin_override_reason=validated.get("admin_override_reason", ""),
+                batch_number=validated.get("batch_number"),
+                items=validated.get("items"),
             )
         except ValueError as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
@@ -367,7 +369,11 @@ class AdminDeliverySourceSubscriptionPrefillView(APIView):
                 "product",
                 "batch",
                 "lucky_id",
-            ).prefetch_related(get_subscription_delivery_prefetch()),
+            ).prefetch_related(
+                get_subscription_delivery_prefetch(),
+                "contract_items",
+                "contract_items__product",
+            ),
             pk=subscription_id,
         )
 
@@ -378,14 +384,19 @@ class AdminDeliverySourceSubscriptionPrefillView(APIView):
         ]
         address_snapshot = ", ".join([part for part in address_parts if part])
 
+        from deliveries.services.delivery_service import get_subscription_item_delivery_progress
+        progress = get_subscription_item_delivery_progress(subscription)
+
         return Response(
             {
                 "source": AdminDeliverySourceSubscriptionSerializer(subscription).data,
+                "progress": progress,
                 "defaults": {
                     "receiver_name": (getattr(customer, "name", "") or "").strip(),
                     "receiver_phone": (getattr(customer, "phone", "") or "").strip(),
                     "delivery_address_snapshot": address_snapshot,
                     "notes": "",
+                    "batch_number": progress["next_batch_number"],
                 },
             }
         )

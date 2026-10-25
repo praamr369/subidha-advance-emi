@@ -34,6 +34,7 @@ import {
   type DeliveryStatus,
   type DeliverySourceSubscription,
   type SubscriptionPlanType,
+  type SubscriptionDeliveryProgress,
 } from "@/services/deliveries";
 
 function toErrorMessage(error: unknown, fallback: string): string {
@@ -186,6 +187,9 @@ export default function AdminDeliveriesPage() {
   const [sourceError, setSourceError] = useState<string | null>(null);
   const [sourceResults, setSourceResults] = useState<DeliverySourceSubscription[]>([]);
   const [selectedSource, setSelectedSource] = useState<DeliverySourceSubscription | null>(null);
+  const [sourceProgress, setSourceProgress] = useState<SubscriptionDeliveryProgress | null>(null);
+  const [createBatchNumber, setCreateBatchNumber] = useState<number>(1);
+  const [batchItemQuantities, setBatchItemQuantities] = useState<Record<number, number>>({});
   const [sourcePrefillLoading, setSourcePrefillLoading] = useState(false);
 
   const createSectionRef = useRef<HTMLDivElement | null>(null);
@@ -292,11 +296,22 @@ export default function AdminDeliveriesPage() {
       setSourceError(null);
       const payload = await getAdminDeliverySourceSubscriptionPrefill(raw);
       setSelectedSource(payload.source);
+      setSourceProgress(payload.progress || null);
       setCreateSubscriptionId(String(payload.source.id));
       setCreateReceiverName(payload.defaults.receiver_name || "");
       setCreateReceiverPhone(payload.defaults.receiver_phone || "");
       setCreateAddress(payload.defaults.delivery_address_snapshot || "");
       setCreateNotes(payload.defaults.notes || "");
+      setCreateBatchNumber(payload.progress?.next_batch_number || 1);
+      if (payload.progress?.items) {
+        const initialQtys: Record<number, number> = {};
+        for (const item of payload.progress.items) {
+          initialQtys[item.product_id] = item.remaining_quantity;
+        }
+        setBatchItemQuantities(initialQtys);
+      } else {
+        setBatchItemQuantities({});
+      }
       setEligibility(null);
       setAdminOverride(false);
       setAdminOverrideReason("");
@@ -446,11 +461,35 @@ export default function AdminDeliveriesPage() {
       setErrorState("Subscription id is required to create a delivery.");
       return;
     }
-    if (activeSelectedDelivery) {
+    if (activeSelectedDelivery && !sourceProgress?.has_remaining) {
       setErrorState(
         `An active delivery already exists for this subscription (${activeSelectedDelivery.delivery_reference}). Complete or cancel the active delivery before creating a new one.`
       );
       return;
+    }
+
+    let batchItemsPayload:
+      | { product_id: number; quantity: number; contract_item_id?: number | null; notes?: string }[]
+      | undefined = undefined;
+
+    if (sourceProgress && sourceProgress.is_multi_item) {
+      const selectedItems = Object.entries(batchItemQuantities)
+        .filter(([_, qty]) => Number(qty) > 0)
+        .map(([productIdStr, qty]) => {
+          const pid = Number(productIdStr);
+          const progItem = sourceProgress.items.find((i) => i.product_id === pid);
+          return {
+            product_id: pid,
+            quantity: Number(qty),
+            contract_item_id: progItem?.contract_item_id ?? null,
+          };
+        });
+
+      if (selectedItems.length === 0) {
+        setErrorState("Please specify at least 1 item quantity to schedule in this delivery batch.");
+        return;
+      }
+      batchItemsPayload = selectedItems;
     }
 
     try {
@@ -468,6 +507,8 @@ export default function AdminDeliveriesPage() {
         notes: createNotes.trim() || undefined,
         admin_override: adminOverride || undefined,
         admin_override_reason: adminOverrideReason.trim() || undefined,
+        batch_number: createBatchNumber,
+        items: batchItemsPayload,
       });
 
       setMessage(`Delivery ${created.delivery_reference} created successfully.`);
@@ -1043,6 +1084,73 @@ export default function AdminDeliveriesPage() {
                         ) : null}
                       </div>
 
+                      {sourceProgress && (
+                        <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex items-center rounded-md bg-primary px-2.5 py-0.5 text-xs font-bold text-primary-foreground">
+                                Batch #{createBatchNumber}
+                              </span>
+                              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                Item-Wise Partial Delivery
+                              </span>
+                            </div>
+                            <div className="text-xs font-medium text-foreground">
+                              Delivered: <span className="font-bold text-emerald-600">{sourceProgress.total_delivered}</span> / {sourceProgress.total_ordered} · Remaining: <span className="font-bold text-primary">{sourceProgress.total_remaining}</span>
+                            </div>
+                          </div>
+
+                          <div className="overflow-x-auto rounded-lg border border-border bg-card">
+                            <table className="w-full text-left text-xs">
+                              <thead className="border-b border-border bg-muted/60 text-muted-foreground font-semibold">
+                                <tr>
+                                  <th className="p-2.5">Product Line Item</th>
+                                  <th className="p-2.5 text-center">Ordered</th>
+                                  <th className="p-2.5 text-center">Delivered</th>
+                                  <th className="p-2.5 text-center">In Transit</th>
+                                  <th className="p-2.5 text-center">Remaining</th>
+                                  <th className="p-2.5 text-right font-bold text-primary">In This Batch</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-border">
+                                {sourceProgress.items.map((it) => (
+                                  <tr key={it.product_id} className="hover:bg-muted/30">
+                                    <td className="p-2.5 font-medium text-foreground">
+                                      {it.product_name}
+                                      {it.product_code ? <span className="ml-1 text-muted-foreground text-[11px]">({it.product_code})</span> : null}
+                                    </td>
+                                    <td className="p-2.5 text-center">{it.ordered_quantity}</td>
+                                    <td className="p-2.5 text-center font-medium text-emerald-600">{it.delivered_quantity}</td>
+                                    <td className="p-2.5 text-center text-amber-600">{it.in_transit_quantity}</td>
+                                    <td className="p-2.5 text-center font-bold">{it.remaining_quantity}</td>
+                                    <td className="p-2.5 text-right">
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        max={it.remaining_quantity}
+                                        value={batchItemQuantities[it.product_id] ?? 0}
+                                        onChange={(e) => {
+                                          const val = Math.max(0, Math.min(it.remaining_quantity, Number(e.target.value) || 0));
+                                          setBatchItemQuantities((prev) => ({
+                                            ...prev,
+                                            [it.product_id]: val,
+                                          }));
+                                        }}
+                                        disabled={it.remaining_quantity === 0}
+                                        className="w-16 rounded border border-input bg-background px-2 py-1 text-right text-xs font-bold text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+                                      />
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                          <div className="text-[11px] text-muted-foreground">
+                            Specify the quantity for each item scheduled in this delivery batch. Stock movement ledger entries are recorded per item upon delivery handover.
+                          </div>
+                        </div>
+                      )}
+
                       <div className="grid gap-3 sm:grid-cols-2">
                         <input
                           value={createReceiverName}
@@ -1136,7 +1244,7 @@ export default function AdminDeliveriesPage() {
                           type="submit"
                           disabled={
                             creating ||
-                            Boolean(activeSelectedDelivery) ||
+                            (Boolean(activeSelectedDelivery) && !sourceProgress?.has_remaining) ||
                             (eligibility !== null && !eligibility.eligible && !adminOverride)
                           }
                           className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
@@ -1144,8 +1252,8 @@ export default function AdminDeliveriesPage() {
                           {creating
                             ? "Creating..."
                             : adminOverride
-                            ? "Force-release delivery (Admin Override)"
-                            : "Create delivery"}
+                            ? `Force-release delivery Batch #${createBatchNumber} (Admin Override)`
+                            : `Schedule delivery Batch #${createBatchNumber}`}
                         </button>
                         <button
                           type="button"

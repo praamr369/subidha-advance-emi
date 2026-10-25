@@ -315,6 +315,9 @@ class Product(TimeStampedModel):
         self.product_code = (self.product_code or "").strip().upper()
         self.name = (self.name or "").strip()
         self.description = (self.description or "").strip()
+        if self.image:
+            from products_core.services.image_optimizer import optimize_image_field
+            optimize_image_field(self, "image")
         from products.services.catalog_master_service import (
             sync_inventory_product_master_fields,
             sync_product_catalog_fields,

@@ -25,6 +25,7 @@ def _payload(*, category: str, severity: str = "INFO", **kwargs: Any) -> dict:
         "receipt_id",
         "purchase_need_id",
         "service_case_id",
+        "delivery_id",
     }
     for key, value in kwargs.items():
         if value is None:
@@ -344,5 +345,188 @@ def schedule_vendor_bill_notification(
             )
         except Exception:
             logger.exception("operational_notification.vendor_bill_failed id=%s", bill_id)
+
+    transaction.on_commit(_run)
+
+
+def schedule_contract_signing_request_notification(
+    *,
+    subscription_id: int,
+    customer_user_id: int | None,
+    contract_ref: str,
+    plan_type: str,
+    product_name: str,
+    signing_path: str,
+) -> None:
+    """Notify registered customer that their contract is ready for digital signature."""
+
+    def _run() -> None:
+        try:
+            from accounts.models import User
+            from system_jobs.services.notifications import emit_notification
+
+            if customer_user_id:
+                customer = User.objects.filter(pk=customer_user_id, is_active=True).first()
+                if customer is not None:
+                    emit_notification(
+                        module="customer",
+                        title="Contract Signature Required",
+                        body=f"Your {plan_type} contract ({contract_ref}) for {product_name} is ready for digital signature.",
+                        recipient=customer,
+                        payload=_payload(
+                            category="CONTRACT_SIGNING_REQUEST",
+                            severity="INFO",
+                            subscription_id=subscription_id,
+                            action_url=signing_path,
+                            object_type="CONTRACT",
+                        ),
+                        dedupe_key=f"CONTRACT_SIGN_REQUEST:{subscription_id}",
+                    )
+        except Exception:
+            logger.exception("operational_notification.contract_signing_request_failed sub_id=%s", subscription_id)
+
+    transaction.on_commit(_run)
+
+
+def schedule_contract_signed_notification(
+    *,
+    subscription_id: int,
+    customer_user_id: int | None,
+    contract_ref: str,
+    plan_type: str,
+    product_name: str,
+) -> None:
+    """Notify registered customer and store admins when a contract is digitally signed."""
+
+    def _run() -> None:
+        try:
+            from accounts.models import User
+            from system_jobs.services.broadcast import notify_all_active_admins
+            from system_jobs.services.notifications import emit_notification
+
+            if customer_user_id:
+                customer = User.objects.filter(pk=customer_user_id, is_active=True).first()
+                if customer is not None:
+                    emit_notification(
+                        module="customer",
+                        title="Contract Digitally Signed",
+                        body=f"Your {plan_type} contract ({contract_ref}) for {product_name} has been digitally signed and saved to your account.",
+                        recipient=customer,
+                        payload=_payload(
+                            category="CONTRACT_SIGNED",
+                            severity="INFO",
+                            subscription_id=subscription_id,
+                            action_url=f"/customer/subscriptions/{subscription_id}",
+                            object_type="CONTRACT",
+                        ),
+                        dedupe_key=f"CONTRACT_SIGNED:{subscription_id}",
+                    )
+
+            notify_all_active_admins(
+                module="subscriptions",
+                title="Contract digitally signed",
+                body=f"{contract_ref} ({product_name}) was signed by customer.",
+                dedupe_prefix=f"ADMIN_CONTRACT_SIGNED:{subscription_id}",
+                payload=_payload(
+                    category="CONTRACT_SIGNED",
+                    severity="INFO",
+                    subscription_id=subscription_id,
+                    action_url=f"/admin/subscriptions/{subscription_id}",
+                    object_type="CONTRACT",
+                ),
+            )
+        except Exception:
+            logger.exception("operational_notification.contract_signed_failed sub_id=%s", subscription_id)
+
+    transaction.on_commit(_run)
+
+
+def schedule_pod_handover_ready_notification(
+    *,
+    delivery_id: int,
+    customer_user_id: int | None,
+    product_name: str,
+    delivery_ref: str,
+    handover_url: str,
+) -> None:
+    """Notify customer when Proof of Delivery (POD) / handover is initiated."""
+
+    def _run() -> None:
+        try:
+            from accounts.models import User
+            from system_jobs.services.notifications import emit_notification
+
+            if customer_user_id:
+                customer = User.objects.filter(pk=customer_user_id, is_active=True).first()
+                if customer is not None:
+                    emit_notification(
+                        module="customer",
+                        title="Delivery Out for Handover (POD)",
+                        body=f"Your delivery {delivery_ref} for {product_name} is out for delivery. Prepare for physical inspection and handover sign-off.",
+                        recipient=customer,
+                        payload=_payload(
+                            category="POD_HANDOVER_READY",
+                            severity="INFO",
+                            delivery_id=delivery_id,
+                            action_url=handover_url,
+                            object_type="DELIVERY_POD",
+                        ),
+                        dedupe_key=f"POD_HANDOVER_READY:{delivery_id}",
+                    )
+        except Exception:
+            logger.exception("operational_notification.pod_handover_ready_failed delivery_id=%s", delivery_id)
+
+    transaction.on_commit(_run)
+
+
+def schedule_pod_completed_notification(
+    *,
+    delivery_id: int,
+    customer_user_id: int | None,
+    product_name: str,
+    delivery_ref: str,
+    delivery_date_str: str,
+) -> None:
+    """Notify customer and admins when Proof of Delivery (POD) handover is completed."""
+
+    def _run() -> None:
+        try:
+            from accounts.models import User
+            from system_jobs.services.broadcast import notify_all_active_admins
+            from system_jobs.services.notifications import emit_notification
+
+            if customer_user_id:
+                customer = User.objects.filter(pk=customer_user_id, is_active=True).first()
+                if customer is not None:
+                    emit_notification(
+                        module="customer",
+                        title="Furniture Handover Confirmed (POD)",
+                        body=f"Proof of delivery for {product_name} ({delivery_ref}) was completed on {delivery_date_str}. Furniture is officially in your custody.",
+                        recipient=customer,
+                        payload=_payload(
+                            category="POD_COMPLETED",
+                            severity="INFO",
+                            delivery_id=delivery_id,
+                            action_url="/customer/deliveries",
+                            object_type="DELIVERY_POD",
+                        ),
+                        dedupe_key=f"POD_COMPLETED:customer:{delivery_id}",
+                    )
+
+            notify_all_active_admins(
+                module="delivery",
+                title="Proof of Delivery (POD) confirmed",
+                body=f"{delivery_ref}: Handover completed with photos and customer signature on {delivery_date_str}.",
+                dedupe_prefix=f"POD_COMPLETED:admin:{delivery_id}",
+                payload=_payload(
+                    category="POD_COMPLETED",
+                    severity="INFO",
+                    delivery_id=delivery_id,
+                    action_url="/admin/deliveries",
+                    object_type="DELIVERY_POD",
+                ),
+            )
+        except Exception:
+            logger.exception("operational_notification.pod_completed_failed delivery_id=%s", delivery_id)
 
     transaction.on_commit(_run)

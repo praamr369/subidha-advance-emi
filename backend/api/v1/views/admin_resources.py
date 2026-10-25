@@ -3948,6 +3948,33 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
         serializer.is_valid(raise_exception=True)
         subscription = serializer.save()
 
+        try:
+            from subscriptions.services.operational_notification_service import (
+                schedule_contract_signing_request_notification,
+            )
+            from api.v1.views.public_contract_sign import generate_contract_signing_token
+
+            customer = getattr(subscription, "customer", None)
+            product = getattr(subscription, "product", None)
+            product_name = getattr(product, "name", "") or "Furniture"
+            contract_ref = (
+                getattr(subscription, "subscription_number", None)
+                or getattr(subscription, "contract_reference", None)
+                or f"SUB-{subscription.id}"
+            )
+            token = generate_contract_signing_token(subscription.id)
+
+            schedule_contract_signing_request_notification(
+                subscription_id=subscription.id,
+                customer_user_id=getattr(customer, "user_id", None),
+                contract_ref=contract_ref,
+                plan_type=subscription.plan_type,
+                product_name=product_name,
+                signing_path=f"/sign-contract/{token}",
+            )
+        except Exception:
+            pass
+
         output = self.get_serializer(subscription)
         headers = self.get_success_headers(output.data)
         return Response(output.data, status=status.HTTP_201_CREATED, headers=headers)
@@ -4411,6 +4438,70 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
         payload["return_assessment"] = result
         return Response(payload)
 
+    @action(detail=True, methods=["get", "post"], url_path="signing-link")
+    def signing_link(self, request, pk=None):
+        subscription = self.get_object()
+        from api.v1.views.public_contract_sign import generate_contract_signing_token
+        from subscriptions.enums import SubscriptionDocumentType
+
+        token = generate_contract_signing_token(subscription.id)
+        customer = getattr(subscription, "customer", None)
+        product = getattr(subscription, "product", None)
+
+        contract_ref = (
+            getattr(subscription, "subscription_number", None)
+            or getattr(subscription, "contract_reference", None)
+            or f"SUB-{subscription.id}"
+        )
+
+        existing_sig = (
+            subscription.documents.filter(document_type=SubscriptionDocumentType.CUSTOMER_SIGNATURE)
+            .order_by("-id")
+            .first()
+        )
+
+        relative_url = f"/sign-contract/{token}"
+        full_signing_url = request.build_absolute_uri(relative_url)
+
+        product_name = getattr(product, "name", "")
+        if not product_name and subscription.product_snapshot:
+            product_name = subscription.product_snapshot.get("name", "Furniture")
+
+        if not existing_sig:
+            try:
+                from subscriptions.services.operational_notification_service import (
+                    schedule_contract_signing_request_notification,
+                )
+                schedule_contract_signing_request_notification(
+                    subscription_id=subscription.id,
+                    customer_user_id=getattr(customer, "user_id", None),
+                    contract_ref=contract_ref,
+                    plan_type=subscription.plan_type,
+                    product_name=product_name,
+                    signing_path=relative_url,
+                )
+            except Exception:
+                pass
+
+        return Response({
+            "success": True,
+            "subscription_id": subscription.id,
+            "token": token,
+            "signing_path": relative_url,
+            "signing_url": full_signing_url,
+            "customer_name": getattr(customer, "name", "Customer"),
+            "customer_phone": getattr(customer, "phone", "") or "",
+            "customer_email": getattr(customer, "email", "") or "",
+            "contract_ref": contract_ref,
+            "plan_type": subscription.plan_type,
+            "product_name": product_name,
+            "total_amount": str(subscription.total_amount),
+            "monthly_amount": str(subscription.monthly_amount),
+            "has_signature": bool(existing_sig),
+            "signed_at": existing_sig.created_at.isoformat() if existing_sig else None,
+            "signature_url": request.build_absolute_uri(existing_sig.file.url) if (existing_sig and existing_sig.file) else None,
+        })
+
 
 # =====================================================
 # P3B — RENTAL ASSET (read-only admin)
@@ -4436,16 +4527,10 @@ class RentalAssetAdminViewSet(viewsets.ReadOnlyModelViewSet):
         from products_core.models import Product
         from deliveries.services.rental_asset_lifecycle_service import (
             create_rental_asset_from_inventory,
+            generate_next_rental_asset_code,
         )
 
         data = request.data
-        asset_code = str(data.get("asset_code") or "").strip()
-        if not asset_code:
-            return Response(
-                {"asset_code": "Asset code is required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
         inventory_item = None
         product = None
         if data.get("inventory_item"):
@@ -4461,6 +4546,10 @@ class RentalAssetAdminViewSet(viewsets.ReadOnlyModelViewSet):
                 {"detail": "Provide either an inventory_item or a product."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        asset_code = str(data.get("asset_code") or "").strip()
+        if not asset_code:
+            asset_code = generate_next_rental_asset_code(product)
 
         location = None
         if data.get("current_location"):
@@ -4483,6 +4572,26 @@ class RentalAssetAdminViewSet(viewsets.ReadOnlyModelViewSet):
             return Response(detail, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(self._serialize_asset(asset), status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=["get"], url_path="next-code")
+    def next_code(self, request):
+        """Generate a recommended next sequential asset code for a product."""
+        from products_core.models import Product
+        from deliveries.services.rental_asset_lifecycle_service import (
+            generate_next_rental_asset_code,
+        )
+
+        product_id = request.query_params.get("product")
+        product = None
+        if product_id:
+            product = Product.objects.filter(pk=product_id).first()
+
+        code = generate_next_rental_asset_code(product=product)
+        return Response({
+            "suggested_asset_code": code,
+            "product_id": product.pk if product else None,
+            "product_name": product.name if product else None,
+        })
 
     def _lifecycle_action(self, request, pk, handler, *, needs_subscription: bool):
         from django.core.exceptions import ValidationError as _ValidationError

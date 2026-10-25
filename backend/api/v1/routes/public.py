@@ -647,6 +647,7 @@ class PublicWinnersView(PublicWinnerHistoryView):
 
 from api.v1.views.whatsapp_catalog import WhatsAppCatalogFeedView  # noqa: E402
 from api.v1.views.admin_pod import public_pod_handover_view  # noqa: E402
+from api.v1.views.public_contract_sign import public_contract_sign_view  # noqa: E402
 
 urlpatterns = [
     path("stats/", PublicStatsView.as_view(), name="public-stats"),
@@ -682,6 +683,7 @@ urlpatterns = [
     path("lucky-draws/<int:draw_id>/verification/", PublicLuckyDrawVerificationView.as_view(), name="public-lucky-draw-verification"),
     path("lucky-draws/<int:draw_id>/winner/", PublicLuckyDrawWinnerView.as_view(), name="public-lucky-draw-winner"),
     path("delivery/handover/<str:token>/", public_pod_handover_view, name="public-delivery-handover"),
+    path("contracts/sign/<str:token>/", public_contract_sign_view, name="public-contract-sign"),
     path("health/", PublicLivenessView.as_view(), name="public-health"),
     path("readiness/", PublicReadinessView.as_view(), name="public-readiness"),
 ]

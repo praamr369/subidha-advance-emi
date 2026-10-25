@@ -8,10 +8,13 @@ import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
 import {
+  createRentalAsset,
+  fetchNextRentalAssetCode,
   listRentalAssets,
   releaseRentalAsset,
   type RentalAssetPage,
 } from "@/services/customer-intelligence";
+import { listProducts, type ProductRecord } from "@/services/products";
 
 const STATUS_FILTERS: Array<{ value: string; label: string }> = [
   { value: "", label: "All" },
@@ -43,6 +46,82 @@ export default function RentalAssetsPage() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+
+  // Register modal states
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [registerLoading, setRegisterLoading] = useState(false);
+  const [registerError, setRegisterError] = useState<string | null>(null);
+  const [products, setProducts] = useState<ProductRecord[]>([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [formProductId, setFormProductId] = useState("");
+  const [formAssetCode, setFormAssetCode] = useState("");
+  const [formSerialNo, setFormSerialNo] = useState("");
+  const [formPurchaseCost, setFormPurchaseCost] = useState("");
+  const [formConditionGrade, setFormConditionGrade] = useState("GOOD");
+
+  const loadProducts = useCallback(async () => {
+    if (products.length > 0 || productsLoading) return;
+    setProductsLoading(true);
+    try {
+      const items = await listProducts();
+      setProducts(items.filter((p) => p.is_active !== false));
+    } catch {
+      // ignore product load error
+    } finally {
+      setProductsLoading(false);
+    }
+  }, [products.length, productsLoading]);
+
+  async function handleProductChange(productIdStr: string) {
+    setFormProductId(productIdStr);
+    if (!productIdStr) {
+      setFormAssetCode("");
+      return;
+    }
+    const selectedProd = products.find((p) => String(p.id) === productIdStr);
+    if (selectedProd?.base_price) {
+      setFormPurchaseCost(selectedProd.base_price);
+    }
+    try {
+      const res = await fetchNextRentalAssetCode(Number(productIdStr));
+      if (res.suggested_asset_code) {
+        setFormAssetCode(res.suggested_asset_code);
+      }
+    } catch {
+      // fallback
+      setFormAssetCode(`RA-PROD${productIdStr}-001`);
+    }
+  }
+
+  async function handleRegisterSubmit() {
+    if (!formProductId) {
+      setRegisterError("Please select a product.");
+      return;
+    }
+    setRegisterLoading(true);
+    setRegisterError(null);
+    try {
+      await createRentalAsset({
+        product: Number(formProductId),
+        asset_code: formAssetCode.trim() || undefined,
+        serial_no: formSerialNo.trim() || undefined,
+        purchase_cost: formPurchaseCost.trim() || undefined,
+        condition_grade: formConditionGrade,
+      });
+      setActionMessage(`Unit registered successfully${formAssetCode ? ` as ${formAssetCode}` : ""} and added to the rental fleet.`);
+      setShowRegisterModal(false);
+      setFormProductId("");
+      setFormAssetCode("");
+      setFormSerialNo("");
+      setFormPurchaseCost("");
+      setFormConditionGrade("GOOD");
+      await load();
+    } catch (err) {
+      setRegisterError(err instanceof Error ? err.message : "Failed to register rental asset.");
+    } finally {
+      setRegisterLoading(false);
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -90,26 +169,148 @@ export default function RentalAssetsPage() {
       ]}
     >
       <div className="space-y-4">
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by status">
-          {STATUS_FILTERS.map((filter) => (
-            <button
-              key={filter.value || "all"}
-              type="button"
-              aria-pressed={statusFilter === filter.value}
-              onClick={() => {
-                setStatusFilter(filter.value);
-                setPage(1);
-              }}
-              className={`rounded-full border px-3 py-1 text-xs font-medium ${
-                statusFilter === filter.value
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-background text-foreground hover:bg-muted"
-              }`}
-            >
-              {filter.label}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by status">
+            {STATUS_FILTERS.map((filter) => (
+              <button
+                key={filter.value || "all"}
+                type="button"
+                aria-pressed={statusFilter === filter.value}
+                onClick={() => {
+                  setStatusFilter(filter.value);
+                  setPage(1);
+                }}
+                className={`rounded-full border px-3 py-1 text-xs font-medium ${
+                  statusFilter === filter.value
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-background text-foreground hover:bg-muted"
+                }`}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setShowRegisterModal((prev) => !prev);
+              void loadProducts();
+            }}
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground shadow-sm hover:opacity-95"
+          >
+            {showRegisterModal ? "Close Drawer" : "+ Register Unit"}
+          </button>
         </div>
+
+        {/* Tip for store operators */}
+        <div className="rounded-lg border border-sky-200 bg-sky-50/60 p-3 text-xs text-sky-900 flex items-start gap-2">
+          <span className="font-bold text-sky-700">💡 Automated Fleet Tagging:</span>
+          <span>
+            When brand-new furniture returns from its 1st rental or lease contract, approving the return inspection
+            automatically assigns a sequential asset tag (e.g. <code className="bg-sky-100 px-1 py-0.5 rounded font-mono font-semibold">RA-SOFA-001</code>)
+            and registers it into your available pool. You can also manually register existing shop units using the button above.
+          </span>
+        </div>
+
+        {showRegisterModal && (
+          <div className="rounded-xl border border-primary/30 bg-card p-5 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Register Physical Rental Asset</h3>
+                <p className="text-xs text-muted-foreground">
+                  Serialize a furniture piece for your reusable rental fleet. Code auto-generates sequentially.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowRegisterModal(false)}
+                className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
+              >
+                Cancel
+              </button>
+            </div>
+
+            {registerError ? (
+              <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                {registerError}
+              </div>
+            ) : null}
+
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <label className="text-xs font-medium text-foreground">Select Product *</label>
+                <select
+                  value={formProductId}
+                  onChange={(e) => void handleProductChange(e.target.value)}
+                  className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs"
+                >
+                  <option value="">-- Choose Product --</option>
+                  {products.map((p) => (
+                    <option key={p.id} value={String(p.id)}>
+                      {p.name} {p.product_code ? `(${p.product_code})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-foreground">Asset Code / Tag *</label>
+                <input
+                  type="text"
+                  value={formAssetCode}
+                  onChange={(e) => setFormAssetCode(e.target.value)}
+                  placeholder="e.g. RA-SOFA-001"
+                  className="mt-1 h-9 w-full rounded-md border border-border bg-background px-3 text-xs font-mono font-medium"
+                />
+                <span className="text-[10px] text-muted-foreground">Auto-generated, or scan physical barcode</span>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-foreground">Serial No (Optional)</label>
+                <input
+                  type="text"
+                  value={formSerialNo}
+                  onChange={(e) => setFormSerialNo(e.target.value)}
+                  placeholder="Manufacturer Serial No"
+                  className="mt-1 h-9 w-full rounded-md border border-border bg-background px-3 text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-foreground">Condition Grade</label>
+                <select
+                  value={formConditionGrade}
+                  onChange={(e) => setFormConditionGrade(e.target.value)}
+                  className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs"
+                >
+                  <option value="NEW">NEW (Like New)</option>
+                  <option value="GOOD">GOOD (Ready to Rent)</option>
+                  <option value="FAIR">FAIR (Minor wear)</option>
+                  <option value="DAMAGED">DAMAGED (Needs repair)</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+              <button
+                type="button"
+                onClick={() => setShowRegisterModal(false)}
+                className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={registerLoading || !formProductId}
+                onClick={() => void handleRegisterSubmit()}
+                className="rounded-md bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-95 disabled:opacity-50"
+              >
+                {registerLoading ? "Registering..." : "Save & Add to Fleet"}
+              </button>
+            </div>
+          </div>
+        )}
 
         {actionError ? (
           <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">

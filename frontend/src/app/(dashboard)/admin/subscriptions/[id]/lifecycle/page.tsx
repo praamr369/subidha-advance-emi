@@ -205,6 +205,7 @@ export default function ContractLifecyclePage() {
   const [inspDamageDeduction, setInspDamageDeduction] = useState("0.00");
   const [inspDepositRefund, setInspDepositRefund] = useState("0.00");
   const [inspStockNotes, setInspStockNotes] = useState("");
+  const [customAssetTag, setCustomAssetTag] = useState("");
 
   const isRentOrLease =
     subscription?.plan_type === "RENT" || subscription?.plan_type === "LEASE";
@@ -360,9 +361,11 @@ export default function ContractLifecyclePage() {
 
   function handleApproveInspection() {
     void runAction(async () => {
-      const insp = await approveReturnInspection(subscriptionId);
+      const insp = await approveReturnInspection(subscriptionId, {
+        asset_code: customAssetTag.trim() || undefined,
+      });
       setInspection(insp);
-    }, "Inspection approved. Unit back in stock and routed by outcome; contract RETURNED; deposit refund approved.");
+    }, "Inspection approved. Unit back in stock and serialized asset tag routed; contract RETURNED; deposit refund approved.");
   }
 
   if (loading) return <ERPLoadingState label="Loading contract lifecycle..." />;
@@ -867,14 +870,34 @@ export default function ContractLifecyclePage() {
                 )}
 
                 {inspection.status === "COMPLETED" && (
-                  <div className="space-y-2">
-                    <p className="text-sm text-muted-foreground">
-                      Approving will route stock based on outcome and approve deposit refund. Product will only
-                      become sellable if outcome is SELLABLE.
-                    </p>
-                    <ActionButton variant="primary" loading={actionBusy} onClick={handleApproveInspection}>
-                      Approve Inspection &amp; Route Stock
-                    </ActionButton>
+                  <div className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
+                    <div>
+                      <h4 className="text-sm font-semibold text-emerald-950">Approve Return &amp; Auto-Tag Unit</h4>
+                      <p className="mt-0.5 text-xs text-emerald-800">
+                        Approving will route stock based on outcome, approve deposit refund, and automatically serialize/tag fresh inventory into your reusable rental fleet (or keep an existing asset code).
+                      </p>
+                    </div>
+                    <div className="max-w-md">
+                      <label htmlFor="f-custom-asset-tag" className="text-xs font-medium text-emerald-900">
+                        Asset Tag / Barcode Sticker (Optional)
+                      </label>
+                      <input
+                        id="f-custom-asset-tag"
+                        type="text"
+                        value={customAssetTag}
+                        onChange={(e) => setCustomAssetTag(e.target.value)}
+                        placeholder="Leave blank to auto-generate (e.g. RA-SOFA-001)"
+                        className="mt-1 h-9 w-full rounded-lg border border-emerald-300 bg-background px-3 text-sm outline-none focus:border-ring"
+                      />
+                      <span className="text-[11px] text-muted-foreground">
+                        If you attached a physical barcode sticker to the furniture, scan or type it here. Otherwise, the next sequential code is generated automatically.
+                      </span>
+                    </div>
+                    <div>
+                      <ActionButton variant="primary" loading={actionBusy} onClick={handleApproveInspection}>
+                        Approve Inspection &amp; Tag Unit
+                      </ActionButton>
+                    </div>
                   </div>
                 )}
 

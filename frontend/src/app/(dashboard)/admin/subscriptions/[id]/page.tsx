@@ -35,6 +35,7 @@ import { formatPlanTypeLabel } from "@/lib/plan-labels";
 import { cn } from "@/lib/utils";
 import GuarantorSection from "@/components/subscriptions/GuarantorSection";
 import { SubscriptionDocumentUploadPanel } from "@/components/subscriptions/SubscriptionDocumentUploadPanel";
+import { CustomerSignatureLinkModal } from "@/components/contracts/CustomerSignatureLinkModal";
 import { GenerateRentLeaseLedgerModal } from "./GenerateRentLeaseLedgerModal";
 import { SettleRentLeaseContractModal } from "./SettleRentLeaseContractModal";
 import {
@@ -790,6 +791,7 @@ export default function AdminSubscriptionDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [settleModalOpen, setSettleModalOpen] = useState(false);
+  const [signatureModalOpen, setSignatureModalOpen] = useState(false);
 
   const { data: queryData, isLoading: loading, isRefetching: refreshing, error: queryError, refetch } = useQuery({
     queryKey: ["admin_subscription_detail", subscriptionId],
@@ -976,6 +978,17 @@ export default function AdminSubscriptionDetailPage() {
     return contractDocuments.find((doc) => doc.document_type === targetType) ?? null;
   }, [contractDocuments, subscription]);
 
+  const customerSignatureDoc = useMemo(
+    () =>
+      contractDocuments.find(
+        (doc) =>
+          doc.document_type.toUpperCase() === "CUSTOMER_SIGNATURE" &&
+          Boolean(doc.file_url)
+      ) ?? null,
+    [contractDocuments]
+  );
+  const hasCustomerSignature = Boolean(customerSignatureDoc);
+
   return (
     <ERPPageShell
       title={`Subscription ${getDisplaySubscriptionNumber(subscription, subscriptionId)}`}
@@ -999,6 +1012,19 @@ export default function AdminSubscriptionDetailPage() {
                 href: `/admin/subscriptions/${subscription.id}/lifecycle`,
                 label: "Contract Lifecycle",
                 variant: "primary" as const,
+              },
+              {
+                href:
+                  subscription.plan_type === "RENT" || subscription.plan_type === "LEASE"
+                    ? `/admin/rent-lease/contracts/${subscription.id}/contract/print`
+                    : `/admin/subscriptions/${subscription.id}/contract/print`,
+                label: "🖨 Print Contract",
+                variant: "secondary" as const,
+              },
+              {
+                onClick: () => setSignatureModalOpen(true),
+                label: hasCustomerSignature ? "Customer Signature (QR / Link)" : "📲 Sign via Phone / QR",
+                variant: hasCustomerSignature ? ("secondary" as const) : ("primary" as const),
               },
               {
                 href: `/admin/finance/collect?subscription=${subscription.id}`,
@@ -1519,8 +1545,51 @@ export default function AdminSubscriptionDetailPage() {
 
                   <div className="mt-6 pt-5 border-t border-border">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-3">
-                      Contract Documents
+                      Contract Documents & Signatures
                     </div>
+
+                    <div className="mb-4 rounded-xl border border-sky-200 bg-sky-50/60 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold text-slate-900">Customer Digital Signature</span>
+                            {hasCustomerSignature ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">
+                                ✓ Attached
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                                ⏳ Pending
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-1 text-xs text-slate-600 max-w-xl">
+                            {hasCustomerSignature
+                              ? `Verified signature is ready and printed on the agreement with official digital timestamp (${customerSignatureDoc?.created_at ? formatDateTime(customerSignatureDoc.created_at) : "Recorded"}).`
+                              : "Customer has not signed yet. Send signing link to their smartphone via WhatsApp, Gmail, or SMS, or have them scan the QR code to sign on their phone."}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setSignatureModalOpen(true)}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-sky-700"
+                          >
+                            <span>📲</span>
+                            <span>{hasCustomerSignature ? "View Signing Link / QR" : "Send Mobile Signing Link"}</span>
+                          </button>
+                          <Link
+                            href={`/admin/subscriptions/${subscription.id}/contract/print`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 rounded-lg border border-border bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+                          >
+                            <span>🖨 Print Contract</span>
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+
                     {contractDocuments.length > 0 ? (
                       <div className="grid gap-2 mb-5">
                         {contractDocuments.slice(0, 10).map((doc) => (
@@ -1653,9 +1722,52 @@ export default function AdminSubscriptionDetailPage() {
                       )}
 
                       <div className="mt-5">
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                          Documents
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-3">
+                          Contract Documents & Signatures
                         </div>
+
+                        <div className="mb-4 rounded-xl border border-sky-200 bg-sky-50/60 p-4">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-semibold text-slate-900">Customer Digital Signature</span>
+                                {hasCustomerSignature ? (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">
+                                    ✓ Attached
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                                    ⏳ Pending
+                                  </span>
+                                )}
+                              </div>
+                              <p className="mt-1 text-xs text-slate-600 max-w-xl">
+                                {hasCustomerSignature
+                                  ? `Verified signature is ready and printed on the agreement with official digital timestamp (${customerSignatureDoc?.created_at ? formatDateTime(customerSignatureDoc.created_at) : "Recorded"}).`
+                                  : "Customer has not signed yet. Send signing link to their smartphone via WhatsApp, Gmail, or SMS, or have them scan the QR code to sign on their phone."}
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setSignatureModalOpen(true)}
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-sky-700"
+                              >
+                                <span>📲</span>
+                                <span>{hasCustomerSignature ? "View Signing Link / QR" : "Send Mobile Signing Link"}</span>
+                              </button>
+                              <Link
+                                href={`/admin/rent-lease/contracts/${subscription.id}/contract/print`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 rounded-lg border border-border bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+                              >
+                                <span>🖨 Print Contract</span>
+                              </Link>
+                            </div>
+                          </div>
+                        </div>
+
                         {contractDocuments.length > 0 ? (
                           <div className="mt-3 grid gap-2">
                             {contractDocuments.slice(0, 10).map((doc) => (
@@ -1700,6 +1812,7 @@ export default function AdminSubscriptionDetailPage() {
                       <SubscriptionDocumentUploadPanel 
                         subscriptionId={subscription.id} 
                         allowedDocTypes={[
+                          "CUSTOMER_SIGNATURE",
                           "RENT_CONTRACT_PDF",
                           "LEASE_CONTRACT_PDF",
                           "SECURITY_DEPOSIT_RECEIPT_PDF",
@@ -2340,6 +2453,15 @@ export default function AdminSubscriptionDetailPage() {
             open={settleModalOpen}
             onOpenChange={setSettleModalOpen}
             onSettled={() => void loadPage()}
+          />
+        ) : null}
+
+        {subscription ? (
+          <CustomerSignatureLinkModal
+            subscriptionId={subscription.id}
+            isOpen={signatureModalOpen}
+            onClose={() => setSignatureModalOpen(false)}
+            onSignatureUpdated={() => void loadPage()}
           />
         ) : null}
       </div>

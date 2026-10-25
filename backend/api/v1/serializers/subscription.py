@@ -111,6 +111,11 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
     next_due_date = serializers.SerializerMethodField()
     contract_items = serializers.SerializerMethodField()
 
+    has_customer_signature = serializers.SerializerMethodField()
+    customer_signature_signed_at = serializers.SerializerMethodField()
+    customer_signature_url = serializers.SerializerMethodField()
+    signing_path = serializers.SerializerMethodField()
+
     class Meta:
         model = Subscription
         fields = (
@@ -162,6 +167,10 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
             "financial_summary",
             "last_payment_date",
             "next_due_date",
+            "has_customer_signature",
+            "customer_signature_signed_at",
+            "customer_signature_url",
+            "signing_path",
         )
         read_only_fields = fields
 
@@ -342,6 +351,39 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
             ),
         )
         return getattr(emis[0], "due_date", None) if emis else None
+
+    def _get_customer_signature_doc(self, obj):
+        prefetched = getattr(obj, "_prefetched_objects_cache", {})
+        if "documents" in prefetched:
+            for d in prefetched["documents"]:
+                if getattr(d, "document_type", None) == "CUSTOMER_SIGNATURE" and getattr(d, "file", None):
+                    return d
+            return None
+        return obj.documents.filter(document_type="CUSTOMER_SIGNATURE", file__isnull=False).order_by("-id").first()
+
+    def get_has_customer_signature(self, obj) -> bool:
+        return self._get_customer_signature_doc(obj) is not None
+
+    def get_customer_signature_signed_at(self, obj):
+        doc = self._get_customer_signature_doc(obj)
+        return doc.created_at.isoformat() if doc and getattr(doc, "created_at", None) else None
+
+    def get_customer_signature_url(self, obj):
+        doc = self._get_customer_signature_doc(obj)
+        if doc and getattr(doc, "file", None):
+            request = self.context.get("request")
+            if request:
+                return request.build_absolute_uri(doc.file.url)
+            return doc.file.url
+        return None
+
+    def get_signing_path(self, obj):
+        try:
+            from api.v1.views.public_contract_sign import generate_contract_signing_token
+            token = generate_contract_signing_token(obj.id)
+            return f"/sign-contract/{token}"
+        except Exception:
+            return None
 
 
 class SubscriptionListSerializer(BaseSubscriptionSerializer):

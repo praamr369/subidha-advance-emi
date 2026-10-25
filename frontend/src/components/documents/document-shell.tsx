@@ -16,7 +16,7 @@ import { shouldBypassNextImageOptimization } from "@/lib/media";
 import { getDocumentPrintSettings } from "@/services/business-setup";
 
 type MetadataItem = { label: string; value: ReactNode };
-type PartyPanel = { title: string; name?: string | null; phone?: string | null; email?: string | null; address?: string | null; gstin?: string | null };
+type PartyPanel = { title: string; name?: string | null; phone?: string | null; email?: string | null; address?: string | null; gstin?: string | null; photoUrl?: string | null };
 type AmountRow = { label: string; value: ReactNode; strong?: boolean; danger?: boolean };
 
 export type DocumentLineItem = {
@@ -154,7 +154,30 @@ export function DocumentMetadataGrid({ items }: { items: MetadataItem[] }) {
 }
 
 export function DocumentPartyPanel({ parties }: { parties: PartyPanel[] }) {
-  return <section className="my-4 grid gap-4 md:grid-cols-2">{parties.map((party) => <div key={party.title} className="document-card rounded-xl border border-border bg-card p-4"><div className="text-[11px] font-black uppercase tracking-[0.12em] text-[#8a5a22]">{party.title}</div><div className="mt-2 text-base font-bold text-[#2f2418]">{safeDocumentText(party.name)}</div><div className="mt-1 text-sm text-[#6f5c46]">{safeDocumentText(party.phone)}</div>{party.email ? <div className="text-sm text-[#6f5c46]">{party.email}</div> : null}{party.address ? <div className="mt-2 whitespace-pre-line text-sm leading-5 text-[#6f5c46]">{party.address}</div> : null}{party.gstin ? <div className="mt-2 text-xs font-semibold text-[#6f4e27]">GSTIN: {party.gstin}</div> : null}</div>)}</section>;
+  return (
+    <section className="my-4 grid gap-4 md:grid-cols-2">
+      {parties.map((party) => (
+        <div key={party.title} className="document-card rounded-xl border border-border bg-card p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="text-[11px] font-black uppercase tracking-[0.12em] text-[#8a5a22]">{party.title}</div>
+              <div className="mt-2 text-base font-bold text-[#2f2418]">{safeDocumentText(party.name)}</div>
+              <div className="mt-1 text-sm text-[#6f5c46]">{safeDocumentText(party.phone)}</div>
+              {party.email ? <div className="text-sm text-[#6f5c46]">{party.email}</div> : null}
+              {party.address ? <div className="mt-2 whitespace-pre-line text-sm leading-5 text-[#6f5c46]">{party.address}</div> : null}
+              {party.gstin ? <div className="mt-2 text-xs font-semibold text-[#6f4e27]">GSTIN: {party.gstin}</div> : null}
+            </div>
+            {party.photoUrl ? (
+              <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-[#d9c39c] bg-[#fffaf0]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={party.photoUrl} alt={party.title} className="h-full w-full object-cover" />
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ))}
+    </section>
+  );
 }
 
 export function DocumentLineItemsTable({ items }: { items: DocumentLineItem[] }) {
@@ -176,10 +199,81 @@ export function DocumentTermsBlock({ terms, termsKey }: { terms?: string[]; term
   return <section className="document-card my-5 rounded-xl border border-[#e6d6bd] bg-[#fff6e4] p-4"><div className="text-xs font-black uppercase tracking-[0.12em] text-[#6f4e27]">Terms & Notes</div><ol className="mt-2 list-decimal space-y-1 pl-5 text-xs leading-5 text-[#6f5c46]">{finalTerms.map((term) => <li key={term}>{term}</li>)}</ol></section>;
 }
 
-export function DocumentSignatureBlock({ labels }: { labels: string[] }) {
+export function DocumentSignatureBlock({
+  labels,
+  customerSignatureUrl,
+  customerSignatureTimestamp,
+  authorizedSignatureUrl,
+  authorizedSignatureTimestamp,
+  signatures,
+}: {
+  labels: string[];
+  customerSignatureUrl?: string | null;
+  customerSignatureTimestamp?: string | null;
+  authorizedSignatureUrl?: string | null;
+  authorizedSignatureTimestamp?: string | null;
+  signatures?: Record<string, string | null | undefined>;
+}) {
   const theme = useDocumentTheme();
-  const finalLabels = labels.map((label) => /Authorized/i.test(label) ? theme.signatureLabels.authorized : /Customer/i.test(label) ? theme.signatureLabels.customer : label);
-  return <section className="document-no-break mt-8 grid gap-6 sm:grid-cols-2">{finalLabels.map((label) => <div key={label} className="document-signature pt-10 text-center"><div className="border-t border-[#8a7255] pt-2 text-xs font-bold uppercase tracking-[0.12em] text-[#6f4e27]">{label}</div></div>)}</section>;
+  const finalLabels = labels.map((label) =>
+    /Authorized/i.test(label)
+      ? theme.signatureLabels.authorized
+      : /Customer/i.test(label)
+      ? theme.signatureLabels.customer
+      : label
+  );
+
+  return (
+    <section className="document-no-break mt-8 grid gap-6 sm:grid-cols-2">
+      {finalLabels.map((label, idx) => {
+        const rawLabel = labels[idx] || label;
+        const isCustomer = /Customer/i.test(label) || /Receiver/i.test(label);
+        const isAuthorized =
+          /Authorized/i.test(label) ||
+          /Staff/i.test(label) ||
+          /Manager/i.test(label) ||
+          /Prepared/i.test(label);
+
+        const sigImg =
+          signatures?.[label] ??
+          signatures?.[rawLabel] ??
+          (isCustomer
+            ? customerSignatureUrl ?? signatures?.customer
+            : isAuthorized
+            ? authorizedSignatureUrl ?? theme.authorizedSignatureUrl ?? signatures?.authorized
+            : null);
+
+        return (
+          <div key={`${label}-${idx}`} className="document-signature flex flex-col items-center justify-end text-center">
+            {sigImg ? (
+              <div className="mb-2 flex h-16 w-52 items-end justify-center overflow-hidden">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={sigImg}
+                  alt={label}
+                  className="max-h-16 max-w-full object-contain filter contrast-125"
+                />
+              </div>
+            ) : (
+              <div className="h-12" />
+            )}
+            <div className="w-full border-t border-[#8a7255] pt-2 text-xs font-bold uppercase tracking-[0.12em] text-[#6f4e27]">
+              {label}
+            </div>
+            {isCustomer && customerSignatureTimestamp ? (
+              <div className="mt-1 text-[10px] font-medium text-[#7c6a56]">
+                Digitally Signed: {customerSignatureTimestamp}
+              </div>
+            ) : isAuthorized && authorizedSignatureTimestamp ? (
+              <div className="mt-1 text-[10px] font-medium text-[#7c6a56]">
+                Authorized: {authorizedSignatureTimestamp}
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
+    </section>
+  );
 }
 
 export function DocumentAuditFooter({ generatedAt }: { generatedAt?: string }) {

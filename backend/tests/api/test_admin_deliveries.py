@@ -261,3 +261,164 @@ class AdminDeliveryApiTests(APITestCase):
         )
         self.assertEqual(dup_resp.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_batched_partial_delivery_flow(self):
+        from contracts.models import ContractItem, Subscription
+        from products_core.models import Product
+        from subscriptions.enums import PlanType
+
+        rent_sub = Subscription.objects.create(
+            customer=self.customer,
+            product=self.product,
+            partner=self.partner,
+            batch=None,
+            lucky_id=None,
+            plan_type=PlanType.RENT,
+            start_date=date(2026, 3, 1),
+            tenure_months=6,
+            total_amount=Decimal("7000.00"),
+            monthly_amount=Decimal("700.00"),
+        )
+
+        self.product.is_rent_enabled = True
+        self.product.save(update_fields=["is_rent_enabled"])
+
+        prod_b = Product.objects.create(
+            name="Delivery Admin Product B",
+            product_code="DLV-API-002",
+            base_price=Decimal("1500.00"),
+            is_rent_enabled=True,
+        )
+        # Create ContractItems on the subscription: Product A (qty 2), Product B (qty 1)
+        c_item_a = ContractItem.objects.create(
+            subscription=rent_sub,
+            product=self.product,
+            quantity=2,
+            unit_base_price=Decimal("2500.00"),
+            total_base_price=Decimal("5000.00"),
+            monthly_amount=Decimal("400.00"),
+            security_deposit_percent=Decimal("20.00"),
+            security_deposit_amount=Decimal("1000.00"),
+        )
+        c_item_b = ContractItem.objects.create(
+            subscription=rent_sub,
+            product=prod_b,
+            quantity=1,
+            unit_base_price=Decimal("1500.00"),
+            total_base_price=Decimal("1500.00"),
+            monthly_amount=Decimal("300.00"),
+            security_deposit_percent=Decimal("20.00"),
+            security_deposit_amount=Decimal("300.00"),
+        )
+
+        self.client.force_authenticate(user=self.admin)
+
+        # 1. Prefill endpoint reports item progress and next batch #1
+        prefill_resp = self.client.get(f"/api/v1/admin/deliveries/sources/subscriptions/{rent_sub.id}/prefill/")
+        self.assertEqual(prefill_resp.status_code, status.HTTP_200_OK)
+        progress = prefill_resp.data["progress"]
+        self.assertEqual(progress["total_ordered"], 3)
+        self.assertEqual(progress["total_delivered"], 0)
+        self.assertEqual(progress["total_remaining"], 3)
+        self.assertEqual(progress["next_batch_number"], 1)
+        self.assertTrue(progress["is_multi_item"])
+
+        # 2. Schedule Delivery Batch #1 with Product A only (quantity: 2)
+        batch1_resp = self.client.post(
+            "/api/v1/admin/deliveries/",
+            {
+                "subscription": rent_sub.id,
+                "batch_number": 1,
+                "status": "SCHEDULED",
+                "scheduled_date": "2026-03-20",
+                "admin_override": True,
+                "admin_override_reason": "Partial batch #1 test",
+                "items": [
+                    {
+                        "product_id": self.product.id,
+                        "quantity": 2,
+                        "contract_item_id": c_item_a.id,
+                    }
+                ],
+            },
+            format="json",
+        )
+        self.assertEqual(batch1_resp.status_code, status.HTTP_201_CREATED, batch1_resp.data)
+        d1_id = batch1_resp.data["id"]
+        self.assertEqual(batch1_resp.data["batch_number"], 1)
+        self.assertEqual(len(batch1_resp.data["delivery_items"]), 1)
+        self.assertEqual(batch1_resp.data["delivery_items"][0]["quantity"], 2)
+
+        # 3. Mark Batch #1 as DELIVERED through standard transitions
+        for st in [DeliveryStatus.DISPATCHED, DeliveryStatus.OUT_FOR_DELIVERY, DeliveryStatus.DELIVERED]:
+            d1_deliv_resp = self.client.post(
+                f"/api/v1/admin/deliveries/{d1_id}/transition/",
+                {"status": st},
+                format="json",
+            )
+            self.assertEqual(d1_deliv_resp.status_code, status.HTTP_200_OK)
+
+        # Subscription fulfillment status is now PARTIALLY_DELIVERED
+        rent_sub.refresh_from_db()
+        self.assertEqual(rent_sub.fulfillment_status, FulfillmentStatus.PARTIALLY_DELIVERED)
+
+        # 4. Prefill endpoint reports 2 delivered, 1 remaining, and next batch #2
+        prefill_resp2 = self.client.get(f"/api/v1/admin/deliveries/sources/subscriptions/{rent_sub.id}/prefill/")
+        self.assertEqual(prefill_resp2.status_code, status.HTTP_200_OK)
+        progress2 = prefill_resp2.data["progress"]
+        self.assertEqual(progress2["total_delivered"], 2)
+        self.assertEqual(progress2["total_remaining"], 1)
+        self.assertEqual(progress2["next_batch_number"], 2)
+        self.assertEqual(progress2["fulfillment_status"], FulfillmentStatus.PARTIALLY_DELIVERED)
+
+        # 5. Schedule Delivery Batch #2 with Product B (quantity: 1)
+        batch2_resp = self.client.post(
+            "/api/v1/admin/deliveries/",
+            {
+                "subscription": rent_sub.id,
+                "batch_number": 2,
+                "status": "SCHEDULED",
+                "scheduled_date": "2026-03-22",
+                "admin_override": True,
+                "admin_override_reason": "Partial batch #2 test",
+                "items": [
+                    {
+                        "product_id": prod_b.id,
+                        "quantity": 1,
+                        "contract_item_id": c_item_b.id,
+                    }
+                ],
+            },
+            format="json",
+        )
+        self.assertEqual(batch2_resp.status_code, status.HTTP_201_CREATED, batch2_resp.data)
+        d2_id = batch2_resp.data["id"]
+        self.assertEqual(batch2_resp.data["batch_number"], 2)
+
+        # 6. Mark Batch #2 as DELIVERED
+        for st in [DeliveryStatus.DISPATCHED, DeliveryStatus.OUT_FOR_DELIVERY, DeliveryStatus.DELIVERED]:
+            d2_deliv_resp = self.client.post(
+                f"/api/v1/admin/deliveries/{d2_id}/transition/",
+                {"status": st},
+                format="json",
+            )
+            self.assertEqual(d2_deliv_resp.status_code, status.HTTP_200_OK)
+
+        # Subscription is now fully DELIVERED
+        rent_sub.refresh_from_db()
+        self.assertEqual(rent_sub.fulfillment_status, FulfillmentStatus.DELIVERED)
+
+        # 7. Attempting to create another delivery should fail since all items are fulfilled
+        batch3_resp = self.client.post(
+            "/api/v1/admin/deliveries/",
+            {
+                "subscription": rent_sub.id,
+                "status": "SCHEDULED",
+                "scheduled_date": "2026-03-25",
+                "admin_override": True,
+                "admin_override_reason": "Batch 3 should fail",
+            },
+            format="json",
+        )
+        self.assertEqual(batch3_resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("already delivered", str(batch3_resp.data))
+

@@ -470,6 +470,22 @@ export default function AdminDeliveryDetailPage() {
                     delivery.subscription_number || `SUB-${delivery.subscription_id ?? "—"}`
                   }
                 />
+                <DetailValue
+                  label="Batch Number"
+                  value={
+                    <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs font-bold text-foreground">
+                      Batch #{delivery.batch_number ?? 1}
+                    </span>
+                  }
+                />
+                <DetailValue
+                  label="Contract Fulfillment"
+                  value={
+                    <span className="inline-flex rounded-full border border-border px-2 py-0.5 text-xs font-semibold">
+                      {delivery.fulfillment_status || "PENDING"}
+                    </span>
+                  }
+                />
                 <DetailValue label="Customer" value={delivery.customer_name || "—"} />
                 <DetailValue label="Phone" value={delivery.customer_phone || "—"} />
                 <DetailValue label="Product" value={delivery.product_name || "—"} />
@@ -523,6 +539,82 @@ export default function AdminDeliveryDetailPage() {
                   value={formatDateTime(delivery.return_requested_at)}
                 />
                 <DetailValue label="Returned" value={formatDateTime(delivery.returned_at)} />
+              </div>
+            </SectionCard>
+
+            <SectionCard
+              title={`Delivery Batch Items (Batch #${delivery.batch_number ?? 1})`}
+              description="Line items and quantities fulfilled in this delivery batch."
+            >
+              <div className="space-y-4">
+                {delivery.delivery_items && delivery.delivery_items.length > 0 ? (
+                  <div className="overflow-x-auto rounded-xl border border-border bg-card">
+                    <table className="w-full text-left text-xs">
+                      <thead className="border-b border-border bg-muted/60 text-muted-foreground font-semibold">
+                        <tr>
+                          <th className="p-3">Product Name</th>
+                          <th className="p-3">Product Code</th>
+                          <th className="p-3 text-center">Batch Quantity</th>
+                          <th className="p-3">Notes</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {delivery.delivery_items.map((it) => (
+                          <tr key={it.id || it.product_id} className="hover:bg-muted/30">
+                            <td className="p-3 font-medium text-foreground">{it.product_name}</td>
+                            <td className="p-3 font-mono text-muted-foreground">{it.product_code || "—"}</td>
+                            <td className="p-3 text-center font-bold text-primary">{it.quantity}</td>
+                            <td className="p-3 text-muted-foreground">{it.notes || "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+                    Standard delivery item: <span className="font-semibold text-foreground">{delivery.product_name || "Product"}</span> (Qty: 1).
+                  </div>
+                )}
+
+                {delivery.delivery_progress && (
+                  <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        Contract Delivery Progress
+                      </div>
+                      <div className="text-xs font-medium text-foreground">
+                        Delivered: <span className="font-bold text-emerald-600">{delivery.delivery_progress.total_delivered}</span> / {delivery.delivery_progress.total_ordered} · Remaining: <span className="font-bold text-primary">{delivery.delivery_progress.total_remaining}</span>
+                      </div>
+                    </div>
+
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full bg-emerald-600 transition-all duration-300"
+                        style={{
+                          width: `${
+                            delivery.delivery_progress.total_ordered > 0
+                              ? Math.min(100, Math.round((delivery.delivery_progress.total_delivered / delivery.delivery_progress.total_ordered) * 100))
+                              : 0
+                          }%`,
+                        }}
+                      />
+                    </div>
+
+                    {delivery.delivery_progress.has_remaining && delivery.subscription_id ? (
+                      <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                        <span className="text-xs text-muted-foreground">
+                          {delivery.delivery_progress.total_remaining} item(s) remain undelivered across this contract.
+                        </span>
+                        <a
+                          href={`/admin/deliveries?mode=create&subscription=${delivery.subscription_id}`}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition hover:opacity-90"
+                        >
+                          + Schedule Delivery Batch #{delivery.delivery_progress.next_batch_number}
+                        </a>
+                      </div>
+                    ) : null}
+                  </div>
+                )}
               </div>
             </SectionCard>
 

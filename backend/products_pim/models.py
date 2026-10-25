@@ -211,6 +211,12 @@ class PimProduct(models.Model):
         verbose_name = "PIM Product"
         verbose_name_plural = "PIM Products"
 
+    def save(self, *args, **kwargs):
+        if self.image:
+            from products_core.services.image_optimizer import optimize_image_field
+            optimize_image_field(self, "image")
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"[{self.code}] {self.name}"
 
@@ -341,6 +347,12 @@ class ProductAsset(models.Model):
         ordering = ["display_order", "-created_at"]
         verbose_name = "Product Asset"
         verbose_name_plural = "Product Assets"
+
+    def save(self, *args, **kwargs):
+        if self.image:
+            from products_core.services.image_optimizer import optimize_image_field
+            optimize_image_field(self, "image")
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.product.code} - Asset {self.id}"

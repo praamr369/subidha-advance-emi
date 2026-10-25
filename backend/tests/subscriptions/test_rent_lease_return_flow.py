@@ -32,6 +32,7 @@ from deliveries.services.return_inspection_service import (
 from inventory.models import InventoryItem, StockLedger, StockLocation, StockMovementType
 from payments.models import RentLeaseBillingDemand, RentLeaseDepositTransaction
 from subscriptions.models import (
+    AssetConditionGrade,
     InspectionCondition,
     InspectionOutcome,
     PossessionStatus,
@@ -319,3 +320,40 @@ class RentLeaseReturnFlowTests(TestCase):
         self.assertEqual(statement["refund_paid"], "3200.00")
         self.assertEqual(statement["refund_balance"], "0.00")
         self.assertEqual(statement["status"], "SETTLED")
+
+    def test_fresh_product_return_auto_creates_and_tags_rental_asset(self):
+        """When a rent contract starts with fresh inventory (no RentalAsset pre-assigned),
+        approving the return inspection automatically generates a clean asset code,
+        creates the RentalAsset, routes its condition, and makes it available to hire again."""
+        fresh_sub = create_rent_contract(
+            customer=self.customer,
+            product=self.subscription.product,
+            tenure_months=3,
+            start_date=date(2026, 7, 1),
+            security_deposit_percent=Decimal("20.00"),
+            performed_by=self.admin,
+        )
+        Subscription.objects.filter(pk=fresh_sub.pk).update(status=SubscriptionStatus.HANDED_OVER)
+        fresh_sub.refresh_from_db()
+        self.assertFalse(RentalAsset.objects.filter(current_subscription=fresh_sub).exists())
+
+        inspection = create_return_inspection(subscription=fresh_sub, performed_by=self.admin)
+        record_inspection(
+            inspection=inspection,
+            inspected_by=self.admin,
+            condition=InspectionCondition.GOOD,
+            outcome=InspectionOutcome.SELLABLE,
+            deposit_refund_amount=Decimal("1000.00"),
+        )
+        approved = approve_inspection(inspection=inspection, approved_by=self.admin)
+        self.assertEqual(approved.status, "APPROVED")
+
+        auto_asset = RentalAsset.objects.filter(metadata__origin_subscription_id=fresh_sub.pk).first()
+        self.assertIsNotNone(auto_asset)
+        self.assertTrue(auto_asset.asset_code.startswith("RA-"))
+        self.assertEqual(auto_asset.product, fresh_sub.product)
+        self.assertEqual(auto_asset.status, RentalAssetStatus.AVAILABLE)
+        self.assertEqual(auto_asset.condition_grade, AssetConditionGrade.GOOD)
+
+        from deliveries.services.return_inspection_service import returned_asset_id_for_subscription
+        self.assertEqual(returned_asset_id_for_subscription(fresh_sub.pk), auto_asset.pk)

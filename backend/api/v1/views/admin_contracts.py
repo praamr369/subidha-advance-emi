@@ -600,8 +600,13 @@ class ContractReturnInspectionApproveView(APIView):
 
         from deliveries.services.return_inspection_service import approve_inspection
         from django.core.exceptions import ValidationError
+        custom_asset_code = str(request.data.get("asset_code") or "").strip()
         try:
-            inspection = approve_inspection(inspection=inspection, approved_by=request.user)
+            inspection = approve_inspection(
+                inspection=inspection,
+                approved_by=request.user,
+                custom_asset_code=custom_asset_code,
+            )
         except ValidationError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 

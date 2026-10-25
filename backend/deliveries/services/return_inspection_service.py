@@ -97,7 +97,7 @@ def record_inspection(
 
 @transaction.atomic
 def approve_inspection(
-    *, inspection: RentLeaseReturnInspection, approved_by
+    *, inspection: RentLeaseReturnInspection, approved_by, custom_asset_code: str = ""
 ) -> RentLeaseReturnInspection:
     """Approve inspection. Product only becomes sellable after SELLABLE outcome here."""
     if inspection.status != InspectionStatus.COMPLETED:
@@ -143,7 +143,7 @@ def approve_inspection(
             inspection=inspection,
         )
 
-    complete_inspected_return(inspection, performed_by=approved_by)
+    complete_inspected_return(inspection, performed_by=approved_by, custom_asset_code=custom_asset_code)
 
     log_audit(
         action_type=AuditLog.ActionType.CONTRACT_RETURN_INSPECTION_APPROVED,
@@ -168,7 +168,7 @@ def approve_inspection(
 
 @transaction.atomic
 def complete_inspected_return(
-    inspection: RentLeaseReturnInspection, *, performed_by=None
+    inspection: RentLeaseReturnInspection, *, performed_by=None, custom_asset_code: str = ""
 ) -> dict:
     """Bring the returned unit back and route it by the approved outcome.
 
@@ -198,7 +198,7 @@ def complete_inspected_return(
 
     result = {"delivery": _close_return_delivery(subscription, inspection, performed_by)}
     result["outcome_stock"] = _route_returned_stock(inspection, subscription, performed_by)
-    result["asset"] = _route_returned_asset(inspection, asset, performed_by)
+    result["asset"] = _route_returned_asset(inspection, asset, performed_by, custom_asset_code=custom_asset_code)
     result["subscription_status"] = _mark_subscription_returned(subscription)
     result["cancelled_demand_ids"] = cancel_unbilled_rent_demands(subscription)
     return result
@@ -403,17 +403,106 @@ def _route_returned_stock(inspection, subscription, performed_by) -> dict:
     return {"movement_type": movement_type, "stock_ledger_id": entry.pk, "created": created}
 
 
-def _route_returned_asset(inspection, asset, performed_by) -> dict:
-    if asset is None:
-        return {"changed": False, "reason": "no_linked_asset"}
-
+def _route_returned_asset(inspection, asset, performed_by, custom_asset_code: str = "") -> dict:
     from deliveries.services.rental_asset_lifecycle_service import (
+        generate_next_rental_asset_code,
         mark_asset_available,
         mark_asset_returned,
         mark_asset_under_repair,
         retire_asset,
     )
+    from subscriptions.models import AssetConditionGrade
 
+    if asset is None:
+        subscription = inspection.subscription
+        products_to_tag = []
+        if hasattr(subscription, "contract_items") and subscription.contract_items.exists():
+            for c_item in subscription.contract_items.select_related("product"):
+                for _ in range(c_item.quantity):
+                    products_to_tag.append(c_item.product)
+        elif subscription.product:
+            products_to_tag.append(subscription.product)
+
+        if not products_to_tag:
+            return {"changed": False, "reason": "no_linked_asset"}
+
+        outcome = inspection.outcome
+        if outcome == InspectionOutcome.SELLABLE:
+            initial_grade = AssetConditionGrade.GOOD
+        elif outcome == InspectionOutcome.MAINTENANCE_REQUIRED:
+            initial_grade = AssetConditionGrade.FAIR
+        elif outcome == InspectionOutcome.SCRAPPED:
+            initial_grade = AssetConditionGrade.SCRAP
+        elif outcome == InspectionOutcome.DAMAGED:
+            initial_grade = AssetConditionGrade.DAMAGED
+        else:
+            initial_grade = AssetConditionGrade.UNKNOWN
+
+        created_assets = []
+        for idx, prod in enumerate(products_to_tag):
+            code_to_use = (
+                custom_asset_code.strip()
+                if (idx == 0 and custom_asset_code.strip())
+                else generate_next_rental_asset_code(prod)
+            )
+
+            item = getattr(prod, "inventory_profile", None)
+            loc = item.default_stock_location if item else None
+
+            new_asset = RentalAsset.objects.create(
+                product=prod,
+                inventory_item=item,
+                asset_code=code_to_use.upper(),
+                purchase_cost=getattr(prod, "base_price", Decimal("0.00")),
+                current_location=loc,
+                status=RentalAssetStatus.RETURNED,
+                condition_grade=initial_grade,
+                metadata={
+                    "origin_subscription_id": subscription.pk,
+                    "auto_generated_on_return": True,
+                    "inspection_id": inspection.pk,
+                    "inspection_outcome": outcome,
+                },
+                created_by=performed_by,
+                updated_by=performed_by,
+            )
+
+            log_audit(
+                action_type=AuditLog.ActionType.RENTAL_ASSET_RETURNED,
+                instance=new_asset,
+                performed_by=performed_by,
+                metadata={
+                    "asset_code": new_asset.asset_code,
+                    "prev_subscription_id": subscription.pk,
+                    "prev_customer_id": subscription.customer_id,
+                    "auto_created_on_return": True,
+                },
+            )
+
+            if outcome == InspectionOutcome.SELLABLE:
+                new_asset = mark_asset_available(new_asset, performed_by=performed_by)
+            elif outcome == InspectionOutcome.SCRAPPED:
+                new_asset = retire_asset(new_asset, performed_by=performed_by, reason="Scrapped at return inspection.")
+            else:
+                new_asset = mark_asset_under_repair(
+                    new_asset,
+                    performed_by=performed_by,
+                    reason=inspection.stock_routing_notes or f"Return inspection outcome: {outcome}.",
+                )
+
+            created_assets.append(new_asset)
+
+        first_asset = created_assets[0]
+        return {
+            "changed": True,
+            "asset_id": first_asset.pk,
+            "status": first_asset.status,
+            "auto_created": True,
+            "asset_code": first_asset.asset_code,
+            "total_assets_created": len(created_assets),
+        }
+
+    # Existing asset path
     asset.refresh_from_db()
     if asset.status == RentalAssetStatus.HANDED_OVER:
         asset = mark_asset_returned(asset, performed_by=performed_by)

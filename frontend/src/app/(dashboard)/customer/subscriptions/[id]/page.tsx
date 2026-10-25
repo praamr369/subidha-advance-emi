@@ -239,6 +239,69 @@ export default function CustomerSubscriptionDetailPage() {
             </div>
           </CPageSection>
 
+          {/* Contract Digital Signature Section */}
+          <CPageSection title="Contract Digital Signature">
+            <CPageCard>
+              {subscription.has_customer_signature ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
+                        ✓ Contract Digitally Signed
+                      </span>
+                    </div>
+                    {subscription.customer_signature_signed_at ? (
+                      <span className="text-[11px] text-muted-foreground">
+                        {formatDateTime(subscription.customer_signature_signed_at)}
+                      </span>
+                    ) : null}
+                  </div>
+                  {subscription.customer_signature_url ? (
+                    <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/40 p-3">
+                      <div>
+                        <div className="text-xs font-semibold text-foreground">Signature on File</div>
+                        <div className="text-[11px] text-muted-foreground">
+                          Attached to your official print contract
+                        </div>
+                      </div>
+                      <div className="flex h-12 w-28 items-center justify-center rounded-lg border border-border bg-white p-1">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={subscription.customer_signature_url}
+                          alt="Customer signature"
+                          className="max-h-10 max-w-full object-contain filter contrast-125"
+                        />
+                      </div>
+                    </div>
+                  ) : null}
+                  <p className="text-xs text-muted-foreground">
+                    Your digital signature is recorded with timestamp and securely bound to your Subidha agreement.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+                      ⏳ Digital Signature Pending
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    This contract requires your digital signature to complete onboarding. You can review the contract terms and sign directly from your smartphone or tablet.
+                  </p>
+                  {subscription.signing_path ? (
+                    <Link
+                      href={subscription.signing_path}
+                      className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-sky-600 text-xs font-bold text-white shadow-sm transition hover:bg-sky-700 active:scale-95"
+                    >
+                      <span>✍</span>
+                      <span>Review & Sign Contract Now</span>
+                    </Link>
+                  ) : null}
+                </div>
+              )}
+            </CPageCard>
+          </CPageSection>
+
           {/* Contract info */}
           <CPageSection title="Contract Details">
             <CPageCard>

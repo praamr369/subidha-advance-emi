@@ -71,6 +71,34 @@ class AdminSubscriptionDeliveryReadSerializer(_BaseSubscriptionDeliveryReadSeria
     # Lets the deliveries pages tell a rent/lease return (a unit to release)
     # from an Advance EMI one.
     plan_type = serializers.CharField(source="subscription.plan_type", read_only=True, default=None)
+    batch_number = serializers.IntegerField(read_only=True)
+    delivery_items = serializers.SerializerMethodField()
+    delivery_progress = serializers.SerializerMethodField()
+
+    def get_delivery_items(self, obj):
+        if not hasattr(obj, "delivery_items"):
+            return []
+        return [
+            {
+                "id": it.id,
+                "product_id": it.product_id,
+                "product_name": it.product.name,
+                "product_code": getattr(it.product, "product_code", "") or "",
+                "quantity": it.quantity,
+                "contract_item_id": it.contract_item_id,
+                "notes": it.notes,
+            }
+            for it in obj.delivery_items.select_related("product").all()
+        ]
+
+    def get_delivery_progress(self, obj):
+        if not obj.subscription_id:
+            return None
+        try:
+            from deliveries.services.delivery_service import get_subscription_item_delivery_progress
+            return get_subscription_item_delivery_progress(obj.subscription)
+        except Exception:
+            return None
 
     class Meta:
         model = SubscriptionDelivery
@@ -80,6 +108,7 @@ class AdminSubscriptionDeliveryReadSerializer(_BaseSubscriptionDeliveryReadSeria
             "subscription_id",
             "subscription_number",
             "plan_type",
+            "batch_number",
             "customer_id",
             "customer_name",
             "customer_phone",
@@ -122,6 +151,8 @@ class AdminSubscriptionDeliveryReadSerializer(_BaseSubscriptionDeliveryReadSeria
             "is_active_delivery",
             "inventory_stock_status",
             "inventory_available_qty",
+            "delivery_items",
+            "delivery_progress",
         )
         read_only_fields = fields
 
@@ -206,6 +237,8 @@ class AdminSubscriptionDeliveryCreateSerializer(serializers.Serializer):
     notes = serializers.CharField(required=False, allow_blank=True)
     admin_override = serializers.BooleanField(required=False, default=False)
     admin_override_reason = serializers.CharField(required=False, allow_blank=True, default="")
+    batch_number = serializers.IntegerField(required=False, allow_null=True)
+    items = serializers.ListField(child=serializers.DictField(), required=False, allow_empty=True)
 
     def validate(self, attrs):
         subscription = attrs.get("subscription")

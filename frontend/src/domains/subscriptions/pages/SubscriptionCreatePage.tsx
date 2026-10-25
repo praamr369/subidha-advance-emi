@@ -18,6 +18,8 @@ import PartnerSelector from "@/components/admin/partners/PartnerSelector";
 import type { CustomerRecord } from "@/services/customers";
 import KycReadinessPanel from "@/domains/subscriptions/components/KycReadinessPanel";
 import type { ContractKycReadiness } from "@/services/kyc-readiness";
+import SignatureCanvas from "@/components/forms/SignatureCanvas";
+import { CustomerSignatureLinkModal } from "@/components/contracts/CustomerSignatureLinkModal";
 
 type PlanType = "EMI" | "RENT" | "LEASE";
 type SubscriptionCreateVariant = "page" | "drawer";
@@ -498,12 +500,58 @@ export default function SubscriptionCreatePage({
 
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [signatureFile, setSignatureFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [signaturePreview, setSignaturePreview] = useState<string | null>(null);
+  const [signatureInputMode, setSignatureInputMode] = useState<"draw" | "upload">("upload");
   const [idDocType, setIdDocType] = useState<string>("AADHAAR");
   const [idDocFile, setIdDocFile] = useState<File | null>(null);
   const [rentAgreementFile, setRentAgreementFile] = useState<File | null>(null);
 
   const [docUploadBusy, setDocUploadBusy] = useState(false);
   const [docUploadError, setDocUploadError] = useState<string | null>(null);
+
+  const handlePhotoChange = (file: File | null) => {
+    setPhotoFile(file);
+    setDocUploadError(null);
+    if (photoPreview && photoPreview.startsWith("blob:")) {
+      URL.revokeObjectURL(photoPreview);
+    }
+    if (file) {
+      setPhotoPreview(URL.createObjectURL(file));
+    } else {
+      setPhotoPreview(null);
+    }
+  };
+
+  const handleSignatureFileChange = (file: File | null) => {
+    setSignatureFile(file);
+    setDocUploadError(null);
+    if (signaturePreview && signaturePreview.startsWith("blob:")) {
+      URL.revokeObjectURL(signaturePreview);
+    }
+    if (file) {
+      setSignaturePreview(URL.createObjectURL(file));
+    } else {
+      setSignaturePreview(null);
+    }
+  };
+
+  const handleSignatureCanvasChange = (file: File | null, dataUrl: string | null) => {
+    setSignatureFile(file);
+    setDocUploadError(null);
+    if (signaturePreview && signaturePreview.startsWith("blob:")) {
+      URL.revokeObjectURL(signaturePreview);
+    }
+    setSignaturePreview(dataUrl);
+  };
+
+  const handleClearSignature = () => {
+    if (signaturePreview && signaturePreview.startsWith("blob:")) {
+      URL.revokeObjectURL(signaturePreview);
+    }
+    setSignatureFile(null);
+    setSignaturePreview(null);
+  };
 
   // customerQuery / customerResults / customerLoading removed – handled by CustomerSelector
   const [productQuery, setProductQuery] = useState("");
@@ -532,6 +580,7 @@ export default function SubscriptionCreatePage({
   const [error, setError] = useState<string | null>(null);
   const [prefillMessages, setPrefillMessages] = useState<string[]>([]);
   const [success, setSuccess] = useState<CreatedSubscriptionResponse | null>(null);
+  const [signatureModalOpen, setSignatureModalOpen] = useState(false);
 
   const leadContext = useMemo(() => {
     const params = new URLSearchParams(searchParamKey);
@@ -1348,6 +1397,8 @@ export default function SubscriptionCreatePage({
 
     setPhotoFile(null);
     setSignatureFile(null);
+    setPhotoPreview(null);
+    setSignaturePreview(null);
     setIdDocFile(null);
     setRentAgreementFile(null);
 
@@ -1580,6 +1631,8 @@ export default function SubscriptionCreatePage({
           finalSuccess = refreshed;
           setPhotoFile(null);
           setSignatureFile(null);
+          setPhotoPreview(null);
+          setSignaturePreview(null);
           setIdDocFile(null);
           setRentAgreementFile(null);
         } catch (docErr) {
@@ -2812,7 +2865,71 @@ export default function SubscriptionCreatePage({
                 )}
               </div>
 
-            <div className="mt-5 flex flex-wrap gap-2">
+            {/* Customer Digital Signature & Mobile Signing Section */}
+            {(() => {
+              const hasAttachedSignature = Boolean(
+                Array.isArray(success.documents) &&
+                  success.documents.some(
+                    (doc) =>
+                      String((doc as Record<string, unknown>).document_type ?? "").toUpperCase() ===
+                        "CUSTOMER_SIGNATURE" &&
+                      Boolean((doc as Record<string, unknown>).file_url)
+                  )
+              );
+
+              return (
+                <div className="mt-5 rounded-2xl border border-sky-200 bg-sky-50/60 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-slate-900">Customer Digital Signature</span>
+                        {hasAttachedSignature ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
+                            ✓ Signed & Attached
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+                            ⏳ Signature Required
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-600 max-w-xl">
+                        {hasAttachedSignature
+                          ? "The customer's digital signature is attached to this agreement and will automatically appear on printed contracts with its verified timestamp."
+                          : "Customer signature is not yet attached. Send a secure signing link to their phone via WhatsApp or SMS, email via Gmail, or scan the on-screen QR code."}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSignatureModalOpen(true)}
+                        className="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700"
+                      >
+                        <span>📲</span>
+                        <span>{hasAttachedSignature ? "View Signing Link / QR" : "Send Mobile Signing Link (WhatsApp / Gmail / QR)"}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            <div className="mt-5 flex flex-wrap items-center gap-2">
+              <Link
+                href={
+                  isRentPlan || isLeasePlan
+                    ? `/admin/rent-lease/contracts/${success.id}/contract/print`
+                    : `/admin/subscriptions/${success.id}/contract/print`
+                }
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-md border border-[#8a5a22] bg-[#f0dfbd] px-3.5 py-2 text-sm font-semibold text-[#5e3818] shadow-sm transition hover:bg-[#e6d1a8]"
+              >
+                <span>🖨</span>
+                <span>Print Final Contract</span>
+              </Link>
+
               <Link
                 href={`/admin/subscriptions/${success.id}`}
                 className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
@@ -2846,6 +2963,13 @@ export default function SubscriptionCreatePage({
                 Create Another With Same Setup
               </button>
             </div>
+
+            <CustomerSignatureLinkModal
+              subscriptionId={success.id}
+              isOpen={signatureModalOpen}
+              onClose={() => setSignatureModalOpen(false)}
+              onSignatureUpdated={() => void refreshSuccess(success.id)}
+            />
           </SectionCard>
         ) : null}
 
@@ -2944,40 +3068,124 @@ export default function SubscriptionCreatePage({
                 </div>
               ) : null}
 
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-6 md:grid-cols-2">
                 <div>
-                  <label htmlFor="photo-file" className="text-xs font-medium text-muted-foreground">Customer photo</label>
+                  <label htmlFor="photo-file" className="text-xs font-semibold text-muted-foreground">Customer Photo</label>
                   <input
                     id="photo-file"
                     type="file"
                     accept="image/*"
                     onChange={(event) => {
                       const file = (event.target.files ?? [])[0] ?? null;
-                      setPhotoFile(file);
-                      setDocUploadError(null);
+                      handlePhotoChange(file);
                     }}
                     className="mt-2 block w-full text-sm"
                   />
-                  <div className="mt-2 text-xs text-muted-foreground">
-                    {photoFile ? photoFile.name : "No file selected"}
-                  </div>
+                  {photoPreview ? (
+                    <div className="mt-3 relative flex h-28 w-28 items-center justify-center overflow-hidden rounded-xl border border-emerald-300 bg-white p-1 shadow-sm">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={photoPreview} alt="Customer photo preview" className="h-full w-full rounded-lg object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => handlePhotoChange(null)}
+                        className="absolute right-1 top-1 rounded-full bg-slate-900/60 p-1 text-[10px] text-white hover:bg-slate-900"
+                        title="Remove photo"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      {photoFile ? photoFile.name : "No photo selected"}
+                    </div>
+                  )}
                 </div>
 
                 <div>
-                  <label htmlFor="signature-file" className="text-xs font-medium text-muted-foreground">Customer signature file</label>
-                  <input
-                    id="signature-file"
-                    type="file"
-                    onChange={(event) => {
-                      const file = (event.target.files ?? [])[0] ?? null;
-                      setSignatureFile(file);
-                      setDocUploadError(null);
-                    }}
-                    className="mt-2 block w-full text-sm"
-                  />
-                  <div className="mt-2 text-xs text-muted-foreground">
-                    {signatureFile ? signatureFile.name : "No file selected"}
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-muted-foreground">Customer Signature</label>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setSignatureInputMode("draw")}
+                        className={`rounded px-2 py-0.5 text-xs font-medium transition ${
+                          signatureInputMode === "draw"
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        ✍ Draw on screen
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSignatureInputMode("upload")}
+                        className={`rounded px-2 py-0.5 text-xs font-medium transition ${
+                          signatureInputMode === "upload"
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        📁 Upload image
+                      </button>
+                    </div>
                   </div>
+
+                  <div className="mt-2">
+                    {signatureInputMode === "draw" ? (
+                      <div className="space-y-2">
+                        <SignatureCanvas
+                          height={140}
+                          label="Customer Signature Pad"
+                          onChange={handleSignatureCanvasChange}
+                        />
+                        <div className="text-[11px] text-muted-foreground">
+                          Draw signature with touchscreen, stylus, or mouse.
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <input
+                          id="signature-file"
+                          type="file"
+                          accept="image/*"
+                          onChange={(event) => {
+                            const file = (event.target.files ?? [])[0] ?? null;
+                            handleSignatureFileChange(file);
+                          }}
+                          className="mt-1 block w-full text-sm"
+                        />
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          Upload JPG, PNG, or WEBP customer signature image.
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {signaturePreview ? (
+                    <div className="mt-3">
+                      <div className="text-[11px] font-medium text-emerald-700">✓ Customer signature captured</div>
+                      <div className="relative mt-1 flex h-20 w-56 items-center justify-center rounded-xl border border-emerald-300 bg-white p-2 shadow-sm">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={signaturePreview}
+                          alt="Signature preview"
+                          className="max-h-16 max-w-full object-contain filter contrast-125"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleClearSignature}
+                          className="absolute right-1 top-1 rounded-full bg-slate-200 p-1 text-[10px] text-slate-700 hover:bg-slate-300"
+                          title="Clear signature"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      {signatureFile ? signatureFile.name : "No signature captured yet"}
+                    </div>
+                  )}
                 </div>
               </div>
             </SectionCard>
