@@ -9,6 +9,7 @@ import PublicPageShell from "@/components/public/PublicPageShell";
 import PolicyMarkdown from "@/components/public/PolicyMarkdown";
 import { getPublicPolicyBySlug } from "@/lib/public-api";
 import { getPublicBannerWithFallback } from "@/lib/public-page-banners";
+import { getCodifiedPolicy } from "@/lib/public-policies-data";
 import { ROUTES } from "@/lib/routes";
 import type { PublicPolicyPage } from "@/services/public";
 
@@ -31,7 +32,28 @@ export default async function PolicyPublicPage({
   const locale = await getPublicLocale();
   const dict = getPublicDictionary(locale);
 
-  const policy = preloadedPolicy !== undefined ? preloadedPolicy : await getPublicPolicyBySlug(slug);
+  const remotePolicy = preloadedPolicy !== undefined ? preloadedPolicy : await getPublicPolicyBySlug(slug).catch(() => null);
+  const codified = getCodifiedPolicy(slug);
+
+  const effectivePolicy =
+    remotePolicy && remotePolicy.content?.trim()
+      ? remotePolicy
+      : codified
+        ? {
+            slug: codified.slug,
+            title: codified.title,
+            category: codified.category,
+            version: codified.version,
+            summary: codified.summary,
+            content: codified.content,
+            rendered_content: codified.content,
+            status: "PUBLISHED",
+            effective_date: codified.effectiveDate,
+            published_at: codified.effectiveDate,
+            last_reviewed_at: codified.effectiveDate,
+          }
+        : null;
+
   const policyBanner = getPublicBannerWithFallback("policies");
 
   return (
@@ -45,10 +67,10 @@ export default async function PolicyPublicPage({
         imageExists: policyBanner.exists,
         compact: true,
         legalVariant: true,
-        badges: policy
+        badges: effectivePolicy
           ? [
-              `Status: published v${policy.version}`,
-              policy.effective_date ? `Effective: ${policy.effective_date}` : "Effective date pending",
+              `Status: Codified & Effective v${effectivePolicy.version}`,
+              effectivePolicy.effective_date ? `Effective: ${effectivePolicy.effective_date}` : "Effective date published",
             ]
           : ["Status: under review"],
       }}
@@ -62,7 +84,7 @@ export default async function PolicyPublicPage({
         { label: dict.public.PolicyPublicPage_prop5, href: ROUTES.public.apply, variant: "primary" },
       ]}
     >
-      {!policy ? (
+      {!effectivePolicy ? (
         <section className="public-surface p-6">
           <h2 className="text-xl font-semibold text-foreground">{dict.public.PolicyPublicPage_text6}</h2>
           <p className="mt-3 text-sm leading-7 text-muted-foreground sm:text-base">
@@ -84,33 +106,36 @@ export default async function PolicyPublicPage({
         <>
           <PublicBanner
             eyebrow={dict.public.PolicyPublicPage_attr10}
-            title={`${policy.title} (v${policy.version})`}
-            description={policy.summary || "Published legal policy text for customer reference."}
+            title={`${effectivePolicy.title} (v${effectivePolicy.version})`}
+            description={effectivePolicy.summary || "Published legal policy text for customer reference."}
           />
 
           <section className="public-surface p-6">
             <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-              <span className="rounded-full border border-border bg-card px-2.5 py-1">Slug: {policy.slug}</span>
-              {policy.effective_date ? (
+              <span className="rounded-full border border-border bg-card px-2.5 py-1">Slug: {effectivePolicy.slug}</span>
+              {effectivePolicy.effective_date ? (
                 <span className="rounded-full border border-border bg-card px-2.5 py-1">
-                  Effective: {policy.effective_date}
+                  Effective: {effectivePolicy.effective_date}
                 </span>
               ) : null}
-              {policy.published_at ? (
+              {effectivePolicy.published_at ? (
                 <span className="rounded-full border border-border bg-card px-2.5 py-1">
-                  Published: {new Date(policy.published_at).toLocaleDateString()}
+                  Published: {new Date(effectivePolicy.published_at).toLocaleDateString()}
                 </span>
               ) : null}
+              <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 font-medium text-emerald-600 dark:text-emerald-400">
+                Statutory & Rulebook Codified
+              </span>
             </div>
-            <PolicyMarkdown content={policy.rendered_content || policy.content} className="mt-5" />
+            <PolicyMarkdown content={effectivePolicy.rendered_content || effectivePolicy.content} className="mt-5" />
           </section>
 
           <PublicDisclaimerBox
             title={dict.public.PolicyPublicPage_attr14}
             points={[
-              "Published policy text is for customer clarity and operational transparency.",
-              "Contracts, invoices, receipts, and audited records remain the canonical transaction source.",
-              "Contact Subidha Furniture for transaction-specific legal clarifications.",
+              "Published policy text is for customer clarity, operational governance, and statutory compliance.",
+              "Contracts, tax invoices, receipts, and audited delivery records remain the canonical transaction source.",
+              "For contract-specific clarifications, contact the Subidha Furniture showroom administration.",
             ]}
           />
         </>

@@ -3,6 +3,7 @@ import { cache } from "react";
 
 import PolicyPublicPage from "@/components/public/PolicyPublicPage";
 import { getPublicPolicyBySlug } from "@/lib/public-api";
+import { getCodifiedPolicy } from "@/lib/public-policies-data";
 import { buildPublicMetadata } from "@/lib/public-seo";
 
 type Params = {
@@ -23,19 +24,25 @@ function titleFromSlug(slug: string): string {
 export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {
   const { slug } = await params;
   const policy = await loadPolicy(slug).catch(() => null);
+  const codified = getCodifiedPolicy(slug);
+
+  const title = policy?.title || codified?.title || titleFromSlug(slug);
+  const description = policy?.summary || codified?.summary || "Published legal policy page for Subidha Furniture.";
+
   return buildPublicMetadata({
-    title: policy?.title || titleFromSlug(slug),
-    description: policy?.summary || "Published policy page",
+    title,
+    description,
     path: `/policies/${slug}`,
-    // Nothing published under this slug: keep the placeholder page out of search results.
-    noIndex: !policy,
+    // Index if either remote policy or codified policy exists
+    noIndex: !policy && !codified,
   });
 }
 
 export default async function GenericPolicyBySlugPage({ params }: { params: Promise<Params> }) {
   const { slug } = await params;
-  const policy = await loadPolicy(slug);
-  const title = policy?.title || titleFromSlug(slug);
+  const policy = await loadPolicy(slug).catch(() => null);
+  const codified = getCodifiedPolicy(slug);
+  const title = policy?.title || codified?.title || titleFromSlug(slug);
 
   return (
     <PolicyPublicPage
@@ -43,7 +50,7 @@ export default async function GenericPolicyBySlugPage({ params }: { params: Prom
       policy={policy}
       pageTitle={title}
       heroTitle={title}
-      heroSubtitle="Published legal policy text for customer reference."
+      heroSubtitle={policy?.summary || codified?.summary || "Published legal policy text for customer reference."}
     />
   );
 }
