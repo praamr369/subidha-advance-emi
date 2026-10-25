@@ -190,3 +190,74 @@ class AdminDeliveryApiTests(APITestCase):
         self.assertEqual(response.data["count"], 1)
         self.assertEqual(response.data["summary"]["delivered"], 1)
         self.assertEqual(response.data["results"][0]["delivery_reference"], "DLV-SUM-001")
+
+    def test_handover_link_and_public_pod_capture_workflow(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from subscriptions.models import Delivery, DeliveryOrderStatus, ProofOfDelivery
+
+        delivery = create_delivery(
+            subscription=self.subscription,
+            status=DeliveryStatus.OUT_FOR_DELIVERY,
+            delivery_reference="DLV-HND-001",
+            created_by=self.admin,
+            updated_by=self.admin,
+        )
+
+        # 1. Admin generates handover link
+        self.client.force_authenticate(user=self.admin)
+        link_resp = self.client.get(f"/api/v1/admin/delivery/{delivery.id}/handover-link/")
+        self.assertEqual(link_resp.status_code, status.HTTP_200_OK)
+        token = link_resp.data["handover_token"]
+        self.assertTrue(token)
+        self.assertIn("/delivery-handover/", link_resp.data["handover_url"])
+
+        # 2. Public / Driver unauthenticated GET to inspect order
+        self.client.logout()
+        info_resp = self.client.get(f"/api/v1/public/delivery/handover/{token}/")
+        self.assertEqual(info_resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(info_resp.data["customer_name"], self.customer.name)
+        self.assertFalse(info_resp.data["is_completed"])
+
+        # 3. Public / Driver unauthenticated POST with photos + touch signature
+        tiny_png = (
+            b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+            b"\x08\x06\x00\x00\x00\x1f\x15c4\x00\x00\x00\rIDATx\x9cc`\x00\x00\x00\x02"
+            b"\x00\x01H\xaf\xa4q\x00\x00\x00\x00IEND\xaeB`\x82"
+        )
+        photo1 = SimpleUploadedFile("product_photo.png", tiny_png, content_type="image/png")
+        sig = SimpleUploadedFile("signature.png", tiny_png, content_type="image/png")
+
+        post_data = {
+            "driver_name": "Ramesh Delivery Agent",
+            "driver_phone": "9876500000",
+            "customer_signature_name": "Delivery Admin Customer",
+            "gps_latitude": "23.6840",
+            "gps_longitude": "86.9840",
+            "notes": "Delivered in perfect condition at 2nd floor",
+            "photo_1": photo1,
+            "signature_image": sig,
+        }
+        submit_resp = self.client.post(
+            f"/api/v1/public/delivery/handover/{token}/",
+            data=post_data,
+            format="multipart",
+        )
+        self.assertEqual(submit_resp.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(submit_resp.data["success"])
+
+        # 4. Verify SubscriptionDelivery is now DELIVERED
+        delivery.refresh_from_db()
+        self.assertEqual(delivery.status, DeliveryStatus.DELIVERED)
+
+        # 5. Verify Delivery model and ProofOfDelivery record exist
+        pod_count = ProofOfDelivery.objects.filter(customer_signature_name="Delivery Admin Customer").count()
+        self.assertEqual(pod_count, 1)
+
+        # 6. Re-submitting on already delivered token is rejected safely
+        dup_resp = self.client.post(
+            f"/api/v1/public/delivery/handover/{token}/",
+            data=post_data,
+            format="multipart",
+        )
+        self.assertEqual(dup_resp.status_code, status.HTTP_400_BAD_REQUEST)
+

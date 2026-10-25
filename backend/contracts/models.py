@@ -222,6 +222,11 @@ class Subscription(TimeStampedModel):
                         {"batch": f"Batch is {batch_status} — new subscriptions cannot be enrolled after the eligible-pool snapshot is frozen (CTRL-LP-5)."}
                     )
 
+            if self.pk and hasattr(self, "contract_items") and self.contract_items.exists():
+                raise ValidationError(
+                    {"contract_items": "Contract items are strictly forbidden for EMI subscriptions."}
+                )
+
         else:
             if self.batch_id or self.lucky_id_id:
                 raise ValidationError(
@@ -593,6 +598,150 @@ class LeaseSubscriptionProfile(TimeStampedModel):
 
     def __str__(self):
         return f"LeaseProfile #{self.pk} for SUB-{self.subscription_id}"
+
+
+
+class ContractItem(TimeStampedModel):
+    """
+    Individual product line item attached to a RENT or LEASE contract.
+    Enables single customer contract with multiple attached furniture assets.
+    INVARIANT: STRICTLY forbidden for PlanType.EMI (Lucky Plan Advance EMI remains single-product).
+    """
+    subscription = models.ForeignKey(
+        Subscription,
+        on_delete=models.CASCADE,
+        related_name="contract_items",
+        db_index=True,
+    )
+    product = models.ForeignKey(
+        'products_core.Product',
+        on_delete=models.PROTECT,
+        related_name="contract_items",
+        db_index=True,
+    )
+    quantity = models.PositiveIntegerField(
+        default=1,
+        validators=[MinValueValidator(1)],
+    )
+    unit_base_price = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    total_base_price = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=MONEY_ZERO,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    monthly_yield_percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("5.00"),
+        validators=[MinValueValidator(Decimal("0.01"))],
+    )
+    monthly_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=MONEY_ZERO,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    security_deposit_percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("20.00"),
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
+    security_deposit_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=MONEY_ZERO,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    product_snapshot = models.JSONField(null=True, blank=True)
+
+    class Meta:
+        db_table = "contract_items"
+        ordering = ["id"]
+        indexes = [
+            models.Index(fields=["subscription", "product"]),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(quantity__gte=1),
+                name="chk_contract_item_quantity_positive",
+            ),
+            models.CheckConstraint(
+                condition=Q(unit_base_price__gte=MONEY_ZERO),
+                name="chk_contract_item_unit_base_price_non_negative",
+            ),
+            models.CheckConstraint(
+                condition=Q(total_base_price__gte=MONEY_ZERO),
+                name="chk_contract_item_total_base_price_non_negative",
+            ),
+            models.CheckConstraint(
+                condition=Q(monthly_amount__gte=MONEY_ZERO),
+                name="chk_contract_item_monthly_amount_non_negative",
+            ),
+        ]
+
+    def clean(self):
+        errors = {}
+        if self.subscription_id and self.subscription.plan_type not in (PlanType.RENT, PlanType.LEASE):
+            errors["subscription"] = "Contract items can only be attached to RENT or LEASE contracts."
+
+        if self.subscription_id and self.product_id:
+            if self.subscription.plan_type == PlanType.RENT and not getattr(self.product, "is_rent_enabled", False):
+                errors["product"] = f"Product '{getattr(self.product, 'name', self.product_id)}' is not enabled for RENT contracts."
+            elif self.subscription.plan_type == PlanType.LEASE and not getattr(self.product, "is_lease_enabled", False):
+                errors["product"] = f"Product '{getattr(self.product, 'name', self.product_id)}' is not enabled for LEASE contracts."
+
+        if self.quantity is None or self.quantity < 1:
+            errors["quantity"] = "Quantity must be at least 1."
+
+        if self.unit_base_price is None or self.unit_base_price < MONEY_ZERO:
+            errors["unit_base_price"] = "Unit base price cannot be negative."
+
+        if self.monthly_yield_percent is None or self.monthly_yield_percent <= Decimal("0.00"):
+            errors["monthly_yield_percent"] = "Monthly yield percent must be greater than zero."
+
+        if self.security_deposit_percent is not None and self.security_deposit_percent < Decimal("0.00"):
+            errors["security_deposit_percent"] = "Security deposit percent cannot be negative."
+
+        if self.security_deposit_amount is not None and self.security_deposit_amount < MONEY_ZERO:
+            errors["security_deposit_amount"] = "Security deposit amount cannot be negative."
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        qty = Decimal(str(self.quantity or 1))
+        unit_price = q2(Decimal(str(self.unit_base_price or MONEY_ZERO)))
+        self.total_base_price = q2(unit_price * qty)
+
+        yield_pct = Decimal(str(self.monthly_yield_percent or Decimal("5.00")))
+        self.monthly_amount = q2(self.total_base_price * yield_pct / Decimal("100.00"))
+
+        deposit_pct = Decimal(str(self.security_deposit_percent or Decimal("20.00")))
+        if not self.security_deposit_amount or self.security_deposit_amount == MONEY_ZERO:
+            self.security_deposit_amount = q2(self.total_base_price * deposit_pct / Decimal("100.00"))
+
+        if not self.product_snapshot and self.product_id:
+            self.product_snapshot = {
+                "product_id": self.product_id,
+                "product_code": getattr(self.product, "product_code", ""),
+                "name": getattr(self.product, "name", ""),
+                "base_price": str(getattr(self.product, "base_price", MONEY_ZERO)),
+                "category": getattr(self.product, "category", ""),
+                "subcategory": getattr(self.product, "subcategory", ""),
+                "sku": getattr(self.product, "sku", ""),
+            }
+
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"ContractItem #{self.pk}: {self.quantity}x {getattr(self.product, 'name', 'Product')} for SUB-{self.subscription_id}"
 
 
 

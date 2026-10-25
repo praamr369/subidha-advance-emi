@@ -49,7 +49,8 @@ class AdminRentContractCreateView(APIView):
 
         subscription = create_rent_contract(
             customer=data["customer"],
-            product=data["product"],
+            product=data.get("product"),
+            items=data.get("items"),
             tenure_months=data["tenure_months"],
             start_date=data.get("start_date"),
             security_deposit_percent=data["security_deposit_percent"],
@@ -80,7 +81,8 @@ class AdminLeaseContractCreateView(APIView):
 
         subscription = create_lease_contract(
             customer=data["customer"],
-            product=data["product"],
+            product=data.get("product"),
+            items=data.get("items"),
             tenure_months=data["tenure_months"],
             start_date=data.get("start_date"),
             security_deposit_percent=data["security_deposit_percent"],

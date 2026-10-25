@@ -6,6 +6,7 @@ import PublicDisclaimerBox from "@/components/public/PublicDisclaimerBox";
 import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
 import PublicPageShell from "@/components/public/PublicPageShell";
 import SectionHeader from "@/components/public/SectionHeader";
+import WorkflowFlowDiagram from "@/components/public/WorkflowFlowDiagram";
 import {
   HOW_IT_WORKS_JOURNEY_A,
   HOW_IT_WORKS_JOURNEY_B,
@@ -96,6 +97,8 @@ export default function HowItWorksPage() {
         obligations are governed by your approved contract, receipt records, and official policy
         documents. Advance EMI / Lucky Plan participation does not guarantee winning.
       </div>
+
+      <WorkflowFlowDiagram />
 
       <nav
         aria-label="Journey sections"

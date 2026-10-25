@@ -2400,6 +2400,7 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
 
 
 class SubscriptionAdminDetailSerializer(SubscriptionAdminSerializer):
+    contract_items = serializers.SerializerMethodField()
     rent_profile = serializers.SerializerMethodField()
     lease_profile = serializers.SerializerMethodField()
     documents = serializers.SerializerMethodField()
@@ -2416,6 +2417,7 @@ class SubscriptionAdminDetailSerializer(SubscriptionAdminSerializer):
 
     class Meta(SubscriptionAdminSerializer.Meta):
         fields = SubscriptionAdminSerializer.Meta.fields + (
+            "contract_items",
             "rent_profile",
             "lease_profile",
             "documents",
@@ -2431,6 +2433,31 @@ class SubscriptionAdminDetailSerializer(SubscriptionAdminSerializer):
             "activation_readiness",
         )
         read_only_fields = fields
+
+    def get_contract_items(self, obj):
+        if obj.plan_type not in (PlanType.RENT, PlanType.LEASE):
+            return []
+        items = obj.contract_items.select_related("product").all()
+        return [
+            {
+                "id": it.id,
+                "product": it.product_id,
+                "product_id": it.product_id,
+                "product_name": it.product.name,
+                "product_code": it.product.product_code,
+                "sku": getattr(it.product, "sku", ""),
+                "category": getattr(it.product, "category", ""),
+                "quantity": it.quantity,
+                "unit_base_price": str(it.unit_base_price),
+                "total_base_price": str(it.total_base_price),
+                "monthly_yield_percent": str(it.monthly_yield_percent),
+                "monthly_amount": str(it.monthly_amount),
+                "security_deposit_percent": str(getattr(it, "security_deposit_percent", "20.00")),
+                "security_deposit_amount": str(it.security_deposit_amount),
+                "product_snapshot": it.product_snapshot,
+            }
+            for it in items
+        ]
 
     def _snapshot(self, obj):
         cache_attr = "_subscription_financial_snapshot"

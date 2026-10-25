@@ -149,8 +149,21 @@ def generate_contract_pdf_for_subscription(*, subscription: Subscription, perfor
     draw_line("Customer", size=11, leading=14.5)
     draw_line(f"Name: {customer.name}", size=10)
     draw_line(f"Phone: {customer.phone}", size=10)
-    draw_line("Product", size=11, leading=14.5)
-    draw_line(f"Product: {product.name} ({product.product_code})", size=10)
+
+    contract_items = list(subscription.contract_items.select_related("product").order_by("id")) if hasattr(subscription, "contract_items") else []
+    if len(contract_items) > 1:
+        draw_line(f"Attached Furniture Assets ({len(contract_items)} Items)", size=11, leading=14.5)
+        for idx, itm in enumerate(contract_items, 1):
+            p = itm.product
+            draw_line(
+                f"{idx}. {p.name} ({getattr(p, 'product_code', '')}) - Qty: {itm.quantity} | "
+                f"Base: INR {itm.total_base_price:,.2f} | Yield: {itm.monthly_yield_percent}% (INR {itm.monthly_amount:,.2f}/mo) | "
+                f"Deposit: INR {itm.security_deposit_amount:,.2f} ({itm.security_deposit_percent}%)",
+                size=9, leading=12
+            )
+    else:
+        draw_line("Product", size=11, leading=14.5)
+        draw_line(f"Product: {product.name} ({product.product_code})", size=10)
     draw_line(f"Plan Type: {subscription.plan_type}", size=10)
     draw_rule()
 

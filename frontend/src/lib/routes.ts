@@ -1,4 +1,4 @@
-﻿export const ROUTES = {
+export const ROUTES = {
   public: {
     home: "/",
     products: "/products",
@@ -12,6 +12,7 @@
     refundCancellation: "/refund-cancellation",
     warranty: "/warranty",
     deliveryPolicy: "/delivery-policy",
+    deliveryHandover: (token: string) => `/delivery-handover/${token}`,
     rentalLeasePolicy: "/rental-lease-policy",
     luckyPlanPolicy: "/lucky-plan-policy",
     directSalePolicy: "/direct-sale-policy",

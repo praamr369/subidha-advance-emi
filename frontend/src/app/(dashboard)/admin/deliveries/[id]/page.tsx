@@ -27,6 +27,7 @@ import {
   updateAdminDelivery,
   type DeliveryRecord,
 } from "@/services/deliveries";
+import { getDeliveryHandoverLink, type HandoverLinkResponse } from "@/services/pod";
 
 type AuditEntry = {
   id: number;
@@ -146,6 +147,23 @@ export default function AdminDeliveryDetailPage() {
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
   const [reason, setReason] = useState("");
+
+  const [handoverData, setHandoverData] = useState<HandoverLinkResponse | null>(null);
+  const [handoverLoading, setHandoverLoading] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
+
+  const fetchHandoverLink = async () => {
+    if (!delivery) return;
+    setHandoverLoading(true);
+    try {
+      const data = await getDeliveryHandoverLink(delivery.id);
+      setHandoverData(data);
+    } catch (err) {
+      setErrorState(toErrorMessage(err, "Failed to generate handover link."));
+    } finally {
+      setHandoverLoading(false);
+    }
+  };
 
   const backHref = useMemo(() => {
     const qs = searchParams.toString();
@@ -586,6 +604,123 @@ export default function AdminDeliveryDetailPage() {
                   </button>
                 </div>
               </div>
+            </SectionCard>
+
+            <SectionCard
+              title="Proof of Delivery & Driver Mobile Handover"
+              description="Send a secure mobile link to your delivery boy or customer so they can capture product condition photos and customer touchscreen signature at the doorstep without logging into the admin portal."
+            >
+              {delivery.status === "DELIVERED" ? (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 space-y-3">
+                  <div className="flex items-center gap-2 text-emerald-800 font-semibold text-sm">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-emerald-200 text-emerald-800 text-xs">
+                      ✓
+                    </span>
+                    Delivery Verified & Handover Completed
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    This order has been verified with Proof of Delivery (POD). Handover photos and the customer's signature are securely stored for future return & warranty audit trails.
+                  </p>
+                  <div>
+                    <a
+                      href="/admin/deliveries/pod-archive"
+                      className="inline-flex h-9 items-center justify-center rounded-xl border border-border bg-background px-3 text-xs font-semibold text-foreground hover:bg-muted/30"
+                    >
+                      Open POD Archive & Year-End Export →
+                    </a>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {handoverData ? (
+                    <div className="rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-indigo-900">
+                          Active Driver Handover Link
+                        </span>
+                        <span className="text-[11px] text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-full font-medium">
+                          Valid for {handoverData.expires_in_days} days
+                        </span>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          readOnly
+                          value={
+                            typeof window !== "undefined"
+                              ? `${window.location.origin}${handoverData.handover_url}`
+                              : handoverData.handover_url
+                          }
+                          className="flex-1 h-9 rounded-xl border border-border bg-background px-3 text-xs text-foreground font-mono"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (typeof window !== "undefined") {
+                              const fullUrl = `${window.location.origin}${handoverData.handover_url}`;
+                              navigator.clipboard.writeText(fullUrl);
+                              setCopySuccess(true);
+                              setTimeout(() => setCopySuccess(false), 2000);
+                            }
+                          }}
+                          className="inline-flex h-9 items-center justify-center rounded-xl bg-indigo-600 hover:bg-indigo-700 px-3 text-xs font-semibold text-white transition"
+                        >
+                          {copySuccess ? "✓ Copied" : "Copy Link"}
+                        </button>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (typeof window !== "undefined") {
+                              const fullUrl = `${window.location.origin}${handoverData.handover_url}`;
+                              const recipient = delivery.receiver_name || "Customer";
+                              const text = `Subidha Furniture Delivery Handover Link for ${recipient}: ${fullUrl}\n\nPlease tap the link to take product quality photos and complete digital signature.`;
+                              window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+                            }
+                          }}
+                          className="inline-flex h-8 items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 px-3 text-xs font-semibold text-emerald-800 transition"
+                        >
+                          <span>💬</span> Share on WhatsApp
+                        </button>
+
+                        <a
+                          href={handoverData.handover_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex h-8 items-center justify-center gap-1.5 rounded-xl border border-border bg-background hover:bg-muted/30 px-3 text-xs font-semibold text-foreground transition"
+                        >
+                          <span>📱</span> Open Mobile Screen
+                        </a>
+                      </div>
+
+                      <p className="text-[11px] text-muted-foreground">
+                        The delivery agent can open this link on their mobile browser to take product pictures, recipient pictures, and collect on-screen finger signatures. No login required.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => void fetchHandoverLink()}
+                        disabled={handoverLoading}
+                        className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 px-4 text-sm font-semibold text-white shadow-sm disabled:opacity-60 transition"
+                      >
+                        {handoverLoading ? "Generating..." : "🔗 Generate Driver Handover Link (WhatsApp/SMS)"}
+                      </button>
+
+                      <a
+                        href="/admin/deliveries/pod-capture"
+                        className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-semibold text-foreground hover:bg-muted/30 transition"
+                      >
+                        Open In-Desk POD Form
+                      </a>
+                    </div>
+                  )}
+                </div>
+              )}
             </SectionCard>
 
             <SectionCard

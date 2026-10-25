@@ -91,41 +91,53 @@ def _render_contract_pdf(*, subscription, profile, contract_kind: str) -> bytes:
     line(f"Customer Address: {getattr(customer, 'address', '') or 'N/A'}", size=10)
     rule()
 
-    line("PRODUCT DETAILS", size=11, lead=15)
-    line(f"Product: {getattr(product, 'name', 'Product')}", size=10)
-    if product:
-        if product.product_code:
-            line(f"Product Code: {product.product_code}", size=10)
-        if product.sku:
-            line(f"SKU: {product.sku}", size=10)
-        if product.brand:
-            line(f"Brand: {product.brand}", size=10)
-        if product.category:
-            cat_str = product.category
-            if product.subcategory:
-                cat_str += f" / {product.subcategory}"
-            line(f"Category: {cat_str}", size=10)
-        if product.hsn_sac_code:
-            line(f"HSN/SAC: {product.hsn_sac_code}", size=10)
-        specs = getattr(product, "base_specs", None) or {}
-        if specs:
-            line("Specifications:", size=10)
-            for k, v in list(specs.items())[:10]:
-                line(f"  • {k}: {v}", size=9, lead=12)
-        accessories = ProductRelationship.objects.filter(
-            product_id=product.id, relationship_type="ACCESSORY",
-        ).select_related("related_product").order_by("id")
-        if accessories.exists():
-            line("Included Accessories:", size=10)
-            for acc in accessories:
-                rp = acc.related_product
-                parts = [rp.name]
-                if rp.product_code:
-                    parts.append(f"Code: {rp.product_code}")
-                if rp.sku:
-                    parts.append(f"SKU: {rp.sku}")
-                parts.append(f"Qty: {acc.quantity:.0f}")
-                line(f"  • {' | '.join(parts)}", size=9, lead=12)
+    contract_items = list(subscription.contract_items.select_related("product").order_by("id")) if hasattr(subscription, "contract_items") else []
+    if len(contract_items) > 1:
+        line(f"ATTACHED PRODUCTS ({len(contract_items)} Items)", size=11, lead=15)
+        for idx, itm in enumerate(contract_items, 1):
+            p = itm.product
+            line(
+                f"{idx}. {p.name} ({getattr(p, 'product_code', '')}) | Qty: {itm.quantity} | "
+                f"Base: INR {itm.total_base_price:,.2f} | Yield: {itm.monthly_yield_percent}% (INR {itm.monthly_amount:,.2f}/mo) | "
+                f"Deposit: INR {itm.security_deposit_amount:,.2f} ({itm.security_deposit_percent}%)",
+                size=9, lead=12
+            )
+    else:
+        line("PRODUCT DETAILS", size=11, lead=15)
+        line(f"Product: {getattr(product, 'name', 'Product')}", size=10)
+        if product:
+            if product.product_code:
+                line(f"Product Code: {product.product_code}", size=10)
+            if product.sku:
+                line(f"SKU: {product.sku}", size=10)
+            if product.brand:
+                line(f"Brand: {product.brand}", size=10)
+            if product.category:
+                cat_str = product.category
+                if product.subcategory:
+                    cat_str += f" / {product.subcategory}"
+                line(f"Category: {cat_str}", size=10)
+            if product.hsn_sac_code:
+                line(f"HSN/SAC: {product.hsn_sac_code}", size=10)
+            specs = getattr(product, "base_specs", None) or {}
+            if specs:
+                line("Specifications:", size=10)
+                for k, v in list(specs.items())[:10]:
+                    line(f"  • {k}: {v}", size=9, lead=12)
+            accessories = ProductRelationship.objects.filter(
+                product_id=product.id, relationship_type="ACCESSORY",
+            ).select_related("related_product").order_by("id")
+            if accessories.exists():
+                line("Included Accessories:", size=10)
+                for acc in accessories:
+                    rp = acc.related_product
+                    parts = [rp.name]
+                    if rp.product_code:
+                        parts.append(f"Code: {rp.product_code}")
+                    if rp.sku:
+                        parts.append(f"SKU: {rp.sku}")
+                    parts.append(f"Qty: {acc.quantity:.0f}")
+                    line(f"  • {' | '.join(parts)}", size=9, lead=12)
     line(f"Reference No: {contract_no}", size=10)
     rule()
     line(f"Tenure: {subscription.tenure_months} months", size=10)

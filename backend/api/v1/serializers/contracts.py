@@ -15,12 +15,32 @@ from subscriptions.models import (
 )
 
 
+class ContractItemInputSerializer(serializers.Serializer):
+    product = serializers.PrimaryKeyRelatedField(
+        queryset=Product.objects.filter(is_active=True).exclude(
+            inventory_profile__stock_item_type__in=["RAW_MATERIAL", "ACCESSORY"]
+        )
+    )
+    quantity = serializers.IntegerField(min_value=1, default=1)
+    unit_base_price = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
+    monthly_yield_percent = serializers.DecimalField(max_digits=5, decimal_places=2, required=False)
+    security_deposit_percent = serializers.DecimalField(max_digits=5, decimal_places=2, required=False)
+    security_deposit_amount = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
+
+
 class AdminRentContractCreateSerializer(serializers.Serializer):
     customer = serializers.PrimaryKeyRelatedField(queryset=Customer.objects.all())
-    product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.filter(is_active=True).exclude(inventory_profile__stock_item_type__in=["RAW_MATERIAL", "ACCESSORY"]))
+    product = serializers.PrimaryKeyRelatedField(
+        queryset=Product.objects.filter(is_active=True).exclude(
+            inventory_profile__stock_item_type__in=["RAW_MATERIAL", "ACCESSORY"]
+        ),
+        required=False,
+        allow_null=True,
+    )
+    items = ContractItemInputSerializer(many=True, required=False)
     tenure_months = serializers.IntegerField(min_value=1)
     start_date = serializers.DateField(required=False)
-    security_deposit_percent = serializers.DecimalField(max_digits=5, decimal_places=2)
+    security_deposit_percent = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, default="20.00")
     monthly_yield_percent = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, default="5.00")
     handover_notes = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     contract_terms_snapshot = serializers.CharField(required=False, allow_blank=True, allow_null=True)
@@ -31,17 +51,29 @@ class AdminRentContractCreateSerializer(serializers.Serializer):
         return value or timezone.localdate()
 
     def validate_security_deposit_percent(self, value):
-        if value < Decimal("20.00") or value > Decimal("30.00"):
-            raise serializers.ValidationError("Security deposit percent must be between 20 and 30.")
+        if value < Decimal("0.00") or value > Decimal("100.00"):
+            raise serializers.ValidationError("Security deposit percent must be between 0 and 100.")
         return value
+
+    def validate(self, attrs):
+        if not attrs.get("items") and not attrs.get("product"):
+            raise serializers.ValidationError({"product": "Either product or items list must be provided."})
+        return attrs
 
 
 class AdminLeaseContractCreateSerializer(serializers.Serializer):
     customer = serializers.PrimaryKeyRelatedField(queryset=Customer.objects.all())
-    product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.filter(is_active=True).exclude(inventory_profile__stock_item_type__in=["RAW_MATERIAL", "ACCESSORY"]))
+    product = serializers.PrimaryKeyRelatedField(
+        queryset=Product.objects.filter(is_active=True).exclude(
+            inventory_profile__stock_item_type__in=["RAW_MATERIAL", "ACCESSORY"]
+        ),
+        required=False,
+        allow_null=True,
+    )
+    items = ContractItemInputSerializer(many=True, required=False)
     tenure_months = serializers.IntegerField(min_value=1)
     start_date = serializers.DateField(required=False)
-    security_deposit_percent = serializers.DecimalField(max_digits=5, decimal_places=2)
+    security_deposit_percent = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, default="20.00")
     monthly_yield_percent = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, default="5.00")
     buyout_amount = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True)
     ownership_transfer_allowed = serializers.BooleanField(required=False, default=False)
@@ -54,8 +86,8 @@ class AdminLeaseContractCreateSerializer(serializers.Serializer):
         return value or timezone.localdate()
 
     def validate_security_deposit_percent(self, value):
-        if value < Decimal("20.00") or value > Decimal("30.00"):
-            raise serializers.ValidationError("Security deposit percent must be between 20 and 30.")
+        if value < Decimal("0.00") or value > Decimal("100.00"):
+            raise serializers.ValidationError("Security deposit percent must be between 0 and 100.")
         return value
 
     def validate_buyout_amount(self, value):
@@ -64,6 +96,11 @@ class AdminLeaseContractCreateSerializer(serializers.Serializer):
         if value < MONEY_ZERO:
             raise serializers.ValidationError("Buyout amount cannot be negative.")
         return value
+
+    def validate(self, attrs):
+        if not attrs.get("items") and not attrs.get("product"):
+            raise serializers.ValidationError({"product": "Either product or items list must be provided."})
+        return attrs
 
 
 class SubscriptionDocumentUploadSerializer(serializers.Serializer):

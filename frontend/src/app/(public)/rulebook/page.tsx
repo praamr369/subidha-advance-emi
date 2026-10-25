@@ -5,6 +5,7 @@ import CtaBanner from "@/components/public/CtaBanner";
 import PublicDisclaimerBox from "@/components/public/PublicDisclaimerBox";
 import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
 import PublicPageShell from "@/components/public/PublicPageShell";
+import WorkflowFlowDiagram from "@/components/public/WorkflowFlowDiagram";
 import { PUBLIC_LEGAL_DISCLAIMER_POINTS, RULEBOOK_SECTIONS } from "@/lib/public-content";
 import { buildPublicMetadata } from "@/lib/public-seo";
 import { ROUTES } from "@/lib/routes";
@@ -45,6 +46,8 @@ export default function RulebookPage() {
           </div>
         </div>
       </div>
+
+      <WorkflowFlowDiagram />
 
       <div className="space-y-6">
         {RULEBOOK_SECTIONS.map((section) => (

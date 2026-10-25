@@ -155,6 +155,54 @@ export const ACTION_PLAYBOOKS: ActionPlaybook[] = [
     ],
   },
   {
+    id: "create-rent-lease-package",
+    intent: "Create a Multi-Product Rental or Lease Contract with Custom Yield & Deposit",
+    category: "sales-contracts",
+    routePrefix: "/admin/subscriptions",
+    actionHref: "/admin/subscriptions/advance-emi/create",
+    actionLabel: "New Rent/Lease Contract",
+    breadcrumbSteps: [
+      "Subscriptions",
+      "Create Contract",
+      "Select RENT or LEASE Plan",
+      "Customer & KYC Check",
+      "Attach Furniture Items to Basket",
+      "Customize Per-Product Yield & Deposit",
+      "Review Aggregate Terms & Activate",
+    ],
+    stepByStepGuide: [
+      {
+        step: 1,
+        title: "Select Plan Type & Customer",
+        description: "Choose RENT (furniture rental) or LEASE (operating lease with optional buyout). Search customer by mobile number. Verify KYC readiness.",
+        fieldDetails: "Plan Type: RENT / LEASE, Customer profile, KYC status (VERIFIED or attach ID).",
+      },
+      {
+        step: 2,
+        title: "Attach Multiple Furniture Products to Basket",
+        description: "In Step 1, click '+ Add Another Product' to assemble a room package (e.g. Double Bed + 2 Mattresses + Center Table) under a single contract.",
+        fieldDetails: "Product search, selection, quantity increment/decrement, line base price.",
+      },
+      {
+        step: 3,
+        title: "Manually Configure Product-Specific Yield Rate & Security Deposit",
+        description: "For each product line in the basket, adjust the Yield Rate (%) and Security Deposit (%) individually. The table automatically calculates the line monthly dues and line deposit share.",
+        fieldDetails: "Per-product Yield %, Per-product Deposit %, Line Monthly Dues, Line Deposit Share.",
+      },
+      {
+        step: 4,
+        title: "Review Aggregate Commercial Terms & Activate / Save Draft",
+        description: "Verify the contract's aggregate product value, total monthly installment, and total security deposit. If customer documents are ready, click 'Activate Contract'; if awaiting document signature, click 'Save as Draft'.",
+        fieldDetails: "Tenure months, Start date, Total Monthly Rent, Total Security Deposit, Effective Deposit %.",
+      },
+    ],
+    criticalRules: [
+      "Rental/Lease packages allow attaching multiple furniture items under one unified customer contract.",
+      "Lucky Plan Advance EMI remains strictly isolated: 1 contract = 1 product = 1 Lucky ID.",
+      "Security deposit and monthly rent demands are strictly derived from itemized product line calculations.",
+    ],
+  },
+  {
     id: "create-direct-sale",
     intent: "Create a Direct Retail Sale & POS Tax Invoice",
     category: "sales-contracts",
@@ -1655,6 +1703,34 @@ export const ADMIN_HELP_TOPICS: AdminHelpTopic[] = [
           },
         ],
       },
+      {
+        name: "Create a Multi-Product Rental or Lease Contract",
+        description: "Assemble a multi-item showroom package (e.g. Bed + Mattress + Wardrobe) with custom yield and deposit rates per product.",
+        steps: [
+          {
+            step: 1,
+            title: "Select RENT or LEASE & Customer",
+            description: "Open Subscriptions > Create Contract. Select RENT (rental agreement) or LEASE (operating lease). Choose customer and verify KYC.",
+            actionHref: "/admin/subscriptions/advance-emi/create",
+            actionLabel: "New Rent/Lease Contract",
+          },
+          {
+            step: 2,
+            title: "Attach Multiple Furniture Products to Basket",
+            description: "Click '+ Add Another Product' to attach multiple furniture units to this contract. Adjust quantities and unit base prices.",
+          },
+          {
+            step: 3,
+            title: "Set Custom Yield Rate & Security Deposit Per Product",
+            description: "Configure individual Yield Rate (%) and Deposit (%) for each product line. The system computes line monthly dues, line deposit share, aggregate contract total, and effective deposit %.",
+          },
+          {
+            step: 4,
+            title: "Review Commercial Posture & Activate / Save Draft",
+            description: "Review tenure, monthly payment schedule, and security deposit receipt terms. Click 'Activate Contract' or 'Save as Draft'.",
+          },
+        ],
+      },
     ],
     setupRequirements: [
       {
@@ -2280,6 +2356,37 @@ export const ADMIN_HELP_TOPICS: AdminHelpTopic[] = [
           },
         ],
       },
+      {
+        name: "Mobile Handover Link & Touchscreen POD Capture",
+        description: "Send a secure WhatsApp link to field delivery staff to capture product quality photos and touchscreen signatures at the doorstep.",
+        steps: [
+          {
+            step: 1,
+            title: "Generate Handover Link",
+            description: "Open the delivery order in /admin/deliveries/[id] and click 'Generate Driver Handover Link'.",
+          },
+          {
+            step: 2,
+            title: "Share on WhatsApp",
+            description: "Click 'Share on WhatsApp' to dispatch the secure token link to the delivery boy or customer.",
+          },
+          {
+            step: 3,
+            title: "Capture Quality Photos",
+            description: "Delivery boy taps link on phone and uses camera to take Photo 1 (room placement & quality) and Photo 2 (customer with item).",
+          },
+          {
+            step: 4,
+            title: "Customer Screen Signature",
+            description: "Customer signs directly on the phone screen with their finger using the interactive digital signature pad.",
+          },
+          {
+            step: 5,
+            title: "Auto-GPS & System Verification",
+            description: "Tapping submit logs GPS coordinates and automatically marks the delivery DELIVERED, activating asset custody under Rule CTRL-RENT-2.",
+          },
+        ],
+      },
     ],
     setupRequirements: [
       {
@@ -2291,6 +2398,9 @@ export const ADMIN_HELP_TOPICS: AdminHelpTopic[] = [
     invariants: [
       "Product delivery state, contract state, and payment state are separate concerns.",
       "Delivery progression is blocked for cancelled or reversed sales invoices.",
+      "Rule CTRL-RENT-2: Delivery cannot be marked DELIVERED without an attached Proof of Delivery (POD) record.",
+      "Field handover link uses tamper-proof signed tokens (valid 7 days); admin credentials must never be shared.",
+      "Product condition photo (Photo 1) acts as the permanent quality baseline for rent/lease return inspections.",
     ],
     keyActions: [
       { label: "Delivery Hub", href: "/admin/deliveries", variant: "primary" },

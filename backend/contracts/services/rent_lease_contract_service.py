@@ -11,6 +11,7 @@ from accounting.services.non_gst_document_service import build_non_gst_snapshot
 from subscriptions.models import (
     MONEY_ZERO,
     AuditLog,
+    ContractItem,
     ContractRefundStatus,
     ContractReturnConditionStatus,
     LeaseSubscriptionProfile,
@@ -56,11 +57,112 @@ def _default_terms_snapshot(*, plan_type: str) -> str:
     )
 
 
+def _normalize_contract_items(
+    *,
+    plan_type: str,
+    product=None,
+    items: list[dict] | None = None,
+    default_monthly_yield_percent: Decimal = Decimal("5.00"),
+    default_security_deposit_percent: Decimal = Decimal("20.00"),
+) -> list[dict]:
+    from products_core.models import Product
+
+    raw_items = list(items or [])
+    if not raw_items:
+        if not product:
+            raise ValidationError({"product": "A product or items list is required."})
+        raw_items = [
+            {
+                "product": product,
+                "quantity": 1,
+                "unit_base_price": getattr(product, "base_price", None),
+                "monthly_yield_percent": default_monthly_yield_percent,
+                "security_deposit_percent": default_security_deposit_percent,
+            }
+        ]
+
+    normalized = []
+    for idx, it in enumerate(raw_items, start=1):
+        prod = it.get("product")
+        if isinstance(prod, (int, str)):
+            try:
+                prod = Product.objects.get(pk=int(prod))
+            except (Product.DoesNotExist, ValueError):
+                raise ValidationError({"items": f"Item {idx}: Product not found."})
+        elif not prod:
+            raise ValidationError({"items": f"Item {idx}: Product is required."})
+
+        if plan_type == PlanType.RENT and not getattr(prod, "is_rent_enabled", False):
+            raise ValidationError(
+                {"items": f"Product '{getattr(prod, 'name', prod)}' is not enabled for RENT contracts."}
+            )
+        elif plan_type == PlanType.LEASE and not getattr(prod, "is_lease_enabled", False):
+            raise ValidationError(
+                {"items": f"Product '{getattr(prod, 'name', prod)}' is not enabled for LEASE contracts."}
+            )
+
+        qty = int(it.get("quantity") or 1)
+        if qty <= 0:
+            raise ValidationError({"items": f"Item {idx}: Quantity must be greater than zero."})
+
+        unit_price = it.get("unit_base_price")
+        if unit_price is None or str(unit_price).strip() == "":
+            unit_price = getattr(prod, "base_price", MONEY_ZERO)
+        unit_price_d = Decimal(str(unit_price)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        if unit_price_d < Decimal("0.00"):
+            raise ValidationError({"items": f"Item {idx}: Unit base price cannot be negative."})
+
+        yield_pct = it.get("monthly_yield_percent")
+        if yield_pct is None or str(yield_pct).strip() == "":
+            yield_pct = default_monthly_yield_percent
+        yield_pct_d = Decimal(str(yield_pct)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        if yield_pct_d <= Decimal("0.00"):
+            raise ValidationError({"items": f"Item {idx}: Yield rate must be greater than zero."})
+
+        total_base = (unit_price_d * Decimal(qty)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        monthly_amt = (total_base * yield_pct_d / Decimal("100.00")).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+
+        deposit_pct = it.get("security_deposit_percent")
+        if deposit_pct is None or str(deposit_pct).strip() == "":
+            deposit_pct = default_security_deposit_percent
+        deposit_pct_d = Decimal(str(deposit_pct)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        if deposit_pct_d < Decimal("0.00"):
+            raise ValidationError({"items": f"Item {idx}: Security deposit percent cannot be negative."})
+
+        deposit_amt = it.get("security_deposit_amount")
+        if deposit_amt is not None and str(deposit_amt).strip() != "":
+            deposit_amt_d = Decimal(str(deposit_amt)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            if deposit_amt_d < Decimal("0.00"):
+                raise ValidationError({"items": f"Item {idx}: Security deposit amount cannot be negative."})
+        else:
+            deposit_amt_d = (total_base * deposit_pct_d / Decimal("100.00")).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
+
+        normalized.append(
+            {
+                "product": prod,
+                "quantity": qty,
+                "unit_base_price": unit_price_d,
+                "total_base_price": total_base,
+                "monthly_yield_percent": yield_pct_d,
+                "monthly_amount": monthly_amt,
+                "security_deposit_percent": deposit_pct_d,
+                "security_deposit_amount": deposit_amt_d,
+            }
+        )
+
+    return normalized
+
+
 @transaction.atomic
 def create_rent_contract(
     *,
     customer,
-    product,
+    product=None,
+    items: list[dict] | None = None,
     tenure_months: int,
     start_date=None,
     security_deposit_percent: Decimal,
@@ -76,8 +178,32 @@ def create_rent_contract(
     if tenure_months <= 0:
         raise ValidationError({"tenure_months": "Tenure must be greater than zero."})
 
-    if not getattr(product, "is_rent_enabled", False):
-        raise ValidationError({"product": "Selected product is not enabled for RENT contracts."})
+    monthly_yield_percent = Decimal(str(monthly_yield_percent)).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
+    if monthly_yield_percent <= Decimal("0.00"):
+        raise ValidationError({"monthly_yield_percent": "Yield rate must be greater than zero."})
+
+    normalized_items = _normalize_contract_items(
+        plan_type=PlanType.RENT,
+        product=product,
+        items=items,
+        default_monthly_yield_percent=monthly_yield_percent,
+        default_security_deposit_percent=security_deposit_percent,
+    )
+
+    primary_product = normalized_items[0]["product"]
+    product_value = sum((it["total_base_price"] for it in normalized_items), MONEY_ZERO)
+    monthly_amount = sum((it["monthly_amount"] for it in normalized_items), MONEY_ZERO)
+    total_amount = (monthly_amount * Decimal(tenure_months)).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
+    deposit_amount = sum((it["security_deposit_amount"] for it in normalized_items), MONEY_ZERO)
+    effective_deposit_percent = (
+        (deposit_amount * Decimal("100.00") / product_value).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        if product_value > MONEY_ZERO
+        else Decimal(str(security_deposit_percent or "20.00")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    )
 
     # Drafts are always allowed. Activating (the default) goes through the
     # additive KYC/document gate (no-op unless KYC gating is enabled).
@@ -89,53 +215,85 @@ def create_rent_contract(
             customer=customer, plan_type=PlanType.RENT, stage="activate"
         )
 
-    product_value = Decimal(product.base_price).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    
-    monthly_yield_percent = Decimal(str(monthly_yield_percent)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    if monthly_yield_percent <= Decimal("0.00"):
-        raise ValidationError({"monthly_yield_percent": "Yield rate must be greater than zero."})
-
-    monthly_amount = (product_value * monthly_yield_percent / Decimal("100.00")).quantize(
-        Decimal("0.01"), rounding=ROUND_HALF_UP
-    )
-    total_amount = (monthly_amount * Decimal(tenure_months)).quantize(
-        Decimal("0.01"), rounding=ROUND_HALF_UP
-    )
-
-    deposit = calculate_security_deposit(contract_value=product_value, percent=security_deposit_percent)
     terms_snapshot = (contract_terms_snapshot or "").strip() or _default_terms_snapshot(plan_type="RENT")
+
+    items_snapshot = [
+        {
+            "product_id": it["product"].id,
+            "product_name": it["product"].name,
+            "product_code": getattr(it["product"], "product_code", ""),
+            "quantity": it["quantity"],
+            "unit_base_price": str(it["unit_base_price"]),
+            "total_base_price": str(it["total_base_price"]),
+            "monthly_yield_percent": str(it["monthly_yield_percent"]),
+            "monthly_amount": str(it["monthly_amount"]),
+            "security_deposit_percent": str(it["security_deposit_percent"]),
+            "security_deposit_amount": str(it["security_deposit_amount"]),
+        }
+        for it in normalized_items
+    ]
 
     subscription = Subscription.objects.create(
         customer=customer,
-        product=product,
+        product=primary_product,
         plan_type=PlanType.RENT,
         tenure_months=tenure_months,
         start_date=start_date,
         total_amount=total_amount,
         monthly_amount=monthly_amount,
         status=contract_status,
+        product_snapshot={
+            "product_id": primary_product.id,
+            "product_code": getattr(primary_product, "product_code", ""),
+            "name": getattr(primary_product, "name", ""),
+            "base_price": str(getattr(primary_product, "base_price", MONEY_ZERO)),
+            "items_count": len(normalized_items),
+            "items": items_snapshot,
+        },
+        pricing_snapshot={
+            "plan_type": PlanType.RENT,
+            "tenure_months": tenure_months,
+            "monthly_amount": str(monthly_amount),
+            "total_amount": str(total_amount),
+            "total_product_value": str(product_value),
+            "items_count": len(normalized_items),
+        },
         tax_profile_snapshot=build_non_gst_snapshot(
             document_type="RENT_CONTRACT",
             document_date=start_date,
             party_type="CUSTOMER",
             party_id=getattr(customer, "id", None),
-            product_id=getattr(product, "id", None),
+            product_id=getattr(primary_product, "id", None),
         ),
     )
 
     RentSubscriptionProfile.objects.create(
         subscription=subscription,
-        security_deposit_percent=deposit.percent,
+        security_deposit_percent=effective_deposit_percent,
         monthly_yield_percent=monthly_yield_percent,
-        security_deposit_amount=deposit.amount,
-        refundable_security_deposit=deposit.amount,
+        security_deposit_amount=deposit_amount,
+        refundable_security_deposit=deposit_amount,
         return_condition_status=ContractReturnConditionStatus.NOT_ASSESSED,
         deduction_amount=MONEY_ZERO,
-        refund_amount=deposit.amount,
+        refund_amount=deposit_amount,
         refund_status=ContractRefundStatus.PENDING,
         handover_notes=handover_notes or "",
         contract_terms_snapshot=terms_snapshot,
     )
+
+    # Persist contract items
+    for it in normalized_items:
+        ContractItem.objects.create(
+            subscription=subscription,
+            product=it["product"],
+            quantity=it["quantity"],
+            unit_base_price=it["unit_base_price"],
+            total_base_price=it["total_base_price"],
+            monthly_yield_percent=it["monthly_yield_percent"],
+            monthly_amount=it["monthly_amount"],
+            security_deposit_percent=it["security_deposit_percent"],
+            security_deposit_amount=it["security_deposit_amount"],
+        )
 
     # Assign immutable contract number
     from contracts.services.contract_number_service import assign_subscription_number
@@ -157,12 +315,15 @@ def create_rent_contract(
             "event": "RENT_CONTRACT_CREATED",
             "subscription_id": subscription.id,
             "customer_id": getattr(customer, "id", None),
-            "product_id": getattr(product, "id", None),
+            "product_id": getattr(primary_product, "id", None),
+            "items_count": len(normalized_items),
+            "product_ids": [it["product"].id for it in normalized_items],
+            "total_product_value": str(product_value),
             "total_amount": str(total_amount),
             "monthly_amount": str(monthly_amount),
             "tenure_months": tenure_months,
-            "security_deposit_percent": str(deposit.percent),
-            "security_deposit_amount": str(deposit.amount),
+            "security_deposit_percent": str(effective_deposit_percent),
+            "security_deposit_amount": str(deposit_amount),
         },
     )
 
@@ -177,7 +338,8 @@ def create_rent_contract(
 def create_lease_contract(
     *,
     customer,
-    product,
+    product=None,
+    items: list[dict] | None = None,
     tenure_months: int,
     start_date=None,
     security_deposit_percent: Decimal,
@@ -195,8 +357,32 @@ def create_lease_contract(
     if tenure_months <= 0:
         raise ValidationError({"tenure_months": "Tenure must be greater than zero."})
 
-    if not getattr(product, "is_lease_enabled", False):
-        raise ValidationError({"product": "Selected product is not enabled for LEASE contracts."})
+    monthly_yield_percent = Decimal(str(monthly_yield_percent)).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
+    if monthly_yield_percent <= Decimal("0.00"):
+        raise ValidationError({"monthly_yield_percent": "Yield rate must be greater than zero."})
+
+    normalized_items = _normalize_contract_items(
+        plan_type=PlanType.LEASE,
+        product=product,
+        items=items,
+        default_monthly_yield_percent=monthly_yield_percent,
+        default_security_deposit_percent=security_deposit_percent,
+    )
+
+    primary_product = normalized_items[0]["product"]
+    product_value = sum((it["total_base_price"] for it in normalized_items), MONEY_ZERO)
+    monthly_amount = sum((it["monthly_amount"] for it in normalized_items), MONEY_ZERO)
+    total_amount = (monthly_amount * Decimal(tenure_months)).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
+    deposit_amount = sum((it["security_deposit_amount"] for it in normalized_items), MONEY_ZERO)
+    effective_deposit_percent = (
+        (deposit_amount * Decimal("100.00") / product_value).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        if product_value > MONEY_ZERO
+        else Decimal(str(security_deposit_percent or "20.00")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    )
 
     # Drafts are always allowed. Activating (the default) goes through the
     # additive KYC/document gate (no-op unless KYC gating is enabled).
@@ -208,20 +394,6 @@ def create_lease_contract(
             customer=customer, plan_type=PlanType.LEASE, stage="activate"
         )
 
-    product_value = Decimal(product.base_price).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    
-    monthly_yield_percent = Decimal(str(monthly_yield_percent)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    if monthly_yield_percent <= Decimal("0.00"):
-        raise ValidationError({"monthly_yield_percent": "Yield rate must be greater than zero."})
-
-    monthly_amount = (product_value * monthly_yield_percent / Decimal("100.00")).quantize(
-        Decimal("0.01"), rounding=ROUND_HALF_UP
-    )
-    total_amount = (monthly_amount * Decimal(tenure_months)).quantize(
-        Decimal("0.01"), rounding=ROUND_HALF_UP
-    )
-
-    deposit = calculate_security_deposit(contract_value=product_value, percent=security_deposit_percent)
     terms_snapshot = (contract_terms_snapshot or "").strip() or _default_terms_snapshot(plan_type="LEASE")
 
     normalized_buyout = None
@@ -230,39 +402,85 @@ def create_lease_contract(
         if normalized_buyout < MONEY_ZERO:
             raise ValidationError({"buyout_amount": "Buyout amount cannot be negative."})
 
+    items_snapshot = [
+        {
+            "product_id": it["product"].id,
+            "product_name": it["product"].name,
+            "product_code": getattr(it["product"], "product_code", ""),
+            "quantity": it["quantity"],
+            "unit_base_price": str(it["unit_base_price"]),
+            "total_base_price": str(it["total_base_price"]),
+            "monthly_yield_percent": str(it["monthly_yield_percent"]),
+            "monthly_amount": str(it["monthly_amount"]),
+            "security_deposit_percent": str(it["security_deposit_percent"]),
+            "security_deposit_amount": str(it["security_deposit_amount"]),
+        }
+        for it in normalized_items
+    ]
+
     subscription = Subscription.objects.create(
         customer=customer,
-        product=product,
+        product=primary_product,
         plan_type=PlanType.LEASE,
         tenure_months=tenure_months,
         start_date=start_date,
         total_amount=total_amount,
         monthly_amount=monthly_amount,
         status=contract_status,
+        product_snapshot={
+            "product_id": primary_product.id,
+            "product_code": getattr(primary_product, "product_code", ""),
+            "name": getattr(primary_product, "name", ""),
+            "base_price": str(getattr(primary_product, "base_price", MONEY_ZERO)),
+            "items_count": len(normalized_items),
+            "items": items_snapshot,
+        },
+        pricing_snapshot={
+            "plan_type": PlanType.LEASE,
+            "tenure_months": tenure_months,
+            "monthly_amount": str(monthly_amount),
+            "total_amount": str(total_amount),
+            "total_product_value": str(product_value),
+            "items_count": len(normalized_items),
+        },
         tax_profile_snapshot=build_non_gst_snapshot(
             document_type="LEASE_CONTRACT",
             document_date=start_date,
             party_type="CUSTOMER",
             party_id=getattr(customer, "id", None),
-            product_id=getattr(product, "id", None),
+            product_id=getattr(primary_product, "id", None),
         ),
     )
 
     LeaseSubscriptionProfile.objects.create(
         subscription=subscription,
-        security_deposit_percent=deposit.percent,
+        security_deposit_percent=effective_deposit_percent,
         monthly_yield_percent=monthly_yield_percent,
-        security_deposit_amount=deposit.amount,
-        refundable_security_deposit=deposit.amount,
+        security_deposit_amount=deposit_amount,
+        refundable_security_deposit=deposit_amount,
         buyout_amount=normalized_buyout,
         ownership_transfer_allowed=bool(ownership_transfer_allowed),
         return_condition_status=ContractReturnConditionStatus.NOT_ASSESSED,
         deduction_amount=MONEY_ZERO,
-        refund_amount=deposit.amount,
+        refund_amount=deposit_amount,
         refund_status=ContractRefundStatus.PENDING,
         handover_notes=handover_notes or "",
         contract_terms_snapshot=terms_snapshot,
     )
+
+    # Persist contract items
+    for it in normalized_items:
+        ContractItem.objects.create(
+            subscription=subscription,
+            product=it["product"],
+            quantity=it["quantity"],
+            unit_base_price=it["unit_base_price"],
+            total_base_price=it["total_base_price"],
+            monthly_yield_percent=it["monthly_yield_percent"],
+            monthly_amount=it["monthly_amount"],
+            security_deposit_percent=it["security_deposit_percent"],
+            security_deposit_amount=it["security_deposit_amount"],
+        )
 
     # Assign immutable contract number
     from contracts.services.contract_number_service import assign_subscription_number
@@ -284,12 +502,15 @@ def create_lease_contract(
             "event": "LEASE_CONTRACT_CREATED",
             "subscription_id": subscription.id,
             "customer_id": getattr(customer, "id", None),
-            "product_id": getattr(product, "id", None),
+            "product_id": getattr(primary_product, "id", None),
+            "items_count": len(normalized_items),
+            "product_ids": [it["product"].id for it in normalized_items],
+            "total_product_value": str(product_value),
             "total_amount": str(total_amount),
             "monthly_amount": str(monthly_amount),
             "tenure_months": tenure_months,
-            "security_deposit_percent": str(deposit.percent),
-            "security_deposit_amount": str(deposit.amount),
+            "security_deposit_percent": str(effective_deposit_percent),
+            "security_deposit_amount": str(deposit_amount),
             "buyout_amount": str(normalized_buyout) if normalized_buyout is not None else None,
             "ownership_transfer_allowed": bool(ownership_transfer_allowed),
         },
