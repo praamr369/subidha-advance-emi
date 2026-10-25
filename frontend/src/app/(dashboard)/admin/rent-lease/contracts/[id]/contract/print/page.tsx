@@ -257,6 +257,24 @@ export default function AdminRentLeaseContractPrintPage() {
 
   const generatedAt = useMemo(() => new Date().toISOString(), []);
 
+  const customerSignatureDoc = useMemo(() => {
+    if (!subscription?.documents?.length) return null;
+    return (
+      subscription.documents.find(
+        (doc) => doc.document_type === "CUSTOMER_SIGNATURE" && doc.file_url
+      ) || null
+    );
+  }, [subscription?.documents]);
+
+  const customerPhotoDoc = useMemo(() => {
+    if (!subscription?.documents?.length) return null;
+    return (
+      subscription.documents.find(
+        (doc) => doc.document_type === "CUSTOMER_PHOTO" && doc.file_url
+      ) || null
+    );
+  }, [subscription?.documents]);
+
   if (loading) {
     return <ERPLoadingState label="Loading rent/lease contract..." />;
   }
@@ -288,24 +306,6 @@ export default function AdminRentLeaseContractPrintPage() {
     subscription.financial_summary?.remaining_amount ??
     subscription.financial_summary?.pending_amount;
   const watermark = documentStatusWatermark(status);
-
-  const customerSignatureDoc = useMemo(() => {
-    if (!subscription?.documents?.length) return null;
-    return (
-      subscription.documents.find(
-        (doc) => doc.document_type === "CUSTOMER_SIGNATURE" && doc.file_url
-      ) || null
-    );
-  }, [subscription?.documents]);
-
-  const customerPhotoDoc = useMemo(() => {
-    if (!subscription?.documents?.length) return null;
-    return (
-      subscription.documents.find(
-        (doc) => doc.document_type === "CUSTOMER_PHOTO" && doc.file_url
-      ) || null
-    );
-  }, [subscription?.documents]);
 
   const customerSignatureUrl = customerSignatureDoc?.file_url ?? null;
   const customerPhotoUrl = customerPhotoDoc?.file_url ?? null;

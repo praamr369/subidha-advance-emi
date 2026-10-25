@@ -234,6 +234,24 @@ export default function AdminSubscriptionContractPrintPage() {
 
   const generatedAt = useMemo(() => new Date().toISOString(), []);
 
+  const customerSignatureDoc = useMemo(() => {
+    if (!subscription?.documents?.length) return null;
+    return (
+      subscription.documents.find(
+        (doc) => doc.document_type === "CUSTOMER_SIGNATURE" && doc.file_url
+      ) || null
+    );
+  }, [subscription?.documents]);
+
+  const customerPhotoDoc = useMemo(() => {
+    if (!subscription?.documents?.length) return null;
+    return (
+      subscription.documents.find(
+        (doc) => doc.document_type === "CUSTOMER_PHOTO" && doc.file_url
+      ) || null
+    );
+  }, [subscription?.documents]);
+
   if (loading) {
     return <ERPLoadingState label="Loading subscription contract..." />;
   }
@@ -264,24 +282,6 @@ export default function AdminSubscriptionContractPrintPage() {
     subscription.product_base_price ?? financialSummary?.total_amount ?? subscription.total_amount;
   const customerDisplayName = subscription.customer_name || customer?.name || "";
   const customerDisplayPhone = subscription.customer_phone || customer?.phone || "";
-
-  const customerSignatureDoc = useMemo(() => {
-    if (!subscription?.documents?.length) return null;
-    return (
-      subscription.documents.find(
-        (doc) => doc.document_type === "CUSTOMER_SIGNATURE" && doc.file_url
-      ) || null
-    );
-  }, [subscription?.documents]);
-
-  const customerPhotoDoc = useMemo(() => {
-    if (!subscription?.documents?.length) return null;
-    return (
-      subscription.documents.find(
-        (doc) => doc.document_type === "CUSTOMER_PHOTO" && doc.file_url
-      ) || null
-    );
-  }, [subscription?.documents]);
 
   const customerSignatureUrl = customerSignatureDoc?.file_url ?? null;
   const customerPhotoUrl = customerPhotoDoc?.file_url ?? null;
