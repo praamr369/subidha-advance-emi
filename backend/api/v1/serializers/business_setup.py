@@ -342,3 +342,54 @@ class EmailSMTPSettingsSerializer(BusinessSetupModelSerializer):
 
 class EmailSMTPTestRequestSerializer(serializers.Serializer):
     recipient = serializers.EmailField()
+
+
+class FreeCloudStorageSettingsSerializer(BusinessSetupModelSerializer):
+    has_secret_access_key = serializers.SerializerMethodField()
+    secret_access_key = serializers.CharField(write_only=True, required=False, allow_blank=True)
+
+    class Meta:
+        from business_setup.models.cloud_storage import FreeCloudStorageSettings
+
+        model = FreeCloudStorageSettings
+        fields = [
+            "id",
+            "provider",
+            "endpoint_url",
+            "bucket_name",
+            "access_key_id",
+            "secret_access_key",
+            "has_secret_access_key",
+            "rclone_remote_name",
+            "is_enabled",
+            "auto_sync_nightly",
+            "last_test_at",
+            "last_test_success",
+            "last_test_message",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ("id", "last_test_at", "last_test_success", "last_test_message", "created_at", "updated_at")
+
+    def get_has_secret_access_key(self, instance):
+        return instance.has_secret_access_key
+
+    def update(self, instance, validated_data):
+        secret_access_key = validated_data.pop("secret_access_key", None)
+        for attribute, value in validated_data.items():
+            setattr(instance, attribute, value)
+        if secret_access_key:
+            instance.set_secret_access_key(secret_access_key)
+        self._validate_instance(instance)
+        instance.save()
+        return instance
+
+    def create(self, validated_data):
+        secret_access_key = validated_data.pop("secret_access_key", None)
+        instance = self.Meta.model(**validated_data)
+        if secret_access_key:
+            instance.set_secret_access_key(secret_access_key)
+        self._validate_instance(instance)
+        instance.save()
+        return instance
+

@@ -9,3 +9,5 @@ from business_setup.models.compliance_review import *  # noqa: F401,F403
 from business_setup.models.print_settings import *  # noqa: F401,F403
 from business_setup.models.email_smtp import *  # noqa: F401,F403
 from business_setup.models.dry_run import *  # noqa: F401,F403
+from business_setup.models.cloud_storage import *  # noqa: F401,F403
+
