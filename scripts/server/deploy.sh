@@ -76,17 +76,32 @@ if ! DB_NAME="$REHEARSAL_DB" \
 fi
 echo "    Rehearsal migration OK."
 
-echo "==> [4/7] Applying to production"
-"$PY" manage.py migrate --no-input
-"$PY" manage.py collectstatic --no-input | tail -1
-"$PY" manage.py check --deploy || true
+echo "==> [4/7] Pre-flight verification and building frontend"
+cd "$APP_DIR/backend"
+if ! "$PY" manage.py check; then
+  echo "!!! Django system check FAILED. Production database untouched."
+  git -C "$APP_DIR" checkout -q "$OLD_COMMIT"
+  exit 1
+fi
 
-echo "==> [5/7] Building frontend"
 cd "$APP_DIR/frontend"
 cp "$FRONTEND_ENV" .env.production
 npm ci --no-audit --no-fund > /tmp/npm-deploy.log 2>&1
-NEXT_BUILD_CPUS=1 NODE_OPTIONS='--max-old-space-size=4096' npm run build > /tmp/next-build-deploy.log 2>&1 \
-  || { echo "!!! Frontend build FAILED:"; tail -20 /tmp/next-build-deploy.log; git -C "$APP_DIR" checkout -q "$OLD_COMMIT"; exit 1; }
+if ! NEXT_BUILD_CPUS=1 NODE_OPTIONS='--max-old-space-size=4096' npm run build > /tmp/next-build-deploy.log 2>&1; then
+  echo "!!! Frontend build FAILED. Production database untouched."
+  echo "--- Build error log tail ---"
+  tail -30 /tmp/next-build-deploy.log
+  echo "----------------------------"
+  git -C "$APP_DIR" checkout -q "$OLD_COMMIT"
+  exit 1
+fi
+echo "    Frontend build and pre-flight checks OK."
+
+echo "==> [5/7] Applying to production"
+cd "$APP_DIR/backend"
+"$PY" manage.py migrate --no-input
+"$PY" manage.py collectstatic --no-input | tail -1
+"$PY" manage.py check --deploy || true
 
 echo "==> [6/7] Restarting services"
 # When the app runs as the non-root 'subidha' account (systemd drop-ins set
