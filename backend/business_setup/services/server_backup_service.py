@@ -22,12 +22,13 @@ import shutil
 import subprocess
 import tarfile
 import time
+import urllib.error
 import urllib.parse
+import urllib.request
 from datetime import datetime, timezone as dt_timezone
 from pathlib import Path
 from typing import Any
 
-import requests
 from django.conf import settings
 from django.core.management import call_command
 from django.db import connection
@@ -368,6 +369,26 @@ def _parse_s3_endpoint(endpoint: str) -> tuple[str, str]:
     return scheme, host
 
 
+def _s3_http_request(
+    method: str,
+    url: str,
+    headers: dict[str, str],
+    payload: bytes = b"",
+    timeout: int = 15,
+) -> tuple[int, str]:
+    req = urllib.request.Request(
+        url,
+        data=payload if method != "DELETE" else None,
+        headers=headers,
+        method=method,
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return resp.status, resp.read().decode("utf-8", errors="ignore")
+    except urllib.error.HTTPError as err:
+        return err.code, err.read().decode("utf-8", errors="ignore")
+
+
 def test_cloud_connection(settings_obj=None) -> dict[str, Any]:
     from business_setup.models.cloud_storage import CloudStorageProvider
 
@@ -416,9 +437,9 @@ def test_cloud_connection(settings_obj=None) -> dict[str, Any]:
                 payload=probe_data,
                 content_type="text/plain",
             )
-            res = requests.put(url, data=probe_data, headers=headers, timeout=15)
-            if res.status_code not in (200, 201, 204):
-                msg = f"Cloudflare R2 returned HTTP {res.status_code}: {res.text[:200]}"
+            status_code, body = _s3_http_request("PUT", url, headers, probe_data, timeout=15)
+            if status_code not in (200, 201, 204):
+                msg = f"Cloudflare R2 returned HTTP {status_code}: {body[:200]}"
                 cfg.last_test_at = now
                 cfg.last_test_success = False
                 cfg.last_test_message = msg
@@ -435,7 +456,7 @@ def test_cloud_connection(settings_obj=None) -> dict[str, Any]:
                 payload=b"",
                 content_type="text/plain",
             )
-            requests.delete(url, headers=del_headers, timeout=10)
+            _s3_http_request("DELETE", url, del_headers, b"", timeout=10)
 
             msg = f"Successfully connected to Cloudflare R2 bucket '{cfg.bucket_name}' (Read/Write verified)."
             cfg.last_test_at = now
@@ -450,6 +471,7 @@ def test_cloud_connection(settings_obj=None) -> dict[str, Any]:
             cfg.last_test_message = msg
             cfg.save(update_fields=["last_test_at", "last_test_success", "last_test_message"])
             return {"success": False, "message": msg}
+
 
     if cfg.provider == CloudStorageProvider.GOOGLE_DRIVE:
         rclone_bin = shutil.which("rclone")
@@ -521,10 +543,10 @@ def upload_file_to_cloud(local_path: Path, cloud_dest_key: str, settings_obj=Non
             content_type=content_type,
         )
         try:
-            res = requests.put(url, data=data, headers=headers, timeout=120)
-            if res.status_code in (200, 201, 204):
+            status_code, body = _s3_http_request("PUT", url, headers, data, timeout=180)
+            if status_code in (200, 201, 204):
                 return True, f"Uploaded to Cloudflare R2: {cloud_dest_key}"
-            return False, f"Cloudflare R2 HTTP {res.status_code}: {res.text[:200]}"
+            return False, f"Cloudflare R2 HTTP {status_code}: {body[:200]}"
         except Exception as exc:
             return False, f"Cloudflare R2 upload error: {str(exc)[:250]}"
 
