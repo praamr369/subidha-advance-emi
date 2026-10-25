@@ -323,7 +323,7 @@ export default function BackupRestorePage() {
         {
           label: "Free Cloud Sync",
           value: cloudSettings?.is_enabled ? (cloudSettings.provider === "CLOUDFLARE_R2" ? "Cloudflare R2" : "Google Drive") : "Disabled",
-          tone: cloudSettings?.is_enabled ? "success" : "neutral",
+          tone: cloudSettings?.is_enabled ? "success" : "default",
           hint: cloudSettings?.last_test_success ? "Verified active" : "Check setup tab",
         },
         {
