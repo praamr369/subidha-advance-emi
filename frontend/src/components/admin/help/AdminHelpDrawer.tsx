@@ -462,6 +462,34 @@ export default function AdminHelpDrawer() {
                               ))}
                             </ul>
                           </div>
+
+                          {/* Staff Operational Tip & Best Practice */}
+                          {pb.staffOperationalTip ? (
+                            <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-3 space-y-1 text-xs">
+                              <div className="font-bold text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
+                                <Sparkles className="size-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+                                <span>Staff Operational Tip &amp; Best Practice:</span>
+                              </div>
+                              <p className="text-blue-900/90 dark:text-blue-200/90 pl-5 leading-relaxed">
+                                {pb.staffOperationalTip}
+                              </p>
+                            </div>
+                          ) : null}
+
+                          {/* Scope of Improvement & Process Enhancements */}
+                          {pb.scopeOfImprovement && pb.scopeOfImprovement.length > 0 ? (
+                            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 space-y-1.5 text-xs">
+                              <div className="font-bold text-emerald-900 dark:text-emerald-200 flex items-center gap-1.5">
+                                <Lightbulb className="size-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                <span>Scope of Improvement &amp; Efficiency Optimizations:</span>
+                              </div>
+                              <ul className="space-y-1 text-emerald-900/90 dark:text-emerald-200/90 pl-5 list-disc leading-relaxed">
+                                {pb.scopeOfImprovement.map((item, oIdx) => (
+                                  <li key={oIdx}>{item}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          ) : null}
                         </div>
                       )}
                     </div>
