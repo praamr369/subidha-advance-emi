@@ -23,6 +23,10 @@ export interface ReviewLinks {
   google_write_url: string | null;
   facebook_review_url: string | null;
   youtube_channel_url: string | null;
+  meta_commerce_manager_url?: string | null;
+  whatsapp_catalog_feed_path?: string | null;
+  catalog_eligible_products_count?: number;
+  whatsapp_phone_configured?: boolean;
 }
 
 export interface CombinedReviewsResponse {
@@ -105,6 +109,7 @@ export async function refreshReviewCache(): Promise<{
   google: { fetched: number; error: string | null };
   facebook: { fetched: number; error: string | null };
   youtube: { fetched: number; error: string | null };
+  whatsapp?: { status: string | null; error: string | null };
 }> {
   return apiFetch("/admin/reviews/refresh-cache/", { method: "POST" });
 }
@@ -123,7 +128,13 @@ export type PlatformConfigFieldName =
   | "facebook_page_id"
   | "facebook_page_access_token"
   | "youtube_api_key"
-  | "youtube_channel_id";
+  | "youtube_channel_id"
+  | "whatsapp_phone_number_id"
+  | "whatsapp_business_account_id"
+  | "whatsapp_access_token"
+  | "google_analytics_id"
+  | "google_site_verification"
+  | "meta_catalog_id";
 
 export interface ReviewPlatformConfig {
   fields: Record<PlatformConfigFieldName, PlatformConfigField>;

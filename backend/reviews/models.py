@@ -48,6 +48,19 @@ class ReviewPlatformConfig(models.Model):
     facebook_page_access_token = models.TextField(blank=True)
     youtube_api_key = models.CharField(max_length=255, blank=True)
     youtube_channel_id = models.CharField(max_length=255, blank=True)
+
+    # WhatsApp Business Cloud API (Meta)
+    whatsapp_phone_number_id = models.CharField(max_length=255, blank=True)
+    whatsapp_business_account_id = models.CharField(max_length=255, blank=True)
+    whatsapp_access_token = models.TextField(blank=True)
+
+    # Free Web Analytics & Search Console (Google)
+    google_analytics_id = models.CharField(max_length=100, blank=True)
+    google_site_verification = models.CharField(max_length=255, blank=True)
+
+    # Meta Catalog Manager (Facebook Shop / WhatsApp Catalog)
+    meta_catalog_id = models.CharField(max_length=255, blank=True)
+
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

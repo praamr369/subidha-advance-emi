@@ -11,6 +11,7 @@ import SkipNav from "@/components/ui/SkipNav";
 import { OfflineNetworkBanner } from "@/components/common/OfflineNetworkBanner";
 
 const publicLogoSrc = brandConfig.publicLogoSrc || undefined;
+const gaId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 
 export const metadata: Metadata = {
   title: {
@@ -38,6 +39,24 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <Script id="subidha-lang-boot" strategy="beforeInteractive">
           {PUBLIC_LANG_BOOTSTRAP_SCRIPT}
         </Script>
+        {gaId ? (
+          <>
+            <Script
+              src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}
+              strategy="afterInteractive"
+            />
+            <Script id="google-analytics" strategy="afterInteractive">
+              {`
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('js', new Date());
+                gtag('config', '${gaId}', {
+                  page_path: window.location.pathname,
+                });
+              `}
+            </Script>
+          </>
+        ) : null}
         <SkipNav />
         <OfflineNetworkBanner />
         <AppProviders>{children}</AppProviders>
