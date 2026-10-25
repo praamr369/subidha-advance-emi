@@ -117,19 +117,22 @@ FRONTEND_RESTART_PID=$!
 # gunicorn leaves them executing the previous revision until something else
 # restarts them. Skipped without complaint when the units are not installed,
 # so this stays safe on a host that does not run background jobs.
+CELERY_PIDS=""
 for unit in $CELERY_SERVICES; do
   if systemctl list-unit-files "$unit.service" --no-legend 2>/dev/null | grep -q .; then
     echo "    restarting $unit"
     systemctl restart "$unit" &
+    CELERY_PIDS="$CELERY_PIDS $!"
   else
     echo "    $unit not installed — skipping"
   fi
 done
 
-wait "$BACKEND_RESTART_PID" "$FRONTEND_RESTART_PID"
+wait "$BACKEND_RESTART_PID" "$FRONTEND_RESTART_PID" $CELERY_PIDS
+sleep 2
 for unit in $CELERY_SERVICES; do
   if systemctl list-unit-files "$unit.service" --no-legend 2>/dev/null | grep -q .; then
-    systemctl is-active --quiet "$unit"
+    systemctl is-active --quiet "$unit" || { echo "    warning: $unit still settling"; sleep 3; systemctl is-active --quiet "$unit"; }
   fi
 done
 
