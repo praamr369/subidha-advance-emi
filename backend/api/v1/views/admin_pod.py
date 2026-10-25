@@ -89,7 +89,6 @@ def save_additional_furniture_photos(*, subscription, files, delivery_date):
             subscription=subscription,
             document_type=SubscriptionDocumentType.DELIVERY_HANDOVER_NOTE,
             file=f,
-            title=f"Delivered Furniture Piece #{idx}",
             notes=f"Doorstep POD furniture quality photo for item #{idx} captured on {date_str}",
             verification_status=DocumentVerificationStatus.VERIFIED,
         )
