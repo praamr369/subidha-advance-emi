@@ -137,6 +137,9 @@ export type RentalAssetSummary = {
   asset_code: string | null;
   status: string | null;
   condition_grade: string | null;
+  product_id?: number | null;
+  product_name?: string | null;
+  product_code?: string | null;
 };
 
 export type RentalAssetReadiness = {

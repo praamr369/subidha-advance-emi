@@ -81,7 +81,7 @@ export const subidhaDocumentTheme: DocumentBrandTheme = {
   showUpiQr: true,
   upiId: "",
   layoutDensity: "COMFORTABLE",
-  phone: "+91 77972 80952",
+  phone: "+91 94764 90946",
   email: "support@subidhafurnitureasansol.com",
   website: "subidhafurnitureasansol.com",
   addressLines: fallbackAddressLines,

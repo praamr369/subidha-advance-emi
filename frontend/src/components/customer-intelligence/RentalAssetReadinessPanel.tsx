@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { cn } from "@/lib/utils";
 
 import {
   createRentalAsset,
@@ -15,6 +16,14 @@ import {
 } from "@/services/customer-intelligence";
 import RentalAssetsAwaitingRelease from "@/components/customer-intelligence/RentalAssetsAwaitingRelease";
 
+export type ContractItemOption = {
+  id: number;
+  product_id: number;
+  product_name: string;
+  product_code?: string | null;
+  quantity: number;
+};
+
 type Props = {
   subscriptionId: number;
   /** Contract product, used to suggest an asset code and filter available units. */
@@ -23,6 +32,7 @@ type Props = {
   inventoryItemId?: number | null;
   /** Rent/lease only: EMI contracts transfer ownership and own no rental asset. */
   canManageAssets?: boolean;
+  contractItems?: ContractItemOption[];
 };
 
 function AssetRow({
@@ -42,9 +52,14 @@ function AssetRow({
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <div className="text-sm font-medium text-foreground">
+          <div className="text-sm font-semibold text-foreground">
             {asset.asset_code ?? `Asset #${asset.id}`}
           </div>
+          {asset.product_name && (
+            <div className="mt-0.5 text-xs font-medium text-primary">
+              Product: {asset.product_name} {asset.product_code ? `(${asset.product_code})` : ""}
+            </div>
+          )}
           {asset.condition_grade && (
             <div className="mt-0.5 text-xs text-muted-foreground">
               Condition: {asset.condition_grade}
@@ -79,6 +94,7 @@ export function RentalAssetReadinessPanel({
   productCode,
   inventoryItemId,
   canManageAssets = false,
+  contractItems = [],
 }: Props) {
   const [data, setData] = useState<RentalAssetReadiness | null>(null);
   const [loading, setLoading] = useState(true);
@@ -89,6 +105,47 @@ export function RentalAssetReadinessPanel({
   const [actionBusy, setActionBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+
+  // Normalize all attached contract products
+  const products = useMemo(() => {
+    if (contractItems && contractItems.length > 0) {
+      return contractItems.map((it) => ({
+        id: it.product_id,
+        name: it.product_name,
+        code: it.product_code || null,
+        quantity: it.quantity || 1,
+      }));
+    }
+    if (productId) {
+      return [
+        {
+          id: productId,
+          name: "Contract Furniture Item",
+          code: productCode || null,
+          quantity: 1,
+        },
+      ];
+    }
+    return [];
+  }, [contractItems, productId, productCode]);
+
+  const [activeProductId, setActiveProductId] = useState<number | null>(
+    products[0]?.id ?? productId ?? null
+  );
+
+  useEffect(() => {
+    if (
+      (activeProductId === null || !products.some((p) => p.id === activeProductId)) &&
+      products.length > 0
+    ) {
+      setActiveProductId(products[0].id);
+    }
+  }, [products, activeProductId]);
+
+  const activeProduct = useMemo(
+    () => products.find((p) => p.id === activeProductId) ?? products[0] ?? null,
+    [products, activeProductId]
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -107,17 +164,21 @@ export function RentalAssetReadinessPanel({
   const loadAvailable = useCallback(async () => {
     if (!canManageAssets) return;
     try {
-      const payload = await listAvailableRentalAssets(productId ?? undefined);
+      const targetProdId = activeProduct?.id ?? productId ?? undefined;
+      const payload = await listAvailableRentalAssets(targetProdId);
       setAvailable(Array.isArray(payload.results) ? payload.results : []);
     } catch {
       setAvailable([]);
     }
-  }, [canManageAssets, productId]);
+  }, [canManageAssets, activeProduct?.id, productId]);
 
   useEffect(() => {
     void load();
+  }, [load]);
+
+  useEffect(() => {
     void loadAvailable();
-  }, [load, loadAvailable]);
+  }, [loadAvailable]);
 
   async function runAction(label: string, fn: () => Promise<unknown>) {
     setActionBusy(true);
@@ -236,7 +297,7 @@ export function RentalAssetReadinessPanel({
       {hasLinkedAssets ? (
         <div className="mt-4" data-testid="rental-asset-linked-assets">
           <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Linked assets ({linkedAssets.length})
+            Linked units ({linkedAssets.length})
           </div>
           <div className="space-y-2">
             {linkedAssets.map((asset) => (
@@ -265,100 +326,167 @@ export function RentalAssetReadinessPanel({
       )}
 
       {canManageAssets ? (
-        <div className="mt-4 space-y-3 rounded-xl border border-border bg-background/60 p-3">
-          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Link a physical unit to this contract
+        <div className="mt-4 space-y-4 rounded-xl border border-border bg-background/60 p-4">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Link a physical unit to this contract
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Each furniture item attached to this rent/lease contract requires an assigned physical rental asset.
+            </p>
           </div>
 
-          {available.length > 0 ? (
-            <div className="flex flex-wrap items-end gap-2">
-              <label className="grid gap-1 text-xs">
-                <span className="text-muted-foreground">Available asset</span>
-                <select
-                  value={selectedAssetId}
-                  onChange={(event) => setSelectedAssetId(event.target.value)}
-                  className="h-9 min-w-[220px] rounded-md border border-border bg-background px-2 text-sm"
+          {/* Product selector tabs when multi-product or multiple items attached */}
+          {products.length > 0 && (
+            <div className="space-y-2 border-y border-border/70 py-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Select target furniture product:
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {products.map((prod) => {
+                  const isSelected = prod.id === activeProduct?.id;
+                  const linkedCount = linkedAssets.filter(
+                    (a) => a.product_id === prod.id
+                  ).length;
+                  const isFulfilled = linkedCount >= prod.quantity;
+
+                  return (
+                    <button
+                      key={prod.id}
+                      type="button"
+                      onClick={() => {
+                        setActiveProductId(prod.id);
+                        setSelectedAssetId("");
+                        setNewAssetCode("");
+                      }}
+                      className={cn(
+                        "flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition",
+                        isSelected
+                          ? "border-primary bg-primary text-primary-foreground shadow-xs"
+                          : "border-border bg-background text-foreground hover:bg-muted"
+                      )}
+                    >
+                      <span>{prod.name.replace(/\s*\([^)]+:[^)]+\)\s*$/i, "").trim() || prod.name}</span>
+                      <span
+                        className={cn(
+                          "rounded-full px-1.5 py-0.2 text-[10px] font-bold",
+                          isSelected
+                            ? "bg-primary-foreground/20 text-primary-foreground"
+                            : isFulfilled
+                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400"
+                            : "bg-muted text-muted-foreground"
+                        )}
+                      >
+                        {linkedCount}/{prod.quantity} Linked
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Asset assignment for active product */}
+          <div className="space-y-3">
+            <div className="text-xs font-medium text-foreground flex items-center justify-between">
+              <span>
+                Available Units for: <strong className="text-primary">{activeProduct?.name.replace(/\s*\([^)]+:[^)]+\)\s*$/i, "").trim() || activeProduct?.name}</strong>
+              </span>
+              {activeProduct?.code && (
+                <span className="font-mono text-[11px] text-muted-foreground">Code: {activeProduct.code}</span>
+              )}
+            </div>
+
+            {available.length > 0 ? (
+              <div className="flex flex-wrap items-end gap-2">
+                <label className="grid gap-1 text-xs">
+                  <span className="text-muted-foreground">Available unit</span>
+                  <select
+                    value={selectedAssetId}
+                    onChange={(event) => setSelectedAssetId(event.target.value)}
+                    className="h-9 min-w-[220px] rounded-md border border-border bg-background px-2 text-sm"
+                  >
+                    <option value="">Select a unit...</option>
+                    {available.map((asset) => (
+                      <option key={asset.id} value={String(asset.id)}>
+                        {asset.asset_code} {asset.condition_grade ? `(${asset.condition_grade})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  disabled={!selectedAssetId || actionBusy}
+                  onClick={() =>
+                    void runAction("Asset reserved for this contract.", () =>
+                      reserveRentalAsset(Number(selectedAssetId), subscriptionId)
+                    )
+                  }
+                  className="inline-flex h-9 items-center rounded-md border border-border bg-background px-3 text-xs font-medium hover:bg-muted disabled:opacity-50"
                 >
-                  <option value="">Select a unit...</option>
-                  {available.map((asset) => (
-                    <option key={asset.id} value={String(asset.id)}>
-                      {asset.asset_code}
-                    </option>
-                  ))}
-                </select>
+                  Reserve
+                </button>
+                <button
+                  type="button"
+                  disabled={!selectedAssetId || actionBusy}
+                  onClick={() =>
+                    void runAction("Asset handed over to the customer.", async () => {
+                      const assetId = Number(selectedAssetId);
+                      await reserveRentalAsset(assetId, subscriptionId).catch(() => undefined);
+                      return handoverRentalAsset(assetId, subscriptionId);
+                    })
+                  }
+                  className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:opacity-95 disabled:opacity-50"
+                >
+                  Reserve + hand over
+                </button>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                No unlinked units exist for {activeProduct?.name.replace(/\s*\([^)]+:[^)]+\)\s*$/i, "").trim() || "this product"} yet. Register one below.
+              </p>
+            )}
+
+            <div className="flex flex-wrap items-end gap-2 border-t border-border pt-3">
+              <label className="grid gap-1 text-xs">
+                <span className="text-muted-foreground">New asset code</span>
+                <input
+                  value={newAssetCode}
+                  onChange={(event) => setNewAssetCode(event.target.value)}
+                  placeholder={activeProduct?.code ? `RA-${activeProduct.code}-001` : "RA-0001"}
+                  className="h-9 min-w-[220px] rounded-md border border-border bg-background px-2 text-sm"
+                />
               </label>
               <button
                 type="button"
-                disabled={!selectedAssetId || actionBusy}
+                disabled={!newAssetCode.trim() || actionBusy}
                 onClick={() =>
-                  void runAction("Asset reserved for this contract.", () =>
-                    reserveRentalAsset(Number(selectedAssetId), subscriptionId)
+                  void runAction("Rental asset registered from inventory.", () =>
+                    createRentalAsset({
+                      asset_code: newAssetCode.trim(),
+                      inventory_item: inventoryItemId ?? undefined,
+                      product: inventoryItemId ? undefined : activeProduct?.id ?? productId ?? undefined,
+                    }).then((asset) => {
+                      setNewAssetCode("");
+                      setSelectedAssetId(String(asset.id));
+                      return asset;
+                    })
                   )
                 }
                 className="inline-flex h-9 items-center rounded-md border border-border bg-background px-3 text-xs font-medium hover:bg-muted disabled:opacity-50"
               >
-                Reserve
+                Register unit
               </button>
-              <button
-                type="button"
-                disabled={!selectedAssetId || actionBusy}
-                onClick={() =>
-                  void runAction("Asset handed over to the customer.", async () => {
-                    const assetId = Number(selectedAssetId);
-                    await reserveRentalAsset(assetId, subscriptionId).catch(() => undefined);
-                    return handoverRentalAsset(assetId, subscriptionId);
-                  })
-                }
-                className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:opacity-95 disabled:opacity-50"
-              >
-                Reserve + hand over
-              </button>
+              <p className="w-full text-[11px] text-muted-foreground">
+                One rental asset is one physical unit you can hire out and take back.
+                Registering here links it to {activeProduct?.name.replace(/\s*\([^)]+:[^)]+\)\s*$/i, "").trim() || "this product"}.
+              </p>
             </div>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              No unlinked units exist for this product yet. Register one below.
-            </p>
-          )}
-
-          <div className="flex flex-wrap items-end gap-2 border-t border-border pt-3">
-            <label className="grid gap-1 text-xs">
-              <span className="text-muted-foreground">New asset code</span>
-              <input
-                value={newAssetCode}
-                onChange={(event) => setNewAssetCode(event.target.value)}
-                placeholder={productCode ? `RA-${productCode}-001` : "RA-0001"}
-                className="h-9 min-w-[220px] rounded-md border border-border bg-background px-2 text-sm"
-              />
-            </label>
-            <button
-              type="button"
-              disabled={!newAssetCode.trim() || actionBusy}
-              onClick={() =>
-                void runAction("Rental asset registered from inventory.", () =>
-                  createRentalAsset({
-                    asset_code: newAssetCode.trim(),
-                    inventory_item: inventoryItemId ?? undefined,
-                    product: inventoryItemId ? undefined : productId ?? undefined,
-                  }).then((asset) => {
-                    setNewAssetCode("");
-                    setSelectedAssetId(String(asset.id));
-                    return asset;
-                  })
-                )
-              }
-              className="inline-flex h-9 items-center rounded-md border border-border bg-background px-3 text-xs font-medium hover:bg-muted disabled:opacity-50"
-            >
-              Register unit
-            </button>
-            <p className="w-full text-[11px] text-muted-foreground">
-              One rental asset is one physical unit you can hire out and take back.
-              Registering here links it to this product inventory item.
-            </p>
           </div>
 
           <div className="border-t border-border pt-3 empty:hidden">
             <RentalAssetsAwaitingRelease
-              productId={productId}
+              productId={activeProduct?.id ?? productId}
               onReleased={() => void loadAvailable()}
             />
           </div>

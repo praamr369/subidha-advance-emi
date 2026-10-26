@@ -9,6 +9,7 @@ import {
   type AdminInventoryItemSearchRow,
   type InventoryCategoriesResponse,
 } from "@/services/inventory";
+import ProductAttributeBadges from "./ProductAttributeBadges";
 
 export type ProductPickerValue = {
   id: number;
@@ -366,16 +367,14 @@ export default function ProductPickerCombobox({
                     </div>
                   ) : null}
 
-                  {/* Row 4: Attributes (Specs) */}
-                  {item.attributes && Object.keys(item.attributes).length > 0 ? (
-                    <div className="mt-1.5 flex flex-wrap gap-1 pl-0.5">
-                      {Object.entries(item.attributes).map(([key, val]) => (
-                        <span key={key} className="rounded border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-700 dark:border-indigo-800/50 dark:bg-indigo-900/30 dark:text-indigo-300">
-                          <span className="opacity-70">{key}: </span>{String(val)}
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
+                  {/* Row 4: Attributes (Specs) with canonical icons & deduplication */}
+                  <div className="mt-1.5 pl-0.5">
+                    <ProductAttributeBadges
+                      attributes={item.attributes}
+                      nameFallback={item.product_name}
+                      size="xs"
+                    />
+                  </div>
 
                   {/* Row 5: Accessories */}
                   {item.accessories && item.accessories.length > 0 ? (

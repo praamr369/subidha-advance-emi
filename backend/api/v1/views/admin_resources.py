@@ -3685,6 +3685,8 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
             "payments",
             "documents",
             "rent_lease_demands",
+            "contract_items",
+            "contract_items__product",
             get_subscription_delivery_prefetch(),
         )
         .all()
@@ -4032,13 +4034,15 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
         total_contract_value = aggregates["total_contract_value"] or MONEY_ZERO
         # Ended contracts (closed, cancelled, returned, completed) are history:
         # the headline contract value / monthly demand show only the live book.
+        from subscriptions.enums import PRE_ACTIVATION_SUBSCRIPTION_STATUSES
         ended_statuses = [
             SubscriptionStatus.CLOSED,
             SubscriptionStatus.CANCELLED,
             SubscriptionStatus.RETURNED,
             SubscriptionStatus.COMPLETED,
         ]
-        live_queryset = queryset.exclude(status__in=ended_statuses)
+        non_live_statuses = ended_statuses + list(PRE_ACTIVATION_SUBSCRIPTION_STATUSES)
+        live_queryset = queryset.exclude(status__in=non_live_statuses)
         live_aggregates = live_queryset.aggregate(
             value=Sum("total_amount"), monthly=Sum("monthly_amount")
         )
@@ -4046,7 +4050,7 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
         total_waived_value = aggregates["total_waived_value"] or MONEY_ZERO
 
         pending_emis = Emi.objects.filter(
-            subscription__in=queryset,
+            subscription__in=live_queryset,
             status=EmiStatus.PENDING,
         )
         pending_emis_count = pending_emis.count()
@@ -4086,7 +4090,10 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
         # cancelled). Counting closed contracts at full value showed a returned
         # contract as ₹14,000 to collect.
         rent_lease_plans = [PlanType.RENT, PlanType.LEASE]
-        emi_side = queryset.exclude(plan_type__in=rent_lease_plans).aggregate(
+        exclude_from_outstanding = list(CLOSED_RENT_LEASE_STATUSES | PRE_ACTIVATION_SUBSCRIPTION_STATUSES)
+        emi_side = queryset.exclude(plan_type__in=rent_lease_plans).exclude(
+            status__in=exclude_from_outstanding
+        ).aggregate(
             value=Sum("total_amount"), waived=Sum("waived_amount")
         )
         emi_outstanding = max(
@@ -4097,7 +4104,7 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
             MONEY_ZERO,
         )
         open_rent_lease = queryset.filter(plan_type__in=rent_lease_plans).exclude(
-            status__in=CLOSED_RENT_LEASE_STATUSES
+            status__in=exclude_from_outstanding
         )
         open_side = open_rent_lease.aggregate(value=Sum("total_amount"), waived=Sum("waived_amount"))
         open_collected = (
@@ -4172,10 +4179,15 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
         single null batch entry so the totals still reconcile.
         """
         queryset = self.get_queryset()
+        from subscriptions.enums import PRE_ACTIVATION_SUBSCRIPTION_STATUSES
+        from subscriptions.services.subscription_financial_service import CLOSED_RENT_LEASE_STATUSES
+        from payments.models import RentLeaseBillingDemand
+
+        live_for_batch = queryset.exclude(status__in=PRE_ACTIVATION_SUBSCRIPTION_STATUSES)
 
         # Base per-batch aggregates straight off the subscription register.
         batch_rows = (
-            queryset.values("batch_id", "batch__batch_code")
+            live_for_batch.values("batch_id", "batch__batch_code")
             .annotate(
                 subscriber_count=Count("id", distinct=True),
                 contract_value=Coalesce(
@@ -4196,7 +4208,7 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
         payments_by_batch = {
             row["emi__subscription__batch_id"]: row["total"]
             for row in FinancialLedger.objects.filter(
-                emi__subscription__in=queryset,
+                emi__subscription__in=live_for_batch,
                 entry_type=LedgerEntryType.EMI_PAYMENT,
             )
             .values("emi__subscription__batch_id")
@@ -4205,7 +4217,7 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
         reversals_by_batch = {
             row["emi__subscription__batch_id"]: row["total"]
             for row in FinancialLedger.objects.filter(
-                emi__subscription__in=queryset,
+                emi__subscription__in=live_for_batch,
                 entry_type=LedgerEntryType.PAYMENT_REVERSAL,
             )
             .values("emi__subscription__batch_id")
@@ -4217,8 +4229,21 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
             batch_id = row["batch_id"]
             contract_value = row["contract_value"] or MONEY_ZERO
             waived_value = row["waived_value"] or MONEY_ZERO
-            collected = payments_by_batch.get(batch_id) or MONEY_ZERO
-            reversed_amount = reversals_by_batch.get(batch_id) or MONEY_ZERO
+            if batch_id is None:
+                rent_lease_active = live_for_batch.filter(batch_id__isnull=True).exclude(
+                    status__in=CLOSED_RENT_LEASE_STATUSES
+                )
+                collected = (
+                    RentLeaseBillingDemand.objects.filter(subscription__in=rent_lease_active)
+                    .exclude(demand_type="SECURITY_DEPOSIT")
+                    .exclude(status="CANCELLED")
+                    .aggregate(total=Sum("collected_amount"))["total"]
+                    or MONEY_ZERO
+                )
+                reversed_amount = MONEY_ZERO
+            else:
+                collected = payments_by_batch.get(batch_id) or MONEY_ZERO
+                reversed_amount = reversals_by_batch.get(batch_id) or MONEY_ZERO
 
             outstanding = contract_value - collected + reversed_amount - waived_value
             if outstanding < MONEY_ZERO:
@@ -4483,12 +4508,20 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
             except Exception:
                 pass
 
+        support_phone = ""
+        try:
+            from api.v1.views.public_contract_sign import get_official_support_phone
+            support_phone = get_official_support_phone()
+        except Exception:
+            pass
+
         return Response({
             "success": True,
             "subscription_id": subscription.id,
             "token": token,
             "signing_path": relative_url,
             "signing_url": full_signing_url,
+            "support_phone": support_phone,
             "customer_name": getattr(customer, "name", "Customer"),
             "customer_phone": getattr(customer, "phone", "") or "",
             "customer_email": getattr(customer, "email", "") or "",
@@ -4713,9 +4746,26 @@ class RentalAssetAdminViewSet(viewsets.ReadOnlyModelViewSet):
         has_handover_snapshot = subscription.asset_condition_snapshots.filter(
             stage=AssetConditionSnapshotStage.BEFORE_HANDOVER
         ).exists()
-        rental_assets = RentalAsset.objects.filter(
-            current_subscription=subscription
-        ).values("id", "asset_code", "status", "condition_grade")
+        rental_assets = [
+            {
+                "id": a["id"],
+                "asset_code": a["asset_code"],
+                "status": a["status"],
+                "condition_grade": a["condition_grade"],
+                "product_id": a["product_id"],
+                "product_name": a["product__name"],
+                "product_code": a["product__product_code"],
+            }
+            for a in RentalAsset.objects.filter(current_subscription=subscription).values(
+                "id",
+                "asset_code",
+                "status",
+                "condition_grade",
+                "product_id",
+                "product__name",
+                "product__product_code",
+            )
+        ]
         readiness = evaluate_contract_activation_readiness(subscription)
         return Response({
             "subscription_id": subscription.pk,

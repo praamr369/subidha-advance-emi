@@ -12,9 +12,11 @@ from payments.services.payment_service import (
     reverse_payment_for_admin,
 )
 from subscriptions.services.subscription_financial_service import (
+    build_customer_dashboard_summary,
     build_subscription_financial_snapshot,
     get_subscription_detail_queryset,
 )
+from subscriptions.models import Subscription, SubscriptionStatus, PlanType
 from tests.helpers import (
     create_admin_user,
     create_batch,
@@ -176,3 +178,74 @@ class SubscriptionFinancialServiceTests(TestCase):
         waived_rows = [row for row in snapshot["emis"] if row["status"] == "WAIVED"]
         self.assertEqual(len(waived_rows), 2)
         self.assertTrue(all(row["month_no"] > 1 for row in waived_rows))
+
+    def test_draft_rent_contract_has_zero_outstanding_and_zero_pending(self):
+        draft_sub = Subscription.objects.create(
+            customer=self.customer,
+            product=self.product,
+            partner=self.partner,
+            plan_type=PlanType.RENT,
+            status=SubscriptionStatus.DRAFT,
+            total_amount=Decimal("24024.00"),
+            monthly_amount=Decimal("2002.00"),
+            tenure_months=12,
+            start_date=date(2026, 3, 1),
+        )
+        snapshot = build_subscription_financial_snapshot(draft_sub)
+
+        self.assertEqual(snapshot["total_amount"], "24024.00")
+        self.assertEqual(snapshot["paid_amount"], "0.00")
+        self.assertEqual(snapshot["remaining_amount"], "0.00")
+        self.assertEqual(snapshot["outstanding_amount"], "0.00")
+        self.assertEqual(snapshot["pending_amount"], "0.00")
+        self.assertEqual(snapshot["warnings"], [])
+        self.assertTrue(snapshot["is_financially_consistent"])
+
+    def test_draft_subscription_excluded_from_dashboard_summary_outstanding(self):
+        draft_sub = Subscription.objects.create(
+            customer=self.customer,
+            product=self.product,
+            partner=self.partner,
+            plan_type=PlanType.RENT,
+            status=SubscriptionStatus.DRAFT,
+            total_amount=Decimal("24024.00"),
+            monthly_amount=Decimal("2002.00"),
+            tenure_months=12,
+            start_date=date(2026, 3, 1),
+        )
+        # Dashboard summary for only the draft subscription
+        summary = build_customer_dashboard_summary([draft_sub])
+        self.assertEqual(summary["outstanding_amount"], "0.00")
+        self.assertEqual(summary["remaining_amount"], "0.00")
+        self.assertEqual(summary["total_pending_amount"], "0.00")
+        self.assertEqual(summary["total_paid_amount"], "0.00")
+        self.assertEqual(summary["active_subscriptions"], 0)
+        self.assertEqual(summary["pending_emis"], 0)
+        self.assertIsNone(summary["next_due_amount"])
+
+        # When combined with an active subscription (which has 3000.00 total)
+        combined_summary = build_customer_dashboard_summary([self.subscription, draft_sub])
+        # Only the active subscription's 3000.00 should be outstanding, NOT 27024.00!
+        self.assertEqual(combined_summary["outstanding_amount"], "3000.00")
+        self.assertEqual(combined_summary["remaining_amount"], "3000.00")
+        self.assertEqual(combined_summary["total_pending_amount"], "3000.00")
+
+    def test_draft_emi_subscription_has_zero_outstanding(self):
+        lucky_id_2 = create_lucky_id(batch=self.batch, lucky_number=99)
+        draft_emi_sub = create_subscription(
+            customer=self.customer,
+            product=self.product,
+            batch=self.batch,
+            lucky_id=lucky_id_2,
+            partner=self.partner,
+            status=SubscriptionStatus.DRAFT,
+            total_amount=Decimal("3000.00"),
+            monthly_amount=Decimal("1000.00"),
+            tenure_months=3,
+        )
+        snapshot = build_subscription_financial_snapshot(draft_emi_sub)
+        self.assertEqual(snapshot["total_amount"], "3000.00")
+        self.assertEqual(snapshot["remaining_amount"], "0.00")
+        self.assertEqual(snapshot["outstanding_amount"], "0.00")
+        self.assertEqual(snapshot["pending_amount"], "0.00")
+        self.assertEqual(snapshot["warnings"], [])

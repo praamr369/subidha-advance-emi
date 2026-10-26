@@ -21,6 +21,7 @@ from subscriptions.models import (
     Payment,
     SubscriptionStatus,
 )
+from subscriptions.enums import PRE_ACTIVATION_SUBSCRIPTION_STATUSES
 from subscriptions.services.dashboard_scopes import (
     AdminScope,
     CashierScope,
@@ -240,6 +241,8 @@ def _build_due_subscription_rows(
     reference_date = effective_window.reference_date
 
     for subscription in subscriptions:
+        if getattr(subscription, "status", None) in PRE_ACTIVATION_SUBSCRIPTION_STATUSES:
+            continue
         snapshot = getattr(subscription, "_subscription_financial_snapshot", None) or {}
         pending_rows = [
             row

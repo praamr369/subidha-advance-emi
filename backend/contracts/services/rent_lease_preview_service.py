@@ -1,13 +1,19 @@
 from django.core.exceptions import ValidationError
 from subscriptions.models import ContractAmendment, SubscriptionStatus
 
+
 def preview_rent_lease_amendment(amendment: ContractAmendment) -> dict:
     source = amendment.source_contract()
     if not source:
         raise ValidationError({"detail": "Source rent/lease contract is required for preview."})
-    
+
     if source.status in {SubscriptionStatus.CANCELLED, "CLOSED", "COMPLETED", "DEFAULTED", "RETURNED", "TERMINATED", "REVERSED"}:
         raise ValidationError({"detail": f"Amendment is blocked for terminal contract status '{source.status}'."})
+
+    # For multi-product Rent and Lease product amendments, use full flexible item preview
+    if amendment.amendment_type in {"PRODUCT_CHANGE", "PRODUCT_UPGRADE"} or source.contract_items.exists():
+        from contracts.services.rent_lease_item_amendment_service import preview_rent_lease_item_amendment
+        return preview_rent_lease_item_amendment(amendment)
 
     requested_values = amendment.requested_values or amendment.new_values or {}
 

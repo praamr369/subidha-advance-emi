@@ -15,6 +15,7 @@ import { WorkspaceSection } from "@/components/ui/workspace";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { getCustomerDirectSale, type CustomerDirectSaleDetail } from "@/services/customer";
 import { createCustomerSupportTicket } from "@/services/support";
+import CustomerProductLink from "@/components/customers/CustomerProductInspectModal";
 
 
 function stringify(value: unknown): string {
@@ -279,7 +280,16 @@ export default function CustomerDirectSaleDetailPage() {
                   <tbody>
                     {row.line_items.map((line, index) => (
                       <tr key={index} className="border-t border-border">
-                        <td className="px-3 py-2">{stringify(line.description)}</td>
+                        <td className="px-3 py-2">
+                          <CustomerProductLink
+                            productId={Number(line.product_id) || null}
+                            productName={String(line.product_name || line.description || "Item")}
+                            productImage={typeof line.product_image === "string" ? line.product_image : null}
+                            showThumbnail
+                            thumbnailSize="sm"
+                            inspectButtonLabel="Inspect Gallery"
+                          />
+                        </td>
                         <td className="px-3 py-2 text-right">{stringify(line.quantity)}</td>
                         <td className="px-3 py-2 text-right">{formatRupee(String(line.unit_price ?? "0.00"))}</td>
                         <td className="px-3 py-2 text-right">{formatRupee(String(line.discount_amount ?? "0.00"))}</td>

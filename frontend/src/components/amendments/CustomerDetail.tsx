@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import AmendmentSafetyNotice from "@/components/amendments/SafetyNotice";
+import RentLeasePreviewPanel from "@/components/amendments/RentLeasePreviewPanel";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
@@ -358,6 +359,9 @@ export default function CustomerAmendmentDetail({ id }: { id: number }) {
             ) : null}
             <ProductRecontractExecutedSummary preview={row.latest_product_recontract_preview} />
             <ProductRecontractCustomerConsentPanel preview={row.latest_product_recontract_preview} onConsent={recordConsent} />
+            {row.contract_type === "RENT_LEASE" ? (
+              <RentLeasePreviewPanel amendment={row} isCustomerView={true} />
+            ) : null}
             <DetailPanel title="Reason" description="Submitted reason.">
               <p className="text-sm text-muted-foreground">{row.reason}</p>
             </DetailPanel>

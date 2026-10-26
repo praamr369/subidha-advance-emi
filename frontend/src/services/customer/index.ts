@@ -40,6 +40,34 @@ export type CustomerSubscriptionWinnerSummary = {
   waived_amount?: number | string;
 };
 
+export type CustomerContractItem = {
+  id: number;
+  product?: number;
+  product_id?: number;
+  product_name: string;
+  product_code?: string;
+  quantity: number;
+  unit_base_price?: string;
+  total_base_price?: string;
+  monthly_yield_percent?: string;
+  monthly_amount?: string;
+  security_deposit_percent?: string;
+  security_deposit_amount?: string;
+  status?: string;
+};
+
+export type CustomerAmendmentSummaryItem = {
+  id: number;
+  amendment_no: string;
+  amendment_type: string;
+  status: string;
+  reason?: string;
+  effective_date?: string | null;
+  financial_impact_amount?: string;
+  created_at?: string;
+  applied_at?: string | null;
+};
+
 export type CustomerSubscription = {
   id: number;
   subscription_number?: string;
@@ -50,6 +78,12 @@ export type CustomerSubscription = {
   total_amount?: number | string;
   monthly_amount?: number | string;
   tenure_months?: number;
+
+  security_deposit_amount?: number | string;
+  security_deposit_percent?: number | string;
+  refundable_security_deposit?: number | string;
+  deposit_status?: string;
+  amendments_count?: number;
 
   product?: number;
   batch?: number | null;
@@ -84,6 +118,8 @@ export type CustomerSubscription = {
   delivery_summary?: DeliveryRecord | null;
   deliveries?: DeliveryRecord[];
   emis?: CustomerEmi[];
+  contract_items?: CustomerContractItem[];
+  amendments?: CustomerAmendmentSummaryItem[];
 
   has_customer_signature?: boolean;
   customer_signature_signed_at?: string | null;
@@ -547,6 +583,7 @@ export function normalizeCustomerSubscription(item: unknown): CustomerSubscripti
         : normalizeDeliveryRecord(row.delivery_summary),
     deliveries: toArray(row.deliveries).map(normalizeDeliveryRecord),
     emis: toArray(row.emis).map(normalizeCustomerEmi),
+    contract_items: Array.isArray(row.contract_items) ? (row.contract_items as CustomerContractItem[]) : [],
 
     has_customer_signature: Boolean(row.has_customer_signature),
     customer_signature_signed_at: toStringOrUndefined(row.customer_signature_signed_at) ?? null,

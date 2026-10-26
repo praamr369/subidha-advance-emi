@@ -9,6 +9,7 @@ from lucky_plan.services.lucky_draw_service import (
     reveal_and_execute_draw,
 )
 from payments.services.payment_service import record_emi_payment
+from subscriptions.models import Subscription, SubscriptionStatus, PlanType
 from tests.helpers import (
     create_admin_user,
     create_batch,
@@ -265,3 +266,35 @@ class AdminSubscriptionDetailApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("lucky_id", response.data)
         self.assertNotIn("uq_subscription_per_lucky_id", str(response.data))
+
+    def test_draft_rent_contract_shows_zero_outstanding_in_list_and_kpis(self):
+        draft_rent_sub = Subscription.objects.create(
+            customer=self.customer,
+            product=self.product,
+            partner=self.partner,
+            plan_type=PlanType.RENT,
+            status=SubscriptionStatus.DRAFT,
+            total_amount=Decimal("24024.00"),
+            monthly_amount=Decimal("2002.00"),
+            tenure_months=12,
+            start_date=date(2026, 3, 1),
+        )
+        # 1. Admin subscriptions list
+        list_res = self.client.get("/api/v1/admin/subscriptions/?plan_type=RENT")
+        self.assertEqual(list_res.status_code, status.HTTP_200_OK)
+        results = list_res.data.get("results") or list_res.data
+        self.assertTrue(len(results) >= 1)
+        draft_row = next(r for r in results if r["id"] == draft_rent_sub.id)
+        self.assertEqual(draft_row["outstanding_amount"], "0.00")
+
+        # 2. Admin subscriptions KPIs for rent
+        kpis_res = self.client.get("/api/v1/admin/subscriptions/kpis/?plan_type=RENT")
+        self.assertEqual(kpis_res.status_code, status.HTTP_200_OK)
+        self.assertEqual(kpis_res.data["total_outstanding"], "0.00")
+
+        # 3. Admin dashboard summary-v2 does not count draft proposal in outstanding receivables
+        dash_res = self.client.get("/api/v1/dashboards/summary-v2/")
+        self.assertEqual(dash_res.status_code, status.HTTP_200_OK)
+        # Outstanding receivables must only be the 3000.00 from active EMI subscription, NOT 27024.00!
+        self.assertEqual(dash_res.data["summary"]["outstanding_amount"], "3000.00")
+        self.assertEqual(dash_res.data["summary"]["remaining_amount"], "3000.00")

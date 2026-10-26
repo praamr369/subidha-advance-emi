@@ -61,21 +61,36 @@ export type AdminFinanceDashboardResponse = {
 };
 
 export type FinanceInvoiceRow = {
-  id: number;
+  id: number | string;
   invoice_no: string | null;
   invoice_date: string;
   status: string;
-  document_type: string;
-  customer_id: number | null;
-  customer_name: string;
-  subscription_id: number | null;
-  subscription_number: string | null;
-  direct_sale_id: number | null;
-  direct_sale_no: string | null;
+  document_type?: string;
+  customer_id?: number | null;
+  customer_name?: string;
+  subscription_id?: number | null;
+  subscription_number?: string | null;
+  direct_sale_id?: number | null;
+  direct_sale_no?: string | null;
+  product_id?: number | null;
+  product_name?: string | null;
+  product_image?: string | null;
+  line_items?: Array<{
+    product_id?: number | null;
+    product_name?: string | null;
+    product_image?: string | null;
+    description?: string;
+    quantity?: string | number;
+  }>;
   grand_total: Money;
   received_total: Money;
   balance_total: Money;
-  billing_channel: string;
+  billing_channel?: string;
+  plan_type?: string;
+  billing_period_start?: string;
+  billing_period_end?: string;
+  due_date?: string;
+  demand_type?: string;
 };
 
 export type FinanceReceiptRow = {
@@ -349,7 +364,7 @@ export async function listPartnerReceipts() {
   return apiFetch<{ count?: number; results: Array<Record<string, unknown>> }>("/partner/receipts/");
 }
 
-export async function downloadInvoicePdf(invoiceId: number): Promise<void> {
+export async function downloadInvoicePdf(invoiceId: number | string): Promise<void> {
   const { downloadAuthenticatedFile } = await import("@/lib/export/auth-download");
   await downloadAuthenticatedFile(
     `/customer/invoices/${invoiceId}/pdf/`,

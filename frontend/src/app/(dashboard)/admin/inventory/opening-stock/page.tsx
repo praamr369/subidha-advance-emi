@@ -19,6 +19,7 @@ import { ApiError } from "@/lib/api";
 import { invalidateAfterOpeningStockMutation } from "@/lib/operational-query-invalidation";
 import { ROUTES } from "@/lib/routes";
 import ProductPickerCombobox, { type ProductPickerValue } from "@/components/ui/ProductPickerCombobox";
+import ProductAttributeBadges from "@/components/ui/ProductAttributeBadges";
 import {
   applyAdminOpeningStockBulkCsv,
   correctionAdminOpeningStockEntry,
@@ -472,11 +473,18 @@ export default function InventoryOpeningStockPage() {
                     required
                   />
                   {pickedItem ? (
-                    <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 rounded-xl border border-primary/20 bg-primary/5 px-4 py-2.5 text-xs text-muted-foreground shadow-sm">
-                      {pickedItem.product_code ? <span className="flex items-center gap-1.5">Code: <span className="font-mono font-bold text-primary">{pickedItem.product_code}</span></span> : null}
-                      {pickedItem.category ? <span className="flex items-center gap-1.5">Category: <span className="font-semibold text-foreground">{pickedItem.category}{pickedItem.subcategory ? ` › ${pickedItem.subcategory}` : ""}</span></span> : null}
-                      {pickedItem.standard_unit_cost ? <span className="flex items-center gap-1.5">Std cost: <span className="font-bold text-foreground">₹{Number(pickedItem.standard_unit_cost).toLocaleString("en-IN")}</span></span> : null}
-                      {pickedItem.unit_of_measure ? <span className="flex items-center gap-1.5">Unit: <span className="font-semibold text-foreground">{pickedItem.unit_of_measure}</span></span> : null}
+                    <div className="mt-3 space-y-2.5 rounded-xl border border-primary/20 bg-primary/5 p-3.5 text-xs text-muted-foreground shadow-sm">
+                      <div className="flex flex-wrap gap-x-5 gap-y-2">
+                        {pickedItem.product_code ? <span className="flex items-center gap-1.5">Code: <span className="font-mono font-bold text-primary">{pickedItem.product_code}</span></span> : null}
+                        {pickedItem.category ? <span className="flex items-center gap-1.5">Category: <span className="font-semibold text-foreground">{pickedItem.category}{pickedItem.subcategory ? ` › ${pickedItem.subcategory}` : ""}</span></span> : null}
+                        {pickedItem.standard_unit_cost ? <span className="flex items-center gap-1.5">Std cost: <span className="font-bold text-foreground">₹{Number(pickedItem.standard_unit_cost).toLocaleString("en-IN")}</span></span> : null}
+                        {pickedItem.unit_of_measure ? <span className="flex items-center gap-1.5">Unit: <span className="font-semibold text-foreground">{pickedItem.unit_of_measure}</span></span> : null}
+                      </div>
+                      <ProductAttributeBadges
+                        attributes={pickedItem.attributes}
+                        nameFallback={pickedItem.product_name}
+                        size="sm"
+                      />
                     </div>
                   ) : null}
                   {manualFieldErrors.inventory_item ? (

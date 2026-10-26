@@ -2,8 +2,9 @@
 
 import { formatRupee } from "@/lib/utils/currency";
 import Link from "next/link";
-import { Star } from "lucide-react";
+import { Star, Camera } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import CustomerProductLink from "@/components/customers/CustomerProductInspectModal";
 
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
@@ -54,6 +55,13 @@ function ContractCard({ sub }: { sub: CustomerSubscription }) {
   const isWinner =
     (sub.status || "").toUpperCase() === "WON" ||
     (sub.winner_month !== null && sub.winner_month !== undefined);
+  const hasSecurityDeposit =
+    pt === "RENT" ||
+    pt === "LEASE" ||
+    Number(sub.security_deposit_amount || 0) > 0;
+  const emiTotalCount = sub.emi_count ?? sub.tenure_months ?? null;
+  const paidCount = sub.paid_emi_count ?? 0;
+  const pendingCount = sub.pending_emi_count ?? (emiTotalCount ? Math.max(emiTotalCount - paidCount, 0) : null);
 
   return (
     <CPageCard href={`/customer/subscriptions/${sub.id}`}>
@@ -72,14 +80,33 @@ function ContractCard({ sub }: { sub: CustomerSubscription }) {
                 ⏳ Sign Pending
               </span>
             )}
+            {hasSecurityDeposit && sub.deposit_status && sub.deposit_status !== "NOT_REQUIRED" ? (
+              <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                sub.deposit_status === "SUBMITTED" || sub.deposit_status === "PAID"
+                  ? "bg-emerald-100 text-emerald-800"
+                  : "bg-amber-100 text-amber-800"
+              }`}>
+                Deposit: {sub.deposit_status}
+              </span>
+            ) : null}
             {isWinner ? (
               <span className="rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-[10px] font-bold flex items-center gap-1">
                 <Star className="size-2.5" /> Winner
               </span>
             ) : null}
           </div>
-          <div className="text-sm font-bold text-foreground">
-            {sub.product_name || `Product #${sub.product}`}
+          <div className="mt-1">
+            <CustomerProductLink
+              productId={sub.product}
+              productName={
+                sub.contract_items && sub.contract_items.length > 1
+                  ? `${(sub.product_name || "").replace(/\s*\([^)]+:[^)]+\)\s*$/i, "").trim()} + ${sub.contract_items.length - 1} more (${sub.contract_items.length} items)`
+                  : sub.product_name || `Product #${sub.product}`
+              }
+              productImage={sub.product_image}
+              thumbnailSize="md"
+              inspectButtonLabel="Inspect Gallery"
+            />
           </div>
           {sub.subscription_number ? (
             <div className="font-mono text-xs text-muted-foreground mt-0.5">{sub.subscription_number}</div>
@@ -90,21 +117,41 @@ function ContractCard({ sub }: { sub: CustomerSubscription }) {
 
       <div className="mt-3 grid grid-cols-2 gap-2 border-t border-border/60 pt-3 text-xs">
         <div>
-          <span className="text-muted-foreground">Monthly</span>
+          <span className="text-muted-foreground">Monthly Installment</span>
           <div className="font-semibold mt-0.5">{formatRupee(sub.monthly_amount)}</div>
         </div>
         <div>
-          <span className="text-muted-foreground">Total</span>
+          <span className="text-muted-foreground">Total Contract Value</span>
           <div className="font-semibold mt-0.5">{formatRupee(sub.total_amount)}</div>
         </div>
         <div>
-          <span className="text-muted-foreground">Tenure</span>
-          <div className="font-semibold mt-0.5">{sub.tenure_months ? `${sub.tenure_months} months` : "—"}</div>
+          <span className="text-muted-foreground">Contract Tenure</span>
+          <div className="font-semibold mt-0.5">{sub.tenure_months ? `${sub.tenure_months} Months` : "—"}</div>
         </div>
         <div>
-          <span className="text-muted-foreground">Start</span>
+          <span className="text-muted-foreground">EMI Progress</span>
+          <div className="font-semibold mt-0.5">
+            {paidCount} of {emiTotalCount ?? "—"} Paid
+            {pendingCount !== null && pendingCount > 0 ? (
+              <span className="ml-1 text-[10px] font-normal text-amber-600">({pendingCount} due)</span>
+            ) : null}
+          </div>
+        </div>
+        <div>
+          <span className="text-muted-foreground">Start Date</span>
           <div className="font-semibold mt-0.5">{formatDate(sub.start_date)}</div>
         </div>
+        {hasSecurityDeposit ? (
+          <div>
+            <span className="text-muted-foreground">Security Deposit</span>
+            <div className="font-semibold text-primary mt-0.5">
+              {formatRupee(sub.security_deposit_amount)}
+              {Number(sub.refundable_security_deposit ?? sub.security_deposit_amount ?? 0) > 0 ? (
+                <span className="ml-1 text-[10px] font-normal text-muted-foreground">(Refundable)</span>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
         {pt === "EMI" && sub.batch_code ? (
           <div>
             <span className="text-muted-foreground">Batch</span>
@@ -125,6 +172,19 @@ function ContractCard({ sub }: { sub: CustomerSubscription }) {
         </div>
       ) : null}
 
+      {Number(sub.amendments_count ?? 0) > 0 ? (
+        <div className="mt-2.5 rounded-xl border border-sky-200 bg-sky-50 dark:bg-sky-950/30 px-3 py-1.5 text-xs font-medium text-sky-800 dark:text-sky-300 flex items-center justify-between">
+          <span>📝 {sub.amendments_count ?? 0} Contract Amendment{(sub.amendments_count ?? 0) > 1 ? "s" : ""} on record</span>
+          <Link
+            href={`/customer/contract-amendments?source_id=${sub.id}`}
+            onClick={(e) => e.stopPropagation()}
+            className="font-bold underline hover:text-sky-900"
+          >
+            View Details
+          </Link>
+        </div>
+      ) : null}
+
       <div className="mt-3 flex flex-wrap gap-2">
         <Link
           href={`/customer/subscriptions/${sub.id}`}
@@ -133,6 +193,16 @@ function ContractCard({ sub }: { sub: CustomerSubscription }) {
         >
           View Detail
         </Link>
+        {sub.product ? (
+          <Link
+            href={`/customer/catalog/${sub.product}`}
+            onClick={(e) => e.stopPropagation()}
+            className="flex-1 min-w-[90px] rounded-xl border border-primary/30 bg-primary/5 text-primary py-2 text-center text-xs font-bold hover:bg-primary/10 transition flex items-center justify-center gap-1 active:scale-95"
+          >
+            <Camera className="size-3" />
+            <span>Product Gallery</span>
+          </Link>
+        ) : null}
         {!sub.has_customer_signature && sub.signing_path ? (
           <Link
             href={sub.signing_path}
@@ -170,7 +240,7 @@ function ContractCard({ sub }: { sub: CustomerSubscription }) {
             onClick={(e) => e.stopPropagation()}
             className="flex-1 min-w-[90px] rounded-xl border border-primary/40 bg-primary/10 text-primary py-2 text-center text-xs font-bold hover:bg-primary/20 transition active:scale-95"
           >
-            Extend Tenure
+            Extend / Amend
           </Link>
         ) : null}
       </div>

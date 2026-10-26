@@ -1,3 +1,4 @@
+import re
 from decimal import Decimal, ROUND_HALF_UP
 
 from dateutil.relativedelta import relativedelta
@@ -45,6 +46,7 @@ from subscriptions.models import (
     SubscriptionDocument,
     SubscriptionDocumentType,
     SubscriptionStatus,
+    PRE_ACTIVATION_SUBSCRIPTION_STATUSES,
     KycStatus,
 )
 from customers.services.customer_account_service import sync_customer_login_identity
@@ -1910,6 +1912,14 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
     overdue_emi_count = serializers.SerializerMethodField()
     total_paid_amount = serializers.SerializerMethodField()
     outstanding_amount = serializers.SerializerMethodField()
+    security_deposit_amount = serializers.SerializerMethodField()
+    security_deposit_percent = serializers.SerializerMethodField()
+    deposit_status = serializers.SerializerMethodField()
+    next_payment_date = serializers.SerializerMethodField()
+    next_payment_amount = serializers.SerializerMethodField()
+    next_payment_is_overdue = serializers.SerializerMethodField()
+    product_attributes = serializers.SerializerMethodField()
+    contract_items = serializers.SerializerMethodField()
     subscription_number = serializers.SerializerMethodField()
     contract_reference = serializers.SerializerMethodField()
 
@@ -1998,6 +2008,14 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
             "overdue_emi_count",
             "total_paid_amount",
             "outstanding_amount",
+            "security_deposit_amount",
+            "security_deposit_percent",
+            "deposit_status",
+            "next_payment_date",
+            "next_payment_amount",
+            "next_payment_is_overdue",
+            "product_attributes",
+            "contract_items",
         )
         read_only_fields = (
             "id",
@@ -2009,6 +2027,14 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
             "total_amount",
             "monthly_amount",
             "waived_amount",
+            "security_deposit_amount",
+            "security_deposit_percent",
+            "deposit_status",
+            "next_payment_date",
+            "next_payment_amount",
+            "next_payment_is_overdue",
+            "product_attributes",
+            "contract_items",
             "winner_month",
             "created_at",
             "delivery_status",
@@ -2048,12 +2074,16 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
         return sum(1 for emi in obj.emis.all() if emi.status == EmiStatus.PAID)
 
     def get_pending_emi_count(self, obj):
+        if getattr(obj, "status", None) in PRE_ACTIVATION_SUBSCRIPTION_STATUSES:
+            return 0
         return sum(1 for emi in obj.emis.all() if emi.status == EmiStatus.PENDING)
 
     def get_waived_emi_count(self, obj):
         return sum(1 for emi in obj.emis.all() if emi.status == EmiStatus.WAIVED)
 
     def get_overdue_emi_count(self, obj):
+        if getattr(obj, "status", None) in PRE_ACTIVATION_SUBSCRIPTION_STATUSES:
+            return 0
         return sum(1 for emi in obj.emis.all() if emi.status == EmiStatus.PENDING and emi.is_overdue())
 
     def _get_financial_snapshot(self, obj):
@@ -2065,7 +2095,187 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
         return str(self._get_financial_snapshot(obj)["paid_amount"])
 
     def get_outstanding_amount(self, obj):
+        if getattr(obj, "status", None) in PRE_ACTIVATION_SUBSCRIPTION_STATUSES:
+            return "0.00"
         return str(self._get_financial_snapshot(obj)["remaining_amount"])
+
+    def get_security_deposit_amount(self, obj):
+        if obj.plan_type == PlanType.RENT:
+            profile = getattr(obj, "rent_profile", None)
+            if profile and profile.security_deposit_amount:
+                return str(profile.security_deposit_amount)
+        elif obj.plan_type == PlanType.LEASE:
+            profile = getattr(obj, "lease_profile", None)
+            if profile and profile.security_deposit_amount:
+                return str(profile.security_deposit_amount)
+
+        pricing = getattr(obj, "pricing_snapshot", None)
+        if isinstance(pricing, dict) and pricing.get("security_deposit_amount"):
+            return str(pricing.get("security_deposit_amount"))
+        return "0.00"
+
+    def get_security_deposit_percent(self, obj):
+        if obj.plan_type == PlanType.RENT:
+            profile = getattr(obj, "rent_profile", None)
+            if profile and profile.security_deposit_percent:
+                return str(profile.security_deposit_percent)
+        elif obj.plan_type == PlanType.LEASE:
+            profile = getattr(obj, "lease_profile", None)
+            if profile and profile.security_deposit_percent:
+                return str(profile.security_deposit_percent)
+        return "0.00"
+
+    def get_deposit_status(self, obj):
+        if obj.plan_type not in (PlanType.RENT, PlanType.LEASE):
+            return "NOT_REQUIRED"
+
+        deposit_amt = Decimal(self.get_security_deposit_amount(obj))
+        if deposit_amt <= MONEY_ZERO:
+            return "NOT_REQUIRED"
+
+        demands = getattr(obj, "_prefetched_objects_cache", {}).get("rent_lease_demands")
+        if demands is None:
+            demands = obj.rent_lease_demands.all()
+
+        deposit_demands = [d for d in demands if d.demand_type == "SECURITY_DEPOSIT"]
+        if deposit_demands:
+            dep_demand = deposit_demands[0]
+            if dep_demand.status == "PAID" or dep_demand.collected_amount >= dep_demand.amount:
+                return "PAID"
+            elif dep_demand.collected_amount > MONEY_ZERO:
+                return "PARTIAL"
+            return "PENDING"
+
+        return "PENDING"
+
+    def _resolve_next_payment_context(self, obj):
+        if hasattr(obj, "_cached_next_payment"):
+            return obj._cached_next_payment
+
+        today = timezone.localdate()
+        next_date = None
+        next_amount = None
+        is_overdue = False
+
+        if obj.plan_type in (PlanType.RENT, PlanType.LEASE):
+            demands = getattr(obj, "_prefetched_objects_cache", {}).get("rent_lease_demands")
+            if demands is None:
+                demands = obj.rent_lease_demands.all()
+
+            unpaid_demands = [
+                d for d in demands
+                if d.demand_type != "SECURITY_DEPOSIT" and d.status not in ("PAID", "WAIVED", "CANCELLED")
+            ]
+            if unpaid_demands:
+                unpaid_demands.sort(key=lambda d: (d.due_date, d.id))
+                first_due = unpaid_demands[0]
+                next_date = first_due.due_date.isoformat()
+                next_amount = str(max(first_due.amount - first_due.collected_amount, MONEY_ZERO))
+                is_overdue = first_due.due_date < today
+            else:
+                if obj.start_date:
+                    next_date = obj.start_date.isoformat()
+                    next_amount = str(obj.monthly_amount)
+                    is_overdue = False
+        else:
+            emis = getattr(obj, "_prefetched_objects_cache", {}).get("emis")
+            if emis is None:
+                emis = obj.emis.all()
+
+            pending_emis = [e for e in emis if e.status == EmiStatus.PENDING]
+            if pending_emis:
+                pending_emis.sort(key=lambda e: (e.due_date, e.month_no))
+                first_due = pending_emis[0]
+                next_date = first_due.due_date.isoformat()
+                next_amount = str(first_due.balance_amount())
+                is_overdue = bool(first_due.is_overdue())
+            elif obj.start_date and obj.status in PRE_ACTIVATION_SUBSCRIPTION_STATUSES:
+                next_date = obj.start_date.isoformat()
+                next_amount = str(obj.monthly_amount)
+                is_overdue = False
+
+        context = {
+            "next_payment_date": next_date,
+            "next_payment_amount": next_amount,
+            "next_payment_is_overdue": is_overdue,
+        }
+        obj._cached_next_payment = context
+        return context
+
+    def get_next_payment_date(self, obj):
+        return self._resolve_next_payment_context(obj)["next_payment_date"]
+
+    def get_next_payment_amount(self, obj):
+        return self._resolve_next_payment_context(obj)["next_payment_amount"]
+
+    def get_next_payment_is_overdue(self, obj):
+        return self._resolve_next_payment_context(obj)["next_payment_is_overdue"]
+
+    def get_product_attributes(self, obj):
+        product = getattr(obj, "product", None)
+        if not product:
+            return {}
+
+        attributes = {}
+        if isinstance(product.base_specs, dict):
+            for k, v in product.base_specs.items():
+                if v is not None and v != "":
+                    display_v = "Yes" if v is True else ("No" if v is False else str(v))
+                    attributes[str(k).strip()] = display_v
+
+        if hasattr(product, "pim_variant") and product.pim_variant:
+            slug_to_key = {k.lower().replace("-", " ").replace("_", " "): k for k in attributes}
+            for attr_val in product.pim_variant.attribute_values.select_related("attribute").all():
+                if attr_val.attribute.data_type == "BOOLEAN":
+                    val = "Yes" if attr_val.value_boolean else "No"
+                elif attr_val.attribute.data_type in ("NUMBER", "DECIMAL"):
+                    val = float(attr_val.value_number) if attr_val.value_number is not None else None
+                else:
+                    val = attr_val.value_text
+
+                if val is not None and val != "":
+                    canonical_name = attr_val.attribute.name.strip()
+                    slug = canonical_name.lower().replace("-", " ").replace("_", " ")
+                    if slug in slug_to_key:
+                        attributes.pop(slug_to_key[slug], None)
+                    attributes[canonical_name] = str(val)
+                    slug_to_key[slug] = canonical_name
+
+        if not attributes and product.name and "(" in product.name and ")" in product.name:
+            match = re.search(r"\((.*?)\)", product.name)
+            if match:
+                parts = match.group(1).split(",")
+                for part in parts:
+                    if ":" in part:
+                        pk, pv = part.split(":", 1)
+                        attributes[pk.strip()] = pv.strip()
+
+        return attributes
+
+    def get_contract_items(self, obj):
+        if obj.plan_type not in (PlanType.RENT, PlanType.LEASE):
+            return []
+        items = obj.contract_items.select_related("product").all()
+        return [
+            {
+                "id": it.id,
+                "product": it.product_id,
+                "product_id": it.product_id,
+                "product_name": it.product.name,
+                "product_code": it.product.product_code,
+                "sku": getattr(it.product, "sku", ""),
+                "category": getattr(it.product, "category", ""),
+                "quantity": it.quantity,
+                "unit_base_price": str(it.unit_base_price),
+                "total_base_price": str(it.total_base_price),
+                "monthly_yield_percent": str(it.monthly_yield_percent),
+                "monthly_amount": str(it.monthly_amount),
+                "security_deposit_percent": str(getattr(it, "security_deposit_percent", "20.00")),
+                "security_deposit_amount": str(it.security_deposit_amount),
+                "status": getattr(it, "status", "ACTIVE"),
+            }
+            for it in items
+        ]
 
     def validate(self, attrs):
         instance = self.instance
@@ -2454,6 +2664,7 @@ class SubscriptionAdminDetailSerializer(SubscriptionAdminSerializer):
                 "monthly_amount": str(it.monthly_amount),
                 "security_deposit_percent": str(getattr(it, "security_deposit_percent", "20.00")),
                 "security_deposit_amount": str(it.security_deposit_amount),
+                "status": getattr(it, "status", "ACTIVE"),
                 "product_snapshot": it.product_snapshot,
             }
             for it in items

@@ -5,12 +5,13 @@ import type { AmendmentType } from "@/services/amendments";
 
 type Props = {
   amendmentType: AmendmentType;
+  contractType?: string;
   values: Record<string, string>;
   onChange: (key: string, value: string) => void;
 };
 
-export default function AmendmentValueFields({ amendmentType, values, onChange }: Props) {
-  const fields = amendmentFieldsFor(amendmentType);
+export default function AmendmentValueFields({ amendmentType, contractType, values, onChange }: Props) {
+  const fields = amendmentFieldsFor(amendmentType, contractType);
   return (
     <div className="mt-4 grid gap-4 md:grid-cols-2">
       {fields.map((field) => (

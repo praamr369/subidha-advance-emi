@@ -5,6 +5,7 @@ from api.v1.views.contract_amendments import (
     CustomerContractAmendmentDetailView,
     CustomerContractAmendmentListCreateView,
     CustomerContractAmendmentProductRecontractConsentView,
+    CustomerContractAmendmentRentLeasePreviewView,
 )
 
 urlpatterns = [
@@ -14,5 +15,9 @@ urlpatterns = [
     path(
         "contract-amendments/<int:pk>/product-recontract/consent/",
         CustomerContractAmendmentProductRecontractConsentView.as_view(),
+    ),
+    path(
+        "contract-amendments/<int:pk>/rent-lease-preview/",
+        CustomerContractAmendmentRentLeasePreviewView.as_view(),
     ),
 ]

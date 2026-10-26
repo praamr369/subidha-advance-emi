@@ -603,6 +603,27 @@ class AdminContractAmendmentRentLeasePreviewView(APIView):
         return self.get(request, pk)
 
 
+class CustomerContractAmendmentRentLeasePreviewView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsCustomer]
+
+    def get(self, request, pk: int):
+        customer = _customer_profile_for(request.user)
+        if not customer:
+            return Response({"detail": "Customer profile not found."}, status=status.HTTP_404_NOT_FOUND)
+        amendment = _amendment_queryset().filter(pk=pk, customer=customer).first()
+        if not amendment:
+            return Response({"detail": "Amendment not found."}, status=status.HTTP_404_NOT_FOUND)
+        from contracts.services.rent_lease_preview_service import preview_rent_lease_amendment
+        try:
+            preview = preview_rent_lease_amendment(amendment)
+        except DjangoValidationError as exc:
+            return _validation_response(exc)
+        return Response(preview, status=status.HTTP_200_OK)
+
+    def post(self, request, pk: int):
+        return self.get(request, pk)
+
+
 class AdminContractAmendmentDepositSecurityPreviewView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 

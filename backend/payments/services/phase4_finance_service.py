@@ -465,7 +465,8 @@ def customer_invoice_list(*, customer, limit: int = 200) -> dict:
     generate_rent_lease_demands(through_date=timezone.localdate())
     rows = list(
         BillingInvoice.objects.filter(customer=customer)
-        .select_related("subscription", "direct_sale")
+        .select_related("subscription", "subscription__product", "direct_sale")
+        .prefetch_related("lines__product")
         .order_by("-invoice_date", "-id")[:limit]
     )
     rent_lease_demands = list(
@@ -476,20 +477,62 @@ def customer_invoice_list(*, customer, limit: int = 200) -> dict:
         .select_related("subscription", "subscription__product")
         .order_by("-due_date", "-id")[:limit]
     )
+
+    def _resolve_billing_invoice(row):
+        sub = row.subscription
+        sub_id = row.subscription_id
+        sub_num = getattr(sub, "subscription_number", None) if sub_id else None
+        ds = row.direct_sale
+        ds_id = row.direct_sale_id
+        ds_no = getattr(ds, "sale_no", None) if ds_id else None
+
+        product_id = None
+        product_name = None
+        product_image = None
+        if sub and getattr(sub, "product", None):
+            product_id = sub.product_id
+            product_name = sub.product.name
+            product_image = sub.product.image.url if getattr(sub.product, "image", None) else None
+
+        lines_payload = []
+        for line in row.lines.all():
+            p_id = line.product_id
+            p_name = line.product.name if line.product else line.description
+            p_img = line.product.image.url if (line.product and getattr(line.product, "image", None)) else None
+            lines_payload.append({
+                "product_id": p_id,
+                "product_name": p_name,
+                "product_image": p_img,
+                "description": line.description,
+                "quantity": str(line.quantity),
+            })
+            if not product_id and p_id:
+                product_id = p_id
+                product_name = p_name
+                product_image = p_img
+
+        return {
+            "id": row.id,
+            "invoice_no": row.document_no,
+            "invoice_date": row.invoice_date,
+            "status": row.status,
+            "subscription_id": sub_id,
+            "subscription_number": sub_num,
+            "direct_sale_id": ds_id,
+            "direct_sale_no": ds_no,
+            "product_id": product_id,
+            "product_name": product_name,
+            "product_image": product_image,
+            "line_items": lines_payload,
+            "grand_total": _money(row.grand_total),
+            "received_total": _money(row.received_total),
+            "balance_total": _money(row.balance_total),
+        }
+
     return {
         "count": len(rows) + len(rent_lease_demands),
         "results": [
-            {
-                "id": row.id,
-                "invoice_no": row.document_no,
-                "invoice_date": row.invoice_date,
-                "status": row.status,
-                "subscription_number": getattr(row.subscription, "subscription_number", None) if row.subscription_id else None,
-                "direct_sale_no": getattr(row.direct_sale, "sale_no", None) if row.direct_sale_id else None,
-                "grand_total": _money(row.grand_total),
-                "received_total": _money(row.received_total),
-                "balance_total": _money(row.balance_total),
-            }
+            _resolve_billing_invoice(row)
             for row in rows
         ] + [
             {
@@ -497,13 +540,18 @@ def customer_invoice_list(*, customer, limit: int = 200) -> dict:
                 "invoice_no": row.reference_key,
                 "invoice_date": row.created_at.date(),
                 "status": row.status,
+                "subscription_id": row.subscription_id,
                 "subscription_number": getattr(row.subscription, "subscription_number", None),
+                "direct_sale_id": None,
                 "direct_sale_no": None,
+                "product_id": getattr(row.subscription, "product_id", None),
+                "product_name": getattr(row.subscription.product, "name", "") if getattr(row.subscription, "product", None) else "",
+                "product_image": row.subscription.product.image.url if (getattr(row.subscription, "product", None) and getattr(row.subscription.product, "image", None)) else None,
+                "line_items": [],
                 "grand_total": _money(row.amount),
                 "received_total": _money(row.collected_amount),
                 "balance_total": _money(row.outstanding_amount()),
                 "plan_type": row.subscription.plan_type,
-                "product_name": getattr(row.subscription.product, "name", ""),
                 "billing_period_start": row.billing_period_start,
                 "billing_period_end": row.billing_period_end,
                 "due_date": row.due_date,

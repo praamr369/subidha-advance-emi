@@ -209,3 +209,35 @@ class PublicContractSignApiTests(APITestCase):
         self.client.logout()
         resp = self.client.get("/api/v1/public/contracts/sign/tampered-token-12345/")
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("support_phone", resp.data)
+
+    def test_percent_encoded_token_resolution(self):
+        import urllib.parse
+        from business_setup.models.core import PublicBusinessProfile
+
+        # Configure custom official support phone in backend
+        PublicBusinessProfile.objects.all().delete()
+        PublicBusinessProfile.objects.create(
+            display_name="Subidha Furniture Test Branch",
+            support_phone="+91 94764 90946",
+            is_active=True,
+        )
+
+        self.client.force_authenticate(user=self.admin)
+        link_resp = self.client.get(f"/api/v1/admin/subscriptions/{self.subscription.id}/signing-link/")
+        self.assertEqual(link_resp.status_code, status.HTTP_200_OK)
+        token = link_resp.data["token"]
+        self.assertEqual(link_resp.data["support_phone"], "+91 94764 90946")
+
+        self.client.logout()
+        # Test raw token
+        raw_resp = self.client.get(f"/api/v1/public/contracts/sign/{token}/")
+        self.assertEqual(raw_resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(raw_resp.data["support_phone"], "+91 94764 90946")
+
+        # Test percent-encoded token (%3A for colons) as sent by some browsers/clients
+        encoded_token = urllib.parse.quote(token)
+        encoded_resp = self.client.get(f"/api/v1/public/contracts/sign/{encoded_token}/")
+        self.assertEqual(encoded_resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(encoded_resp.data["customer_name"], "John Doe")
+        self.assertEqual(encoded_resp.data["support_phone"], "+91 94764 90946")

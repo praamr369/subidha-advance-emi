@@ -63,15 +63,24 @@ const PRODUCT_CHANGE_IMPLEMENTATION_WARNING =
 
 function canShowImplementationAction(row: AmendmentRecord) {
   if (typeof row.is_implementable === "boolean") return row.is_implementable;
+  if (row.workflow_capability?.category === "RENT_LEASE_ITEM_AMENDMENT" && row.status === "APPROVED") {
+    return true;
+  }
   return row.status === "APPROVED" && (SAFE_PHASE3_TYPES.has(row.amendment_type) || row.amendment_type === "PRODUCT_CHANGE");
 }
 
 function implementationWarning(row: AmendmentRecord) {
+  if (row.workflow_capability?.category === "RENT_LEASE_ITEM_AMENDMENT") {
+    return "Executing this amendment will update contract items, recalculate monthly rent/lease amounts and security deposit, and adjust future uncollected billing demands.";
+  }
   return row.amendment_type === "PRODUCT_CHANGE" ? PRODUCT_CHANGE_IMPLEMENTATION_WARNING : PHASE3_IMPLEMENTATION_WARNING;
 }
 
 function implementationLabel(row: AmendmentRecord, busy: string | null) {
   if (busy === "implement") return "Implementing...";
+  if (row.workflow_capability?.category === "RENT_LEASE_ITEM_AMENDMENT") {
+    return "Implement approved rent/lease product amendment";
+  }
   if (row.amendment_type === "PRODUCT_CHANGE") return "Implement approved same-price product reference correction";
   return "Implement approved non-financial correction";
 }
@@ -280,7 +289,7 @@ export default function AdminAmendmentDetail({ id }: { id: number }) {
             {row.workflow_capability?.category === "LUCKY_ID_BATCH_PREVIEW" ? (
               <LuckyBatchPreviewPanel amendment={row} />
             ) : null}
-            {row.workflow_capability?.category === "RENT_LEASE_PREVIEW" ? (
+            {row.workflow_capability?.category === "RENT_LEASE_PREVIEW" || row.workflow_capability?.category === "RENT_LEASE_ITEM_AMENDMENT" ? (
               <RentLeasePreviewPanel amendment={row} />
             ) : null}
             {row.workflow_capability?.category === "DEPOSIT_SECURITY_PREVIEW" ? (

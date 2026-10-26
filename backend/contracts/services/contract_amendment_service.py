@@ -612,6 +612,9 @@ def implement_approved_amendment(*, amendment: ContractAmendment, implemented_by
         raise ValidationError({"detail": "This amendment is already implemented."})
     if locked_amendment.status != "APPROVED":
         raise ValidationError({"detail": f"Cannot implement amendment in status '{locked_amendment.status}'. Must be APPROVED."})
+    if locked_amendment.contract_type == "RENT_LEASE" and locked_amendment.amendment_type in {"PRODUCT_CHANGE", "PRODUCT_UPGRADE"}:
+        from contracts.services.rent_lease_item_amendment_service import apply_rent_lease_item_amendment
+        return apply_rent_lease_item_amendment(amendment=locked_amendment, performed_by=implemented_by)
     if locked_amendment.amendment_type == "PRODUCT_CHANGE":
         return _implement_product_change(locked_amendment=locked_amendment, implemented_by=implemented_by)
     if locked_amendment.amendment_type == "PRODUCT_UPGRADE":
@@ -632,6 +635,13 @@ def get_workflow_capability(amendment: ContractAmendment) -> dict:
         "requires_reconciliation_bridge": False,
         "blocked_reason": ""
     }
+
+    if amendment.contract_type == "RENT_LEASE" and amendment.amendment_type in {"PRODUCT_CHANGE", "PRODUCT_UPGRADE"}:
+        capability["category"] = "RENT_LEASE_ITEM_AMENDMENT"
+        capability["can_execute_directly"] = True
+        capability["requires_preview"] = True
+        capability["blocked_reason"] = ""
+        return capability
 
     if amendment.amendment_type in {"PRODUCT_CHANGE", "PRODUCT_UPGRADE"}:
         meta = phase3_implementation_metadata(amendment)

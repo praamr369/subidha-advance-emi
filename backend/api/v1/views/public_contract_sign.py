@@ -1,6 +1,7 @@
 import base64
 import logging
 import re
+import urllib.parse
 from django.core.files.base import ContentFile
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 from django.utils import timezone
@@ -20,6 +21,25 @@ CONTRACT_SIGNING_SALT = "subidha.contract.signing.v1"
 CONTRACT_SIGNING_MAX_AGE = 86400 * 14  # 14 days
 
 
+def get_official_support_phone() -> str:
+    """
+    Returns official store support phone configured by the admin in backend Business Setup.
+    Prefers active PublicBusinessProfile.support_phone, then BusinessProfile.primary_phone,
+    with safe default fallback to production store number.
+    """
+    try:
+        from business_setup.models.core import PublicBusinessProfile, BusinessProfile
+        pub = PublicBusinessProfile.objects.filter(is_active=True).order_by("-id").first()
+        if pub and pub.support_phone and pub.support_phone.strip():
+            return pub.support_phone.strip()
+        biz = BusinessProfile.objects.order_by("-id").first()
+        if biz and biz.primary_phone and biz.primary_phone.strip():
+            return biz.primary_phone.strip()
+    except Exception:
+        pass
+    return "+91 94764 90946"
+
+
 def generate_contract_signing_token(subscription_id: int) -> str:
     """Generate a tamper-proof timestamped signing token for a contract/subscription."""
     signer = TimestampSigner(salt=CONTRACT_SIGNING_SALT)
@@ -27,9 +47,24 @@ def generate_contract_signing_token(subscription_id: int) -> str:
 
 
 def verify_contract_signing_token(token: str) -> int:
-    """Verifies signing token and returns subscription_id. Raises BadSignature or SignatureExpired."""
+    """
+    Verifies signing token and returns subscription_id. Raises BadSignature or SignatureExpired.
+    Safely decodes percent-encoded tokens (e.g. %3A for colon) to ensure links opened from
+    any browser, mobile SMS, WhatsApp, or frontend fetch clients resolve reliably.
+    """
     signer = TimestampSigner(salt=CONTRACT_SIGNING_SALT)
-    subscription_id_str = signer.unsign(token, max_age=CONTRACT_SIGNING_MAX_AGE)
+    clean_token = (token or "").strip()
+    if "%" in clean_token:
+        try:
+            clean_token = urllib.parse.unquote(clean_token)
+        except Exception:
+            pass
+    if "%" in clean_token:
+        try:
+            clean_token = urllib.parse.unquote(clean_token)
+        except Exception:
+            pass
+    subscription_id_str = signer.unsign(clean_token, max_age=CONTRACT_SIGNING_MAX_AGE)
     return int(subscription_id_str)
 
 
@@ -50,16 +85,24 @@ def public_contract_sign_view(request, token: str):
     GET:  Returns contract details for review.
     POST: Accepts digital touchscreen signature (base64 data URL or uploaded file) and attaches to subscription.
     """
+    support_phone = get_official_support_phone()
+
     try:
         subscription_id = verify_contract_signing_token(token)
     except SignatureExpired:
         return Response(
-            {"error": "This contract signing link has expired. Please contact Subidha Furniture for an updated link."},
+            {
+                "error": "This contract signing link has expired. Please contact Subidha Furniture for an updated link.",
+                "support_phone": support_phone,
+            },
             status=status.HTTP_410_GONE,
         )
     except (BadSignature, Exception):
         return Response(
-            {"error": "Invalid signing link or token."},
+            {
+                "error": "Invalid signing link or token.",
+                "support_phone": support_phone,
+            },
             status=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -119,6 +162,7 @@ def public_contract_sign_view(request, token: str):
             "customer_name": getattr(customer, "name", "Valued Customer"),
             "customer_phone_masked": _mask_phone(getattr(customer, "phone", "")),
             "customer_email": getattr(customer, "email", "") or "",
+            "support_phone": support_phone,
             "product_name": product_display_name or "Subidha Furniture",
             "items": items_summary,
             "total_amount": str(subscription.total_amount),

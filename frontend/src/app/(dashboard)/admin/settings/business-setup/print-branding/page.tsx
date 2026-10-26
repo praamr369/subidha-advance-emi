@@ -427,7 +427,7 @@ export default function PrintBrandingSettingsPage() {
                   <div className="text-lg font-black uppercase tracking-wide">{settings.business_name || "Subidha Furniture"}</div>
                   <div className="text-xs font-semibold uppercase tracking-wider text-[#8a5a22]">{settings.business_tagline || "Furniture, Advance EMI, Rent & Lease"}</div>
                   <div className="mt-1 whitespace-pre-line text-xs text-[#6f5c46]">{settings.print_address || "Subidha Furniture, Asansol\nWest Bengal, India"}</div>
-                  <div className="mt-2 text-xs text-[#6f5c46]">{settings.print_phone || "+91 77972 80952"} · {settings.print_email || "support@subidhafurnitureasansol.com"}</div>
+                  <div className="mt-2 text-xs text-[#6f5c46]">{settings.print_phone || "+91 94764 90946"} · {settings.print_email || "support@subidhafurnitureasansol.com"}</div>
                 </div>
               </div>
             </section>
