@@ -662,6 +662,11 @@ urlpatterns = [
         WhatsAppCatalogFeedView.as_view(),
         name="public-whatsapp-catalog-feed",
     ),
+    path(
+        "brand/meta-catalog.csv",
+        WhatsAppCatalogFeedView.as_view(),
+        name="public-brand-meta-catalog-feed",
+    ),
     path("product-categories/", PublicProductCategoriesView.as_view(), name="public-product-categories"),
     path("categories/", PublicProductCategoriesView.as_view(), name="public-categories"),
     path("products/<str:slug>/", PublicProductDetailView.as_view(), name="public-product-detail"),

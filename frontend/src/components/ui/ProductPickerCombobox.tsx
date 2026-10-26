@@ -78,8 +78,13 @@ export default function ProductPickerCombobox({
         subcategory: subcat || undefined,
         stock_item_type: type || undefined,
         include_locations: true,
+        include_draft: true,
       });
-      setResults(res.results);
+      // In Opening Stock, all active store products should be available
+      const visible = (res.results || []).filter(
+        (item) => item.is_active !== false
+      );
+      setResults(visible);
       setActiveIndex(-1);
     } catch {
       setResults([]);

@@ -29,7 +29,14 @@ type CustomerOption = {
   name: string;
   phone: string;
   kyc_status?: string;
+  profile_photo_url?: string | null;
 };
+
+export function isCustomerKycApproved(status?: string | null): boolean {
+  if (!status) return false;
+  const s = status.trim().toUpperCase();
+  return s === "VERIFIED" || s === "APPROVED" || s === "EXCEPTION_APPROVED";
+}
 
 type ProductOption = {
   id: number;
@@ -164,6 +171,7 @@ function normalizeCustomer(raw: Record<string, unknown>): CustomerOption {
     name: String(raw.name ?? ""),
     phone: String(raw.phone ?? ""),
     kyc_status: toOptionalString(raw.kyc_status),
+    profile_photo_url: toOptionalString(raw.profile_photo_url ?? raw.profile_photo),
   };
 }
 
@@ -876,14 +884,30 @@ export default function SubscriptionCreatePage({
     }
     if (!startDate) blockers.push("Set a start date.");
     if (!tenureMonths || tenureMonths <= 0) blockers.push("Tenure must be at least 1 month.");
-    if (!photoFile) blockers.push("Customer photo is required.");
-    if (!signatureFile) blockers.push("Customer signature is required.");
+    if (!photoFile && !customer?.profile_photo_url) blockers.push("Customer photo is required.");
+    if (!signatureFile) blockers.push("Customer signature is required (draw on screen or upload).");
 
     if ((isRentPlan || isLeasePlan) && customer) {
-      const hasVerifiedKyc = customer.kyc_status === "VERIFIED" || Boolean(idDocFile);
-      if (!hasVerifiedKyc) {
+      const isApprovedKyc =
+        isCustomerKycApproved(customer.kyc_status) ||
+        Boolean(kycReadiness?.can_activate) ||
+        Boolean(kycReadiness?.kyc_verified) ||
+        Boolean(idDocFile);
+      if (!isApprovedKyc) {
         blockers.push(
-          "Customer KYC must be VERIFIED or an ID document (Aadhaar/PAN/Voter ID) must be uploaded before activating a Rent or Lease contract."
+          "Customer KYC must be verified/approved (or an ID document uploaded) before activating a Rent or Lease contract."
+        );
+      }
+
+      // Supporting residential proof is required for Rent and Lease contracts
+      const hasResidentialProof =
+        Boolean(rentAgreementFile) ||
+        Boolean(kycReadiness?.can_activate) ||
+        Boolean(kycReadiness?.present_documents?.includes("ADDRESS_PROOF")) ||
+        Boolean(kycReadiness?.required_documents?.some((r) => r.code === "ADDRESS_PROOF" && r.present));
+      if (!hasResidentialProof) {
+        blockers.push(
+          "Supporting residential proof (Rent Agreement or Tenancy document) must be provided for Rent & Lease contract activation."
         );
       }
     }
@@ -905,6 +929,8 @@ export default function SubscriptionCreatePage({
     photoFile,
     signatureFile,
     idDocFile,
+    rentAgreementFile,
+    kycReadiness,
   ]);
 
   // For RENT/LEASE, the activate path is gated on KYC readiness from the backend.
@@ -912,9 +938,15 @@ export default function SubscriptionCreatePage({
   const canActivate = useMemo(() => {
     if (!canSubmit) return false;
     if (isEmiPlan) return canSubmit;
-    if (kycReadiness && !kycReadiness.can_activate && !idDocFile) return false;
+    const isApprovedKyc =
+      isCustomerKycApproved(customer?.kyc_status) ||
+      Boolean(kycReadiness?.can_activate) ||
+      Boolean(kycReadiness?.kyc_verified) ||
+      Boolean(idDocFile);
+    if (!isApprovedKyc) return false;
+    if (kycReadiness && !kycReadiness.can_activate && !idDocFile && !isApprovedKyc) return false;
     return true;
-  }, [canSubmit, isEmiPlan, kycReadiness, idDocFile]);
+  }, [canSubmit, isEmiPlan, kycReadiness, idDocFile, customer]);
 
   // Save as Draft is always allowed when the form structure is complete (no KYC gate).
   const canSaveAsDraft = useMemo(() => {
@@ -1607,6 +1639,26 @@ export default function SubscriptionCreatePage({
         }
       }
 
+      // Supporting residential tenancy proof (sync to customer dossier as well):
+      if ((isRentPlan || isLeasePlan) && rentAgreementFile && customer) {
+        try {
+          const rentForm = new FormData();
+          rentForm.append("document_type", "OTHER");
+          rentForm.append("category", "DELIVERY_ADDRESS_PROOF");
+          rentForm.append("file", rentAgreementFile);
+          rentForm.append(
+            "notes",
+            `Supporting Tenancy Proof / Rent Agreement during ${planType} contract creation (#${created.id})`
+          );
+          await apiFetch(`/admin/customers/${customer.id}/kyc-documents/upload/`, {
+            method: "POST",
+            body: rentForm,
+          });
+        } catch (rentErr) {
+          console.warn("Rent agreement customer KYC sync notice:", rentErr);
+        }
+      }
+
       // 2. Subscription documents (photo, signature, rent agreement):
       if (!!photoFile || signatureFile || rentAgreementFile) {
         try {
@@ -1819,7 +1871,13 @@ export default function SubscriptionCreatePage({
                     : null
                 }
                 onSelect={(rec: CustomerRecord) => {
-                  setCustomer({ id: rec.id, name: rec.name, phone: rec.phone, kyc_status: rec.kyc_status });
+                  setCustomer({
+                    id: rec.id,
+                    name: rec.name,
+                    phone: rec.phone,
+                    kyc_status: rec.kyc_status,
+                    profile_photo_url: rec.profile_photo_url,
+                  });
                   setError(null);
                   setSuccess(null);
                 }}
@@ -1883,10 +1941,34 @@ export default function SubscriptionCreatePage({
                             return (
                               <tr key={itm.id} className="hover:bg-muted/20 transition-colors">
                                 <td className="px-3 py-2.5">
-                                  <div className="font-semibold text-foreground">{itm.product.name}</div>
-                                  <div className="text-[11px] text-muted-foreground font-mono">
-                                    {itm.product.product_code || "—"}{" "}
-                                    {itm.product.category ? `· ${itm.product.category}` : ""}
+                                  <div className="font-semibold text-foreground flex items-center gap-2">
+                                    <span>{itm.product.name}</span>
+                                    {isRentPlan && !itm.product.is_rent_enabled && (
+                                      <span className="inline-flex items-center gap-1 rounded bg-amber-100 dark:bg-amber-950/40 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-300">
+                                        ⚠ Not Rent Enabled
+                                      </span>
+                                    )}
+                                    {isLeasePlan && !itm.product.is_lease_enabled && (
+                                      <span className="inline-flex items-center gap-1 rounded bg-amber-100 dark:bg-amber-950/40 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-300">
+                                        ⚠ Not Lease Enabled
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-[11px] text-muted-foreground font-mono flex items-center gap-2">
+                                    <span>
+                                      {itm.product.product_code || "—"}{" "}
+                                      {itm.product.category ? `· ${itm.product.category}` : ""}
+                                    </span>
+                                    {((isRentPlan && !itm.product.is_rent_enabled) || (isLeasePlan && !itm.product.is_lease_enabled)) && (
+                                      <a
+                                        href={`/admin/products/${itm.product.id}/edit`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-primary hover:underline text-[10px] font-medium"
+                                      >
+                                        Enable in Products ↗
+                                      </a>
+                                    )}
                                   </div>
                                 </td>
                                 <td className="px-3 py-2.5">
@@ -2063,6 +2145,7 @@ export default function SubscriptionCreatePage({
                     </div>
                     <ProductSelector
                       selected={null}
+                      planFilter={planType as "ADVANCE_EMI" | "RENT" | "LEASE"}
                       onSelect={(item) => addProductToBasket(item)}
                       onClear={() => {}}
                     />
@@ -2077,6 +2160,7 @@ export default function SubscriptionCreatePage({
                 </div>
                 <ProductSelector
                   selected={product}
+                  planFilter={planType as "ADVANCE_EMI" | "RENT" | "LEASE"}
                   onSelect={(item) => {
                     nextLuckyRequestToken();
                     setProduct(item);
@@ -2992,12 +3076,23 @@ export default function SubscriptionCreatePage({
                       </div>
                     </div>
                     <div>
-                      {customer.kyc_status === "VERIFIED" ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-800">
-                          ✓ KYC Verified
-                        </span>
+                      {isCustomerKycApproved(customer.kyc_status) || kycReadiness?.can_activate ? (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 dark:bg-emerald-950/40 px-3 py-1 text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+                            ✓ KYC Approved ({customer.kyc_status || "APPROVED"})
+                          </span>
+                          {rentAgreementFile ? (
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 dark:bg-emerald-950/40 px-3 py-1 text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+                              ✓ Tenancy Proof Attached
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 dark:bg-blue-950/40 px-3 py-1 text-xs font-medium text-blue-800 dark:text-blue-300">
+                              Tenancy Proof Ready to Upload
+                            </span>
+                          )}
+                        </div>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 dark:bg-amber-950/40 px-3 py-1 text-xs font-medium text-amber-800 dark:text-amber-300">
                           ⚠ KYC Action Required for Activation
                         </span>
                       )}
@@ -3037,14 +3132,24 @@ export default function SubscriptionCreatePage({
                         }}
                         className="mt-1 block w-full text-sm"
                       />
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {idDocFile ? idDocFile.name : (customer.kyc_status === "VERIFIED" ? "✓ Existing verified KYC on file" : "Upload to verify customer KYC automatically")}
+                      <div className="mt-1 text-xs">
+                        {idDocFile ? (
+                          <span className="text-emerald-700 dark:text-emerald-400 font-medium">
+                            ✓ Selected: {idDocFile.name}
+                          </span>
+                        ) : isCustomerKycApproved(customer.kyc_status) || kycReadiness?.can_activate ? (
+                          <span className="text-emerald-700 dark:text-emerald-400 font-medium">
+                            ✓ Existing verified KYC on file ({customer.kyc_status || "APPROVED"})
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">Upload to verify customer KYC automatically</span>
+                        )}
                       </div>
                     </div>
 
                     <div>
                       <label htmlFor="rent-agreement-file" className="text-xs font-medium text-muted-foreground">
-                        Supporting Document: Rent Agreement / Tenancy Proof
+                        Supporting Document: Rent Agreement / Tenancy Proof (Required for Rent/Lease)
                       </label>
                       <input
                         id="rent-agreement-file"
@@ -3057,8 +3162,16 @@ export default function SubscriptionCreatePage({
                         }}
                         className="mt-1 block w-full text-sm"
                       />
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {rentAgreementFile ? rentAgreementFile.name : "Optional for Draft, required for asset handover & premises verification"}
+                      <div className="mt-1 text-xs">
+                        {rentAgreementFile ? (
+                          <span className="text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                            ✓ Attached: {rentAgreementFile.name} ({(rentAgreementFile.size / 1024).toFixed(1)} KB)
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">
+                            Required residential proof of physical premises where rented/leased items are deployed.
+                          </span>
+                        )}
                       </div>
                       <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                         Provides legal proof of physical premises where rented/leased items are deployed.
@@ -3070,7 +3183,9 @@ export default function SubscriptionCreatePage({
 
               <div className="grid gap-6 md:grid-cols-2">
                 <div>
-                  <label htmlFor="photo-file" className="text-xs font-semibold text-muted-foreground">Customer Photo</label>
+                  <label htmlFor="photo-file" className="text-xs font-semibold text-muted-foreground">
+                    Customer Photo {customer?.profile_photo_url ? "(Profile Photo on File)" : ""}
+                  </label>
                   <input
                     id="photo-file"
                     type="file"
@@ -3093,6 +3208,14 @@ export default function SubscriptionCreatePage({
                       >
                         ✕
                       </button>
+                    </div>
+                  ) : customer?.profile_photo_url ? (
+                    <div className="mt-3 relative flex h-28 w-28 items-center justify-center overflow-hidden rounded-xl border border-emerald-200 bg-emerald-50/50 p-1 shadow-sm">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={customer.profile_photo_url} alt="Customer profile photo" className="h-full w-full rounded-lg object-cover" />
+                      <div className="absolute bottom-0 inset-x-0 bg-emerald-900/80 py-0.5 text-center text-[9px] font-medium text-white">
+                        ✓ On Profile
+                      </div>
                     </div>
                   ) : (
                     <div className="mt-2 text-xs text-muted-foreground">

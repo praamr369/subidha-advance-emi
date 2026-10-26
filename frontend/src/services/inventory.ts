@@ -1104,6 +1104,8 @@ export type AdminInventoryItemSearchRow = {
   default_stock_location_code: string | null;
   attributes?: Record<string, string | number | boolean>;
   accessories?: Array<{ name: string; qty: number; type: string }>;
+  is_published?: boolean;
+  is_active?: boolean;
   available_by_location?: Array<{
     stock_location_id: number;
     stock_location_name: string;
@@ -1124,6 +1126,7 @@ export async function searchAdminInventoryItems(params: {
   subcategory?: string;
   stock_item_type?: string;
   include_locations?: boolean;
+  include_draft?: boolean;
 }): Promise<{ count: number; results: AdminInventoryItemSearchRow[] }> {
   const query = new URLSearchParams();
   if (params.q) query.append("q", params.q);
@@ -1131,6 +1134,7 @@ export async function searchAdminInventoryItems(params: {
   if (params.subcategory) query.append("subcategory", params.subcategory);
   if (params.stock_item_type) query.append("stock_item_type", params.stock_item_type);
   if (params.include_locations) query.append("include_locations", "1");
+  if (params.include_draft) query.append("include_draft", "1");
   const qs = query.toString();
   return apiFetch(`/admin/inventory/items/search/${qs ? `?${qs}` : ""}`);
 }
