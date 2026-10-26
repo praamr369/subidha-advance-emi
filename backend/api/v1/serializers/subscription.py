@@ -155,6 +155,10 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
             "waived_amount",
             "delivery_status",
             "deposit_status",
+            "security_deposit_amount",
+            "security_deposit_percent",
+            "refundable_security_deposit",
+            "amendments_count",
             "fulfillment_status",
             "created_at",
             "emi_count",
@@ -192,6 +196,58 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
             return "NOT_REQUIRED"
         except Exception:
             return "UNKNOWN"
+
+    def get_security_deposit_amount(self, obj):
+        try:
+            if obj.plan_type == PlanType.RENT and hasattr(obj, "rent_profile") and obj.rent_profile:
+                return str(obj.rent_profile.security_deposit_amount or Decimal("0.00"))
+            if obj.plan_type == PlanType.LEASE and hasattr(obj, "lease_profile") and obj.lease_profile:
+                return str(obj.lease_profile.security_deposit_amount or Decimal("0.00"))
+        except Exception:
+            pass
+        try:
+            items = getattr(obj, "contract_items", None)
+            if items and hasattr(items, "all"):
+                item_list = list(items.all())
+                if item_list:
+                    total_dep = sum((it.security_deposit_amount or Decimal("0.00")) for it in item_list)
+                    if total_dep > Decimal("0.00"):
+                        return str(total_dep)
+        except Exception:
+            pass
+        if obj.pricing_snapshot and isinstance(obj.pricing_snapshot, dict):
+            dep = obj.pricing_snapshot.get("security_deposit_amount")
+            if dep is not None:
+                return str(dep)
+        return "0.00"
+
+    def get_security_deposit_percent(self, obj):
+        try:
+            if obj.plan_type == PlanType.RENT and hasattr(obj, "rent_profile") and obj.rent_profile:
+                return str(obj.rent_profile.security_deposit_percent or Decimal("20.00"))
+            if obj.plan_type == PlanType.LEASE and hasattr(obj, "lease_profile") and obj.lease_profile:
+                return str(obj.lease_profile.security_deposit_percent or Decimal("20.00"))
+        except Exception:
+            pass
+        return "0.00"
+
+    def get_refundable_security_deposit(self, obj):
+        try:
+            if obj.plan_type == PlanType.RENT and hasattr(obj, "rent_profile") and obj.rent_profile:
+                return str(obj.rent_profile.refundable_security_deposit or obj.rent_profile.security_deposit_amount or Decimal("0.00"))
+            if obj.plan_type == PlanType.LEASE and hasattr(obj, "lease_profile") and obj.lease_profile:
+                return str(obj.lease_profile.refundable_security_deposit or obj.lease_profile.security_deposit_amount or Decimal("0.00"))
+        except Exception:
+            pass
+        return "0.00"
+
+    def get_amendments_count(self, obj):
+        try:
+            if hasattr(obj, "amendments"):
+                return obj.amendments.count()
+        except Exception:
+            pass
+        return 0
 
     def get_contract_items(self, obj):
         if obj.plan_type not in (PlanType.RENT, PlanType.LEASE):
@@ -416,6 +472,7 @@ class SubscriptionDetailSerializer(BaseSubscriptionSerializer):
     emis = serializers.SerializerMethodField()
     delivery_summary = serializers.SerializerMethodField()
     deliveries = serializers.SerializerMethodField()
+    amendments = serializers.SerializerMethodField()
 
     class Meta(BaseSubscriptionSerializer.Meta):
         fields = BaseSubscriptionSerializer.Meta.fields + (
@@ -424,6 +481,7 @@ class SubscriptionDetailSerializer(BaseSubscriptionSerializer):
             "delivery_summary",
             "deliveries",
             "emis",
+            "amendments",
         )
         read_only_fields = fields
 
@@ -473,6 +531,28 @@ class SubscriptionDetailSerializer(BaseSubscriptionSerializer):
         if deliveries is None:
             deliveries = obj.deliveries.all().order_by("-created_at", "-id")
         return CustomerSubscriptionDeliveryReadSerializer(deliveries, many=True).data
+
+    def get_amendments(self, obj):
+        try:
+            if not hasattr(obj, "amendments"):
+                return []
+            rows = obj.amendments.all().order_by("-created_at", "-id")[:15]
+            return [
+                {
+                    "id": a.id,
+                    "amendment_no": getattr(a, "amendment_no", "") or f"AMD-{a.id}",
+                    "amendment_type": a.amendment_type,
+                    "status": a.status,
+                    "reason": a.reason or "",
+                    "effective_date": str(a.effective_date) if a.effective_date else None,
+                    "financial_impact_amount": str(getattr(a, "financial_impact_amount", None) or "0.00"),
+                    "created_at": a.created_at.isoformat() if a.created_at else None,
+                    "applied_at": a.applied_at.isoformat() if a.applied_at else None,
+                }
+                for a in rows
+            ]
+        except Exception:
+            return []
 
 
 SubscriptionSerializer = SubscriptionListSerializer

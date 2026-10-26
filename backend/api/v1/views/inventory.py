@@ -962,8 +962,15 @@ class AdminInventoryItemSearchView(APIView):
                     })
 
             attributes = {}
+            slug_to_key = {}
             if isinstance(item.product.base_specs, dict):
-                attributes.update(item.product.base_specs)
+                for k, v in item.product.base_specs.items():
+                    if v is not None and v != "":
+                        display_v = "Yes" if v is True else ("No" if v is False else v)
+                        clean_k = str(k).strip()
+                        slug = clean_k.lower().replace("-", " ").replace("_", " ")
+                        attributes[clean_k] = display_v
+                        slug_to_key[slug] = clean_k
 
             if hasattr(item.product, "pim_variant") and item.product.pim_variant:
                 for attr_val in item.product.pim_variant.attribute_values.all():
@@ -975,7 +982,12 @@ class AdminInventoryItemSearchView(APIView):
                         val = attr_val.value_text
                     
                     if val is not None and val != "":
-                        attributes[attr_val.attribute.name] = val
+                        canonical_name = attr_val.attribute.name.strip()
+                        slug = canonical_name.lower().replace("-", " ").replace("_", " ")
+                        if slug in slug_to_key:
+                            attributes.pop(slug_to_key[slug], None)
+                        attributes[canonical_name] = val
+                        slug_to_key[slug] = canonical_name
 
             is_pub = True
             if hasattr(item.product, "pim") and item.product.pim.all():

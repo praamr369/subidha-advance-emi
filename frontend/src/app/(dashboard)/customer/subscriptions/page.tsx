@@ -2,10 +2,11 @@
 
 import { formatRupee } from "@/lib/utils/currency";
 import Link from "next/link";
-import { RefreshCw, Package, Star } from "lucide-react";
+import { RefreshCw, Package, Star, Camera } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import CustomerProductLink from "@/components/customers/CustomerProductInspectModal";
 
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
@@ -76,8 +77,18 @@ function SubscriptionCard({ sub }: { sub: CustomerSubscription }) {
               </span>
             ) : null}
           </div>
-          <div className="text-sm font-bold text-foreground truncate">
-            {sub.product_name || `Product #${sub.product}`}
+          <div className="mt-1">
+            <CustomerProductLink
+              productId={sub.product}
+              productName={
+                sub.contract_items && sub.contract_items.length > 1
+                  ? `${(sub.product_name || "").replace(/\s*\([^)]+:[^)]+\)\s*$/i, "").trim()} + ${sub.contract_items.length - 1} more (${sub.contract_items.length} items)`
+                  : sub.product_name || `Product #${sub.product}`
+              }
+              productImage={sub.product_image}
+              thumbnailSize="md"
+              inspectButtonLabel="Inspect Gallery"
+            />
           </div>
           {sub.subscription_number ? (
             <div className="text-xs font-mono text-muted-foreground mt-0.5">
@@ -90,7 +101,7 @@ function SubscriptionCard({ sub }: { sub: CustomerSubscription }) {
 
       <div className="mt-3 grid grid-cols-2 gap-2 border-t border-border/60 pt-3 text-xs">
         <div>
-          <span className="text-muted-foreground">Monthly</span>
+          <span className="text-muted-foreground">Monthly Installment</span>
           <div className="font-semibold mt-0.5">{formatRupee(sub.monthly_amount)}</div>
         </div>
         <div>
@@ -99,6 +110,24 @@ function SubscriptionCard({ sub }: { sub: CustomerSubscription }) {
             {formatRupee(sub.total_paid_amount ?? sub.financial_summary?.paid_amount)}
           </div>
         </div>
+        <div>
+          <span className="text-muted-foreground">Contract Tenure</span>
+          <div className="font-semibold mt-0.5">{sub.tenure_months ? `${sub.tenure_months} Months` : "—"}</div>
+        </div>
+        <div>
+          <span className="text-muted-foreground">EMI Progress</span>
+          <div className="font-semibold mt-0.5">
+            {sub.paid_emi_count ?? 0} of {sub.emi_count ?? sub.tenure_months ?? "—"} Paid
+          </div>
+        </div>
+        {Number(sub.security_deposit_amount || 0) > 0 || sub.plan_type === "RENT" || sub.plan_type === "LEASE" ? (
+          <div>
+            <span className="text-muted-foreground">Security Deposit</span>
+            <div className="font-semibold text-primary mt-0.5">
+              {formatRupee(sub.security_deposit_amount)}
+            </div>
+          </div>
+        ) : null}
         {sub.batch_code ? (
           <div>
             <span className="text-muted-foreground">Batch</span>
@@ -119,6 +148,13 @@ function SubscriptionCard({ sub }: { sub: CustomerSubscription }) {
         ) : null}
       </div>
 
+      {Number(sub.amendments_count ?? 0) > 0 ? (
+        <div className="mt-2 rounded-xl bg-sky-50 dark:bg-sky-950/30 px-3 py-1 text-[11px] font-medium text-sky-800 dark:text-sky-300 flex items-center justify-between">
+          <span>📝 {sub.amendments_count ?? 0} Amendment{(sub.amendments_count ?? 0) > 1 ? "s" : ""} on file</span>
+          <span className="font-semibold underline">Details →</span>
+        </div>
+      ) : null}
+
       {outstanding > 0 ? (
         <div className="mt-2 rounded-xl bg-amber-50 dark:bg-amber-950/30 px-3 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-400">
           Outstanding: {formatRupee(outstanding)}
@@ -131,6 +167,26 @@ function SubscriptionCard({ sub }: { sub: CustomerSubscription }) {
           {Number(sub.waived_amount ?? 0) > 0 ? ` · Waived ${formatRupee(sub.waived_amount)}` : ""}
         </div>
       ) : null}
+
+      <div className="mt-3 flex flex-wrap gap-2 pt-2 border-t border-border/60">
+        <Link
+          href={`/customer/subscriptions/${sub.id}`}
+          onClick={(e) => e.stopPropagation()}
+          className="flex-1 min-w-[90px] rounded-xl border border-border bg-background py-2 text-center text-xs font-semibold hover:bg-muted transition"
+        >
+          View Detail
+        </Link>
+        {sub.product ? (
+          <Link
+            href={`/customer/catalog/${sub.product}`}
+            onClick={(e) => e.stopPropagation()}
+            className="flex-1 min-w-[90px] rounded-xl border border-primary/30 bg-primary/5 text-primary py-2 text-center text-xs font-bold hover:bg-primary/10 transition flex items-center justify-center gap-1 active:scale-95"
+          >
+            <Camera className="size-3" />
+            <span>Product Gallery</span>
+          </Link>
+        ) : null}
+      </div>
     </CPageCard>
   );
 }

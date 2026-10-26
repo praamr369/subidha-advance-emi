@@ -38,6 +38,7 @@ import { SubscriptionDocumentUploadPanel } from "@/components/subscriptions/Subs
 import { CustomerSignatureLinkModal } from "@/components/contracts/CustomerSignatureLinkModal";
 import { GenerateRentLeaseLedgerModal } from "./GenerateRentLeaseLedgerModal";
 import { SettleRentLeaseContractModal } from "./SettleRentLeaseContractModal";
+import ProductAttributeBadges from "@/components/ui/ProductAttributeBadges";
 import {
   normalizeDeliveryRecord,
   type DeliveryRecord,
@@ -243,6 +244,7 @@ type SubscriptionDetailRecord = {
   product_id: number | null;
   product_name: string;
   product_code: string;
+  product_attributes?: Record<string, string>;
   partner_id: number | null;
   partner_name: string | null;
   partner_phone: string | null;
@@ -727,6 +729,10 @@ function normalizeSubscriptionDetail(
     lease_profile: normalizeLeaseProfile(raw.lease_profile),
     documents: toArray<Record<string, unknown>>(raw.documents).map(normalizeContractDocument),
     activation_readiness: normalizeActivationReadiness(raw.activation_readiness),
+    product_attributes:
+      raw.product_attributes && typeof raw.product_attributes === "object" && !Array.isArray(raw.product_attributes)
+        ? (raw.product_attributes as Record<string, string>)
+        : undefined,
   };
 }
 
@@ -1393,7 +1399,30 @@ export default function AdminSubscriptionDetailPage() {
                   />
                   <DetailValue label="Customer" value={subscription.customer_name} />
                   <DetailValue label="Phone" value={subscription.customer_phone} />
-                  <DetailValue label="Product" value={subscription.product_name} />
+                  <DetailValue
+                    label="Product"
+                    value={
+                      subscription.contract_items && subscription.contract_items.length > 1 ? (
+                        <div className="space-y-1">
+                          <div className="font-semibold text-foreground">
+                            {subscription.contract_items.length} Attached Furniture Items
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Primary: {subscription.product_name}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-1.5">
+                          <div className="font-medium text-foreground">{subscription.product_name}</div>
+                          <ProductAttributeBadges
+                            attributes={subscription.product_attributes}
+                            nameFallback={subscription.product_name}
+                            size="xs"
+                          />
+                        </div>
+                      )
+                    }
+                  />
                   <DetailValue label="Product Code" value={subscription.product_code} />
                   <DetailValue label="Plan Type" value={formatPlanTypeLabel(subscription.plan_type)} />
                   <DetailValue label="Tenure" value={`${subscription.tenure_months} months`} />
@@ -1458,7 +1487,10 @@ export default function AdminSubscriptionDetailPage() {
                           <tr key={itm.id} className="hover:bg-muted/20 transition-colors">
                             <td className="px-3 py-2.5">
                               <div className="font-semibold text-foreground">{itm.product_name}</div>
-                              <div className="text-[11px] text-muted-foreground font-mono">
+                              <div className="mt-1">
+                                <ProductAttributeBadges nameFallback={itm.product_name} size="xs" />
+                              </div>
+                              <div className="mt-1 text-[11px] text-muted-foreground font-mono">
                                 {itm.product_code || "—"} {itm.category ? `· ${itm.category}` : ""}
                               </div>
                             </td>
@@ -1930,6 +1962,7 @@ export default function AdminSubscriptionDetailPage() {
                     subscriptionId={subscription.id}
                     productId={subscription.product_id}
                     productCode={subscription.product_code}
+                    contractItems={subscription.contract_items}
                     canManageAssets={
                       subscription.plan_type === "RENT" || subscription.plan_type === "LEASE"
                     }

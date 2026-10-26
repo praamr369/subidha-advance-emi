@@ -3685,6 +3685,8 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
             "payments",
             "documents",
             "rent_lease_demands",
+            "contract_items",
+            "contract_items__product",
             get_subscription_delivery_prefetch(),
         )
         .all()
@@ -4506,12 +4508,20 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
             except Exception:
                 pass
 
+        support_phone = ""
+        try:
+            from api.v1.views.public_contract_sign import get_official_support_phone
+            support_phone = get_official_support_phone()
+        except Exception:
+            pass
+
         return Response({
             "success": True,
             "subscription_id": subscription.id,
             "token": token,
             "signing_path": relative_url,
             "signing_url": full_signing_url,
+            "support_phone": support_phone,
             "customer_name": getattr(customer, "name", "Customer"),
             "customer_phone": getattr(customer, "phone", "") or "",
             "customer_email": getattr(customer, "email", "") or "",
@@ -4736,9 +4746,26 @@ class RentalAssetAdminViewSet(viewsets.ReadOnlyModelViewSet):
         has_handover_snapshot = subscription.asset_condition_snapshots.filter(
             stage=AssetConditionSnapshotStage.BEFORE_HANDOVER
         ).exists()
-        rental_assets = RentalAsset.objects.filter(
-            current_subscription=subscription
-        ).values("id", "asset_code", "status", "condition_grade")
+        rental_assets = [
+            {
+                "id": a["id"],
+                "asset_code": a["asset_code"],
+                "status": a["status"],
+                "condition_grade": a["condition_grade"],
+                "product_id": a["product_id"],
+                "product_name": a["product__name"],
+                "product_code": a["product__product_code"],
+            }
+            for a in RentalAsset.objects.filter(current_subscription=subscription).values(
+                "id",
+                "asset_code",
+                "status",
+                "condition_grade",
+                "product_id",
+                "product__name",
+                "product__product_code",
+            )
+        ]
         readiness = evaluate_contract_activation_readiness(subscription)
         return Response({
             "subscription_id": subscription.pk,

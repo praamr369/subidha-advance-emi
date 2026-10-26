@@ -1,11 +1,12 @@
 "use client";
 
 import { formatRupee } from "@/lib/utils/currency";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Camera, ExternalLink } from "lucide-react";
 import { useCallback, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
+import CustomerProductLink from "@/components/customers/CustomerProductInspectModal";
 
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
@@ -23,6 +24,7 @@ import {
   formatWinnerMonthLabel,
 } from "@/domains/subscriptions/detail/view-model";
 import { formatPlanTypeLabel } from "@/lib/plan-labels";
+import ProductAttributeBadges from "@/components/ui/ProductAttributeBadges";
 import {
   getCustomerSubscription,
   listCustomerSubscriptions,
@@ -50,6 +52,11 @@ function formatDateTime(value?: string | null): string {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "—";
   return parsed.toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function cleanProductTitle(name?: string | null): string {
+  if (!name) return "";
+  return name.replace(/\s*\([^)]+:[^)]+\)\s*$/i, "").trim() || name;
 }
 
 type EmiRow = {
@@ -163,6 +170,11 @@ export default function CustomerSubscriptionDetailPage() {
   const waivedEmiCount = useMemo(() => emiRows.filter((r) => r.status.toUpperCase() === "WAIVED").length, [emiRows]);
 
   const winnerSummary = subscription?.winner_summary;
+  const hasSecurityDeposit =
+    subscription?.plan_type === "RENT" ||
+    subscription?.plan_type === "LEASE" ||
+    Number(subscription?.security_deposit_amount || 0) > 0;
+
   const detailSemantics = useMemo(() => buildSubscriptionDetailSemantics({
     contractStatus: subscription?.status,
     winnerStatus: winnerSummary?.winner_status ?? subscription?.winner_status,
@@ -180,7 +192,11 @@ export default function CustomerSubscriptionDetailPage() {
   return (
     <CustomerPageShell
       title={subscription?.subscription_number || `SUB-${subscriptionId || ""}`}
-      subtitle={subscription?.product_name || "Subscription details"}
+      subtitle={
+        subscription?.contract_items && subscription.contract_items.length > 1
+          ? `${subscription.contract_items.length} Furniture Items: ${subscription.contract_items.map((it) => cleanProductTitle(it.product_name)).join(", ")}`
+          : cleanProductTitle(subscription?.product_name) || "Subscription details"
+      }
       backHref="/customer/subscriptions"
       backLabel="Subscriptions"
       actions={
@@ -209,8 +225,12 @@ export default function CustomerSubscriptionDetailPage() {
           <CPageStats>
             <CPageStat label="Outstanding" value={formatRupee(financialSummary.outstanding_amount)} tone={detailSemantics.isSettled ? "success" : "warning"} />
             <CPageStat label="Paid EMIs" value={paidEmiCount} tone={paidEmiCount > 0 ? "success" : "default"} />
-            <CPageStat label="Total EMIs" value={emiRows.length} />
+            <CPageStat label="Total EMIs" value={emiRows.length || subscription.tenure_months || 0} />
             <CPageStat label="Pending" value={pendingEmiCount} tone={pendingEmiCount > 0 ? "warning" : "success"} />
+            {hasSecurityDeposit ? (
+              <CPageStat label="Security Deposit" value={formatRupee(subscription.security_deposit_amount)} tone="info" />
+            ) : null}
+            <CPageStat label="Tenure" value={subscription.tenure_months ? `${subscription.tenure_months} Mo` : "—"} />
           </CPageStats>
 
           {/* Quick links */}
@@ -228,12 +248,21 @@ export default function CustomerSubscriptionDetailPage() {
               >
                 View Deliveries
               </Link>
+              {subscription.product ? (
+                <Link
+                  href={`/customer/catalog/${subscription.product}`}
+                  className="col-span-2 flex h-10 items-center justify-center gap-1.5 rounded-xl border border-primary/30 bg-primary/5 text-xs font-bold text-primary transition hover:bg-primary/10 active:scale-95"
+                >
+                  <Camera className="size-4" />
+                  <span>Inspect Product Photos & Gallery</span>
+                </Link>
+              ) : null}
               {subscription.plan_type === "RENT" || subscription.plan_type === "LEASE" ? (
                 <Link
                   href={`/customer/contract-amendments/new?source_id=${subscription.id}&contract_type=RENT_LEASE&amendment_type=TENURE_EXTENSION`}
                   className="col-span-2 flex h-10 items-center justify-center rounded-xl border border-primary/40 bg-primary/10 text-xs font-bold text-primary transition hover:bg-primary/20 active:scale-95"
                 >
-                  Extend Contract Tenure
+                  Extend Contract Tenure / Amend
                 </Link>
               ) : null}
             </div>
@@ -246,7 +275,7 @@ export default function CustomerSubscriptionDetailPage() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-800 px-2.5 py-0.5 text-xs font-semibold">
                         ✓ Contract Digitally Signed
                       </span>
                     </div>
@@ -306,15 +335,155 @@ export default function CustomerSubscriptionDetailPage() {
           <CPageSection title="Contract Details">
             <CPageCard>
               <InfoRow label="Status" value={<ERPStatusBadge status={subscription.status} />} />
-              <InfoRow label="Product" value={text(subscription.product_name)} />
+              {subscription.contract_items && subscription.contract_items.length > 1 ? (
+                <InfoRow
+                  label="Products"
+                  value={
+                    <span className="font-semibold text-primary">
+                      {subscription.contract_items.length} Attached Furniture Items
+                    </span>
+                  }
+                />
+              ) : (
+                <InfoRow
+                  label="Product"
+                  value={
+                    <div className="space-y-1.5 flex flex-col items-end">
+                      <CustomerProductLink
+                        productId={subscription.product}
+                        productName={cleanProductTitle(subscription.product_name)}
+                        productImage={subscription.product_image}
+                        productCode={subscription.product_code}
+                        showThumbnail
+                        thumbnailSize="sm"
+                        inspectButtonLabel="Inspect Gallery"
+                      />
+                      <ProductAttributeBadges nameFallback={subscription.product_name} size="xs" />
+                    </div>
+                  }
+                />
+              )}
               <InfoRow label="Plan type" value={formatPlanTypeLabel(subscription.plan_type)} />
-              <InfoRow label="Batch" value={text(subscription.batch_code)} />
+              <InfoRow label="Contract Tenure" value={subscription.tenure_months ? `${subscription.tenure_months} Months` : "—"} />
+              <InfoRow label="Monthly Installment" value={formatRupee(subscription.monthly_amount)} />
+              <InfoRow label="Total Contract Value" value={formatRupee(subscription.total_amount)} />
               <InfoRow label="Start date" value={formatDate(subscription.start_date)} />
-              <InfoRow label="Lucky number" value={formatLuckyNumberLabel(subscription.lucky_number)} />
+              {subscription.plan_type === "EMI" && subscription.batch_code ? (
+                <InfoRow label="Batch" value={text(subscription.batch_code)} />
+              ) : null}
+              {subscription.plan_type === "EMI" && subscription.lucky_number != null ? (
+                <InfoRow label="Lucky number" value={formatLuckyNumberLabel(subscription.lucky_number)} />
+              ) : null}
               <InfoRow label="Next due" value={formatDate(subscription.next_due_date)} />
               <InfoRow label="Created" value={formatDate(subscription.created_at)} />
             </CPageCard>
           </CPageSection>
+
+          {/* Multi-product attached furniture section */}
+          {subscription.contract_items && subscription.contract_items.length > 0 ? (
+            <CPageSection title={`Rented Furniture Products (${subscription.contract_items.length})`}>
+              <div className="space-y-3">
+                {subscription.contract_items.map((item, idx) => (
+                  <CPageCard key={item.id || idx}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="space-y-1 min-w-0 flex-1">
+                        <CustomerProductLink
+                          productId={item.product || item.product_id}
+                          productName={cleanProductTitle(item.product_name)}
+                          productCode={item.product_code}
+                          thumbnailSize="sm"
+                          inspectButtonLabel="Inspect Gallery"
+                        />
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                          <span>Quantity: <strong className="text-foreground">{item.quantity}</strong></span>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="text-xs text-muted-foreground">Monthly Share</div>
+                        <div className="text-sm font-bold text-primary">
+                          {formatRupee(item.monthly_amount)}/mo
+                        </div>
+                        {(item.product || item.product_id) ? (
+                          <Link
+                            href={`/customer/catalog/${item.product || item.product_id}`}
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline mt-1"
+                          >
+                            <ExternalLink className="size-3" />
+                            <span>Catalog</span>
+                          </Link>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    {/* Product attribute badges */}
+                    <div className="mt-2.5">
+                      <ProductAttributeBadges nameFallback={item.product_name} size="xs" />
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-2 gap-2 border-t border-border/60 pt-2 text-xs">
+                      <div>
+                        <span className="text-muted-foreground">Base Value: </span>
+                        <span className="font-semibold text-foreground">
+                          {formatRupee(item.total_base_price || item.unit_base_price)}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-muted-foreground">Deposit Share: </span>
+                        <span className="font-semibold text-foreground">
+                          {formatRupee(item.security_deposit_amount || 0)}
+                        </span>
+                      </div>
+                    </div>
+                  </CPageCard>
+                ))}
+              </div>
+            </CPageSection>
+          ) : null}
+
+          {/* Security Deposit Section */}
+          {hasSecurityDeposit ? (
+            <CPageSection title="Security Deposit">
+              <CPageCard>
+                <InfoRow
+                  label="Deposit Amount"
+                  value={
+                    <span className="text-base font-bold text-primary">
+                      {formatRupee(subscription.security_deposit_amount)}
+                    </span>
+                  }
+                />
+                {Number(subscription.security_deposit_percent || 0) > 0 ? (
+                  <InfoRow label="Deposit rate" value={`${subscription.security_deposit_percent}%`} />
+                ) : null}
+                <InfoRow
+                  label="Refundable deposit"
+                  value={
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                      {formatRupee(subscription.refundable_security_deposit || subscription.security_deposit_amount)}
+                    </span>
+                  }
+                />
+                <InfoRow
+                  label="Deposit status"
+                  value={
+                    <ERPStatusBadge
+                      status={subscription.deposit_status || "PENDING"}
+                      label={
+                        subscription.deposit_status === "SUBMITTED" || subscription.deposit_status === "PAID"
+                          ? "Held / Received"
+                          : subscription.deposit_status === "REFUNDED"
+                          ? "Refunded"
+                          : "Pending Deposit"
+                      }
+                    />
+                  }
+                />
+                <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
+                  Security deposit is held in a protected escrow balance and is refundable upon return condition assessment under contract terms.
+                </p>
+              </CPageCard>
+            </CPageSection>
+          ) : null}
 
           {/* Financial position */}
           <CPageSection title="Financial Position">
@@ -323,6 +492,10 @@ export default function CustomerSubscriptionDetailPage() {
               <InfoRow label="Paid" value={<span className="text-emerald-600 dark:text-emerald-400">{formatRupee(financialSummary.paid_amount)}</span>} />
               <InfoRow label="Waived" value={formatRupee(financialSummary.waived_amount)} />
               <InfoRow label="Outstanding" value={<span className={detailSemantics.isSettled ? "text-emerald-600" : "text-amber-600"}>{formatRupee(financialSummary.outstanding_amount)}</span>} />
+              <InfoRow label="EMI Completion" value={`${paidEmiCount} of ${emiRows.length || subscription.tenure_months || 0} Installments (${pendingEmiCount} Pending)`} />
+              {hasSecurityDeposit ? (
+                <InfoRow label="Security Deposit held" value={<span className="text-primary font-bold">{formatRupee(subscription.security_deposit_amount)}</span>} />
+              ) : null}
             </CPageCard>
           </CPageSection>
 
@@ -405,6 +578,72 @@ export default function CustomerSubscriptionDetailPage() {
               </CPageCard>
             </CPageSection>
           ) : null}
+
+          {/* Contract Amendments */}
+          <CPageSection title="Contract Amendments & Variations">
+            <CPageCard>
+              {subscription.amendments && subscription.amendments.length > 0 ? (
+                <div className="space-y-3">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Amendments on File ({subscription.amendments.length})
+                  </div>
+                  <div className="divide-y divide-border/60">
+                    {subscription.amendments.map((amd) => (
+                      <div key={amd.id} className="py-2.5 first:pt-0 last:pb-0 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-xs font-bold text-foreground">
+                            {amd.amendment_no}
+                          </span>
+                          <ERPStatusBadge status={amd.status} />
+                        </div>
+                        <div className="text-xs font-semibold text-foreground">
+                          {amd.amendment_type.replace(/_/g, " ")}
+                        </div>
+                        {amd.reason ? (
+                          <p className="text-[11px] text-muted-foreground">
+                            Reason: {amd.reason}
+                          </p>
+                        ) : null}
+                        <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-0.5">
+                          {amd.effective_date ? (
+                            <span>Effective: {formatDate(amd.effective_date)}</span>
+                          ) : (
+                            <span>Requested: {formatDate(amd.created_at)}</span>
+                          )}
+                          {Number(amd.financial_impact_amount || 0) !== 0 ? (
+                            <span className="font-semibold text-foreground">
+                              Impact: {formatRupee(amd.financial_impact_amount)}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-xs text-muted-foreground py-1">
+                  No active or historical amendments filed on this contract.
+                </div>
+              )}
+
+              <div className="mt-3 pt-3 border-t border-border/60 flex flex-wrap gap-2">
+                {subscription.plan_type === "RENT" || subscription.plan_type === "LEASE" ? (
+                  <Link
+                    href={`/customer/contract-amendments/new?source_id=${subscription.id}&contract_type=RENT_LEASE&amendment_type=TENURE_EXTENSION`}
+                    className="flex-1 min-w-[120px] rounded-xl bg-primary text-primary-foreground py-2 text-center text-xs font-bold hover:opacity-95 transition"
+                  >
+                    Request Tenure Extension
+                  </Link>
+                ) : null}
+                <Link
+                  href="/customer/contract-amendments"
+                  className="flex-1 min-w-[120px] rounded-xl border border-border bg-background py-2 text-center text-xs font-semibold hover:bg-muted"
+                >
+                  View All Amendments
+                </Link>
+              </div>
+            </CPageCard>
+          </CPageSection>
         </>
       ) : null}
     </CustomerPageShell>

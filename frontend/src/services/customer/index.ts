@@ -56,6 +56,18 @@ export type CustomerContractItem = {
   status?: string;
 };
 
+export type CustomerAmendmentSummaryItem = {
+  id: number;
+  amendment_no: string;
+  amendment_type: string;
+  status: string;
+  reason?: string;
+  effective_date?: string | null;
+  financial_impact_amount?: string;
+  created_at?: string;
+  applied_at?: string | null;
+};
+
 export type CustomerSubscription = {
   id: number;
   subscription_number?: string;
@@ -66,6 +78,12 @@ export type CustomerSubscription = {
   total_amount?: number | string;
   monthly_amount?: number | string;
   tenure_months?: number;
+
+  security_deposit_amount?: number | string;
+  security_deposit_percent?: number | string;
+  refundable_security_deposit?: number | string;
+  deposit_status?: string;
+  amendments_count?: number;
 
   product?: number;
   batch?: number | null;
@@ -101,6 +119,7 @@ export type CustomerSubscription = {
   deliveries?: DeliveryRecord[];
   emis?: CustomerEmi[];
   contract_items?: CustomerContractItem[];
+  amendments?: CustomerAmendmentSummaryItem[];
 
   has_customer_signature?: boolean;
   customer_signature_signed_at?: string | null;

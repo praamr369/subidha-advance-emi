@@ -17,7 +17,8 @@ import ReturnedAssetReleaseButton from "@/components/customer-intelligence/Retur
 import { DataTableShell, DetailPanel, FormSection, WorkflowCard } from "@/components/ui/operations";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { RegistryPageShell } from "@/components/layout/page-shells";
-import { InfoIcon, CalendarClock, CheckCircle2, AlertCircle } from "lucide-react";
+import { InfoIcon, CalendarClock, CheckCircle2, AlertCircle, Calendar } from "lucide-react";
+import ProductAttributeBadges from "@/components/ui/ProductAttributeBadges";
 import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
 import { apiFetch } from "@/lib/api";
 import { downloadCsv } from "@/lib/export/csv";
@@ -99,6 +100,22 @@ type SubscriptionRow = {
     outstanding_amount: string;
   };
   deposit_status?: string;
+  security_deposit_amount?: string;
+  security_deposit_percent?: string;
+  next_payment_date?: string | null;
+  next_payment_amount?: string | null;
+  next_payment_is_overdue?: boolean;
+  product_attributes?: Record<string, string>;
+  contract_items?: Array<{
+    id: number;
+    product_id: number;
+    product_name: string;
+    product_code?: string;
+    quantity: number;
+    monthly_amount?: string;
+    security_deposit_amount?: string;
+    status?: string;
+  }>;
   emi_count?: number;
   paid_emi_count?: number;
   pending_emi_count?: number;
@@ -250,6 +267,11 @@ function formatDate(value: string | null | undefined): string {
   return new Date(parsed).toLocaleDateString();
 }
 
+function cleanProductTitle(name?: string | null): string {
+  if (!name) return "";
+  return name.replace(/\s*\([^)]+:[^)]+\)\s*$/i, "").trim() || name;
+}
+
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) {
     return error.message;
@@ -348,6 +370,17 @@ function normalizeSubscriptionRow(raw: Record<string, unknown>): SubscriptionRow
       pending_amount: toMoneyString((raw.financial_summary as any).pending_amount),
       outstanding_amount: toMoneyString((raw.financial_summary as any).outstanding_amount),
     } : undefined,
+    deposit_status: toStringValue(raw.deposit_status) || undefined,
+    security_deposit_amount: toNullableString(raw.security_deposit_amount) ?? undefined,
+    security_deposit_percent: toNullableString(raw.security_deposit_percent) ?? undefined,
+    next_payment_date: toNullableString(raw.next_payment_date),
+    next_payment_amount: toNullableString(raw.next_payment_amount),
+    next_payment_is_overdue: Boolean(raw.next_payment_is_overdue),
+    product_attributes:
+      raw.product_attributes && typeof raw.product_attributes === "object" && !Array.isArray(raw.product_attributes)
+        ? (raw.product_attributes as Record<string, string>)
+        : undefined,
+    contract_items: Array.isArray(raw.contract_items) ? (raw.contract_items as any[]) : undefined,
     emi_count: toNumber(raw.emi_count),
     paid_emi_count: toNumber(raw.paid_emi_count),
     pending_emi_count: toNumber(raw.pending_emi_count),
@@ -1251,33 +1284,56 @@ export default function AdminSubscriptionsPage() {
                     <div key={row.id} className="flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm transition hover:shadow-md">
                       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border bg-muted/20 px-5 py-4">
                         <div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             <h4 className="text-base font-semibold text-foreground">
                               {row.subscription_number}
                             </h4>
                             <ERPStatusBadge status={row.status} size="sm" />
+                            {typeof row.tenure_months === "number" && (
+                              <span className="inline-flex items-center gap-1 rounded-md border border-border/80 bg-background px-2 py-0.5 text-xs font-semibold text-foreground shadow-xs">
+                                <Calendar className="h-3 w-3 text-primary" />
+                                {row.tenure_months} Mo Tenure
+                              </span>
+                            )}
                           </div>
                           <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
                             <span>Start: {formatDate(row.start_date)}</span>
                             <span>·</span>
-                            <span>Tenure: {typeof row.tenure_months === "number" ? `${row.tenure_months} mo` : "—"}</span>
+                            <span>Plan: <span className="font-semibold text-foreground">{row.plan_type || "Plan"}</span></span>
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="text-sm font-semibold text-foreground">
+                          <div className="text-sm font-bold text-foreground">
                             {formatRupee(row.total_amount)}
+                            <span className="ml-1 text-[11px] font-normal text-muted-foreground">Total</span>
                           </div>
-                          <div className="mt-1 text-xs text-muted-foreground flex items-center justify-end gap-1">
-                            <span>{row.plan_type || "Plan"} · {formatRupee(row.monthly_amount)}/mo</span>
-                            {(row.plan_type === "RENT" || row.plan_type === "LEASE") && (row.deposit_status === "SUBMITTED" || row.deposit_status === "PENDING") && (
+                          <div className="mt-1 flex flex-wrap items-center justify-end gap-1.5 text-xs">
+                            <span className="font-medium text-foreground">
+                              {row.plan_type === "RENT" ? "Rent" : row.plan_type === "LEASE" ? "Lease" : "EMI"}:{" "}
+                              <span className="font-bold text-primary">{formatRupee(row.monthly_amount)}</span>/mo
+                            </span>
+                            {(row.plan_type === "RENT" || row.plan_type === "LEASE" || Number(row.security_deposit_amount || 0) > 0) && (
                               <>
-                                <span>·</span>
-                                <span className={cn(
-                                  "font-medium",
-                                  row.deposit_status === "SUBMITTED" ? "text-emerald-600" : "text-amber-600"
-                                )}>
-                                  {row.deposit_status === "SUBMITTED" ? "Deposit Paid" : "Deposit Pending"}
-                                </span>
+                                <span className="text-muted-foreground">·</span>
+                                <div className="inline-flex items-center gap-1 rounded border border-border/80 bg-background px-1.5 py-0.5 text-[11px]">
+                                  <span className="text-muted-foreground">Deposit:</span>
+                                  <span className="font-semibold text-foreground">
+                                    {formatRupee(row.security_deposit_amount || "0.00")}
+                                  </span>
+                                  {row.deposit_status === "PAID" || row.deposit_status === "SUBMITTED" ? (
+                                    <span className="inline-flex items-center gap-0.5 font-semibold text-emerald-600">
+                                      <CheckCircle2 className="h-2.5 w-2.5" /> Paid
+                                    </span>
+                                  ) : row.deposit_status === "PARTIAL" ? (
+                                    <span className="font-semibold text-blue-600">Partial</span>
+                                  ) : row.deposit_status === "NOT_REQUIRED" ? (
+                                    <span className="text-muted-foreground">None</span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-0.5 font-semibold text-amber-600">
+                                      <AlertCircle className="h-2.5 w-2.5" /> Pending
+                                    </span>
+                                  )}
+                                </div>
                               </>
                             )}
                           </div>
@@ -1307,12 +1363,77 @@ export default function AdminSubscriptionsPage() {
                           )}
                           
                           <div>
-                            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Product Context</div>
-                            <div className="mt-1 text-sm font-medium">{row.product_name || "Unknown product"}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {row.batch_code ? `Batch ${row.batch_code}` : "No Batch"}
-                              {typeof row.lucky_number === "number" ? ` · Lucky #${row.lucky_number}` : ""}
+                            <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                              <span>Product Context</span>
+                              {row.contract_items && row.contract_items.length > 1 && (
+                                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
+                                  {row.contract_items.length} Items Attached
+                                </span>
+                              )}
                             </div>
+
+                            {row.contract_items && row.contract_items.length > 1 ? (
+                              <div className="mt-1.5 space-y-2">
+                                {row.contract_items.map((item, idx) => (
+                                  <div
+                                    key={item.id || idx}
+                                    className="rounded-lg border border-border/70 bg-muted/20 p-2.5 transition hover:bg-muted/40"
+                                  >
+                                    <div className="flex items-start justify-between gap-2">
+                                      <span className="text-xs font-semibold text-foreground">
+                                        {cleanProductTitle(item.product_name)}
+                                      </span>
+                                      <span className="shrink-0 text-xs font-semibold text-primary">
+                                        Qty: {item.quantity}
+                                      </span>
+                                    </div>
+                                    <div className="mt-1">
+                                      <ProductAttributeBadges
+                                        nameFallback={item.product_name}
+                                        size="xs"
+                                      />
+                                    </div>
+                                    <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted-foreground">
+                                      {item.product_code && (
+                                        <span className="font-mono text-[10px] rounded bg-muted px-1 py-0.2 text-foreground">
+                                          {item.product_code}
+                                        </span>
+                                      )}
+                                      {item.monthly_amount && (
+                                        <span>
+                                          Rent: <strong className="text-foreground">{formatRupee(item.monthly_amount)}/mo</strong>
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <>
+                                <div className="mt-1 text-sm font-semibold text-foreground">
+                                  {cleanProductTitle(row.product_name) || "Unknown product"}
+                                </div>
+
+                                {/* Semantic Product Attribute Badges with Icons */}
+                                <div className="mt-1.5">
+                                  <ProductAttributeBadges
+                                    attributes={row.product_attributes}
+                                    nameFallback={row.product_name}
+                                    size="xs"
+                                  />
+                                </div>
+
+                                <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                  {row.product_code && (
+                                    <span className="font-mono text-[11px] rounded border border-border/60 bg-muted px-1.5 py-0.5 text-foreground">
+                                      {row.product_code}
+                                    </span>
+                                  )}
+                                  <span>{row.batch_code ? `Batch ${row.batch_code}` : "No Batch"}</span>
+                                  {typeof row.lucky_number === "number" ? <span>· Lucky #{row.lucky_number}</span> : null}
+                                </div>
+                              </>
+                            )}
                           </div>
                         </div>
 
@@ -1378,6 +1499,80 @@ export default function AdminSubscriptionsPage() {
                               </div>
                             </div>
                           </div>
+
+                          {/* Next payment or settlement status */}
+                          {row.status === "COMPLETED" || row.status === "CLOSED" || row.status === "CANCELLED" || row.status === "RETURNED" ? (
+                            <div className="rounded-lg border border-border/50 bg-muted/10 px-3 py-1.5 text-xs text-muted-foreground flex items-center gap-1.5">
+                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                              <span>Contract settled / closed</span>
+                            </div>
+                          ) : row.status === "DRAFT" || row.status === "REQUESTED" || row.status === "PENDING_APPROVAL" ? (
+                            <div className="rounded-lg border border-dashed border-border bg-muted/20 px-3 py-2 text-xs flex items-center justify-between text-muted-foreground">
+                              <div className="flex items-center gap-1.5">
+                                <CalendarClock className="h-3.5 w-3.5 text-muted-foreground" />
+                                <span>First payment due on activation:</span>
+                              </div>
+                              <span className="font-semibold text-foreground tabular-nums">
+                                {formatRupee(row.next_payment_amount || row.monthly_amount)}
+                              </span>
+                            </div>
+                          ) : row.next_payment_date ? (
+                            <div className={cn(
+                              "rounded-lg border px-3 py-2 text-xs flex items-center justify-between",
+                              row.next_payment_is_overdue
+                                ? "border-destructive/40 bg-destructive/5 text-destructive"
+                                : "border-border bg-muted/30 text-foreground"
+                            )}>
+                              <div className="flex items-center gap-1.5">
+                                <CalendarClock className={cn("h-3.5 w-3.5", row.next_payment_is_overdue ? "text-destructive" : "text-primary")} />
+                                <span className="font-medium">Next Due:</span>
+                                <span className="font-semibold">{formatDate(row.next_payment_date)}</span>
+                                {row.next_payment_is_overdue && (
+                                  <span className="rounded bg-destructive/15 text-destructive px-1.5 py-0.2 text-[10px] font-bold">
+                                    OVERDUE
+                                  </span>
+                                )}
+                              </div>
+                              <span className="font-bold tabular-nums">
+                                {formatRupee(row.next_payment_amount || row.monthly_amount)}
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="rounded-lg border border-border/50 bg-muted/10 px-3 py-1.5 text-xs text-muted-foreground flex items-center justify-between">
+                              <div className="flex items-center gap-1.5">
+                                <CalendarClock className="h-3.5 w-3.5 text-muted-foreground" />
+                                <span>Next due:</span>
+                              </div>
+                              <span className="font-semibold tabular-nums">{formatRupee(row.monthly_amount)}/mo</span>
+                            </div>
+                          )}
+
+                          {/* For Rent/Lease contracts: Security deposit details strip */}
+                          {(row.plan_type === "RENT" || row.plan_type === "LEASE") && Number(row.security_deposit_amount || 0) > 0 && (
+                            <div className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/10 px-3 py-1.5 text-xs">
+                              <span className="text-muted-foreground">
+                                Security Deposit {row.security_deposit_percent ? `(${row.security_deposit_percent}%)` : ""}:
+                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-semibold text-foreground">{formatRupee(row.security_deposit_amount || "0.00")}</span>
+                                <span className={cn(
+                                  "text-[10px] font-semibold px-1.5 py-0.5 rounded",
+                                  row.deposit_status === "PAID" || row.deposit_status === "SUBMITTED"
+                                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400"
+                                    : row.deposit_status === "PARTIAL"
+                                    ? "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-400"
+                                    : "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400"
+                                )}>
+                                  {row.deposit_status === "PAID" || row.deposit_status === "SUBMITTED"
+                                    ? "Paid"
+                                    : row.deposit_status === "PARTIAL"
+                                    ? "Partial"
+                                    : "Deposit Pending"}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+
                           {row.plan_type === "EMI" && Number(row.emi_count) > 0 && (
                             <div className="mt-1 space-y-1.5 px-1">
                               <div className="flex w-full h-1.5 rounded-full overflow-hidden bg-muted/60" role="progressbar" aria-valuenow={Number(row.paid_emi_count || 0)} aria-valuemin={0} aria-valuemax={Number(row.emi_count)} aria-label={`EMI progress: ${row.paid_emi_count || 0} of ${row.emi_count} paid`}>

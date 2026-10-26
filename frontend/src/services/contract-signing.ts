@@ -9,6 +9,7 @@ export type PublicContractSigningInfo = {
   customer_name: string;
   customer_phone_masked: string;
   customer_email?: string;
+  support_phone?: string;
   product_name: string;
   items?: Array<{
     name: string;
@@ -30,6 +31,7 @@ export type AdminContractSigningLink = {
   token: string;
   signing_path: string;
   signing_url: string;
+  support_phone?: string;
   customer_name: string;
   customer_phone: string;
   customer_email: string;
@@ -50,7 +52,8 @@ export async function getAdminContractSigningLink(subscriptionId: number | strin
 }
 
 export async function getPublicContractSigningInfo(token: string): Promise<PublicContractSigningInfo> {
-  return apiFetch<PublicContractSigningInfo>(`/public/contracts/sign/${encodeURIComponent(token)}/`, {
+  const cleanToken = (token || "").trim();
+  return apiFetch<PublicContractSigningInfo>(`/public/contracts/sign/${cleanToken}/`, {
     cache: "no-store",
   });
 }
@@ -70,19 +73,20 @@ export async function submitPublicContractSignature(
   contract_ref: string;
   signature_url?: string | null;
 }> {
+  const cleanToken = (token || "").trim();
   if (payload.signature_image) {
     const formData = new FormData();
     formData.append("signature_image", payload.signature_image);
     if (payload.customer_name_confirmation) {
       formData.append("customer_name_confirmation", payload.customer_name_confirmation);
     }
-    return apiFetch(`/public/contracts/sign/${encodeURIComponent(token)}/`, {
+    return apiFetch(`/public/contracts/sign/${cleanToken}/`, {
       method: "POST",
       body: formData,
     });
   }
 
-  return apiFetch(`/public/contracts/sign/${encodeURIComponent(token)}/`, {
+  return apiFetch(`/public/contracts/sign/${cleanToken}/`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

@@ -1394,9 +1394,16 @@ class CustomerDirectSaleReceiptSerializer(serializers.ModelSerializer):
 
 
 class CustomerDirectSaleLineSerializer(serializers.ModelSerializer):
+    product_id = serializers.IntegerField(source="product.id", read_only=True)
+    product_name = serializers.CharField(source="product.name", read_only=True)
+    product_image = serializers.SerializerMethodField()
+
     class Meta:
         model = DirectSaleLine
         fields = [
+            "product_id",
+            "product_name",
+            "product_image",
             "description",
             "quantity",
             "unit_price",
@@ -1411,6 +1418,12 @@ class CustomerDirectSaleLineSerializer(serializers.ModelSerializer):
             "hsn_sac_code",
         ]
         read_only_fields = fields
+
+    def get_product_image(self, obj):
+        if not getattr(obj, "product", None) or not getattr(obj.product, "image", None):
+            return None
+        from api.v1.serializers.media import serialize_media_url
+        return serialize_media_url(self.context.get("request"), obj.product.image)
 
 
 class CustomerDirectSaleListSerializer(serializers.ModelSerializer):

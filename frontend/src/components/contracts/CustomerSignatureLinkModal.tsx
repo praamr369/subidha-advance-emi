@@ -88,8 +88,9 @@ export default function CustomerSignatureLinkModal({
 
   const whatsappHref = `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(whatsappMessage)}`;
 
+  const supportPhone = data?.support_phone || "+91 94764 90946";
   const emailSubject = `Subidha Furniture Webapp — Digital Signature Required for Contract ${data?.contract_ref}`;
-  const emailBody = `Dear ${data?.customer_name || "Customer"},\n\nAs a registered customer of Subidha Furniture, your ${data?.plan_type || "contract"} (${data?.contract_ref}) for ${data?.product_name || "your order"} has been prepared and is ready for your digital signature.\n\nPlease click the secure link below to review the contract terms and sign digitally:\n\n${fullUrl}\n\nAfter signing, your agreement will be immediately accessible in your Subidha Webapp account under "My Contracts".\n\nWarm regards,\nSubidha Furniture, Asansol\nPhone: +91 77972 80952`;
+  const emailBody = `Dear ${data?.customer_name || "Customer"},\n\nAs a registered customer of Subidha Furniture, your ${data?.plan_type || "contract"} (${data?.contract_ref}) for ${data?.product_name || "your order"} has been prepared and is ready for your digital signature.\n\nPlease click the secure link below to review the contract terms and sign digitally:\n\n${fullUrl}\n\nAfter signing, your agreement will be immediately accessible in your Subidha Webapp account under "My Contracts".\n\nWarm regards,\nSubidha Furniture, Asansol\nPhone: ${supportPhone}`;
 
   const emailHref = `mailto:${data?.customer_email || ""}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
   const smsHref = `sms:${cleanPhone}?body=${encodeURIComponent(`Subidha Furniture: Dear registered customer, please review and sign your contract ${data?.contract_ref} on our webapp at ${fullUrl}`)}`;

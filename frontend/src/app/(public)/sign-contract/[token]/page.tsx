@@ -5,6 +5,7 @@ import React, { useEffect, useState, use } from "react";
 
 import SignatureCanvas from "@/components/forms/SignatureCanvas";
 import { formatDocumentDateTime, formatDocumentMoney } from "@/lib/documents/formatters";
+import { getPublicBusinessProfile } from "@/services/public";
 import {
   getPublicContractSigningInfo,
   submitPublicContractSignature,
@@ -17,8 +18,10 @@ interface PageProps {
 
 export default function PublicContractSignPage({ params }: PageProps) {
   const resolvedParams = use(params);
-  const token = resolvedParams?.token || "";
+  const rawToken = resolvedParams?.token || "";
+  const token = rawToken ? decodeURIComponent(rawToken) : "";
 
+  const [supportPhone, setSupportPhone] = useState<string>("+91 94764 90946");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [contract, setContract] = useState<PublicContractSigningInfo | null>(null);
@@ -37,6 +40,25 @@ export default function PublicContractSignPage({ params }: PageProps) {
     signature_url?: string | null;
   } | null>(null);
 
+  // Fetch official business profile contact dynamically from backend
+  useEffect(() => {
+    let mounted = true;
+    getPublicBusinessProfile()
+      .then((profile) => {
+        if (!mounted) return;
+        if (profile?.support_phone && profile.support_phone.trim()) {
+          setSupportPhone(profile.support_phone.trim());
+        }
+      })
+      .catch(() => {
+        // Safe fallback preserved
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   useEffect(() => {
     let mounted = true;
     if (!token) {
@@ -54,9 +76,18 @@ export default function PublicContractSignPage({ params }: PageProps) {
         if (data.customer_name) {
           setSignerName(data.customer_name);
         }
+        if (data.support_phone && data.support_phone.trim()) {
+          setSupportPhone(data.support_phone.trim());
+        }
       })
       .catch((err) => {
         if (!mounted) return;
+        if (err && typeof err === "object" && "body" in err) {
+          const body = (err as { body?: { support_phone?: string } }).body;
+          if (body?.support_phone && body.support_phone.trim()) {
+            setSupportPhone(body.support_phone.trim());
+          }
+        }
         setError(err instanceof Error ? err.message : "Failed to load contract details.");
       })
       .finally(() => {
@@ -159,8 +190,8 @@ export default function PublicContractSignPage({ params }: PageProps) {
             <p className="mt-1 text-sm text-muted-foreground">{error}</p>
             <div className="mt-5 rounded-xl border border-border bg-background p-3 text-xs text-muted-foreground">
               If this signing link expired or was used already, please contact Subidha Furniture support at{" "}
-              <a href="tel:+917797280952" className="font-semibold text-primary underline">
-                +91 77972 80952
+              <a href={`tel:${supportPhone.replace(/\s+/g, "")}`} className="font-semibold text-primary underline">
+                {supportPhone}
               </a>.
             </div>
           </div>
