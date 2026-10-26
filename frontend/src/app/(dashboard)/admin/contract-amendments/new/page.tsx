@@ -37,14 +37,14 @@ export default function AdminContractAmendmentCreatePage() {
       const id = Number(sourceId);
       if (!Number.isFinite(id) || id <= 0) throw new Error("Enter a valid source contract/subscription ID.");
       if (!reason.trim()) throw new Error("Reason is required.");
-      const fieldError = validateRequestedValues(amendmentType, fieldValues);
+      const fieldError = validateRequestedValues(amendmentType, fieldValues, contractType);
       if (fieldError) throw new Error(fieldError);
       const created = await createAdminAmendment({
         contract_type: contractType,
         subscription: contractType === "EMI_SUBSCRIPTION" ? id : null,
         rent_lease_contract: contractType === "RENT_LEASE" ? id : null,
         amendment_type: amendmentType,
-        requested_values: buildRequestedValues(amendmentType, fieldValues),
+        requested_values: buildRequestedValues(amendmentType, fieldValues, contractType),
         reason: reason.trim(),
         requested_role: requestedRole,
         admin_note: adminNote.trim(),
@@ -142,6 +142,7 @@ export default function AdminContractAmendmentCreatePage() {
           </div>
           <AmendmentValueFields
             amendmentType={amendmentType}
+            contractType={contractType}
             values={fieldValues}
             onChange={(key, value) => setFieldValues((prev) => ({ ...prev, [key]: value }))}
           />

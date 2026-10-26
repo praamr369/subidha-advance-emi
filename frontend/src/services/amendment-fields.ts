@@ -75,23 +75,63 @@ export const AMENDMENT_FIELD_SCHEMA: Partial<Record<AmendmentType, AmendmentFiel
   ],
 };
 
-export function amendmentFieldsFor(type: AmendmentType): AmendmentField[] {
+export function amendmentFieldsFor(type: AmendmentType, contractType?: string): AmendmentField[] {
+  if (type === "PRODUCT_CHANGE" && contractType === "RENT_LEASE") {
+    return [
+      {
+        key: "item_action",
+        label: "Item Action (RETURN, CLOSE, UPGRADE, ADD)",
+        type: "text",
+        placeholder: "RETURN, CLOSE, UPGRADE, or ADD",
+        help: "Flexible rent/lease amendment action on multi-product contract.",
+        required: true,
+      },
+      {
+        key: "contract_item_id",
+        label: "Target Contract Item ID (optional if 1 item)",
+        type: "number",
+        placeholder: "ID of the contract item line",
+      },
+      {
+        key: "quantity",
+        label: "Quantity (for return or add)",
+        type: "number",
+        placeholder: "Units to return / add",
+      },
+      {
+        key: "new_product_id",
+        label: "New Product ID (for upgrade or add)",
+        type: "number",
+        placeholder: "Target Product ID",
+      },
+      {
+        key: "note",
+        label: "Amendment details / offline request notes",
+        type: "textarea",
+        placeholder: "Specific offline or customer request details",
+        required: true,
+      },
+    ];
+  }
   return AMENDMENT_FIELD_SCHEMA[type] ?? [NOTE_FIELD];
 }
 
-export function buildRequestedValues(type: AmendmentType, values: Record<string, string>): Record<string, unknown> {
-  const fields = amendmentFieldsFor(type);
+export function buildRequestedValues(type: AmendmentType, values: Record<string, string>, contractType?: string): Record<string, unknown> {
+  const fields = amendmentFieldsFor(type, contractType);
   const out: Record<string, unknown> = {};
   for (const field of fields) {
     const raw = (values[field.key] ?? "").trim();
     if (!raw) continue;
     out[field.key] = field.type === "number" ? Number(raw) : raw;
   }
+  if (contractType === "RENT_LEASE" && type === "PRODUCT_CHANGE" && out.item_action) {
+    out.action = String(out.item_action).toUpperCase();
+  }
   return out;
 }
 
-export function validateRequestedValues(type: AmendmentType, values: Record<string, string>): string | null {
-  for (const field of amendmentFieldsFor(type)) {
+export function validateRequestedValues(type: AmendmentType, values: Record<string, string>, contractType?: string): string | null {
+  for (const field of amendmentFieldsFor(type, contractType)) {
     if (field.required && !(values[field.key] ?? "").trim()) {
       return `${field.label} is required.`;
     }

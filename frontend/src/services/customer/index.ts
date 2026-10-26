@@ -40,6 +40,22 @@ export type CustomerSubscriptionWinnerSummary = {
   waived_amount?: number | string;
 };
 
+export type CustomerContractItem = {
+  id: number;
+  product?: number;
+  product_id?: number;
+  product_name: string;
+  product_code?: string;
+  quantity: number;
+  unit_base_price?: string;
+  total_base_price?: string;
+  monthly_yield_percent?: string;
+  monthly_amount?: string;
+  security_deposit_percent?: string;
+  security_deposit_amount?: string;
+  status?: string;
+};
+
 export type CustomerSubscription = {
   id: number;
   subscription_number?: string;
@@ -84,6 +100,7 @@ export type CustomerSubscription = {
   delivery_summary?: DeliveryRecord | null;
   deliveries?: DeliveryRecord[];
   emis?: CustomerEmi[];
+  contract_items?: CustomerContractItem[];
 
   has_customer_signature?: boolean;
   customer_signature_signed_at?: string | null;
@@ -547,6 +564,7 @@ export function normalizeCustomerSubscription(item: unknown): CustomerSubscripti
         : normalizeDeliveryRecord(row.delivery_summary),
     deliveries: toArray(row.deliveries).map(normalizeDeliveryRecord),
     emis: toArray(row.emis).map(normalizeCustomerEmi),
+    contract_items: Array.isArray(row.contract_items) ? (row.contract_items as CustomerContractItem[]) : [],
 
     has_customer_signature: Boolean(row.has_customer_signature),
     customer_signature_signed_at: toStringOrUndefined(row.customer_signature_signed_at) ?? null,

@@ -659,12 +659,27 @@ class ContractItem(TimeStampedModel):
         validators=[MinValueValidator(MONEY_ZERO)],
     )
     product_snapshot = models.JSONField(null=True, blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ("ACTIVE", "Active"),
+            ("RETURNED", "Returned"),
+            ("CLOSED", "Closed"),
+            ("UPGRADED", "Upgraded"),
+        ],
+        default="ACTIVE",
+        db_index=True,
+    )
+    returned_quantity = models.PositiveIntegerField(default=0)
+    returned_at = models.DateTimeField(null=True, blank=True)
+    notes = models.CharField(max_length=255, blank=True, default="")
 
     class Meta:
         db_table = "contract_items"
         ordering = ["id"]
         indexes = [
             models.Index(fields=["subscription", "product"]),
+            models.Index(fields=["subscription", "status"]),
         ]
         constraints = [
             models.CheckConstraint(

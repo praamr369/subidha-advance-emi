@@ -31,7 +31,7 @@ export type ProductRecontractConsentStatus = "PENDING" | "ACCEPTED" | "REJECTED"
 export type ProductRecontractAdminApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
 
 export type AmendmentWorkflowCapability = {
-  category: "NON_FINANCIAL" | "SAME_PRICE_PRODUCT_REFERENCE" | "PRODUCT_RECONTRACT" | "LUCKY_ID_BATCH_PREVIEW" | "RENT_LEASE_PREVIEW" | "DEPOSIT_SECURITY_PREVIEW" | "BLOCKED";
+  category: "NON_FINANCIAL" | "SAME_PRICE_PRODUCT_REFERENCE" | "PRODUCT_RECONTRACT" | "LUCKY_ID_BATCH_PREVIEW" | "RENT_LEASE_PREVIEW" | "RENT_LEASE_ITEM_AMENDMENT" | "DEPOSIT_SECURITY_PREVIEW" | "BLOCKED";
   can_review: boolean;
   can_approve_decision: boolean;
   can_reject_decision: boolean;
@@ -375,6 +375,71 @@ export async function listAdminProductRecontractReport(filters: ProductRecontrac
 
 export async function getAdminAmendment(id: number): Promise<AmendmentRecord> {
   return apiFetch<AmendmentRecord>(`/admin/contract-amendments/${id}/`);
+}
+
+export type RentLeaseItemPreviewItem = {
+  id: number;
+  product_id: number;
+  product_name: string;
+  product_code?: string;
+  quantity: number;
+  unit_base_price: string;
+  total_base_price: string;
+  monthly_yield_percent: string;
+  monthly_amount: string;
+  security_deposit_percent: string;
+  security_deposit_amount: string;
+  status?: string;
+  action_tag?: string;
+};
+
+export type RentLeasePreviewResponse = {
+  amendment_id: number;
+  amendment_type: AmendmentType;
+  amendment_status: AmendmentStatus;
+  contract_type?: AmendmentContractType;
+  current_contract_id: number;
+  current_contract_reference: string | null;
+  customer_id?: number | null;
+  customer_name: string | null;
+  current_product: string | null;
+  requested_product_id: number | null;
+  current_items?: RentLeaseItemPreviewItem[];
+  proposed_items?: RentLeaseItemPreviewItem[];
+  item_actions?: Array<Record<string, unknown>>;
+  current_product_value?: string;
+  proposed_product_value?: string;
+  product_value_difference?: string;
+  current_monthly_amount: string | null;
+  proposed_monthly_amount?: string | null;
+  requested_monthly_amount: string | null;
+  monthly_amount_difference?: string | null;
+  current_tenure_months: number | null;
+  requested_tenure_months: number | null;
+  current_total_amount?: string;
+  proposed_total_amount?: string;
+  total_amount_difference?: string;
+  current_deposit_amount: string | null;
+  proposed_deposit_amount?: string | null;
+  requested_deposit_amount: string | null;
+  deposit_difference?: string | null;
+  deposit_liability_risk: string | null;
+  demand_schedule_impact_summary: string | null;
+  paid_demand_count: string | null;
+  pending_demand_count: string | null;
+  accounting_impact_category: string | null;
+  reconciliation_impact_category: string | null;
+  delivery_possession_risk: string | null;
+  execution_supported: boolean;
+  blocker_reasons: string[];
+};
+
+export async function getAdminRentLeasePreview(id: number): Promise<RentLeasePreviewResponse> {
+  return apiFetch<RentLeasePreviewResponse>(`/admin/contract-amendments/${id}/rent-lease-preview/`);
+}
+
+export async function getCustomerRentLeasePreview(id: number): Promise<RentLeasePreviewResponse> {
+  return apiFetch<RentLeasePreviewResponse>(`/customer/contract-amendments/${id}/rent-lease-preview/`);
 }
 
 export async function getAdminLuckyBatchPreview(id: number): Promise<LuckyBatchPreview> {
