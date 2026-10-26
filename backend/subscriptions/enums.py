@@ -157,6 +157,13 @@ class SubscriptionStatus(models.TextChoices):
     CLOSED = "CLOSED", "Closed"
 
 
+PRE_ACTIVATION_SUBSCRIPTION_STATUSES = frozenset({
+    SubscriptionStatus.DRAFT,
+    SubscriptionStatus.REQUESTED,
+    SubscriptionStatus.PENDING_APPROVAL,
+})
+
+
 # ---------------------------------------------------------------------------
 # Lucky ID / Batch
 # ---------------------------------------------------------------------------

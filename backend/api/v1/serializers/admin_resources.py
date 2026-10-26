@@ -45,6 +45,7 @@ from subscriptions.models import (
     SubscriptionDocument,
     SubscriptionDocumentType,
     SubscriptionStatus,
+    PRE_ACTIVATION_SUBSCRIPTION_STATUSES,
     KycStatus,
 )
 from customers.services.customer_account_service import sync_customer_login_identity
@@ -2048,12 +2049,16 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
         return sum(1 for emi in obj.emis.all() if emi.status == EmiStatus.PAID)
 
     def get_pending_emi_count(self, obj):
+        if getattr(obj, "status", None) in PRE_ACTIVATION_SUBSCRIPTION_STATUSES:
+            return 0
         return sum(1 for emi in obj.emis.all() if emi.status == EmiStatus.PENDING)
 
     def get_waived_emi_count(self, obj):
         return sum(1 for emi in obj.emis.all() if emi.status == EmiStatus.WAIVED)
 
     def get_overdue_emi_count(self, obj):
+        if getattr(obj, "status", None) in PRE_ACTIVATION_SUBSCRIPTION_STATUSES:
+            return 0
         return sum(1 for emi in obj.emis.all() if emi.status == EmiStatus.PENDING and emi.is_overdue())
 
     def _get_financial_snapshot(self, obj):
@@ -2065,6 +2070,8 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
         return str(self._get_financial_snapshot(obj)["paid_amount"])
 
     def get_outstanding_amount(self, obj):
+        if getattr(obj, "status", None) in PRE_ACTIVATION_SUBSCRIPTION_STATUSES:
+            return "0.00"
         return str(self._get_financial_snapshot(obj)["remaining_amount"])
 
     def validate(self, attrs):

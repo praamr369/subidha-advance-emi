@@ -18,6 +18,7 @@ from subscriptions.models import (
     SubscriptionDocument,
     q2,
 )
+from subscriptions.enums import PRE_ACTIVATION_SUBSCRIPTION_STATUSES
 from deliveries.services.delivery_service import get_subscription_delivery_prefetch
 from contracts.services.subscription_status_service import (
     resolve_expected_subscription_status,
@@ -158,10 +159,16 @@ def build_subscription_financial_snapshot(subscription: Subscription) -> dict:
         waived_amount = q2(waived_amount + waived_row_amount)
         waiver_ledger_amount = q2(waiver_ledger_amount + emi_waiver_ledger_total)
 
-        if emi.status == EmiStatus.WAIVED:
+        if subscription.status in PRE_ACTIVATION_SUBSCRIPTION_STATUSES:
+            emi_balance = MONEY_ZERO
+            derived_status = "DRAFT"
+        elif emi.status == EmiStatus.WAIVED:
             emi_count_waived += 1
             emi_balance = MONEY_ZERO
             derived_status = EmiStatus.WAIVED
+        elif emi.status == EmiStatus.CANCELLED:
+            emi_balance = MONEY_ZERO
+            derived_status = EmiStatus.CANCELLED
         elif balance_amount <= MONEY_ZERO:
             emi_count_paid += 1
             emi_balance = MONEY_ZERO
@@ -239,30 +246,44 @@ def build_subscription_financial_snapshot(subscription: Subscription) -> dict:
 
     remaining_amount = q2(max(total_amount - paid_amount - waived_amount, MONEY_ZERO))
 
-    if not is_emi_plan and not emis:
+    if subscription.status in PRE_ACTIVATION_SUBSCRIPTION_STATUSES:
+        # Pre-activation states (DRAFT, REQUESTED, PENDING_APPROVAL) are prospective
+        # quotes/proposals: no goods have been delivered, no contract is activated,
+        # and no active debt or receivable exists.
+        remaining_amount = MONEY_ZERO
+        pending_amount = MONEY_ZERO
+        open_demand_balance = MONEY_ZERO
+        if not is_emi_plan and not emis:
+            total_emi_amount = total_amount
+    elif not is_emi_plan and not emis:
         total_emi_amount = total_amount
         if subscription.status in CLOSED_RENT_LEASE_STATUSES:
             # Once the goods are back (or the contract ended), the unused
             # contract value is not owed — only rent billed and still unpaid.
             remaining_amount = open_demand_balance
         pending_amount = remaining_amount
-
-    if is_emi_plan and not _is_close(total_amount, total_emi_amount):
-        add_warning("Contract total does not match the sum of scheduled EMI amounts.")
-
-    if not _is_close(q2(subscription.waived_amount), waived_amount):
-        add_warning(
-            "Stored subscription waived amount does not match waived EMI row total."
-        )
-
-    if not _is_close(waiver_ledger_amount, waived_amount):
-        add_warning("Waiver ledger total does not match waived EMI row total.")
+    elif subscription.status in CLOSED_RENT_LEASE_STATUSES:
+        # Cancelled or terminated EMI contract: only active uncancelled pending EMIs (if any) are owed
+        remaining_amount = pending_amount
 
     pending_matches_remaining = _is_close(pending_amount, remaining_amount)
-    if is_emi_plan and not pending_matches_remaining:
-        add_warning(
-            "Pending EMI total does not perfectly match contract-derived remaining amount. Review payment reversals and waiver history."
-        )
+
+    if subscription.status not in PRE_ACTIVATION_SUBSCRIPTION_STATUSES:
+        if is_emi_plan and not _is_close(total_amount, total_emi_amount):
+            add_warning("Contract total does not match the sum of scheduled EMI amounts.")
+
+        if not _is_close(q2(subscription.waived_amount), waived_amount):
+            add_warning(
+                "Stored subscription waived amount does not match waived EMI row total."
+            )
+
+        if not _is_close(waiver_ledger_amount, waived_amount):
+            add_warning("Waiver ledger total does not match waived EMI row total.")
+
+        if is_emi_plan and not pending_matches_remaining:
+            add_warning(
+                "Pending EMI total does not perfectly match contract-derived remaining amount. Review payment reversals and waiver history."
+            )
 
     winner_evidence = get_subscription_winner_evidence(subscription)
     winning_draw = winner_evidence["winning_draw"]
@@ -325,7 +346,7 @@ def build_subscription_financial_snapshot(subscription: Subscription) -> dict:
         and _is_close(waiver_ledger_amount, waived_amount)
         and pending_matches_remaining
         and not any(row["warnings"] for row in emi_rows)
-    )
+    ) if subscription.status not in PRE_ACTIVATION_SUBSCRIPTION_STATUSES else True
 
     return {
         "subscription_id": subscription.id,
@@ -460,24 +481,25 @@ def build_customer_dashboard_summary(subscriptions) -> dict[str, object]:
         if snapshot.get("has_reversal_history"):
             has_payment_adjustments = True
 
-        for emi_row in snapshot.get("emis") or []:
-            if emi_row.get("derived_status") != EmiStatus.PENDING:
-                continue
+        if subscription.status not in PRE_ACTIVATION_SUBSCRIPTION_STATUSES:
+            for emi_row in snapshot.get("emis") or []:
+                if emi_row.get("derived_status") != EmiStatus.PENDING:
+                    continue
 
-            balance_amount = _decimal(emi_row.get("balance_amount"))
+                balance_amount = _decimal(emi_row.get("balance_amount"))
 
-            if emi_row.get("is_overdue"):
-                overdue_emis += 1
-                total_overdue_amount = q2(total_overdue_amount + balance_amount)
-            else:
-                upcoming_emis += 1
-                total_upcoming_amount = q2(total_upcoming_amount + balance_amount)
+                if emi_row.get("is_overdue"):
+                    overdue_emis += 1
+                    total_overdue_amount = q2(total_overdue_amount + balance_amount)
+                else:
+                    upcoming_emis += 1
+                    total_upcoming_amount = q2(total_upcoming_amount + balance_amount)
 
-            if next_due_emi is None or _pending_emi_sort_key(emi_row) < _pending_emi_sort_key(
-                next_due_emi
-            ):
-                next_due_emi = emi_row
-                next_due_subscription = subscription
+                if next_due_emi is None or _pending_emi_sort_key(emi_row) < _pending_emi_sort_key(
+                    next_due_emi
+                ):
+                    next_due_emi = emi_row
+                    next_due_subscription = subscription
 
     next_due_amount = _money(
         _decimal(next_due_emi.get("balance_amount")) if next_due_emi else MONEY_ZERO
