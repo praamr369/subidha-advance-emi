@@ -1,4 +1,4 @@
-from django.db.models import Q
+from django.db.models import Q, Subquery
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -871,13 +871,62 @@ class AdminInventoryItemSearchView(APIView):
         subcategory = (request.query_params.get("subcategory") or "").strip()
         stock_item_type = (request.query_params.get("stock_item_type") or "").strip()
         include_locations = request.query_params.get("include_locations") == "1"
+        include_draft = request.query_params.get("include_draft") in {"1", "true", "yes"}
+
+        # Ensure active physical products have inventory profiles prepared
+        try:
+            from products_core.models import Product
+            from inventory.services.inventory_profile_service import prepare_inventory_profile_for_product
+            missing_products = Product.objects.filter(
+                is_active=True,
+                inventory_profile__isnull=True
+            ).exclude(item_type="SERVICE")[:100]
+            for p in missing_products:
+                prepare_inventory_profile_for_product(product_id=p.id, stock_tracking_enabled=True)
+        except Exception:
+            pass
 
         queryset = InventoryItem.objects.select_related(
             "product", "default_stock_location"
         ).prefetch_related(
             "product__related_products__related_product",
+            "product__pim",
+            "product__pim_variant__product",
             "product__pim_variant__attribute_values__attribute"
         ).filter(is_active=True)
+
+        if not include_draft:
+            # Operational product must be active and not discontinued
+            queryset = queryset.filter(product__is_active=True).exclude(
+                product__lifecycle_status="DISCONTINUED"
+            )
+
+            # Exclude if directly linked PIM product is unpublished (draft) or inactive (disabled)
+            queryset = queryset.exclude(
+                Q(product__pim__is_published=False) | Q(product__pim__is_active=False)
+            )
+
+            # Exclude if linked PIM variant is inactive or its parent blueprint is unpublished/inactive
+            queryset = queryset.exclude(
+                Q(product__pim_variant__is_active=False)
+                | Q(product__pim_variant__product__is_published=False)
+                | Q(product__pim_variant__product__is_active=False)
+            )
+
+            # Also exclude by code: any PimProduct that is draft or inactive
+            # or whose parent blueprint is draft or inactive
+            from products_pim.models import PimProduct
+            draft_or_inactive_pim_codes = PimProduct.objects.filter(
+                Q(is_published=False)
+                | Q(is_active=False)
+                | Q(parent__is_published=False)
+                | Q(parent__is_active=False)
+            ).values("code")
+
+            queryset = queryset.exclude(
+                Q(product__product_code__in=Subquery(draft_or_inactive_pim_codes))
+                | Q(sku__in=Subquery(draft_or_inactive_pim_codes))
+            )
 
         if term:
             queryset = queryset.filter(
@@ -893,7 +942,7 @@ class AdminInventoryItemSearchView(APIView):
         if stock_item_type:
             queryset = queryset.filter(stock_item_type=stock_item_type)
 
-        queryset = queryset.order_by("product__name", "id")[:40]
+        queryset = queryset.distinct().order_by("product__name", "id")[:40]
 
         locations = (
             list(StockLocation.objects.filter(is_active=True).order_by("name", "id"))
@@ -928,6 +977,13 @@ class AdminInventoryItemSearchView(APIView):
                     if val is not None and val != "":
                         attributes[attr_val.attribute.name] = val
 
+            is_pub = True
+            if hasattr(item.product, "pim") and item.product.pim.all():
+                is_pub = all(p.is_published for p in item.product.pim.all())
+            elif hasattr(item.product, "pim_variant") and item.product.pim_variant:
+                pv = item.product.pim_variant
+                is_pub = bool(getattr(pv.product, "is_published", True))
+
             row = {
                 "id": item.id,
                 "inventory_item_id": item.id,
@@ -945,6 +1001,8 @@ class AdminInventoryItemSearchView(APIView):
                 "default_stock_location_code": item.default_stock_location.code if item.default_stock_location else None,
                 "attributes": attributes,
                 "accessories": accessories,
+                "is_published": is_pub,
+                "is_active": bool(item.is_active and item.product.is_active),
             }
             if include_locations:
                 by_location = []
@@ -970,11 +1028,12 @@ class AdminInventoryCategoriesView(APIView):
 
     def get(self, request):
         from subscriptions.models import ProductCategoryMaster, ProductSubcategoryMaster
-        # Prefer master table entries; fall back to distinct raw strings on products
+        from products_core.models import Product
+
+        # Category masters from catalog masters
         cat_masters = list(
             ProductCategoryMaster.objects.filter(is_active=True)
-            .order_by("name")
-            .values("id", "name")
+            .values_list("name", flat=True)
         )
         subcat_masters = list(
             ProductSubcategoryMaster.objects.filter(is_active=True)
@@ -982,30 +1041,88 @@ class AdminInventoryCategoriesView(APIView):
             .order_by("category__name", "name")
             .values("id", "name", "category__name")
         )
-        # Also gather raw string values that appear on inventory items (products)
-        from django.db.models import Count
+
+        # Categories from PIM category master
+        try:
+            from products_pim.models import ProductCategory as PimProductCategory
+            pim_cats = list(PimProductCategory.objects.values_list("name", flat=True))
+        except Exception:
+            pim_cats = []
+
+        # Categories from operational products
+        product_cats = list(
+            Product.objects.filter(is_active=True)
+            .exclude(category="")
+            .values_list("category", flat=True)
+            .distinct()
+        )
+
+        # Categories from PIM products
+        try:
+            from products_pim.models import PimProduct
+            pim_product_cats = list(
+                PimProduct.objects.filter(is_active=True)
+                .exclude(category__isnull=True)
+                .values_list("category__name", flat=True)
+                .distinct()
+            )
+        except Exception:
+            pim_product_cats = []
+
+        # Categories on inventory items
         raw_cats = list(
             InventoryItem.objects.filter(is_active=True)
             .exclude(product__category="")
             .values_list("product__category", flat=True)
             .distinct()
-            .order_by("product__category")
         )
         raw_subcats = list(
             InventoryItem.objects.filter(is_active=True)
             .exclude(product__subcategory="")
             .values("product__category", "product__subcategory")
             .distinct()
-            .order_by("product__category", "product__subcategory")
         )
+
+        # Combine all unique non-empty category names across all sources
+        categories_set = set()
+        for cats in (cat_masters, pim_cats, product_cats, pim_product_cats, raw_cats):
+            for c in cats:
+                val = (c or "").strip()
+                if val:
+                    categories_set.add(val)
+        all_categories = sorted(categories_set, key=lambda s: s.lower())
+
+        # Combine all subcategories
+        subcategories_map = {}
+        for r in subcat_masters:
+            c = (r.get("category__name") or "").strip()
+            s = (r.get("name") or "").strip()
+            if c and s:
+                subcategories_map[(c, s)] = {"category": c, "subcategory": s}
+        for r in raw_subcats:
+            c = (r.get("product__category") or "").strip()
+            s = (r.get("product__subcategory") or "").strip()
+            if c and s:
+                subcategories_map[(c, s)] = {"category": c, "subcategory": s}
+        try:
+            from products_pim.models import PimProduct
+            for r in PimProduct.objects.filter(is_active=True, subcategory__isnull=False).select_related("category", "subcategory").values("category__name", "subcategory__name"):
+                c = (r.get("category__name") or "").strip()
+                s = (r.get("subcategory__name") or "").strip()
+                if c and s:
+                    subcategories_map[(c, s)] = {"category": c, "subcategory": s}
+        except Exception:
+            pass
+        all_subcategories = list(subcategories_map.values())
+
         stock_item_types = [
             {"value": "FINISHED_GOOD", "label": "Finished Good"},
             {"value": "ACCESSORY", "label": "Accessory"},
             {"value": "RAW_MATERIAL", "label": "Raw Material"},
         ]
         return Response({
-            "categories": raw_cats,
-            "subcategories": [{"category": r["product__category"], "subcategory": r["product__subcategory"]} for r in raw_subcats],
+            "categories": all_categories,
+            "subcategories": all_subcategories,
             "stock_item_types": stock_item_types,
         })
 

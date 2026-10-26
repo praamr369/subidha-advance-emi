@@ -4,7 +4,7 @@ import { CheckCircle, X } from "lucide-react";
 
 import ProductSpecSearch, { type ProductSpecRow } from "@/components/products/ProductSpecSearch";
 
-type PlanType = "EMI" | "RENT" | "LEASE" | "DIRECT_SALE";
+type PlanType = "EMI" | "ADVANCE_EMI" | "RENT" | "LEASE" | "DIRECT_SALE";
 
 export type ProductOption = {
   id: number;
@@ -154,7 +154,7 @@ export default function ProductSelector({
       directSaleOnly={planFilter === "DIRECT_SALE"}
       filterRow={(row) => {
         if (row.lifecycle_status === "DISCONTINUED") return false;
-        if (planFilter === "EMI") return Boolean(row.is_emi_enabled);
+        if (planFilter === "EMI" || planFilter === "ADVANCE_EMI") return Boolean(row.is_emi_enabled);
         if (planFilter === "RENT") return Boolean(row.is_rent_enabled);
         if (planFilter === "LEASE") return Boolean(row.is_lease_enabled);
         if (planFilter === "DIRECT_SALE") return Boolean(row.is_direct_sale_enabled);

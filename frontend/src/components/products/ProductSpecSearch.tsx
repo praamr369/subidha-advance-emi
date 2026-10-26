@@ -81,6 +81,8 @@ export default function ProductSpecSearch({
   const [open, setOpen] = useState(false);
   const reqIdRef = useRef(0);
   const boxRef = useRef<HTMLDivElement>(null);
+  const filterRowRef = useRef(filterRow);
+  filterRowRef.current = filterRow;
 
   // Debounced search; ignore stale (out-of-order) responses via a request id.
   useEffect(() => {
@@ -107,7 +109,7 @@ export default function ProductSpecSearch({
         if (myReq !== reqIdRef.current) return; // a newer request superseded this one
         let rows = data.results ?? [];
         if (itemType) rows = rows.filter((r) => (r.stock_item_type ?? "FINISHED_GOOD") === itemType);
-        if (filterRow) rows = rows.filter(filterRow);
+        if (filterRowRef.current) rows = rows.filter(filterRowRef.current);
         setResults(rows);
       } catch (err) {
         if (myReq !== reqIdRef.current) return;
