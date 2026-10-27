@@ -147,6 +147,8 @@ class CustomerSubscriptionProductMediaTests(APITestCase):
         response = self.client.get(f"/api/v1/customer/subscriptions/{rent_sub.id}/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["security_deposit_amount"], "5000.00")
+        self.assertEqual(response.data["security_deposit_paid"], "0.00")
+        self.assertEqual(response.data["security_deposit_pending"], "5000.00")
         self.assertEqual(response.data["security_deposit_percent"], "20.00")
         self.assertEqual(response.data["refundable_security_deposit"], "5000.00")
         self.assertEqual(response.data["deposit_status"], "PENDING")
@@ -162,3 +164,39 @@ class CustomerSubscriptionProductMediaTests(APITestCase):
         self.assertIsNotNone(dep_row)
         self.assertEqual(dep_row["deposit_amount"], 5000.0)
         self.assertEqual(dep_row["status"], "PENDING")
+
+        # Test list endpoint exposes deposit fields too
+        list_resp = self.client.get("/api/v1/customer/subscriptions/")
+        self.assertEqual(list_resp.status_code, status.HTTP_200_OK)
+        rent_list_row = next((r for r in list_resp.data["results"] if r.get("id") == rent_sub.id), None)
+        self.assertIsNotNone(rent_list_row)
+        self.assertEqual(rent_list_row["security_deposit_amount"], "5000.00")
+        self.assertEqual(rent_list_row["security_deposit_percent"], "20.00")
+        self.assertEqual(rent_list_row["deposit_status"], "PENDING")
+
+    def test_create_rent_contract_with_partial_deposit_and_buffer(self):
+        from decimal import Decimal
+        from contracts.services.rent_lease_contract_service import create_rent_contract
+        from payments.models import RentLeaseBillingDemand
+
+        self.product.is_rent_enabled = True
+        self.product.save(update_fields=["is_rent_enabled"])
+
+        rent_sub = create_rent_contract(
+            customer=self.customer,
+            product=self.product,
+            tenure_months=12,
+            security_deposit_percent=Decimal("20.00"),
+            save_as_draft=True,
+            deposit_payment_option="PARTIAL",
+            deposit_buffer_days=30,
+            initial_deposit_payment=Decimal("2000.00"),
+        )
+        self.assertEqual(rent_sub.plan_type, "RENT")
+        demand = RentLeaseBillingDemand.objects.filter(
+            subscription=rent_sub, demand_type="SECURITY_DEPOSIT"
+        ).first()
+        self.assertIsNotNone(demand)
+        self.assertEqual(demand.status, "PARTIAL")
+        self.assertEqual(demand.collected_amount, Decimal("2000.00"))
+        self.assertTrue(demand.due_date > rent_sub.start_date)

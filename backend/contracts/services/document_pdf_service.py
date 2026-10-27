@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from io import BytesIO
 
 from django.utils import timezone
@@ -144,7 +145,12 @@ def _render_contract_pdf(*, subscription, profile, contract_kind: str) -> bytes:
     line(f"Start Date: {subscription.start_date}", size=10)
     line(f"End Date: {getattr(subscription, 'end_date', None) or 'N/A'}", size=10)
     line(f"Monthly {monthly_label} Amount: INR {subscription.monthly_amount:.2f}", size=10)
-    line(f"Security Deposit Amount: INR {profile.security_deposit_amount:.2f}", size=10)
+    from contracts.services.contract_activation_readiness_service import (
+        get_subscription_deposit_summary,
+    )
+    dep_summary = get_subscription_deposit_summary(subscription)
+    dep_paid_str = f"INR {Decimal(dep_summary['security_deposit_paid']):,.2f}"
+    line(f"Security Deposit Required: INR {profile.security_deposit_amount:,.2f} | Paid: {dep_paid_str} ({dep_summary['deposit_status']})", size=10)
     if contract_kind.upper() == "LEASE":
         line(f"Renewal/Upgrade Note: {profile.contract_terms_snapshot or 'Standard lease renewal terms apply.'}", size=10)
     else:

@@ -169,25 +169,61 @@ export async function downloadAuthenticatedFile(
 }
 
 export async function openAuthenticatedFile(
-  path: string
+  path: string,
+  fallbackFilename?: string
 ): Promise<void> {
-  let response = await fetchDownload(path, getAccessToken());
+  const isMobile =
+    typeof navigator !== "undefined" &&
+    /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-  if (response.status === 401) {
-    const refreshed = await refreshAccessToken();
-    if (!refreshed) {
-      throw new Error("Authentication expired.");
+  // On mobile browsers, opening a blob URL in a new tab often shows a blank screen
+  // or fails due to lack of an inline PDF viewer. Downloading directly gives the best UX.
+  if (isMobile) {
+    await downloadAuthenticatedFile(path, fallbackFilename || "document.pdf");
+    return;
+  }
+
+  // Pre-open window synchronously to prevent browser popup blockers from intercepting
+  // after the asynchronous fetch completes.
+  let popup: Window | null = null;
+  try {
+    popup = window.open("about:blank", "_blank");
+    if (popup) {
+      popup.document.title = "Loading document...";
     }
-    response = await fetchDownload(path, refreshed);
+  } catch {
+    popup = null;
   }
 
-  if (!response.ok) {
-    throw await resolveError(response);
-  }
+  try {
+    const response = await fetchAuthorized(path);
+    const contentType = response.headers.get("content-type") || "application/pdf";
+    const rawBlob = await response.blob();
+    const blob = new Blob([rawBlob], { type: contentType });
+    const url = URL.createObjectURL(blob);
 
-  const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
-  window.open(url, "_blank");
-  // We can't immediately revoke the URL because the new tab needs time to load it.
-  setTimeout(() => URL.revokeObjectURL(url), 60000);
+    if (popup && !popup.closed) {
+      popup.location.href = url;
+    } else {
+      // Fallback if popup was blocked or closed
+      const filename = resolveFilename(
+        response.headers.get("content-disposition"),
+        fallbackFilename || "document.pdf"
+      );
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    }
+
+    // We can't immediately revoke the URL because the new tab needs time to load it.
+    setTimeout(() => URL.revokeObjectURL(url), 120000);
+  } catch (error) {
+    if (popup && !popup.closed) {
+      popup.close();
+    }
+    throw error;
+  }
 }

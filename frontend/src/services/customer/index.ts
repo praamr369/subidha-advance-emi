@@ -80,6 +80,8 @@ export type CustomerSubscription = {
   tenure_months?: number;
 
   security_deposit_amount?: number | string;
+  security_deposit_paid?: number | string;
+  security_deposit_pending?: number | string;
   security_deposit_percent?: number | string;
   refundable_security_deposit?: number | string;
   deposit_status?: string;
@@ -100,6 +102,7 @@ export type CustomerSubscription = {
   product_name?: string;
   product_code?: string | null;
   product_image?: string | null;
+  product_base_price?: number | string;
   batch_code?: string | null;
   lucky_number?: number | null;
   emi_count?: number;
@@ -519,6 +522,14 @@ export function normalizeCustomerSubscription(item: unknown): CustomerSubscripti
       row.security_deposit_amount === null || row.security_deposit_amount === undefined
         ? undefined
         : toMoneyString(row.security_deposit_amount),
+    security_deposit_paid:
+      row.security_deposit_paid === null || row.security_deposit_paid === undefined
+        ? undefined
+        : toMoneyString(row.security_deposit_paid),
+    security_deposit_pending:
+      row.security_deposit_pending === null || row.security_deposit_pending === undefined
+        ? undefined
+        : toMoneyString(row.security_deposit_pending),
     security_deposit_percent:
       row.security_deposit_percent === null || row.security_deposit_percent === undefined
         ? undefined

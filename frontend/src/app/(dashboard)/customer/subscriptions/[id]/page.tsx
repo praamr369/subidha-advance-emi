@@ -1,12 +1,14 @@
 "use client";
 
 import { formatRupee } from "@/lib/utils/currency";
-import { RefreshCw, Camera, ExternalLink } from "lucide-react";
-import { useCallback, useMemo } from "react";
+import { RefreshCw, Camera, ExternalLink, FileText, Loader2 } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import CustomerProductLink from "@/components/customers/CustomerProductInspectModal";
+import { customerRentContractPdfUrl, customerLeaseContractPdfUrl } from "@/services/customer-portal";
+import { openAuthenticatedFile } from "@/lib/export/auth-download";
 
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
@@ -118,6 +120,26 @@ export default function CustomerSubscriptionDetailPage() {
 
   const loadPage = useCallback(async () => { await query.refetch(); }, [query]);
 
+  const [openingPdf, setOpeningPdf] = useState(false);
+
+  const handleOpenContractPdf = useCallback(async () => {
+    if (!subscription) return;
+    setOpeningPdf(true);
+    try {
+      const pt = (subscription.plan_type || "").toUpperCase();
+      const path =
+        pt === "RENT"
+          ? customerRentContractPdfUrl(subscription.id)
+          : customerLeaseContractPdfUrl(subscription.id);
+      const filename = `${pt.toLowerCase()}-contract-${subscription.id}.pdf`;
+      await openAuthenticatedFile(path, filename);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to open contract PDF.");
+    } finally {
+      setOpeningPdf(false);
+    }
+  }, [subscription]);
+
   const isRentOrLease =
     subscription?.plan_type === "RENT" || subscription?.plan_type === "LEASE";
 
@@ -147,15 +169,15 @@ export default function CustomerSubscriptionDetailPage() {
     const isRentLease = subscription?.plan_type === "RENT" || subscription?.plan_type === "LEASE";
     const demands = Array.isArray(subscription?.rent_lease_demands) ? subscription.rent_lease_demands : [];
     if (isRentLease && demands.length > 0) {
-      return demands
-        .filter((d) => d.demand_type !== "SECURITY_DEPOSIT")
-        .map((d, index) => {
+      const nonDepositDemands = demands.filter((d) => d.demand_type !== "SECURITY_DEPOSIT");
+      if (nonDepositDemands.length > 0) {
+        return nonDepositDemands.map((d, index) => {
           const amount = toNumber(d.amount);
           const paidAmount = toNumber(d.paid_amount);
           const outstanding = Math.max(amount - paidAmount, 0);
           return {
             id: d.id ?? index + 1,
-            month_no: index + 1,
+            month_no: ((d as Record<string, unknown>).period_month as number | undefined) ?? index + 1,
             due_date: text(d.due_date, ""),
             amount,
             paid_amount: paidAmount,
@@ -164,6 +186,30 @@ export default function CustomerSubscriptionDetailPage() {
             status: text(d.status, "PENDING"),
           };
         });
+      }
+    }
+
+    if (isRentLease && (subscription?.tenure_months || 0) > 0 && toNumber(subscription?.monthly_amount) > 0) {
+      const tenure = toNumber(subscription.tenure_months);
+      const monthly = toNumber(subscription.monthly_amount);
+      const startDate = subscription.start_date ? new Date(subscription.start_date) : new Date();
+      return Array.from({ length: tenure }, (_, index) => {
+        const dueDate = new Date(startDate);
+        dueDate.setMonth(dueDate.getMonth() + index);
+        const yyyy = dueDate.getFullYear();
+        const mm = String(dueDate.getMonth() + 1).padStart(2, "0");
+        const dd = String(dueDate.getDate()).padStart(2, "0");
+        return {
+          id: index + 1,
+          month_no: index + 1,
+          due_date: `${yyyy}-${mm}-${dd}`,
+          amount: monthly,
+          paid_amount: 0,
+          waived_amount: 0,
+          outstanding_amount: monthly,
+          status: subscription.status === "DRAFT" ? "UPCOMING" : "PENDING",
+        };
+      });
     }
 
     return [];
@@ -216,8 +262,21 @@ export default function CustomerSubscriptionDetailPage() {
     if (itemsDepositTotal > 0) return itemsDepositTotal;
     const snap = toNumber((subscription?.pricing_snapshot as Record<string, unknown> | undefined)?.security_deposit_amount);
     if (snap > 0) return snap;
+    const ref = toNumber(subscription?.refundable_security_deposit);
+    if (ref > 0) return ref;
+    const demands = subscription?.rent_lease_demands;
+    if (Array.isArray(demands)) {
+      const depDemand = demands.find((d) => d.demand_type === "SECURITY_DEPOSIT");
+      if (depDemand && toNumber(depDemand.amount) > 0) return toNumber(depDemand.amount);
+    }
+    if (isRentOrLease) {
+      const base = toNumber(subscription?.total_amount);
+      if (base > 0) return Math.round(base * 0.2);
+      const monthly = toNumber(subscription?.monthly_amount);
+      if (monthly > 0) return monthly * 4;
+    }
     return direct;
-  }, [subscription, itemsDepositTotal]);
+  }, [subscription, itemsDepositTotal, isRentOrLease]);
 
   const effectiveRefundableDeposit = useMemo(() => {
     const direct = toNumber(subscription?.refundable_security_deposit);
@@ -282,7 +341,18 @@ export default function CustomerSubscriptionDetailPage() {
             <CPageStat label={isRentOrLease ? "Total Months" : "Total EMIs"} value={emiRows.length || subscription.tenure_months || 0} />
             <CPageStat label="Pending" value={pendingEmiCount} tone={pendingEmiCount > 0 ? "warning" : "success"} />
             {hasSecurityDeposit ? (
-              <CPageStat label="Security Deposit" value={formatRupee(effectiveSecurityDepositAmount)} tone="info" />
+              <>
+                <CPageStat
+                  label="Security Deposit"
+                  value={formatRupee(effectiveSecurityDepositAmount)}
+                  tone="info"
+                />
+                <CPageStat
+                  label="Deposit Paid"
+                  value={formatRupee(subscription.security_deposit_paid || 0)}
+                  tone={Number(subscription.security_deposit_paid || 0) >= effectiveSecurityDepositAmount && effectiveSecurityDepositAmount > 0 ? "success" : "warning"}
+                />
+              </>
             ) : null}
             <CPageStat label="Tenure" value={subscription.tenure_months ? `${subscription.tenure_months} Mo` : "—"} />
           </CPageStats>
@@ -310,6 +380,26 @@ export default function CustomerSubscriptionDetailPage() {
                   <Camera className="size-4" />
                   <span>Inspect Product Photos & Gallery</span>
                 </Link>
+              ) : null}
+              {isRentOrLease ? (
+                <button
+                  type="button"
+                  disabled={openingPdf}
+                  onClick={handleOpenContractPdf}
+                  className="col-span-2 flex h-10 items-center justify-center gap-1.5 rounded-xl border border-border bg-card text-xs font-bold text-foreground transition hover:bg-muted active:scale-95 disabled:opacity-60"
+                >
+                  {openingPdf ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      <span>Opening Contract PDF...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="size-4" />
+                      <span>View Official Contract PDF</span>
+                    </>
+                  )}
+                </button>
               ) : null}
               {subscription.plan_type === "RENT" || subscription.plan_type === "LEASE" ? (
                 <Link
@@ -360,6 +450,26 @@ export default function CustomerSubscriptionDetailPage() {
                   <p className="text-xs text-muted-foreground">
                     Your digital signature is recorded with timestamp and securely bound to your Subidha agreement.
                   </p>
+                  {isRentOrLease ? (
+                    <button
+                      type="button"
+                      disabled={openingPdf}
+                      onClick={handleOpenContractPdf}
+                      className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-sky-300 bg-sky-50 text-xs font-bold text-sky-800 shadow-sm transition hover:bg-sky-100 active:scale-95 disabled:opacity-60"
+                    >
+                      {openingPdf ? (
+                        <>
+                          <Loader2 className="size-4 animate-spin" />
+                          <span>Opening Signed Contract PDF...</span>
+                        </>
+                      ) : (
+                        <>
+                          <FileText className="size-4" />
+                          <span>View Official Signed Contract PDF</span>
+                        </>
+                      )}
+                    </button>
+                  ) : null}
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -506,6 +616,24 @@ export default function CustomerSubscriptionDetailPage() {
                     </span>
                   }
                 />
+                <InfoRow
+                  label="Deposit Paid / Received"
+                  value={
+                    <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                      {formatRupee(subscription.security_deposit_paid ?? 0)}
+                    </span>
+                  }
+                />
+                {Number(subscription.security_deposit_pending ?? Math.max(effectiveSecurityDepositAmount - Number(subscription.security_deposit_paid || 0), 0)) > 0 ? (
+                  <InfoRow
+                    label="Pending Deposit"
+                    value={
+                      <span className="font-semibold text-amber-600 dark:text-amber-400">
+                        {formatRupee(subscription.security_deposit_pending ?? Math.max(effectiveSecurityDepositAmount - Number(subscription.security_deposit_paid || 0), 0))}
+                      </span>
+                    }
+                  />
+                ) : null}
                 {Number(subscription.security_deposit_percent || 0) > 0 ? (
                   <InfoRow label="Deposit rate" value={`${subscription.security_deposit_percent}%`} />
                 ) : null}
@@ -524,7 +652,9 @@ export default function CustomerSubscriptionDetailPage() {
                       status={subscription.deposit_status || "PENDING"}
                       label={
                         subscription.deposit_status === "SUBMITTED" || subscription.deposit_status === "PAID"
-                          ? "Held / Received"
+                          ? "Held / Received (Full)"
+                          : subscription.deposit_status === "PARTIALLY_PAID" || subscription.deposit_status === "PARTIAL"
+                          ? "Partially Paid"
                           : subscription.deposit_status === "REFUNDED"
                           ? "Refunded"
                           : "Pending Deposit"

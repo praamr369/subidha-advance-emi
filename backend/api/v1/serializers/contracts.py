@@ -46,6 +46,32 @@ class AdminRentContractCreateSerializer(serializers.Serializer):
     contract_terms_snapshot = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     # Additive: when true the contract is created as DRAFT (KYC gate not applied).
     save_as_draft = serializers.BooleanField(required=False, default=False)
+    # Additive: deposit payment terms (full upfront or part payment with 20-30 day buffer)
+    deposit_payment_option = serializers.ChoiceField(
+        choices=["FULL", "PARTIAL"],
+        default="FULL",
+        required=False,
+    )
+    deposit_buffer_days = serializers.IntegerField(
+        min_value=0,
+        max_value=90,
+        default=30,
+        required=False,
+    )
+    initial_deposit_payment = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        required=False,
+        allow_null=True,
+    )
+    deposit_finance_account_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+    )
+    deposit_payment_method = serializers.CharField(
+        required=False,
+        default="CASH",
+    )
 
     def validate_start_date(self, value):
         return value or timezone.localdate()
@@ -81,6 +107,32 @@ class AdminLeaseContractCreateSerializer(serializers.Serializer):
     contract_terms_snapshot = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     # Additive: when true the contract is created as DRAFT (KYC gate not applied).
     save_as_draft = serializers.BooleanField(required=False, default=False)
+    # Additive: deposit payment terms (full upfront or part payment with 20-30 day buffer)
+    deposit_payment_option = serializers.ChoiceField(
+        choices=["FULL", "PARTIAL"],
+        default="FULL",
+        required=False,
+    )
+    deposit_buffer_days = serializers.IntegerField(
+        min_value=0,
+        max_value=90,
+        default=30,
+        required=False,
+    )
+    initial_deposit_payment = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        required=False,
+        allow_null=True,
+    )
+    deposit_finance_account_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+    )
+    deposit_payment_method = serializers.CharField(
+        required=False,
+        default="CASH",
+    )
 
     def validate_start_date(self, value):
         return value or timezone.localdate()

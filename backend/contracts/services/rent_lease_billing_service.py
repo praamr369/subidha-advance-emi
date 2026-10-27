@@ -149,18 +149,56 @@ def ensure_security_deposit_demand(*, subscription: Subscription, performed_by=N
         raise ValidationError("Security deposit demands are only supported for RENT/LEASE contracts.")
 
     profile = (
-        subscription.rent_profile
+        getattr(subscription, "rent_profile", None)
         if subscription.plan_type == PlanType.RENT
-        else subscription.lease_profile
+        else getattr(subscription, "lease_profile", None)
     )
-    deposit_amount = q2(Decimal(str(profile.security_deposit_amount or MONEY_ZERO)))
+    if not profile:
+        try:
+            if subscription.plan_type == PlanType.RENT:
+                from contracts.models import RentSubscriptionProfile
+                profile = RentSubscriptionProfile.objects.filter(subscription_id=subscription.id).first()
+            else:
+                from contracts.models import LeaseSubscriptionProfile
+                profile = LeaseSubscriptionProfile.objects.filter(subscription_id=subscription.id).first()
+        except Exception:
+            profile = None
+
+    deposit_amount = q2(Decimal(str(getattr(profile, "security_deposit_amount", None) or MONEY_ZERO)))
+    if deposit_amount == MONEY_ZERO:
+        try:
+            items_dep = sum((it.security_deposit_amount or MONEY_ZERO) for it in subscription.contract_items.all())
+            if items_dep > MONEY_ZERO:
+                deposit_amount = q2(items_dep)
+                if profile:
+                    profile.security_deposit_amount = deposit_amount
+                    profile.refundable_security_deposit = deposit_amount
+                    profile.save(update_fields=["security_deposit_amount", "refundable_security_deposit"])
+        except Exception:
+            pass
+
+    due_date = subscription.start_date or timezone.localdate()
+    snap = subscription.pricing_snapshot or {}
+    if isinstance(snap, dict):
+        deposit_due_date_str = snap.get("deposit_due_date")
+        buffer_days = snap.get("deposit_buffer_days")
+        if deposit_due_date_str:
+            try:
+                from datetime import date as _dt
+                due_date = _dt.fromisoformat(str(deposit_due_date_str))
+            except Exception:
+                pass
+        elif buffer_days and int(buffer_days) > 0 and subscription.start_date:
+            from datetime import timedelta
+            due_date = subscription.start_date + timedelta(days=int(buffer_days))
+
     demand, created = RentLeaseBillingDemand.objects.get_or_create(
         reference_key=_deposit_reference_key(subscription),
         defaults={
             "subscription": subscription,
             "demand_type": RentLeaseDemandType.SECURITY_DEPOSIT,
             "status": RentLeaseDemandStatus.PENDING,
-            "due_date": subscription.start_date or timezone.localdate(),
+            "due_date": due_date,
             "amount": deposit_amount,
             "collected_amount": MONEY_ZERO,
             "held_amount": MONEY_ZERO,
@@ -170,7 +208,9 @@ def ensure_security_deposit_demand(*, subscription: Subscription, performed_by=N
                 "contract_number": subscription.subscription_number,
                 "customer_id": subscription.customer_id,
                 "product_id": subscription.product_id,
-                "security_deposit_percent": str(profile.security_deposit_percent),
+                "security_deposit_percent": str(getattr(profile, "security_deposit_percent", "20.00")),
+                "deposit_payment_option": snap.get("deposit_payment_option", "FULL"),
+                "deposit_buffer_days": snap.get("deposit_buffer_days", 30),
             },
             "tax_profile_snapshot": _demand_tax_snapshot(
                 subscription=subscription,
@@ -179,6 +219,10 @@ def ensure_security_deposit_demand(*, subscription: Subscription, performed_by=N
             ),
         },
     )
+    if not created and demand.due_date != due_date and demand.collected_amount <= MONEY_ZERO:
+        demand.due_date = due_date
+        demand.save(update_fields=["due_date", "updated_at"])
+
     if created:
         RentLeaseDepositTransaction.objects.create(
             subscription=subscription,

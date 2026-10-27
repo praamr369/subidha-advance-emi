@@ -87,10 +87,14 @@ def _customer_subscription_queryset(customer):
             "product",
             "lucky_id",
             "partner",
+            "rent_profile",
+            "lease_profile",
         )
         .prefetch_related(
             Prefetch("emis", queryset=emi_queryset),
             get_subscription_delivery_prefetch(),
+            "contract_items",
+            "rent_lease_demands",
         )
         .order_by("-created_at", "-id")
     )

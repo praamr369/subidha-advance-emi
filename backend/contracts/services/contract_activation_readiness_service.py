@@ -168,74 +168,174 @@ def _vault_doc_blocker(docs: list, *, missing_code: str, rejected_code: str, exp
 def _rent_lease_profile(subscription):
     try:
         if subscription.plan_type == PlanType.RENT:
-            return subscription.rent_profile
+            profile = getattr(subscription, "rent_profile", None)
+            if profile is not None:
+                return profile
+            from subscriptions.models import RentSubscriptionProfile
+            return RentSubscriptionProfile.objects.filter(subscription_id=subscription.id).first()
         if subscription.plan_type == PlanType.LEASE:
-            return subscription.lease_profile
-    except ObjectDoesNotExist:
+            profile = getattr(subscription, "lease_profile", None)
+            if profile is not None:
+                return profile
+            from subscriptions.models import LeaseSubscriptionProfile
+            return LeaseSubscriptionProfile.objects.filter(subscription_id=subscription.id).first()
+    except (ObjectDoesNotExist, Exception):
         return None
     return None
 
 
-def _deposit_readiness(subscription) -> dict:
-    """Read authoritative deposit collection state without creating a demand."""
+def get_subscription_deposit_summary(subscription) -> dict:
+    """
+    Returns authoritative deposit amounts, collection progress, and status for a subscription.
+    Checks rent/lease profile, contract items, pricing snapshot, demands, and deposit transactions.
+    """
     if not subscription or not getattr(subscription, "pk", None):
         return {
-            "required": False,
-            "ready": False,
-            "expected_amount": "0.00",
-            "collected_amount": "0.00",
-            "outstanding_amount": "0.00",
-            "evidence_source": "NONE",
+            "security_deposit_amount": "0.00",
+            "security_deposit_paid": "0.00",
+            "security_deposit_pending": "0.00",
+            "refundable_security_deposit": "0.00",
+            "security_deposit_percent": "0.00",
+            "deposit_status": "NOT_REQUIRED",
+            "is_paid": False,
         }
+
+    plan_type = getattr(subscription, "plan_type", "")
+    is_rent_lease = plan_type in [PlanType.RENT, PlanType.LEASE]
 
     profile = _rent_lease_profile(subscription)
     expected = q2(
         Decimal(str(getattr(profile, "security_deposit_amount", MONEY_ZERO) or MONEY_ZERO))
     )
+
     if expected <= MONEY_ZERO:
-        return {
-            "required": True,
-            "ready": False,
-            "expected_amount": f"{expected:.2f}",
-            "collected_amount": "0.00",
-            "outstanding_amount": f"{expected:.2f}",
-            "evidence_source": "PROFILE",
-        }
+        try:
+            items = getattr(subscription, "contract_items", None)
+            if items and hasattr(items, "all"):
+                item_sum = sum((it.security_deposit_amount or MONEY_ZERO) for it in items.all())
+                if item_sum > MONEY_ZERO:
+                    expected = q2(item_sum)
+        except Exception:
+            pass
 
-    demand = (
-        RentLeaseBillingDemand.objects.filter(
-            subscription=subscription,
-            demand_type=RentLeaseDemandType.SECURITY_DEPOSIT,
-        )
-        .order_by("-created_at", "-id")
-        .first()
-    )
-    if demand is not None:
-        collected = q2(demand.collected_amount)
-        expected = q2(max(expected, demand.amount))
-        source = "SECURITY_DEPOSIT_DEMAND"
-    else:
-        collected = q2(
-            RentLeaseDepositTransaction.objects.filter(
+    if expected <= MONEY_ZERO and getattr(subscription, "pricing_snapshot", None):
+        try:
+            snap_val = subscription.pricing_snapshot.get("security_deposit_amount")
+            if snap_val:
+                expected = q2(Decimal(str(snap_val)))
+        except Exception:
+            pass
+
+    collected_demand = MONEY_ZERO
+    try:
+        dep_demand = (
+            RentLeaseBillingDemand.objects.filter(
                 subscription=subscription,
-                status=RentLeaseDepositTransactionStatus.ACTIVE,
-                transaction_type__in=[
-                    RentLeaseDepositTransactionType.COLLECTED,
-                    RentLeaseDepositTransactionType.DEPOSIT_RECEIPT,
-                ],
-            ).aggregate(total=Sum("amount"))["total"]
-            or MONEY_ZERO
+                demand_type=RentLeaseDemandType.SECURITY_DEPOSIT,
+            )
+            .order_by("-created_at", "-id")
+            .first()
         )
-        source = "ACTIVE_DEPOSIT_TRANSACTIONS" if collected > MONEY_ZERO else "NONE"
+        if dep_demand and dep_demand.collected_amount:
+            collected_demand = q2(dep_demand.collected_amount)
+            if expected <= MONEY_ZERO and dep_demand.amount:
+                expected = q2(dep_demand.amount)
+    except Exception:
+        pass
 
+    collected_tx = MONEY_ZERO
+    try:
+        tx_agg = RentLeaseDepositTransaction.objects.filter(
+            subscription=subscription,
+            status=RentLeaseDepositTransactionStatus.ACTIVE,
+            transaction_type__in=[
+                RentLeaseDepositTransactionType.COLLECTED,
+                RentLeaseDepositTransactionType.DEPOSIT_RECEIPT,
+            ],
+        ).aggregate(total=Sum("amount"))["total"]
+        if tx_agg:
+            collected_tx = q2(Decimal(str(tx_agg)))
+    except Exception:
+        pass
+
+    if expected <= MONEY_ZERO and is_rent_lease:
+        try:
+            total_amt = getattr(subscription, "total_amount", None)
+            if total_amt and Decimal(str(total_amt)) > MONEY_ZERO:
+                expected = q2(Decimal(str(total_amt)) * Decimal("0.20"))
+            else:
+                monthly = getattr(subscription, "monthly_amount", None)
+                if monthly and Decimal(str(monthly)) > MONEY_ZERO:
+                    expected = q2(Decimal(str(monthly)) * Decimal("4"))
+        except Exception:
+            pass
+
+    collected = q2(max(collected_demand, collected_tx))
     outstanding = q2(max(expected - collected, MONEY_ZERO))
+
+    refundable = expected
+    if profile and getattr(profile, "refundable_security_deposit", None):
+        try:
+            r_val = q2(Decimal(str(profile.refundable_security_deposit)))
+            if r_val > MONEY_ZERO:
+                refundable = r_val
+        except Exception:
+            pass
+
+    percent = "20.00" if is_rent_lease else "0.00"
+    if profile and getattr(profile, "security_deposit_percent", None):
+        try:
+            percent = str(profile.security_deposit_percent)
+        except Exception:
+            pass
+    elif is_rent_lease:
+        try:
+            items = getattr(subscription, "contract_items", None)
+            if items and hasattr(items, "all"):
+                first_item = items.first()
+                if first_item and getattr(first_item, "security_deposit_percent", None):
+                    percent = str(first_item.security_deposit_percent)
+        except Exception:
+            pass
+
+    refund_status = getattr(profile, "refund_status", None) if profile else None
+    if refund_status == "REFUNDED":
+        status_str = "REFUNDED"
+    elif not is_rent_lease and expected <= MONEY_ZERO:
+        status_str = "NOT_REQUIRED"
+    elif expected > MONEY_ZERO and outstanding <= MONEY_ZERO:
+        status_str = "PAID"
+    elif collected > MONEY_ZERO:
+        status_str = "PARTIALLY_PAID"
+    else:
+        status_str = "PENDING"
+
     return {
-        "required": True,
-        "ready": expected > MONEY_ZERO and outstanding <= MONEY_ZERO,
-        "expected_amount": f"{expected:.2f}",
-        "collected_amount": f"{collected:.2f}",
-        "outstanding_amount": f"{outstanding:.2f}",
-        "evidence_source": source,
+        "security_deposit_amount": f"{expected:.2f}",
+        "security_deposit_paid": f"{collected:.2f}",
+        "security_deposit_pending": f"{outstanding:.2f}",
+        "refundable_security_deposit": f"{refundable:.2f}",
+        "security_deposit_percent": percent,
+        "deposit_status": status_str,
+        "is_paid": expected > MONEY_ZERO and outstanding <= MONEY_ZERO,
+    }
+
+
+def _deposit_readiness(subscription) -> dict:
+    """Read authoritative deposit collection state without creating a demand."""
+    summary = get_subscription_deposit_summary(subscription)
+    expected = Decimal(summary["security_deposit_amount"])
+    collected = Decimal(summary["security_deposit_paid"])
+    outstanding = Decimal(summary["security_deposit_pending"])
+    is_rent_lease = getattr(subscription, "plan_type", "") in [PlanType.RENT, PlanType.LEASE]
+
+    return {
+        "required": is_rent_lease or expected > MONEY_ZERO,
+        "ready": summary["is_paid"],
+        "expected_amount": summary["security_deposit_amount"],
+        "collected_amount": summary["security_deposit_paid"],
+        "outstanding_amount": summary["security_deposit_pending"],
+        "evidence_source": "DEPOSIT_SUMMARY",
     }
 
 

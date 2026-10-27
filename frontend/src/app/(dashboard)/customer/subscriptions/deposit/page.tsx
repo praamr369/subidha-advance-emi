@@ -6,12 +6,12 @@ import { WorkspaceSection } from "@/components/ui/workspace";
 import { fetchCustomerDeposits } from "@/services/customer-portal";
 
 type Deposit = {
-  id: number;
+  id: number | string;
   subscription_number: string;
   product_name: string;
   deposit_amount: number;
   paid_amount: number;
-  status: "PENDING" | "PAID" | "REFUNDED" | "FORFEITED";
+  status: "PENDING" | "PARTIAL" | "PAID" | "REFUNDED" | "FORFEITED";
   paid_at: string | null;
   refund_eligible_date: string | null;
   refunded_at: string | null;
@@ -20,8 +20,9 @@ type Deposit = {
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   PENDING: { label: "Payment Pending", color: "yellow" },
-  PAID: { label: "Paid & Held", color: "blue" },
-  REFUNDED: { label: "Refunded", color: "green" },
+  PARTIAL: { label: "Partially Paid", color: "blue" },
+  PAID: { label: "Paid & Held", color: "green" },
+  REFUNDED: { label: "Refunded", color: "purple" },
   FORFEITED: { label: "Forfeited", color: "red" },
 };
 
@@ -96,6 +97,18 @@ export default function DepositStatusPage() {
                     <div className="text-gray-500 text-xs">Deposit Amount</div>
                     <div className="font-semibold">₹{dep.deposit_amount.toLocaleString("en-IN")}</div>
                   </div>
+                  {dep.status === "PARTIAL" && (
+                    <div>
+                      <div className="text-gray-500 text-xs">Paid So Far</div>
+                      <div className="font-semibold text-blue-600">₹{dep.paid_amount.toLocaleString("en-IN")}</div>
+                    </div>
+                  )}
+                  {dep.status === "PARTIAL" && (
+                    <div>
+                      <div className="text-gray-500 text-xs">Remaining Balance</div>
+                      <div className="font-semibold text-amber-600">₹{Math.max(dep.deposit_amount - dep.paid_amount, 0).toLocaleString("en-IN")}</div>
+                    </div>
+                  )}
                   {dep.paid_at && (
                     <div>
                       <div className="text-gray-500 text-xs">Paid On</div>

@@ -59,6 +59,11 @@ class AdminRentContractCreateView(APIView):
             handover_notes=(data.get("handover_notes") or ""),
             contract_terms_snapshot=(data.get("contract_terms_snapshot") or ""),
             save_as_draft=bool(data.get("save_as_draft", False)),
+            deposit_payment_option=data.get("deposit_payment_option", "FULL"),
+            deposit_buffer_days=data.get("deposit_buffer_days", 30),
+            initial_deposit_payment=data.get("initial_deposit_payment"),
+            deposit_finance_account_id=data.get("deposit_finance_account_id"),
+            deposit_payment_method=data.get("deposit_payment_method", "CASH"),
         )
 
         from contracts.services.contract_pdf_service import generate_contract_pdf_for_subscription
@@ -93,6 +98,11 @@ class AdminLeaseContractCreateView(APIView):
             handover_notes=(data.get("handover_notes") or ""),
             contract_terms_snapshot=(data.get("contract_terms_snapshot") or ""),
             save_as_draft=bool(data.get("save_as_draft", False)),
+            deposit_payment_option=data.get("deposit_payment_option", "FULL"),
+            deposit_buffer_days=data.get("deposit_buffer_days", 30),
+            initial_deposit_payment=data.get("initial_deposit_payment"),
+            deposit_finance_account_id=data.get("deposit_finance_account_id"),
+            deposit_payment_method=data.get("deposit_payment_method", "CASH"),
         )
 
         from contracts.services.contract_pdf_service import generate_contract_pdf_for_subscription

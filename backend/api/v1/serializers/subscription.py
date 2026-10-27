@@ -114,6 +114,8 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
     last_payment_date = serializers.SerializerMethodField()
     next_due_date = serializers.SerializerMethodField()
     contract_items = serializers.SerializerMethodField()
+    security_deposit_paid = serializers.SerializerMethodField()
+    security_deposit_pending = serializers.SerializerMethodField()
 
     has_customer_signature = serializers.SerializerMethodField()
     customer_signature_signed_at = serializers.SerializerMethodField()
@@ -160,6 +162,8 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
             "delivery_status",
             "deposit_status",
             "security_deposit_amount",
+            "security_deposit_paid",
+            "security_deposit_pending",
             "security_deposit_percent",
             "refundable_security_deposit",
             "amendments_count",
@@ -189,91 +193,33 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
         current_delivery = get_current_subscription_delivery(obj)
         return getattr(current_delivery, "status", None)
 
+    def _get_deposit_summary(self, obj):
+        cached = getattr(obj, "_cached_deposit_summary", None)
+        if cached is None:
+            from contracts.services.contract_activation_readiness_service import (
+                get_subscription_deposit_summary,
+            )
+            cached = get_subscription_deposit_summary(obj)
+            setattr(obj, "_cached_deposit_summary", cached)
+        return cached
+
     def get_deposit_status(self, obj):
-        if obj.plan_type not in ["RENT", "LEASE"]:
-            return "NOT_REQUIRED"
-        try:
-            profile = getattr(obj, "rent_profile", None) or getattr(obj, "lease_profile", None)
-            if profile and getattr(profile, "refund_status", None) == "REFUNDED":
-                return "REFUNDED"
-            from contracts.services.contract_activation_readiness_service import _deposit_readiness
-            deposit = _deposit_readiness(obj)
-            if deposit.get("required"):
-                return "SUBMITTED" if deposit.get("ready") else "PENDING"
-            return "NOT_REQUIRED"
-        except Exception:
-            return "PENDING" if obj.plan_type in ["RENT", "LEASE"] else "NOT_REQUIRED"
+        return self._get_deposit_summary(obj)["deposit_status"]
 
     def get_security_deposit_amount(self, obj):
-        try:
-            if obj.plan_type == PlanType.RENT and hasattr(obj, "rent_profile") and obj.rent_profile:
-                val = obj.rent_profile.security_deposit_amount
-                if val is not None and Decimal(str(val)) > Decimal("0.00"):
-                    return str(val)
-            if obj.plan_type == PlanType.LEASE and hasattr(obj, "lease_profile") and obj.lease_profile:
-                val = obj.lease_profile.security_deposit_amount
-                if val is not None and Decimal(str(val)) > Decimal("0.00"):
-                    return str(val)
-        except Exception:
-            pass
-        try:
-            items = getattr(obj, "contract_items", None)
-            if items and hasattr(items, "all"):
-                item_list = list(items.all())
-                if item_list:
-                    total_dep = sum((it.security_deposit_amount or Decimal("0.00")) for it in item_list)
-                    if total_dep > Decimal("0.00"):
-                        return str(total_dep)
-        except Exception:
-            pass
-        if obj.pricing_snapshot and isinstance(obj.pricing_snapshot, dict):
-            dep = obj.pricing_snapshot.get("security_deposit_amount")
-            if dep is not None and Decimal(str(dep)) > Decimal("0.00"):
-                return str(dep)
-        try:
-            if obj.plan_type == PlanType.RENT and hasattr(obj, "rent_profile") and obj.rent_profile:
-                return str(obj.rent_profile.security_deposit_amount or Decimal("0.00"))
-            if obj.plan_type == PlanType.LEASE and hasattr(obj, "lease_profile") and obj.lease_profile:
-                return str(obj.lease_profile.security_deposit_amount or Decimal("0.00"))
-        except Exception:
-            pass
-        return "0.00"
+        return self._get_deposit_summary(obj)["security_deposit_amount"]
 
-    def get_security_deposit_percent(self, obj):
-        try:
-            if obj.plan_type == PlanType.RENT and hasattr(obj, "rent_profile") and obj.rent_profile:
-                val = obj.rent_profile.security_deposit_percent
-                if val is not None and Decimal(str(val)) > Decimal("0.00"):
-                    return str(val)
-            if obj.plan_type == PlanType.LEASE and hasattr(obj, "lease_profile") and obj.lease_profile:
-                val = obj.lease_profile.security_deposit_percent
-                if val is not None and Decimal(str(val)) > Decimal("0.00"):
-                    return str(val)
-        except Exception:
-            pass
-        try:
-            items = getattr(obj, "contract_items", None)
-            if items and hasattr(items, "all"):
-                first_item = items.first()
-                if first_item and getattr(first_item, "security_deposit_percent", None):
-                    return str(first_item.security_deposit_percent)
-        except Exception:
-            pass
-        return "20.00" if obj.plan_type in [PlanType.RENT, PlanType.LEASE] else "0.00"
+    def get_security_deposit_paid(self, obj):
+        return self._get_deposit_summary(obj)["security_deposit_paid"]
+
+    def get_security_deposit_pending(self, obj):
+        return self._get_deposit_summary(obj)["security_deposit_pending"]
 
     def get_refundable_security_deposit(self, obj):
-        try:
-            if obj.plan_type == PlanType.RENT and hasattr(obj, "rent_profile") and obj.rent_profile:
-                val = obj.rent_profile.refundable_security_deposit or obj.rent_profile.security_deposit_amount
-                if val is not None and Decimal(str(val)) > Decimal("0.00"):
-                    return str(val)
-            if obj.plan_type == PlanType.LEASE and hasattr(obj, "lease_profile") and obj.lease_profile:
-                val = obj.lease_profile.refundable_security_deposit or obj.lease_profile.security_deposit_amount
-                if val is not None and Decimal(str(val)) > Decimal("0.00"):
-                    return str(val)
-        except Exception:
-            pass
-        return self.get_security_deposit_amount(obj)
+        return self._get_deposit_summary(obj)["refundable_security_deposit"]
+
+    def get_security_deposit_percent(self, obj):
+        return self._get_deposit_summary(obj)["security_deposit_percent"]
 
     def get_amendments_count(self, obj):
         try:
@@ -286,27 +232,33 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
     def get_contract_items(self, obj):
         if obj.plan_type not in (PlanType.RENT, PlanType.LEASE):
             return []
-        items = obj.contract_items.select_related("product").all()
-        return [
-            {
-                "id": it.id,
-                "product": it.product_id,
-                "product_id": it.product_id,
-                "product_name": it.product.name,
-                "product_code": it.product.product_code,
-                "sku": getattr(it.product, "sku", ""),
-                "category": getattr(it.product, "category", ""),
-                "quantity": it.quantity,
-                "unit_base_price": str(it.unit_base_price),
-                "total_base_price": str(it.total_base_price),
-                "monthly_yield_percent": str(it.monthly_yield_percent),
-                "monthly_amount": str(it.monthly_amount),
-                "security_deposit_percent": str(getattr(it, "security_deposit_percent", "20.00")),
-                "security_deposit_amount": str(it.security_deposit_amount),
-                "product_snapshot": it.product_snapshot,
-            }
-            for it in items
-        ]
+        items = list(obj.contract_items.select_related("product").all())
+        if items:
+            return [
+                {
+                    "id": it.id,
+                    "product": it.product_id,
+                    "product_id": it.product_id,
+                    "product_name": it.product.name,
+                    "product_code": it.product.product_code,
+                    "sku": getattr(it.product, "sku", ""),
+                    "category": getattr(it.product, "category", ""),
+                    "quantity": it.quantity,
+                    "unit_base_price": str(it.unit_base_price),
+                    "total_base_price": str(it.total_base_price),
+                    "monthly_yield_percent": str(it.monthly_yield_percent),
+                    "monthly_amount": str(it.monthly_amount),
+                    "security_deposit_percent": str(getattr(it, "security_deposit_percent", "20.00")),
+                    "security_deposit_amount": str(it.security_deposit_amount),
+                    "product_snapshot": it.product_snapshot,
+                }
+                for it in items
+            ]
+        if obj.product_snapshot and isinstance(obj.product_snapshot, dict):
+            snap_items = obj.product_snapshot.get("items")
+            if isinstance(snap_items, list) and snap_items:
+                return snap_items
+        return []
 
     def get_product_image(self, obj):
         return serialize_media_url(

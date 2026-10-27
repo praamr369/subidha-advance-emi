@@ -130,20 +130,55 @@ def public_contract_sign_view(request, token: str):
     )
 
     if request.method == "GET":
+        from contracts.services.contract_activation_readiness_service import (
+            get_subscription_deposit_summary,
+        )
+
+        dep_summary = get_subscription_deposit_summary(subscription)
+
         items_summary = []
-        if hasattr(subscription, "contract_items"):
-            for itm in subscription.contract_items.all():
+        if hasattr(subscription, "contract_items") and subscription.contract_items.exists():
+            for itm in subscription.contract_items.select_related("product").all():
                 pname = getattr(itm.product, "name", "Furniture Item")
                 items_summary.append({
+                    "id": itm.id,
+                    "product_id": itm.product_id,
                     "name": pname,
+                    "product_code": getattr(itm.product, "product_code", ""),
                     "quantity": itm.quantity,
+                    "unit_base_price": str(itm.unit_base_price),
+                    "total_base_price": str(itm.total_base_price),
                     "monthly_amount": str(itm.monthly_amount),
+                    "monthly_yield_percent": str(itm.monthly_yield_percent),
+                    "security_deposit_amount": str(itm.security_deposit_amount),
+                    "security_deposit_percent": str(getattr(itm, "security_deposit_percent", "20.00")),
                 })
+        elif subscription.product_snapshot and isinstance(subscription.product_snapshot, dict):
+            snap_items = subscription.product_snapshot.get("items")
+            if isinstance(snap_items, list) and snap_items:
+                for idx, sitm in enumerate(snap_items, 1):
+                    items_summary.append({
+                        "id": sitm.get("product_id") or idx,
+                        "product_id": sitm.get("product_id"),
+                        "name": sitm.get("product_name") or "Furniture Item",
+                        "product_code": sitm.get("product_code", ""),
+                        "quantity": sitm.get("quantity", 1),
+                        "unit_base_price": str(sitm.get("unit_base_price", "0.00")),
+                        "total_base_price": str(sitm.get("total_base_price", "0.00")),
+                        "monthly_amount": str(sitm.get("monthly_amount", "0.00")),
+                        "monthly_yield_percent": str(sitm.get("monthly_yield_percent", "")),
+                        "security_deposit_amount": str(sitm.get("security_deposit_amount", "0.00")),
+                        "security_deposit_percent": str(sitm.get("security_deposit_percent", "20.00")),
+                    })
 
-        product_display_name = getattr(product, "name", "")
-        if not product_display_name and items_summary:
-            product_display_name = f"{items_summary[0]['name']} (+{len(items_summary) - 1} more)" if len(items_summary) > 1 else items_summary[0]["name"]
-        elif not product_display_name and subscription.product_snapshot:
+        product_display_name = ""
+        if len(items_summary) > 1:
+            product_display_name = f"{items_summary[0]['name']} + {len(items_summary) - 1} more ({len(items_summary)} items)"
+        elif len(items_summary) == 1:
+            product_display_name = items_summary[0]["name"]
+        elif product:
+            product_display_name = getattr(product, "name", "")
+        elif subscription.product_snapshot:
             product_display_name = subscription.product_snapshot.get("name", "Furniture Package")
 
         sig_url = None
@@ -169,6 +204,12 @@ def public_contract_sign_view(request, token: str):
             "monthly_amount": str(subscription.monthly_amount),
             "tenure_months": subscription.tenure_months,
             "start_date": str(subscription.start_date) if subscription.start_date else None,
+            "security_deposit_amount": dep_summary["security_deposit_amount"],
+            "security_deposit_paid": dep_summary["security_deposit_paid"],
+            "security_deposit_pending": dep_summary["security_deposit_pending"],
+            "refundable_security_deposit": dep_summary["refundable_security_deposit"],
+            "security_deposit_percent": dep_summary["security_deposit_percent"],
+            "deposit_status": dep_summary["deposit_status"],
             "already_signed": bool(existing_sig),
             "signed_at": existing_sig.created_at.isoformat() if existing_sig else None,
             "signature_url": sig_url,

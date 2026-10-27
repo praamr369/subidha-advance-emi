@@ -291,6 +291,39 @@ export default function PublicContractSignPage({ params }: PageProps) {
               </div>
             ) : null}
 
+            {contract.items && contract.items.length > 0 ? (
+              <div className="mt-4 rounded-xl border border-border bg-muted/30 p-3 text-left text-xs">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">
+                  Products in Contract ({contract.items.length} {contract.items.length === 1 ? "item" : "items"})
+                </div>
+                <div className="divide-y divide-border/60">
+                  {contract.items.map((item, idx) => (
+                    <div key={item.id || idx} className="py-1.5 flex items-center justify-between">
+                      <span className="font-semibold text-foreground">
+                        {idx + 1}. {item.name} × {item.quantity}
+                      </span>
+                      <span className="font-bold text-primary">{formatDocumentMoney(item.monthly_amount)}/mo</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {Number(contract.security_deposit_amount || 0) > 0 ? (
+              <div className="mt-3 rounded-xl border border-sky-100 bg-sky-50/50 dark:bg-sky-950/20 p-3 text-left text-xs">
+                <div className="flex justify-between font-semibold">
+                  <span className="text-muted-foreground">Security Deposit:</span>
+                  <span className="text-foreground">{formatDocumentMoney(contract.security_deposit_amount)}</span>
+                </div>
+                <div className="flex justify-between font-semibold mt-1">
+                  <span className="text-muted-foreground">Paid Deposit:</span>
+                  <span className="text-emerald-700 dark:text-emerald-400">
+                    {formatDocumentMoney(contract.security_deposit_paid || "0.00")} ({contract.deposit_status || "PAID"})
+                  </span>
+                </div>
+              </div>
+            ) : null}
+
             <div className="mt-4 rounded-xl border border-sky-200 bg-sky-50 dark:bg-sky-950/30 p-3 text-left text-xs text-sky-800 dark:text-sky-200">
               <p className="font-semibold flex items-center gap-1.5">
                 <span>👤</span>
@@ -346,10 +379,57 @@ export default function PublicContractSignPage({ params }: PageProps) {
                   <span className="text-muted-foreground">Contract Ref:</span>
                   <div className="font-semibold text-foreground">{contract.contract_ref}</div>
                 </div>
-                <div className="col-span-2">
-                  <span className="text-muted-foreground">Product / Package:</span>
-                  <div className="font-semibold text-foreground">{contract.product_name}</div>
-                </div>
+
+                {/* Single or Multi-Product Display */}
+                {contract.items && contract.items.length > 0 ? (
+                  <div className="col-span-2 rounded-xl border border-amber-200/80 bg-amber-50/50 dark:bg-amber-950/20 p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-amber-900 dark:text-amber-300">
+                        Chosen Furniture Products ({contract.items.length} {contract.items.length === 1 ? "item" : "items"})
+                      </span>
+                      {contract.items.length > 1 ? (
+                        <span className="rounded-full bg-amber-200/70 dark:bg-amber-900/60 px-2 py-0.5 text-[10px] font-bold text-amber-900 dark:text-amber-200">
+                          Multi-Item Package
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="divide-y divide-amber-200/50 dark:divide-amber-900/50">
+                      {contract.items.map((item, idx) => (
+                        <div key={item.id || idx} className="py-2 flex items-start justify-between gap-3 text-xs">
+                          <div className="min-w-0 flex-1">
+                            <div className="font-semibold text-foreground flex items-center gap-1.5 flex-wrap">
+                              <span>{idx + 1}. {item.name}</span>
+                              <span className="rounded bg-muted px-1.5 py-0.2 text-[10px] text-muted-foreground font-mono">
+                                Qty: {item.quantity}
+                              </span>
+                            </div>
+                            {item.product_code ? (
+                              <div className="text-[10px] text-muted-foreground font-mono mt-0.5">
+                                Code: {item.product_code}
+                              </div>
+                            ) : null}
+                          </div>
+                          <div className="text-right shrink-0">
+                            <div className="font-bold text-primary">
+                              {formatDocumentMoney(item.monthly_amount)}/mo
+                            </div>
+                            {Number(item.security_deposit_amount || 0) > 0 ? (
+                              <div className="text-[10px] text-muted-foreground">
+                                Deposit: {formatDocumentMoney(item.security_deposit_amount)}
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="col-span-2">
+                    <span className="text-muted-foreground">Product / Package:</span>
+                    <div className="font-semibold text-foreground">{contract.product_name}</div>
+                  </div>
+                )}
+
                 <div>
                   <span className="text-muted-foreground">Monthly Installment:</span>
                   <div className="text-sm font-bold text-primary">
@@ -372,6 +452,70 @@ export default function PublicContractSignPage({ params }: PageProps) {
                     {formatDocumentMoney(contract.total_amount)}
                   </div>
                 </div>
+
+                {/* Security Deposit Details */}
+                {(contract.plan_type === "RENT" ||
+                  contract.plan_type === "LEASE" ||
+                  Number(contract.security_deposit_amount || 0) > 0) ? (
+                  <div className="col-span-2 rounded-xl border border-sky-200 bg-sky-50/60 dark:bg-sky-950/30 p-3.5 text-xs">
+                    <div className="flex items-center justify-between pb-2 border-b border-sky-200/60 dark:border-sky-800/60">
+                      <div className="font-bold text-sky-950 dark:text-sky-200 flex items-center gap-1.5">
+                        <span>🛡</span>
+                        <span>Security Deposit Details</span>
+                      </div>
+                      <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                        contract.deposit_status === "PAID" || contract.deposit_status === "SUBMITTED"
+                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                          : contract.deposit_status === "PARTIALLY_PAID" || contract.deposit_status === "PARTIAL"
+                          ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                          : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                      }`}>
+                        {contract.deposit_status === "PAID" || contract.deposit_status === "SUBMITTED"
+                          ? "✓ Deposit Paid"
+                          : contract.deposit_status === "PARTIALLY_PAID" || contract.deposit_status === "PARTIAL"
+                          ? "Partially Paid"
+                          : "Deposit Pending"}
+                      </span>
+                    </div>
+
+                    <div className="mt-2.5 grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <span className="text-muted-foreground">Deposit Required:</span>
+                        <div className="text-sm font-bold text-foreground">
+                          {formatDocumentMoney(contract.security_deposit_amount || "0.00")}
+                          {contract.security_deposit_percent && Number(contract.security_deposit_percent) > 0 ? (
+                            <span className="ml-1 text-[10px] text-muted-foreground font-normal">
+                              ({contract.security_deposit_percent}%)
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Deposit Paid / Received:</span>
+                        <div className="text-sm font-bold text-emerald-700 dark:text-emerald-400">
+                          {formatDocumentMoney(contract.security_deposit_paid || "0.00")}
+                        </div>
+                      </div>
+                      {Number(contract.security_deposit_pending || 0) > 0 ? (
+                        <div>
+                          <span className="text-muted-foreground">Pending Deposit:</span>
+                          <div className="font-semibold text-amber-700 dark:text-amber-400">
+                            {formatDocumentMoney(contract.security_deposit_pending || "0.00")}
+                          </div>
+                        </div>
+                      ) : null}
+                      <div>
+                        <span className="text-muted-foreground">Refundable Deposit:</span>
+                        <div className="font-semibold text-foreground">
+                          {formatDocumentMoney(contract.refundable_security_deposit || contract.security_deposit_amount || "0.00")}
+                        </div>
+                      </div>
+                    </div>
+                    <p className="mt-2.5 text-[11px] text-muted-foreground leading-relaxed">
+                      Security deposit is held in a protected escrow balance and is 100% refundable upon completion of tenure and asset condition return inspection.
+                    </p>
+                  </div>
+                ) : null}
               </div>
             </div>
 

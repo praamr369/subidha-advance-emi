@@ -8,6 +8,7 @@ import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import CustomerPageShell, { CPageCard, CPageSection, CPageTabs } from "@/components/layout/CustomerPageShell";
 import { apiFetch } from "@/lib/api";
+import { openAuthenticatedFile } from "@/lib/export/auth-download";
 
 type ArchiveCategory = "ALL" | "AGREEMENT" | "RECEIPT" | "DRAW_CERTIFICATE";
 
@@ -61,6 +62,7 @@ export default function CustomerDocumentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [entries, setEntries] = useState<ArchiveEntry[]>([]);
   const [tab, setTab] = useState<ArchiveCategory>("ALL");
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -124,15 +126,44 @@ export default function CustomerDocumentsPage() {
                   </div>
                 </div>
                 {entry.download_url ? (
-                  <a
-                    href={entry.download_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-background py-2.5 text-xs font-semibold text-foreground hover:bg-muted transition"
+                  <button
+                    type="button"
+                    disabled={downloadingId === entry.id}
+                    onClick={async (e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setDownloadingId(entry.id);
+                      try {
+                        const url = entry.download_url!;
+                        if (url.startsWith("/api/") || !url.startsWith("http")) {
+                          await openAuthenticatedFile(
+                            url,
+                            `${entry.label.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`
+                          );
+                        } else {
+                          window.open(url, "_blank", "noopener,noreferrer");
+                        }
+                      } catch (err) {
+                        alert(
+                          err instanceof Error
+                            ? err.message
+                            : "Failed to open document."
+                        );
+                      } finally {
+                        setDownloadingId(null);
+                      }
+                    }}
+                    className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-background py-2.5 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-60 transition active:scale-95"
                   >
-                    <FileDown className="size-3.5" />
-                    {entry.download_label}
-                  </a>
+                    <FileDown
+                      className={`size-3.5 ${downloadingId === entry.id ? "animate-bounce" : ""}`}
+                    />
+                    <span>
+                      {downloadingId === entry.id
+                        ? "Opening..."
+                        : entry.download_label}
+                    </span>
+                  </button>
                 ) : (
                   <p className="mt-3 text-xs text-muted-foreground text-center">File not available</p>
                 )}

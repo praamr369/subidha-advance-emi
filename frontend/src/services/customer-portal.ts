@@ -1,4 +1,5 @@
 import { apiFetch } from '@/lib/api'
+import { getAccessToken } from '@/lib/auth/tokens'
 
 // ── Deliveries: Handover Receipts ──
 
@@ -9,17 +10,23 @@ export async function fetchCustomerHandoverReceipts(): Promise<unknown> {
 // ── Contracts ──
 
 export function customerRentContractPdfUrl(subscriptionId: number | string): string {
-  return `/api/v1/customer/rent-contracts/${subscriptionId}/pdf/`
+  const token = typeof window !== 'undefined' ? getAccessToken() : null
+  const base = `/api/v1/customer/rent-contracts/${subscriptionId}/pdf/`
+  return token ? `${base}?token=${encodeURIComponent(token)}` : base
 }
 
 export function customerLeaseContractPdfUrl(subscriptionId: number | string): string {
-  return `/api/v1/customer/lease-contracts/${subscriptionId}/pdf/`
+  const token = typeof window !== 'undefined' ? getAccessToken() : null
+  const base = `/api/v1/customer/lease-contracts/${subscriptionId}/pdf/`
+  return token ? `${base}?token=${encodeURIComponent(token)}` : base
 }
 
 // ── Receipts ──
 
 export function customerReceiptPdfUrl(receiptId: number | string): string {
-  return `/api/v1/customer/receipts/${receiptId}/pdf/`
+  const token = typeof window !== 'undefined' ? getAccessToken() : null
+  const base = `/api/v1/customer/receipts/${receiptId}/pdf/`
+  return token ? `${base}?token=${encodeURIComponent(token)}` : base
 }
 
 // ── Returns ──

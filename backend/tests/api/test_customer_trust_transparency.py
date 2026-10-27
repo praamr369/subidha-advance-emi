@@ -150,6 +150,33 @@ class CustomerTrustTransparencyApiTests(APITestCase):
         response = self.client.get(f"/api/v1/customer/rent-contracts/{self.rent_subscription.id}/pdf/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("application/pdf", response["Content-Type"])
+        self.assertIn("inline", response["Content-Disposition"])
+
+    def test_contract_pdf_works_with_query_param_token(self):
+        from rest_framework_simplejwt.tokens import RefreshToken
+
+        token = str(RefreshToken.for_user(self.customer_one.user).access_token)
+        self.client.logout()
+
+        # Query param token authentication
+        response = self.client.get(
+            f"/api/v1/customer/rent-contracts/{self.rent_subscription.id}/pdf/?token={token}"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("application/pdf", response["Content-Type"])
+        self.assertIn("inline", response["Content-Disposition"])
+
+        # With download=1 query param
+        download_resp = self.client.get(
+            f"/api/v1/customer/rent-contracts/{self.rent_subscription.id}/pdf/?token={token}&download=1"
+        )
+        self.assertEqual(download_resp.status_code, status.HTTP_200_OK)
+        self.assertIn("attachment", download_resp["Content-Disposition"])
+
+    def test_contract_pdf_without_auth_fails_with_401(self):
+        self.client.logout()
+        response = self.client.get(f"/api/v1/customer/rent-contracts/{self.rent_subscription.id}/pdf/")
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_public_page_data_smoke_endpoints(self):
         paths = [

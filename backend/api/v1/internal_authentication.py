@@ -2,6 +2,40 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
+from rest_framework_simplejwt.authentication import JWTAuthentication
+
+
+class QueryParamJWTAuthentication(JWTAuthentication):
+    """
+    Extends SimpleJWT's JWTAuthentication to accept JWT access tokens in URL query
+    parameters (?token=... or ?access_token=...) for read-only GET/HEAD requests
+    such as PDF/document downloads opened directly by the browser in new tabs.
+    Prioritizes standard Authorization headers if present.
+    """
+
+    def authenticate(self, request):
+        header = self.get_header(request)
+        if header is not None:
+            return super().authenticate(request)
+
+        if request.method not in ("GET", "HEAD"):
+            return None
+
+        raw_token = (
+            request.query_params.get("token")
+            or request.query_params.get("access_token")
+            or request.GET.get("token")
+            or request.GET.get("access_token")
+            or ""
+        ).strip()
+        if not raw_token:
+            return None
+
+        try:
+            validated_token = self.get_validated_token(raw_token.encode("utf-8"))
+            return self.get_user(validated_token), validated_token
+        except Exception:
+            return None
 
 
 class InternalServiceAuthentication(BaseAuthentication):

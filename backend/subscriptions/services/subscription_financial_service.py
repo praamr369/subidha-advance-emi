@@ -86,6 +86,7 @@ def get_subscription_detail_queryset():
             ),
         ),
         "rent_lease_demands",
+        "contract_items",
         get_subscription_delivery_prefetch(),
     )
 

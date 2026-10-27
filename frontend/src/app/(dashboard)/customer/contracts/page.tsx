@@ -2,9 +2,10 @@
 
 import { formatRupee } from "@/lib/utils/currency";
 import Link from "next/link";
-import { Star, Camera } from "lucide-react";
+import { Star, Camera, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import CustomerProductLink from "@/components/customers/CustomerProductInspectModal";
+import { openAuthenticatedFile } from "@/lib/export/auth-download";
 
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
@@ -51,6 +52,7 @@ function planLabel(planType: string) {
 }
 
 function ContractCard({ sub }: { sub: CustomerSubscription }) {
+  const [openingPdf, setOpeningPdf] = useState(false);
   const pt = (sub.plan_type ?? "").toUpperCase();
   const isWinner =
     (sub.status || "").toUpperCase() === "WON" ||
@@ -212,27 +214,40 @@ function ContractCard({ sub }: { sub: CustomerSubscription }) {
             ✍ Sign Contract
           </Link>
         ) : null}
-        {pt === "RENT" ? (
-          <a
-            href={customerRentContractPdfUrl(sub.id)}
-            target="_blank"
-            rel="noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="flex-1 min-w-[90px] rounded-xl border border-border bg-background py-2 text-center text-xs font-semibold hover:bg-muted"
+        {pt === "RENT" || pt === "LEASE" ? (
+          <button
+            type="button"
+            disabled={openingPdf}
+            onClick={async (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setOpeningPdf(true);
+              try {
+                const path =
+                  pt === "RENT"
+                    ? customerRentContractPdfUrl(sub.id)
+                    : customerLeaseContractPdfUrl(sub.id);
+                const filename = `${pt.toLowerCase()}-contract-${sub.id}.pdf`;
+                await openAuthenticatedFile(path, filename);
+              } catch (err) {
+                alert(
+                  err instanceof Error ? err.message : "Failed to open contract PDF."
+                );
+              } finally {
+                setOpeningPdf(false);
+              }
+            }}
+            className="flex-1 min-w-[90px] rounded-xl border border-border bg-background py-2 text-center text-xs font-semibold hover:bg-muted disabled:opacity-60 flex items-center justify-center gap-1.5 transition active:scale-95"
           >
-            Contract PDF
-          </a>
-        ) : null}
-        {pt === "LEASE" ? (
-          <a
-            href={customerLeaseContractPdfUrl(sub.id)}
-            target="_blank"
-            rel="noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="flex-1 min-w-[90px] rounded-xl border border-border bg-background py-2 text-center text-xs font-semibold hover:bg-muted"
-          >
-            Contract PDF
-          </a>
+            {openingPdf ? (
+              <>
+                <Loader2 className="size-3 animate-spin" />
+                <span>Opening...</span>
+              </>
+            ) : (
+              <span>Contract PDF</span>
+            )}
+          </button>
         ) : null}
         {pt === "RENT" || pt === "LEASE" ? (
           <Link

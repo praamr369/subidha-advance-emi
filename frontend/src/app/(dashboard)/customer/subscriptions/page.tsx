@@ -65,9 +65,36 @@ function SubscriptionCard({ sub }: { sub: CustomerSubscription }) {
   const itemsDepositTotal = Array.isArray(sub.contract_items)
     ? sub.contract_items.reduce((sum, item) => sum + Number(item.security_deposit_amount || 0), 0)
     : 0;
-  const effectiveDeposit = Number(sub.security_deposit_amount || 0) > 0
-    ? sub.security_deposit_amount
-    : (itemsDepositTotal > 0 ? itemsDepositTotal : (sub.security_deposit_amount || 0));
+  const snapDeposit = Number(
+    (sub.pricing_snapshot as Record<string, unknown> | undefined)?.security_deposit_amount || 0
+  );
+  const directDeposit = Number(sub.security_deposit_amount || 0);
+
+  const effectiveDeposit = useMemo(() => {
+    if (directDeposit > 0) return directDeposit;
+    if (itemsDepositTotal > 0) return itemsDepositTotal;
+    if (snapDeposit > 0) return snapDeposit;
+    const ref = Number(sub.refundable_security_deposit || 0);
+    if (ref > 0) return ref;
+    if (Array.isArray(sub.rent_lease_demands)) {
+      const depDemand = sub.rent_lease_demands.find((d) => d.demand_type === "SECURITY_DEPOSIT");
+      if (depDemand && Number(depDemand.amount || 0) > 0) {
+        return Number(depDemand.amount);
+      }
+    }
+    if (isRentOrLease) {
+      const itemsBaseTotal = Array.isArray(sub.contract_items)
+        ? sub.contract_items.reduce((sum, item) => sum + Number(item.total_base_price || 0), 0)
+        : 0;
+      const base = itemsBaseTotal > 0 ? itemsBaseTotal : Number(sub.product_base_price || 0);
+      const pct = Number(sub.security_deposit_percent || 20);
+      if (base > 0) return (base * pct) / 100;
+      if (Number(sub.monthly_amount || 0) > 0) {
+        return Number(sub.monthly_amount) * 4;
+      }
+    }
+    return 0;
+  }, [directDeposit, itemsDepositTotal, snapDeposit, sub, isRentOrLease]);
 
   return (
     <CPageCard href={`/customer/subscriptions/${sub.id}`}>
@@ -101,6 +128,25 @@ function SubscriptionCard({ sub }: { sub: CustomerSubscription }) {
               {sub.subscription_number}
             </div>
           ) : null}
+
+          {sub.contract_items && sub.contract_items.length > 1 ? (
+            <div className="mt-2.5 rounded-xl border border-border/70 bg-muted/30 p-2 text-xs">
+              <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">
+                <span>Products ({sub.contract_items.length})</span>
+                <span className="text-primary font-semibold">Multi-Product Package</span>
+              </div>
+              <div className="divide-y divide-border/50">
+                {sub.contract_items.map((item, idx) => (
+                  <div key={item.id || idx} className="py-1 flex items-center justify-between gap-1 text-[11px]">
+                    <span className="font-medium text-foreground truncate">
+                      {idx + 1}. {(item.product_name || "").replace(/\s*\([^)]+:[^)]+\)\s*$/i, "").trim()} × {item.quantity}
+                    </span>
+                    <span className="font-semibold text-primary shrink-0">{formatRupee(item.monthly_amount)}/mo</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
         <ERPStatusBadge status={sub.status || "ACTIVE"} />
       </div>
@@ -123,7 +169,7 @@ function SubscriptionCard({ sub }: { sub: CustomerSubscription }) {
         <div>
           <span className="text-muted-foreground">{isRentOrLease ? "Installment Progress" : "EMI Progress"}</span>
           <div className="font-semibold mt-0.5">
-            {sub.paid_emi_count ?? 0} of {sub.emi_count ?? sub.tenure_months ?? "—"} Paid
+            {sub.paid_emi_count ?? 0} of {(isRentOrLease ? (sub.tenure_months ?? sub.emi_count ?? 12) : (sub.emi_count ?? sub.tenure_months)) ?? "—"} Paid
           </div>
         </div>
         {Number(effectiveDeposit || 0) > 0 || isRentOrLease ? (
@@ -131,6 +177,19 @@ function SubscriptionCard({ sub }: { sub: CustomerSubscription }) {
             <span className="text-muted-foreground">Security Deposit</span>
             <div className="font-semibold text-primary mt-0.5">
               {formatRupee(effectiveDeposit)}
+            </div>
+            <div className="text-[10px] mt-0.5 font-medium flex items-center gap-1 flex-wrap">
+              <span className="text-muted-foreground">Paid:</span>
+              <span className={Number(sub.security_deposit_paid || 0) >= Number(effectiveDeposit) && Number(effectiveDeposit) > 0 ? "font-bold text-emerald-600 dark:text-emerald-400" : "font-semibold text-foreground"}>
+                {formatRupee(sub.security_deposit_paid || 0)}
+              </span>
+              {Number(sub.security_deposit_paid || 0) >= Number(effectiveDeposit) && Number(effectiveDeposit) > 0 ? (
+                <span className="text-emerald-600 dark:text-emerald-400">✓</span>
+              ) : Number(sub.security_deposit_pending ?? Math.max(Number(effectiveDeposit) - Number(sub.security_deposit_paid || 0), 0)) > 0 ? (
+                <span className="text-amber-600 dark:text-amber-400">
+                  ({formatRupee(sub.security_deposit_pending ?? Math.max(Number(effectiveDeposit) - Number(sub.security_deposit_paid || 0), 0))} due)
+                </span>
+              ) : null}
             </div>
           </div>
         ) : null}

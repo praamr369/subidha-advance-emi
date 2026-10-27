@@ -622,6 +622,7 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "api.v1.internal_authentication.QueryParamJWTAuthentication",
         "api.v1.internal_authentication.InternalServiceAuthentication",
     ),
     # Versioning. Reads the version from the /api/<version>/ prefix that is

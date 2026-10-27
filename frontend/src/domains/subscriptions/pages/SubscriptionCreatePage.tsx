@@ -505,6 +505,9 @@ export default function SubscriptionCreatePage({
   const [handoverNotes, setHandoverNotes] = useState("");
   const [contractTermsSnapshot, setContractTermsSnapshot] = useState("");
   const [yieldRatePercent, setYieldRatePercent] = useState("5.00");
+  const [depositPaymentOption, setDepositPaymentOption] = useState<"FULL" | "PARTIAL">("FULL");
+  const [depositBufferDays, setDepositBufferDays] = useState("30");
+  const [initialDepositPayment, setInitialDepositPayment] = useState("");
 
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [signatureFile, setSignatureFile] = useState<File | null>(null);
@@ -1568,6 +1571,13 @@ export default function SubscriptionCreatePage({
           handover_notes: handoverNotes || "",
           contract_terms_snapshot: contractTermsSnapshot || "",
           save_as_draft: asDraft,
+          deposit_payment_option: depositPaymentOption,
+          deposit_buffer_days: Number(depositBufferDays) || 30,
+          initial_deposit_payment: initialDepositPayment.trim()
+            ? Number(initialDepositPayment)
+            : depositPaymentOption === "FULL"
+              ? securityDepositAmount
+              : null,
         };
 
         created = await apiFetch<CreatedSubscriptionResponse>("/admin/contracts/rent/", {
@@ -1601,6 +1611,13 @@ export default function SubscriptionCreatePage({
           handover_notes: handoverNotes || "",
           contract_terms_snapshot: contractTermsSnapshot || "",
           save_as_draft: asDraft,
+          deposit_payment_option: depositPaymentOption,
+          deposit_buffer_days: Number(depositBufferDays) || 30,
+          initial_deposit_payment: initialDepositPayment.trim()
+            ? Number(initialDepositPayment)
+            : depositPaymentOption === "FULL"
+              ? securityDepositAmount
+              : null,
         };
 
         created = await apiFetch<CreatedSubscriptionResponse>("/admin/contracts/lease/", {
@@ -2487,6 +2504,98 @@ export default function SubscriptionCreatePage({
                           : `Computed from base price ${money(totalProductBaseValue)}`}
                       </div>
                     </div>
+                  </div>
+
+                  {/* Security Deposit Payment Terms: Full upfront vs Part payment with buffer */}
+                  <div className="mt-4 rounded-xl border border-border bg-[var(--surface-card-elevated)] p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs font-semibold text-foreground">
+                        Deposit Payment Plan &amp; Buffer
+                      </div>
+                      <span className="text-[10px] text-muted-foreground font-mono">
+                        Total Deposit: {money(securityDepositAmount)}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Customer can pay full security deposit upfront at creation time, or make a part payment with a 20–30 day buffer to complete the full deposit.
+                    </p>
+
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDepositPaymentOption("FULL");
+                          setInitialDepositPayment(String(securityDepositAmount));
+                        }}
+                        className={`rounded-lg border px-3 py-2 text-xs font-semibold transition text-left ${
+                          depositPaymentOption === "FULL"
+                            ? "border-primary bg-primary/10 text-primary ring-1 ring-primary"
+                            : "border-border bg-background text-muted-foreground hover:bg-muted"
+                        }`}
+                      >
+                        <div className="font-bold">Full Payment Upfront</div>
+                        <div className="text-[10px] opacity-80 mt-0.5">100% paid at creation ({money(securityDepositAmount)})</div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDepositPaymentOption("PARTIAL");
+                          if (!initialDepositPayment) {
+                            setInitialDepositPayment(String(Math.round(Number(securityDepositAmount) / 2)));
+                          }
+                        }}
+                        className={`rounded-lg border px-3 py-2 text-xs font-semibold transition text-left ${
+                          depositPaymentOption === "PARTIAL"
+                            ? "border-primary bg-primary/10 text-primary ring-1 ring-primary"
+                            : "border-border bg-background text-muted-foreground hover:bg-muted"
+                        }`}
+                      >
+                        <div className="font-bold">Part Payment + Buffer</div>
+                        <div className="text-[10px] opacity-80 mt-0.5">Part now, 20–30 days buffer for full deposit</div>
+                      </button>
+                    </div>
+
+                    {depositPaymentOption === "PARTIAL" && (
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2 border-t border-border/60 pt-3">
+                        <div>
+                          <label className="text-xs font-medium text-muted-foreground">
+                            Upfront Deposit Paid Now (₹)
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            max={securityDepositAmount}
+                            step="100"
+                            value={initialDepositPayment}
+                            onChange={(e) => setInitialDepositPayment(e.target.value)}
+                            placeholder="e.g. 2000"
+                            className="mt-1.5 h-9 w-full rounded-lg border border-border bg-background px-3 text-xs outline-none focus:border-ring"
+                          />
+                          <div className="mt-1 text-[10px] text-muted-foreground">
+                            Remaining Balance: {money(Math.max(Number(securityDepositAmount) - Number(initialDepositPayment || 0), 0))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-medium text-muted-foreground">
+                            Buffer Days for Full Deposit
+                          </label>
+                          <select
+                            value={depositBufferDays}
+                            onChange={(e) => setDepositBufferDays(e.target.value)}
+                            className="mt-1.5 h-9 w-full rounded-lg border border-border bg-background px-3 text-xs outline-none focus:border-ring"
+                          >
+                            <option value="20">20 Days Buffer</option>
+                            <option value="25">25 Days Buffer</option>
+                            <option value="30">30 Days Buffer (Standard)</option>
+                          </select>
+                          <div className="mt-1 text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+                            Full balance due within {depositBufferDays} days from contract start
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="mt-4 grid gap-3 md:grid-cols-2">

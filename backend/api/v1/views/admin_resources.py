@@ -4488,9 +4488,55 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
         relative_url = f"/sign-contract/{token}"
         full_signing_url = request.build_absolute_uri(relative_url)
 
-        product_name = getattr(product, "name", "")
-        if not product_name and subscription.product_snapshot:
-            product_name = subscription.product_snapshot.get("name", "Furniture")
+        items_summary = []
+        if hasattr(subscription, "contract_items") and subscription.contract_items.exists():
+            for itm in subscription.contract_items.select_related("product").all():
+                pname = getattr(itm.product, "name", "Furniture Item")
+                items_summary.append({
+                    "id": itm.id,
+                    "product_id": itm.product_id,
+                    "name": pname,
+                    "product_code": getattr(itm.product, "product_code", ""),
+                    "quantity": itm.quantity,
+                    "unit_base_price": str(itm.unit_base_price),
+                    "total_base_price": str(itm.total_base_price),
+                    "monthly_amount": str(itm.monthly_amount),
+                    "monthly_yield_percent": str(itm.monthly_yield_percent),
+                    "security_deposit_amount": str(itm.security_deposit_amount),
+                    "security_deposit_percent": str(getattr(itm, "security_deposit_percent", "20.00")),
+                })
+        elif subscription.product_snapshot and isinstance(subscription.product_snapshot, dict):
+            snap_items = subscription.product_snapshot.get("items")
+            if isinstance(snap_items, list) and snap_items:
+                for idx, sitm in enumerate(snap_items, 1):
+                    items_summary.append({
+                        "id": sitm.get("product_id") or idx,
+                        "product_id": sitm.get("product_id"),
+                        "name": sitm.get("product_name") or "Furniture Item",
+                        "product_code": sitm.get("product_code", ""),
+                        "quantity": sitm.get("quantity", 1),
+                        "unit_base_price": str(sitm.get("unit_base_price", "0.00")),
+                        "total_base_price": str(sitm.get("total_base_price", "0.00")),
+                        "monthly_amount": str(sitm.get("monthly_amount", "0.00")),
+                        "monthly_yield_percent": str(sitm.get("monthly_yield_percent", "")),
+                        "security_deposit_amount": str(sitm.get("security_deposit_amount", "0.00")),
+                        "security_deposit_percent": str(sitm.get("security_deposit_percent", "20.00")),
+                    })
+
+        product_name = ""
+        if len(items_summary) > 1:
+            product_name = f"{items_summary[0]['name']} + {len(items_summary) - 1} more ({len(items_summary)} items)"
+        elif len(items_summary) == 1:
+            product_name = items_summary[0]["name"]
+        elif product:
+            product_name = getattr(product, "name", "")
+        elif subscription.product_snapshot:
+            product_name = subscription.product_snapshot.get("name", "Furniture Package")
+
+        from contracts.services.contract_activation_readiness_service import (
+            get_subscription_deposit_summary,
+        )
+        dep_summary = get_subscription_deposit_summary(subscription)
 
         if not existing_sig:
             try:
@@ -4502,7 +4548,7 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
                     customer_user_id=getattr(customer, "user_id", None),
                     contract_ref=contract_ref,
                     plan_type=subscription.plan_type,
-                    product_name=product_name,
+                    product_name=product_name or "Furniture",
                     signing_path=relative_url,
                 )
             except Exception:
@@ -4527,9 +4573,15 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
             "customer_email": getattr(customer, "email", "") or "",
             "contract_ref": contract_ref,
             "plan_type": subscription.plan_type,
-            "product_name": product_name,
+            "product_name": product_name or "Subidha Furniture",
+            "items": items_summary,
             "total_amount": str(subscription.total_amount),
             "monthly_amount": str(subscription.monthly_amount),
+            "security_deposit_amount": dep_summary["security_deposit_amount"],
+            "security_deposit_paid": dep_summary["security_deposit_paid"],
+            "security_deposit_pending": dep_summary["security_deposit_pending"],
+            "refundable_security_deposit": dep_summary["refundable_security_deposit"],
+            "deposit_status": dep_summary["deposit_status"],
             "has_signature": bool(existing_sig),
             "signed_at": existing_sig.created_at.isoformat() if existing_sig else None,
             "signature_url": request.build_absolute_uri(existing_sig.file.url) if (existing_sig and existing_sig.file) else None,

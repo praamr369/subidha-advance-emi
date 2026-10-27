@@ -1,5 +1,19 @@
 import { apiFetch } from "@/lib/api";
 
+export type PublicContractItem = {
+  id?: number;
+  product_id?: number;
+  name: string;
+  product_code?: string;
+  quantity: number;
+  unit_base_price?: string;
+  total_base_price?: string;
+  monthly_amount: string;
+  monthly_yield_percent?: string;
+  security_deposit_amount?: string;
+  security_deposit_percent?: string;
+};
+
 export type PublicContractSigningInfo = {
   success: boolean;
   subscription_id: number;
@@ -11,15 +25,17 @@ export type PublicContractSigningInfo = {
   customer_email?: string;
   support_phone?: string;
   product_name: string;
-  items?: Array<{
-    name: string;
-    quantity: number;
-    monthly_amount: string;
-  }>;
+  items?: PublicContractItem[];
   total_amount: string;
   monthly_amount: string;
   tenure_months: number;
   start_date?: string | null;
+  security_deposit_amount?: string;
+  security_deposit_paid?: string;
+  security_deposit_pending?: string;
+  refundable_security_deposit?: string;
+  security_deposit_percent?: string;
+  deposit_status?: string;
   already_signed: boolean;
   signed_at?: string | null;
   signature_url?: string | null;
@@ -38,8 +54,14 @@ export type AdminContractSigningLink = {
   contract_ref: string;
   plan_type: string;
   product_name: string;
+  items?: PublicContractItem[];
   total_amount: string;
   monthly_amount: string;
+  security_deposit_amount?: string;
+  security_deposit_paid?: string;
+  security_deposit_pending?: string;
+  refundable_security_deposit?: string;
+  deposit_status?: string;
   has_signature: boolean;
   signed_at?: string | null;
   signature_url?: string | null;

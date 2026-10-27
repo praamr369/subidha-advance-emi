@@ -132,7 +132,8 @@ class CustomerRentContractPdfView(APIView):
             return Response({"detail": "Rent contract not found."}, status=status.HTTP_404_NOT_FOUND)
         pdf_bytes = render_rent_contract_pdf(contract=subscription.rent_profile)
         response = HttpResponse(pdf_bytes, content_type="application/pdf")
-        response["Content-Disposition"] = f'attachment; filename="rent-contract-{subscription.id}.pdf"'
+        disposition = "attachment" if request.query_params.get("download") in ("1", "true") else "inline"
+        response["Content-Disposition"] = f'{disposition}; filename="rent-contract-{subscription.id}.pdf"'
         return response
 
 
@@ -152,7 +153,8 @@ class CustomerLeaseContractPdfView(APIView):
             return Response({"detail": "Lease contract not found."}, status=status.HTTP_404_NOT_FOUND)
         pdf_bytes = render_lease_contract_pdf(contract=subscription.lease_profile)
         response = HttpResponse(pdf_bytes, content_type="application/pdf")
-        response["Content-Disposition"] = f'attachment; filename="lease-contract-{subscription.id}.pdf"'
+        disposition = "attachment" if request.query_params.get("download") in ("1", "true") else "inline"
+        response["Content-Disposition"] = f'{disposition}; filename="lease-contract-{subscription.id}.pdf"'
         return response
 
 

@@ -241,3 +241,98 @@ class PublicContractSignApiTests(APITestCase):
         self.assertEqual(encoded_resp.status_code, status.HTTP_200_OK)
         self.assertEqual(encoded_resp.data["customer_name"], "John Doe")
         self.assertEqual(encoded_resp.data["support_phone"], "+91 94764 90946")
+
+    def test_public_sign_multi_product_and_security_deposit(self):
+        from datetime import date
+        from contracts.models import ContractItem, RentSubscriptionProfile, Subscription
+        from subscriptions.enums import PlanType, SubscriptionStatus
+        from payments.models import RentLeaseDepositTransaction
+        from subscriptions.enums import RentLeaseDepositTransactionStatus, RentLeaseDepositTransactionType
+
+        self.product.is_rent_enabled = True
+        self.product.save(update_fields=["is_rent_enabled"])
+
+        product2 = create_product(
+            name="Wooden Wardrobe 3-Door",
+            product_code="WARDROBE-001",
+            base_price=Decimal("20000.00"),
+        )
+        product2.is_rent_enabled = True
+        product2.save(update_fields=["is_rent_enabled"])
+
+        rent_sub = Subscription.objects.create(
+            subscription_number="RENT-2026-MULTI",
+            customer=self.customer,
+            product=self.product,
+            plan_type=PlanType.RENT,
+            status=SubscriptionStatus.ACTIVE,
+            start_date=date.today(),
+            monthly_amount=Decimal("2500.00"),
+            total_amount=Decimal("30000.00"),
+            tenure_months=12,
+        )
+        RentSubscriptionProfile.objects.create(
+            subscription=rent_sub,
+            security_deposit_percent=Decimal("20.00"),
+            security_deposit_amount=Decimal("7000.00"),
+            refundable_security_deposit=Decimal("7000.00"),
+        )
+        ContractItem.objects.create(
+            subscription=rent_sub,
+            product=self.product,
+            quantity=1,
+            unit_base_price=Decimal("15000.00"),
+            total_base_price=Decimal("15000.00"),
+            monthly_yield_percent=Decimal("5.00"),
+            monthly_amount=Decimal("1000.00"),
+            security_deposit_percent=Decimal("20.00"),
+            security_deposit_amount=Decimal("3000.00"),
+        )
+        ContractItem.objects.create(
+            subscription=rent_sub,
+            product=product2,
+            quantity=1,
+            unit_base_price=Decimal("20000.00"),
+            total_base_price=Decimal("20000.00"),
+            monthly_yield_percent=Decimal("5.00"),
+            monthly_amount=Decimal("1500.00"),
+            security_deposit_percent=Decimal("20.00"),
+            security_deposit_amount=Decimal("4000.00"),
+        )
+        # Record a deposit collection transaction of ₹7,000
+        RentLeaseDepositTransaction.objects.create(
+            subscription=rent_sub,
+            customer=self.customer,
+            plan_type=PlanType.RENT,
+            transaction_type=RentLeaseDepositTransactionType.COLLECTED,
+            status=RentLeaseDepositTransactionStatus.ACTIVE,
+            amount=Decimal("7000.00"),
+        )
+
+        # Admin gets signing link
+        self.client.force_authenticate(user=self.admin)
+        link_resp = self.client.get(f"/api/v1/admin/subscriptions/{rent_sub.id}/signing-link/")
+        self.assertEqual(link_resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(link_resp.data["items"]), 2)
+        self.assertEqual(link_resp.data["security_deposit_amount"], "7000.00")
+        self.assertEqual(link_resp.data["security_deposit_paid"], "7000.00")
+        self.assertEqual(link_resp.data["security_deposit_pending"], "0.00")
+        self.assertEqual(link_resp.data["deposit_status"], "PAID")
+        self.assertIn("King Size Bed", link_resp.data["product_name"])
+        self.assertIn("1 more", link_resp.data["product_name"])
+
+        # Public signing page
+        self.client.logout()
+        token = link_resp.data["token"]
+        resp = self.client.get(f"/api/v1/public/contracts/sign/{token}/")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(resp.data["items"]), 2)
+        self.assertEqual(resp.data["items"][0]["name"], "King Size Bed")
+        self.assertEqual(resp.data["items"][0]["security_deposit_amount"], "3000.00")
+        self.assertEqual(resp.data["items"][1]["name"], "Wooden Wardrobe 3-Door")
+        self.assertEqual(resp.data["items"][1]["security_deposit_amount"], "4000.00")
+        self.assertEqual(resp.data["security_deposit_amount"], "7000.00")
+        self.assertEqual(resp.data["security_deposit_paid"], "7000.00")
+        self.assertEqual(resp.data["security_deposit_pending"], "0.00")
+        self.assertEqual(resp.data["refundable_security_deposit"], "7000.00")
+        self.assertEqual(resp.data["deposit_status"], "PAID")

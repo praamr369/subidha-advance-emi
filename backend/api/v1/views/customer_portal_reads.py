@@ -92,7 +92,7 @@ def customer_deposits_view(request):
     # For any RENT/LEASE contract without an existing deposit transaction, include pending record
     pending_subs = (
         Subscription.objects.select_related("product", "rent_profile", "lease_profile")
-        .prefetch_related("contract_items")
+        .prefetch_related("contract_items", "rent_lease_demands")
         .filter(customer=customer, plan_type__in=["RENT", "LEASE"])
         .exclude(id__in=seen_sub_ids)
     )
@@ -106,7 +106,25 @@ def customer_deposits_view(request):
             items = getattr(sub, "contract_items", None)
             if items:
                 dep_amt = sum((it.security_deposit_amount or Decimal("0.00")) for it in items.all())
+                if dep_amt <= Decimal("0.00"):
+                    base_total = sum((it.total_base_price or Decimal("0.00")) for it in items.all())
+                    if base_total > Decimal("0.00"):
+                        dep_amt = (base_total * Decimal("0.20")).quantize(Decimal("0.01"))
+        if dep_amt <= Decimal("0.00"):
+            if sub.product and getattr(sub.product, "base_price", None):
+                dep_amt = (Decimal(str(sub.product.base_price)) * Decimal("0.20")).quantize(Decimal("0.01"))
+            elif sub.monthly_amount:
+                dep_amt = (Decimal(str(sub.monthly_amount)) * Decimal("4.00")).quantize(Decimal("0.01"))
+
         if dep_amt > Decimal("0.00"):
+            demand = sub.rent_lease_demands.filter(demand_type="SECURITY_DEPOSIT").first() if hasattr(sub, "rent_lease_demands") else None
+            paid_amount = float(demand.collected_amount) if demand else 0.0
+            status_val = demand.status if demand else "PENDING"
+            if paid_amount > 0 and paid_amount < float(dep_amt):
+                status_val = "PARTIAL"
+            elif paid_amount >= float(dep_amt):
+                status_val = "PAID"
+
             results.append(
                 {
                     "id": f"sub-pending-{sub.id}",
@@ -117,14 +135,14 @@ def customer_deposits_view(request):
                     "transaction_type": "DEMAND_PENDING",
                     "amount": str(dep_amt),
                     "deposit_amount": float(dep_amt),
-                    "paid_amount": 0.0,
-                    "status": "PENDING",
-                    "paid_at": None,
+                    "paid_amount": paid_amount,
+                    "status": status_val,
+                    "paid_at": sub.start_date.isoformat() if status_val in ("PAID", "PARTIAL") and sub.start_date else None,
                     "refunded_at": None,
                     "transaction_date": sub.start_date,
                     "payment_method": "",
                     "reference_no": "",
-                    "notes": "Pending contract deposit",
+                    "notes": f"{status_val} contract deposit",
                 }
             )
 
