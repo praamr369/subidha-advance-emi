@@ -290,7 +290,20 @@ async function parseResponseBody(response: Response): Promise<ParsedResponseBody
 
 function resolveErrorMessage(body: unknown, status: number): string {
   if (typeof body === "string" && body.trim()) {
-    return body;
+    const trimmed = body.trim();
+    if (
+      trimmed.startsWith("<!doctype") ||
+      trimmed.startsWith("<!DOCTYPE") ||
+      trimmed.startsWith("<html") ||
+      trimmed.startsWith("<HTML") ||
+      /<[a-z][\s\S]*>/i.test(trimmed)
+    ) {
+      if (status >= 500) {
+        return "The server encountered an error while processing your request. Please try again or contact support.";
+      }
+      return `Request failed with status ${status}. Please try again.`;
+    }
+    return trimmed;
   }
 
   if (body && typeof body === "object") {

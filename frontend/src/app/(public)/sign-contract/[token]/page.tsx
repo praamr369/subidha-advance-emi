@@ -150,7 +150,12 @@ export default function PublicContractSignPage({ params }: PageProps) {
         signature_url: res.signature_url || signatureDataUrl,
       });
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : "Failed to submit signature. Please try again.");
+      const rawMsg = err instanceof Error ? err.message : "Failed to submit signature. Please try again.";
+      const cleanMsg =
+        typeof rawMsg === "string" && (rawMsg.includes("<html") || rawMsg.includes("<!doctype") || /<[a-z][\s\S]*>/i.test(rawMsg))
+          ? "The server encountered an error while securing your digital signature. Please try again or contact support."
+          : rawMsg;
+      setSubmitError(cleanMsg);
     } finally {
       setSubmitting(false);
     }

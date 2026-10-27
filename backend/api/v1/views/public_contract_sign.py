@@ -11,7 +11,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from contracts.models import Subscription, SubscriptionDocument
-from subscriptions.enums import DocumentVerificationStatus, SubscriptionDocumentType
+from subscriptions.enums import DocumentVerificationStatus, DocumentSignedStatus, SubscriptionDocumentType
 from subscriptions.models import AuditLog
 from subscriptions.services.audit_service import log_audit
 
@@ -224,7 +224,7 @@ def public_contract_sign_view(request, token: str):
         file_obj = request.FILES["signature_image"]
 
     # Option B: Base64 Canvas data URI (data:image/png;base64,...)
-    elif "signature_data" in request.data:
+    if not file_obj and "signature_data" in request.data:
         data_uri = str(request.data["signature_data"]).strip()
         if "base64," in data_uri:
             try:
@@ -253,22 +253,30 @@ def public_contract_sign_view(request, token: str):
         file=file_obj,
         notes=f"Digitally signed via mobile signing link by {signer_name} on {now.strftime('%d %b %Y, %I:%M %p')}.",
         verification_status=DocumentVerificationStatus.VERIFIED,
+        signed_status=DocumentSignedStatus.SIGNED,
     )
 
-    log_audit(
-        action_type=AuditLog.ActionType.SUB_ACTIVATED if subscription.status == "DRAFT" else AuditLog.ActionType.PAYMENT_FLAGGED,
-        instance=doc,
-        performed_by=None,
-        metadata={
-            "event": "CUSTOMER_DIGITAL_SIGNATURE_ATTACHED",
-            "subscription_id": subscription.id,
-            "document_id": doc.id,
-            "contract_ref": contract_ref,
-            "signer_name": signer_name,
-            "signed_at": now.isoformat(),
-            "ip_address": request.META.get("REMOTE_ADDR"),
-        },
-    )
+    try:
+        log_audit(
+            action_type=getattr(
+                AuditLog.ActionType,
+                "CONTRACT_SIGNED",
+                getattr(AuditLog.ActionType, "CONTRACT_APPROVED", AuditLog.ActionType.SUB_CREATED),
+            ),
+            instance=doc,
+            performed_by=None,
+            metadata={
+                "event": "CUSTOMER_DIGITAL_SIGNATURE_ATTACHED",
+                "subscription_id": subscription.id,
+                "document_id": doc.id,
+                "contract_ref": contract_ref,
+                "signer_name": signer_name,
+                "signed_at": now.isoformat(),
+                "ip_address": request.META.get("REMOTE_ADDR"),
+            },
+        )
+    except Exception as e:
+        logger.warning("Failed to log audit for contract signature: %s", e)
 
     try:
         from subscriptions.services.operational_notification_service import (
@@ -288,11 +296,18 @@ def public_contract_sign_view(request, token: str):
     except Exception:
         pass
 
+    sig_url = None
+    if doc.file:
+        try:
+            sig_url = request.build_absolute_uri(doc.file.url)
+        except Exception:
+            sig_url = None
+
     return Response({
         "success": True,
         "message": "Your digital signature has been recorded and attached to your contract.",
         "contract_ref": contract_ref,
         "document_id": doc.id,
         "signed_at": now.isoformat(),
-        "signature_url": request.build_absolute_uri(doc.file.url) if doc.file else None,
+        "signature_url": sig_url,
     }, status=status.HTTP_201_CREATED)

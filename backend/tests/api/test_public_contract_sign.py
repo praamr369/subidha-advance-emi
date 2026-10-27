@@ -111,6 +111,38 @@ class PublicContractSignApiTests(APITestCase):
         self.assertEqual(get_resp.status_code, status.HTTP_200_OK)
         self.assertEqual(get_resp.data["already_signed"], True)
 
+    def test_public_sign_post_draft_subscription_and_multipart_upload(self):
+        # Fresh subscription in DRAFT status (real-world scenario for pending contracts)
+        self.subscription.status = "DRAFT"
+        self.subscription.save()
+
+        self.client.force_authenticate(user=self.admin)
+        link_resp = self.client.get(f"/api/v1/admin/subscriptions/{self.subscription.id}/signing-link/")
+        token = link_resp.data["token"]
+        self.client.logout()
+
+        sig_file = SimpleUploadedFile("sig.png", b"fake_png_binary_data", content_type="image/png")
+        post_resp = self.client.post(
+            f"/api/v1/public/contracts/sign/{token}/",
+            data={
+                "signature_image": sig_file,
+                "customer_name_confirmation": "Mahananda Maiti",
+            },
+            format="multipart",
+        )
+        self.assertEqual(post_resp.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(post_resp.data["success"])
+        self.assertIn("signed_at", post_resp.data)
+
+        # Confirm document created and signed_status is SIGNED
+        doc = SubscriptionDocument.objects.filter(
+            subscription=self.subscription,
+            document_type=SubscriptionDocumentType.CUSTOMER_SIGNATURE,
+        ).first()
+        self.assertIsNotNone(doc)
+        self.assertEqual(doc.signed_status, "SIGNED")
+        self.assertIn("Mahananda Maiti", doc.notes)
+
     def test_customer_receives_notifications_on_signing_request_and_completion(self):
         from system_jobs.models import Notification
 

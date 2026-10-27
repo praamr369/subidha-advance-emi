@@ -102,6 +102,9 @@ export async function submitPublicContractSignature(
     if (payload.customer_name_confirmation) {
       formData.append("customer_name_confirmation", payload.customer_name_confirmation);
     }
+    if (payload.signature_data) {
+      formData.append("signature_data", payload.signature_data);
+    }
     return apiFetch(`/public/contracts/sign/${cleanToken}/`, {
       method: "POST",
       body: formData,
