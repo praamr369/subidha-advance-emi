@@ -41,9 +41,12 @@ export interface PODCapture {
   driver_phone?: string;
   customer_signature_name: string;
   photo_1: File;
+  photo_1_data?: string;
   photo_2?: File;
+  photo_2_data?: string;
   furniture_photos?: File[];
-  signature_image: File;
+  signature_image?: File;
+  signature_data?: string;
   gps_latitude?: string;
   gps_longitude?: string;
   notes?: string;
@@ -70,11 +73,14 @@ export function capturePOD(deliveryId: number, payload: PODCapture): Promise<POD
   formData.append("driver_phone", payload.driver_phone || "");
   formData.append("customer_signature_name", payload.customer_signature_name);
   formData.append("photo_1", payload.photo_1);
+  if (payload.photo_1_data) formData.append("photo_1_data", payload.photo_1_data);
   if (payload.photo_2) formData.append("photo_2", payload.photo_2);
+  if (payload.photo_2_data) formData.append("photo_2_data", payload.photo_2_data);
   if (payload.furniture_photos && payload.furniture_photos.length > 0) {
     payload.furniture_photos.forEach((file) => formData.append("furniture_photos", file));
   }
-  formData.append("signature_image", payload.signature_image);
+  if (payload.signature_image) formData.append("signature_image", payload.signature_image);
+  if (payload.signature_data) formData.append("signature_data", payload.signature_data);
   if (payload.gps_latitude) formData.append("gps_latitude", payload.gps_latitude);
   if (payload.gps_longitude) formData.append("gps_longitude", payload.gps_longitude);
   formData.append("notes", payload.notes || "");
@@ -151,11 +157,14 @@ export function submitPublicHandoverPOD(token: string, payload: PODCapture): Pro
   formData.append("driver_phone", payload.driver_phone || "");
   formData.append("customer_signature_name", payload.customer_signature_name);
   formData.append("photo_1", payload.photo_1);
+  if (payload.photo_1_data) formData.append("photo_1_data", payload.photo_1_data);
   if (payload.photo_2) formData.append("photo_2", payload.photo_2);
+  if (payload.photo_2_data) formData.append("photo_2_data", payload.photo_2_data);
   if (payload.furniture_photos && payload.furniture_photos.length > 0) {
     payload.furniture_photos.forEach((file) => formData.append("furniture_photos", file));
   }
-  formData.append("signature_image", payload.signature_image);
+  if (payload.signature_image) formData.append("signature_image", payload.signature_image);
+  if (payload.signature_data) formData.append("signature_data", payload.signature_data);
   if (payload.gps_latitude) formData.append("gps_latitude", payload.gps_latitude);
   if (payload.gps_longitude) formData.append("gps_longitude", payload.gps_longitude);
   formData.append("notes", payload.notes || "");

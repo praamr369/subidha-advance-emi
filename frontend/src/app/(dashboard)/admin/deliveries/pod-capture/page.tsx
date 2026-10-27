@@ -46,7 +46,7 @@ export default function PODCapturePage() {
   };
 
   const handleSubmit = async () => {
-    if (!deliveryId || !driverName || !custSigName || !photo1 || !signature) {
+    if (!deliveryId || !driverName || !custSigName || !photo1 || (!signature && !previewSig)) {
       setError("Delivery ID, driver name, customer signature name, photo 1, and signature are required.");
       return;
     }
@@ -63,7 +63,8 @@ export default function PODCapturePage() {
         customer_signature_name: custSigName,
         photo_1: photo1,
         photo_2: photo2 || undefined,
-        signature_image: signature,
+        signature_image: signature || undefined,
+        signature_data: previewSig || undefined,
         gps_latitude: gpsLat || undefined,
         gps_longitude: gpsLon || undefined,
         notes,

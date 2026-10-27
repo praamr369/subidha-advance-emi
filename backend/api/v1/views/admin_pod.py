@@ -1,36 +1,42 @@
 """Admin views for Proof of Delivery (POD) capture and year-end export."""
-import json
+import base64
 import csv
+import json
+import logging
+import urllib.parse
 import zipfile
-from io import StringIO, BytesIO
 from datetime import datetime
 from decimal import Decimal
+from io import BytesIO, StringIO
 
-from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated, AllowAny
-from api.v1.permissions import IsAdmin
-from rest_framework.response import Response
-from rest_framework import status
-from django.http import FileResponse
-from django.utils import timezone
-from django.shortcuts import get_object_or_404
+from django.core.files.base import ContentFile
+from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 from django.db.models import Q
+from django.http import FileResponse
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from rest_framework import status
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
 
+from api.v1.permissions import IsAdmin
 from subscriptions.models import (
+    AuditLog,
     Delivery,
     DeliveryOrderStatus,
-    ProofOfDelivery,
-    PODStatus,
-    SubscriptionDelivery,
     DeliveryStatus,
-    ProductPossession,
+    PODStatus,
     PossessionStatus,
+    ProductPossession,
+    ProofOfDelivery,
     RentalAsset,
     RentalAssetStatus,
-    AuditLog,
+    SubscriptionDelivery,
 )
 from subscriptions.services.audit_service import log_audit
+
+logger = logging.getLogger(__name__)
 
 HANDOVER_SIGNER_SALT = "subidha.delivery.handover.v1"
 HANDOVER_TOKEN_MAX_AGE = 86400 * 7  # 7 days
@@ -43,10 +49,65 @@ def generate_handover_token(delivery_id: int) -> str:
 
 
 def verify_handover_token(token: str) -> int:
-    """Verifies handover token and returns delivery_id. Raises BadSignature or SignatureExpired."""
+    """
+    Verifies handover token and returns delivery_id. Raises BadSignature or SignatureExpired.
+    Safely handles percent-encoded tokens (e.g. %3A for colon) from SMS, WhatsApp, and browsers.
+    """
     signer = TimestampSigner(salt=HANDOVER_SIGNER_SALT)
-    delivery_id_str = signer.unsign(token, max_age=HANDOVER_TOKEN_MAX_AGE)
+    clean_token = (token or "").strip()
+    if "%" in clean_token:
+        try:
+            clean_token = urllib.parse.unquote(clean_token)
+        except Exception:
+            pass
+    if "%" in clean_token:
+        try:
+            clean_token = urllib.parse.unquote(clean_token)
+        except Exception:
+            pass
+    delivery_id_str = signer.unsign(clean_token, max_age=HANDOVER_TOKEN_MAX_AGE)
     return int(delivery_id_str)
+
+
+def _parse_gps_coord(val, min_val: float, max_val: float) -> Decimal | None:
+    """Safely parse and quantize GPS coordinates to 7 decimal places, matching DecimalField(max_digits=10, decimal_places=7)."""
+    if val is None:
+        return None
+    s = str(val).strip()
+    if not s or s.lower() in ("null", "undefined", "none", "nan"):
+        return None
+    try:
+        dec = Decimal(s).quantize(Decimal("0.0000001"))
+        if Decimal(str(min_val)) <= dec <= Decimal(str(max_val)):
+            return dec
+    except Exception:
+        pass
+    return None
+
+
+def _extract_image_file(request, file_key: str, data_key: str, filename_prefix: str, delivery_id: int):
+    """
+    Extracts an image from multipart FILES or base64 data URI in request.data.
+    Returns an UploadedFile / ContentFile or None.
+    """
+    if file_key in request.FILES:
+        return request.FILES[file_key]
+
+    val = request.data.get(file_key) or request.data.get(data_key)
+    if val and hasattr(val, "read"):
+        return val
+
+    if val and isinstance(val, str) and "base64," in val:
+        try:
+            header, encoded = val.split("base64,", 1)
+            data_bytes = base64.b64decode(encoded)
+            ext = ".png" if "image/png" in header else ".jpg"
+            timestamp_token = int(timezone.now().timestamp())
+            filename = f"{filename_prefix}_{delivery_id}_{timestamp_token}{ext}"
+            return ContentFile(data_bytes, name=filename)
+        except Exception as e:
+            logger.warning("Failed to decode base64 %s: %s", file_key, e)
+    return None
 
 
 def resolve_delivery_order(delivery_id: int) -> Delivery | None:
@@ -80,19 +141,25 @@ def save_additional_furniture_photos(*, subscription, files, delivery_date):
     as auditable SubscriptionDocument records under DELIVERY_HANDOVER_NOTE.
     """
     from contracts.models import SubscriptionDocument
-    from subscriptions.enums import SubscriptionDocumentType, DocumentVerificationStatus
+    from subscriptions.enums import SubscriptionDocumentType, DocumentVerificationStatus, DocumentSignedStatus
 
     date_str = str(delivery_date.date() if hasattr(delivery_date, "date") else delivery_date)
     saved_docs = []
     for idx, f in enumerate(files, start=1):
-        doc = SubscriptionDocument.objects.create(
-            subscription=subscription,
-            document_type=SubscriptionDocumentType.DELIVERY_HANDOVER_NOTE,
-            file=f,
-            notes=f"Doorstep POD furniture quality photo for item #{idx} captured on {date_str}",
-            verification_status=DocumentVerificationStatus.VERIFIED,
-        )
-        saved_docs.append(doc)
+        if not f:
+            continue
+        try:
+            doc = SubscriptionDocument.objects.create(
+                subscription=subscription,
+                document_type=SubscriptionDocumentType.DELIVERY_HANDOVER_NOTE,
+                file=f,
+                notes=f"Doorstep POD furniture quality photo for item #{idx} captured on {date_str}",
+                verification_status=DocumentVerificationStatus.VERIFIED,
+                signed_status=DocumentSignedStatus.NOT_REQUIRED,
+            )
+            saved_docs.append(doc)
+        except Exception as e:
+            logger.warning("Failed to attach additional furniture photo #%s: %s", idx, e)
     return saved_docs
 
 
@@ -147,17 +214,20 @@ def sync_delivery_success_state(*, delivery: Delivery, delivery_date, customer_s
         asset.save(update_fields=["status"])
 
     # 5. Log audit trail
-    log_audit(
-        action_type=AuditLog.ActionType.DELIVERY_COMPLETED if hasattr(AuditLog.ActionType, "DELIVERY_COMPLETED") else "DELIVERY_COMPLETED",
-        instance=delivery,
-        performed_by=performed_by,
-        metadata={
-            "customer_signature_name": customer_sig_name,
-            "driver_phone": driver_phone,
-            "delivery_date": delivery_date.isoformat() if hasattr(delivery_date, "isoformat") else str(delivery_date),
-            "subscription_id": delivery.subscription_id,
-        },
-    )
+    try:
+        log_audit(
+            action_type=AuditLog.ActionType.DELIVERY_COMPLETED if hasattr(AuditLog.ActionType, "DELIVERY_COMPLETED") else "DELIVERY_COMPLETED",
+            instance=delivery,
+            performed_by=performed_by,
+            metadata={
+                "customer_signature_name": customer_sig_name,
+                "driver_phone": driver_phone,
+                "delivery_date": delivery_date.isoformat() if hasattr(delivery_date, "isoformat") else str(delivery_date),
+                "subscription_id": delivery.subscription_id,
+            },
+        )
+    except Exception as e:
+        logger.warning("Failed to log audit for delivery completion: %s", e)
 
     # 6. Notify customer and admin of confirmed POD handover
     try:
@@ -211,11 +281,15 @@ def pod_capture_view(request, delivery_id):
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    if 'photo_1' not in request.FILES or 'signature_image' not in request.FILES:
+    photo_1_obj = _extract_image_file(request, "photo_1", "photo_1_data", "pod_photo1", delivery.id)
+    sig_obj = _extract_image_file(request, "signature_image", "signature_data", "pod_sig", delivery.id)
+    if not photo_1_obj or not sig_obj:
         return Response(
             {"error": "photo_1 and signature_image files are required."},
             status=status.HTTP_400_BAD_REQUEST
         )
+
+    photo_2_obj = _extract_image_file(request, "photo_2", "photo_2_data", "pod_photo2", delivery.id)
 
     try:
         delivery_date = datetime.fromisoformat(delivery_date_str.replace('Z', '+00:00'))
@@ -229,19 +303,19 @@ def pod_capture_view(request, delivery_id):
         driver_name=driver_name,
         driver_phone=driver_phone,
         customer_signature_name=customer_sig_name,
-        photo_1=request.FILES['photo_1'],
-        photo_2=request.FILES.get('photo_2'),
-        signature_image=request.FILES['signature_image'],
+        photo_1=photo_1_obj,
+        photo_2=photo_2_obj,
+        signature_image=sig_obj,
         notes=notes,
         status=PODStatus.CAPTURED,
     )
 
-    if gps_lat and gps_lon:
-        try:
-            pod.gps_latitude = Decimal(str(gps_lat))
-            pod.gps_longitude = Decimal(str(gps_lon))
-        except Exception:
-            pass
+    if gps_lat is not None and gps_lon is not None:
+        lat = _parse_gps_coord(gps_lat, -90.0, 90.0)
+        lon = _parse_gps_coord(gps_lon, -180.0, 180.0)
+        if lat is not None and lon is not None:
+            pod.gps_latitude = lat
+            pod.gps_longitude = lon
 
     pod.save()
 
@@ -394,13 +468,17 @@ def public_pod_handover_view(request, token):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    if "photo_1" not in request.FILES:
+    photo_1_obj = _extract_image_file(request, "photo_1", "photo_1_data", "pod_photo1", delivery.id)
+    if not photo_1_obj:
         return Response(
             {"error": "Product condition photo (Photo 1) is mandatory to verify product quality."},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    if "signature_image" not in request.FILES:
+    photo_2_obj = _extract_image_file(request, "photo_2", "photo_2_data", "pod_photo2", delivery.id)
+
+    sig_obj = _extract_image_file(request, "signature_image", "signature_data", "pod_sig", delivery.id)
+    if not sig_obj:
         return Response(
             {"error": "Customer touchscreen signature is required."},
             status=status.HTTP_400_BAD_REQUEST,
@@ -421,19 +499,19 @@ def public_pod_handover_view(request, token):
         driver_name=driver_name,
         driver_phone=driver_phone,
         customer_signature_name=customer_sig_name,
-        photo_1=request.FILES["photo_1"],
-        photo_2=request.FILES.get("photo_2"),
-        signature_image=request.FILES["signature_image"],
+        photo_1=photo_1_obj,
+        photo_2=photo_2_obj,
+        signature_image=sig_obj,
         notes=notes,
         status=PODStatus.CAPTURED,
     )
 
-    if gps_lat and gps_lon:
-        try:
-            pod.gps_latitude = Decimal(str(gps_lat))
-            pod.gps_longitude = Decimal(str(gps_lon))
-        except Exception:
-            pass
+    if gps_lat is not None and gps_lon is not None:
+        lat = _parse_gps_coord(gps_lat, -90.0, 90.0)
+        lon = _parse_gps_coord(gps_lon, -180.0, 180.0)
+        if lat is not None and lon is not None:
+            pod.gps_latitude = lat
+            pod.gps_longitude = lon
 
     pod.save()
 

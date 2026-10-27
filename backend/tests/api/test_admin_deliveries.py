@@ -1,10 +1,12 @@
 from datetime import date
 from decimal import Decimal
 
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from subscriptions.models import AuditLog, DeliveryStatus, FulfillmentStatus, SubscriptionDelivery
+from subscriptions.models import AuditLog, DeliveryStatus, FulfillmentStatus, ProofOfDelivery, SubscriptionDelivery
 from tests.helpers import (
     create_admin_user,
     create_batch,
@@ -260,6 +262,80 @@ class AdminDeliveryApiTests(APITestCase):
             format="multipart",
         )
         self.assertEqual(dup_resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_public_handover_base64_signature_high_precision_gps_and_extra_photos(self):
+        import urllib.parse
+        from django.utils import timezone
+        from contracts.models import SubscriptionDocument
+        from subscriptions.enums import SubscriptionDocumentType
+
+        # Create a second delivery order
+        delivery2 = SubscriptionDelivery.objects.create(
+            subscription=self.subscription,
+            status=DeliveryStatus.DISPATCHED,
+            dispatched_at=timezone.now(),
+            delivery_address_snapshot="Plot 42, Asansol Market Road",
+            scheduled_date=date(2026, 3, 10),
+            delivery_reference="DLV-TEST-POD-02",
+        )
+
+        self.client.force_authenticate(user=self.admin)
+        link_resp = self.client.get(f"/api/v1/admin/delivery/{delivery2.id}/handover-link/")
+        self.assertEqual(link_resp.status_code, status.HTTP_200_OK)
+        token = link_resp.data["handover_token"]
+
+        self.client.logout()
+
+        tiny_png = (
+            b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+            b"\x08\x06\x00\x00\x00\x1f\x15c4\x00\x00\x00\rIDATx\x9cc`\x00\x00\x00\x02"
+            b"\x00\x01H\xaf\xa4q\x00\x00\x00\x00IEND\xaeB`\x82"
+        )
+        photo1 = SimpleUploadedFile("product_front.png", tiny_png, content_type="image/png")
+        extra_photo = SimpleUploadedFile("product_assembly.png", tiny_png, content_type="image/png")
+
+        # Base64 data URI touchscreen signature (from canvas on mobile screen)
+        b64_sig = (
+            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+        )
+
+        # High precision 14-decimal GPS from mobile browser geolocation
+        post_data = {
+            "driver_name": "Suresh Delivery Agent",
+            "driver_phone": "9876543210",
+            "customer_signature_name": "Sunita Customer",
+            "gps_latitude": "23.68713028374615",
+            "gps_longitude": "86.98401928374615",
+            "notes": "Assembled cleanly with extra photo",
+            "photo_1": photo1,
+            "signature_data": b64_sig,
+            "furniture_photos": [extra_photo],
+        }
+
+        # Also test percent-encoded token as received from messaging apps
+        encoded_token = urllib.parse.quote(token)
+        submit_resp = self.client.post(
+            f"/api/v1/public/delivery/handover/{encoded_token}/",
+            data=post_data,
+            format="multipart",
+        )
+        self.assertEqual(submit_resp.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(submit_resp.data["success"])
+
+        # Check POD record saved with correctly quantized 7-decimal GPS
+        pod = ProofOfDelivery.objects.filter(customer_signature_name="Sunita Customer").first()
+        self.assertIsNotNone(pod)
+        self.assertEqual(pod.gps_latitude, Decimal("23.6871303"))
+        self.assertEqual(pod.gps_longitude, Decimal("86.9840193"))
+        self.assertTrue(bool(pod.signature_image))
+
+        # Check additional furniture photo saved as auditable SubscriptionDocument
+        extra_doc = SubscriptionDocument.objects.filter(
+            subscription=self.subscription,
+            document_type=SubscriptionDocumentType.DELIVERY_HANDOVER_NOTE,
+        ).first()
+        self.assertIsNotNone(extra_doc)
+        self.assertIn("Doorstep POD furniture quality photo", extra_doc.notes)
 
     def test_batched_partial_delivery_flow(self):
         from contracts.models import ContractItem, Subscription

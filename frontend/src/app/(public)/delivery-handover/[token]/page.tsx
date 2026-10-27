@@ -47,6 +47,7 @@ export default function DeliveryHandoverPage({ params }: PageProps) {
 
   // Customer signature drawn on delivery boy's phone
   const [signatureFile, setSignatureFile] = useState<File | null>(null);
+  const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
 
   // Submission state
   const [submitting, setSubmitting] = useState(false);
@@ -105,6 +106,13 @@ export default function DeliveryHandoverPage({ params }: PageProps) {
     );
   };
 
+  useEffect(() => {
+    // Attempt automatic GPS tagging when opening handover page on driver device
+    if (typeof window !== "undefined" && navigator?.geolocation) {
+      handleCaptureGPS();
+    }
+  }, []);
+
   const handleAddFurniturePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -158,7 +166,7 @@ export default function DeliveryHandoverPage({ params }: PageProps) {
       return;
     }
 
-    if (!signatureFile) {
+    if (!signatureFile && !signatureDataUrl) {
       setSubmitError(
         "Customer signature is required. Please hand your phone to the customer to sign on the screen."
       );
@@ -212,7 +220,8 @@ export default function DeliveryHandoverPage({ params }: PageProps) {
         photo_1: photo1File,
         photo_2: photo2File,
         furniture_photos: additionalFurnitureFiles,
-        signature_image: signatureFile,
+        signature_image: signatureFile || undefined,
+        signature_data: signatureDataUrl || undefined,
         gps_latitude: gpsLat || undefined,
         gps_longitude: gpsLon || undefined,
         notes: combinedNotes,
@@ -224,8 +233,12 @@ export default function DeliveryHandoverPage({ params }: PageProps) {
         totalPhotos: furniturePhotos.length + (recipientPhoto ? 1 : 0),
       });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Submission failed. Please try again.";
-      setSubmitError(msg);
+      const rawMsg = err instanceof Error ? err.message : "Submission failed. Please try again.";
+      const cleanMsg =
+        typeof rawMsg === "string" && (rawMsg.includes("<html") || rawMsg.includes("<!doctype") || /<[a-z][\s\S]*>/i.test(rawMsg))
+          ? "The server encountered an error while securing delivery proof. Please try again or contact support."
+          : rawMsg;
+      setSubmitError(cleanMsg);
     } finally {
       setSubmitting(false);
     }
@@ -551,7 +564,10 @@ export default function DeliveryHandoverPage({ params }: PageProps) {
                 required
                 height={180}
                 label="Sign Below on Screen (Using Finger)"
-                onChange={(file) => setSignatureFile(file)}
+                onChange={(file, dataUrl) => {
+                  setSignatureFile(file);
+                  setSignatureDataUrl(dataUrl);
+                }}
               />
             </div>
           </div>
