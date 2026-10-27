@@ -79,7 +79,7 @@ export default function DepositStatusPage() {
           )}
 
           {!loading && deposits.map((dep) => {
-            const cfg = STATUS_CONFIG[dep.status];
+            const cfg = STATUS_CONFIG[dep.status] || STATUS_CONFIG.PENDING;
             return (
               <div key={dep.id} className="p-4 border rounded-lg mb-3">
                 <div className="flex items-start justify-between">

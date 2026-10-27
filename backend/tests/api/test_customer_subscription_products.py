@@ -107,3 +107,58 @@ class CustomerSubscriptionProductMediaTests(APITestCase):
             ),
             response.data["product_image"],
         )
+
+    def test_rent_subscription_detail_exposes_security_deposit_and_demands(self):
+        from datetime import date
+        from decimal import Decimal
+        from contracts.models import RentSubscriptionProfile, Subscription
+        from subscriptions.enums import PlanType, SubscriptionStatus
+        from subscriptions.models import RentLeaseBillingDemand
+
+        rent_sub = Subscription.objects.create(
+            subscription_number="RENT-2026-TEST",
+            customer=self.customer,
+            product=self.product,
+            plan_type=PlanType.RENT,
+            status=SubscriptionStatus.ACTIVE,
+            start_date=date.today(),
+            monthly_amount=Decimal("1500.00"),
+            total_amount=Decimal("18000.00"),
+            tenure_months=12,
+        )
+        RentSubscriptionProfile.objects.create(
+            subscription=rent_sub,
+            security_deposit_percent=Decimal("20.00"),
+            security_deposit_amount=Decimal("5000.00"),
+            refundable_security_deposit=Decimal("5000.00"),
+        )
+        RentLeaseBillingDemand.objects.create(
+            subscription=rent_sub,
+            demand_type="RENT_MONTHLY",
+            due_date=date.today(),
+            billing_period_start=date.today(),
+            billing_period_end=date.today(),
+            amount=Decimal("1500.00"),
+            collected_amount=Decimal("0.00"),
+            status="PENDING",
+            reference_key=f"DEMAND-{rent_sub.id}-1",
+        )
+
+        response = self.client.get(f"/api/v1/customer/subscriptions/{rent_sub.id}/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["security_deposit_amount"], "5000.00")
+        self.assertEqual(response.data["security_deposit_percent"], "20.00")
+        self.assertEqual(response.data["refundable_security_deposit"], "5000.00")
+        self.assertEqual(response.data["deposit_status"], "PENDING")
+        self.assertEqual(len(response.data["rent_lease_demands"]), 1)
+        self.assertEqual(len(response.data["emis"]), 1)
+        self.assertEqual(response.data["emis"][0]["amount"], "1500.00")
+
+        # Test deposits endpoint
+        deposits_resp = self.client.get("/api/v1/subscriptions/deposits/")
+        self.assertEqual(deposits_resp.status_code, status.HTTP_200_OK)
+        self.assertTrue(deposits_resp.data["count"] >= 1)
+        dep_row = next((r for r in deposits_resp.data["results"] if r.get("subscription_id") == rent_sub.id), None)
+        self.assertIsNotNone(dep_row)
+        self.assertEqual(dep_row["deposit_amount"], 5000.0)
+        self.assertEqual(dep_row["status"], "PENDING")

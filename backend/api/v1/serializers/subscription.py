@@ -193,20 +193,27 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
         if obj.plan_type not in ["RENT", "LEASE"]:
             return "NOT_REQUIRED"
         try:
+            profile = getattr(obj, "rent_profile", None) or getattr(obj, "lease_profile", None)
+            if profile and getattr(profile, "refund_status", None) == "REFUNDED":
+                return "REFUNDED"
             from contracts.services.contract_activation_readiness_service import _deposit_readiness
             deposit = _deposit_readiness(obj)
             if deposit.get("required"):
                 return "SUBMITTED" if deposit.get("ready") else "PENDING"
             return "NOT_REQUIRED"
         except Exception:
-            return "UNKNOWN"
+            return "PENDING" if obj.plan_type in ["RENT", "LEASE"] else "NOT_REQUIRED"
 
     def get_security_deposit_amount(self, obj):
         try:
             if obj.plan_type == PlanType.RENT and hasattr(obj, "rent_profile") and obj.rent_profile:
-                return str(obj.rent_profile.security_deposit_amount or Decimal("0.00"))
+                val = obj.rent_profile.security_deposit_amount
+                if val is not None and Decimal(str(val)) > Decimal("0.00"):
+                    return str(val)
             if obj.plan_type == PlanType.LEASE and hasattr(obj, "lease_profile") and obj.lease_profile:
-                return str(obj.lease_profile.security_deposit_amount or Decimal("0.00"))
+                val = obj.lease_profile.security_deposit_amount
+                if val is not None and Decimal(str(val)) > Decimal("0.00"):
+                    return str(val)
         except Exception:
             pass
         try:
@@ -221,29 +228,52 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
             pass
         if obj.pricing_snapshot and isinstance(obj.pricing_snapshot, dict):
             dep = obj.pricing_snapshot.get("security_deposit_amount")
-            if dep is not None:
+            if dep is not None and Decimal(str(dep)) > Decimal("0.00"):
                 return str(dep)
+        try:
+            if obj.plan_type == PlanType.RENT and hasattr(obj, "rent_profile") and obj.rent_profile:
+                return str(obj.rent_profile.security_deposit_amount or Decimal("0.00"))
+            if obj.plan_type == PlanType.LEASE and hasattr(obj, "lease_profile") and obj.lease_profile:
+                return str(obj.lease_profile.security_deposit_amount or Decimal("0.00"))
+        except Exception:
+            pass
         return "0.00"
 
     def get_security_deposit_percent(self, obj):
         try:
             if obj.plan_type == PlanType.RENT and hasattr(obj, "rent_profile") and obj.rent_profile:
-                return str(obj.rent_profile.security_deposit_percent or Decimal("20.00"))
+                val = obj.rent_profile.security_deposit_percent
+                if val is not None and Decimal(str(val)) > Decimal("0.00"):
+                    return str(val)
             if obj.plan_type == PlanType.LEASE and hasattr(obj, "lease_profile") and obj.lease_profile:
-                return str(obj.lease_profile.security_deposit_percent or Decimal("20.00"))
+                val = obj.lease_profile.security_deposit_percent
+                if val is not None and Decimal(str(val)) > Decimal("0.00"):
+                    return str(val)
         except Exception:
             pass
-        return "0.00"
+        try:
+            items = getattr(obj, "contract_items", None)
+            if items and hasattr(items, "all"):
+                first_item = items.first()
+                if first_item and getattr(first_item, "security_deposit_percent", None):
+                    return str(first_item.security_deposit_percent)
+        except Exception:
+            pass
+        return "20.00" if obj.plan_type in [PlanType.RENT, PlanType.LEASE] else "0.00"
 
     def get_refundable_security_deposit(self, obj):
         try:
             if obj.plan_type == PlanType.RENT and hasattr(obj, "rent_profile") and obj.rent_profile:
-                return str(obj.rent_profile.refundable_security_deposit or obj.rent_profile.security_deposit_amount or Decimal("0.00"))
+                val = obj.rent_profile.refundable_security_deposit or obj.rent_profile.security_deposit_amount
+                if val is not None and Decimal(str(val)) > Decimal("0.00"):
+                    return str(val)
             if obj.plan_type == PlanType.LEASE and hasattr(obj, "lease_profile") and obj.lease_profile:
-                return str(obj.lease_profile.refundable_security_deposit or obj.lease_profile.security_deposit_amount or Decimal("0.00"))
+                val = obj.lease_profile.refundable_security_deposit or obj.lease_profile.security_deposit_amount
+                if val is not None and Decimal(str(val)) > Decimal("0.00"):
+                    return str(val)
         except Exception:
             pass
-        return "0.00"
+        return self.get_security_deposit_amount(obj)
 
     def get_amendments_count(self, obj):
         try:
@@ -474,6 +504,7 @@ class SubscriptionDetailSerializer(BaseSubscriptionSerializer):
     winner_status = serializers.SerializerMethodField()
     winner_summary = serializers.SerializerMethodField()
     emis = serializers.SerializerMethodField()
+    rent_lease_demands = serializers.SerializerMethodField()
     delivery_summary = serializers.SerializerMethodField()
     deliveries = serializers.SerializerMethodField()
     amendments = serializers.SerializerMethodField()
@@ -486,6 +517,7 @@ class SubscriptionDetailSerializer(BaseSubscriptionSerializer):
             "deliveries",
             "emis",
             "amendments",
+            "rent_lease_demands",
         )
         read_only_fields = fields
 
@@ -522,7 +554,75 @@ class SubscriptionDetailSerializer(BaseSubscriptionSerializer):
                 emi.id or 0,
             ),
         )
-        return CustomerEmiSerializer(emis, many=True).data
+        if emis:
+            return CustomerEmiSerializer(emis, many=True).data
+
+        # For Rent/Lease contracts without EMI rows, synthesize schedule rows from monthly demands
+        if obj.plan_type in (PlanType.RENT, PlanType.LEASE):
+            try:
+                from subscriptions.models import RentLeaseBillingDemand
+                prefetched = getattr(obj, "_prefetched_objects_cache", {})
+                if "rent_lease_demands" in prefetched:
+                    demands = [d for d in prefetched["rent_lease_demands"] if getattr(d, "demand_type", "") != "SECURITY_DEPOSIT"]
+                else:
+                    demands = list(
+                        RentLeaseBillingDemand.objects.filter(subscription=obj)
+                        .exclude(demand_type="SECURITY_DEPOSIT")
+                        .order_by("due_date", "id")
+                    )
+                if demands:
+                    synthetic_rows = []
+                    for idx, demand in enumerate(demands, start=1):
+                        amt = demand.amount or Decimal("0.00")
+                        collected = demand.collected_amount or Decimal("0.00")
+                        status_val = demand.status or "PENDING"
+                        if status_val not in ("PAID", "WAIVED", "CANCELLED", "OVERDUE"):
+                            if collected >= amt and amt > Decimal("0.00"):
+                                status_val = "PAID"
+                            elif collected > Decimal("0.00"):
+                                status_val = "PARTIAL"
+                            else:
+                                status_val = "PENDING"
+                        synthetic_rows.append({
+                            "id": demand.id,
+                            "subscription": obj.id,
+                            "month_no": idx,
+                            "due_date": demand.due_date.isoformat() if demand.due_date else None,
+                            "amount": str(amt),
+                            "paid_amount": str(collected),
+                            "waived_amount": "0.00",
+                            "outstanding_amount": str(max(amt - collected, Decimal("0.00"))),
+                            "status": status_val,
+                        })
+                    return synthetic_rows
+            except Exception:
+                pass
+
+        return []
+
+    def get_rent_lease_demands(self, obj):
+        if obj.plan_type not in (PlanType.RENT, PlanType.LEASE):
+            return []
+        try:
+            from subscriptions.models import RentLeaseBillingDemand
+            prefetched = getattr(obj, "_prefetched_objects_cache", {})
+            if "rent_lease_demands" in prefetched:
+                demands = prefetched["rent_lease_demands"]
+            else:
+                demands = RentLeaseBillingDemand.objects.filter(subscription=obj).order_by("due_date", "id")
+            return [
+                {
+                    "id": demand.id,
+                    "demand_type": demand.demand_type,
+                    "due_date": demand.due_date.isoformat() if demand.due_date else None,
+                    "amount": str(demand.amount),
+                    "status": demand.status,
+                    "paid_amount": str(demand.collected_amount),
+                }
+                for demand in demands
+            ]
+        except Exception:
+            return []
 
     def get_delivery_summary(self, obj):
         current_delivery = get_current_subscription_delivery(obj)

@@ -62,6 +62,13 @@ function SubscriptionCard({ sub }: { sub: CustomerSubscription }) {
   const outstanding = Number(
     sub.outstanding_amount ?? sub.financial_summary?.outstanding_amount ?? 0
   );
+  const isRentOrLease = sub.plan_type === "RENT" || sub.plan_type === "LEASE";
+  const itemsDepositTotal = Array.isArray(sub.contract_items)
+    ? sub.contract_items.reduce((sum, item) => sum + Number(item.security_deposit_amount || 0), 0)
+    : 0;
+  const effectiveDeposit = Number(sub.security_deposit_amount || 0) > 0
+    ? sub.security_deposit_amount
+    : (itemsDepositTotal > 0 ? itemsDepositTotal : (sub.security_deposit_amount || 0));
 
   return (
     <CPageCard href={`/customer/subscriptions/${sub.id}`}>
@@ -115,16 +122,16 @@ function SubscriptionCard({ sub }: { sub: CustomerSubscription }) {
           <div className="font-semibold mt-0.5">{sub.tenure_months ? `${sub.tenure_months} Months` : "—"}</div>
         </div>
         <div>
-          <span className="text-muted-foreground">EMI Progress</span>
+          <span className="text-muted-foreground">{isRentOrLease ? "Installment Progress" : "EMI Progress"}</span>
           <div className="font-semibold mt-0.5">
             {sub.paid_emi_count ?? 0} of {sub.emi_count ?? sub.tenure_months ?? "—"} Paid
           </div>
         </div>
-        {Number(sub.security_deposit_amount || 0) > 0 || sub.plan_type === "RENT" || sub.plan_type === "LEASE" ? (
+        {Number(effectiveDeposit || 0) > 0 || isRentOrLease ? (
           <div>
             <span className="text-muted-foreground">Security Deposit</span>
             <div className="font-semibold text-primary mt-0.5">
-              {formatRupee(sub.security_deposit_amount)}
+              {formatRupee(effectiveDeposit)}
             </div>
           </div>
         ) : null}

@@ -84,6 +84,14 @@ export type CustomerSubscription = {
   refundable_security_deposit?: number | string;
   deposit_status?: string;
   amendments_count?: number;
+  rent_lease_demands?: Array<{
+    id: number;
+    demand_type: string;
+    due_date?: string | null;
+    amount: string | number;
+    status: string;
+    paid_amount?: string | number;
+  }>;
 
   product?: number;
   batch?: number | null;
@@ -507,6 +515,24 @@ export function normalizeCustomerSubscription(item: unknown): CustomerSubscripti
         ? undefined
         : toNumber(row.tenure_months),
 
+    security_deposit_amount:
+      row.security_deposit_amount === null || row.security_deposit_amount === undefined
+        ? undefined
+        : toMoneyString(row.security_deposit_amount),
+    security_deposit_percent:
+      row.security_deposit_percent === null || row.security_deposit_percent === undefined
+        ? undefined
+        : toMoneyString(row.security_deposit_percent),
+    refundable_security_deposit:
+      row.refundable_security_deposit === null || row.refundable_security_deposit === undefined
+        ? undefined
+        : toMoneyString(row.refundable_security_deposit),
+    deposit_status: toStringOrUndefined(row.deposit_status),
+    amendments_count:
+      row.amendments_count === null || row.amendments_count === undefined
+        ? undefined
+        : toNumber(row.amendments_count),
+
     product:
       row.product === null || row.product === undefined
         ? undefined
@@ -584,6 +610,16 @@ export function normalizeCustomerSubscription(item: unknown): CustomerSubscripti
     deliveries: toArray(row.deliveries).map(normalizeDeliveryRecord),
     emis: toArray(row.emis).map(normalizeCustomerEmi),
     contract_items: Array.isArray(row.contract_items) ? (row.contract_items as CustomerContractItem[]) : [],
+    rent_lease_demands: Array.isArray(row.rent_lease_demands)
+      ? (row.rent_lease_demands as Array<{
+          id: number;
+          demand_type: string;
+          due_date?: string | null;
+          amount: string | number;
+          status: string;
+          paid_amount?: string | number;
+        }>)
+      : [],
 
     has_customer_signature: Boolean(row.has_customer_signature),
     customer_signature_signed_at: toStringOrUndefined(row.customer_signature_signed_at) ?? null,

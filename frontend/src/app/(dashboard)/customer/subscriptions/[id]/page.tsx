@@ -118,28 +118,57 @@ export default function CustomerSubscriptionDetailPage() {
 
   const loadPage = useCallback(async () => { await query.refetch(); }, [query]);
 
+  const isRentOrLease =
+    subscription?.plan_type === "RENT" || subscription?.plan_type === "LEASE";
+
   const emis = useMemo<CustomerEmi[]>(() => (
     Array.isArray(subscription?.emis) ? (subscription?.emis as CustomerEmi[]) : []
   ), [subscription]);
 
-  const emiRows = useMemo<EmiRow[]>(() => emis.map((emi, index) => {
-    const amount = toNumber(emi.amount);
-    const paidAmount = toNumber(emi.paid_amount);
-    const waivedAmount = toNumber(emi.waived_amount);
-    const computedOutstanding = Math.max(amount - paidAmount - waivedAmount, 0);
-    return {
-      id: emi.id ?? index + 1,
-      month_no: toNumber(emi.month_no ?? emi.sequence_no ?? index + 1),
-      due_date: text(emi.due_date, ""),
-      amount,
-      paid_amount: paidAmount,
-      waived_amount: waivedAmount,
-      outstanding_amount: emi.outstanding_amount !== undefined && emi.outstanding_amount !== null && String(emi.outstanding_amount) !== ""
-        ? toNumber(emi.outstanding_amount)
-        : computedOutstanding,
-      status: text(emi.status, "—"),
-    };
-  }), [emis]);
+  const emiRows = useMemo<EmiRow[]>(() => {
+    if (emis.length > 0) {
+      return emis.map((emi, index) => {
+        const amount = toNumber(emi.amount);
+        const paidAmount = toNumber(emi.paid_amount);
+        const waivedAmount = toNumber(emi.waived_amount);
+        const computedOutstanding = Math.max(amount - paidAmount - waivedAmount, 0);
+        return {
+          id: emi.id ?? index + 1,
+          month_no: toNumber(emi.month_no ?? emi.sequence_no ?? index + 1),
+          due_date: text(emi.due_date, ""),
+          amount,
+          paid_amount: paidAmount,
+          waived_amount: waivedAmount,
+          outstanding_amount: emi.outstanding_amount !== undefined && emi.outstanding_amount !== null && String(emi.outstanding_amount) !== ""
+            ? toNumber(emi.outstanding_amount)
+            : computedOutstanding,
+          status: text(emi.status, "—"),
+        };
+      });
+    }
+
+    if (isRentOrLease && Array.isArray(subscription?.rent_lease_demands) && subscription.rent_lease_demands.length > 0) {
+      return subscription.rent_lease_demands
+        .filter((d) => d.demand_type !== "SECURITY_DEPOSIT")
+        .map((d, index) => {
+          const amount = toNumber(d.amount);
+          const paidAmount = toNumber(d.paid_amount);
+          const outstanding = Math.max(amount - paidAmount, 0);
+          return {
+            id: d.id ?? index + 1,
+            month_no: index + 1,
+            due_date: text(d.due_date, ""),
+            amount,
+            paid_amount: paidAmount,
+            waived_amount: 0,
+            outstanding_amount: outstanding,
+            status: text(d.status, "PENDING"),
+          };
+        });
+    }
+
+    return [];
+  }, [emis, isRentOrLease, subscription?.rent_lease_demands]);
 
   const derivedFinancialSummary = useMemo(() => ({
     emi_total: emiRows.reduce((sum, row) => sum + row.amount, 0),
@@ -170,10 +199,35 @@ export default function CustomerSubscriptionDetailPage() {
   const waivedEmiCount = useMemo(() => emiRows.filter((r) => r.status.toUpperCase() === "WAIVED").length, [emiRows]);
 
   const winnerSummary = subscription?.winner_summary;
+
+  const itemsDepositTotal = useMemo(() => {
+    if (Array.isArray(subscription?.contract_items)) {
+      return subscription.contract_items.reduce(
+        (sum, it) => sum + toNumber(it.security_deposit_amount),
+        0
+      );
+    }
+    return 0;
+  }, [subscription?.contract_items]);
+
+  const effectiveSecurityDepositAmount = useMemo(() => {
+    const direct = toNumber(subscription?.security_deposit_amount);
+    if (direct > 0) return direct;
+    if (itemsDepositTotal > 0) return itemsDepositTotal;
+    const snap = toNumber((subscription?.pricing_snapshot as Record<string, unknown> | undefined)?.security_deposit_amount);
+    if (snap > 0) return snap;
+    return direct;
+  }, [subscription?.security_deposit_amount, itemsDepositTotal, subscription?.pricing_snapshot]);
+
+  const effectiveRefundableDeposit = useMemo(() => {
+    const direct = toNumber(subscription?.refundable_security_deposit);
+    if (direct > 0) return direct;
+    return effectiveSecurityDepositAmount;
+  }, [subscription?.refundable_security_deposit, effectiveSecurityDepositAmount]);
+
   const hasSecurityDeposit =
-    subscription?.plan_type === "RENT" ||
-    subscription?.plan_type === "LEASE" ||
-    Number(subscription?.security_deposit_amount || 0) > 0;
+    isRentOrLease ||
+    effectiveSecurityDepositAmount > 0;
 
   const detailSemantics = useMemo(() => buildSubscriptionDetailSemantics({
     contractStatus: subscription?.status,
@@ -224,11 +278,11 @@ export default function CustomerSubscriptionDetailPage() {
           {/* Financial stats */}
           <CPageStats>
             <CPageStat label="Outstanding" value={formatRupee(financialSummary.outstanding_amount)} tone={detailSemantics.isSettled ? "success" : "warning"} />
-            <CPageStat label="Paid EMIs" value={paidEmiCount} tone={paidEmiCount > 0 ? "success" : "default"} />
-            <CPageStat label="Total EMIs" value={emiRows.length || subscription.tenure_months || 0} />
+            <CPageStat label={isRentOrLease ? "Paid Months" : "Paid EMIs"} value={paidEmiCount} tone={paidEmiCount > 0 ? "success" : "default"} />
+            <CPageStat label={isRentOrLease ? "Total Months" : "Total EMIs"} value={emiRows.length || subscription.tenure_months || 0} />
             <CPageStat label="Pending" value={pendingEmiCount} tone={pendingEmiCount > 0 ? "warning" : "success"} />
             {hasSecurityDeposit ? (
-              <CPageStat label="Security Deposit" value={formatRupee(subscription.security_deposit_amount)} tone="info" />
+              <CPageStat label="Security Deposit" value={formatRupee(effectiveSecurityDepositAmount)} tone="info" />
             ) : null}
             <CPageStat label="Tenure" value={subscription.tenure_months ? `${subscription.tenure_months} Mo` : "—"} />
           </CPageStats>
@@ -448,7 +502,7 @@ export default function CustomerSubscriptionDetailPage() {
                   label="Deposit Amount"
                   value={
                     <span className="text-base font-bold text-primary">
-                      {formatRupee(subscription.security_deposit_amount)}
+                      {formatRupee(effectiveSecurityDepositAmount)}
                     </span>
                   }
                 />
@@ -459,7 +513,7 @@ export default function CustomerSubscriptionDetailPage() {
                   label="Refundable deposit"
                   value={
                     <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                      {formatRupee(subscription.refundable_security_deposit || subscription.security_deposit_amount)}
+                      {formatRupee(effectiveRefundableDeposit)}
                     </span>
                   }
                 />
@@ -488,13 +542,13 @@ export default function CustomerSubscriptionDetailPage() {
           {/* Financial position */}
           <CPageSection title="Financial Position">
             <CPageCard>
-              <InfoRow label="EMI total" value={formatRupee(financialSummary.emi_total)} />
+              <InfoRow label={isRentOrLease ? "Total Contract Value" : "EMI total"} value={formatRupee(financialSummary.emi_total)} />
               <InfoRow label="Paid" value={<span className="text-emerald-600 dark:text-emerald-400">{formatRupee(financialSummary.paid_amount)}</span>} />
               <InfoRow label="Waived" value={formatRupee(financialSummary.waived_amount)} />
               <InfoRow label="Outstanding" value={<span className={detailSemantics.isSettled ? "text-emerald-600" : "text-amber-600"}>{formatRupee(financialSummary.outstanding_amount)}</span>} />
-              <InfoRow label="EMI Completion" value={`${paidEmiCount} of ${emiRows.length || subscription.tenure_months || 0} Installments (${pendingEmiCount} Pending)`} />
+              <InfoRow label={isRentOrLease ? "Installment Completion" : "EMI Completion"} value={`${paidEmiCount} of ${emiRows.length || subscription.tenure_months || 0} Installments (${pendingEmiCount} Pending)`} />
               {hasSecurityDeposit ? (
-                <InfoRow label="Security Deposit held" value={<span className="text-primary font-bold">{formatRupee(subscription.security_deposit_amount)}</span>} />
+                <InfoRow label="Security Deposit held" value={<span className="text-primary font-bold">{formatRupee(effectiveSecurityDepositAmount)}</span>} />
               ) : null}
             </CPageCard>
           </CPageSection>
@@ -523,9 +577,9 @@ export default function CustomerSubscriptionDetailPage() {
           ) : null}
 
           {/* EMI schedule */}
-          <CPageSection title="Advance EMI Schedule">
+          <CPageSection title={isRentOrLease ? "Rental Billing Schedule" : "Advance EMI Schedule"}>
             {emiRows.length === 0 ? (
-              <ERPEmptyState title="No EMI schedule" description="No advance EMI rows for this subscription." />
+              <ERPEmptyState title={isRentOrLease ? "No rental schedule" : "No EMI schedule"} description={isRentOrLease ? "No rental billing schedule generated for this subscription." : "No advance EMI rows for this subscription."} />
             ) : (
               <div className="space-y-2">
                 {emiRows.map((row) => {
@@ -534,7 +588,9 @@ export default function CustomerSubscriptionDetailPage() {
                     <CPageCard key={row.id}>
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <div className="text-sm font-bold text-foreground">Month {row.month_no}</div>
+                          <div className="text-sm font-bold text-foreground">
+                            {isRentOrLease ? `Month ${row.month_no} Rent` : `Month ${row.month_no}`}
+                          </div>
                           <div className="text-xs text-muted-foreground mt-0.5">{formatDate(row.due_date)}</div>
                         </div>
                         <ERPStatusBadge status={badge.status} label={badge.label} />
