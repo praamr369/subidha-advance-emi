@@ -258,10 +258,10 @@ def public_contract_sign_view(request, token: str):
 
     try:
         log_audit(
-            action_type=getattr(
-                AuditLog.ActionType,
-                "CONTRACT_SIGNED",
-                getattr(AuditLog.ActionType, "CONTRACT_APPROVED", AuditLog.ActionType.SUB_CREATED),
+            action_type=(
+                AuditLog.ActionType.SUB_CREATED
+                if subscription.status == "DRAFT"
+                else AuditLog.ActionType.PAYMENT_FLAGGED
             ),
             instance=doc,
             performed_by=None,

@@ -242,7 +242,6 @@ class AuditLog(models.Model):
         CONTRACT_ACTIVATED = "CONTRACT_ACTIVATED", "Contract Activated"
         CONTRACT_CANCELLED = "CONTRACT_CANCELLED", "Contract Cancelled"
         CONTRACT_CLOSED = "CONTRACT_CLOSED", "Contract Closed"
-        CONTRACT_SIGNED = "CONTRACT_SIGNED", "Contract Signed"
         CONTRACT_AMENDMENT_REQUESTED = "CONTRACT_AMENDMENT_REQUESTED", "Contract Amendment Requested"
         CONTRACT_AMENDMENT_APPROVED = "CONTRACT_AMENDMENT_APPROVED", "Contract Amendment Approved"
         CONTRACT_AMENDMENT_REJECTED = "CONTRACT_AMENDMENT_REJECTED", "Contract Amendment Rejected"
