@@ -22,7 +22,6 @@ import CustomerPageShell, {
 } from "@/components/layout/CustomerPageShell";
 import {
   listCustomerSubscriptionsRegister,
-  type CustomerSubscriptionRegisterResponse,
 } from "@/services/customer/paginated-subscriptions";
 import type { CustomerSubscription } from "@/services/customer";
 

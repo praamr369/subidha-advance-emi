@@ -121,13 +121,10 @@ export default function CustomerSubscriptionDetailPage() {
   const isRentOrLease =
     subscription?.plan_type === "RENT" || subscription?.plan_type === "LEASE";
 
-  const emis = useMemo<CustomerEmi[]>(() => (
-    Array.isArray(subscription?.emis) ? (subscription?.emis as CustomerEmi[]) : []
-  ), [subscription]);
-
   const emiRows = useMemo<EmiRow[]>(() => {
-    if (emis.length > 0) {
-      return emis.map((emi, index) => {
+    const rawEmis = Array.isArray(subscription?.emis) ? (subscription.emis as CustomerEmi[]) : [];
+    if (rawEmis.length > 0) {
+      return rawEmis.map((emi, index) => {
         const amount = toNumber(emi.amount);
         const paidAmount = toNumber(emi.paid_amount);
         const waivedAmount = toNumber(emi.waived_amount);
@@ -147,8 +144,10 @@ export default function CustomerSubscriptionDetailPage() {
       });
     }
 
-    if (isRentOrLease && Array.isArray(subscription?.rent_lease_demands) && subscription.rent_lease_demands.length > 0) {
-      return subscription.rent_lease_demands
+    const isRentLease = subscription?.plan_type === "RENT" || subscription?.plan_type === "LEASE";
+    const demands = Array.isArray(subscription?.rent_lease_demands) ? subscription.rent_lease_demands : [];
+    if (isRentLease && demands.length > 0) {
+      return demands
         .filter((d) => d.demand_type !== "SECURITY_DEPOSIT")
         .map((d, index) => {
           const amount = toNumber(d.amount);
@@ -168,7 +167,7 @@ export default function CustomerSubscriptionDetailPage() {
     }
 
     return [];
-  }, [emis, isRentOrLease, subscription?.rent_lease_demands]);
+  }, [subscription]);
 
   const derivedFinancialSummary = useMemo(() => ({
     emi_total: emiRows.reduce((sum, row) => sum + row.amount, 0),
@@ -201,14 +200,15 @@ export default function CustomerSubscriptionDetailPage() {
   const winnerSummary = subscription?.winner_summary;
 
   const itemsDepositTotal = useMemo(() => {
-    if (Array.isArray(subscription?.contract_items)) {
-      return subscription.contract_items.reduce(
+    const items = subscription?.contract_items;
+    if (Array.isArray(items)) {
+      return items.reduce(
         (sum, it) => sum + toNumber(it.security_deposit_amount),
         0
       );
     }
     return 0;
-  }, [subscription?.contract_items]);
+  }, [subscription]);
 
   const effectiveSecurityDepositAmount = useMemo(() => {
     const direct = toNumber(subscription?.security_deposit_amount);
@@ -217,13 +217,13 @@ export default function CustomerSubscriptionDetailPage() {
     const snap = toNumber((subscription?.pricing_snapshot as Record<string, unknown> | undefined)?.security_deposit_amount);
     if (snap > 0) return snap;
     return direct;
-  }, [subscription?.security_deposit_amount, itemsDepositTotal, subscription?.pricing_snapshot]);
+  }, [subscription, itemsDepositTotal]);
 
   const effectiveRefundableDeposit = useMemo(() => {
     const direct = toNumber(subscription?.refundable_security_deposit);
     if (direct > 0) return direct;
     return effectiveSecurityDepositAmount;
-  }, [subscription?.refundable_security_deposit, effectiveSecurityDepositAmount]);
+  }, [subscription, effectiveSecurityDepositAmount]);
 
   const hasSecurityDeposit =
     isRentOrLease ||
