@@ -528,5 +528,80 @@ class PreActivationContractModificationTests(TestCase):
         self.assertEqual(Decimal(str(data["monthly_amount"])), Decimal("300.00"))  # 6k * 5%
         self.assertEqual(Decimal(str(data["total_amount"])), Decimal("3000.00"))  # 300 * 10
 
+    def test_rent_contract_flexible_future_start_date_deposit_upfront(self):
+        from datetime import date, timedelta
+        from django.utils import timezone
+        from subscriptions.models import RentLeaseDemandType
+        from contracts.services.rent_lease_billing_service import generate_monthly_demands_for_subscription
+        from api.v1.serializers.admin_resources import SubscriptionAdminDetailSerializer
+
+        today = timezone.localdate()
+        future_start = today + timedelta(days=20)  # e.g. 1st rent starts in 20 days
+
+        sub = create_rent_contract(
+            customer=self.customer1,
+            product=self.product1,
+            tenure_months=6,
+            start_date=future_start,
+            security_deposit_percent=Decimal("20.00"),
+            deposit_payment_option="FULL",
+            performed_by=self.user,
+        )
+        generate_monthly_demands_for_subscription(
+            subscription=sub,
+            generate_full_schedule=True,
+            performed_by=self.user,
+        )
+
+        dep_demand = sub.rent_lease_demands.filter(demand_type=RentLeaseDemandType.SECURITY_DEPOSIT).first()
+        first_rent = sub.rent_lease_demands.filter(demand_type=RentLeaseDemandType.RENT_MONTHLY).order_by("due_date").first()
+
+        self.assertIsNotNone(dep_demand)
+        self.assertIsNotNone(first_rent)
+        # Security deposit must be due on or before the 1st rent date!
+        self.assertLessEqual(dep_demand.due_date, first_rent.due_date)
+        self.assertEqual(dep_demand.due_date, today)
+        self.assertEqual(first_rent.due_date, future_start)
+
+        # Serializer ordering check: Security deposit must be listed first
+        serializer_data = SubscriptionAdminDetailSerializer(sub).data
+        demands = serializer_data["rent_lease_demands"]
+        self.assertEqual(demands[0]["demand_type"], RentLeaseDemandType.SECURITY_DEPOSIT)
+
+    def test_rebase_schedule_preserves_upfront_deposit(self):
+        from datetime import date, timedelta
+        from django.utils import timezone
+        from subscriptions.models import RentLeaseDemandType
+        from contracts.services.rent_lease_billing_service import rebase_rent_lease_schedule
+
+        today = timezone.localdate()
+        future_start = today + timedelta(days=15)
+        new_future_start = today + timedelta(days=30)
+
+        sub = create_rent_contract(
+            customer=self.customer1,
+            product=self.product1,
+            tenure_months=6,
+            start_date=future_start,
+            security_deposit_percent=Decimal("20.00"),
+            deposit_payment_option="FULL",
+            performed_by=self.user,
+        )
+
+        rebase_rent_lease_schedule(
+            subscription=sub,
+            start_date=new_future_start,
+            deposit_due_date=today,
+            performed_by=self.user,
+        )
+
+        dep_demand = sub.rent_lease_demands.filter(demand_type=RentLeaseDemandType.SECURITY_DEPOSIT).first()
+        first_rent = sub.rent_lease_demands.filter(demand_type=RentLeaseDemandType.RENT_MONTHLY).order_by("due_date").first()
+
+        self.assertEqual(dep_demand.due_date, today)
+        self.assertEqual(first_rent.due_date, new_future_start)
+        self.assertLess(dep_demand.due_date, first_rent.due_date)
+
+
 
 

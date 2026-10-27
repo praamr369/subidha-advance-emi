@@ -2822,8 +2822,15 @@ class SubscriptionAdminDetailSerializer(SubscriptionAdminSerializer):
     def get_rent_lease_demands(self, obj):
         if obj.plan_type not in ("RENT", "LEASE"):
             return []
-        from subscriptions.models import RentLeaseBillingDemand
-        demands = RentLeaseBillingDemand.objects.filter(subscription=obj).order_by("due_date", "id")
+        from subscriptions.models import RentLeaseBillingDemand, RentLeaseDemandType
+        from django.db.models import Case, When, Value, IntegerField
+        demands = RentLeaseBillingDemand.objects.filter(subscription=obj).annotate(
+            type_order=Case(
+                When(demand_type=RentLeaseDemandType.SECURITY_DEPOSIT, then=Value(0)),
+                default=Value(1),
+                output_field=IntegerField(),
+            )
+        ).order_by("due_date", "type_order", "id")
         return [
             {
                 "id": demand.id,

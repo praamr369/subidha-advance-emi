@@ -10,14 +10,18 @@ export function GenerateRentLeaseLedgerModal({
   open,
   onOpenChange,
   currentStartDate,
+  currentDepositDueDate,
 }: {
   subscriptionId: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Contract's current start date (yyyy-mm-dd), used to prefill the picker. */
   currentStartDate?: string | null;
+  /** Contract's current deposit due date (yyyy-mm-dd). */
+  currentDepositDueDate?: string | null;
 }) {
   const [startDate, setStartDate] = useState("");
+  const [depositDueDate, setDepositDueDate] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -27,8 +31,10 @@ export function GenerateRentLeaseLedgerModal({
     if (!open) return;
     setError(null);
     setMessage(null);
+    const today = new Date().toISOString().slice(0, 10);
     setStartDate((current) => current || (currentStartDate ?? "").slice(0, 10));
-  }, [open, currentStartDate]);
+    setDepositDueDate((current) => current || (currentDepositDueDate ?? today).slice(0, 10));
+  }, [open, currentStartDate, currentDepositDueDate]);
 
   async function handleGenerate() {
     if (!startDate) {
@@ -38,7 +44,7 @@ export function GenerateRentLeaseLedgerModal({
     try {
       setLoading(true);
       setError(null);
-      await generateRentLeaseLedger(subscriptionId, startDate);
+      await generateRentLeaseLedger(subscriptionId, startDate, depositDueDate || null);
       setMessage("Rent schedule rebased to the new start date.");
       onOpenChange(false);
       router.refresh();
@@ -71,7 +77,7 @@ export function GenerateRentLeaseLedgerModal({
         </div>
         <div className="grid gap-2">
           <label htmlFor="start_date" className="text-sm font-medium">
-            Rent start date
+            Rent start date (1st Rent Due Date)
           </label>
           <input
             id="start_date"
@@ -83,6 +89,22 @@ export function GenerateRentLeaseLedgerModal({
           <p className="text-xs text-muted-foreground">
             The first month&apos;s rent falls due on this date, and each following
             month on the same day.
+          </p>
+        </div>
+
+        <div className="grid gap-2">
+          <label htmlFor="deposit_due_date" className="text-sm font-medium">
+            Security Deposit Due Date
+          </label>
+          <input
+            id="deposit_due_date"
+            type="date"
+            value={depositDueDate}
+            onChange={(event) => setDepositDueDate(event.target.value)}
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          />
+          <p className="text-xs text-muted-foreground">
+            Security deposit is collected upfront (due upon activation/delivery, on or before rent starts).
           </p>
         </div>
 

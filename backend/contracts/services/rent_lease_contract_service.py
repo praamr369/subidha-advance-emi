@@ -175,6 +175,7 @@ def create_rent_contract(
     save_as_draft: bool = False,
     deposit_payment_option: str = "FULL",
     deposit_buffer_days: int = 30,
+    deposit_due_date: date | None = None,
     initial_deposit_payment: Decimal | None = None,
     deposit_finance_account_id: int | None = None,
     deposit_payment_method: str = "CASH",
@@ -212,14 +213,17 @@ def create_rent_contract(
         else Decimal(str(security_deposit_percent or "20.00")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     )
 
+    today = timezone.localdate()
     deposit_buffer_days = int(deposit_buffer_days or 30)
     if deposit_buffer_days < 0 or deposit_buffer_days > 90:
         deposit_buffer_days = 30
-    deposit_due_date = (
-        (start_date + timedelta(days=deposit_buffer_days))
-        if deposit_payment_option == "PARTIAL" or (initial_deposit_payment is not None and Decimal(str(initial_deposit_payment)) < deposit_amount)
-        else start_date
-    )
+    if deposit_due_date is not None:
+        deposit_due_date = deposit_due_date
+    elif deposit_payment_option == "PARTIAL":
+        deposit_due_date = min(today + timedelta(days=deposit_buffer_days), start_date)
+    else:
+        # Full upfront deposit: due at contract activation/creation (today) or on start_date if earlier
+        deposit_due_date = min(today, start_date)
 
     # Drafts are always allowed. Activating (the default) goes through the
     # additive KYC/document gate (no-op unless KYC gating is enabled).
@@ -414,6 +418,7 @@ def create_lease_contract(
     save_as_draft: bool = False,
     deposit_payment_option: str = "FULL",
     deposit_buffer_days: int = 30,
+    deposit_due_date: date | None = None,
     initial_deposit_payment: Decimal | None = None,
     deposit_finance_account_id: int | None = None,
     deposit_payment_method: str = "CASH",
@@ -451,14 +456,17 @@ def create_lease_contract(
         else Decimal(str(security_deposit_percent or "20.00")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     )
 
+    today = timezone.localdate()
     deposit_buffer_days = int(deposit_buffer_days or 30)
     if deposit_buffer_days < 0 or deposit_buffer_days > 90:
         deposit_buffer_days = 30
-    deposit_due_date = (
-        (start_date + timedelta(days=deposit_buffer_days))
-        if deposit_payment_option == "PARTIAL" or (initial_deposit_payment is not None and Decimal(str(initial_deposit_payment)) < deposit_amount)
-        else start_date
-    )
+    if deposit_due_date is not None:
+        deposit_due_date = deposit_due_date
+    elif deposit_payment_option == "PARTIAL":
+        deposit_due_date = min(today + timedelta(days=deposit_buffer_days), start_date)
+    else:
+        # Full upfront deposit: due at contract activation/creation (today) or on start_date if earlier
+        deposit_due_date = min(today, start_date)
 
     # Drafts are always allowed. Activating (the default) goes through the
     # additive KYC/document gate (no-op unless KYC gating is enabled).

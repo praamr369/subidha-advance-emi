@@ -2302,7 +2302,17 @@ export default function AdminSubscriptionDetailPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {subscription.rent_lease_demands.map((demand) => (
+                          {[...subscription.rent_lease_demands]
+                            .sort((a, b) => {
+                              const dateA = a.due_date ? new Date(a.due_date).getTime() : 0;
+                              const dateB = b.due_date ? new Date(b.due_date).getTime() : 0;
+                              if (dateA !== dateB) return dateA - dateB;
+                              const isDepA = a.demand_type === "SECURITY_DEPOSIT" ? 0 : 1;
+                              const isDepB = b.demand_type === "SECURITY_DEPOSIT" ? 0 : 1;
+                              if (isDepA !== isDepB) return isDepA - isDepB;
+                              return a.id - b.id;
+                            })
+                            .map((demand) => (
                             <tr key={demand.id} className="align-top">
                               <td className="border-b border-border px-4 py-3 text-sm text-foreground">{demand.demand_type.replace("_", " ")}</td>
                               <td className="border-b border-border px-4 py-3 text-sm text-foreground">{formatDate(demand.due_date)}</td>
@@ -2493,6 +2503,9 @@ export default function AdminSubscriptionDetailPage() {
           <GenerateRentLeaseLedgerModal
             subscriptionId={subscription.id}
             currentStartDate={subscription.start_date}
+            currentDepositDueDate={
+              subscription.rent_lease_demands.find((d) => d.demand_type === "SECURITY_DEPOSIT")?.due_date
+            }
             open={scheduleModalOpen}
             onOpenChange={setScheduleModalOpen}
           />

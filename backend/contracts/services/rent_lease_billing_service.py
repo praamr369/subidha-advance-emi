@@ -188,9 +188,14 @@ def ensure_security_deposit_demand(*, subscription: Subscription, performed_by=N
                 due_date = _dt.fromisoformat(str(deposit_due_date_str))
             except Exception:
                 pass
-        elif buffer_days and int(buffer_days) > 0 and subscription.start_date:
+        elif buffer_days and int(buffer_days) > 0:
+            created_base = subscription.created_at.date() if subscription.created_at else timezone.localdate()
             from datetime import timedelta
-            due_date = subscription.start_date + timedelta(days=int(buffer_days))
+            due_date = min(created_base + timedelta(days=int(buffer_days)), subscription.start_date or created_base)
+        else:
+            # Full upfront: due at creation or contract start date, whichever is earlier
+            created_base = subscription.created_at.date() if subscription.created_at else timezone.localdate()
+            due_date = min(created_base, subscription.start_date or created_base)
 
     demand, created = RentLeaseBillingDemand.objects.get_or_create(
         reference_key=_deposit_reference_key(subscription),
@@ -247,7 +252,7 @@ def ensure_security_deposit_demand(*, subscription: Subscription, performed_by=N
 
 @transaction.atomic
 def rebase_rent_lease_schedule(
-    *, subscription: Subscription, start_date: date, performed_by=None
+    *, subscription: Subscription, start_date: date, deposit_due_date: date | None = None, performed_by=None
 ) -> dict:
     """Move a rent/lease contract's whole schedule onto a new start date.
 
@@ -287,16 +292,21 @@ def rebase_rent_lease_schedule(
     subscription.start_date = start_date
     subscription.save(update_fields=["start_date"])
 
-    # The deposit is due at contract start; realign it too, but only while it is
-    # still uncollected.
+    # The deposit is due upfront (on contract creation / activation / today).
+    # If uncollected, ensure its due date does not fall after the new rent start date.
     deposit = RentLeaseBillingDemand.objects.filter(
         subscription=subscription,
         demand_type=RentLeaseDemandType.SECURITY_DEPOSIT,
         collected_amount__lte=MONEY_ZERO,
     ).first()
-    if deposit is not None and deposit.due_date != start_date:
-        deposit.due_date = start_date
-        deposit.save(update_fields=["due_date", "updated_at"])
+    if deposit is not None:
+        target_dep_date = deposit_due_date or min(deposit.due_date or start_date, start_date)
+        if deposit.due_date != target_dep_date:
+            deposit.due_date = target_dep_date
+            deposit.save(update_fields=["due_date", "updated_at"])
+        if isinstance(subscription.pricing_snapshot, dict):
+            subscription.pricing_snapshot["deposit_due_date"] = target_dep_date.isoformat()
+            subscription.save(update_fields=["pricing_snapshot"])
 
     result = generate_monthly_demands_for_subscription(
         subscription=subscription,

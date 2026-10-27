@@ -41,7 +41,21 @@ export default function VariantPublishControlPage() {
   // local draft of per-variant flags before saving
   const [localVariants, setLocalVariants] = useState<PimVariantPublishRow[]>([]);
   const [basePublished, setBasePublished] = useState(false);
+  const [basePrice, setBasePrice] = useState<string>("");
+  const [baseEmi, setBaseEmi] = useState(true);
+  const [baseRent, setBaseRent] = useState(false);
+  const [baseLease, setBaseLease] = useState(false);
+  const [baseSale, setBaseSale] = useState(true);
   const [dirty, setDirty] = useState(false);
+
+  const syncBase = useCallback((base: PimVariantPublishControl["base"]) => {
+    setBasePublished(base.is_published);
+    setBasePrice(base.base_price ?? "");
+    setBaseEmi(base.is_emi_enabled);
+    setBaseRent(base.is_rent_enabled);
+    setBaseLease(base.is_lease_enabled);
+    setBaseSale(base.is_direct_sale_enabled);
+  }, []);
 
   const load = useCallback(() => {
     if (!productId) return;
@@ -51,12 +65,12 @@ export default function VariantPublishControlPage() {
       .then((d) => {
         setData(d);
         setLocalVariants(d.variants);
-        setBasePublished(d.base.is_published);
+        syncBase(d.base);
         setDirty(false);
       })
       .catch((e) => setError(e?.message ?? "Failed to load variant publish control."))
       .finally(() => setLoading(false));
-  }, [productId]);
+  }, [productId, syncBase]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -66,11 +80,16 @@ export default function VariantPublishControlPage() {
     try {
       const result = await patchVariantPublishControl(productId, {
         base_published: basePublished,
+        base_price: basePrice || null,
+        is_emi_enabled: baseEmi,
+        is_rent_enabled: baseRent,
+        is_lease_enabled: baseLease,
+        is_direct_sale_enabled: baseSale,
         variants: localVariants.map((v) => ({ id: v.id, is_published: v.is_published, is_emi_enabled: v.is_emi_enabled, is_rent_enabled: v.is_rent_enabled, is_lease_enabled: v.is_lease_enabled, is_direct_sale_enabled: v.is_direct_sale_enabled })),
       });
       setData(result);
       setLocalVariants(result.variants);
-      setBasePublished(result.base.is_published);
+      syncBase(result.base);
       setDirty(false);
     } catch (e: unknown) {
       setError((e as Error)?.message ?? "Save failed.");
@@ -86,7 +105,7 @@ export default function VariantPublishControlPage() {
       const result = await patchVariantPublishControl(productId, { all: flag });
       setData(result);
       setLocalVariants(result.variants);
-      setBasePublished(result.base.is_published);
+      syncBase(result.base);
       setDirty(false);
     } catch (e: unknown) {
       setError((e as Error)?.message ?? "Bulk toggle failed.");
@@ -141,29 +160,67 @@ export default function VariantPublishControlPage() {
             title="Base product"
             description="The root PIM record. Publishing the base makes the product discoverable; variants are controlled individually below."
           >
-            <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-card px-5 py-4">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-mono text-sm font-semibold text-foreground">{data.base.code}</span>
+            <div className="rounded-xl border border-border bg-card overflow-hidden">
+              {/* Header matching variant table */}
+              <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto] gap-4 px-5 py-3 bg-muted/40">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Code / Name</div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Price</div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Status</div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Toggle</div>
+              </div>
+              {/* Base product data row */}
+              <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-4 px-5 py-3.5">
+                <div className="min-w-0">
+                  <p className="font-mono text-sm font-semibold text-foreground truncate">{data.base.code}</p>
+                  <p className="text-xs text-muted-foreground truncate">{data.base.name}</p>
+                </div>
+                <div className="text-sm text-foreground">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-muted-foreground text-xs">₹</span>
+                    <input
+                      type="number"
+                      value={basePrice}
+                      onChange={(e) => { setBasePrice(e.target.value); setDirty(true); }}
+                      placeholder="Base price"
+                      className="w-28 rounded-md border border-border bg-background px-2 py-1 text-sm font-medium tabular-nums focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap gap-1 text-[10px]">
+                    {([
+                      ["is_emi_enabled", "EMI", baseEmi, setBaseEmi] as const,
+                      ["is_rent_enabled", "Rent", baseRent, setBaseRent] as const,
+                      ["is_lease_enabled", "Lease", baseLease, setBaseLease] as const,
+                      ["is_direct_sale_enabled", "Sale", baseSale, setBaseSale] as const,
+                    ]).map(([, label, value, setter]) => (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => { setter(!value); setDirty(true); }}
+                        className={`rounded border px-1.5 py-0.5 ${value ? "border-green-300 bg-green-50 text-green-700" : "border-border text-muted-foreground"}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
                   <PublishBadge published={basePublished} />
                 </div>
-                <p className="mt-1 text-sm text-muted-foreground">{data.base.name}</p>
+                <div>
+                  <button
+                    type="button"
+                    onClick={toggleBase}
+                    className="transition hover:scale-110"
+                    title={basePublished ? "Click to set draft" : "Click to publish"}
+                  >
+                    {basePublished ? (
+                      <ToggleRight className="h-7 w-7 text-green-600" />
+                    ) : (
+                      <ToggleLeft className="h-7 w-7 text-slate-400" />
+                    )}
+                  </button>
+                </div>
               </div>
-              <button aria-label="Hide"
-                type="button"
-                onClick={toggleBase}
-                className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition hover:-translate-y-0.5 ${
-                  basePublished
-                    ? "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
-                    : "border-green-200 bg-green-50 text-green-700 hover:bg-green-100"
-                }`}
-              >
-                {basePublished ? (
-                  <><EyeOff className="h-4 w-4" /> Set to draft</>
-                ) : (
-                  <><Eye className="h-4 w-4" /> Publish</>
-                )}
-              </button>
             </div>
           </WorkspaceSection>
 

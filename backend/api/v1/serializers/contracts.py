@@ -58,6 +58,10 @@ class AdminRentContractCreateSerializer(serializers.Serializer):
         default=30,
         required=False,
     )
+    deposit_due_date = serializers.DateField(
+        required=False,
+        allow_null=True,
+    )
     initial_deposit_payment = serializers.DecimalField(
         max_digits=12,
         decimal_places=2,
@@ -118,6 +122,10 @@ class AdminLeaseContractCreateSerializer(serializers.Serializer):
         max_value=90,
         default=30,
         required=False,
+    )
+    deposit_due_date = serializers.DateField(
+        required=False,
+        allow_null=True,
     )
     initial_deposit_payment = serializers.DecimalField(
         max_digits=12,

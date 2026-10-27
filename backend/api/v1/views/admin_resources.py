@@ -3779,6 +3779,7 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
             return Response({"detail": "Only Rent and Lease contracts support ledger generation."}, status=status.HTTP_400_BAD_REQUEST)
 
         start_date = serializer.validated_data["start_date"]
+        deposit_due_date = serializer.validated_data.get("deposit_due_date")
 
         # Rebase rather than plain generate: regenerating alone keys new rows by
         # billing period and leaves the previous schedule in place, so changing
@@ -3787,6 +3788,7 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
             rebase_rent_lease_schedule(
                 subscription=subscription,
                 start_date=start_date,
+                deposit_due_date=deposit_due_date,
                 performed_by=request.user,
             )
         except DjangoValidationError as exc:

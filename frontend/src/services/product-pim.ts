@@ -129,7 +129,17 @@ export type PimVariantPublishRow = {
 };
 
 export type PimVariantPublishControl = {
-  base: { id: number; code: string; name: string; is_published: boolean };
+  base: {
+    id: number;
+    code: string;
+    name: string;
+    is_published: boolean;
+    base_price: string | null;
+    is_emi_enabled: boolean;
+    is_rent_enabled: boolean;
+    is_lease_enabled: boolean;
+    is_direct_sale_enabled: boolean;
+  };
   variants: PimVariantPublishRow[];
 };
 
@@ -141,7 +151,15 @@ export function patchVariantPublishControl(
   productId: number | string,
   body:
     | { all: boolean }
-  | { base_published?: boolean; variants?: Array<{ id: number; is_published: boolean; is_emi_enabled?: boolean; is_rent_enabled?: boolean; is_lease_enabled?: boolean; is_direct_sale_enabled?: boolean }> }
+  | {
+      base_published?: boolean;
+      base_price?: string | null;
+      is_emi_enabled?: boolean;
+      is_rent_enabled?: boolean;
+      is_lease_enabled?: boolean;
+      is_direct_sale_enabled?: boolean;
+      variants?: Array<{ id: number; is_published: boolean; is_emi_enabled?: boolean; is_rent_enabled?: boolean; is_lease_enabled?: boolean; is_direct_sale_enabled?: boolean }>;
+    }
 ) {
   return apiFetch<PimVariantPublishControl>(`/pim/products/${productId}/variants_publish_control/`, {
     method: "PATCH",

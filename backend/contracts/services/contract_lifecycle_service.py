@@ -509,6 +509,23 @@ def modify_pre_activation_contract(
         deposit_buffer_days = int(data.get("deposit_buffer_days") or 30)
         initial_deposit_payment = data.get("initial_deposit_payment")
 
+        today = timezone.localdate()
+        raw_deposit_due_date = data.get("deposit_due_date")
+        if raw_deposit_due_date:
+            from datetime import date as _dt
+            if isinstance(raw_deposit_due_date, _dt):
+                final_deposit_due_date = raw_deposit_due_date
+            else:
+                try:
+                    final_deposit_due_date = _dt.fromisoformat(str(raw_deposit_due_date)[:10])
+                except Exception:
+                    final_deposit_due_date = min(today, subscription.start_date)
+        elif deposit_payment_option == "PARTIAL":
+            from datetime import timedelta
+            final_deposit_due_date = min(today + timedelta(days=deposit_buffer_days), subscription.start_date)
+        else:
+            final_deposit_due_date = min(today, subscription.start_date)
+
         subscription.product = primary_product
         subscription.total_amount = total_amount
         subscription.monthly_amount = monthly_amount
@@ -551,6 +568,7 @@ def modify_pre_activation_contract(
             "security_deposit_amount": str(deposit_amount),
             "deposit_payment_option": deposit_payment_option,
             "deposit_buffer_days": deposit_buffer_days,
+            "deposit_due_date": final_deposit_due_date.isoformat(),
             "initial_deposit_payment": str(initial_deposit_payment or MONEY_ZERO),
         }
 
@@ -652,7 +670,8 @@ def modify_pre_activation_contract(
         dep_demand = ensure_security_deposit_demand(subscription=subscription, performed_by=performed_by)
         if dep_demand and dep_demand.collected_amount <= MONEY_ZERO:
             dep_demand.amount = deposit_amount
-            dep_demand.save(update_fields=["amount", "updated_at"])
+            dep_demand.due_date = final_deposit_due_date
+            dep_demand.save(update_fields=["amount", "due_date", "updated_at"])
 
         # Re-generate contract PDF
         try:

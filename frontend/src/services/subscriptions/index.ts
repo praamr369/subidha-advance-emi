@@ -147,9 +147,17 @@ export function getSubscription(id: number | string): Promise<SubscriptionRecord
   return request(`/admin/subscriptions/${id}/`);
 }
 
-export function generateRentLeaseLedger(id: number | string, startDate: string): Promise<{ updated: boolean; subscription: SubscriptionRecord }> {
+export function generateRentLeaseLedger(
+  id: number | string,
+  startDate: string,
+  depositDueDate?: string | null
+): Promise<{ updated: boolean; subscription: SubscriptionRecord }> {
+  const body: Record<string, unknown> = { start_date: startDate };
+  if (depositDueDate) {
+    body.deposit_due_date = depositDueDate;
+  }
   return request(`/admin/subscriptions/${id}/generate-rent-lease-ledger/`, {
     method: "POST",
-    body: JSON.stringify({ start_date: startDate }),
+    body: JSON.stringify(body),
   });
 }

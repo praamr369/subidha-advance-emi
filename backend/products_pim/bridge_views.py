@@ -243,6 +243,11 @@ class ProductPimVariantPublishControlView(APIView):
             "code": pim.code,
             "name": pim.name or (op.name if op else pim.code),
             "is_published": pim.is_published,
+            "base_price": str(pim.base_price) if pim.base_price is not None else None,
+            "is_emi_enabled": bool(pim.is_emi_enabled),
+            "is_rent_enabled": bool(pim.is_rent_enabled),
+            "is_lease_enabled": bool(pim.is_lease_enabled),
+            "is_direct_sale_enabled": bool(pim.is_direct_sale_enabled),
         }
 
 
@@ -273,10 +278,34 @@ class ProductPimVariantPublishControlView(APIView):
                 "variants": self._variant_rows(pim),
             })
 
-        # Toggle base
+        # Toggle base publish + business line flags + price
+        base_update_fields = []
         if "base_published" in data:
             pim.is_published = bool(data["base_published"])
-            pim.save(update_fields=["is_published"])
+            base_update_fields.append("is_published")
+        for flag_field in ("is_emi_enabled", "is_rent_enabled", "is_lease_enabled", "is_direct_sale_enabled"):
+            if flag_field in data:
+                setattr(pim, flag_field, bool(data[flag_field]))
+                base_update_fields.append(flag_field)
+        if "base_price" in data and data["base_price"] is not None:
+            from decimal import Decimal, InvalidOperation
+            try:
+                pim.base_price = Decimal(str(data["base_price"]))
+                base_update_fields.append("base_price")
+            except (InvalidOperation, ValueError):
+                pass
+        if base_update_fields:
+            pim.save(update_fields=base_update_fields)
+            # Sync business line flags to the linked operational product
+            op_flag_fields = [f for f in base_update_fields if f.startswith("is_")]
+            if op_flag_fields and pim.source_product_id:
+                from subscriptions.models import Product as OperationalProduct
+                op = OperationalProduct.objects.filter(pk=pim.source_product_id).first()
+                if op:
+                    for f in op_flag_fields:
+                        if hasattr(op, f):
+                            setattr(op, f, getattr(pim, f))
+                    op.save(update_fields=[f for f in op_flag_fields if hasattr(op, f)])
 
         # Per-variant toggles — accept EITHER child PimProduct IDs OR ProductVariant IDs
         from products_pim.models import PimProduct, ProductVariant

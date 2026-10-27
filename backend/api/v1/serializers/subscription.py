@@ -556,12 +556,26 @@ class SubscriptionDetailSerializer(BaseSubscriptionSerializer):
         if obj.plan_type not in (PlanType.RENT, PlanType.LEASE):
             return []
         try:
-            from subscriptions.models import RentLeaseBillingDemand
+            from subscriptions.models import RentLeaseBillingDemand, RentLeaseDemandType
+            from django.db.models import Case, When, Value, IntegerField
             prefetched = getattr(obj, "_prefetched_objects_cache", {})
             if "rent_lease_demands" in prefetched:
-                demands = prefetched["rent_lease_demands"]
+                demands = sorted(
+                    prefetched["rent_lease_demands"],
+                    key=lambda d: (
+                        d.due_date or timezone.localdate(),
+                        0 if getattr(d, "demand_type", "") == RentLeaseDemandType.SECURITY_DEPOSIT else 1,
+                        d.id or 0,
+                    )
+                )
             else:
-                demands = RentLeaseBillingDemand.objects.filter(subscription=obj).order_by("due_date", "id")
+                demands = RentLeaseBillingDemand.objects.filter(subscription=obj).annotate(
+                    type_order=Case(
+                        When(demand_type=RentLeaseDemandType.SECURITY_DEPOSIT, then=Value(0)),
+                        default=Value(1),
+                        output_field=IntegerField(),
+                    )
+                ).order_by("due_date", "type_order", "id")
             return [
                 {
                     "id": demand.id,
@@ -615,3 +629,4 @@ SubscriptionSerializer = SubscriptionListSerializer
 
 class RentLeaseGenerateScheduleSerializer(serializers.Serializer):
     start_date = serializers.DateField(required=True)
+    deposit_due_date = serializers.DateField(required=False, allow_null=True)

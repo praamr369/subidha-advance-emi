@@ -517,6 +517,7 @@ export default function SubscriptionCreatePage({
   const [yieldRatePercent, setYieldRatePercent] = useState("5.00");
   const [depositPaymentOption, setDepositPaymentOption] = useState<"FULL" | "PARTIAL">("FULL");
   const [depositBufferDays, setDepositBufferDays] = useState("30");
+  const [depositDueDate, setDepositDueDate] = useState(new Date().toISOString().slice(0, 10));
   const [initialDepositPayment, setInitialDepositPayment] = useState("");
 
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -1250,6 +1251,14 @@ export default function SubscriptionCreatePage({
               if (prof.ownership_transfer_allowed != null) setOwnershipTransferAllowed(Boolean(prof.ownership_transfer_allowed));
             }
           }
+
+          const snap = data.pricing_snapshot as Record<string, unknown> | null;
+          if (snap) {
+            if (snap.deposit_payment_option) setDepositPaymentOption(snap.deposit_payment_option as "FULL" | "PARTIAL");
+            if (snap.deposit_buffer_days) setDepositBufferDays(String(snap.deposit_buffer_days));
+            if (snap.deposit_due_date) setDepositDueDate(String(snap.deposit_due_date).slice(0, 10));
+            if (snap.initial_deposit_payment) setInitialDepositPayment(String(snap.initial_deposit_payment));
+          }
         }
       } catch (err) {
         if (!cancelled) {
@@ -1724,6 +1733,7 @@ export default function SubscriptionCreatePage({
           body.contract_terms_snapshot = contractTermsSnapshot || "";
           body.deposit_payment_option = depositPaymentOption;
           body.deposit_buffer_days = Number(depositBufferDays) || 30;
+          body.deposit_due_date = depositDueDate || null;
           body.initial_deposit_payment = initialDepositPayment.trim()
             ? Number(initialDepositPayment)
             : depositPaymentOption === "FULL"
@@ -1783,6 +1793,7 @@ export default function SubscriptionCreatePage({
           save_as_draft: asDraft,
           deposit_payment_option: depositPaymentOption,
           deposit_buffer_days: Number(depositBufferDays) || 30,
+          deposit_due_date: depositDueDate || null,
           initial_deposit_payment: initialDepositPayment.trim()
             ? Number(initialDepositPayment)
             : depositPaymentOption === "FULL"
@@ -1823,6 +1834,7 @@ export default function SubscriptionCreatePage({
           save_as_draft: asDraft,
           deposit_payment_option: depositPaymentOption,
           deposit_buffer_days: Number(depositBufferDays) || 30,
+          deposit_due_date: depositDueDate || null,
           initial_deposit_payment: initialDepositPayment.trim()
             ? Number(initialDepositPayment)
             : depositPaymentOption === "FULL"
@@ -2882,6 +2894,41 @@ export default function SubscriptionCreatePage({
                         </div>
                       </div>
                     )}
+
+                    <div className="mt-3 border-t border-border/60 pt-3">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-medium text-foreground">
+                          Security Deposit Due Date
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setDepositDueDate(new Date().toISOString().slice(0, 10))}
+                            className="text-[11px] font-medium text-primary hover:underline"
+                          >
+                            Today (Upfront)
+                          </button>
+                          {startDate && (
+                            <button
+                              type="button"
+                              onClick={() => setDepositDueDate(startDate)}
+                              className="text-[11px] font-medium text-muted-foreground hover:underline"
+                            >
+                              On Rent Start
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <input
+                        type="date"
+                        value={depositDueDate}
+                        onChange={(e) => setDepositDueDate(e.target.value)}
+                        className="mt-1.5 h-9 w-full max-w-xs rounded-lg border border-border bg-background px-3 text-xs outline-none focus:border-ring"
+                      />
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        Security deposit is collected upfront (due upon activation/delivery, on or before the 1st rent date).
+                      </p>
+                    </div>
                   </div>
 
                   <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -3024,9 +3071,13 @@ export default function SubscriptionCreatePage({
 
             <div className="rounded-xl border border-border bg-background p-4">
               <div className="space-y-1">
-                <h3 className="text-sm font-semibold text-foreground">Start Date</h3>
+                <h3 className="text-sm font-semibold text-foreground">
+                  {isRentPlan || isLeasePlan ? "Rent Start Date (1st Rent Due Date)" : "Start Date"}
+                </h3>
                 <p className="text-xs text-muted-foreground">
-                  Contract start date used for schedule creation and audit trace.
+                  {isRentPlan || isLeasePlan
+                    ? "Flexible rent start date. Contract can be activated today, with the first monthly rent demand starting on this date."
+                    : "Contract start date used for schedule creation and audit trace."}
                 </p>
               </div>
 
