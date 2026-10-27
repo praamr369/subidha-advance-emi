@@ -3982,19 +3982,38 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
         return Response(output.data, status=status.HTTP_201_CREATED, headers=headers)
 
     def update(self, request, *args, **kwargs):
-        partial = kwargs.pop("partial", False)
         instance = self.get_object()
 
-        serializer = self.get_serializer(
-            instance,
-            data=request.data,
-            partial=partial,
-        )
-        serializer.is_valid(raise_exception=True)
-        subscription = serializer.save()
+        pre_activation = {
+            SubscriptionStatus.DRAFT,
+            SubscriptionStatus.REQUESTED,
+            SubscriptionStatus.PENDING_APPROVAL,
+            SubscriptionStatus.APPROVED,
+        }
+        if instance.status not in pre_activation or instance.terms_locked_at is not None:
+            return Response(
+                {
+                    "detail": (
+                        f"Contract is already activated (status '{instance.status}') and terms are locked. "
+                        "Modifications to active contracts must be processed through Contract Amendments."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        output = self.get_serializer(subscription)
-        return Response(output.data)
+        from contracts.services.contract_lifecycle_service import modify_pre_activation_contract
+        try:
+            subscription = modify_pre_activation_contract(
+                subscription=instance,
+                performed_by=request.user,
+                data=request.data,
+            )
+        except DjangoValidationError as exc:
+            detail = exc.message_dict if hasattr(exc, "message_dict") else {"detail": exc.messages if hasattr(exc, "messages") else str(exc)}
+            return Response(detail, status=status.HTTP_400_BAD_REQUEST)
+
+        refreshed = get_subscription_detail_queryset().get(pk=subscription.pk)
+        return Response(SubscriptionAdminDetailSerializer(refreshed, context={"request": request}).data)
 
     def partial_update(self, request, *args, **kwargs):
         kwargs["partial"] = True

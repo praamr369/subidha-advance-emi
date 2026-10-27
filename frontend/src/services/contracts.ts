@@ -48,6 +48,16 @@ export async function activateContract(subscriptionId: number): Promise<Contract
   });
 }
 
+export async function modifyPreActivationContract(
+  subscriptionId: number,
+  payload: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  return apiFetch<Record<string, unknown>>(`/admin/contracts/${subscriptionId}/modify/`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function cancelContract(subscriptionId: number, reason: string): Promise<ContractLifecycleResult> {
   return apiFetch<ContractLifecycleResult>(`/admin/contracts/${subscriptionId}/cancel/`, {
     method: "POST",

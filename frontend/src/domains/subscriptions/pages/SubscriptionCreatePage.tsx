@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
@@ -398,11 +398,21 @@ export default function SubscriptionCreatePage({
   variant = "page",
   queryString,
   onCreated,
+  mode = "create",
+  subscriptionId,
 }: {
   variant?: SubscriptionCreateVariant;
   queryString?: string;
   onCreated?: (subscriptionId: number) => void;
+  mode?: "create" | "edit";
+  subscriptionId?: number;
 } = {}) {
+  const router = useRouter();
+  const isEditMode = mode === "edit" && Boolean(subscriptionId);
+  const [activeBlockedError, setActiveBlockedError] = useState<string | null>(null);
+  const [existingContractNumber, setExistingContractNumber] = useState<string | null>(null);
+  const [contractLoadLoading, setContractLoadLoading] = useState(false);
+
   const runtimeSearchParams = useSearchParams();
   const searchParamKey = useMemo(() => {
     const raw = (queryString ?? "").trim();
@@ -1118,6 +1128,150 @@ export default function SubscriptionCreatePage({
   }
 
   useEffect(() => {
+    if (!isEditMode || !subscriptionId) return;
+
+    let cancelled = false;
+    async function loadExistingContract() {
+      setContractLoadLoading(true);
+      setGlobalLoadingLabel("Loading existing contract data...");
+      setError(null);
+      try {
+        const data = await apiFetch<Record<string, unknown>>(`/admin/subscriptions/${subscriptionId}/`);
+        if (cancelled) return;
+
+        const contractStatus = String(data.status || "");
+        const termsLocked = Boolean(data.terms_locked_at);
+        const preActivationStatuses = ["DRAFT", "REQUESTED", "PENDING_APPROVAL", "APPROVED"];
+        const contractNo = String(data.subscription_number || `SUB-${subscriptionId}`);
+        setExistingContractNumber(contractNo);
+
+        if (!preActivationStatuses.includes(contractStatus) || termsLocked) {
+          setActiveBlockedError(
+            `Contract ${contractNo} is already activated (Status: ${contractStatus}). Financial terms are locked and cannot be directly edited. Changes must be processed through Contract Amendments.`
+          );
+          return;
+        }
+
+        const rawPlan = String(data.plan_type || "EMI").toUpperCase();
+        const pType: PlanType = rawPlan === "RENT" ? "RENT" : rawPlan === "LEASE" ? "LEASE" : "EMI";
+        setPlanType(pType);
+
+        if (data.customer) {
+          setCustomer({
+            id: Number(data.customer),
+            name: String(data.customer_name || `Customer #${data.customer}`),
+            phone: String(data.customer_phone || ""),
+          });
+        }
+
+        if (data.start_date) {
+          setStartDate(String(data.start_date));
+        }
+
+        if (data.tenure_months) {
+          setManualTenureMonths(String(data.tenure_months));
+        }
+
+        if (data.partner) {
+          setPartner({
+            id: Number(data.partner),
+            username: String(data.partner_name || `Partner #${data.partner}`),
+            phone: String(data.partner_phone || ""),
+          });
+        }
+
+        if (pType === "EMI") {
+          if (data.product) {
+            setProduct({
+              id: Number(data.product),
+              name: String(data.product_name || `Product #${data.product}`),
+              product_code: String(data.product_code || ""),
+              base_price: String(data.total_amount || "0.00"),
+              is_emi_enabled: true,
+            });
+          }
+          if (data.batch) {
+            setBatch({
+              id: Number(data.batch),
+              batch_code: String(data.batch_code || `Batch #${data.batch}`),
+              duration_months: Number(data.tenure_months || 0),
+              status: String(data.batch_status || "OPEN"),
+            });
+          }
+          if (data.lucky_id) {
+            setLuckyId({
+              id: Number(data.lucky_id),
+              lucky_number: Number(data.lucky_number ?? 0),
+              status: "ASSIGNED",
+            });
+          }
+        } else {
+          // RENT or LEASE
+          if (Array.isArray(data.contract_items) && data.contract_items.length > 0) {
+            const items: ContractBasketItem[] = (data.contract_items as Record<string, unknown>[]).map((it, idx) => ({
+              id: `item-${it.id || it.product_id || idx}-${Date.now()}`,
+              product: {
+                id: Number(it.product_id || it.product),
+                name: String(it.product_name || `Product #${it.product_id}`),
+                product_code: String(it.product_code || ""),
+                base_price: String(it.unit_base_price || "0.00"),
+                is_rent_enabled: true,
+                is_lease_enabled: true,
+              },
+              quantity: Number(it.quantity || 1),
+              unit_base_price: String(it.unit_base_price || "0.00"),
+              monthly_yield_percent: String(it.monthly_yield_percent || "5.00"),
+              security_deposit_percent: String(it.security_deposit_percent || "20.00"),
+              security_deposit_amount: it.security_deposit_amount ? String(it.security_deposit_amount) : undefined,
+            }));
+            setContractItems(items);
+            if (items.length > 0) {
+              setProduct(items[0].product);
+            }
+          } else if (data.product) {
+            setProduct({
+              id: Number(data.product),
+              name: String(data.product_name || `Product #${data.product}`),
+              product_code: String(data.product_code || ""),
+              base_price: String(data.total_amount || "0.00"),
+              is_rent_enabled: true,
+              is_lease_enabled: true,
+            });
+          }
+
+          const prof = (pType === "RENT" ? data.rent_profile : data.lease_profile) as Record<string, unknown> | null;
+          if (prof) {
+            if (prof.security_deposit_percent) setSecurityDepositPercent(String(prof.security_deposit_percent));
+            if (prof.monthly_yield_percent) setYieldRatePercent(String(prof.monthly_yield_percent));
+            if (prof.handover_notes) setHandoverNotes(String(prof.handover_notes));
+            if (prof.contract_terms_snapshot) setContractTermsSnapshot(String(prof.contract_terms_snapshot));
+            if (pType === "LEASE") {
+              if (prof.buyout_amount != null) setLeaseBuyoutAmount(String(prof.buyout_amount));
+              if (prof.ownership_transfer_allowed != null) setOwnershipTransferAllowed(Boolean(prof.ownership_transfer_allowed));
+            }
+          }
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(toErrorMessage(err));
+        }
+      } finally {
+        if (!cancelled) {
+          setContractLoadLoading(false);
+          setGlobalLoadingLabel(null);
+        }
+      }
+    }
+
+    void loadExistingContract();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isEditMode, subscriptionId]);
+
+  useEffect(() => {
+    if (isEditMode) return;
     let cancelled = false;
     const params = new URLSearchParams(searchParamKey);
 
@@ -1520,17 +1674,73 @@ export default function SubscriptionCreatePage({
 
     setSubmitting(true);
     setGlobalLoadingLabel(
-      isEmiPlan
-        ? "Creating subscription and applying contract rules..."
-        : asDraft
-          ? `Saving ${planType} contract as draft...`
-          : `Creating ${planType} contract and generating contract PDF...`
+      isEditMode
+        ? `Updating ${planType} contract...`
+        : isEmiPlan
+          ? "Creating subscription and applying contract rules..."
+          : asDraft
+            ? `Saving ${planType} contract as draft...`
+            : `Creating ${planType} contract and generating contract PDF...`
     );
 
     try {
       let created: CreatedSubscriptionResponse;
 
-      if (isEmiPlan) {
+      if (isEditMode && subscriptionId) {
+        const primaryProd =
+          (isRentPlan || isLeasePlan) && contractItems.length > 0
+            ? contractItems[0].product
+            : product!;
+
+        const itemsPayload =
+          (isRentPlan || isLeasePlan) && contractItems.length > 0
+            ? contractItems.map((it) => ({
+                product: it.product.id,
+                quantity: it.quantity,
+                unit_base_price: it.unit_base_price,
+                monthly_yield_percent: it.monthly_yield_percent || yieldRatePercent,
+                security_deposit_percent: it.security_deposit_percent || securityDepositPercent,
+                security_deposit_amount: it.security_deposit_amount || undefined,
+              }))
+            : undefined;
+
+        const body: Record<string, unknown> = {
+          customer: customer.id,
+          product: primaryProd.id,
+          plan_type: planType,
+          tenure_months: tenureMonths,
+          start_date: startDate,
+          partner: partner?.id ?? null,
+        };
+
+        if (isEmiPlan) {
+          body.batch = batch?.id ?? null;
+          body.lucky_id = luckyId?.id ?? null;
+        } else {
+          body.items = itemsPayload;
+          body.security_deposit_percent = Number(effectiveDepositPercent) || depositPercentNumber;
+          body.monthly_yield_percent = Number(yieldRatePercent) || 5.0;
+          body.handover_notes = handoverNotes || "";
+          body.contract_terms_snapshot = contractTermsSnapshot || "";
+          body.deposit_payment_option = depositPaymentOption;
+          body.deposit_buffer_days = Number(depositBufferDays) || 30;
+          body.initial_deposit_payment = initialDepositPayment.trim()
+            ? Number(initialDepositPayment)
+            : depositPaymentOption === "FULL"
+              ? securityDepositAmount
+              : null;
+
+          if (isLeasePlan) {
+            body.buyout_amount = leaseBuyoutAmount.trim() ? leaseBuyoutAmount.trim() : null;
+            body.ownership_transfer_allowed = ownershipTransferAllowed;
+          }
+        }
+
+        created = await apiFetch<CreatedSubscriptionResponse>(`/admin/contracts/${subscriptionId}/modify/`, {
+          method: "POST",
+          body: JSON.stringify(body),
+        });
+      } else if (isEmiPlan) {
         const body: Record<string, unknown> = {
           customer: customer.id,
           product: product!.id,
@@ -1710,6 +1920,14 @@ export default function SubscriptionCreatePage({
       }
 
       setSuccess(finalSuccess);
+      if (isEditMode) {
+        if (onCreated) {
+          onCreated(finalSuccess.id);
+        } else {
+          router.push(`/admin/subscriptions/${finalSuccess.id}`);
+        }
+        return;
+      }
       onCreated?.(finalSuccess.id);
     } catch (err) {
       const message = toErrorMessage(err);
@@ -1780,20 +1998,80 @@ export default function SubscriptionCreatePage({
     }
   }
 
+  if (activeBlockedError) {
+    return (
+      <ERPPageShell
+        title={`Contract #${subscriptionId} Already Activated`}
+        subtitle="Financial terms are locked for active contracts."
+        breadcrumbs={[
+          { label: "Admin", href: "/admin" },
+          { label: "Subscriptions", href: "/admin/subscriptions" },
+          { label: `#${subscriptionId}`, href: `/admin/subscriptions/${subscriptionId}` },
+          { label: "Edit" },
+        ]}
+      >
+        <div className="space-y-4">
+          <ERPErrorState
+            title="Contract Already Active"
+            description={activeBlockedError}
+          />
+          <div className="flex flex-wrap gap-3">
+            <ActionButton
+              href={`/admin/contract-amendments/new?subscription=${subscriptionId}`}
+              variant="primary"
+            >
+              Go to Contract Amendment
+            </ActionButton>
+            <ActionButton
+              href={`/admin/subscriptions/${subscriptionId}`}
+              variant="outline"
+            >
+              Back to Subscription Detail
+            </ActionButton>
+          </div>
+        </div>
+      </ERPPageShell>
+    );
+  }
+
   return (
     <ERPPageShell
-      title={variant === "drawer" ? "Create subscription" : "Create Subscription"}
-      subtitle="Search-first contract creation flow for customer, product, plan, batch, Lucky ID, and start date."
-      helperNote="This flow preserves existing EMI, payment, waiver, draw, and audit semantics while adding safe contract onboarding controls."
+      title={
+        isEditMode
+          ? `Edit Contract ${existingContractNumber || `#${subscriptionId}`}`
+          : variant === "drawer"
+            ? "Create subscription"
+            : "Create Subscription"
+      }
+      subtitle={
+        isEditMode
+          ? "Modify contract customer, products, items, batch, lucky ID, and financial terms before activation."
+          : "Search-first contract creation flow for customer, product, plan, batch, Lucky ID, and start date."
+      }
+      helperNote={
+        isEditMode
+          ? "Pre-activation edits directly update contract terms. Once activated, changes must proceed through Contract Amendments."
+          : "This flow preserves existing EMI, payment, waiver, draw, and audit semantics while adding safe contract onboarding controls."
+      }
       helperTone="info"
       breadcrumbs={
         variant === "drawer"
           ? []
-          : [
-              { label: "Admin", href: "/admin" },
-              { label: "Subscriptions", href: "/admin/subscriptions" },
-              { label: "Create" },
-            ]
+          : isEditMode
+            ? [
+                { label: "Admin", href: "/admin" },
+                { label: "Subscriptions", href: "/admin/subscriptions" },
+                {
+                  label: existingContractNumber || `#${subscriptionId}`,
+                  href: `/admin/subscriptions/${subscriptionId}`,
+                },
+                { label: "Edit" },
+              ]
+            : [
+                { label: "Admin", href: "/admin" },
+                { label: "Subscriptions", href: "/admin/subscriptions" },
+                { label: "Create" },
+              ]
       }
       actions={
         variant === "drawer"
@@ -1801,18 +2079,26 @@ export default function SubscriptionCreatePage({
               { href: canonicalSelfHref, label: "Open full page", variant: "secondary" },
               { href: customerCreateHref, label: "Create Customer", variant: "ghost" },
             ]
-          : [
-              {
-                href: "/admin/subscriptions",
-                label: "Back to Register",
-                variant: "secondary",
-              },
-              {
-                href: customerCreateHref,
-                label: "Create Customer",
-                variant: "secondary",
-              },
-            ]
+          : isEditMode
+            ? [
+                {
+                  href: `/admin/subscriptions/${subscriptionId}`,
+                  label: "Back to Subscription",
+                  variant: "secondary",
+                },
+              ]
+            : [
+                {
+                  href: "/admin/subscriptions",
+                  label: "Back to Register",
+                  variant: "secondary",
+                },
+                {
+                  href: customerCreateHref,
+                  label: "Create Customer",
+                  variant: "secondary",
+                },
+              ]
       }
       stats={
         variant === "drawer"
@@ -3461,15 +3747,19 @@ export default function SubscriptionCreatePage({
                   className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {submitting
-                    ? isEmiPlan
-                      ? "Creating Subscription..."
-                      : "Creating Contract..."
-                    : isEmiPlan
-                      ? "Create Subscription"
-                      : "Activate Contract"}
+                    ? isEditMode
+                      ? "Saving Changes..."
+                      : isEmiPlan
+                        ? "Creating Subscription..."
+                        : "Creating Contract..."
+                    : isEditMode
+                      ? "Update Contract"
+                      : isEmiPlan
+                        ? "Create Subscription"
+                        : "Activate Contract"}
                 </button>
 
-                {!isEmiPlan ? (
+                {!isEmiPlan && !isEditMode ? (
                   <button
                     type="button"
                     onClick={() => { void handleSubmit({ saveAsDraft: true }); }}
@@ -3481,17 +3771,19 @@ export default function SubscriptionCreatePage({
                   </button>
                 ) : null}
 
-                <button
-                  type="button"
-                  onClick={resetForFreshCreate}
-                  disabled={submitting}
-                  className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Reset Form
-                </button>
+                {!isEditMode ? (
+                  <button
+                    type="button"
+                    onClick={resetForFreshCreate}
+                    disabled={submitting}
+                    className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Reset Form
+                  </button>
+                ) : null}
 
                 <Link
-                  href="/admin/subscriptions"
+                  href={isEditMode ? `/admin/subscriptions/${subscriptionId}` : "/admin/subscriptions"}
                   className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
                 >
                   Cancel

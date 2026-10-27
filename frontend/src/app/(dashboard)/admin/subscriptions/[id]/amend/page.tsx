@@ -117,6 +117,21 @@ export default function AmendSubscriptionPage({ params }: { params: Promise<{ id
     >
       <div className="space-y-5">
         <AmendmentSafetyNotice />
+        {["DRAFT", "REQUESTED", "PENDING_APPROVAL", "APPROVED"].includes(subscription.status || "") &&
+        !(subscription as Record<string, unknown>).terms_locked_at ? (
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+            <div className="font-semibold text-blue-950">Pre-Activation Direct Editing Available</div>
+            <p className="mt-1 text-xs text-blue-800">
+              This contract is currently in <strong>{subscription.status}</strong> status and has not been activated yet.
+              Before activation, you can directly modify the full contract just like at creation time.
+            </p>
+            <div className="mt-3">
+              <ActionButton href={`/admin/subscriptions/${subscriptionId}/edit`} variant="primary">
+                ✏️ Edit Full Contract Directly
+              </ActionButton>
+            </div>
+          </div>
+        ) : null}
         {error ? <ERPErrorState title="Unable to create amendment" description={error} /> : null}
         
         <DetailPanel title="Contract Context">

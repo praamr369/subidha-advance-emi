@@ -10,6 +10,7 @@ from products_core.models import Product
 from subscriptions.models import (
     ContractItem,
     Emi,
+    EmiStatus,
     PlanType,
     RentSubscriptionProfile,
     Subscription,
@@ -330,4 +331,202 @@ class MultiProductRentLeaseContractTests(TestCase):
         self.assertEqual(c_items[1].monthly_amount, Decimal("750.00"))
         self.assertEqual(c_items[1].security_deposit_percent, Decimal("15.00"))
         self.assertEqual(c_items[1].security_deposit_amount, Decimal("1500.00"))
+
+
+class PreActivationContractModificationTests(TestCase):
+    def setUp(self):
+        from tests.helpers import create_customer_user
+
+        self.user = create_admin_user(username="admin_edit_test", phone="9876543212")
+        cust_user1 = create_customer_user(username="cust_mod_1", phone="9876543213")
+        self.customer1 = create_customer_profile(user=cust_user1, name="Customer One", phone="9876543213")
+        self.customer1.kyc_status = "VERIFIED"
+        self.customer1.save()
+
+        cust_user2 = create_customer_user(username="cust_mod_2", phone="9876543214")
+        self.customer2 = create_customer_profile(user=cust_user2, name="Customer Two", phone="9876543214")
+        self.customer2.kyc_status = "VERIFIED"
+        self.customer2.save()
+
+        self.product1 = Product.objects.create(
+            name="Dining Table Solid Wood",
+            product_code="DT-001",
+            base_price=Decimal("12000.00"),
+            is_active=True,
+            is_rent_enabled=True,
+            is_lease_enabled=True,
+            is_emi_enabled=True,
+        )
+        self.product2 = Product.objects.create(
+            name="Executive Office Chair",
+            product_code="CH-002",
+            base_price=Decimal("6000.00"),
+            is_active=True,
+            is_rent_enabled=True,
+            is_lease_enabled=True,
+            is_emi_enabled=True,
+        )
+
+        self.batch1 = create_batch(batch_code="BATCH101", duration_months=10)
+        self.lucky1 = create_lucky_id(batch=self.batch1, lucky_number=10)
+        self.lucky2 = create_lucky_id(batch=self.batch1, lucky_number=11)
+
+    def test_pre_activation_modify_emi_contract(self):
+        from contracts.services.contract_lifecycle_service import modify_pre_activation_contract
+        from subscriptions.models import LuckyIdStatus
+
+        # Create draft EMI subscription
+        sub = Subscription.objects.create(
+            customer=self.customer1,
+            product=self.product1,
+            batch=self.batch1,
+            lucky_id=self.lucky1,
+            plan_type=PlanType.EMI,
+            tenure_months=10,
+            start_date=timezone.localdate(),
+            total_amount=Decimal("12000.00"),
+            monthly_amount=Decimal("1200.00"),
+            status=SubscriptionStatus.DRAFT,
+        )
+        self.lucky1.status = LuckyIdStatus.ASSIGNED
+        self.lucky1.save()
+
+        # Modify to Customer Two, Product 2 (6000.00), Lucky ID 2
+        updated = modify_pre_activation_contract(
+            subscription=sub,
+            performed_by=self.user,
+            data={
+                "customer": self.customer2.id,
+                "product": self.product2.id,
+                "lucky_id": self.lucky2.id,
+                "tenure_months": 10,
+            },
+        )
+
+        self.assertEqual(updated.customer_id, self.customer2.id)
+        self.assertEqual(updated.product_id, self.product2.id)
+        self.assertEqual(updated.total_amount, Decimal("6000.00"))
+        self.assertEqual(updated.monthly_amount, Decimal("600.00"))
+        self.assertEqual(updated.lucky_id_id, self.lucky2.id)
+
+        # Check lucky status updates
+        self.lucky1.refresh_from_db()
+        self.lucky2.refresh_from_db()
+        self.assertEqual(self.lucky1.status, LuckyIdStatus.AVAILABLE)
+        self.assertEqual(self.lucky2.status, LuckyIdStatus.ASSIGNED)
+
+        # Check draft EMIs were generated for updated amount
+        emis = list(updated.emis.filter(status=EmiStatus.PENDING).order_by("month_no"))
+        self.assertEqual(len(emis), 10)
+        self.assertEqual(emis[0].amount, Decimal("600.00"))
+
+    def test_pre_activation_modify_rent_contract(self):
+        from contracts.services.contract_lifecycle_service import modify_pre_activation_contract
+
+        sub = create_rent_contract(
+            customer=self.customer1,
+            product=self.product1,
+            tenure_months=6,
+            security_deposit_percent=Decimal("20.00"),
+            monthly_yield_percent=Decimal("5.00"),
+            performed_by=self.user,
+            save_as_draft=True,
+        )
+        self.assertEqual(sub.status, SubscriptionStatus.DRAFT)
+        self.assertEqual(sub.monthly_amount, Decimal("600.00"))  # 12k * 5%
+
+        # Modify items basket to add product2 and change yield to 6% and tenure to 12
+        updated = modify_pre_activation_contract(
+            subscription=sub,
+            performed_by=self.user,
+            data={
+                "items": [
+                    {
+                        "product": self.product1.id,
+                        "quantity": 1,
+                        "unit_base_price": "12000.00",
+                        "monthly_yield_percent": "6.00",
+                        "security_deposit_percent": "20.00",
+                    },
+                    {
+                        "product": self.product2.id,
+                        "quantity": 2,
+                        "unit_base_price": "6000.00",
+                        "monthly_yield_percent": "6.00",
+                        "security_deposit_percent": "20.00",
+                    },
+                ],
+                "tenure_months": 12,
+                "monthly_yield_percent": "6.00",
+                "security_deposit_percent": "20.00",
+            },
+        )
+
+        # Product value: 12000 + 12000 = 24000
+        # Monthly: 24000 * 6% = 1440.00
+        # Total: 1440 * 12 = 17280.00
+        # Deposit: 24000 * 20% = 4800.00
+        self.assertEqual(updated.monthly_amount, Decimal("1440.00"))
+        self.assertEqual(updated.total_amount, Decimal("17280.00"))
+        self.assertEqual(updated.rent_profile.security_deposit_amount, Decimal("4800.00"))
+        self.assertEqual(updated.contract_items.filter(status="ACTIVE").count(), 2)
+
+    def test_modify_blocked_after_activation(self):
+        from contracts.services.contract_lifecycle_service import modify_pre_activation_contract
+
+        sub = create_rent_contract(
+            customer=self.customer1,
+            product=self.product1,
+            tenure_months=6,
+            security_deposit_percent=Decimal("20.00"),
+            performed_by=self.user,
+            save_as_draft=False,  # Creates as ACTIVE
+        )
+        self.assertEqual(sub.status, SubscriptionStatus.ACTIVE)
+
+        with self.assertRaises(ValidationError) as ctx:
+            modify_pre_activation_contract(
+                subscription=sub,
+                performed_by=self.user,
+                data={"tenure_months": 12},
+            )
+        self.assertIn("Contract Amendments", str(ctx.exception))
+
+    def test_modify_api_endpoint(self):
+        from rest_framework.test import APIClient
+
+        sub = create_rent_contract(
+            customer=self.customer1,
+            product=self.product1,
+            tenure_months=6,
+            security_deposit_percent=Decimal("20.00"),
+            performed_by=self.user,
+            save_as_draft=True,
+        )
+
+        client = APIClient()
+        client.force_authenticate(user=self.user)
+
+        response = client.post(
+            f"/api/v1/admin/contracts/{sub.id}/modify/",
+            {
+                "items": [
+                    {
+                        "product": self.product2.id,
+                        "quantity": 1,
+                        "unit_base_price": "6000.00",
+                        "monthly_yield_percent": "5.00",
+                        "security_deposit_percent": "20.00",
+                    }
+                ],
+                "tenure_months": 10,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(Decimal(str(data["monthly_amount"])), Decimal("300.00"))  # 6k * 5%
+        self.assertEqual(Decimal(str(data["total_amount"])), Decimal("3000.00"))  # 300 * 10
+
+
 

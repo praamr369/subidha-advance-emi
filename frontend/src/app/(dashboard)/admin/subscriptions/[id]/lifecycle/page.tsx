@@ -459,7 +459,32 @@ export default function ContractLifecyclePage() {
             <FieldRow label="Contract No." value={contractNo ?? <span className="text-muted-foreground">Not assigned yet</span>} />
             <FieldRow label="Plan Type" value={sub?.plan_type} />
             <FieldRow label="Status" value={<ERPStatusBadge status={status} />} />
-            <FieldRow label="Terms Locked" value={termsLocked ? "Yes — financial terms are immutable" : "No — terms can still be edited"} />
+            <FieldRow
+              label="Terms Locked"
+              value={
+                termsLocked ? (
+                  <span className="inline-flex items-center gap-2">
+                    <span>Yes — financial terms are immutable</span>
+                    <Link
+                      href={`/admin/contract-amendments/new?subscription=${subscriptionId}`}
+                      className="text-xs font-medium text-primary underline hover:opacity-80"
+                    >
+                      Request Amendment →
+                    </Link>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-2">
+                    <span>No — terms can still be edited before activation</span>
+                    <Link
+                      href={`/admin/subscriptions/${subscriptionId}/edit`}
+                      className="rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary hover:bg-primary/20"
+                    >
+                      ✏️ Edit Full Contract
+                    </Link>
+                  </span>
+                )
+              }
+            />
             <FieldRow label="Total Amount" value={money(sub?.total_amount)} />
             <FieldRow label="Monthly Amount" value={money(sub?.monthly_amount)} />
             <FieldRow label="Tenure" value={sub?.tenure_months ? `${sub.tenure_months} months` : "—"} />
@@ -472,6 +497,15 @@ export default function ContractLifecyclePage() {
           description="Controlled transitions. Approve → Activate → (operational states) → Close. Cancellation preserves historical payments."
         >
           <div className="flex flex-wrap gap-3">
+            {!termsLocked && (
+              <ActionButton
+                variant="outline"
+                href={`/admin/subscriptions/${subscriptionId}/edit`}
+              >
+                ✏️ Edit Full Contract
+              </ActionButton>
+            )}
+
             {canApprove && (
               <ActionButton
                 variant="primary"

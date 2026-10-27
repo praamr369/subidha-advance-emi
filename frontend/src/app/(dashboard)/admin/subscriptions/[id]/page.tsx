@@ -1014,10 +1014,28 @@ export default function AdminSubscriptionDetailPage() {
         },
         ...(subscription
           ? [
+              ...(
+                ["DRAFT", "REQUESTED", "PENDING_APPROVAL", "APPROVED"].includes(String(subscription.status || "")) &&
+                !(subscription as Record<string, unknown>).terms_locked_at
+                  ? [
+                      {
+                        href: `/admin/subscriptions/${subscription.id}/edit`,
+                        label: "✏️ Edit Contract",
+                        variant: "primary" as const,
+                      },
+                    ]
+                  : [
+                      {
+                        href: `/admin/contract-amendments/new?subscription=${subscription.id}`,
+                        label: "📋 Amend Contract",
+                        variant: "secondary" as const,
+                      },
+                    ]
+              ),
               {
                 href: `/admin/subscriptions/${subscription.id}/lifecycle`,
                 label: "Contract Lifecycle",
-                variant: "primary" as const,
+                variant: "secondary" as const,
               },
               {
                 href:

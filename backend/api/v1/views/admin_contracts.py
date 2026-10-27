@@ -195,6 +195,43 @@ class ContractApproveView(APIView):
         return Response(SubscriptionAdminDetailSerializer(refreshed, context={"request": request}).data)
 
 
+class ContractPreActivationModifyView(APIView):
+    """POST / PUT /api/v1/admin/contracts/<id>/modify/
+    
+    Allows admin to fully modify a contract (Advance EMI, Rent, or Lease)
+    before activation.
+    If the contract is active or terms locked, returns HTTP 400 directing admin
+    to the Contract Amendment workflow.
+    """
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def put(self, request, pk):
+        return self._modify(request, pk)
+
+    def post(self, request, pk):
+        return self._modify(request, pk)
+
+    def _modify(self, request, pk):
+        sub = _get_subscription_or_404(pk)
+        if sub is None:
+            return Response({"detail": "Contract not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        from contracts.services.contract_lifecycle_service import modify_pre_activation_contract
+        from django.core.exceptions import ValidationError
+        try:
+            sub = modify_pre_activation_contract(
+                subscription=sub,
+                performed_by=request.user,
+                data=request.data,
+            )
+        except ValidationError as exc:
+            detail = exc.message_dict if hasattr(exc, "message_dict") else {"detail": exc.messages if hasattr(exc, "messages") else str(exc)}
+            return Response(detail, status=status.HTTP_400_BAD_REQUEST)
+
+        refreshed = get_subscription_detail_queryset().get(pk=sub.pk)
+        return Response(SubscriptionAdminDetailSerializer(refreshed, context={"request": request}).data)
+
+
 class ContractActivateView(APIView):
     """POST /api/v1/admin/contracts/<id>/activate/"""
     permission_classes = [IsAuthenticated, IsAdmin]

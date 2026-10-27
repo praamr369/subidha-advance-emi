@@ -5,6 +5,7 @@ from api.v1.views.admin_contracts import AdminRentContractCreateView
 from api.v1.views.admin_contracts import AdminRentContractPdfView
 from api.v1.views.admin_contracts import AdminReturnInspectionPdfView
 from api.v1.views.admin_contracts import ContractActivateView
+from api.v1.views.admin_contracts import ContractPreActivationModifyView
 from api.v1.views.admin_contracts import ContractAmendmentApplyView
 from api.v1.views.admin_contracts import ContractAmendmentApproveView
 from api.v1.views.admin_contracts import ContractAmendmentListCreateView
@@ -40,6 +41,7 @@ urlpatterns = [
     path("rent-contracts/<int:pk>/pdf/", AdminRentContractPdfView.as_view()),
     path("lease-contracts/<int:pk>/pdf/", AdminLeaseContractPdfView.as_view()),
     # Phase 3: contract lifecycle transitions
+    path("contracts/<int:pk>/modify/", ContractPreActivationModifyView.as_view()),
     path("contracts/<int:pk>/approve/", ContractApproveView.as_view()),
     path("contracts/<int:pk>/activate/", ContractActivateView.as_view()),
     path("contracts/<int:pk>/cancel/", ContractCancelView.as_view()),
