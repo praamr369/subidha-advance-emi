@@ -306,7 +306,12 @@ export default function AdminDeliveriesPage() {
       if (payload.progress?.items) {
         const initialQtys: Record<number, number> = {};
         for (const item of payload.progress.items) {
-          initialQtys[item.product_id] = item.remaining_quantity;
+          // Preselect only what can move today. Unavailable lines stay on the
+          // same contract and can be scheduled in a later delivery batch.
+          initialQtys[item.product_id] = Math.min(
+            item.remaining_quantity,
+            Math.max(0, item.available_quantity ?? 0),
+          );
         }
         setBatchItemQuantities(initialQtys);
       } else {
@@ -1109,6 +1114,7 @@ export default function AdminDeliveriesPage() {
                                   <th className="p-2.5 text-center">Delivered</th>
                                   <th className="p-2.5 text-center">In Transit</th>
                                   <th className="p-2.5 text-center">Remaining</th>
+                                  <th className="p-2.5 text-center">Available now</th>
                                   <th className="p-2.5 text-right font-bold text-primary">In This Batch</th>
                                 </tr>
                               </thead>
@@ -1123,20 +1129,30 @@ export default function AdminDeliveriesPage() {
                                     <td className="p-2.5 text-center font-medium text-emerald-600">{it.delivered_quantity}</td>
                                     <td className="p-2.5 text-center text-amber-600">{it.in_transit_quantity}</td>
                                     <td className="p-2.5 text-center font-bold">{it.remaining_quantity}</td>
+                                    <td className={`p-2.5 text-center font-semibold ${it.available_quantity > 0 ? "text-emerald-600" : "text-amber-700"}`}>
+                                      {Math.min(it.remaining_quantity, it.available_quantity ?? 0)}
+                                      <div className="text-[10px] font-normal uppercase tracking-wide text-muted-foreground">
+                                        {it.stock_status || "not available"}
+                                      </div>
+                                    </td>
                                     <td className="p-2.5 text-right">
                                       <input
                                         type="number"
                                         min="0"
-                                        max={it.remaining_quantity}
+                                        max={Math.min(it.remaining_quantity, it.available_quantity ?? 0)}
                                         value={batchItemQuantities[it.product_id] ?? 0}
                                         onChange={(e) => {
-                                          const val = Math.max(0, Math.min(it.remaining_quantity, Number(e.target.value) || 0));
+                                          const val = Math.max(0, Math.min(
+                                            it.remaining_quantity,
+                                            it.available_quantity ?? 0,
+                                            Number(e.target.value) || 0,
+                                          ));
                                           setBatchItemQuantities((prev) => ({
                                             ...prev,
                                             [it.product_id]: val,
                                           }));
                                         }}
-                                        disabled={it.remaining_quantity === 0}
+                                        disabled={it.remaining_quantity === 0 || (it.available_quantity ?? 0) === 0}
                                         className="w-16 rounded border border-input bg-background px-2 py-1 text-right text-xs font-bold text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
                                       />
                                     </td>
@@ -1146,7 +1162,7 @@ export default function AdminDeliveriesPage() {
                             </table>
                           </div>
                           <div className="text-[11px] text-muted-foreground">
-                            Specify the quantity for each item scheduled in this delivery batch. Stock movement ledger entries are recorded per item upon delivery handover.
+                            Quantities are preselected from current availability. Unavailable items remain on the contract and can be scheduled in a later batch; stock ledger entries are posted per item at handover.
                           </div>
                         </div>
                       )}

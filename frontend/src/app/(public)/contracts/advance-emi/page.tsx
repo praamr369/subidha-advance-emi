@@ -30,7 +30,7 @@ export default function ContractsAdvanceEmiPage() {
     <PublicPageShell
       title="SFEMI Advance EMI"
       subtitle={subtitle}
-      heroSlot={<LuckyPlanAnimatedHero title="Advance EMI (Lucky Plan)" subtitle={subtitle} />}
+      heroSlot={<LuckyPlanAnimatedHero title="Advance EMI (SFEMI)" subtitle={subtitle} />}
       breadcrumbs={[
         { label: "Home", href: ROUTES.public.home },
         { label: "Contracts", href: ROUTES.public.contracts },
@@ -44,10 +44,10 @@ export default function ContractsAdvanceEmiPage() {
       <PublicMarketingBanner
         eyebrow="Plan benefits"
         title="Easy monthly plan with clear financial boundaries"
-        description="Winning waives remaining future EMI obligations only; already paid EMI stays recorded and valid. The public page explains the plan, but does not create contracts or alter ledgers."
+        description="An approved SFEMI promotional benefit may reduce future EMI obligations only; already paid EMI stays recorded and valid. The public page explains the plan, but does not create contracts or alter ledgers."
         items={[
           { title: "Deterministic schedule", description: "EMI schedule remains reproducible and auditable." },
-          { title: "Transparent draw workflow", description: "Published winner records come from reveal events only." },
+          { title: "Transparent benefit workflow", description: "Published SFEMI benefit records come from verified system events only." },
           { title: "No hidden retroactive edits", description: "Settled payment history is never silently rewritten." },
         ]}
       />
@@ -81,13 +81,13 @@ export default function ContractsAdvanceEmiPage() {
       />
 
       <PublicMarketingBanner
-        eyebrow="Winner transparency"
-        title="Public winner proof with privacy protection"
+        eyebrow="SFEMI benefit transparency"
+        title="Public benefit records with privacy protection"
           description="Published SFEMI records include approved contract context and customer-safe information. Private customer details remain protected."
         items={[
-          { title: "Batch + draw context", description: "Each published winner row is tied to the exact batch and draw month." },
+          { title: "Batch + cycle context", description: "Each published benefit record is tied to the exact batch and promotional cycle." },
           { title: "Proof hash visibility", description: "Commit/reveal proof references are shown when available." },
-          { title: "Masked identity", description: "Winner names are masked on public pages for privacy." },
+          { title: "Masked identity", description: "Customer names are masked on public pages for privacy." },
         ]}
       />
 

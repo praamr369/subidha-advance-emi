@@ -10,6 +10,8 @@ export type FinanceFilter = {
   contractType?: string;
   status?: string;
   branch?: number | string;
+  customerId?: number | string;
+  subscriptionId?: number | string;
 };
 
 function toQuery(params?: FinanceFilter): string {
@@ -23,6 +25,8 @@ function toQuery(params?: FinanceFilter): string {
   if (params.branch !== undefined && params.branch !== null && params.branch !== "") {
     search.set("branch", String(params.branch));
   }
+  if (params.customerId !== undefined && params.customerId !== null && params.customerId !== "") search.set("customer_id", String(params.customerId));
+  if (params.subscriptionId !== undefined && params.subscriptionId !== null && params.subscriptionId !== "") search.set("subscription_id", String(params.subscriptionId));
   const query = search.toString();
   return query ? `?${query}` : "";
 }

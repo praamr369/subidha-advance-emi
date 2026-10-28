@@ -23,13 +23,13 @@ export default function LuckyIdGrid({ highlightSlot, className }: LuckyIdGridPro
     >
       <div className="mb-4 space-y-1">
         <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-          Lucky ID range · Explanatory only
+          SFEMI ID range · Explanatory only
         </div>
         <h3 className="text-base font-semibold text-foreground">
-          00 – 99: One Lucky ID per batch slot
+          00 – 99: One SFEMI ID per batch slot
         </h3>
         <p className="text-sm leading-6 text-muted-foreground">
-          Each batch has up to 100 numbered slots (00 to 99). A customer&apos;s Lucky ID corresponds to one slot in
+          Each batch has up to 100 numbered slots (00 to 99). A customer&apos;s SFEMI ID corresponds to one slot in
           one batch. This grid is for visual explanation only — actual assignment is controlled by the
           branch system and is not performed on this page.
         </p>
@@ -38,7 +38,7 @@ export default function LuckyIdGrid({ highlightSlot, className }: LuckyIdGridPro
       <div
         className="grid grid-cols-10 gap-1.5"
         role="list"
-        aria-label="Lucky ID slot grid (explanatory)"
+        aria-label="SFEMI ID slot grid (explanatory)"
       >
         {cells.map((n, i) => {
           const id = String(n).padStart(2, "0");
@@ -52,7 +52,7 @@ export default function LuckyIdGrid({ highlightSlot, className }: LuckyIdGridPro
               whileHover={{ y: -2, scale: 1.05 }}
               key={id}
               role="listitem"
-              aria-label={`Lucky ID ${id}`}
+              aria-label={`SFEMI ID ${id}`}
               className={cn(
                 "lucky-id-cell flex aspect-square items-center justify-center rounded-xl border text-[11px] font-bold tabular-nums",
                 isHighlighted
@@ -68,7 +68,7 @@ export default function LuckyIdGrid({ highlightSlot, className }: LuckyIdGridPro
 
       <p className="mt-4 text-[11px] leading-5 text-muted-foreground">
         <strong className="font-semibold text-foreground/70">{t('public.LuckyIdGrid_text4')}</strong>{" "}
-        This grid is for customer education only. Lucky IDs are assigned inside the core system by branch staff. A customer may hold multiple Lucky IDs across different batches. Lucky ID assignment does not guarantee winning the monthly draw.
+        This grid is for customer education only. SFEMI IDs are assigned inside the core system by branch staff. A customer may hold multiple SFEMI IDs across different batches. An SFEMI ID provides promotional-cycle eligibility only and does not guarantee any benefit.
       </p>
     </section>
   );

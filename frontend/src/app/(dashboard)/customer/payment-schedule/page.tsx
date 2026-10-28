@@ -10,7 +10,8 @@ import { getCustomerPaymentSchedule } from "@/services/phase4-finance";
 import Link from "next/link";
 
 type ScheduleRow = {
-  emi_id: number;
+  emi_id?: number;
+  schedule_id?: string;
   subscription_number?: string | null;
   plan_type?: string;
   product_name?: string;
@@ -21,6 +22,9 @@ type ScheduleRow = {
   paid_amount?: string;
   outstanding_amount?: string;
   is_overdue?: boolean;
+  receipt_pdf_url?: string | null;
+  deposit_pdf_url?: string | null;
+  demand_type?: string;
 };
 
 function statusChip(status?: string, overdue?: boolean) {
@@ -84,7 +88,7 @@ export default function CustomerPaymentSchedulePage() {
       {!loading && !error && overdue.length > 0 ? (
         <CPageSection title={`⚠️ Overdue (${overdue.length})`}>
           <div className="space-y-2">
-            {overdue.map((row) => <ScheduleCard key={row.emi_id} row={row} />)}
+            {overdue.map((row) => <ScheduleCard key={row.schedule_id || row.emi_id} row={row} />)}
           </div>
         </CPageSection>
       ) : null}
@@ -92,7 +96,7 @@ export default function CustomerPaymentSchedulePage() {
       {!loading && !error && pending.length > 0 ? (
         <CPageSection title={`Upcoming (${pending.length})`}>
           <div className="space-y-2">
-            {pending.map((row) => <ScheduleCard key={row.emi_id} row={row} />)}
+            {pending.map((row) => <ScheduleCard key={row.schedule_id || row.emi_id} row={row} />)}
           </div>
         </CPageSection>
       ) : null}
@@ -100,7 +104,7 @@ export default function CustomerPaymentSchedulePage() {
       {!loading && !error && paid.length > 0 ? (
         <CPageSection title={`Paid (${paid.length})`}>
           <div className="space-y-2">
-            {paid.map((row) => <ScheduleCard key={row.emi_id} row={row} />)}
+            {paid.map((row) => <ScheduleCard key={row.schedule_id || row.emi_id} row={row} />)}
           </div>
         </CPageSection>
       ) : null}
@@ -143,6 +147,16 @@ function ScheduleCard({ row }: { row: ScheduleRow }) {
         <div className="mt-2 rounded-xl bg-amber-50 dark:bg-amber-950/30 px-3 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-400">
           Outstanding: {formatRupee(row.outstanding_amount)}
         </div>
+      ) : null}
+      {row.receipt_pdf_url || row.deposit_pdf_url ? (
+        <a
+          href={row.receipt_pdf_url || row.deposit_pdf_url || "#"}
+          className="mt-3 inline-flex rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-semibold hover:bg-muted"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Download {row.deposit_pdf_url ? "Deposit Receipt" : "Receipt"}
+        </a>
       ) : null}
     </div>
   );

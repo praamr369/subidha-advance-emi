@@ -23,9 +23,9 @@ export const LUCKY_PLAN_FAQ: FaqItem[] = [
       "When an SFEMI promotional benefit is approved under the published terms, any remaining future EMI treatment follows those terms. Previously paid EMIs remain settled and valid.",
   },
   {
-    question: "Is previously paid EMI refunded if I win?",
+    question: "Is previously paid EMI refunded if a benefit is approved?",
     answer:
-      "No. Under our strict financial invariants, winning waives future remaining installments only. Settled past EMIs and advance down payments are never refunded in cash or bank transfer.",
+      "No. Under our strict financial invariants, an approved benefit applies to future remaining installments only. Settled past EMIs and advance down payments are never refunded in cash or bank transfer.",
   },
 ] as const;
 
@@ -41,9 +41,9 @@ export const HOW_IT_WORKS_STEPS: TimelineStep[] = [
       "Provide identity proof under DPDP privacy standards. The branch registers your subscription and generates an approved contract.",
   },
   {
-    title: "3. Receive Batch Lucky ID (00–99)",
+    title: "3. Receive Batch SFEMI ID (00–99)",
     description:
-      "An exclusive Lucky ID is allocated within your batch and permanently linked to your contract reference.",
+      "An SFEMI ID is allocated within your batch and permanently linked to your contract reference. It provides eligibility for the published promotional cycle only and does not guarantee a benefit.",
   },
   {
     title: "4. Pay Monthly Advance Installments",
@@ -51,14 +51,14 @@ export const HOW_IT_WORKS_STEPS: TimelineStep[] = [
       "Remit scheduled payments via Cash Counter, authorized UPI, or Bank Transfer. Every transaction generates an instant official receipt.",
   },
   {
-    title: "5. Transparent Fair Draw (Commit-then-Reveal)",
+    title: "5. Transparent promotional cycle (Commit-then-Reveal)",
     description:
       "Monthly draws use cryptographic SHA-256 commitment hashes published prior to the draw, proving outcomes cannot be retrospectively altered.",
   },
   {
-    title: "6. Future EMI Waiver or Ownership Completion",
+    title: "6. Approved future-EMI benefit or ownership completion",
     description:
-      "Winners receive 100% waiver of remaining future EMIs. Non-winning subscribers complete their tenure and receive full ownership upon final installment.",
+      "If a promotional benefit is approved under the signed terms, remaining future EMI treatment follows those terms. All other subscribers complete their tenure and receive ownership upon final installment.",
   },
 ] as const;
 
@@ -111,7 +111,7 @@ export const PUBLIC_LEGAL_DISCLAIMER_POINTS = [
   "This website is published by Subidha Furniture for informational, product catalog, and operational guidance purposes.",
   "Final legal rights and obligations are governed strictly by system-generated approved contracts, tax invoices, official receipts, delivery notes, and return inspection reports.",
       "SFEMI Advance EMI participation does not guarantee a promotional benefit. The plan is a product purchase installment arrangement subject to applicable law and the signed terms.",
-  "Winning a lucky draw waives remaining future EMI installments only. Settled installments and advance down payments are strictly non-refundable in cash or bank transfer.",
+  "An approved SFEMI promotional benefit applies to remaining future EMI installments only. Settled installments and advance down payments are strictly non-refundable in cash or bank transfer.",
   "Under Hire-Purchase terms, legal title to goods delivered under advance prepayment remains with Subidha Furniture until 100% of the contract value is settled.",
   "Rent and Lease security deposits are refundable liabilities subject to technical condition inspection, 45-day arrears limits, and verified deductions.",
   "Warranty and after-sales service are subject to manufacturer terms, craftsmanship guidelines, and explicit exclusions including water, pest, and misuse damage.",
@@ -120,7 +120,7 @@ export const PUBLIC_LEGAL_DISCLAIMER_POINTS = [
 
 export const READ_BEFORE_APPLY = {
   advanceEmi: [
-    "Lucky ID allocation (00–99) gives draw eligibility but does NOT guarantee winning in any draw cycle.",
+    "SFEMI ID allocation (00–99) provides promotional-cycle eligibility only and does NOT guarantee any benefit.",
     "Advance Delivery (60% to 80% down payment) unlocks immediate same-day delivery under Hire-Purchase title retention.",
     "If an advance-delivery customer wins a draw, remaining future EMIs (20% to 40%) are 100% waived; ZERO cash refund is given for settled down payments.",
     "Subidha Furniture retains legal title until 100% settled and reserves enforceable 30-day default repossession rights.",
@@ -152,7 +152,7 @@ export const READ_BEFORE_APPLY = {
 export const POLICY_TIMELINE = [
   {
     title: "1. Consultation & Product Selection",
-    description: "Customer selects verified furniture units across Direct Sale, Lucky Plan EMI, Rent, or Lease pathways.",
+    description: "Customer selects verified furniture units across Direct Sale, SFEMI Advance EMI, Rent, or Lease pathways.",
   },
   {
     title: "2. KYC Verification & Activation Gating",
@@ -206,11 +206,11 @@ export const ADVANCE_EMI_POLICY = {
       ],
     },
     {
-      title: "Winner Benefit: Future EMI Waiver Only",
+      title: "SFEMI Benefit: Future EMI Treatment Only",
       points: [
-        "Verified draw winners receive 100% waiver of all remaining future unpaid EMIs from the winning month onward.",
+        "An approved SFEMI benefit applies to remaining future unpaid EMIs only, from the approved effective month onward.",
         "Zero Cash Refund Invariant: Settled EMIs and advance down payments are non-refundable in cash, credit, or bank transfer.",
-        "Upon winning, the contract status transitions to WON, remaining receivables are extinguished, and full ownership title vests unconditionally in the customer.",
+        "When approved, the contract records the benefit under the signed terms; settled payments remain unchanged and ownership follows the contract terms.",
       ],
     },
     {
@@ -222,11 +222,11 @@ export const ADVANCE_EMI_POLICY = {
       ],
     },
     {
-      title: "Cancellation & Lucky ID Release Policy",
+      title: "Cancellation & SFEMI ID Release Policy",
       points: [
         "Subscription cancellation is audit-preserving; cancelled records are permanently retained.",
-        "If cancelled while batch is in OPEN status, the Lucky ID is released back to AVAILABLE status.",
-        "If cancelled after batch is LOCKED or DRAW_COMMITTED, the Lucky ID remains permanently linked to preserve legal draw auditability.",
+        "If cancelled while batch is in OPEN status, the SFEMI ID is released back to AVAILABLE status.",
+        "If cancelled after batch is LOCKED or cycle committed, the SFEMI ID remains linked to preserve legal auditability.",
       ],
     },
   ],
@@ -398,7 +398,7 @@ export const GENERIC_POLICIES = {
     title: "Delivery, Transit, and Proof of Delivery Policy",
     points: [
       "Stock-on-Hand Invariant: Deliveries are scheduled only after goods physically exist in the Stock Ledger.",
-      "Lucky Plan Delivery Eligibility: Customer must be (1) Draw Winner, OR (2) Completed Tenure, OR (3) Paid 60%–80% Advance Prepayment threshold.",
+      "SFEMI delivery eligibility: Customer must satisfy the approved contract milestone, completed tenure, or applicable advance-prepayment threshold.",
       "Admin Override Protocol: Force-release deliveries for ineligible subscriptions require explicit administrative sign-off and permanently carry a visible Admin Override audit badge.",
       "Mandatory Proof of Delivery (POD): Physical handover requires co-signed handover note, room photo, and driver GPS confirmation.",
       "Customer Site Access: Customers must ensure doorways, stairwells, and passages accommodate assembled furniture.",
@@ -472,21 +472,21 @@ export const GENERIC_POLICIES = {
       "Internal Automated Calculation: Commission calculations are automated backend workflows based on approved partnership agreements.",
       "Prohibition of Self-Approval: Partners cannot self-approve or self-post commission payouts; all payouts require administrative authorization.",
       "Commission Clawback: Cancelled subscriptions or reversed payments trigger an automatic clawback debited from accrued commissions.",
-      "No Promise Authority: Partners have no authority to promise waivers, lucky draw wins, discounts, or delivery dates outside signed contracts.",
+      "No Promise Authority: Partners have no authority to promise benefits, discounts, or delivery dates outside signed contracts.",
     ],
   },
 } as const;
 
 export const FULL_PUBLIC_FAQ = [
   {
-    question: "What is Subidha Core and the Lucky Plan Advance EMI?",
+    question: "What is Subidha Core and the SFEMI Advance EMI?",
     answer:
-      "Subidha Core is the digital operating and financial ledger system powering Subidha Furniture. The Lucky Plan Advance EMI is an installment program allowing customers to acquire quality furniture through structured monthly advance installments. Every enrolled customer is allocated a Lucky ID (00–99) within a batch and participates in monthly fair draws. If selected, remaining future EMIs are 100% waived.",
+      "Subidha Core is the digital operating and financial ledger system powering Subidha Furniture. SFEMI Advance EMI is an installment program allowing customers to acquire quality furniture through structured monthly advance installments. Every enrolled customer receives an SFEMI ID (00–99) within a batch for the published promotional cycle. Any benefit is subject to the signed terms and is never guaranteed.",
   },
   {
-    question: "Is winning the Lucky Plan monthly draw guaranteed?",
+    question: "Is an SFEMI promotional benefit guaranteed?",
     answer:
-      "No. Winning is never guaranteed. Every active Lucky ID in the batch participates equally, and outcomes are determined through an auditable, transparent draw. Participation constitutes an installment purchase agreement, not an investment or prize entitlement.",
+      "No. An SFEMI ID provides eligibility only and never guarantees a benefit. Participation constitutes an installment purchase agreement, not an investment or prize entitlement.",
   },
   {
     question: "Do I receive a refund of already-paid EMIs if I win?",
@@ -543,15 +543,15 @@ export const FULL_PUBLIC_FAQ = [
 export const RULEBOOK_SECTIONS = [
   {
     id: "lucky-plan-structure",
-    title: "1. Lucky Plan Structure & Deterministic EMI",
+    title: "1. SFEMI Structure & Deterministic EMI",
     rules: [
-      "Lucky Plan (Advance EMI) is a structured monthly installment purchase agreement for durable home and commercial furniture.",
+      "SFEMI Advance EMI is a structured monthly installment purchase agreement for durable home and commercial furniture.",
       "The product showroom base price represents the total contract value, without hidden financing charges or inflated interest rates.",
       "Default monthly EMI is deterministically derived by dividing total contract value by the batch tenure (e.g., 10 to 15 months).",
       "Subscriptions are organized into controlled batches of up to 100 slots (numbered 00 to 99).",
-      "A customer may hold multiple Lucky IDs across multiple independent contracts.",
-      "Lucky ID allocation provides fair draw eligibility but does NOT guarantee winning.",
-      "Lucky Plan is compliant with the Prize Chits Act, 1978, and BUDS Act, 2019, representing a genuine retail purchase plan.",
+      "A customer may hold multiple SFEMI IDs across multiple independent contracts.",
+      "SFEMI ID allocation provides promotional-cycle eligibility but does NOT guarantee any benefit.",
+      "SFEMI is presented as a genuine retail purchase plan; customers must rely on the approved contract and applicable law.",
     ],
   },
   {
@@ -562,17 +562,17 @@ export const RULEBOOK_SECTIONS = [
       "Prior to the draw, the system generates a secret cryptographic seed and publishes its SHA-256 commitment hash publicly.",
       "The draw is conducted openly at the showroom in the presence of customers.",
       "Following draw selection, the secret seed is revealed, allowing public verification that Hash == SHA256(seed + winning_number).",
-      "Public winner displays mask personal customer names to comply with the DPDP Act, 2023.",
+      "Public benefit displays mask personal customer names to comply with the DPDP Act, 2023.",
       "No customer or administrative action can alter or manipulate a revealed draw outcome.",
     ],
   },
   {
-    id: "advance-delivery-winner-waiver",
-    title: "3. Advance Delivery & Winner Benefit Invariants",
+    id: "advance-delivery-sfemi-benefit",
+    title: "3. Advance Delivery & SFEMI Benefit Invariants",
     rules: [
       "Customers paying an advance prepayment threshold (60% to 80% upfront) qualify for Same-Day Enrollment & Same-Day Delivery.",
       "Physical handover requires verified customer ID, co-signed Delivery Handover Note, room photo, and driver GPS confirmation.",
-      "Winner Benefit: If an advance-delivery customer is selected in any monthly draw, 100% of remaining future EMIs (20% to 40%) are waived.",
+      "SFEMI Benefit: Any approved future-EMI treatment is governed by the signed contract and applies only to future obligations.",
       "Zero Cash Refund Invariant: Under no circumstances is any settled EMI or advance down payment refunded in cash or bank transfer.",
       "The customer retains full, unencumbered ownership of the already-delivered furniture once the waiver is executed.",
     ],

@@ -34,6 +34,8 @@ export type DeliveryItemProgress = {
   delivered_quantity: number;
   in_transit_quantity: number;
   remaining_quantity: number;
+  available_quantity: number;
+  stock_status: string;
 };
 
 export type SubscriptionDeliveryProgress = {

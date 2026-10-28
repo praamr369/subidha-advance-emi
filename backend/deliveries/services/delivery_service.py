@@ -299,6 +299,7 @@ def _generate_delivery_reference() -> str:
 def get_subscription_item_delivery_progress(subscription: Subscription) -> dict:
     """Calculate item-level delivery progress across all delivery batches for a subscription."""
     from deliveries.models import SubscriptionDeliveryItem
+    from inventory.services.demand_planning_service import stock_status_for_delivery
 
     contract_items = (
         list(subscription.contract_items.select_related("product").all())
@@ -358,6 +359,13 @@ def get_subscription_item_delivery_progress(subscription: Subscription) -> dict:
             delivered = delivered_qty_by_prod.get(p.id, 0)
             in_transit = in_transit_qty_by_prod.get(p.id, 0)
             remaining = max(0, ordered - (delivered + in_transit))
+            try:
+                stock = stock_status_for_delivery(product_id=p.id)
+                available_quantity = int(Decimal(str(stock.get("available", 0))))
+                stock_status = stock.get("status") or "not available"
+            except Exception:
+                available_quantity = 0
+                stock_status = "not available"
 
             total_ordered += ordered
             total_delivered += delivered
@@ -373,6 +381,8 @@ def get_subscription_item_delivery_progress(subscription: Subscription) -> dict:
                 "delivered_quantity": delivered,
                 "in_transit_quantity": in_transit,
                 "remaining_quantity": remaining,
+                "available_quantity": max(0, available_quantity),
+                "stock_status": stock_status,
             })
     elif subscription.product:
         p = subscription.product
@@ -380,6 +390,13 @@ def get_subscription_item_delivery_progress(subscription: Subscription) -> dict:
         delivered = delivered_qty_by_prod.get(p.id, 0)
         in_transit = in_transit_qty_by_prod.get(p.id, 0)
         remaining = max(0, ordered - (delivered + in_transit))
+        try:
+            stock = stock_status_for_delivery(product_id=p.id)
+            available_quantity = int(Decimal(str(stock.get("available", 0))))
+            stock_status = stock.get("status") or "not available"
+        except Exception:
+            available_quantity = 0
+            stock_status = "not available"
 
         total_ordered = ordered
         total_delivered = delivered
@@ -395,6 +412,8 @@ def get_subscription_item_delivery_progress(subscription: Subscription) -> dict:
             "delivered_quantity": delivered,
             "in_transit_quantity": in_transit,
             "remaining_quantity": remaining,
+            "available_quantity": max(0, available_quantity),
+            "stock_status": stock_status,
         })
 
     if total_ordered > 0 and total_delivered >= total_ordered:
@@ -699,6 +718,23 @@ def create_subscription_delivery(
 
     if not target_items:
         raise ValueError("No items selected or available for this delivery batch.")
+
+    # A scheduled batch must be ready item-by-item.  Pending batches may contain
+    # unavailable lines, allowing the operator to keep one contract visible while
+    # scheduling only the lines that can actually move today.
+    if str(status or "").strip().upper() == DeliveryStatus.SCHEDULED:
+        for item in target_items:
+            progress_item = next(
+                row for row in progress["items"]
+                if row["product_id"] == item["product_id"]
+                and row.get("contract_item_id") == item.get("contract_item_id")
+            )
+            if item["quantity"] > progress_item.get("available_quantity", 0):
+                raise ValueError(
+                    f"{progress_item['product_name']} has only "
+                    f"{progress_item.get('available_quantity', 0)} available; "
+                    "leave it out of this scheduled batch and deliver it later."
+                )
 
     _enforce_delivery_kyc_gate(
         subscription, delivery_address_snapshot=delivery_address_snapshot

@@ -63,6 +63,8 @@ class FinanceFilter:
     plan_type: str = ""
     status: str = ""
     branch_id: int | None = None
+    customer_id: int | None = None
+    subscription_id: int | None = None
 
     @classmethod
     def from_query_params(cls, query_params):
@@ -74,6 +76,8 @@ class FinanceFilter:
             plan_type=(query_params.get("contract_type") or "").strip().upper(),
             status=(query_params.get("status") or "").strip().upper(),
             branch_id=int(raw_branch) if raw_branch.isdigit() else None,
+            customer_id=int((query_params.get("customer_id") or "").strip()) if (query_params.get("customer_id") or "").strip().isdigit() else None,
+            subscription_id=int((query_params.get("subscription_id") or "").strip()) if (query_params.get("subscription_id") or "").strip().isdigit() else None,
         )
 
 
@@ -96,6 +100,10 @@ def _apply_invoice_filter(queryset, flt: FinanceFilter):
         queryset = queryset.filter(branch_id=flt.branch_id)
     if flt.plan_type:
         queryset = queryset.filter(subscription__plan_type=flt.plan_type)
+    if flt.customer_id:
+        queryset = queryset.filter(customer_id=flt.customer_id)
+    if flt.subscription_id:
+        queryset = queryset.filter(subscription_id=flt.subscription_id)
     return queryset
 
 
@@ -107,6 +115,10 @@ def _apply_receipt_filter(queryset, flt: FinanceFilter):
         queryset = queryset.filter(branch_id=flt.branch_id)
     if flt.plan_type:
         queryset = queryset.filter(subscription__plan_type=flt.plan_type)
+    if flt.customer_id:
+        queryset = queryset.filter(customer_id=flt.customer_id)
+    if flt.subscription_id:
+        queryset = queryset.filter(subscription_id=flt.subscription_id)
     return queryset
 
 
@@ -358,6 +370,7 @@ def list_admin_receipts(*, flt: FinanceFilter, limit: int = 200) -> dict:
                 "payment_id": row.payment_id,
                 "payment_method": getattr(row.payment, "method", None) if row.payment_id else None,
                 "reference_no": row.source_reference,
+                "pdf_url": f"/api/v1/admin/receipts/{row.id}/pdf/",
             }
             for row in rows
         ],
@@ -764,9 +777,16 @@ def customer_payment_schedule(*, customer) -> dict:
         .select_related("subscription", "subscription__product", "subscription__batch", "subscription__lucky_id")
         .order_by("due_date", "id")
     )
-    return {
-        "count": len(rows),
-        "results": [
+    emi_ids = [row.id for row in rows]
+    receipt_by_emi = {
+        receipt.payment.emi_id: receipt
+        for receipt in ReceiptDocument.objects.filter(
+            customer=customer,
+            payment__emi_id__in=emi_ids,
+        ).select_related("payment").order_by("-receipt_date", "-id")
+        if receipt.payment_id and receipt.payment.emi_id
+    }
+    results = [
             {
                 "emi_id": row.id,
                 "subscription_id": row.subscription_id,
@@ -784,10 +804,49 @@ def customer_payment_schedule(*, customer) -> dict:
                 "paid_amount": _money(row.total_paid()),
                 "outstanding_amount": _money(row.balance_amount()),
                 "is_overdue": row.is_overdue(),
+                "receipt_id": getattr(receipt_by_emi.get(row.id), "id", None),
+                "receipt_no": getattr(receipt_by_emi.get(row.id), "receipt_no", None),
+                "receipt_pdf_url": (
+                    f"/api/v1/customer/receipts/{receipt_by_emi[row.id].id}/pdf/"
+                    if row.id in receipt_by_emi else None
+                ),
             }
             for row in rows
+        ]
+
+    # Rent/lease schedules are demand records rather than EMI rows. Include
+    # them here so the customer sees one payment calendar, including deposits.
+    demands = RentLeaseBillingDemand.objects.filter(
+        subscription__customer=customer,
+        demand_type__in=[
+            RentLeaseDemandType.RENT_MONTHLY,
+            RentLeaseDemandType.LEASE_MONTHLY,
+            RentLeaseDemandType.SECURITY_DEPOSIT,
         ],
-    }
+    ).select_related("subscription", "subscription__product").order_by("due_date", "id")
+    for demand in demands:
+        results.append({
+            "schedule_id": f"demand-{demand.id}",
+            "subscription_id": demand.subscription_id,
+            "subscription_number": getattr(demand.subscription, "subscription_number", None),
+            "plan_type": demand.subscription.plan_type,
+            "product_name": getattr(demand.subscription.product, "name", ""),
+            "month_no": None,
+            "due_date": demand.due_date,
+            "amount": _money(demand.amount),
+            "status": demand.status,
+            "paid_amount": _money(demand.collected_amount),
+            "outstanding_amount": _money(demand.outstanding_amount()),
+            "is_overdue": demand.status == "OVERDUE",
+            "demand_type": demand.demand_type,
+            "reference_key": demand.reference_key,
+            "deposit_pdf_url": (
+                f"/api/v1/customer/deposits/{demand.id}/pdf/"
+                if demand.demand_type == RentLeaseDemandType.SECURITY_DEPOSIT else None
+            ),
+        })
+    results.sort(key=lambda item: (str(item.get("due_date") or ""), str(item.get("schedule_id") or item.get("emi_id") or "")))
+    return {"count": len(results), "results": results}
 
 
 def customer_account_statement(*, customer, flt: FinanceFilter) -> dict:
