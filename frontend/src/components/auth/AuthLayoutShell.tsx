@@ -16,7 +16,7 @@ type AuthLayoutShellProps = {
 
 const DEFAULT_PANEL_TITLE = "Subidha Furniture secure operations access";
 const DEFAULT_PANEL_DESCRIPTION =
-  "Sign in to run daily Lucky Plan Advance EMI operations through one controlled workspace.";
+  "Sign in to run daily Subidha EMI (SFEMI) Advance EMI operations through one controlled workspace.";
 
 const PANEL_POINTS = [
   {

@@ -5,12 +5,12 @@ export const LUCKY_PLAN_FAQ: FaqItem[] = [
   {
     question: "How do batches work?",
     answer:
-      "A batch is an operational subscriber cycle comprising up to 100 customer slots (numbered 00 to 99). Batches maintain clean draw coordination, financial tracking, and transparent winner publication.",
+      "A batch is an operational subscriber cycle comprising up to 100 customer slots (numbered 00 to 99). Batches maintain clean enrollment, financial tracking, and transparent SFEMI benefit records.",
   },
   {
-    question: "How are Lucky IDs assigned?",
+    question: "How are SFEMI IDs assigned?",
     answer:
-      "Lucky IDs (00–99) are allocated within an active batch upon initial enrollment and verified installment receipt. Assignment is controlled by the branch system and does not guarantee winning.",
+      "SFEMI IDs (00–99) are allocated within an active batch upon initial enrollment and verified installment receipt. Assignment is controlled by the branch system and does not guarantee a promotional benefit.",
   },
   {
     question: "How do monthly payments work?",
@@ -18,9 +18,9 @@ export const LUCKY_PLAN_FAQ: FaqItem[] = [
       "You pay scheduled monthly advance EMIs according to your contract. Payment entries are posted to append-only ledgers and generate official, tamper-evident system receipts.",
   },
   {
-    question: "What happens when a winner is declared?",
+    question: "What happens when a promotional benefit is approved?",
     answer:
-      "When a verified winning Lucky ID is declared, remaining future unpaid EMI obligations from that draw month onward are waived 100%. Previously paid EMIs remain settled and valid.",
+      "When an SFEMI promotional benefit is approved under the published terms, any remaining future EMI treatment follows those terms. Previously paid EMIs remain settled and valid.",
   },
   {
     question: "Is previously paid EMI refunded if I win?",
@@ -110,7 +110,7 @@ export const PUBLIC_PURPOSE_BADGES = [
 export const PUBLIC_LEGAL_DISCLAIMER_POINTS = [
   "This website is published by Subidha Furniture for informational, product catalog, and operational guidance purposes.",
   "Final legal rights and obligations are governed strictly by system-generated approved contracts, tax invoices, official receipts, delivery notes, and return inspection reports.",
-  "Lucky Plan Advance EMI participation does not guarantee winning. The plan is a product purchase installment plan compliant with the Prize Chits Act, 1978, and BUDS Act, 2019.",
+      "SFEMI Advance EMI participation does not guarantee a promotional benefit. The plan is a product purchase installment arrangement subject to applicable law and the signed terms.",
   "Winning a lucky draw waives remaining future EMI installments only. Settled installments and advance down payments are strictly non-refundable in cash or bank transfer.",
   "Under Hire-Purchase terms, legal title to goods delivered under advance prepayment remains with Subidha Furniture until 100% of the contract value is settled.",
   "Rent and Lease security deposits are refundable liabilities subject to technical condition inspection, 45-day arrears limits, and verified deductions.",
@@ -177,9 +177,9 @@ export const POLICY_TIMELINE = [
 ] as const;
 
 export const ADVANCE_EMI_POLICY = {
-  title: "Lucky Plan Advance EMI Rules & Invariants",
+  title: "SFEMI Advance EMI Rules & Invariants",
   intro:
-    "The Lucky Plan is an advance installment purchase program backed by tangible furniture products, disciplined monthly advance schedules, and an auditable fair draw benefit.",
+    "SFEMI is an advance installment purchase program backed by tangible furniture products, disciplined monthly advance schedules, and documented promotional benefits.",
   cards: [
     {
       title: "Contract Valuation & Deterministic EMI",
@@ -190,11 +190,11 @@ export const ADVANCE_EMI_POLICY = {
       ],
     },
     {
-      title: "Batch Structure & Lucky ID (00–99)",
+      title: "Batch Structure & SFEMI ID (00–99)",
       points: [
         "Subscriptions are organized into controlled batches of up to 100 slots (numbered 00 to 99).",
-        "A customer may hold multiple independent subscriptions and Lucky IDs across same or different batches.",
-        "Lucky ID allocation provides fair draw eligibility but creates no guarantee of winning.",
+        "A customer may hold multiple independent subscriptions and SFEMI IDs across same or different batches.",
+        "SFEMI ID allocation records enrollment eligibility but creates no guarantee of a promotional benefit.",
       ],
     },
     {

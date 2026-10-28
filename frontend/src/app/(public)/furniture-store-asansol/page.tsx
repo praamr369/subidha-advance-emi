@@ -15,11 +15,11 @@ export default function FurnitureStoreAsansolPage() {
     <LocalSeoLanding
       heroEyebrow="Furniture store in Asansol"
       title="Furniture Store in Asansol — Subidha Furniture"
-      subtitle="Beds, sofas, wardrobes, dining sets, mattresses and more, with EMI and Lucky Plan options as per approved terms."
+      subtitle="Beds, sofas, wardrobes, dining sets, mattresses and more, with EMI and SFEMI options as per approved terms."
       breadcrumbs={[{ label: "Home", href: "/" }, { label: "Furniture Store in Asansol" }]}
       intro={[
         "Subidha Furniture is a furniture store based in Asansol, West Bengal. We help local families furnish their homes with beds, sofas, wardrobes, dining tables, mattresses and everyday furniture.",
-        "You can pay directly, choose EMI, or ask about our Lucky Plan EMI purchase plan — all as per the approved terms explained on our plan and policy pages. Visit our showroom for current models and availability.",
+        "You can pay directly, choose EMI, or ask about our SFEMI Advance EMI purchase plan — all as per the approved terms explained on our plan and policy pages. Visit our showroom for current models and availability.",
       ]}
       sections={[
         {

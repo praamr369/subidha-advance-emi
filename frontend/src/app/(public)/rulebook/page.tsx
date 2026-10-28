@@ -13,22 +13,22 @@ import { ROUTES } from "@/lib/routes";
 export const metadata: Metadata = buildPublicMetadata({
   title: "Rulebook",
   description:
-    "Customer-friendly public rulebook covering Lucky Plan structure, monthly draw rules, winner waiver, payment discipline, rent/lease, delivery, and cancellation.",
+    "Customer-friendly public rulebook covering SFEMI structure, promotional terms, payment discipline, rent/lease, delivery, and cancellation.",
   path: "/rulebook",
 });
 
 export default function RulebookPage() {
   return (
     <PublicPageShell
-      title="Lucky Plan Rulebook"
-      subtitle="A plain-language guide to how the Lucky Plan works, what the draw rules are, and what customers should expect — before and after enrollment."
+      title="SFEMI Rulebook"
+      subtitle="A plain-language guide to how SFEMI works and what customers should expect — before and after enrollment."
       breadcrumbs={[
         { label: "Home", href: ROUTES.public.home },
         { label: "Rulebook" },
       ]}
       hero={{
         eyebrow: "Public rules reference",
-        badges: ["Lucky Plan", "Draw rules", "Rent / Lease", "Payments", "Delivery"],
+        badges: ["SFEMI", "Promotional terms", "Rent / Lease", "Payments", "Delivery"],
       }}
       actions={[
         { label: "View FAQ", href: ROUTES.public.faq, variant: "secondary" },

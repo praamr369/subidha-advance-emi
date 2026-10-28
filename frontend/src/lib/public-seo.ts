@@ -6,7 +6,7 @@ import type { ResolvedPublicBusinessProfile } from "@/lib/public-profile";
 const fallbackBaseUrl = "https://subidha.example.com";
 const defaultSiteName = "Subidha Furniture";
 const defaultDescription =
-  "Subidha Furniture public site for Lucky Plan EMI, rent, lease, direct sale, product enquiry, policy reading, and winner transparency.";
+  "Subidha Furniture public site for Subidha EMI (SFEMI) Advance EMI, rent, lease, direct sale, product enquiry, and clear customer policies.";
 const productsSearchPath = "/products?search={search_term_string}";
 
 export function getPublicSiteUrl(): string {

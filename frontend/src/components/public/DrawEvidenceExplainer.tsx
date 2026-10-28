@@ -15,7 +15,7 @@ const evidenceCards = [
     points: [
       "Batch code and draw month when available.",
       "Masked winner display name.",
-      "Lucky ID or lucky number if the public API returns it.",
+      "SFEMI ID or approved reference if the public API returns it.",
       "Commitment hash and verification status when published.",
     ],
   },
@@ -34,7 +34,7 @@ const evidenceCards = [
     title: dict.public.DrawEvidenceExplainer_prop3,
     points: [
       "They cannot select or change a winner.",
-      "They cannot assign Lucky IDs or create subscriptions.",
+      "They cannot assign SFEMI IDs or create subscriptions.",
       "They cannot waive EMI or reverse payment history.",
       "They cannot create receipts, invoices, or accounting records.",
     ],

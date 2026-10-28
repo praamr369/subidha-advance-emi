@@ -16,19 +16,19 @@ import { buildPublicMetadata } from "@/lib/public-seo";
 import { ROUTES } from "@/lib/routes";
 
 export const metadata: Metadata = buildPublicMetadata({
-  title: "Advance EMI (Lucky Plan) Contract",
+  title: "SFEMI Advance EMI Contract",
   description:
-    "Full details of the Advance EMI (Lucky Plan) contract: Lucky ID assignment, monthly draw, winner waiver on future EMI only, and transparent draw rules.",
+    "Full details of the SFEMI Advance EMI contract: SFEMI ID assignment, promotional eligibility, customer protections, and transparent terms.",
   path: "/contracts/advance-emi",
 });
 
 const subtitle =
-  "Join a batch, receive a Lucky ID, pay monthly EMI, and follow transparent winner publication. Draws are run under published rules; participation does not guarantee a prize, and any waiver applies only to future EMI obligations as described in branch documents.";
+  "Join an approved batch, receive an SFEMI ID, pay the agreed monthly EMI, and follow the published promotional terms. SFEMI is a product purchase arrangement, not an investment or guaranteed return.";
 
 export default function ContractsAdvanceEmiPage() {
   return (
     <PublicPageShell
-      title="Advance EMI (Lucky Plan)"
+      title="SFEMI Advance EMI"
       subtitle={subtitle}
       heroSlot={<LuckyPlanAnimatedHero title="Advance EMI (Lucky Plan)" subtitle={subtitle} />}
       breadcrumbs={[
@@ -56,7 +56,7 @@ export default function ContractsAdvanceEmiPage() {
 
       <section className="space-y-4">
         <SectionHeader
-          eyebrow="Lucky ID visualised"
+          eyebrow="SFEMI ID explained"
           title="The 00–99 batch slot grid"
           description="Each batch holds up to 100 numbered slots. This grid is for explanatory purposes only."
         />
@@ -66,7 +66,7 @@ export default function ContractsAdvanceEmiPage() {
       <section className="space-y-4">
         <SectionHeader
           eyebrow="Full journey"
-          title="The Lucky Plan EMI journey — step by step"
+          title="The SFEMI Advance EMI journey — step by step"
         />
         <EmiJourneyTimeline />
       </section>
@@ -83,7 +83,7 @@ export default function ContractsAdvanceEmiPage() {
       <PublicMarketingBanner
         eyebrow="Winner transparency"
         title="Public winner proof with privacy protection"
-        description="Published winner records include batch, draw month/date, lucky ID, and commitment proof hash where available. Winner names are masked. No public component can change a revealed draw result."
+          description="Published SFEMI records include approved contract context and customer-safe information. Private customer details remain protected."
         items={[
           { title: "Batch + draw context", description: "Each published winner row is tied to the exact batch and draw month." },
           { title: "Proof hash visibility", description: "Commit/reveal proof references are shown when available." },

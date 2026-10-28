@@ -25,7 +25,7 @@ export const CODIFIED_PUBLIC_POLICIES: Record<string, CodifiedPolicy> = {
 
 These Terms and Conditions constitute a legally binding agreement between the customer (hereinafter referred to as the "Customer" or "User") and Subidha Furniture. They govern all commercial engagements, including:
 1. Direct showroom and online purchases (Direct Sales).
-2. Subscription to the Lucky Plan Advance EMI program.
+2. Subscription to the Subidha EMI (SFEMI) Advance EMI program.
 3. Furniture and appliance rental agreements (Rent Contracts).
 4. Long-term furniture leasing arrangements (Lease Contracts).
 5. Delivery, handover, warranty, after-sales maintenance, and customer service workflows.
@@ -45,9 +45,9 @@ These Terms and Conditions constitute a legally binding agreement between the cu
 2. **Partial Payments and Title Retention**: If a direct sale is provisioned with partial advance payment, Subidha Furniture retains full legal title, lien, and custody control over the goods until the outstanding balance is completely settled.
 3. **Price Quotations**: Quotations issued by showroom staff are valid for seven (7) calendar days unless otherwise specified in writing.
 
-## 4. Lucky Plan Advance EMI & Draw Invariants
+## 4. SFEMI Advance EMI & Promotional Benefit Invariants
 
-1. **Subscription Structure**: The Lucky Plan is a structured advance installment plan for furniture acquisition over an approved tenure (e.g., 10 to 15 months). The product base price constitutes the total contract value, and monthly EMI equals the total contract value divided by the tenure months.
+1. **Subscription Structure**: SFEMI is a structured advance installment plan for furniture acquisition over an approved tenure (e.g., 10 to 15 months). The product base price constitutes the total contract value, and monthly EMI equals the total contract value divided by the tenure months.
 2. **Lucky ID Assignment**: Customers are assigned a batch-specific Lucky ID (00 to 99). Assignment of a Lucky ID does not guarantee any prize, winning, or financial return.
 3. **Fair Draw Integrity (Commit-then-Reveal)**: Monthly draws are conducted transparently using cryptographic SHA-256 commit-then-reveal procedures. A commitment hash is published prior to the draw, and the revealed winning number must match the hash.
 4. **Winner Benefit Scope (Strictly Future EMI Waiver)**:
@@ -315,19 +315,19 @@ Physical handover requires complete execution of the Proof of Delivery protocol:
 
   "lucky-plan-policy": {
     slug: "lucky-plan-policy",
-    title: "Lucky Plan Advance EMI Policy",
+    title: "SFEMI Advance EMI Policy",
     category: "LUCKY_PLAN",
     version: "2.4",
     effectiveDate: "2026-08-20",
     summary:
-      "Operational framework, batch structure, Lucky ID rules, commit-then-reveal fair draw mechanisms, advance delivery terms, and future EMI waiver invariants.",
+      "Operational framework, batch structure, SFEMI ID rules, promotional benefit mechanisms, advance delivery terms, and future EMI treatment invariants.",
     content: `# Lucky Plan Advance EMI Policy
 
-Subidha Furniture's **Lucky Plan** is an innovative retail installment program enabling households to acquire high-quality furniture through transparent, disciplined monthly advance installments combined with an auditable fair-draw waiver benefit.
+Subidha Furniture's **SFEMI** is a retail installment program enabling households to acquire high-quality furniture through transparent, disciplined monthly advance installments and documented promotional benefits.
 
 ## 1. Commercial Foundation & Regulatory Compliance
 
-1. **Product-Backed Purchase**: The Lucky Plan is not a lottery, wager, chit fund, or financial deposit scheme. Every subscription is anchored to a specific, tangible furniture product.
+1. **Product-Backed Purchase**: SFEMI is not a lottery, wager, chit fund, or financial deposit scheme. Every subscription is anchored to a specific, tangible furniture product.
 2. **Statutory Alignment**: Operates in full compliance with:
    - Prize Chits and Money Circulation Schemes (Banning) Act, 1978 (participation creates no financial loss; product value matches all payments);
    - Banning of Unregulated Deposit Schemes (BUDS) Act, 2019 (all payments constitute advance consideration for retail goods);

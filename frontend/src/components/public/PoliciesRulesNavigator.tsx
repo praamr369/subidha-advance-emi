@@ -14,7 +14,7 @@ export default async function PoliciesRulesNavigator() {
         title: dict.public.PoliciesRulesNavigator_prop1,
         description: dict.public.PoliciesRulesNavigator_prop2,
         href: ROUTES.public.luckyPlan,
-        cta: "Read Lucky Plan",
+        cta: "Read SFEMI rules",
       },
       {
         icon: PackageCheck,

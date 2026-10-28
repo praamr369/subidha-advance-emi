@@ -53,14 +53,14 @@ export function getPublicDictionary(locale: PublicLocale) {
         apply: "Apply / Enquire",
         mediaCarousel: {
           featuredLabel: "Featured catalogue items",
-          winnerHighlightsLabel: "Winner prize highlights",
+          winnerHighlightsLabel: "SFEMI benefit highlights",
           productGalleryLabel: "Product image gallery",
           previousSlide: "Previous slide",
           nextSlide: "Next slide",
         },
       },
-      homePage: { title: "Bring Home Furniture, Electronics, and Home Appliances with Easy Monthly Plans", subtitle: "Choose your product, join the Lucky Plan, and enjoy a simple, transparent path to ownership for your family.", ctaProducts: "Browse products", ctaPlan: "Understand Lucky Plan", ctaContact: "Talk to support" },
-      seo: { homeTitle: "Furniture Shop in Asansol | Easy Monthly Plan & Lucky Plan", homeDescription: "Subidha Furniture helps families in Asansol bring home furniture, electronics, and home appliances with easy monthly plans and transparent Lucky Plan rules." },
+      homePage: { title: "Bring Home Furniture, Electronics, and Home Appliances with Easy Monthly Plans", subtitle: "Choose your product, join SFEMI Advance EMI, and enjoy a simple, transparent path to ownership for your family.", ctaProducts: "Browse products", ctaPlan: "Understand SFEMI", ctaContact: "Talk to support" },
+      seo: { homeTitle: "Furniture Shop in Asansol | Easy Monthly Plan & SFEMI", homeDescription: "Subidha Furniture helps families in Asansol bring home furniture, electronics, and home appliances with easy monthly plans and transparent SFEMI rules." },
       public: enJSON.public,
     },
     hi: {
@@ -151,19 +151,19 @@ export type LocalizedText = Record<PublicLanguage, string>;
 export const publicContent = {
   nav: {
     trustBadge: {
-      en: "Transparent Lucky Plan · Real branch support",
+      en: "Transparent SFEMI · Real branch support",
       hi: "पारदर्शी लकी प्लान · भरोसेमंद शाखा सहायता",
       bn: "স্বচ্ছ লাকি প্ল্যান · নির্ভরযোগ্য শাখা সহায়তা",
     },
   },
   homeHero: {
     title: {
-      en: "Furniture and appliances with clear monthly plans — and honest Lucky Plan rules",
+      en: "Furniture and appliances with clear monthly plans — and honest SFEMI rules",
       hi: "स्पष्ट मासिक योजना के साथ फर्नीचर व उपकरण — और ईमानदार लकी प्लान नियम",
       bn: "স্পষ্ট মাসিক পরিকল্পনায় ফার্নিচার ও অ্যাপ্লায়েন্স — আর স্বচ্ছ লাকি প্ল্যান নিয়ম",
     },
     subtitle: {
-      en: "Choose sofas, beds, wardrobes, dining sets and home appliances — then own them on a Lucky Plan EMI, use them on rent or lease, or buy outright. Every payment is receipted and every draw is published for anyone to verify.",
+      en: "Choose sofas, beds, wardrobes, dining sets and home appliances — then own them through SFEMI Advance EMI, use them on rent or lease, or buy outright. Every payment is receipted and every promotional term is documented.",
       hi: "सोफ़ा, बेड, वार्डरोब, डाइनिंग सेट और घरेलू उपकरण चुनें — फिर लकी प्लान EMI से अपना बनाएं, किराये या लीज़ पर लें, या सीधे खरीदें। हर भुगतान की रसीद मिलती है और हर ड्रॉ सबके सत्यापन के लिए प्रकाशित होता है।",
       bn: "সোফা, খাট, আলমারি, ডাইনিং সেট ও গৃহস্থালির যন্ত্রপাতি বেছে নিন — তারপর লাকি প্ল্যান EMI-তে নিজের করুন, ভাড়া বা লিজে নিন, অথবা সরাসরি কিনুন। প্রতিটি পেমেন্টের রসিদ পাবেন, আর প্রতিটি ড্রয় সবার যাচাইয়ের জন্য প্রকাশিত হয়।",
     },

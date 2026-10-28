@@ -91,7 +91,7 @@ export const WORKFLOW_FLOWS: WorkflowFlow[] = [
   },
   {
     id: "lucky-plan",
-    name: "Lucky Plan EMI & Draw",
+    name: "SFEMI Advance EMI",
     badge: "BUDS & Prize Chits Compliant",
     tagline: "Deterministic Installments with Cryptographic Commit-then-Reveal Fair Draw",
     description:
@@ -109,10 +109,10 @@ export const WORKFLOW_FLOWS: WorkflowFlow[] = [
       {
         step: 2,
         icon: "🎟️",
-        title: "Lucky ID Allocation",
+        title: "SFEMI ID Allocation",
         subtitle: "Batch Scope (00-99)",
         description:
-          "A unique, verifiable Lucky ID is assigned within a controlled 100-member batch. Customer may hold multiple IDs across contracts.",
+          "A unique, verifiable SFEMI ID is assigned within a controlled batch. A customer may hold multiple IDs across contracts.",
         systemRule: "Audited Slot Uniqueness",
       },
       {
@@ -153,7 +153,7 @@ export const WORKFLOW_FLOWS: WorkflowFlow[] = [
       },
     ],
     legalGuardrail:
-      "Statutory Invariant: Lucky Plan is a structured retail purchase plan with future installment waivers for winners. Settled payments are never refunded in cash, fully complying with BUDS Act 2019 and Prize Chits Act 1978.",
+      "Statutory Invariant: SFEMI is a structured retail purchase plan. Any promotional benefit follows the signed terms, and settled payments are never refunded in cash.",
   },
   {
     id: "rent-lease",

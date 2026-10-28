@@ -46,7 +46,7 @@ const proofPoints = [
               Apply / Enquire
             </h1>
             <p className="max-w-3xl text-base leading-8 text-muted-foreground sm:text-lg">
-              Share your product preference, plan interest, monthly comfort, and contact details so Subidha Furniture can guide you through Lucky Plan EMI, rent, lease, or direct-sale options.
+              Share your product preference, plan interest, monthly comfort, and contact details so Subidha Furniture can guide you through SFEMI Advance EMI, rent, lease, or direct-sale options.
             </p>
             <div className="public-card-sm max-w-3xl px-4 py-3 text-sm leading-6 text-muted-foreground">
               <strong className="font-semibold text-foreground">{dict.public.ApplyEnquiryHero_text10}</strong> This form starts branch follow-up only. Financial records, receipt documents, Lucky IDs, rent/lease deposits, and contracts are never created from the public page alone.
@@ -58,7 +58,7 @@ const proofPoints = [
               Browse products
             </Link>
             <Link href={ROUTES.public.luckyPlan} className="public-action-secondary">
-              Lucky Plan rules
+              SFEMI rules
             </Link>
             <Link href={ROUTES.public.contact} className="public-action-primary gap-2">
               Contact branch

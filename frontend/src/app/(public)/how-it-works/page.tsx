@@ -21,7 +21,7 @@ import { ROUTES } from "@/lib/routes";
 export const metadata: Metadata = buildPublicMetadata({
   title: "How It Works",
   description:
-    "Step-by-step guide covering all five customer journeys at Subidha Furniture — Advance EMI (Lucky Plan), Rent, Lease, Payment & Receipt, and Delivery Readiness.",
+    "Step-by-step guide covering all five customer journeys at Subidha Furniture — SFEMI Advance EMI, Rent, Lease, Payment & Receipt, and Delivery Readiness.",
   path: "/how-it-works",
 });
 
@@ -30,9 +30,9 @@ const journeys = [
     id: "advance-emi",
     label: "A",
     eyebrow: "Journey A — Advance EMI",
-    title: "Advance EMI / Lucky Plan",
+      title: "SFEMI Advance EMI",
     description:
-      "From product selection and customer registration through Lucky ID assignment, monthly EMI payments, draw participation, and delivery. Winning is not guaranteed. Winner benefit is future EMI waiver only.",
+      "From product selection and customer registration through SFEMI ID assignment, monthly EMI payments, promotional eligibility, and delivery. Benefits follow the approved terms.",
     steps: HOW_IT_WORKS_JOURNEY_A,
   },
   {
@@ -77,7 +77,7 @@ export default function HowItWorksPage() {
   return (
     <PublicPageShell
       title="How It Works"
-      subtitle="Five customer journeys explained step by step — Advance EMI (Lucky Plan), Rent, Lease, Payment & Receipt, and Delivery Readiness."
+      subtitle="Five customer journeys explained step by step — SFEMI Advance EMI, Rent, Lease, Payment & Receipt, and Delivery Readiness."
       breadcrumbs={[
         { label: "Home", href: ROUTES.public.home },
         { label: "How it works" },

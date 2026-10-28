@@ -52,8 +52,8 @@ const emiJourney: JourneyStep[] = [
     step: 3,
     title: dict.public.EmiJourneyTimeline_prop5,
     description:
-      "You are enrolled in an active batch. The system assigns a Lucky ID (00–99) to your subscription. One customer can hold multiple Lucky IDs across different batches.",
-    note: "Lucky ID assignment does not guarantee winning.",
+      "You are enrolled in an approved batch. The system assigns an SFEMI ID (00–99) to your subscription. One customer can hold multiple SFEMI IDs across different batches.",
+    note: "SFEMI ID assignment does not guarantee a promotional benefit.",
   },
   {
     icon: CreditCard,
@@ -74,7 +74,7 @@ const emiJourney: JourneyStep[] = [
     step: 6,
     title: dict.public.EmiJourneyTimeline_prop11,
     description:
-      "If your Lucky ID wins, remaining future EMI obligations from that month onward may be waived per plan rules. Already-paid EMI is not reversed or refunded automatically.",
+      "If your SFEMI ID qualifies under the published terms, remaining future EMI obligations may be handled as stated. Already-paid EMI is not reversed or refunded automatically.",
     note: "Winning is not guaranteed. Waiver applies to future EMI only.",
   },
   {
@@ -107,10 +107,10 @@ const emiJourney: JourneyStep[] = [
           Step-by-step journey
         </div>
         <h2 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-          The Lucky Plan EMI journey
+          The SFEMI Advance EMI journey
         </h2>
         <p className="max-w-2xl text-sm leading-7 text-muted-foreground">
-          From product selection to final delivery — here is how the full Lucky Plan cycle works.
+          From product selection to final delivery — here is how the full SFEMI cycle works.
         </p>
       </div>
 

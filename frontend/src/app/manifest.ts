@@ -6,7 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: `${brandConfig.companyName} — ${brandConfig.publicProgramName}`,
     short_name: brandConfig.companyName,
-    description: `${brandConfig.companyName} Lucky Plan Advance EMI — furniture on easy monthly installments`,
+    description: `${brandConfig.companyName} Subidha EMI (SFEMI) Advance EMI — furniture on easy monthly installments`,
     start_url: "/",
     display: "standalone",
     background_color: "#ffffff",

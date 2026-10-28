@@ -26,7 +26,7 @@ export default function EMICalculatorWidget({ className }: EMICalculatorWidgetPr
 
   const [principal, setPrincipal] = useState(25000);
   const [months, setMonths] = useState(6);
-  // Lucky Plan EMI is the plan value divided by the tenure.
+  // SFEMI Advance EMI is the plan value divided by the tenure.
   const emi = Math.round(principal / months);
   const monthsLabel = `${months} ${t("public.EMICalculatorWidget_text12")}`;
 

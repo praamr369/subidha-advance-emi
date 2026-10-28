@@ -19,7 +19,7 @@ const sections = [
     id: "website-purpose",
     title: "Purpose of this website",
     paragraphs: [
-      "This website (Subidha CORE public site) is published by Subidha Furniture for the purpose of explaining products, plan options (Lucky Plan EMI, Rent, Lease, Direct Sale), policies, and customer/partner information to the public.",
+      "This website (Subidha CORE public site) is published by Subidha Furniture for the purpose of explaining products, plan options (SFEMI Advance EMI, Rent, Lease, Direct Sale), policies, and customer/partner information to the public.",
       "The content on this site is for informational purposes only. It does not constitute a legally binding contract, offer, guarantee, or financial product unless explicitly stated in a signed document.",
     ],
   },
@@ -35,7 +35,7 @@ const sections = [
     id: "not-gambling",
     title: "Lucky Plan is not gambling",
     paragraphs: [
-      "Lucky Plan is a structured monthly instalment payment plan (Advance EMI) attached to a real product purchase contract. Participation is not a wager or game of chance. The draw feature is a transparent, auditable benefit mechanism governed by published rules and customer contracts.",
+      "SFEMI is a structured monthly instalment payment plan (Advance EMI) attached to a real product purchase contract. Participation is not an investment or wager. Any promotional benefit is governed by published terms and customer contracts.",
     ],
   },
   {

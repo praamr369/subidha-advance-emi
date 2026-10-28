@@ -5,7 +5,7 @@ import { buildPublicMetadata } from "@/lib/public-seo";
 
 export const metadata: Metadata = buildPublicMetadata({
   title: "Business Policies",
-  description: "Business policies for Subidha Furniture covering rent, lease, Lucky Plan EMI, delivery, warranty, payments, and customer service.",
+  description: "Business policies for Subidha Furniture covering rent, lease, SFEMI Advance EMI, delivery, warranty, payments, and customer service.",
   path: "/legal/policies",
 });
 

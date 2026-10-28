@@ -126,7 +126,7 @@ export type HomeCopy = {
 const en: HomeCopy = {
   hero: {
     promises: ["A receipt for every payment", "Draw results you can verify", "Rules published before you join"],
-    figures: { seats: "Lucky Plan seats open", members: "Active plan members", winners: "Winners published" },
+    figures: { seats: "SFEMI seats open", members: "Active SFEMI members", winners: "SFEMI benefits published" },
     explore: "Explore products",
     compare: "Compare plans",
     apply: "Apply / Enquire",
@@ -153,15 +153,15 @@ const en: HomeCopy = {
     enquire: "Enquire",
     items: {
       luckyPlan: {
-        name: "Lucky Plan · Advance EMI",
+        name: "SFEMI · Advance EMI",
         pitch: "Own your furniture through fixed monthly instalments, with a monthly draw that can waive your remaining EMIs.",
         points: [
           "Monthly EMI is the plan value divided by the tenure, fixed before you join",
-          "Join a batch and receive a Lucky ID (00–99) for the monthly draw",
-          "If your Lucky ID is drawn, future EMIs are waived as per the rulebook",
+          "Join an approved batch and receive an SFEMI ID (00–99) for the promotional benefit process",
+          "If your SFEMI ID is selected under the published terms, future EMIs are handled as stated in the rulebook",
         ],
         bestFor: "Families who want to own with a predictable monthly budget.",
-        note: "A promotional purchase plan, not a lottery. A Lucky ID does not guarantee a win.",
+        note: "A promotional purchase plan, not a lottery. An SFEMI ID does not guarantee a benefit.",
       },
       rent: {
         name: "Rent",
@@ -198,12 +198,12 @@ const en: HomeCopy = {
       title: "Which plan fits you?",
       note: "A side-by-side view of the four schemes. Your signed contract always carries the final terms.",
       feature: "Feature",
-      columns: ["Lucky Plan", "Rent", "Lease", "Direct purchase"],
+      columns: ["SFEMI", "Rent", "Lease", "Direct purchase"],
       rows: [
         { label: "Who owns it", values: ["You, once the plan is complete", "Stays with Subidha", "Stays with Subidha", "You, on full payment"] },
         { label: "What you pay", values: ["Fixed monthly instalments", "Deposit + monthly rent", "Deposit + monthly lease charge", "Full price, once"] },
         { label: "Refundable deposit", values: ["No", "Yes", "Yes", "No"] },
-        { label: "Monthly lucky draw", values: ["Yes — future EMIs may be waived", "No", "No", "No"] },
+        { label: "Promotional benefit process", values: ["As stated in SFEMI terms", "No", "No", "No"] },
         {
           label: "Delivery",
           values: ["When the plan becomes eligible", "After the deposit is collected", "After the deposit is collected", "After payment and scheduling"],
@@ -243,8 +243,8 @@ const en: HomeCopy = {
     description:
       "Live figures come straight from our records and refresh every minute. A draw result appears only after the draw is revealed.",
     kinds: { live: "Live", rule: "Rule", policy: "Policy", visit: "Visit" },
-    latestResult: "Latest draw result",
-    luckyId: "Lucky ID",
+    latestResult: "Latest SFEMI benefit record",
+    luckyId: "SFEMI ID",
     batch: (name) => `Batch ${name}`,
     drawMonth: (month) => `Draw month ${month}`,
     product: "Product",
@@ -261,24 +261,24 @@ const en: HomeCopy = {
     },
     commitHash: "Commit hash",
     verifyDraw: "Verify this draw",
-    winnerHistory: "Winner history",
+    winnerHistory: "SFEMI benefit history",
     emptyTitle: "No draw result published yet",
-    emptyBody: "The first result appears here as soon as a draw is revealed. We never show placeholder winners.",
+    emptyBody: "SFEMI benefit records appear here only after they are verified. We never show placeholder records.",
     howDrawsWork: "How draws work",
     seats: {
-      title: (open) => `${open} Lucky Plan seats open`,
+      title: (open) => `${open} SFEMI seats open`,
       body: (taken, capacity, batches) => `${taken} of ${capacity} seats are taken across ${batches} published batches.`,
       cta: "Join a batch",
     },
     members: {
-      title: (active) => `${active} active Lucky Plan members`,
+      title: (active) => `${active} active SFEMI members`,
       body: (rent, lease) => `Alongside ${rent} rent and ${lease} lease contracts running today.`,
-      cta: "How Lucky Plan works",
+      cta: "How SFEMI works",
     },
     fairDraw: {
-      title: "How every monthly draw stays fair",
-      body: "A commitment hash is published before each draw and revealed after it, so nobody can change a result once it is committed.",
-      cta: "Fair-draw method",
+      title: "How SFEMI benefits are verified",
+      body: "Eligibility and promotional records follow documented terms and controlled branch verification.",
+      cta: "Read SFEMI terms",
     },
     deposits: {
       title: "Rent and lease deposits are refundable",
@@ -302,7 +302,7 @@ const en: HomeCopy = {
       },
       {
         title: "Pick a plan and apply",
-        body: "Choose Lucky Plan EMI, rent, lease or direct purchase. Send an enquiry and the branch helps with documents and KYC.",
+        body: "Choose SFEMI Advance EMI, rent, lease or direct purchase. Send an enquiry and the branch helps with documents and KYC.",
       },
       {
         title: "Pay monthly, keep every receipt",
@@ -336,7 +336,7 @@ const en: HomeCopy = {
       },
       {
         title: "Showroom trust, digital records",
-        body: "Touch and try every product in person, then track payments, receipts, Lucky IDs and delivery from your phone.",
+        body: "Touch and try every product in person, then track payments, receipts, SFEMI IDs and delivery from your phone.",
       },
       {
         title: "A scheme for every stage of life",
@@ -358,7 +358,7 @@ const en: HomeCopy = {
   calculator: {
     eyebrow: "EMI calculator",
     title: "Estimate your monthly payment",
-    description: "Move the sliders to see a Lucky Plan monthly amount — the plan value divided by the number of months.",
+    description: "Move the sliders to see an SFEMI monthly amount — the plan value divided by the number of months.",
   },
   faq: {
     eyebrow: "Common questions",

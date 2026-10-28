@@ -8,7 +8,7 @@ import ApplyPageClient from "./ApplyPageClient";
 export const metadata: Metadata = buildPublicMetadata({
   title: "Apply / Enquire",
   description:
-    "Submit a product and plan enquiry for Lucky Plan EMI, rent, lease, or direct-sale guidance from Subidha Furniture.",
+    "Submit a product and plan enquiry for SFEMI Advance EMI, rent, lease, or direct-sale guidance from Subidha Furniture.",
   path: "/apply",
 });
 

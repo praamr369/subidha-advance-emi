@@ -25,7 +25,7 @@ import { buildPublicMetadata } from "@/lib/public-seo";
 export const metadata: Metadata = buildPublicMetadata({
   title: "Home",
   description:
-    "Furniture and home appliances in Asansol on Lucky Plan EMI, rent, lease or direct purchase — with receipted payments and publicly verifiable draws.",
+    "Furniture and home appliances in Asansol through SFEMI Advance EMI, rent, lease or direct purchase — with receipted payments and clear published terms.",
   path: "/",
 });
 

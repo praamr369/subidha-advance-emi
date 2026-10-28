@@ -85,7 +85,7 @@ const trustPoints = [
               Explore products
             </Link>
             <Link href={ROUTES.public.luckyPlan} className="public-action-secondary">
-              View Lucky Plan
+              View SFEMI Advance EMI
             </Link>
           </div>
 

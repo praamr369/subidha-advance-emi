@@ -29,7 +29,7 @@ export default function PublicStatsWidget() {
       {
         key: "total_winners",
         label: t('public.PublicStatsWidget_prop4'),
-        helper: "Winner records already revealed",
+        helper: "SFEMI benefit records already verified",
       },
     ] as const;
 

@@ -16,7 +16,7 @@ import ProductGrid from "./ProductGrid";
 
 export const metadata: Metadata = buildPublicMetadata({
   title: "Furniture Products in Asansol",
-  description: "Browse beds, sofas, wardrobes, dining tables, mattresses and appliances at Subidha Furniture, Asansol. EMI and Lucky Plan options as per approved terms.",
+  description: "Browse beds, sofas, wardrobes, dining tables, mattresses and appliances at Subidha Furniture, Asansol. EMI and SFEMI options as per approved terms.",
   path: "/products",
 });
 
@@ -27,7 +27,7 @@ const PRODUCTS_FAQS = [
   },
   {
     question: "Can I buy furniture on EMI in Asansol?",
-    answer: "EMI and Lucky Plan EMI options may be available as per approved terms. Contact us or visit the showroom to understand the plans and eligibility.",
+    answer: "EMI and SFEMI Advance EMI options may be available as per approved terms. Contact us or visit the showroom to understand the plans and eligibility.",
   },
   {
     question: "Do the listed products confirm stock or price?",
@@ -138,7 +138,7 @@ export default async function ProductsPage({
       <section className="public-surface p-6">
         <h2 className="text-lg font-semibold text-foreground">Shop furniture by category in Asansol</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Explore our main furniture categories. Visit the showroom for current designs, availability, and EMI or Lucky Plan options.
+          Explore our main furniture categories. Visit the showroom for current designs, availability, and EMI or SFEMI options.
         </p>
         <ul className="mt-4 flex flex-wrap gap-3">
           {PRODUCT_SEO_CATEGORIES.map((category) => (

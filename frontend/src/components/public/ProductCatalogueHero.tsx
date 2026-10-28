@@ -76,7 +76,7 @@ export default async function ProductCatalogueHero({
               <ArrowRight className="h-4 w-4" />
             </Link>
             <Link href={ROUTES.public.luckyPlan} className="public-action-secondary">
-              Lucky Plan
+              SFEMI Advance EMI
             </Link>
             <Link href={ROUTES.public.rent} className="public-action-secondary">
               Rent / Lease

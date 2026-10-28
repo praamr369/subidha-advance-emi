@@ -22,7 +22,7 @@ const pillars = [
     icon: ShieldCheck,
     title: "Winner draw is verifiable",
     description:
-      "Lucky draw results come from a commit-then-reveal process. The commitment hash is published before the draw, and the reveal is published afterward. No result can be secretly altered after commitment.",
+      "SFEMI benefit records come from controlled verification and published terms. No public page can silently alter a customer contract or payment record.",
     badge: "Verifiable",
   },
   {
@@ -36,7 +36,7 @@ const pillars = [
     icon: Smartphone,
     title: "Customer portal visibility",
     description:
-      "After login, customers can see their own subscriptions, payment history, Lucky ID assignments, delivery status, and support requests — all in one place.",
+      "After login, customers can see their own subscriptions, payment history, SFEMI ID assignments, delivery status, and support requests — all in one place.",
     badge: "Self-service",
   },
   {

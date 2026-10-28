@@ -16,7 +16,7 @@ import { ROUTES } from "@/lib/routes";
 export const metadata: Metadata = buildPublicMetadata({
   title: "Business policies",
   description:
-    "Published policy and customer rule hub for Lucky Plan, rent, lease, direct sale, delivery, warranty, payment, verification, and compliance guidance.",
+    "Published policy and customer rule hub for SFEMI Advance EMI, rent, lease, direct sale, delivery, warranty, payment, verification, and compliance guidance.",
   path: "/policies",
 });
 

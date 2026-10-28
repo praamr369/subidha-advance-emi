@@ -17,7 +17,7 @@ import { ROUTES } from "@/lib/routes";
 export const metadata: Metadata = buildPublicMetadata({
   title: "FAQ",
   description:
-    "Answers to common questions about Subidha Core, Advance EMI (Lucky Plan), Lucky IDs, monthly draw, winner waiver, rent, lease, payment receipts, partner payouts, and delivery.",
+    "Answers to common questions about Subidha Core, SFEMI Advance EMI, SFEMI IDs, promotional benefits, rent, lease, payment receipts, partner payouts, and delivery.",
   path: "/faq",
 });
 
@@ -25,14 +25,14 @@ export default function FaqPage() {
   return (
     <PublicPageShell
       title="Frequently Asked Questions"
-      subtitle="Clear answers to the questions customers ask most about Subidha Core, Lucky Plan, rent, lease, payments, delivery, and more."
+      subtitle="Clear answers to the questions customers ask most about Subidha Core, SFEMI, rent, lease, payments, delivery, and more."
       breadcrumbs={[
         { label: "Home", href: ROUTES.public.home },
         { label: "FAQ" },
       ]}
       hero={{
         eyebrow: "Customer help",
-        badges: ["Subidha Core", "Lucky Plan", "Rent / Lease", "Payments", "Delivery"],
+        badges: ["Subidha Core", "SFEMI", "Rent / Lease", "Payments", "Delivery"],
       }}
       actions={[
         { label: "Contact Store", href: ROUTES.public.contact, variant: "secondary" },
@@ -42,7 +42,7 @@ export default function FaqPage() {
       <section className="space-y-4">
         <SectionHeader
           eyebrow="About Subidha Core and Advance EMI"
-          title="What is Subidha Core and Advance EMI / Lucky Plan?"
+          title="What is Subidha Core and SFEMI Advance EMI?"
           description="Start here if you are new to Subidha Furniture's digital system."
         />
         <FaqBlock items={PHASE10C_FAQ.filter((_, i) => i < 3)} />
@@ -50,9 +50,9 @@ export default function FaqPage() {
 
       <section className="space-y-4">
         <SectionHeader
-          eyebrow="Lucky Plan questions"
-          title="Lucky Plan EMI & Lucky ID"
-          description="Everything customers want to know about the Lucky Plan subscription, Lucky IDs, and the monthly draw."
+          eyebrow="SFEMI questions"
+          title="SFEMI Advance EMI & SFEMI ID"
+          description="Everything customers want to know about the SFEMI subscription, SFEMI IDs, and promotional terms."
         />
         <FaqBlock items={FULL_PUBLIC_FAQ.filter((_, i) => i < 5)} />
       </section>

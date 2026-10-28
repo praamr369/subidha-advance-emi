@@ -43,7 +43,7 @@ const proofPoints = [
         <div className="space-y-6">
           <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_78%,transparent)] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground shadow-[inset_0_1px_0_var(--hairline-shine)]">
             <BadgeCheck className="h-3.5 w-3.5 text-primary" />
-            Advance EMI · Lucky Plan
+            Advance EMI · SFEMI
           </div>
 
           <div className="space-y-4">
@@ -54,7 +54,7 @@ const proofPoints = [
               {subtitle}
             </p>
             <div className="public-card-sm max-w-3xl px-4 py-3 text-sm leading-6 text-muted-foreground">
-              <strong className="font-semibold text-foreground">{dict.public.LuckyPlanAnimatedHero_text8}</strong> Lucky Plan is explained here for customer understanding. Actual subscription creation, EMI records, payment receipts, winner reveal, and waiver posting remain controlled inside the core system.
+              <strong className="font-semibold text-foreground">{dict.public.LuckyPlanAnimatedHero_text8}</strong> SFEMI is explained here for customer understanding. Actual subscription creation, EMI records, payment receipts, promotional approvals, and waiver posting remain controlled inside the core system.
             </div>
           </div>
 
@@ -64,10 +64,10 @@ const proofPoints = [
               <ArrowRight className="h-4 w-4" />
             </Link>
             <Link href={ROUTES.public.fairDraw} className="public-action-secondary">
-              View fair draw
+              View SFEMI terms
             </Link>
             <Link href={ROUTES.public.faq} className="public-action-secondary">
-              Published winners
+              SFEMI benefit records
             </Link>
           </div>
         </div>

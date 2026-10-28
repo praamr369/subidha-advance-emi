@@ -13,7 +13,7 @@ import { ROUTES } from "@/lib/routes";
 export const metadata: Metadata = buildPublicMetadata({
   title: "Contracts — Advance EMI, Rent, and Lease",
   description:
-    "Understand the three contract types offered by Subidha Furniture: Advance EMI (Lucky Plan), Rent, and Lease. Compare features, obligations, and Lucky ID eligibility.",
+    "Understand the three contract types offered by Subidha Furniture: SFEMI Advance EMI, Rent, and Lease. Compare features, obligations, and SFEMI ID eligibility.",
   path: "/contracts",
 });
 
@@ -21,11 +21,11 @@ const contractCards = [
   {
     href: ROUTES.public.contractsAdvanceEmi,
     icon: CalendarDays,
-    eyebrow: "Lucky Plan",
+    eyebrow: "SFEMI Advance EMI",
     title: "Advance EMI",
     description:
-      "Pay monthly instalments in advance, receive a Lucky ID, and participate in the transparent monthly draw. Winner benefit — if selected — waives remaining future EMI only. No winning is guaranteed.",
-    tags: ["Lucky ID assigned", "Monthly draw", "Future EMI waiver if winner"],
+      "Pay monthly instalments in advance, receive an SFEMI ID, and follow the approved promotional terms. Any benefit applies only as stated in the contract.",
+      tags: ["SFEMI ID assigned", "Published terms", "Future EMI treatment as contracted"],
     highlight: true,
   },
   {
@@ -34,8 +34,8 @@ const contractCards = [
     eyebrow: "Short-term access",
     title: "Rent",
     description:
-      "Short-term furniture or appliance usage under a rental contract. Deposit is refundable subject to inspection. Rent does not create Lucky ID participation or draw eligibility.",
-    tags: ["No Lucky ID", "Deposit required", "Usage-based"],
+      "Short-term furniture or appliance usage under a rental contract. Deposit is refundable subject to inspection. Rent does not create SFEMI ID participation.",
+    tags: ["No SFEMI ID", "Deposit required", "Usage-based"],
     highlight: false,
   },
   {
@@ -44,8 +44,8 @@ const contractCards = [
     eyebrow: "Long-term access",
     title: "Lease",
     description:
-      "Longer-term contract-backed access with fixed tenure and approval checkpoints. Upgrade and renewal require business approval. Lease does not create Lucky ID participation.",
-    tags: ["No Lucky ID", "Approval-based upgrade", "Fixed tenure"],
+      "Longer-term contract-backed access with fixed tenure and approval checkpoints. Upgrade and renewal require business approval. Lease does not create SFEMI ID participation.",
+    tags: ["No SFEMI ID", "Approval-based upgrade", "Fixed tenure"],
     highlight: false,
   },
 ];
@@ -54,7 +54,7 @@ export default function ContractsHubPage() {
   return (
     <PublicPageShell
       title="Contracts"
-      subtitle="Subidha Furniture offers three distinct contract types. Each has separate rules for deposit, monthly payment, Lucky ID eligibility, and ownership or access. Choose the one that fits your need."
+      subtitle="Subidha Furniture offers three distinct contract types. Each has separate rules for deposit, monthly payment, SFEMI ID eligibility, and ownership or access. Choose the one that fits your need."
       breadcrumbs={[
         { label: "Home", href: ROUTES.public.home },
         { label: "Contracts" },
@@ -64,7 +64,7 @@ export default function ContractsHubPage() {
         badges: ["Advance EMI", "Rent", "Lease"],
       }}
       actions={[
-        { label: "Advance EMI (Lucky Plan)", href: ROUTES.public.contractsAdvanceEmi, variant: "primary" },
+        { label: "SFEMI Advance EMI", href: ROUTES.public.contractsAdvanceEmi, variant: "primary" },
         { label: "Rent", href: ROUTES.public.contractsRent, variant: "secondary" },
         { label: "Lease", href: ROUTES.public.contractsLease, variant: "secondary" },
       ]}
@@ -121,14 +121,14 @@ export default function ContractsHubPage() {
           <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Side-by-side</div>
           <h2 className="mt-1 text-xl font-semibold text-foreground">Rent vs Lease — key differences</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Both Rent and Lease provide usage access without Lucky ID or draw participation. See how they differ on tenure, deposit, and upgrade rules.
+            Both Rent and Lease provide usage access without SFEMI ID participation. See how they differ on tenure, deposit, and upgrade rules.
           </p>
         </div>
         <RentLeaseComparison />
       </section>
 
       <div className="rounded-[1.5rem] border border-amber-200/70 bg-amber-50/60 px-5 py-4 text-sm leading-6 text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
-        <strong className="font-semibold">Important:</strong> Advance EMI (Lucky Plan), Rent, and Lease are separate contract types with distinct rules. A customer enrolled in Rent or Lease does not receive a Lucky ID, does not participate in the monthly draw, and is not eligible for an EMI waiver. Contract type is fixed at enrollment and cannot be changed retroactively.
+        <strong className="font-semibold">Important:</strong> SFEMI Advance EMI, Rent, and Lease are separate contract types with distinct rules. A customer enrolled in Rent or Lease does not receive an SFEMI ID or SFEMI promotional benefits. Contract type is fixed at enrollment and cannot be changed retroactively.
       </div>
 
       <PublicDisclaimerBox points={PUBLIC_LEGAL_DISCLAIMER_POINTS} />

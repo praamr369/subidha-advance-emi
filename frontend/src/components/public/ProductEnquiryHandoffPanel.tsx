@@ -92,10 +92,10 @@ export default function ProductEnquiryHandoffPanel({ product, dict }: ProductEnq
     {
       value: "LUCKY_PLAN",
       title: hasAdvanceEmiBatch 
-        ? ((dict.public as any).ProductEnquiryHandoffPanel_prop1 || "Lucky Plan Advance EMI")
+        ? ((dict.public as any).ProductEnquiryHandoffPanel_prop1 || "SFEMI Advance EMI")
         : "Request Advance EMI",
       description: hasAdvanceEmiBatch
-        ? ((dict.public as any).ProductEnquiryHandoffPanel_prop2 || "Enquire about Lucky ID enrollment, monthly draw transparent rules, and transparent contract.")
+        ? ((dict.public as any).ProductEnquiryHandoffPanel_prop2 || "Enquire about SFEMI ID enrollment, promotional terms, and a transparent contract.")
         : "No active batches currently. Register your interest for the next batch.",
       icon: BadgeCheck,
     },

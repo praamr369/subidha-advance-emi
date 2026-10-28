@@ -46,7 +46,7 @@ const proofPoints = [
               Business policies and customer rules
             </h1>
             <p className="max-w-3xl text-base leading-8 text-muted-foreground sm:text-lg">
-              Read Lucky Plan, rent, lease, direct sale, delivery, warranty, payment, refund, KYC, and support rules before enquiry, payment, or contract signing.
+              Read SFEMI Advance EMI, rent, lease, direct sale, delivery, warranty, payment, refund, KYC, and support rules before enquiry, payment, or contract signing.
             </p>
             <div className="public-card-sm max-w-3xl px-4 py-3 text-sm leading-6 text-muted-foreground">
               <strong className="font-semibold text-foreground">{dict.public.PoliciesHubHero_text10}</strong> Public rules explain customer expectations. Final transaction truth remains in approved contracts, invoices, receipts, delivery records, inspection evidence, and audited ledgers.
@@ -55,7 +55,7 @@ const proofPoints = [
 
           <div className="flex flex-wrap gap-3">
             <Link href={ROUTES.public.luckyPlan} className="public-action-secondary">
-              Lucky Plan
+              SFEMI Advance EMI
             </Link>
             <Link href={ROUTES.public.rent} className="public-action-secondary">
               Rent

@@ -12,9 +12,9 @@ import { submitPublicLead } from "@/services/public";
 
 const PLAN_OPTIONS = [
   { value: "NOT_SURE", label: "Not sure yet", description: "Branch can guide the right path." },
-  { value: "LUCKY_PLAN", label: "Lucky Plan Advance EMI", description: "Ownership path with Lucky ID and future EMI waiver rules." },
-  { value: "RENT", label: "Rent", description: "Flexible usage access, no Lucky ID." },
-  { value: "LEASE", label: "Lease", description: "Longer-term contract-backed access, no Lucky ID." },
+  { value: "LUCKY_PLAN", label: "SFEMI Advance EMI", description: "Ownership path with SFEMI ID and published promotional terms." },
+  { value: "RENT", label: "Rent", description: "Flexible usage access, no SFEMI ID." },
+  { value: "LEASE", label: "Lease", description: "Longer-term contract-backed access, no SFEMI ID." },
   { value: "DIRECT_SALE", label: "Direct Sale", description: "Standard invoice and receipt purchase path." },
 ] as const;
 
@@ -34,7 +34,7 @@ const handoffCards = [
   {
     icon: ShieldCheck,
     title: "3. Controlled workflow",
-    description: "Contracts, payments, receipts, Lucky IDs, deposits, and deliveries stay inside authenticated workflows.",
+    description: "Contracts, payments, receipts, SFEMI IDs, deposits, and deliveries stay inside authenticated workflows.",
   },
 ] as const;
 
@@ -200,7 +200,7 @@ export default function ApplyPageClient({ heroSlot }: { heroSlot: React.ReactNod
   return (
     <PublicPageShell
       title="Apply / Enquire"
-      subtitle="Share your product preference, preferred monthly comfort, and contact details so the branch can guide you on Lucky Plan Advance EMI, rent, lease, or direct-sale availability."
+      subtitle="Share your product preference, preferred monthly comfort, and contact details so the branch can guide you on SFEMI Advance EMI, rent, lease, or direct-sale availability."
       heroSlot={heroSlot}
       breadcrumbs={[
         { label: "Home", href: ROUTES.public.home },
@@ -214,10 +214,10 @@ export default function ApplyPageClient({ heroSlot }: { heroSlot: React.ReactNod
       <PublicMarketingBanner
         eyebrow="Safe enquiry handoff"
         title="One form for product interest, not financial posting"
-        description="The public apply page captures lead context only. It does not create subscriptions, rent/lease contracts, Lucky IDs, payments, receipts, deposits, journal entries, or delivery records."
+        description="The public apply page captures lead context only. It does not create subscriptions, rent/lease contracts, SFEMI IDs, payments, receipts, deposits, journal entries, or delivery records."
         items={[
           { title: "Product context", description: "Catalogue product details can prefill the enquiry so staff know what to discuss." },
-          { title: "Plan interest", description: "Customer can indicate Lucky Plan, rent, lease, direct sale, or ask for guidance." },
+          { title: "Plan interest", description: "Customer can indicate SFEMI, rent, lease, direct sale, or ask for guidance." },
           { title: "Branch-controlled next step", description: "Staff review eligibility, documents, stock posture, and financial terms before any operational record." },
         ]}
       />
@@ -423,7 +423,7 @@ export default function ApplyPageClient({ heroSlot }: { heroSlot: React.ReactNod
             </div>
             <div className="grid gap-2 text-sm leading-6 text-muted-foreground">
               {[
-                "No automatic Lucky ID assignment",
+                "No automatic SFEMI ID assignment",
                 "No automatic EMI schedule",
                 "No automatic rent/lease deposit",
                 "No public payment collection",

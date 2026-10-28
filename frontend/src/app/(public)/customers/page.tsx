@@ -56,8 +56,8 @@ export default function CustomersPage() {
         description="Once you are a registered customer with an approved contract, you can log in to the customer portal to view your full history."
         items={[
           {
-            title: "Contracts and Lucky IDs",
-            description: "View your active subscriptions, contract details, and assigned Lucky IDs.",
+            title: "Contracts and SFEMI IDs",
+            description: "View your active subscriptions, contract details, and assigned SFEMI IDs.",
           },
           {
             title: "Payment history and receipts",
@@ -97,8 +97,8 @@ export default function CustomersPage() {
       <section className="space-y-4">
         <SectionHeader
           eyebrow="Multiple contracts"
-          title="Multiple contracts and multiple Lucky IDs"
-          description="What happens when a customer holds more than one contract or more than one Lucky ID."
+          title="Multiple contracts and multiple SFEMI IDs"
+          description="What happens when a customer holds more than one contract or more than one SFEMI ID."
         />
         <div className="grid gap-4 sm:grid-cols-2">
           <article className="public-card p-5">
@@ -108,7 +108,7 @@ export default function CustomersPage() {
             </p>
           </article>
           <article className="public-card p-5">
-            <h3 className="text-sm font-semibold text-foreground">Multiple Lucky IDs</h3>
+            <h3 className="text-sm font-semibold text-foreground">Multiple SFEMI IDs</h3>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
               {CUSTOMER_MULTI_CONTRACT_INFO.multipleLuckyIds}
             </p>

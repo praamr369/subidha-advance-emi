@@ -7,7 +7,7 @@ import { ROUTES } from "@/lib/routes";
 export const metadata: Metadata = {
   title: "Vision & Trust",
   description:
-    "See how the public Lucky Plan site emphasizes winner publication, auditability, and real public conversion paths.",
+    "See how the public SFEMI site emphasizes customer clarity, auditability, and real public conversion paths.",
 };
 
 export default function VisionTrustPage() {

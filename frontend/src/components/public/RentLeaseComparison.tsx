@@ -11,9 +11,9 @@ type ComparisonRow = {
 };
 
 const rows: ComparisonRow[] = [
-  { feature: "Lucky ID eligibility", rent: false, lease: false },
+  { feature: "SFEMI ID eligibility", rent: false, lease: false },
   { feature: "Monthly draw participation", rent: false, lease: false },
-  { feature: "EMI waiver if lucky winner", rent: false, lease: false },
+  { feature: "SFEMI promotional benefit", rent: false, lease: false },
   { feature: "Security deposit required", rent: true, lease: true },
   { feature: "Deposit is refundable", rent: "Subject to inspection", lease: "Subject to inspection" },
   { feature: "Monthly demand (separate from deposit)", rent: true, lease: true },
@@ -49,7 +49,7 @@ export default function RentLeaseComparison({ className }: RentLeaseComparisonPr
           Rent vs. Lease — key differences
         </h2>
         <p className="text-sm leading-6 text-muted-foreground">
-          Neither rent nor lease includes Lucky ID, monthly draw, or EMI waiver benefits. These are
+          Neither rent nor lease includes SFEMI ID or SFEMI promotional benefits. These are
           separate usage-access contracts. Deposit and monthly demand are always separate line items.
         </p>
       </div>

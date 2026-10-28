@@ -53,7 +53,7 @@ const proofPoints = [
               Contact {profile.resolved_display_name}
             </h1>
             <p className="max-w-3xl text-base leading-8 text-muted-foreground sm:text-lg">
-              Call, message, or visit for product guidance, Lucky Plan clarity, rent/lease suitability, direct-sale questions, documents, and delivery support.
+              Call, message, or visit for product guidance, SFEMI clarity, rent/lease suitability, direct-sale questions, documents, and delivery support.
             </p>
             <div className="public-card-sm max-w-3xl px-4 py-3 text-sm leading-6 text-muted-foreground">
               <strong className="font-semibold text-foreground">{dict.public.ContactBranchHero_text10}</strong> Contact and message actions are support handoffs only. Final product allocation, plan approval, payment, receipt, deposit, and delivery records stay inside authenticated branch workflows.
