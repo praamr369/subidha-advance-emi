@@ -544,7 +544,7 @@ export default function AdminDeliveryDetailPage() {
 
             <SectionCard
               title={`Delivery Batch Items (Batch #${delivery.batch_number ?? 1})`}
-              description="Line items and quantities fulfilled in this delivery batch."
+              description="Manage each item independently: ready stock can be dispatched, unavailable stock remains pending, and delivered quantities are recorded separately."
             >
               <div className="space-y-4">
                 {delivery.delivery_items && delivery.delivery_items.length > 0 ? (
@@ -555,6 +555,8 @@ export default function AdminDeliveryDetailPage() {
                           <th className="p-3">Product Name</th>
                           <th className="p-3">Product Code</th>
                           <th className="p-3 text-center">Batch Quantity</th>
+                          <th className="p-3 text-center">Ready / Status</th>
+                          <th className="p-3 text-center">Delivered</th>
                           <th className="p-3">Notes</th>
                         </tr>
                       </thead>
@@ -564,6 +566,17 @@ export default function AdminDeliveryDetailPage() {
                             <td className="p-3 font-medium text-foreground">{it.product_name}</td>
                             <td className="p-3 font-mono text-muted-foreground">{it.product_code || "—"}</td>
                             <td className="p-3 text-center font-bold text-primary">{it.quantity}</td>
+                            <td className="p-3 text-center">
+                              <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-bold ${
+                                it.readiness === "DELIVERED" ? "bg-emerald-100 text-emerald-700" :
+                                it.readiness === "IN_TRANSIT" ? "bg-blue-100 text-blue-700" :
+                                (it.available_quantity ?? 0) >= it.quantity ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"
+                              }`}>
+                                {it.readiness === "DELIVERED" ? "Delivered" : it.readiness === "IN_TRANSIT" ? "In transit" : it.readiness === "READY_TO_DISPATCH" ? "Ready to dispatch" : "Stock unavailable"}
+                              </span>
+                              {it.readiness !== "DELIVERED" ? <div className="mt-1 text-[10px] text-muted-foreground">Available: {it.available_quantity ?? 0}</div> : null}
+                            </td>
+                            <td className="p-3 text-center font-semibold text-emerald-600">{it.delivered_quantity ?? 0} / {it.quantity}</td>
                             <td className="p-3 text-muted-foreground">{it.notes || "—"}</td>
                           </tr>
                         ))}

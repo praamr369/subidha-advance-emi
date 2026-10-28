@@ -21,6 +21,10 @@ export type DeliveryBatchItem = {
   product_name?: string;
   product_code?: string;
   quantity: number;
+  delivered_quantity?: number;
+  in_transit_quantity?: number;
+  available_quantity?: number;
+  readiness?: "READY_TO_DISPATCH" | "IN_TRANSIT" | "DELIVERED" | "NOT_DELIVERED";
   contract_item_id?: number | null;
   notes?: string;
 };

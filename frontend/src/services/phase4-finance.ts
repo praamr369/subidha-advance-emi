@@ -120,6 +120,21 @@ export type FinanceReceiptRow = {
   pdf_url?: string | null;
 };
 
+export type AdminRentLeaseReceiptRow = {
+  receipt_key: string;
+  kind: string;
+  number: string;
+  amount: string;
+  payment_date: string | null;
+  payment_method: string;
+  status: string;
+  reference_no: string;
+  subscription_id: number | null;
+  subscription_number: string | null;
+  customer_id: number | null;
+  customer_name: string;
+};
+
 export type FinanceDocumentRow = {
   id: number;
   subscription_id: number;
@@ -339,6 +354,14 @@ export async function listCustomerInvoices() {
 
 export async function listCustomerReceipts() {
   return apiFetch<{ count: number; results: FinanceReceiptRow[] }>("/customer/receipts/");
+}
+
+export async function listAdminRentLeaseReceipts(params?: { customerId?: number | string; subscriptionId?: number | string }) {
+  const query = new URLSearchParams();
+  if (params?.customerId) query.set("customer", String(params.customerId));
+  if (params?.subscriptionId) query.set("subscription", String(params.subscriptionId));
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return apiFetch<{ count?: number; results: AdminRentLeaseReceiptRow[] }>(`/admin/subscriptions/rent-lease-receipts/${suffix}`);
 }
 
 export async function listCustomerDocuments() {

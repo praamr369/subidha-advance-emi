@@ -138,12 +138,33 @@ export default function BillingReceiptsPage() {
       key: "actions",
       header: "Actions",
       render: (row) => (
-        <ActionButton
-          href={`/admin/rent-lease-receipts/${encodeURIComponent(row.receipt_key)}/pdf/`}
-          variant="primary"
-        >
-          Print / Save PDF
-        </ActionButton>
+        <div className="flex flex-wrap gap-2">
+          <ActionButton
+            href={`/admin/rent-lease-receipts/${encodeURIComponent(row.receipt_key)}/pdf/`}
+            variant="primary"
+          >
+            Print / Save PDF
+          </ActionButton>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+            onClick={() => openWhatsAppDirectModal({
+              partyType: "CUSTOMER",
+              customerId: row.customer_id,
+              name: row.customer_name,
+              eventType: "PAYMENT_RECEIPT",
+              amount: row.amount,
+              ref: row.number || row.receipt_key,
+              receipt: row.number || row.receipt_key,
+              date: row.payment_date || "",
+              docUrl: `/admin/rent-lease-receipts/${encodeURIComponent(row.receipt_key)}/pdf/`,
+              sourceModel: "RentLeaseReceipt",
+              sourceId: row.receipt_key,
+            })}
+          >
+            <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
+          </button>
+        </div>
       ),
     },
   ];

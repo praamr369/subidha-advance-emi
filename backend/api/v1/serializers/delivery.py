@@ -78,6 +78,8 @@ class AdminSubscriptionDeliveryReadSerializer(_BaseSubscriptionDeliveryReadSeria
     def get_delivery_items(self, obj):
         if not hasattr(obj, "delivery_items"):
             return []
+        progress = self.get_delivery_progress(obj) or {}
+        progress_rows = progress.get("items", [])
         return [
             {
                 "id": it.id,
@@ -85,6 +87,29 @@ class AdminSubscriptionDeliveryReadSerializer(_BaseSubscriptionDeliveryReadSeria
                 "product_name": it.product.name,
                 "product_code": getattr(it.product, "product_code", "") or "",
                 "quantity": it.quantity,
+                "delivered_quantity": it.quantity if obj.status == DeliveryStatus.DELIVERED else 0,
+                "in_transit_quantity": it.quantity if obj.status in {
+                    DeliveryStatus.PENDING,
+                    DeliveryStatus.SCHEDULED,
+                    DeliveryStatus.DISPATCHED,
+                    DeliveryStatus.OUT_FOR_DELIVERY,
+                } else 0,
+                "available_quantity": next(
+                    (row.get("available_quantity", 0) for row in progress_rows
+                     if row.get("product_id") == it.product_id
+                     and row.get("contract_item_id") == it.contract_item_id),
+                    0,
+                ),
+                "readiness": (
+                    "DELIVERED" if obj.status == DeliveryStatus.DELIVERED else
+                    "IN_TRANSIT" if obj.status in {
+                        DeliveryStatus.DISPATCHED, DeliveryStatus.OUT_FOR_DELIVERY,
+                    } else "READY_TO_DISPATCH" if next(
+                        (row.get("available_quantity", 0) for row in progress_rows
+                         if row.get("product_id") == it.product_id
+                         and row.get("contract_item_id") == it.contract_item_id), 0
+                    ) >= it.quantity else "NOT_DELIVERED"
+                ),
                 "contract_item_id": it.contract_item_id,
                 "notes": it.notes,
             }

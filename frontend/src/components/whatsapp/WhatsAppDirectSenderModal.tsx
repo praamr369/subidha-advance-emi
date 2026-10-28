@@ -50,6 +50,7 @@ import { searchCustomers, type CustomerRecord } from "@/services/customers";
 import { listVendors, type Vendor } from "@/services/vendors";
 import { listHrStaff, type HrStaff } from "@/services/admin-hr";
 import { listBillingInvoices, listReceiptDocuments } from "@/services/billing";
+import { listAdminRentLeaseReceipts } from "@/services/phase4-finance";
 import { listSubscriptions } from "@/services/subscriptions";
 import { listOutstandings } from "@/services/outstandings";
 import { uploadDocument, documentDownloadUrl, type DocumentCategory, type DocumentRecord } from "@/services/documents";
@@ -387,9 +388,10 @@ export default function WhatsAppDirectSenderModal({
     const custPhone = selectedParty.phone;
 
     try {
-      const [invoicesRes, receiptsRes, subsRes, outstandingsRes] = await Promise.allSettled([
+      const [invoicesRes, receiptsRes, rentLeaseReceiptsRes, subsRes, outstandingsRes] = await Promise.allSettled([
         listBillingInvoices({ customer: custId, page_size: 25 }),
         listReceiptDocuments({ customer: custId, page_size: 25 }),
+        listAdminRentLeaseReceipts({ customerId: custId }),
         listSubscriptions({ q: custPhone || custName }),
         listOutstandings({ customer: custName, q: custPhone }),
       ]);
@@ -447,6 +449,33 @@ export default function WhatsAppDirectSenderModal({
             amountToApply: rec.amount || "0",
             refToApply: rcptNo,
             receiptToApply: rcptNo,
+          });
+        }
+      }
+
+      // Rent/lease collections and security deposits are not ReceiptDocument
+      // rows. Add their authoritative source receipts to the same picker so
+      // WhatsApp never falls back to ₹0 / REF-001 for these transactions.
+      if (rentLeaseReceiptsRes.status === "fulfilled" && rentLeaseReceiptsRes.value?.results) {
+        for (const rec of rentLeaseReceiptsRes.value.results) {
+          const receiptNo = rec.number || rec.receipt_key;
+          const pdfRoute = `/admin/rent-lease-receipts/${encodeURIComponent(rec.receipt_key)}/pdf/`;
+          const fullPdfUrl = typeof window !== "undefined" ? `${window.location.origin}${pdfRoute}` : pdfRoute;
+          items.push({
+            id: `rent-lease-receipt-${rec.receipt_key}`,
+            kind: "RECEIPT",
+            categoryLabel: rec.kind === "DEPOSIT_RECEIPT" ? "Security Deposit Receipt" : "Rent / Lease Receipt",
+            documentNo: receiptNo,
+            date: rec.payment_date || "",
+            amount: rec.amount || "0",
+            status: rec.status || "ACTIVE",
+            title: `${rec.kind === "DEPOSIT_RECEIPT" ? "Security deposit" : "Rent / lease payment"} receipt ${receiptNo}`,
+            docUrl: fullPdfUrl,
+            previewUrl: pdfRoute,
+            recommendedTemplate: "PAYMENT_RECEIPT",
+            amountToApply: rec.amount || "0",
+            refToApply: receiptNo,
+            receiptToApply: receiptNo,
           });
         }
       }
