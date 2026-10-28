@@ -439,7 +439,14 @@ def _milestone_requirements(subscription) -> list[dict]:
         evidence(MilestoneDocCode.SIGNED_CONTRACT, signed_present)
         evidence(
             MilestoneDocCode.DEPOSIT_RECEIPT,
-            _has_collected_deposit(subscription),
+            _has_collected_deposit(subscription)
+            or bool(
+                SubscriptionDocument.objects.filter(
+                    subscription=subscription,
+                    document_type=SubscriptionDocumentType.SECURITY_DEPOSIT_RECEIPT_PDF,
+                    verification_status=DocumentVerificationStatus.VERIFIED,
+                ).exists()
+            ),
             category="PAYMENT_DEPOSIT",
         )
         if plan == PlanType.LEASE:

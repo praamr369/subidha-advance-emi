@@ -200,6 +200,15 @@ def sync_delivery_success_state(*, delivery: Delivery, delivery_date, customer_s
 
     # 3. Handover ProductPossession custody
     possession = ProductPossession.objects.filter(subscription=delivery.subscription).first()
+    if possession is None and delivery.subscription.plan_type in (PlanType.RENT, PlanType.LEASE):
+        from deliveries.services.product_possession_service import create_possession_record
+        possession = create_possession_record(
+            subscription=delivery.subscription,
+            expected_return_date=None,
+            serial_number="",
+            handover_condition_notes=notes,
+            performed_by=performed_by,
+        )
     if possession:
         possession.status = PossessionStatus.HANDED_OVER
         possession.handover_date = delivery_date.date() if hasattr(delivery_date, "date") else delivery_date
