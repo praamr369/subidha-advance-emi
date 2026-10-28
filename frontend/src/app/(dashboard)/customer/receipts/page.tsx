@@ -34,7 +34,7 @@ function ReceiptCard({ row }: { row: FinanceReceiptRow }) {
           <span className="text-base font-bold text-foreground">{formatRupee(row.amount)}</span>
           <button
             onClick={() => void downloadAuthenticatedFile(
-              `/customer/receipts/${row.id}/pdf/`,
+              row.pdf_url || `/customer/receipts/${row.id}/pdf/`,
               `receipt-${row.id}.pdf`
             )}
             className="rounded-xl border border-border bg-background px-3 py-1 text-xs font-medium hover:bg-muted"

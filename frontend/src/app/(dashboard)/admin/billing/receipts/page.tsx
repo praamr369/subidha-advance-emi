@@ -42,6 +42,7 @@ type RentLeaseReceiptRow = {
   subscription_number: string;
   customer_id: number | null;
   customer_name: string;
+  receipt_key: string;
 };
 
 const RENT_LEASE_RECEIPT_LABELS: Record<string, string> = {
@@ -133,6 +134,18 @@ export default function BillingReceiptsPage() {
       render: (row) => (row.demand_due_date ? accountingDate(row.demand_due_date) : "—"),
     },
     { key: "status", header: "Status" },
+    {
+      key: "actions",
+      header: "Actions",
+      render: (row) => (
+        <ActionButton
+          href={`/admin/rent-lease-receipts/${encodeURIComponent(row.receipt_key)}/pdf/`}
+          variant="primary"
+        >
+          Print / Save PDF
+        </ActionButton>
+      ),
+    },
   ];
 
   const { data: queryData, isLoading: loading, error: queryError, refetch } = useQuery({

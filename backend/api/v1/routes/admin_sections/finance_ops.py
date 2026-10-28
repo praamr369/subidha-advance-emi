@@ -24,6 +24,7 @@ from api.v1.views.phase4_finance import AdminFinanceDashboardView
 from api.v1.views.phase4_finance import AdminFinanceDepositDeductionPdfView
 from api.v1.views.phase4_finance import AdminFinanceDepositDeductionView
 from api.v1.views.phase4_finance import AdminFinanceDepositPdfView
+from api.v1.views.phase4_finance import AdminRentLeaseReceiptPdfView
 from api.v1.views.phase4_finance import AdminFinanceDepositRefundApproveView
 from api.v1.views.phase4_finance import AdminFinanceDepositRefundPdfView
 from api.v1.views.phase4_finance import AdminFinanceDepositRefundRecordView
@@ -63,6 +64,7 @@ urlpatterns = [
     path("finance/waiver-loss/", AdminFinanceWaiverLossView.as_view()),
     path("finance/deposits/", AdminFinanceDepositRegisterView.as_view()),
     path("finance/deposits/<int:pk>/pdf/", AdminFinanceDepositPdfView.as_view()),
+    path("rent-lease-receipts/<str:receipt_key>/pdf/", AdminRentLeaseReceiptPdfView.as_view()),
     path("finance/deposits/<int:pk>/refund-pdf/", AdminFinanceDepositRefundPdfView.as_view()),
     path("finance/deposits/<int:pk>/deduction-pdf/", AdminFinanceDepositDeductionPdfView.as_view()),
     path("finance/deposits/deduct/", AdminFinanceDepositDeductionView.as_view()),

@@ -33,6 +33,10 @@ function formatDate(value: string | null | undefined): string {
 }
 
 function handleDownloadReceipt(receiptId: number | string) {
+  if (typeof receiptId === "string" && (receiptId.startsWith("deposit-") || receiptId.startsWith("collection-"))) {
+    void downloadAuthenticatedFile(`/customer/rent-lease-receipts/${encodeURIComponent(receiptId)}/pdf/`, `receipt-${receiptId}.pdf`);
+    return;
+  }
   void downloadAuthenticatedFile(`/customer/receipts/${receiptId}/pdf/`, `receipt-${receiptId}.pdf`);
 }
 

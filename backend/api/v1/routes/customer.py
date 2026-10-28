@@ -40,6 +40,7 @@ from api.v1.views.customer_finance import (
     CustomerReceiptDetailView,
     CustomerReceiptListView,
     CustomerReceiptPdfView,
+    CustomerRentLeaseReceiptPdfView,
     CustomerReturnInspectionPdfView,
 )
 from api.v1.views.paginated_registers import PaginatedCustomerSubscriptionListView
@@ -120,6 +121,7 @@ urlpatterns = [
     path("receipts/", CustomerReceiptListView.as_view()),
     path("receipts/<int:pk>/", CustomerReceiptDetailView.as_view()),
     path("receipts/<int:pk>/pdf/", CustomerReceiptPdfView.as_view()),
+    path("rent-lease-receipts/<str:receipt_key>/pdf/", CustomerRentLeaseReceiptPdfView.as_view()),
     path("documents/", CustomerDocumentListView.as_view()),
     path("archive/", CustomerArchiveView.as_view()),
     path("payment-schedule/", CustomerPaymentScheduleView.as_view()),

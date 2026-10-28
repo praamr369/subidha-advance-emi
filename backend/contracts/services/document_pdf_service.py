@@ -644,6 +644,50 @@ def render_security_deposit_pdf(*, deposit_or_contract) -> bytes:
     return data
 
 
+def render_rent_lease_receipt_pdf(*, transaction, kind: str) -> bytes:
+    """Render payment evidence for a rent/lease collection or deposit receipt."""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.pdfgen import canvas
+
+    subscription = transaction.subscription
+    customer = getattr(transaction, "customer", None)
+    buf = BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4, pageCompression=0)
+    width, height = A4
+    mx = 16 * mm
+    cy = height - (52 * mm)
+    document_no = getattr(transaction, "transaction_number", None) or getattr(transaction, "collection_number", None) or f"RCT-{transaction.id}"
+    title = "SECURITY DEPOSIT RECEIPT" if kind == "deposit" else "RENT / LEASE PAYMENT RECEIPT"
+    generated_label = _draw_common_header(canvas=c, width=width, height=height, margin_x=mx, document_no=document_no, title=title)
+
+    def line(text: str, size: int = 10, lead: int = 15):
+        nonlocal cy
+        c.setFont("Helvetica", size)
+        c.drawString(mx, cy, text)
+        cy -= lead
+
+    line(title, size=13, lead=18)
+    line(f"Receipt Number: {document_no}")
+    line(f"Receipt Date: {getattr(transaction, 'transaction_date', None) or getattr(transaction, 'payment_date', None) or 'N/A'}")
+    line(f"Contract: {getattr(subscription, 'subscription_number', None) or f'SUB-{subscription.id}'}")
+    line(f"Customer: {getattr(customer, 'name', 'Customer')}")
+    line(f"Phone (masked): {_mask_phone(getattr(customer, 'phone', ''))}")
+    line(f"Amount Received: INR {transaction.amount:.2f}")
+    line(f"Payment Method: {getattr(transaction, 'payment_method', None) or getattr(transaction, 'metadata', {}).get('payment_method', 'N/A')}")
+    line(f"Reference: {getattr(transaction, 'external_reference_no', None) or 'N/A'}")
+    if kind == "deposit":
+        line("Security deposit is refundable subject to contract dues, damage assessment, and return inspection.")
+        line("This receipt records a customer liability; it is not rent income.")
+    else:
+        line("This receipt confirms collection against the rent/lease billing demand.")
+    c.showPage()
+    c.save()
+    data = buf.getvalue()
+    buf.close()
+    return data
+
+
 def render_deposit_refund_pdf(*, refund_or_deposit_action) -> bytes:
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import mm

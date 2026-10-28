@@ -48,6 +48,7 @@ def build_rent_lease_receipt_rows(
         rows.append(
             {
                 "key": f"collection-{row.id}",
+                "receipt_key": f"collection-{row.id}",
                 "kind": "RENT_MONTHLY" if row.plan_type == "RENT" else "LEASE_MONTHLY",
                 "number": row.collection_number,
                 "amount": str(row.amount),
@@ -67,6 +68,7 @@ def build_rent_lease_receipt_rows(
         rows.append(
             {
                 "key": f"deposit-{row.id}",
+                "receipt_key": f"deposit-{row.id}",
                 "kind": row.transaction_type,
                 "number": row.transaction_number,
                 "amount": str(row.amount),

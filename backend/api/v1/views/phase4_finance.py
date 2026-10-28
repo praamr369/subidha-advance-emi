@@ -26,6 +26,8 @@ from subscriptions.models import (
     Subscription,
     SubscriptionDocument,
 )
+from payments.models import RentLeaseCollection
+from subscriptions.models import RentLeaseDepositTransaction
 from subscriptions.services.audit_service import log_audit
 from contracts.services.contract_pdf_service import (
     generate_advance_emi_contract_pdf,
@@ -58,6 +60,7 @@ from contracts.services.document_pdf_service import (
     render_rent_contract_pdf,
     render_return_inspection_pdf,
     render_security_deposit_pdf,
+    render_rent_lease_receipt_pdf,
 )
 from contracts.services.rent_lease_billing_service import (
     list_admin_deposit_register,
@@ -185,6 +188,44 @@ class AdminFinanceDepositPdfView(APIView):
         pdf_bytes = render_security_deposit_pdf(deposit_or_contract=demand)
         response = HttpResponse(pdf_bytes, content_type="application/pdf")
         response["Content-Disposition"] = f'attachment; filename="deposit-{demand.reference_key}.pdf"'
+        return response
+
+
+def _rent_lease_receipt_source(receipt_key: str):
+    prefix, _, raw_id = receipt_key.partition("-")
+    if not raw_id.isdigit():
+        return None, None
+    if prefix == "deposit":
+        return RentLeaseDepositTransaction.objects.select_related("subscription", "customer").filter(pk=int(raw_id), transaction_type="DEPOSIT_RECEIPT").first(), "deposit"
+    if prefix == "collection":
+        return RentLeaseCollection.objects.select_related("subscription", "customer").filter(pk=int(raw_id)).first(), "collection"
+    return None, None
+
+
+class AdminRentLeaseReceiptPdfView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request, receipt_key: str):
+        transaction, kind = _rent_lease_receipt_source(receipt_key)
+        if transaction is None:
+            return Response({"detail": "Rent/lease receipt not found."}, status=status.HTTP_404_NOT_FOUND)
+        pdf_bytes = render_rent_lease_receipt_pdf(transaction=transaction, kind=kind)
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = f'inline; filename="receipt-{receipt_key}.pdf"'
+        return response
+
+
+class CustomerRentLeaseReceiptPdfView(APIView):
+    permission_classes = [IsCustomer]
+
+    def get(self, request, receipt_key: str):
+        customer = _safe_customer_profile(request)
+        transaction, kind = _rent_lease_receipt_source(receipt_key)
+        if customer is None or transaction is None or transaction.customer_id != customer.id:
+            return Response({"detail": "Receipt not found."}, status=status.HTTP_404_NOT_FOUND)
+        pdf_bytes = render_rent_lease_receipt_pdf(transaction=transaction, kind=kind)
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = f'inline; filename="receipt-{receipt_key}.pdf"'
         return response
 
 

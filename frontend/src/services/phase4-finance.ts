@@ -94,7 +94,7 @@ export type FinanceInvoiceRow = {
 };
 
 export type FinanceReceiptRow = {
-  id: number;
+  id: number | string;
   receipt_no: string | null;
   receipt_date: string;
   status: string;
@@ -112,6 +112,8 @@ export type FinanceReceiptRow = {
   payment_id: number | null;
   payment_method: string | null;
   reference_no: string;
+  receipt_key?: string;
+  pdf_url?: string | null;
 };
 
 export type FinanceDocumentRow = {

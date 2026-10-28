@@ -592,9 +592,7 @@ def customer_receipt_list(*, customer, limit: int = 200) -> dict:
     # limit=None is the detail lookup, which must be able to reach a receipt
     # older than the list's window.
     rows = list(queryset if limit is None else queryset[:limit])
-    return {
-        "count": len(rows),
-        "results": [
+    results = [
             {
                 "id": row.id,
                 "receipt_no": row.receipt_no,
@@ -616,8 +614,35 @@ def customer_receipt_list(*, customer, limit: int = 200) -> dict:
                 "reference_no": (row.source_reference or "").strip(),
             }
             for row in rows
-        ],
-    }
+        ]
+    # Rent/lease collections and security-deposit receipts are authoritative
+    # payment evidence too, but intentionally remain outside ReceiptDocument.
+    from contracts.services.rent_lease_receipt_register_service import build_rent_lease_receipt_rows
+    rent_rows = build_rent_lease_receipt_rows(customer_id=customer.id, limit=limit)
+    for row in rent_rows:
+        if row.get("status") != "ACTIVE":
+            continue
+        results.append({
+            "id": row["receipt_key"],
+            "receipt_no": row["number"],
+            "receipt_date": row["payment_date"],
+            "receipt_type": row["kind"],
+            "status": row["status"],
+            "amount": row["amount"],
+            "payment_method": row["payment_method"],
+            "invoice_no": None,
+            "invoice_id": None,
+            "subscription_id": row["subscription_id"],
+            "subscription_number": row["subscription_number"],
+            "plan_type": "RENT" if row["kind"] == "RENT_MONTHLY" else "LEASE",
+            "direct_sale_id": None,
+            "direct_sale_no": None,
+            "payment_id": None,
+            "reference_no": row["reference_no"] or "",
+            "pdf_url": f"/api/v1/customer/rent-lease-receipts/{row['receipt_key']}/pdf/",
+        })
+    results.sort(key=lambda item: (str(item.get("receipt_date") or ""), str(item.get("id") or "")), reverse=True)
+    return {"count": len(results), "results": results[:limit]}
 
 
 def customer_document_list(*, customer, limit: int = 200) -> dict:
