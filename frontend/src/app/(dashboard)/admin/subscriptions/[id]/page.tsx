@@ -281,6 +281,14 @@ type SubscriptionDetailRecord = {
   lease_profile: LeaseProfile | null;
   documents: ContractDocument[];
   activation_readiness: ActivationReadiness | null;
+  rent_lease_kpis: RentLeaseKpis | null;
+};
+
+type RentLeaseKpis = {
+  deposit_due: string; deposit_paid: string; deposit_pending: string; deposit_held: string;
+  deposit_deducted: string; deposit_refundable: string; rent_due: string; rent_paid: string;
+  rent_outstanding: string; demand_count: number; paid_demand_count: number;
+  pending_demand_count: number; deposit_status: string;
 };
 
 // Rent/lease money received. These never become Payment rows (Advance EMI only),
@@ -729,6 +737,12 @@ function normalizeSubscriptionDetail(
     lease_profile: normalizeLeaseProfile(raw.lease_profile),
     documents: toArray<Record<string, unknown>>(raw.documents).map(normalizeContractDocument),
     activation_readiness: normalizeActivationReadiness(raw.activation_readiness),
+    rent_lease_kpis: raw.rent_lease_kpis && typeof raw.rent_lease_kpis === "object" ? {
+      ...(raw.rent_lease_kpis as RentLeaseKpis),
+      demand_count: toNumber((raw.rent_lease_kpis as Record<string, unknown>).demand_count),
+      paid_demand_count: toNumber((raw.rent_lease_kpis as Record<string, unknown>).paid_demand_count),
+      pending_demand_count: toNumber((raw.rent_lease_kpis as Record<string, unknown>).pending_demand_count),
+    } : null,
     product_attributes:
       raw.product_attributes && typeof raw.product_attributes === "object" && !Array.isArray(raw.product_attributes)
         ? (raw.product_attributes as Record<string, string>)
@@ -1291,7 +1305,7 @@ export default function AdminSubscriptionDetailPage() {
                     }
                   />
 
-                  <DetailHeroSurface
+                  {isEmiSubscription ? <DetailHeroSurface
                     eyebrow="Winner Benefit"
                     title={detailSemantics.winnerHeadline}
                     description={detailSemantics.winnerDescription}
@@ -1330,9 +1344,16 @@ export default function AdminSubscriptionDetailPage() {
                         />
                       </>
                     }
-                  />
+                  /> : <DetailHeroSurface
+                    eyebrow={subscription.plan_type === "LEASE" ? "Lease Security Deposit" : "Rent Security Deposit"}
+                    title={`${subscription.rent_lease_kpis?.deposit_status || "PENDING"} deposit`}
+                    description="Security deposit collection is separate from monthly rent and is tracked from canonical billing demands."
+                    tone={subscription.rent_lease_kpis?.deposit_pending === "0.00" ? "success" : "warning"}
+                    badge={<ERPStatusBadge status={subscription.rent_lease_kpis?.deposit_pending === "0.00" ? "COMPLETED" : "ACTIVE"} label={subscription.rent_lease_kpis?.deposit_pending === "0.00" ? "Deposit settled" : "Deposit pending"} size="md" />}
+                    meta={<><DetailMetricTile label="Deposit Due" value={money(subscription.rent_lease_kpis?.deposit_due || "0.00")} /><DetailMetricTile label="Paid" value={money(subscription.rent_lease_kpis?.deposit_paid || "0.00")} tone="success" /><DetailMetricTile label="Pending" value={money(subscription.rent_lease_kpis?.deposit_pending || "0.00")} tone={subscription.rent_lease_kpis?.deposit_pending === "0.00" ? "success" : "warning"} /></>}
+                  />}
 
-                  <DetailHeroSurface
+                  {isEmiSubscription ? <DetailHeroSurface
                     eyebrow="Waiver And Settlement"
                     title={detailSemantics.waiverHeadline}
                     description={detailSemantics.waiverDescription}
@@ -1363,7 +1384,14 @@ export default function AdminSubscriptionDetailPage() {
                         />
                       </>
                     }
-                  />
+                  /> : <DetailHeroSurface
+                    eyebrow="Rent / Lease Billing"
+                    title={`${subscription.rent_lease_kpis?.pending_demand_count || 0} billing demand(s) pending`}
+                    description="Monthly rent or lease demand, collection, outstanding balance, and deposit liability are shown independently."
+                    tone={subscription.rent_lease_kpis?.rent_outstanding === "0.00" ? "success" : "warning"}
+                    badge={<ERPStatusBadge status={subscription.rent_lease_kpis?.rent_outstanding === "0.00" ? "COMPLETED" : "ACTIVE"} label={subscription.rent_lease_kpis?.rent_outstanding === "0.00" ? "Rent clear" : "Rent outstanding"} size="md" />}
+                    meta={<><DetailMetricTile label="Rent Due" value={money(subscription.rent_lease_kpis?.rent_due || "0.00")} /><DetailMetricTile label="Rent Paid" value={money(subscription.rent_lease_kpis?.rent_paid || "0.00")} tone="success" /><DetailMetricTile label="Outstanding" value={money(subscription.rent_lease_kpis?.rent_outstanding || "0.00")} tone={subscription.rent_lease_kpis?.rent_outstanding === "0.00" ? "success" : "warning"} /></>}
+                  />}
                 </div>
               </div>
 

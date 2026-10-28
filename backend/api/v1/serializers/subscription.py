@@ -460,6 +460,7 @@ class SubscriptionDetailSerializer(BaseSubscriptionSerializer):
     delivery_summary = serializers.SerializerMethodField()
     deliveries = serializers.SerializerMethodField()
     amendments = serializers.SerializerMethodField()
+    rent_lease_kpis = serializers.SerializerMethodField()
 
     class Meta(BaseSubscriptionSerializer.Meta):
         fields = BaseSubscriptionSerializer.Meta.fields + (
@@ -470,6 +471,7 @@ class SubscriptionDetailSerializer(BaseSubscriptionSerializer):
             "emis",
             "amendments",
             "rent_lease_demands",
+            "rent_lease_kpis",
         )
         read_only_fields = fields
 
@@ -496,6 +498,35 @@ class SubscriptionDetailSerializer(BaseSubscriptionSerializer):
 
     def get_winner_summary(self, obj):
         return self._snapshot(obj)["winner_summary"]
+
+    def get_rent_lease_kpis(self, obj):
+        if obj.plan_type not in (PlanType.RENT, PlanType.LEASE):
+            return None
+        from decimal import Decimal
+        from subscriptions.models import RentLeaseBillingDemand, RentLeaseDemandType
+        demands = list(RentLeaseBillingDemand.objects.filter(subscription=obj))
+        deposit = [d for d in demands if d.demand_type == RentLeaseDemandType.SECURITY_DEPOSIT]
+        monthly = [d for d in demands if d.demand_type != RentLeaseDemandType.SECURITY_DEPOSIT]
+        total = lambda rows, field: sum((getattr(row, field, Decimal("0.00")) or Decimal("0.00") for row in rows), Decimal("0.00"))
+        deposit_due = total(deposit, "amount")
+        deposit_paid = total(deposit, "collected_amount")
+        rent_due = total(monthly, "amount")
+        rent_paid = total(monthly, "collected_amount")
+        return {
+            "deposit_due": str(deposit_due),
+            "deposit_paid": str(deposit_paid),
+            "deposit_pending": str(max(deposit_due - deposit_paid, Decimal("0.00"))),
+            "deposit_held": str(total(deposit, "held_amount")),
+            "deposit_deducted": str(total(deposit, "deducted_amount")),
+            "deposit_refundable": str(total(deposit, "refundable_amount")),
+            "rent_due": str(rent_due),
+            "rent_paid": str(rent_paid),
+            "rent_outstanding": str(max(rent_due - rent_paid, Decimal("0.00"))),
+            "demand_count": len(monthly),
+            "paid_demand_count": sum(1 for row in monthly if row.status == "PAID"),
+            "pending_demand_count": sum(1 for row in monthly if row.status not in {"PAID", "CANCELLED"}),
+            "deposit_status": "PAID" if deposit_due and deposit_paid >= deposit_due else ("PARTIAL" if deposit_paid else "PENDING"),
+        }
 
     def get_emis(self, obj):
         emis = sorted(
