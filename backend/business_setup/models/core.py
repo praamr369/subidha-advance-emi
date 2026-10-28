@@ -558,7 +558,7 @@ class PolicyCategory(models.TextChoices):
     WARRANTY = "WARRANTY", "Warranty"
     DELIVERY = "DELIVERY", "Delivery"
     RENT_LEASE = "RENT_LEASE", "Rental / Lease"
-    LUCKY_PLAN = "LUCKY_PLAN", "Subidha EMI (SFEMI)"
+    LUCKY_PLAN = "LUCKY_PLAN", "Lucky Plan EMI"
     DIRECT_SALE = "DIRECT_SALE", "Direct Sale"
     PAYMENT = "PAYMENT", "Payment"
     SERVICE = "SERVICE", "Service / Repair"
