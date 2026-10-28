@@ -40,9 +40,9 @@ from api.v1.views.customer_finance import (
     CustomerReceiptDetailView,
     CustomerReceiptListView,
     CustomerReceiptPdfView,
-    CustomerRentLeaseReceiptPdfView,
     CustomerReturnInspectionPdfView,
 )
+from api.v1.views.phase4_finance import CustomerRentLeaseReceiptPdfView
 from api.v1.views.paginated_registers import PaginatedCustomerSubscriptionListView
 from api.v1.views.subscription_requests import (
     CustomerSubscriptionRequestCancelView,
