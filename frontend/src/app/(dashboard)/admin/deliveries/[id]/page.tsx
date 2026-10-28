@@ -565,7 +565,7 @@ export default function AdminDeliveryDetailPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border">
-                        {delivery.delivery_items.map((it) => (
+                        {(delivery.delivery_items ?? []).map((it) => (
                           <tr key={it.id || it.product_id} className="hover:bg-muted/30">
                             <td className="p-3 font-medium text-foreground">{it.product_name}</td>
                             <td className="p-3 font-mono text-muted-foreground">{it.product_code || "—"}</td>
