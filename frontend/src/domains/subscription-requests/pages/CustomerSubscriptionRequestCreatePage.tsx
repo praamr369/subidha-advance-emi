@@ -719,7 +719,7 @@ export default function CustomerSubscriptionRequestCreatePage({
           <div className="space-y-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
             <div>
               <h2 className="font-bold text-foreground">Pick a Batch</h2>
-              <p className="text-xs text-muted-foreground">Choose an open batch with available lucky ID slots</p>
+              <p className="text-xs text-muted-foreground">Choose an open batch with available SFEMI ID slots</p>
             </div>
             <BatchPicker
               batches={options?.batches ?? []}
@@ -731,7 +731,7 @@ export default function CustomerSubscriptionRequestCreatePage({
           <div className="space-y-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
             <div>
               <h2 className="font-bold text-foreground">Choose Your Lucky Number</h2>
-              <p className="text-xs text-muted-foreground">Available lucky IDs in the selected batch</p>
+              <p className="text-xs text-muted-foreground">Available SFEMI IDs in the selected batch</p>
             </div>
             <LuckyNumberPicker
               numbers={options?.lucky_numbers ?? []}
@@ -792,7 +792,7 @@ export default function CustomerSubscriptionRequestCreatePage({
           </div>
 
           <div className="rounded-xl border border-dashed border-border bg-muted/30 px-4 py-3 text-xs text-muted-foreground">
-            This is a request only — not a live contract. Admin approval creates your subscription, EMI schedule, and lucky draw assignment.
+            This is a request only — not a live contract. Admin approval creates your subscription, EMI schedule, and SFEMI promotional assignment.
           </div>
 
           <button

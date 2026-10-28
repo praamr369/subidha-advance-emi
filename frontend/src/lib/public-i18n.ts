@@ -40,16 +40,16 @@ import bnJSON from "@/i18n/locales/bn.json";
 export function getPublicDictionary(locale: PublicLocale) {
   const content = {
     en: {
-      nav: { links: ["Home", "Products", "Contracts", "How It Works", "Winners", "Winner History", "About", "Contact", "Blog"], apply: "Apply", register: "Register", login: "Login", whatsapp: "WhatsApp", navigate: "Navigate", quickActions: "Quick actions", language: "Language" },
+      nav: { links: ["Home", "Products", "Contracts", "How It Works", "About", "Contact", "Blog"], apply: "Apply", register: "Register", login: "Login", whatsapp: "WhatsApp", navigate: "Navigate", quickActions: "Quick actions", language: "Language" },
       footer: { intro: "Trusted local shopping support for furniture, electronics, and home appliances with simple monthly plans.", quickLinks: "Quick links", contact: "Contact", social: "Social", whatsapp: "WhatsApp the branch" },
       common: {
         home: "Home",
         contact: "Contact",
         products: "Products",
-        luckyPlan: "Lucky Plan",
+        luckyPlan: "Subidha EMI (SFEMI)",
         howItWorks: "How it works",
-        winners: "Winners",
-        winnerHistory: "Winner history",
+        winners: "SFEMI benefit records",
+        winnerHistory: "SFEMI history",
         apply: "Apply / Enquire",
         mediaCarousel: {
           featuredLabel: "Featured catalogue items",

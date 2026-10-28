@@ -23,19 +23,17 @@ export default async function PublicFooter() {
 
   const discoverLinks = [
     { href: ROUTES.public.products, label: dictionary.common.products },
-    { href: ROUTES.public.contractsAdvanceEmi, label: "Advance EMI (Lucky Plan)" },
+    { href: ROUTES.public.contractsAdvanceEmi, label: "Subidha EMI (SFEMI)" },
     { href: ROUTES.public.contractsRent, label: "Rent contract" },
     { href: ROUTES.public.contractsLease, label: "Lease contract" },
     { href: ROUTES.public.contracts, label: "All Contracts" },
-    { href: ROUTES.public.winners, label: dictionary.common.winners },
-    { href: ROUTES.public.winnerHistory, label: dictionary.common.winnerHistory },
   ];
 
   const companyLinks = [
     { href: ROUTES.public.about, label: "About Us" },
     { href: ROUTES.public.howItWorks, label: dictionary.common.howItWorks },
     { href: ROUTES.public.faq, label: "FAQ" },
-    { href: ROUTES.public.rulebook, label: "Lucky Plan Rulebook" },
+    { href: ROUTES.public.rulebook, label: "SFEMI Rules" },
     { href: ROUTES.public.customers, label: "Customer Guide" },
     { href: ROUTES.public.partners, label: "Partner Program" },
     { href: ROUTES.public.contact, label: dictionary.common.contact },
@@ -43,7 +41,7 @@ export default async function PublicFooter() {
 
   const policyLinks = [
     { href: ROUTES.public.policies, label: "Business Policies" },
-    { href: ROUTES.public.luckyPlanPolicy, label: "Lucky Plan EMI Policy" },
+    { href: ROUTES.public.luckyPlanPolicy, label: "SFEMI Policy" },
     { href: ROUTES.public.rentalLeasePolicy, label: "Rental / Lease Policy" },
     { href: ROUTES.public.directSalePolicy, label: "Direct Sale Policy" },
     { href: ROUTES.public.warranty, label: "Warranty & Support" },

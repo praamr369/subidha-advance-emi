@@ -20,7 +20,7 @@ export default function VisionTrustPage() {
         { label: "Vision & Trust" },
       ]}
       actions={[
-        { label: "View winners", href: ROUTES.public.winners, variant: "secondary" },
+        { label: "Read SFEMI terms", href: ROUTES.public.luckyPlanPolicy, variant: "secondary" },
         { label: "Apply", href: ROUTES.public.apply, variant: "primary" },
       ]}
     >

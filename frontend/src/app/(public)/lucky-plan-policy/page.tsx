@@ -4,8 +4,8 @@ import PolicyPublicPage from "@/components/public/PolicyPublicPage";
 import { buildPublicMetadata } from "@/lib/public-seo";
 
 export const metadata: Metadata = buildPublicMetadata({
-  title: "Lucky Plan EMI Policy",
-  description: "Lucky Plan EMI terms including base-price contract rule and future-EMI waiver rule.",
+  title: "Subidha EMI (SFEMI) Policy",
+  description: "SFEMI Advance EMI terms, contract basis, payment responsibility, and customer protections.",
   path: "/lucky-plan-policy",
 });
 
@@ -13,9 +13,9 @@ export default function LuckyPlanPolicyPage() {
   return (
     <PolicyPublicPage
       slug="lucky-plan-policy"
-      pageTitle="Lucky Plan EMI Policy"
-      heroTitle="Lucky Plan EMI Policy"
-      heroSubtitle="Contract rules for Lucky IDs, EMI basis, payment responsibility, and winner future-EMI waiver scope."
+      pageTitle="Subidha EMI (SFEMI) Policy"
+      heroTitle="Subidha EMI (SFEMI) Policy"
+      heroSubtitle="Contract rules for SFEMI enrollment, Advance EMI basis, payment responsibility, and customer protections."
     />
   );
 }

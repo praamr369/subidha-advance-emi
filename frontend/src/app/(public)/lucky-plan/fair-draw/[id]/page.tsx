@@ -123,7 +123,7 @@ export default async function FairDrawDetailPage({ params }: PageProps) {
         { label: `Draw ${id}` },
       ]}
       actions={[
-        { label: dictionary.common.winnerHistory, href: ROUTES.public.winnerHistory, variant: "secondary" },
+        { label: "SFEMI FAQ", href: ROUTES.public.faq, variant: "secondary" },
         { label: dictionary.common.howItWorks, href: ROUTES.public.howItWorks, variant: "secondary" },
       ]}
     >
@@ -220,7 +220,7 @@ export default async function FairDrawDetailPage({ params }: PageProps) {
         description="Review the public explanation and browse related winner records. Public pages do not execute draw operations."
         actions={[
           { href: ROUTES.public.fairDraw, label: "Back to fair draw", variant: "secondary" },
-          { href: ROUTES.public.winners, label: dictionary.common.winners, variant: "secondary" },
+          { href: ROUTES.public.faq, label: "SFEMI FAQ", variant: "secondary" },
           { href: ROUTES.public.howItWorks, label: dictionary.common.howItWorks, variant: "primary" },
         ]}
       />

@@ -113,15 +113,15 @@ export const ADMIN_ENTERPRISE_MODULES: AdminEnterpriseModule[] = [
     title: "Fulfillment",
     href: ROUTES.admin.deliveries,
     description:
-      "Delivery execution, lucky ID control, and draw workflow administration.",
+      "Delivery execution, SFEMI ID control, and promotional benefit workflow administration.",
     operationalFocus:
       "Keep delivery, draw, and contract lifecycle concerns separate but operationally linked.",
     masterDataDirection:
       "Consumes subscription, batch, and product truth without rewriting contract or payment history.",
     routes: [
       { label: "Deliveries", href: ROUTES.admin.deliveries },
-      { label: "Lucky IDs", href: ROUTES.admin.luckyIds },
-      { label: "Lucky Draws", href: ROUTES.admin.luckyDraws },
+      { label: "SFEMI IDs", href: ROUTES.admin.luckyIds },
+      { label: "SFEMI Benefits", href: ROUTES.admin.luckyDraws },
     ],
   },
   {

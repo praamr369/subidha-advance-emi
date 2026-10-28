@@ -823,7 +823,7 @@ export default function PartnerSubscriptionRequestCreatePage({
           <div className="space-y-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
             <div>
               <h2 className="font-bold text-foreground">Pick a Batch</h2>
-              <p className="text-xs text-muted-foreground">Choose an open batch with available lucky ID slots</p>
+              <p className="text-xs text-muted-foreground">Choose an open batch with available SFEMI ID slots</p>
             </div>
             <BatchPicker
               batches={options?.batches ?? []}
@@ -835,7 +835,7 @@ export default function PartnerSubscriptionRequestCreatePage({
           <div className="space-y-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
             <div>
               <h2 className="font-bold text-foreground">Choose Lucky Number</h2>
-              <p className="text-xs text-muted-foreground">Available lucky IDs in the selected batch</p>
+              <p className="text-xs text-muted-foreground">Available SFEMI IDs in the selected batch</p>
             </div>
             <LuckyNumberPicker
               numbers={options?.lucky_numbers ?? []}

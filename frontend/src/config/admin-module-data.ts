@@ -283,22 +283,22 @@ export const ADMIN_MODULE_DATA: Record<string, ModuleData> = {
     ],
   },
 
-  // Lucky Plan
+  // SFEMI
   "lucky-plan": {
     kpi: { label: "Active Draws", value: "12", trend: "up" },
     workflows: [
       { id: "1", label: "Manage IDs", icon: Plus, action: "/admin/lucky-plan/lucky-ids" },
       { id: "2", label: "Create Draw", icon: Plus, action: "/admin/lucky-plan/draws" },
-      { id: "3", label: "View Winners", icon: Eye, action: "/admin/lucky-plan/winners" },
+      { id: "3", label: "View SFEMI Benefits", icon: Eye, action: "/admin/lucky-plan/winners" },
     ],
     requests: [
       { id: "1", label: "Unrevealed", count: 3, status: "active" },
       { id: "2", label: "Pending Audit", count: 2, status: "pending" },
     ],
     quickActions: [
-      { label: "Lucky IDs", href: "/admin/lucky-plan/lucky-ids" },
+      { label: "SFEMI IDs", href: "/admin/lucky-plan/lucky-ids" },
       { label: "Draws", href: "/admin/lucky-plan/draws" },
-      { label: "Winners", href: "/admin/lucky-plan/winners" },
+      { label: "SFEMI Benefits", href: "/admin/lucky-plan/winners" },
       { label: "Analytics", href: "/admin/lucky-plan/analytics" },
     ],
   },

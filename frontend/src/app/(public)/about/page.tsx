@@ -17,7 +17,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const dictionary = getPublicDictionary(locale);
   return buildPublicMetadata({
     title: `${dictionary.nav.links[6]} | Subidha Furniture`,
-    description: "Learn why local families trust Subidha Furniture for transparent Lucky Plan and easy monthly purchase support.",
+    description: "Learn why local families trust Subidha Furniture for transparent SFEMI Advance EMI and easy monthly purchase support.",
     path: "/about",
   });
 }
@@ -66,7 +66,7 @@ export default async function AboutPage() {
         description="We publish process explanations for plan rules, winner transparency, payment safety, and delivery workflow."
         items={[
           { title: "Plan rules", description: "Customers can review eligibility, tenure, and monthly commitment rules before applying." },
-          { title: "Winner transparency", description: "Public winner pages use revealed draw records with masked names." },
+          { title: "Customer transparency", description: "Public SFEMI information explains terms, receipts, and customer protections clearly." },
           { title: "Delivery + support", description: "Delivery tracking and warranty/return support remain available post-sale." },
         ]}
       />

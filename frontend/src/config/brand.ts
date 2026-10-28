@@ -4,7 +4,7 @@ export const brandConfig = {
   /** @deprecated Prefer `systemProductName` for system copy; kept for gradual migration. */
   platformName: "SUBIDHA CORE",
   companyName: "Subidha Furniture",
-  publicProgramName: "Lucky Plan",
+  publicProgramName: "Subidha EMI (SFEMI)",
   publicBranchLocation: "Asansol, West Bengal",
   publicLogoSrc: "/brand/logo.png",
   publicLogoAlt: "Subidha Furniture logo",

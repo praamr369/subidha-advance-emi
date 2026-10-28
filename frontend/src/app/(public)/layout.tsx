@@ -13,7 +13,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return buildPublicMetadata({
   title: dict.public.layout_prop1,
   description:
-    "Subidha Furniture Lucky Plan Advance EMI — buy furniture on easy monthly installments with full transparency, fair draw, and winner tracking.",
+    "Subidha Furniture Subidha EMI (SFEMI) — buy furniture on transparent Advance EMI installments with clear terms and customer support.",
   path: "/",
 });
 }

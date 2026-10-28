@@ -102,7 +102,7 @@ export default function PublicLatestWinnerWidget() {
 
         <div className="flex flex-wrap gap-2">
           <Link
-            href={ROUTES.public.winnerHistory}
+            href={ROUTES.public.faq}
             className="inline-flex h-10 items-center rounded-xl border border-border bg-card px-4 text-sm font-medium text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:-translate-y-0.5 hover:bg-card"
           >
             View Winner History

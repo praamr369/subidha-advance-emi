@@ -220,7 +220,7 @@ export default function AdminSubscriptionsPage() {
     <ERPPageShell
       className="receipt-print-page"
       title="Subscription Management"
-      subtitle="Create subscriptions, review portfolio health, and operate daily Lucky Plan workflows."
+      subtitle="Create subscriptions, review portfolio health, and operate daily SFEMI workflows."
     >
       <section
         className="receipt-print-hide"
@@ -443,7 +443,7 @@ export default function AdminSubscriptionsPage() {
                   Back
                 </button>
                 <button type="button" disabled={!form.product || !form.batch} onClick={() => setStep(3)}>
-                  Next: Lucky ID & Confirm
+                  Next: SFEMI ID & Confirm
                 </button>
               </div>
             </>
@@ -455,7 +455,7 @@ export default function AdminSubscriptionsPage() {
                 value={form.lucky_id}
                 onChange={(event) => setForm((prev) => ({ ...prev, lucky_id: event.target.value }))}
               >
-                <option value="">Auto-assign next available lucky ID</option>
+                <option value="">Auto-assign next available SFEMI ID</option>
                 {availableLuckyIds.map((l) => (
                   <option key={l.id} value={l.id}>
                     #{String(l.lucky_number).padStart(2, "0")}
@@ -478,7 +478,7 @@ export default function AdminSubscriptionsPage() {
                   Partner: <b>{selectedPartner?.username || "Auto / None"}</b>
                 </p>
                 <p>
-                  Lucky ID: <b>{selectedLuckyId ? `#${String(selectedLuckyId.lucky_number).padStart(2, "0")}` : "Auto assign"}</b>
+                  SFEMI ID: <b>{selectedLuckyId ? `#${String(selectedLuckyId.lucky_number).padStart(2, "0")}` : "Auto assign"}</b>
                 </p>
                 <p>
                   Plan: <b>{form.plan_type}</b>
@@ -519,7 +519,7 @@ export default function AdminSubscriptionsPage() {
             { key: "product_name", title: "Product" },
             { key: "partner_name", title: "Partner" },
             { key: "batch_code", title: "Batch" },
-            { key: "lucky_label", title: "Lucky ID" },
+            { key: "lucky_label", title: "SFEMI ID" },
             { key: "plan_type", title: "Plan" },
             { key: "tenure_months", title: "Tenure" },
             { key: "monthly_amount", title: "Monthly" },

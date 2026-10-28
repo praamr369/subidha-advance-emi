@@ -362,7 +362,7 @@ class BusinessRulePolicy(BusinessSetupTimeStampedModel):
         if self.is_active and BusinessRulePolicy.objects.filter(is_active=True).exclude(pk=self.pk).exists():
             errors["is_active"] = "Only one active business rule policy is allowed."
         if self.funding_source == BenefitFundingSource.CUSTOMER_POOL_BLOCKED:
-            errors["funding_source"] = "Customer pool funding is blocked for Lucky Plan classification."
+            errors["funding_source"] = "Customer pool funding is blocked for SFEMI classification."
         forbidden_label_terms = {"penalty", "punishment", "fine"}
         if any(term in self.late_payment_charge_label.lower() for term in forbidden_label_terms):
             errors["late_payment_charge_label"] = "Use 'Late Payment Charge' wording; penalty/punishment/fine wording is not allowed."
@@ -558,7 +558,7 @@ class PolicyCategory(models.TextChoices):
     WARRANTY = "WARRANTY", "Warranty"
     DELIVERY = "DELIVERY", "Delivery"
     RENT_LEASE = "RENT_LEASE", "Rental / Lease"
-    LUCKY_PLAN = "LUCKY_PLAN", "Lucky Plan EMI"
+    LUCKY_PLAN = "LUCKY_PLAN", "Subidha EMI (SFEMI)"
     DIRECT_SALE = "DIRECT_SALE", "Direct Sale"
     PAYMENT = "PAYMENT", "Payment"
     SERVICE = "SERVICE", "Service / Repair"

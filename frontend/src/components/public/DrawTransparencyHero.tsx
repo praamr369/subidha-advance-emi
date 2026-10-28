@@ -27,7 +27,7 @@ const modeCopy = {
   winners: {
     eyebrow: dict.public.DrawTransparencyHero_prop1,
     primaryLabel: "Winner history",
-    primaryHref: ROUTES.public.winnerHistory,
+    primaryHref: ROUTES.public.faq,
     secondaryLabel: "Fair Draw",
     secondaryHref: ROUTES.public.fairDraw,
     calloutTitle: "Masked display",
@@ -36,7 +36,7 @@ const modeCopy = {
   history: {
     eyebrow: dict.public.DrawTransparencyHero_prop2,
     primaryLabel: "Latest winners",
-    primaryHref: ROUTES.public.winners,
+    primaryHref: ROUTES.public.faq,
     secondaryLabel: "Fair Draw",
     secondaryHref: ROUTES.public.fairDraw,
     calloutTitle: "Archive view",
@@ -45,7 +45,7 @@ const modeCopy = {
   fairDraw: {
     eyebrow: dict.public.DrawTransparencyHero_prop3,
     primaryLabel: "Published winners",
-    primaryHref: ROUTES.public.winners,
+    primaryHref: ROUTES.public.faq,
     secondaryLabel: "Lucky Plan rules",
     secondaryHref: ROUTES.public.luckyPlan,
     calloutTitle: "Commit first",
@@ -54,7 +54,7 @@ const modeCopy = {
   certificate: {
     eyebrow: dict.public.DrawTransparencyHero_prop4,
     primaryLabel: "All winners",
-    primaryHref: ROUTES.public.winners,
+    primaryHref: ROUTES.public.faq,
     secondaryLabel: "Fair Draw home",
     secondaryHref: ROUTES.public.fairDraw,
     calloutTitle: "Verification detail",

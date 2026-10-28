@@ -125,7 +125,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   // for rent/lease live under Collections & Cashier and Delivery & Service.
   item("Sales & Contracts", "Sales Workspace", ROUTES.admin.salesWorkspace, "Sales pipeline and fulfillment handoff."),
   item("Sales & Contracts", "Advance EMI / Subscriptions", `${ROUTES.admin.subscriptions}?plan_type=EMI`, "Advance EMI subscription register.", { badgeSource: "queue.contract_approvals_pending" }),
-  item("Sales & Contracts", "Prepayment & Advance Delivery", ROUTES.admin.subscriptions, "Advance EMI prepayment unlock â€” customers pay 60-70% of remaining EMIs to get product delivered immediately (no lucky draw).", { badgeSource: "queue.contract_activation_pending" }),
+  item("Sales & Contracts", "Prepayment & Advance Delivery", ROUTES.admin.subscriptions, "Advance EMI prepayment unlock â€” customers pay 60-70% of remaining EMIs to get product delivered immediately (no promotional benefit selection).", { badgeSource: "queue.contract_activation_pending" }),
   item("Sales & Contracts", "Create Advance EMI Contract", ROUTES.admin.subscriptionsAdvanceEmiCreate, "Create an Advance EMI contract."),
   item("Sales & Contracts", "Direct Sale", ROUTES.admin.billingDirectSaleWorkspace, "Direct-sale billing workspace and register."),
   item("Sales & Contracts", "Create Direct Sale Invoice", ROUTES.admin.billingDirectSaleCreate, "Open full-page direct-sale invoice creation."),
@@ -169,10 +169,10 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   //   /admin/lucky-ids    â†’ /admin/lucky-plan/lucky-ids (migrate_then_alias)
   //   /admin/lucky-draws  â†’ /admin/lucky-plan/draws    (migrate_then_alias)
   // Winners route is implemented as a read-only register page.
-  item("Lucky Plan Control", "Lucky Plan Control", ROUTES.admin.luckyPlanControl, "Lucky Plan hub: batches, Lucky IDs, draws, and winner audit evidence.", { badgeSource: "pending_draw_count" }),
+  item("SFEMI Control", "SFEMI Control", ROUTES.admin.luckyPlanControl, "SFEMI hub: batches, SFEMI IDs, promotional benefits, and audit evidence.", { badgeSource: "pending_draw_count" }),
   item("Lucky Plan Control", "Batches", ROUTES.admin.luckyPlanBatches, "Batch lifecycle and draw scope.", { badgeSource: "pending_draw_count" }),
-  item("Lucky Plan Control", "Lucky IDs", ROUTES.admin.luckyPlanLuckyIds, "Lucky ID register and 00â€“99 allocation grid."),
-  item("Lucky Plan Control", "Lucky Draws", ROUTES.admin.luckyPlanDraws, "Draw schedule and execution: commit, reveal, winner evidence.", { badgeSource: "pending_draw_count" }),
+  item("SFEMI Control", "SFEMI IDs", ROUTES.admin.luckyPlanLuckyIds, "SFEMI ID register and allocation grid."),
+  item("SFEMI Control", "SFEMI Benefits", ROUTES.admin.luckyPlanDraws, "Promotional benefit schedule and execution evidence.", { badgeSource: "pending_draw_count" }),
   item("Lucky Plan Control", "Winners", ROUTES.admin.luckyPlanWinners, "Winner visibility and EMI waiver audit trail."),
   item("Lucky Plan Control", "Analytics", ROUTES.admin.luckyPlanAnalytics, "Draw performance metrics: winners, waiver totals, success rate."),
   item("Lucky Plan Control", "Draw Audit", ROUTES.admin.luckyPlanDrawAudit, "Cryptographic draw audit trail and evidence."),

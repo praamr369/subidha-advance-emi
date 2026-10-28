@@ -66,7 +66,7 @@ const proofPoints = [
             <Link href={ROUTES.public.fairDraw} className="public-action-secondary">
               View fair draw
             </Link>
-            <Link href={ROUTES.public.winners} className="public-action-secondary">
+            <Link href={ROUTES.public.faq} className="public-action-secondary">
               Published winners
             </Link>
           </div>

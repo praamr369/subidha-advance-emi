@@ -115,7 +115,7 @@ def _check_rent_lease_delivery_eligibility(
 def check_delivery_eligibility(subscription: Subscription) -> DeliveryEligibility:
     """Check if a subscription meets delivery window eligibility criteria.
 
-    The rule is plan-specific. EMI (Advance EMI / Lucky Plan) releases the asset
+    The rule is plan-specific. EMI (Advance EMI / SFEMI) releases the asset
     once enough of the plan is pre-paid or the customer wins the draw. RENT and
     LEASE release it against a collected security deposit — applying the EMI
     threshold there would block every rent contract forever, since rent

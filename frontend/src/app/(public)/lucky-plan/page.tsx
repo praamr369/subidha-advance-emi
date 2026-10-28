@@ -3,7 +3,6 @@ import type { Metadata } from "next";
 import CtaBanner from "@/components/public/CtaBanner";
 import EmiJourneyTimeline from "@/components/public/EmiJourneyTimeline";
 import FaqBlock from "@/components/public/FaqBlock";
-import LuckyIdGrid from "@/components/public/LuckyIdGrid";
 import LuckyPlanAnimatedHero from "@/components/public/LuckyPlanAnimatedHero";
 import LuckyPlanMechanicsPreview from "@/components/public/LuckyPlanMechanicsPreview";
 import PublicDisclaimerBox from "@/components/public/PublicDisclaimerBox";
@@ -18,8 +17,8 @@ import { buildPublicMetadata } from "@/lib/public-seo";
 import { ROUTES } from "@/lib/routes";
 
 export const metadata: Metadata = buildPublicMetadata({
-  title: "Lucky Plan",
-  description: "Understand batches, Lucky IDs, EMI payments, winner publication, and future EMI waiver rules.",
+  title: "Subidha EMI (SFEMI)",
+  description: "Understand Advance EMI payments, product terms, customer benefits, and clear eligibility rules.",
   path: "/lucky-plan",
 });
 
@@ -27,7 +26,7 @@ export default async function LuckyPlanPage() {
   const locale = await getPublicLocale();
   const dictionary = getPublicDictionary(locale);
   const subtitle =
-    "Join a batch, receive a Lucky ID, pay monthly EMI, and follow transparent winner publication. Draws are run under published rules; participation does not guarantee a prize, and any waiver applies only to future EMI obligations as described in branch documents.";
+    "Join the Subidha EMI (SFEMI) promotional Advance EMI program, pay the agreed monthly installment, and receive benefits only under the published product terms. SFEMI is a product purchase arrangement, not an investment or guaranteed return.";
 
   return (
     <PublicPageShell
@@ -46,10 +45,10 @@ export default async function LuckyPlanPage() {
       <PublicMarketingBanner
         eyebrow="Plan benefits"
         title="Easy monthly plan with clear financial boundaries"
-        description="Winning waives remaining future EMI obligations only; already paid EMI stays recorded and valid. The public page explains the plan, but does not create contracts or alter ledgers."
+        description="Any promotional benefit applies only as stated in the signed SFEMI terms; already paid EMI remains recorded and valid. This page explains the product and does not create contracts or alter ledgers."
         items={[
           { title: "Deterministic schedule", description: "EMI schedule remains reproducible and auditable." },
-          { title: "Transparent draw workflow", description: "Published winner records come from reveal events only." },
+          { title: "Clear promotional terms", description: "Eligibility and benefits follow the published SFEMI terms." },
           { title: "No hidden retroactive edits", description: "Settled payment history is never silently rewritten." },
         ]}
       />
@@ -58,17 +57,16 @@ export default async function LuckyPlanPage() {
 
       <section className="space-y-4">
         <SectionHeader
-          eyebrow="Lucky ID visualised"
-          title="The 00–99 batch slot grid"
-          description="Each batch holds up to 100 numbered slots. This grid is for explanatory purposes only."
+          eyebrow="SFEMI enrollment"
+          title="Structured enrollment and contract records"
+          description="Availability, tenure, and installment terms are confirmed by the branch before enrollment."
         />
-        <LuckyIdGrid />
       </section>
 
       <section className="space-y-4">
         <SectionHeader
           eyebrow="Full journey"
-          title="The Lucky Plan EMI journey — step by step"
+        title="The SFEMI Advance EMI journey — step by step"
         />
         <EmiJourneyTimeline />
       </section>
@@ -83,20 +81,20 @@ export default async function LuckyPlanPage() {
       />
 
       <PublicMarketingBanner
-        eyebrow="Winner transparency"
-        title="Public winner proof with privacy protection"
-        description="Published winner records include batch, draw month/date, lucky ID, and commitment proof hash where available. Winner names are masked. No public component can change a revealed draw result."
+        eyebrow="Customer protection"
+        title="Clear records with privacy protection"
+        description="Customer contracts, receipts, eligibility, and benefit records are handled through documented business processes. Public pages do not expose private customer or financial information."
         items={[
-          { title: "Batch + draw context", description: "Each published winner row is tied to the exact batch and draw month." },
-          { title: "Proof hash visibility", description: "Commit/reveal proof references are shown when available." },
-          { title: "Masked identity", description: "Winner names are masked on public pages for privacy." },
+          { title: "Contract context", description: "Product, tenure, and installment terms are recorded against the contract." },
+          { title: "Receipt visibility", description: "Customers can access their own payment receipts through the portal." },
+          { title: "Masked identity", description: "Private customer information is protected on public pages." },
         ]}
       />
 
       <PublicMarketingBanner
         eyebrow="Operations clarity"
         title="Payment safety and delivery flow"
-        description="Receipt records and delivery tracking are visible in customer self-service without changing contract or reconciliation behavior. Lucky Plan public content remains separate from operational posting."
+        description="Receipt records and delivery tracking are visible in customer self-service without changing contract or reconciliation behavior. SFEMI public content remains separate from operational posting."
         items={[
           { title: "Receipt-first payments", description: "Collected payments are receipted and visible in customer payment/receipt pages." },
           { title: "Delivery as separate workflow", description: "Delivery status is tracked separately from EMI and contract state." },
@@ -114,7 +112,7 @@ export default async function LuckyPlanPage() {
         actions={[
           { href: ROUTES.public.rulebook, label: "View Rulebook", variant: "secondary" },
           { href: ROUTES.public.faq, label: "View FAQ", variant: "secondary" },
-          { href: ROUTES.public.fairDraw, label: "View fair draw", variant: "secondary" },
+          { href: ROUTES.public.faq, label: "Read SFEMI FAQ", variant: "secondary" },
           { href: ROUTES.public.contact, label: dictionary.common.contact, variant: "secondary" },
           { href: ROUTES.public.apply, label: dictionary.common.apply, variant: "primary" },
         ]}

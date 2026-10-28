@@ -60,11 +60,9 @@ export default function PublicNavClient({
     { href: ROUTES.public.products, label: dictionary.links[1] },
     { href: ROUTES.public.contracts, label: dictionary.links[2] },
     { href: ROUTES.public.howItWorks, label: dictionary.links[3] },
-    { href: ROUTES.public.winners, label: dictionary.links[4] },
-    { href: ROUTES.public.winnerHistory, label: dictionary.links[5] },
-    { href: ROUTES.public.about, label: dictionary.links[6] },
-    { href: ROUTES.public.contact, label: dictionary.links[7] },
-    { href: ROUTES.public.blog, label: dictionary.links[8] },
+    { href: ROUTES.public.about, label: dictionary.links[4] },
+    { href: ROUTES.public.contact, label: dictionary.links[5] },
+    { href: ROUTES.public.blog, label: dictionary.links[6] },
   ];
 
   const actions = [

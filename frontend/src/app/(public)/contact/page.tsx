@@ -14,7 +14,7 @@ import ContactLeadForm from "./ContactLeadForm";
 
 export const metadata: Metadata = buildPublicMetadata({
   title: "Contact",
-  description: "Contact Subidha Furniture for product, branch, Lucky Plan, rent, lease, direct-sale, document, and delivery guidance.",
+  description: "Contact Subidha Furniture for product, branch, SFEMI Advance EMI, rent, lease, direct-sale, document, and delivery guidance.",
   path: "/contact",
 });
 
@@ -39,7 +39,7 @@ export default async function ContactPage() {
         title="Talk to us in simple language"
         description="Our branch team guides customers through products, plan options, required documents, delivery expectations, and next steps. Public support remains separate from operational posting."
         items={[
-          { title: "Plan clarity", description: "Understand monthly comfort, tenure, Lucky Plan scope, rent, lease, or direct-sale suitability before joining." },
+          { title: "Plan clarity", description: "Understand monthly comfort, tenure, SFEMI scope, rent, lease, or direct-sale suitability before joining." },
           { title: "Document guidance", description: "Know what to carry for quicker onboarding and staff verification." },
           { title: "Follow-up support", description: "Get branch-level help after enquiry submission without creating financial records publicly." },
         ]}

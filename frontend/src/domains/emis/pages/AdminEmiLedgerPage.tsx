@@ -234,7 +234,7 @@ export default function AdminEmiLedgerPage() {
                     },
                     {
                       key: "lucky_number",
-                      title: "Lucky ID",
+                      title: "SFEMI ID",
                       render: (row) => (row.lucky_number ? `#${row.lucky_number}` : "-"),
                     },
                   ]}

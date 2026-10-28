@@ -26,8 +26,6 @@ export const ROUTES = {
     lease: "/lease",
     directSale: "/direct-sale",
     visionTrust: "/vision-trust",
-    winners: "/winners",
-    winnerHistory: "/winner-history",
     fairDraw: "/lucky-plan/fair-draw",
     verifyDraw: "/lucky-plan/verify",
     contact: "/contact",

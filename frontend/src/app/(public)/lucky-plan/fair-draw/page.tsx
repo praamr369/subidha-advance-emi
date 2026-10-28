@@ -124,7 +124,7 @@ export default async function FairDrawPage() {
         { label: "Fair Draw" },
       ]}
       actions={[
-        { label: dictionary.common.winners, href: ROUTES.public.winners, variant: "secondary" },
+        { label: "SFEMI FAQ", href: ROUTES.public.faq, variant: "secondary" },
         { label: dictionary.common.howItWorks, href: ROUTES.public.howItWorks, variant: "secondary" },
       ]}
     >
@@ -181,7 +181,7 @@ export default async function FairDrawPage() {
             label: "Open latest draw",
             variant: "primary",
           },
-          { href: ROUTES.public.winnerHistory, label: dictionary.common.winnerHistory, variant: "secondary" },
+          { href: ROUTES.public.faq, label: "SFEMI FAQ", variant: "secondary" },
         ]}
       />
     </PublicPageShell>

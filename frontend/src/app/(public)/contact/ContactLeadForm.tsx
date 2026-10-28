@@ -8,7 +8,7 @@ import { submitPublicLead } from "@/lib/public-api";
 const TOPIC_OPTIONS = [
   { value: "GENERAL", label: "General support" },
   { value: "PRODUCT", label: "Product enquiry" },
-  { value: "LUCKY_PLAN", label: "Lucky Plan guidance" },
+  { value: "LUCKY_PLAN", label: "SFEMI / Advance EMI guidance" },
   { value: "RENT_LEASE", label: "Rent / Lease guidance" },
   { value: "DIRECT_SALE", label: "Direct sale / invoice" },
   { value: "DELIVERY", label: "Delivery / service support" },
@@ -75,7 +75,7 @@ export default function ContactLeadForm() {
       </div>
       <h2 className="mt-3 text-xl font-semibold text-foreground">Send a message</h2>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">
-        Ask about products, Lucky Plan, rent, lease, direct sale, documents, or delivery support. This form creates a public lead only; branch follow-up works best with a correct phone number.
+        Ask about products, SFEMI Advance EMI, rent, lease, direct sale, documents, or delivery support. This form creates a public lead only; branch follow-up works best with a correct phone number.
       </p>
 
       <form onSubmit={onSubmit} className="mt-6 grid gap-6">
