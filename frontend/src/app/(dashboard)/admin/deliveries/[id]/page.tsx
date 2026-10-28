@@ -600,7 +600,7 @@ export default function AdminDeliveryDetailPage() {
                     <p className="mt-1 text-xs text-amber-900">Enter what was delivered today. Remaining quantities become a separate pending or scheduled batch, while this original batch stays in history.</p>
                     <div className="mt-3 overflow-x-auto rounded-lg border border-amber-200 bg-background">
                       <table className="w-full text-left text-xs"><tbody className="divide-y divide-border">
-                        {delivery.delivery_items.map((it) => (
+                        {(delivery.delivery_items ?? []).map((it) => (
                           <tr key={`split-${it.id}`}>
                             <td className="p-2 font-medium">{it.product_name}</td><td className="p-2 text-right">{it.quantity} total</td>
                             <td className="p-2"><input type="number" min={0} max={it.quantity} value={splitQuantities[it.id || 0] ?? 0} onChange={(event) => setSplitQuantities((current) => ({ ...current, [it.id || 0]: Number(event.target.value) }))} className="w-24 rounded border border-border px-2 py-1" /></td>
