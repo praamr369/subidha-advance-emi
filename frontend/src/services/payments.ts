@@ -172,6 +172,8 @@ export interface PaymentRegisterRow {
   verified_by_username?: string | null
   branch_name?: string | null
   branch_code?: string | null
+  receipt_id?: number | null
+  receipt_pdf_url?: string | null
 }
 
 export interface PaymentRegisterSummary {
