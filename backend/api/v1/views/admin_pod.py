@@ -561,7 +561,7 @@ def pod_list_view(request):
     if year:
         try:
             year_int = int(year)
-            pods = pods.filter(delivery_date__year=year_int)
+            pods = pods.filter(Q(delivery_date__year=year_int) | Q(created_at__year=year_int)).distinct()
         except:
             pass
 
@@ -569,7 +569,10 @@ def pod_list_view(request):
         try:
             month_int = int(month)
             year_int = int(year)
-            pods = pods.filter(delivery_date__year=year_int, delivery_date__month=month_int)
+            pods = pods.filter(
+                Q(delivery_date__year=year_int, delivery_date__month=month_int)
+                | Q(created_at__year=year_int, created_at__month=month_int)
+            ).distinct()
         except:
             pass
 
@@ -672,7 +675,7 @@ def pod_export_year_view(request):
 
     # Fetch all PODs for the year
     pods = ProofOfDelivery.objects.filter(
-        delivery_date__year=year_int
+        Q(delivery_date__year=year_int) | Q(created_at__year=year_int)
     ).select_related('delivery__subscription__customer').order_by('delivery_date')
 
     if not pods.exists():
