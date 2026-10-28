@@ -6,6 +6,7 @@ export interface PODRecord {
   pod_id: number;
   delivery_id: number;
   subscription_id: number;
+  archive_key?: string;
   contract_ref: string;
   customer_name: string;
   delivery_date: string;
@@ -19,6 +20,7 @@ export interface PODDetail {
   pod_id: number;
   delivery_id: number;
   subscription_id: number;
+  archive_key?: string;
   contract_ref: string;
   customer_name: string;
   delivery_date: string;
@@ -95,11 +97,12 @@ export function listPOD(params: { year?: number; month?: number } = {}): Promise
   const q = new URLSearchParams();
   if (params.year) q.set("year", String(params.year));
   if (params.month) q.set("month", String(params.month));
-  return apiFetch(`/admin/delivery/pod/?${q}`);
+  q.set("_refresh", String(Date.now()));
+  return apiFetch(`/admin/delivery/pod/?${q}`, { cache: "no-store" });
 }
 
 export function getPODDetail(podId: number): Promise<PODDetail> {
-  return apiFetch(`/admin/delivery/pod/${podId}/`);
+  return apiFetch(`/admin/delivery/pod/${podId}/`, { cache: "no-store" });
 }
 
 export function exportPODYear(year: number): Promise<Blob> {
