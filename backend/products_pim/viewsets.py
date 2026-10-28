@@ -304,13 +304,17 @@ class PimProductViewSet(viewsets.ModelViewSet):
             product_ids = list({int(value) for value in raw_ids})
         except (TypeError, ValueError):
             return Response({"detail": "product_ids must contain only numeric IDs."}, status=status.HTTP_400_BAD_REQUEST)
-        published = request.data.get("published")
-        if not isinstance(published, bool):
+        raw_published = request.data.get("published")
+        if isinstance(raw_published, bool):
+            published = raw_published
+        elif isinstance(raw_published, str) and raw_published.strip().lower() in {"true", "false"}:
+            published = raw_published.strip().lower() == "true"
+        else:
             return Response({"detail": "published must be true or false."}, status=status.HTTP_400_BAD_REQUEST)
 
         with transaction.atomic():
             products = list(
-                self.get_queryset().select_for_update().filter(id__in=product_ids)
+                PimProduct.objects.select_for_update().filter(id__in=product_ids)
             )
             found_ids = {product.id for product in products}
             missing_ids = sorted(set(product_ids) - found_ids)
