@@ -1040,6 +1040,52 @@ def mark_subscription_delivery_delivered(*, delivery, performed_by=None, receive
     )
 
 
+@transaction.atomic
+def split_subscription_delivery(*, delivery, delivered_items, remaining_scheduled_date=None, performed_by=None, notes=""):
+    """Split an active batch into delivered-today and later items.
+
+    The source batch is retained as a cancelled audit record. New child batches
+    own the actual delivered and remaining quantities, so progress and stock
+    posting remain item-accurate without mutating history.
+    """
+    if delivery.status not in SubscriptionDelivery.ACTIVE_STATUSES:
+        raise ValueError("Only pending, scheduled, dispatched, or out-for-delivery batches can be split.")
+    source_items = list(delivery.delivery_items.select_related("product").all())
+    requested = {int(row.get("delivery_item_id")): int(row.get("quantity", 0)) for row in delivered_items}
+    delivered_rows = []
+    remaining_rows = []
+    for item in source_items:
+        qty = requested.get(item.id, 0)
+        if qty < 0 or qty > item.quantity:
+            raise ValueError(f"Delivered quantity for {item.product.name} must be between 0 and {item.quantity}.")
+        if qty:
+            delivered_rows.append({"product_id": item.product_id, "quantity": qty, "contract_item_id": item.contract_item_id, "notes": notes or item.notes})
+        if item.quantity - qty:
+            remaining_rows.append({"product_id": item.product_id, "quantity": item.quantity - qty, "contract_item_id": item.contract_item_id, "notes": item.notes})
+    if not delivered_rows or not remaining_rows:
+        raise ValueError("Split requires at least one item delivered today and one item remaining.")
+    cancel_subscription_delivery(delivery=delivery, performed_by=performed_by, reason="Batch split: item-level partial delivery", notes=notes)
+    subscription = delivery.subscription
+    delivered = create_subscription_delivery(
+        subscription=subscription, performed_by=performed_by, status=DeliveryStatus.PENDING,
+        delivery_reference=f"{delivery.delivery_reference}-PARTIAL", scheduled_date=delivery.scheduled_date,
+        receiver_name=delivery.receiver_name, receiver_phone=delivery.receiver_phone,
+        delivery_address_snapshot=delivery.delivery_address_snapshot, notes=notes or "Partial delivery from split batch",
+        admin_override=True, admin_override_reason="Approved item-level split of existing delivery batch",
+        batch_number=None, items=delivered_rows,
+    )
+    mark_subscription_delivery_delivered(delivery=delivered, performed_by=performed_by, receiver_name=delivery.receiver_name, receiver_phone=delivery.receiver_phone, notes=notes)
+    remaining = create_subscription_delivery(
+        subscription=subscription, performed_by=performed_by, status=DeliveryStatus.SCHEDULED if remaining_scheduled_date else DeliveryStatus.PENDING,
+        delivery_reference=f"{delivery.delivery_reference}-REMAINING", scheduled_date=remaining_scheduled_date,
+        receiver_name=delivery.receiver_name, receiver_phone=delivery.receiver_phone,
+        delivery_address_snapshot=delivery.delivery_address_snapshot, notes=notes or "Remaining items from split batch",
+        admin_override=True, admin_override_reason="Approved item-level split of existing delivery batch",
+        batch_number=None, items=remaining_rows,
+    )
+    return delivery, delivered, remaining
+
+
 def mark_subscription_delivery_failed(*, delivery, performed_by=None, failure_reason: str, notes=None):
     return transition_subscription_delivery_status(
         delivery=delivery,

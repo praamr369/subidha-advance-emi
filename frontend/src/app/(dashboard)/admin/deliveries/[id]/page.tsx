@@ -24,6 +24,7 @@ import {
   markAdminDeliveryReturned,
   requestAdminDeliveryReturn,
   transitionAdminDelivery,
+  splitAdminDelivery,
   updateAdminDelivery,
   type DeliveryRecord,
 } from "@/services/deliveries";
@@ -147,6 +148,9 @@ export default function AdminDeliveryDetailPage() {
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
   const [reason, setReason] = useState("");
+  const [splitQuantities, setSplitQuantities] = useState<Record<number, number>>({});
+  const [splitDate, setSplitDate] = useState("");
+  const [splitBusy, setSplitBusy] = useState(false);
 
   const [handoverData, setHandoverData] = useState<HandoverLinkResponse | null>(null);
   const [handoverLoading, setHandoverLoading] = useState(false);
@@ -588,6 +592,28 @@ export default function AdminDeliveryDetailPage() {
                     Standard delivery item: <span className="font-semibold text-foreground">{delivery.product_name || "Product"}</span> (Qty: 1).
                   </div>
                 )}
+
+                {((delivery.delivery_items?.some((item) => item.quantity > 1) || (delivery.delivery_items?.length ?? 0) > 1) &&
+                  ["PENDING", "SCHEDULED", "DISPATCHED", "OUT_FOR_DELIVERY"].includes(delivery.status)) ? (
+                  <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
+                    <div className="text-sm font-semibold text-amber-950">Partial handover / split this batch</div>
+                    <p className="mt-1 text-xs text-amber-900">Enter what was delivered today. Remaining quantities become a separate pending or scheduled batch, while this original batch stays in history.</p>
+                    <div className="mt-3 overflow-x-auto rounded-lg border border-amber-200 bg-background">
+                      <table className="w-full text-left text-xs"><tbody className="divide-y divide-border">
+                        {delivery.delivery_items.map((it) => (
+                          <tr key={`split-${it.id}`}>
+                            <td className="p-2 font-medium">{it.product_name}</td><td className="p-2 text-right">{it.quantity} total</td>
+                            <td className="p-2"><input type="number" min={0} max={it.quantity} value={splitQuantities[it.id || 0] ?? 0} onChange={(event) => setSplitQuantities((current) => ({ ...current, [it.id || 0]: Number(event.target.value) }))} className="w-24 rounded border border-border px-2 py-1" /></td>
+                          </tr>
+                        ))}
+                      </tbody></table>
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center gap-3">
+                      <label className="text-xs font-medium text-amber-950">Later batch date <input type="date" value={splitDate} onChange={(event) => setSplitDate(event.target.value)} className="ml-2 rounded border border-border bg-background px-2 py-1" /></label>
+                      <button type="button" disabled={splitBusy} onClick={async () => { try { setSplitBusy(true); const items = Object.entries(splitQuantities).map(([delivery_item_id, quantity]) => ({ delivery_item_id: Number(delivery_item_id), quantity })).filter((item) => item.quantity > 0); await splitAdminDelivery(delivery.id, items, splitDate || undefined, "Item-level partial delivery recorded from delivery workspace."); window.location.reload(); } catch (error) { window.alert(error instanceof Error ? error.message : "Unable to split delivery batch."); } finally { setSplitBusy(false); } }} className="rounded-lg bg-amber-700 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60">{splitBusy ? "Splitting…" : "Record partial delivery"}</button>
+                    </div>
+                  </div>
+                ) : null}
 
                 {delivery.delivery_progress && (
                   <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">

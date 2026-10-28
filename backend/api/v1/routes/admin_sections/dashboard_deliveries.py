@@ -13,6 +13,7 @@ from api.v1.views.admin_deliveries import AdminDeliverySourceDirectSalesView
 from api.v1.views.admin_deliveries import AdminDeliverySourceSubscriptionPrefillView
 from api.v1.views.admin_deliveries import AdminDeliverySourceSubscriptionsView
 from api.v1.views.admin_deliveries import AdminDeliverySummaryView
+from api.v1.views.admin_deliveries import AdminDeliverySplitView
 from api.v1.views.admin_deliveries import AdminDeliveryTransitionView
 from api.v1.views.admin_deliveries import AdminDirectSaleDeliveryApprovePaymentExceptionView
 from api.v1.views.admin_deliveries import AdminDirectSaleDeliveryCancelView
@@ -49,6 +50,7 @@ urlpatterns = [
     path("deliveries/<int:pk>/pdf/", AdminDeliveryPdfView.as_view()),
     path("deliveries/<int:pk>/transition/", AdminDeliveryTransitionView.as_view()),
     path("deliveries/<int:pk>/mark-delivered/", AdminDeliveryMarkDeliveredView.as_view()),
+    path("deliveries/<int:pk>/split/", AdminDeliverySplitView.as_view()),
     path("deliveries/<int:pk>/mark-failed/", AdminDeliveryMarkFailedView.as_view()),
     path("deliveries/<int:pk>/cancel/", AdminDeliveryCancelView.as_view()),
     path("deliveries/<int:pk>/request-return/", AdminDeliveryRequestReturnView.as_view()),

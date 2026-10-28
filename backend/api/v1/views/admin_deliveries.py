@@ -25,6 +25,7 @@ from api.v1.serializers.delivery import (
     AdminSubscriptionDeliveryReasonSerializer,
     AdminSubscriptionDeliveryTransitionSerializer,
     AdminSubscriptionDeliveryUpdateSerializer,
+    AdminSubscriptionDeliverySplitSerializer,
 )
 from billing.models import DirectSale, DirectSaleStatus
 from billing.services.direct_sale_delivery_bridge_service import sync_direct_sale_delivery_case
@@ -52,6 +53,7 @@ from deliveries.services.delivery_service import (
     request_subscription_delivery_return,
     transition_subscription_delivery_status,
     update_subscription_delivery_metadata,
+    split_subscription_delivery,
 )
 from contracts.services.operational_cancellation_service import record_delivery_cancellation_audit
 
@@ -511,6 +513,29 @@ class AdminDeliveryMarkDeliveredView(APIView):
             raise serializers.ValidationError({"detail": str(exc)}) from exc
 
         return Response(AdminSubscriptionDeliveryReadSerializer(delivery).data)
+
+
+class AdminDeliverySplitView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, pk):
+        delivery = get_object_or_404(get_delivery_queryset(), pk=pk)
+        serializer = AdminSubscriptionDeliverySplitSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            _, delivered, remaining = split_subscription_delivery(
+                delivery=delivery, performed_by=request.user,
+                delivered_items=serializer.validated_data["delivered_items"],
+                remaining_scheduled_date=serializer.validated_data.get("remaining_scheduled_date"),
+                notes=serializer.validated_data.get("notes", ""),
+            )
+        except ValueError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        return Response({
+            "source_delivery_id": delivery.id,
+            "delivered_batch": AdminSubscriptionDeliveryReadSerializer(delivered).data,
+            "remaining_batch": AdminSubscriptionDeliveryReadSerializer(remaining).data,
+        }, status=status.HTTP_201_CREATED)
 
 
 class AdminDeliveryMarkFailedView(APIView):

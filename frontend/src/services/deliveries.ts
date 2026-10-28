@@ -795,6 +795,18 @@ export async function transitionAdminDelivery(
   return normalizeDeliveryRecord(response);
 }
 
+export async function splitAdminDelivery(
+  id: number | string,
+  deliveredItems: Array<{ delivery_item_id: number; quantity: number }>,
+  remainingScheduledDate?: string,
+  notes?: string,
+): Promise<void> {
+  await apiFetch(`/admin/deliveries/${id}/split/`, {
+    method: "POST",
+    body: JSON.stringify({ delivered_items: deliveredItems, remaining_scheduled_date: remainingScheduledDate || null, notes: notes || "" }),
+  });
+}
+
 export async function markAdminDeliveryDelivered(
   id: number | string,
   payload: {

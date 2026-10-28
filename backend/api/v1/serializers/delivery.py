@@ -317,6 +317,12 @@ class AdminSubscriptionDeliveryMarkDeliveredSerializer(serializers.Serializer):
     notes = serializers.CharField(required=False, allow_blank=True)
 
 
+class AdminSubscriptionDeliverySplitSerializer(serializers.Serializer):
+    delivered_items = serializers.ListField(child=serializers.DictField(), allow_empty=False)
+    remaining_scheduled_date = serializers.DateField(required=False, allow_null=True)
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+
 class AdminSubscriptionDeliveryReasonSerializer(serializers.Serializer):
     reason = serializers.CharField(required=True, allow_blank=False, trim_whitespace=True)
     notes = serializers.CharField(required=False, allow_blank=True)
