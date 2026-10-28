@@ -64,6 +64,12 @@ function ContractCard({ sub }: { sub: CustomerSubscription }) {
   const emiTotalCount = sub.emi_count ?? sub.tenure_months ?? null;
   const paidCount = sub.paid_emi_count ?? 0;
   const pendingCount = sub.pending_emi_count ?? (emiTotalCount ? Math.max(emiTotalCount - paidCount, 0) : null);
+  const securityDepositTotal = Number(sub.security_deposit_amount ?? 0);
+  const securityDepositPaid = Number(sub.security_deposit_paid ?? 0);
+  const securityDepositRemaining = Math.max(
+    Number(sub.security_deposit_pending ?? securityDepositTotal - securityDepositPaid),
+    0,
+  );
 
   return (
     <CPageCard href={`/customer/subscriptions/${sub.id}`}>
@@ -147,10 +153,16 @@ function ContractCard({ sub }: { sub: CustomerSubscription }) {
           <div>
             <span className="text-muted-foreground">Security Deposit</span>
             <div className="font-semibold text-primary mt-0.5">
-              {formatRupee(sub.security_deposit_amount)}
+              Total: {formatRupee(securityDepositTotal)}
               {Number(sub.refundable_security_deposit ?? sub.security_deposit_amount ?? 0) > 0 ? (
                 <span className="ml-1 text-[10px] font-normal text-muted-foreground">(Refundable)</span>
               ) : null}
+            </div>
+            <div className="mt-0.5 space-y-0.5 text-[10px] font-medium">
+              <div className="text-emerald-700 dark:text-emerald-400">Paid: {formatRupee(securityDepositPaid)}</div>
+              <div className={securityDepositRemaining > 0 ? "text-amber-700 dark:text-amber-400" : "text-emerald-700 dark:text-emerald-400"}>
+                Remaining: {formatRupee(securityDepositRemaining)}
+              </div>
             </div>
           </div>
         ) : null}
