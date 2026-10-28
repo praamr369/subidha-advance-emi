@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type PointerEvent as ReactPointerEvent } from "react";
 
 import BusinessSetupLinks from "@/components/admin/business-setup/BusinessSetupLinks";
 import PageHeader from "@/components/ui/PageHeader";
@@ -172,6 +172,8 @@ export default function PrintBrandingSettingsPage() {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [clearLogo, setClearLogo] = useState(false);
   const [signatureFile, setSignatureFile] = useState<File | null>(null);
+  const [signatureMode, setSignatureMode] = useState<"upload" | "draw">("upload");
+  const [hasDrawnSignature, setHasDrawnSignature] = useState(false);
   const [clearSignature, setClearSignature] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -180,6 +182,43 @@ export default function PrintBrandingSettingsPage() {
 
   const logoInputRef = useRef<HTMLInputElement>(null);
   const signatureInputRef = useRef<HTMLInputElement>(null);
+  const signatureCanvasRef = useRef<HTMLCanvasElement>(null);
+  const drawingRef = useRef(false);
+
+  function beginSignatureStroke(event: ReactPointerEvent<HTMLCanvasElement>) {
+    const canvas = signatureCanvasRef.current;
+    if (!canvas) return;
+    drawingRef.current = true;
+    canvas.setPointerCapture(event.pointerId);
+    const rect = canvas.getBoundingClientRect();
+    const context = canvas.getContext("2d");
+    if (!context) return;
+    context.beginPath();
+    context.moveTo((event.clientX - rect.left) * (canvas.width / rect.width), (event.clientY - rect.top) * (canvas.height / rect.height));
+  }
+
+  function drawSignatureStroke(event: ReactPointerEvent<HTMLCanvasElement>) {
+    if (!drawingRef.current) return;
+    const canvas = signatureCanvasRef.current;
+    const context = canvas?.getContext("2d");
+    if (!canvas || !context) return;
+    const rect = canvas.getBoundingClientRect();
+    context.lineWidth = 3;
+    context.lineCap = "round";
+    context.strokeStyle = "#111827";
+    context.lineTo((event.clientX - rect.left) * (canvas.width / rect.width), (event.clientY - rect.top) * (canvas.height / rect.height));
+    context.stroke();
+    setHasDrawnSignature(true);
+  }
+
+  function endSignatureStroke() { drawingRef.current = false; }
+
+  function clearDrawnSignature() {
+    const canvas = signatureCanvasRef.current;
+    const context = canvas?.getContext("2d");
+    if (canvas && context) context.clearRect(0, 0, canvas.width, canvas.height);
+    setHasDrawnSignature(false);
+  }
 
   async function loadSettings() {
     try {
@@ -235,7 +274,12 @@ export default function PrintBrandingSettingsPage() {
       }
       if (logoFile) formData.append("business_logo", logoFile);
       if (clearLogo) formData.append("clear_logo", "true");
-      if (signatureFile) formData.append("authorized_signature", signatureFile);
+      if (signatureMode === "draw" && hasDrawnSignature && signatureCanvasRef.current) {
+        const drawnFile = await new Promise<File | null>((resolve) => {
+          signatureCanvasRef.current?.toBlob((blob) => resolve(blob ? new File([blob], "authorized-signature.png", { type: "image/png" }) : null), "image/png");
+        });
+        if (drawnFile) formData.append("authorized_signature", drawnFile);
+      } else if (signatureFile) formData.append("authorized_signature", signatureFile);
       if (clearSignature) formData.append("clear_signature", "true");
 
       const saved = await saveDocumentPrintSettings(formData);
@@ -297,6 +341,28 @@ export default function PrintBrandingSettingsPage() {
                   onRestore={() => setClearSignature(false)}
                   maxLabel="1 MB max"
                 />
+              </div>
+
+              <div className="mt-4 rounded-xl border border-border bg-muted/30 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <div className="text-sm font-semibold text-foreground">Signature input</div>
+                    <div className="text-xs text-muted-foreground">Upload an image or draw the authorized signature on screen.</div>
+                  </div>
+                  <div className="flex gap-2">
+                    {(["upload", "draw"] as const).map((mode) => (
+                      <button key={mode} type="button" onClick={() => setSignatureMode(mode)} className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${signatureMode === mode ? "bg-primary text-primary-foreground" : "border border-border bg-background text-foreground"}`}>
+                        {mode === "upload" ? "Upload image" : "Draw on screen"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {signatureMode === "draw" ? (
+                  <div className="mt-3">
+                    <canvas ref={signatureCanvasRef} width={900} height={220} className="h-32 w-full touch-none rounded-lg border border-dashed border-border bg-white" onPointerDown={beginSignatureStroke} onPointerMove={drawSignatureStroke} onPointerUp={endSignatureStroke} onPointerCancel={endSignatureStroke} />
+                    <button type="button" onClick={clearDrawnSignature} className="mt-2 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-foreground">Clear drawing</button>
+                  </div>
+                ) : null}
               </div>
 
               <div className="mt-4 grid gap-4 md:grid-cols-2">
