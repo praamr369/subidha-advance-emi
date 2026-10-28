@@ -607,6 +607,19 @@ export const pimService = {
   }> =>
     request(`${BASE}/products/${productId}/unpublish/`, { method: "POST" }),
 
+  bulkPublish: (payload: { product_ids: number[]; published: boolean }): Promise<{
+    published: boolean;
+    requested: number;
+    matched: number;
+    missing_ids: number[];
+    affected_products: number;
+    variants_activated: number;
+  }> =>
+    request(`${BASE}/products/bulk-publish/`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
   // Cross-module sync
   getRegisterStatus: (params?: {
     search?: string;

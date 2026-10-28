@@ -1,6 +1,7 @@
 # pyright: reportIncompatibleMethodOverride=false
 # pyright: reportAttributeAccessIssue=false
 from typing import cast
+from django.db import transaction
 from django.db.models import Q
 from products_pim.services.sync_service import PIMSyncService
 from rest_framework import viewsets, status
@@ -283,6 +284,52 @@ class PimProductViewSet(viewsets.ModelViewSet):
         return Response({
             "published": False,
             "child_pim_unpublished": child_count,
+        })
+
+    @action(detail=False, methods=["post"], url_path="bulk-publish")
+    def bulk_publish(self, request):
+        """Bulk publish or unpublish selected PIM products safely.
+
+        The operation is limited to explicit product IDs and cascades to child
+        variant blueprints, matching the single-product publish controls. It
+        changes catalog visibility only; operational product, stock, payment,
+        and contract records are not deleted or rewritten.
+        """
+        raw_ids = request.data.get("product_ids")
+        if not isinstance(raw_ids, list) or not raw_ids:
+            return Response({"detail": "product_ids must be a non-empty list."}, status=status.HTTP_400_BAD_REQUEST)
+        if len(raw_ids) > 500:
+            return Response({"detail": "Select no more than 500 products at a time."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            product_ids = list({int(value) for value in raw_ids})
+        except (TypeError, ValueError):
+            return Response({"detail": "product_ids must contain only numeric IDs."}, status=status.HTTP_400_BAD_REQUEST)
+        published = request.data.get("published")
+        if not isinstance(published, bool):
+            return Response({"detail": "published must be true or false."}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            products = list(
+                self.get_queryset().select_for_update().filter(id__in=product_ids)
+            )
+            found_ids = {product.id for product in products}
+            missing_ids = sorted(set(product_ids) - found_ids)
+            affected_ids = set(found_ids)
+            for product in products:
+                affected_ids.update(product.child_pim_products.values_list("id", flat=True))
+            changed = PimProduct.objects.filter(id__in=affected_ids).update(is_published=published)
+            activated_variants = 0
+            if published:
+                for product in products:
+                    activated_variants += product.variants.filter(is_active=False).update(is_active=True)
+
+        return Response({
+            "published": published,
+            "requested": len(product_ids),
+            "matched": len(found_ids),
+            "missing_ids": missing_ids,
+            "affected_products": changed,
+            "variants_activated": activated_variants,
         })
 
 

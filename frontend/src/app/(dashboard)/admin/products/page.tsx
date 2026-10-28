@@ -167,12 +167,16 @@ function PimProductRow({
   expanded,
   childCount,
   onToggle,
+  selected = false,
+  onSelect,
 }: {
   p: PimProduct;
   isChild?: boolean;
   expanded?: boolean;
   childCount?: number;
   onToggle?: () => void;
+  selected?: boolean;
+  onSelect?: (selected: boolean) => void;
 }) {
   const hasChildren = !isChild && (childCount ?? 0) > 0;
 
@@ -181,6 +185,15 @@ function PimProductRow({
       {/* Code + expand toggle */}
       <td className="px-4 py-2.5">
         <div className={`flex items-center gap-1.5 ${isChild ? "pl-6" : ""}`}>
+          {!isChild && onSelect ? (
+            <input
+              type="checkbox"
+              aria-label={`Select ${p.full_name || p.name}`}
+              checked={selected}
+              onChange={(event) => onSelect(event.target.checked)}
+              className="h-4 w-4 rounded border-border"
+            />
+          ) : null}
           {isChild ? (
             <GitBranch className="h-3 w-3 text-muted-foreground/60 shrink-0" />
           ) : hasChildren ? (
@@ -377,6 +390,9 @@ function PimPanel() {
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [relinking, setRelinking] = useState(false);
   const [relinkResult, setRelinkResult] = useState<string | null>(null);
+  const [selectedPimIds, setSelectedPimIds] = useState<Set<number>>(new Set());
+  const [bulkPublishing, setBulkPublishing] = useState(false);
+  const [bulkPublishResult, setBulkPublishResult] = useState<string | null>(null);
   const tableTopRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -415,6 +431,27 @@ function PimPanel() {
 
   useEffect(() => { void loadPimProducts(); }, [loadPimProducts]);
 
+  useEffect(() => {
+    setSelectedPimIds(new Set());
+  }, [pimSearch, pimCat, pimPage, pimPageSize]);
+
+  const handleBulkPublish = useCallback(async (published: boolean) => {
+    const ids = Array.from(selectedPimIds);
+    if (!ids.length) return;
+    setBulkPublishing(true);
+    setBulkPublishResult(null);
+    try {
+      const result = await pimService.bulkPublish({ product_ids: ids, published });
+      setBulkPublishResult(`${result.affected_products} product records ${published ? "published" : "hidden"} from the public catalogue.`);
+      setSelectedPimIds(new Set());
+      await loadPimProducts();
+    } catch (error) {
+      setBulkPublishResult(error instanceof Error ? error.message : "Bulk publication update failed.");
+    } finally {
+      setBulkPublishing(false);
+    }
+  }, [loadPimProducts, selectedPimIds]);
+
   const handleRelink = useCallback(async () => {
     setRelinking(true);
     setRelinkResult(null);
@@ -435,6 +472,8 @@ function PimPanel() {
   }, [loadPimProducts]);
 
   const { roots, orphanChildren } = useMemo(() => buildPimTree(pimProducts), [pimProducts]);
+  const visibleRootIds = useMemo(() => roots.map((node) => node.product.id), [roots]);
+  const allVisibleRootsSelected = visibleRootIds.length > 0 && visibleRootIds.every((id) => selectedPimIds.has(id));
 
   const toggleExpand = useCallback((id: number) => {
     setExpandedIds((prev) => {
@@ -496,6 +535,31 @@ function PimPanel() {
             <GitBranch className="h-4 w-4" />
             {relinking ? "Relinking…" : "Relink Orphans"}
           </button>
+          {bulkPublishResult && (
+            <span className="text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-2 py-1">{bulkPublishResult}</span>
+          )}
+          {selectedPimIds.size > 0 && (
+            <>
+              <button
+                type="button"
+                onClick={() => void handleBulkPublish(true)}
+                disabled={bulkPublishing}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 text-white px-3 py-2 text-sm hover:bg-emerald-700 disabled:opacity-50"
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                {bulkPublishing ? "Updating…" : `Publish selected (${selectedPimIds.size})`}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleBulkPublish(false)}
+                disabled={bulkPublishing}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 text-amber-800 px-3 py-2 text-sm hover:bg-amber-50 disabled:opacity-50"
+              >
+                <X className="h-4 w-4" />
+                Hide selected
+              </button>
+            </>
+          )}
           <button
             type="button"
             onClick={() => loadPimProducts()}
@@ -556,7 +620,16 @@ function PimPanel() {
           <table className="w-full text-sm">
             <thead className="bg-muted/50 border-b">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Code</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all visible products"
+                    checked={allVisibleRootsSelected}
+                    onChange={(event) => setSelectedPimIds(event.target.checked ? new Set(visibleRootIds) : new Set())}
+                    className="h-4 w-4 rounded border-border"
+                  />
+                  <span className="ml-2">Code</span>
+                </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Name / Type</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Category</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">Price</th>
@@ -575,6 +648,12 @@ function PimPanel() {
                       expanded={isExpanded}
                       childCount={node.children.length}
                       onToggle={() => toggleExpand(node.product.id)}
+                      selected={selectedPimIds.has(node.product.id)}
+                      onSelect={(selected) => setSelectedPimIds((current) => {
+                        const next = new Set(current);
+                        if (selected) next.add(node.product.id); else next.delete(node.product.id);
+                        return next;
+                      })}
                     />
                     {isExpanded && node.children.map((child) => (
                       <PimProductRow key={child.id} p={child} isChild />
