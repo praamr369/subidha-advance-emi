@@ -35,6 +35,7 @@ import {
 import { ROUTES } from "@/lib/routes";
 import { formatRupee } from "@/lib/utils/currency";
 import { apiFetch } from "@/lib/api";
+import { openAuthenticatedFile } from "@/lib/export/auth-download";
 import {
   getAdminPaymentRegister,
   type PaymentRegisterRow,
@@ -310,14 +311,13 @@ function PaymentsTable({ rows }: { rows: PaymentRegisterRow[] }) {
                       Reconciliation
                     </Link>
                     {row.receipt_pdf_url ? (
-                      <a
-                        href={row.receipt_pdf_url}
-                        target="_blank"
-                        rel="noreferrer"
+                      <button
+                        type="button"
+                        onClick={() => void openAuthenticatedFile(row.receipt_pdf_url!, `receipt-${row.receipt_id ?? row.id}.pdf`)}
                         className="inline-flex items-center rounded-md border border-primary/30 bg-primary/5 px-3 py-1.5 text-sm font-medium text-primary shadow-sm transition hover:bg-primary/10"
                       >
                         View / Download Receipt
-                      </a>
+                      </button>
                     ) : null}
                   </div>
                 </td>
@@ -999,14 +999,16 @@ export default function AdminPaymentsPage() {
                           <td className="border-b border-border px-3 py-2">{formatShortDate(row.demand_due_date)}</td>
                           <td className="border-b border-border px-3 py-2">{row.status || "—"}</td>
                           <td className="border-b border-border px-3 py-2">
-                            <a
-                              href={`/api/v1/admin/rent-lease-receipts/${encodeURIComponent(row.key)}/pdf/`}
-                              target="_blank"
-                              rel="noreferrer"
+                            <button
+                              type="button"
+                              onClick={() => void openAuthenticatedFile(
+                                `/admin/rent-lease-receipts/${encodeURIComponent(row.key)}/pdf/`,
+                                `receipt-${row.key}.pdf`,
+                              )}
                               className="inline-flex rounded-md border border-primary/30 bg-primary/5 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/10"
                             >
                               View / Download PDF
-                            </a>
+                            </button>
                           </td>
                         </tr>
                       ))}

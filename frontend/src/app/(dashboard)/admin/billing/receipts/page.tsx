@@ -3,6 +3,7 @@
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { openAuthenticatedFile } from "@/lib/export/auth-download";
 import { MessageCircle } from "lucide-react";
 
 import ERPPageShell from "@/components/erp/ERPPageShell";
@@ -139,12 +140,16 @@ export default function BillingReceiptsPage() {
       header: "Actions",
       render: (row) => (
         <div className="flex flex-wrap gap-2">
-          <ActionButton
-            href={`/api/v1/admin/rent-lease-receipts/${encodeURIComponent(row.receipt_key)}/pdf/`}
-            variant="primary"
+          <button
+            type="button"
+            onClick={() => void openAuthenticatedFile(
+              `/admin/rent-lease-receipts/${encodeURIComponent(row.receipt_key)}/pdf/`,
+              `receipt-${row.receipt_key}.pdf`,
+            )}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-primary/90 bg-primary px-4 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
           >
             Print / Save PDF
-          </ActionButton>
+          </button>
           <button
             type="button"
             className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"

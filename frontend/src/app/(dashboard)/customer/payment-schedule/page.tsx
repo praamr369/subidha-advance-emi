@@ -1,6 +1,7 @@
 "use client";
 
 import { formatRupee } from "@/lib/utils/currency";
+import { downloadAuthenticatedFile } from "@/lib/export/auth-download";
 import { useCallback, useEffect, useState } from "react";
 import CustomerPageShell, { CPageSection } from "@/components/layout/CustomerPageShell";
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
@@ -149,14 +150,16 @@ function ScheduleCard({ row }: { row: ScheduleRow }) {
         </div>
       ) : null}
       {row.receipt_pdf_url || row.deposit_pdf_url ? (
-        <a
-          href={row.receipt_pdf_url || row.deposit_pdf_url || "#"}
+        <button
+          type="button"
+          onClick={() => void downloadAuthenticatedFile(
+            (row.receipt_pdf_url || row.deposit_pdf_url || "").replace("/api/v1", ""),
+            `${row.deposit_pdf_url ? "deposit" : "receipt"}-${row.schedule_id || row.emi_id || "document"}.pdf`,
+          )}
           className="mt-3 inline-flex rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-semibold hover:bg-muted"
-          target="_blank"
-          rel="noreferrer"
         >
           Download {row.deposit_pdf_url ? "Deposit Receipt" : "Receipt"}
-        </a>
+        </button>
       ) : null}
     </div>
   );

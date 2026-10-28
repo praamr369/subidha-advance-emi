@@ -430,7 +430,7 @@ export default function WhatsAppDirectSenderModal({
       if (receiptsRes.status === "fulfilled" && receiptsRes.value?.results) {
         for (const rec of receiptsRes.value.results) {
           const printRoute = buildAdminBillingReceiptPrintRoute(rec.id);
-          const fullPrintUrl = typeof window !== "undefined" ? `${window.location.origin}${printRoute}` : "";
+          const customerReceiptUrl = typeof window !== "undefined" ? `${window.location.origin}/customer/payments` : "/customer/payments";
           const rcptNo = rec.receipt_no || `REC-${rec.id}`;
           const isEmi = rec.receipt_type === "EMI_PAYMENT_RECEIPT";
 
@@ -443,7 +443,7 @@ export default function WhatsAppDirectSenderModal({
             amount: rec.amount || "0",
             status: rec.status || "POSTED",
             title: rec.notes || (isEmi ? `Advance EMI Payment Receipt ${rcptNo}` : `Retail Cash Receipt ${rcptNo}`),
-            docUrl: fullPrintUrl,
+            docUrl: customerReceiptUrl,
             previewUrl: printRoute,
             recommendedTemplate: "PAYMENT_RECEIPT",
             amountToApply: rec.amount || "0",
@@ -460,7 +460,7 @@ export default function WhatsAppDirectSenderModal({
         for (const rec of rentLeaseReceiptsRes.value.results) {
           const receiptNo = rec.number || rec.receipt_key;
           const pdfRoute = `/api/v1/admin/rent-lease-receipts/${encodeURIComponent(rec.receipt_key)}/pdf/`;
-          const fullPdfUrl = typeof window !== "undefined" ? `${window.location.origin}${pdfRoute}` : pdfRoute;
+          const customerReceiptUrl = typeof window !== "undefined" ? `${window.location.origin}/customer/payments` : "/customer/payments";
           items.push({
             id: `rent-lease-receipt-${rec.receipt_key}`,
             kind: "RECEIPT",
@@ -470,7 +470,7 @@ export default function WhatsAppDirectSenderModal({
             amount: rec.amount || "0",
             status: rec.status || "ACTIVE",
             title: `${rec.kind === "DEPOSIT_RECEIPT" ? "Security deposit" : "Rent / lease payment"} receipt ${receiptNo}`,
-            docUrl: fullPdfUrl,
+            docUrl: customerReceiptUrl,
             previewUrl: pdfRoute,
             recommendedTemplate: "PAYMENT_RECEIPT",
             amountToApply: rec.amount || "0",
