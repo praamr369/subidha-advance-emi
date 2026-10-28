@@ -140,7 +140,7 @@ export default function BillingReceiptsPage() {
       render: (row) => (
         <div className="flex flex-wrap gap-2">
           <ActionButton
-            href={`/admin/rent-lease-receipts/${encodeURIComponent(row.receipt_key)}/pdf/`}
+            href={`/api/v1/admin/rent-lease-receipts/${encodeURIComponent(row.receipt_key)}/pdf/`}
             variant="primary"
           >
             Print / Save PDF
@@ -157,7 +157,7 @@ export default function BillingReceiptsPage() {
               ref: row.number || row.receipt_key,
               receipt: row.number || row.receipt_key,
               date: row.payment_date || "",
-              docUrl: `/admin/rent-lease-receipts/${encodeURIComponent(row.receipt_key)}/pdf/`,
+              docUrl: `/api/v1/admin/rent-lease-receipts/${encodeURIComponent(row.receipt_key)}/pdf/`,
               sourceModel: "RentLeaseReceipt",
               sourceId: row.receipt_key,
             })}

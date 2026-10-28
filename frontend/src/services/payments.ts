@@ -137,6 +137,8 @@ export interface PaymentRecord {
   emi_month_no?: number | null
   collected_by_username?: string | null
   verified_by_username?: string | null
+  receipt_id?: number | null
+  receipt_pdf_url?: string | null
   subscription: number
   subscription_status?: string
   customer?: number | null

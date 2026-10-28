@@ -1281,6 +1281,8 @@ class PaymentAdminSerializer(serializers.ModelSerializer):
     plan_type_hint = serializers.CharField(read_only=True)
     is_reversed = serializers.SerializerMethodField()
     reversal_metadata = serializers.SerializerMethodField()
+    receipt_id = serializers.SerializerMethodField()
+    receipt_pdf_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Payment
@@ -1326,6 +1328,8 @@ class PaymentAdminSerializer(serializers.ModelSerializer):
             "allocation_metadata",
             "is_reversed",
             "reversal_metadata",
+            "receipt_id",
+            "receipt_pdf_url",
             "collected_by",
             "collected_by_id",
             "collected_by_username",
@@ -1431,6 +1435,14 @@ class PaymentAdminSerializer(serializers.ModelSerializer):
         metadata = getattr(obj, "allocation_metadata", None) or {}
         reversal = metadata.get("reversal") or {}
         return reversal
+
+    def get_receipt_id(self, obj):
+        receipt = getattr(obj, "receipt_document", None)
+        return getattr(receipt, "id", None)
+
+    def get_receipt_pdf_url(self, obj):
+        receipt_id = self.get_receipt_id(obj)
+        return f"/api/v1/admin/receipts/{receipt_id}/pdf/" if receipt_id else None
 
 
 class AdminPaymentCollectSerializer(serializers.Serializer):

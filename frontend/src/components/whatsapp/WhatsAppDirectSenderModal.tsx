@@ -459,7 +459,7 @@ export default function WhatsAppDirectSenderModal({
       if (rentLeaseReceiptsRes.status === "fulfilled" && rentLeaseReceiptsRes.value?.results) {
         for (const rec of rentLeaseReceiptsRes.value.results) {
           const receiptNo = rec.number || rec.receipt_key;
-          const pdfRoute = `/admin/rent-lease-receipts/${encodeURIComponent(rec.receipt_key)}/pdf/`;
+          const pdfRoute = `/api/v1/admin/rent-lease-receipts/${encodeURIComponent(rec.receipt_key)}/pdf/`;
           const fullPdfUrl = typeof window !== "undefined" ? `${window.location.origin}${pdfRoute}` : pdfRoute;
           items.push({
             id: `rent-lease-receipt-${rec.receipt_key}`,
