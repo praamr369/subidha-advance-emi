@@ -2638,6 +2638,7 @@ class SubscriptionAdminDetailSerializer(SubscriptionAdminSerializer):
     rent_lease_demands = serializers.SerializerMethodField()
     rent_lease_collections = serializers.SerializerMethodField()
     activation_readiness = serializers.SerializerMethodField()
+    rent_lease_kpis = serializers.SerializerMethodField()
 
     class Meta(SubscriptionAdminSerializer.Meta):
         fields = SubscriptionAdminSerializer.Meta.fields + (
@@ -2655,6 +2656,7 @@ class SubscriptionAdminDetailSerializer(SubscriptionAdminSerializer):
             "rent_lease_demands",
             "rent_lease_collections",
             "activation_readiness",
+            "rent_lease_kpis",
         )
         read_only_fields = fields
 
@@ -2854,6 +2856,41 @@ class SubscriptionAdminDetailSerializer(SubscriptionAdminSerializer):
             }
             for demand in demands
         ]
+
+    def get_rent_lease_kpis(self, obj):
+        if obj.plan_type not in ("RENT", "LEASE"):
+            return None
+        from decimal import Decimal
+        from subscriptions.models import RentLeaseBillingDemand, RentLeaseDemandType
+        from contracts.services.contract_activation_readiness_service import get_subscription_deposit_summary
+
+        demands = list(RentLeaseBillingDemand.objects.filter(subscription=obj))
+        deposit_rows = [row for row in demands if row.demand_type == RentLeaseDemandType.SECURITY_DEPOSIT]
+        monthly_rows = [row for row in demands if row.demand_type != RentLeaseDemandType.SECURITY_DEPOSIT]
+        amount = lambda rows, field: sum((getattr(row, field, Decimal("0.00")) or Decimal("0.00") for row in rows), Decimal("0.00"))
+        deposit_summary = get_subscription_deposit_summary(obj)
+        deposit_due = Decimal(str(deposit_summary.get("security_deposit_amount", "0.00")))
+        deposit_paid = Decimal(str(deposit_summary.get("security_deposit_paid", "0.00")))
+        rent_due = amount(monthly_rows, "amount")
+        rent_paid = amount(monthly_rows, "collected_amount")
+        if rent_due <= Decimal("0.00"):
+            items = obj.contract_items.all()
+            rent_due = sum((getattr(item, "monthly_amount", Decimal("0.00")) or Decimal("0.00") for item in items), Decimal("0.00")) * max(int(obj.tenure_months or 0), 1)
+        return {
+            "deposit_due": str(deposit_due),
+            "deposit_paid": str(deposit_paid),
+            "deposit_pending": str(max(deposit_due - deposit_paid, Decimal("0.00"))),
+            "deposit_held": str(amount(deposit_rows, "held_amount") or deposit_paid),
+            "deposit_deducted": str(amount(deposit_rows, "deducted_amount")),
+            "deposit_refundable": str(deposit_summary.get("refundable_security_deposit", "0.00")),
+            "rent_due": str(rent_due),
+            "rent_paid": str(rent_paid),
+            "rent_outstanding": str(max(rent_due - rent_paid, Decimal("0.00"))),
+            "demand_count": len(monthly_rows),
+            "paid_demand_count": sum(1 for row in monthly_rows if row.status == "PAID"),
+            "pending_demand_count": sum(1 for row in monthly_rows if row.status not in {"PAID", "CANCELLED"}),
+            "deposit_status": deposit_summary.get("deposit_status", "PENDING"),
+        }
 
     def get_rent_lease_collections(self, obj):
         """Rent/lease money received: monthly collections + deposit receipts/refunds.
