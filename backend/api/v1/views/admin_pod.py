@@ -15,6 +15,7 @@ from django.db.models import Q
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.db import transaction
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -493,6 +494,17 @@ def public_pod_handover_view(request, token):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
+    # Validate the handover gate before persisting media. A partial security
+    # deposit must not create an apparently completed POD or orphaned photos.
+    try:
+        from contracts.services.contract_activation_readiness_service import assert_contract_activation_ready
+        assert_contract_activation_ready(sub, stage="handover")
+    except Exception as exc:
+        return Response(
+            {"error": str(exc), "code": "HANDOVER_NOT_READY", "delivery_id": delivery.id},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     delivery_date = timezone.now()
     delivery_date_str = request.data.get("delivery_date")
     if delivery_date_str:
@@ -501,47 +513,30 @@ def public_pod_handover_view(request, token):
         except Exception:
             pass
 
-    # Save ProofOfDelivery
-    pod = ProofOfDelivery(
-        delivery=delivery,
-        delivery_date=delivery_date,
-        driver_name=driver_name,
-        driver_phone=driver_phone,
-        customer_signature_name=customer_sig_name,
-        photo_1=photo_1_obj,
-        photo_2=photo_2_obj,
-        signature_image=sig_obj,
-        notes=notes,
-        status=PODStatus.CAPTURED,
-    )
-
-    if gps_lat is not None and gps_lon is not None:
-        lat = _parse_gps_coord(gps_lat, -90.0, 90.0)
-        lon = _parse_gps_coord(gps_lon, -180.0, 180.0)
-        if lat is not None and lon is not None:
-            pod.gps_latitude = lat
-            pod.gps_longitude = lon
-
-    pod.save()
-
-    # Save any additional furniture photos for multi-item orders
-    extra_files = request.FILES.getlist("furniture_photos") or request.FILES.getlist("additional_photos")
-    if extra_files and delivery.subscription:
-        save_additional_furniture_photos(
-            subscription=delivery.subscription,
-            files=extra_files,
-            delivery_date=delivery_date,
+    with transaction.atomic():
+        pod = ProofOfDelivery(
+            delivery=delivery, delivery_date=delivery_date, driver_name=driver_name,
+            driver_phone=driver_phone, customer_signature_name=customer_sig_name,
+            photo_1=photo_1_obj, photo_2=photo_2_obj, signature_image=sig_obj,
+            notes=notes, status=PODStatus.CAPTURED,
         )
+        if gps_lat is not None and gps_lon is not None:
+            lat = _parse_gps_coord(gps_lat, -90.0, 90.0)
+            lon = _parse_gps_coord(gps_lon, -180.0, 180.0)
+            if lat is not None and lon is not None:
+                pod.gps_latitude = lat
+                pod.gps_longitude = lon
+        pod.save()
 
-    # Synchronize all delivery models & asset handover
-    sync_delivery_success_state(
-        delivery=delivery,
-        delivery_date=delivery_date,
-        customer_sig_name=customer_sig_name,
-        driver_phone=driver_phone,
-        notes=notes,
-        performed_by=None,
-    )
+        extra_files = request.FILES.getlist("furniture_photos") or request.FILES.getlist("additional_photos")
+        if extra_files and delivery.subscription:
+            save_additional_furniture_photos(subscription=delivery.subscription, files=extra_files, delivery_date=delivery_date)
+
+        sync_delivery_success_state(
+            delivery=delivery, delivery_date=delivery_date,
+            customer_sig_name=customer_sig_name, driver_phone=driver_phone,
+            notes=notes, performed_by=None,
+        )
 
     return Response({
         "success": True,
