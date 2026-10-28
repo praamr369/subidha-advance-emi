@@ -220,6 +220,7 @@ ALLOWED_DELIVERY_TRANSITIONS: dict[str, set[str]] = {
     },
     DeliveryStatus.DISPATCHED: {
         DeliveryStatus.OUT_FOR_DELIVERY,
+        DeliveryStatus.SCHEDULED,
         DeliveryStatus.FAILED,
         DeliveryStatus.CANCELLED,
     },

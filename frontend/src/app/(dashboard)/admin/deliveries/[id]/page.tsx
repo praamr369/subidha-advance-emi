@@ -149,6 +149,7 @@ export default function AdminDeliveryDetailPage() {
   const [notes, setNotes] = useState("");
   const [reason, setReason] = useState("");
   const [splitQuantities, setSplitQuantities] = useState<Record<number, number>>({});
+  const [splitDecisions, setSplitDecisions] = useState<Record<number, "YES" | "NO">>({});
   const [splitDate, setSplitDate] = useState("");
   const [splitBusy, setSplitBusy] = useState(false);
 
@@ -603,7 +604,7 @@ export default function AdminDeliveryDetailPage() {
                         {(delivery.delivery_items ?? []).map((it) => (
                           <tr key={`split-${it.id}`}>
                             <td className="p-2 font-medium">{it.product_name}</td><td className="p-2 text-right">{it.quantity} total</td>
-                            <td className="p-2"><input type="number" min={0} max={it.quantity} value={splitQuantities[it.id || 0] ?? 0} onChange={(event) => setSplitQuantities((current) => ({ ...current, [it.id || 0]: Number(event.target.value) }))} className="w-24 rounded border border-border px-2 py-1" /></td>
+                            <td className="p-2"><select value={splitDecisions[it.id || 0] ?? "NO"} onChange={(event) => { const decision = event.target.value as "YES" | "NO"; setSplitDecisions((current) => ({ ...current, [it.id || 0]: decision })); if (decision === "NO") setSplitQuantities((current) => ({ ...current, [it.id || 0]: 0 })); }} className="mr-2 rounded border border-border px-2 py-1"><option value="YES">Yes — today</option><option value="NO">No — later</option></select><input type="number" min={0} max={it.quantity} disabled={(splitDecisions[it.id || 0] ?? "NO") === "NO"} value={splitQuantities[it.id || 0] ?? 0} onChange={(event) => setSplitQuantities((current) => ({ ...current, [it.id || 0]: Number(event.target.value) }))} className="w-24 rounded border border-border px-2 py-1 disabled:bg-muted" /></td>
                           </tr>
                         ))}
                       </tbody></table>
