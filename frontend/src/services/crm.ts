@@ -239,6 +239,10 @@ export function getCrmParty(id: number | string) {
   return apiFetch<PartyDetailResponse>(`/crm/parties/${id}/`);
 }
 
+export function getCrmPartyArchiveUrl(id: number | string) {
+  return `/api/v1/crm/parties/${id}/archive/`;
+}
+
 export function updateCrmParty(
   id: number | string,
   payload: {

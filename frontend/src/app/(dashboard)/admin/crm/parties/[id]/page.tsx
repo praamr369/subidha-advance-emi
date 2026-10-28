@@ -25,6 +25,8 @@ import {
   buildAdminSubscriptionRoute,
 } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
+import { API_BASE_URL } from "@/lib/constants";
+import { getAccessToken } from "@/lib/auth/tokens";
 import {
   createPartyInteraction,
   getCrmParty,
@@ -232,6 +234,22 @@ export default function AdminCrmPartyDetailPage() {
     }
   }
 
+  async function handleDownloadArchive() {
+    if (!payload) return;
+    const token = getAccessToken();
+    const response = await fetch(`${API_BASE_URL}/crm/parties/${payload.party.id}/archive/`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
+    if (!response.ok) throw new Error("Unable to download the party archive.");
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${payload.party.party_no}-archive.zip`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <ERPPageShell
       eyebrow="CRM"
@@ -246,6 +264,7 @@ export default function AdminCrmPartyDetailPage() {
       actions={[
         { href: ROUTES.admin.crmParties, label: "Back to Directory", variant: "secondary" },
         { href: ROUTES.admin.crmLeads, label: "CRM Leads", variant: "secondary" },
+        ...(payload ? [{ onClick: () => void handleDownloadArchive(), label: "Download Full ZIP Archive", variant: "secondary" as const }] : []),
         ...quickLinks.map((item) => ({
           href: item.href,
           label: `Open ${item.label}`,
