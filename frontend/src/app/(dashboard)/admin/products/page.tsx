@@ -285,6 +285,7 @@ function PimProductRow({
         <div className="flex flex-col gap-1.5 items-start">
           <Link
             href={`/admin/pim/products/${p.id}/edit`}
+            onClick={() => rememberProductsWorkspaceState({ tab: "pim", scrollY: window.scrollY })}
             className="inline-flex items-center gap-1 text-primary text-xs hover:underline font-medium"
           >
             PIM Editor <ExternalLink className="h-3 w-3" />
@@ -292,6 +293,7 @@ function PimProductRow({
           {!isChild && (
             <Link
               href={`/admin/pim/products/${p.id}/variants/publish-control`}
+              onClick={() => rememberProductsWorkspaceState({ tab: "pim", scrollY: window.scrollY })}
               className="inline-flex items-center gap-1 text-violet-600 text-xs hover:underline font-medium"
             >
               Publish control <Layers className="h-3 w-3" />
@@ -321,6 +323,24 @@ function PimProductRow({
 
 const PIM_PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
 const PIM_CHILD_PAGE_SIZE = 200;
+const PRODUCTS_WORKSPACE_STATE_KEY = "admin-products-workspace-state";
+
+type ProductsWorkspaceState = {
+  tab: "subscription" | "pim" | "help";
+  pimSearchInput: string;
+  pimCat: number | "";
+  pimPage: number;
+  pimPageSize: number;
+  scrollY: number;
+};
+
+function rememberProductsWorkspaceState(partial: Partial<ProductsWorkspaceState> = {}) {
+  if (typeof window === "undefined") return;
+  try {
+    const current = JSON.parse(sessionStorage.getItem(PRODUCTS_WORKSPACE_STATE_KEY) || "{}") as Partial<ProductsWorkspaceState>;
+    sessionStorage.setItem(PRODUCTS_WORKSPACE_STATE_KEY, JSON.stringify({ ...current, ...partial }));
+  } catch { /* workspace restoration is best effort */ }
+}
 
 /** Every variant SKU of the given blueprints, following pages until all are loaded. */
 async function fetchVariantSkus(parentIds: number[]): Promise<PimProduct[]> {
@@ -394,6 +414,22 @@ function PimPanel() {
   const [bulkPublishing, setBulkPublishing] = useState(false);
   const [bulkPublishResult, setBulkPublishResult] = useState<string | null>(null);
   const tableTopRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(PRODUCTS_WORKSPACE_STATE_KEY) || "null") as Partial<ProductsWorkspaceState> | null;
+      if (!saved) return;
+      if (typeof saved.pimSearchInput === "string") setPimSearchInput(saved.pimSearchInput);
+      if (typeof saved.pimCat === "number" || saved.pimCat === "") setPimCat(saved.pimCat);
+      if (typeof saved.pimPage === "number") setPimPage(saved.pimPage);
+      if (typeof saved.pimPageSize === "number" && PIM_PAGE_SIZE_OPTIONS.includes(saved.pimPageSize)) setPimPageSize(saved.pimPageSize);
+      requestAnimationFrame(() => { if (typeof saved.scrollY === "number") window.scrollTo({ top: saved.scrollY, behavior: "instant" as ScrollBehavior }); });
+    } catch { /* ignore malformed workspace state */ }
+  }, []);
+
+  useEffect(() => {
+    return () => rememberProductsWorkspaceState({ tab: "pim", pimSearchInput, pimCat, pimPage, pimPageSize, scrollY: window.scrollY });
+  }, [pimSearchInput, pimCat, pimPage, pimPageSize]);
 
   useEffect(() => {
     pimService.getCategories().then((cats) => setPimCategories(Array.isArray(cats) ? cats : []), () => {});
@@ -694,6 +730,13 @@ export default function AdminProductsPage() {
     if (tabParam === "help") return "help";
     return tabParam === "pim" ? "pim" : "subscription";
   });
+  useEffect(() => {
+    if (searchParams.get("tab")) return;
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(PRODUCTS_WORKSPACE_STATE_KEY) || "null") as Partial<ProductsWorkspaceState> | null;
+      if (saved?.tab === "pim" || saved?.tab === "help") setActiveTab(saved.tab);
+    } catch { /* ignore malformed workspace state */ }
+  }, [searchParams]);
   const [catalogOptions, setCatalogOptions] = useState<ProductCatalogOptions>(() => emptyCatalogOptions());
   const [showAdvanced, setShowAdvanced] = useState(false);
   // Subscription products: hide variant SKUs by default (they're managed via PIM base product)
