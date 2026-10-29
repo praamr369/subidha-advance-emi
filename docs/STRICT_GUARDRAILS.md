@@ -31,6 +31,16 @@
 - **Minimal Diffs**: Keep changes focused strictly on what the user requested. Prefer additive improvements to existing files over creating new files.
 - **Document New Files**: If creating a new file is required, its necessity and location must be documented.
 
+## 6. Strict Terminology & Brand Guardrail (NO "Lucky Plan" — USE "SFEMI")
+- **NO "Lucky Plan", "Lucky Draw", or "Lucky ID" Wordings**: Never use the words "Lucky Plan", "Lucky Draw", or "Lucky ID" in any AI-generated marketing copy, advertisements, customer-facing text, public announcements, banners, or newly drafted documentation.
+- **Use Canonical Term "SFEMI"**: The canonical, legally compliant, approved commercial and retail term is strictly **SFEMI** (or **Subidha EMI (SFEMI)** / **SFEMI Advance EMI**).
+- **Approved Terminology Mapping**:
+  - Scheme name: **SFEMI (Advance EMI)**
+  - Subscriber identifier: **SFEMI ID** (e.g., SFEMI ID 00–99)
+  - Monthly draw/selection: **SFEMI Monthly Promotional Benefit** or **Promotional Benefit Selection**
+  - Winner / benefit outcome: **Promotional Benefit Waiver** (Remaining future EMIs waived as per rulebook and customer contract)
+- **Legal Compliance**: This prevents any confusion with wagers/lotteries/chit funds, complies with retail promotional scheme legal standards under Indian consumer protection law, and represents the true registered brand identity.
+
 ---
 
 ## Enforcement Hooks

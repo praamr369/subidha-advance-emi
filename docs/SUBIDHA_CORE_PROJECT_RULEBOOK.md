@@ -69,6 +69,7 @@ All AI agents (Antigravity, Gemini, Claude, Cursor, GitHub Copilot, Codex, Winds
 | **3** | **No Direct Database Mutation & Never Use DELETE** | Destructive database operations (`DELETE`, `DROP`, `TRUNCATE`, `flush`, `migrate zero`) are strictly forbidden. Financial records and business history are strictly append-only. |
 | **4** | **Nothing Deleted Without Permission** | Never delete any file, component, service, route, or test (`rm`, `git rm`, unlink). Route consolidations are strictly additive (tabs). Guarded by `.githooks/pre-commit`. |
 | **5** | **Nothing Added Without Permission** | Never introduce unrequested third-party packages, libraries, microservices, or new route hierarchies without explicit approval. Keep diffs focused and minimal. |
+| **6** | **Strict Terminology Guardrail (No "Lucky Plan" — Use "SFEMI")** | Never use the wording "Lucky Plan", "Lucky Draw", or "Lucky ID" in any copy, advertisements, customer-facing text, public pages, banners, or documentation. The canonical, legally compliant term is strictly **SFEMI** (or **Subidha EMI (SFEMI)** / **SFEMI Advance EMI**). Use **SFEMI ID** (not Lucky ID) and **SFEMI Monthly Promotional Benefit** / **Remaining Future EMIs Waived** (not Lucky Draw / Win). |
 
 Full technical guardrail specification is maintained in [`docs/STRICT_GUARDRAILS.md`](STRICT_GUARDRAILS.md).
 Inter-agent coordination and audit ledger are maintained in [`docs/AGENT_SYNC_LOG.md`](AGENT_SYNC_LOG.md) and [`scripts/agent_sync.py`](../scripts/agent_sync.py).

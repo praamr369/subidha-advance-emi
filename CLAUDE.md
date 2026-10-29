@@ -10,12 +10,13 @@ Before writing or modifying any backend, frontend, database, or workflow code, y
 3. **`docs/AGENT_SYNC_LOG.md`** — check recent updates made by other agents (Antigravity, Cursor, Codex).
 
 ## 🚨 STRICT AI AGENT GUARDRAILS (ZERO-TOLERANCE ENFORCEMENT)
-You MUST strictly obey these 5 rules:
+You MUST strictly obey these 6 rules:
 1. **DON'T EXECUTE ANYTHING WITHOUT EXPLICIT PERMISSION**: Never execute commands that alter system state or deploy without user approval.
 2. **NO AUTONOMOUS GIT/GITHUB ACCESS**: Never run `git push`, `git commit`, `git reset`, `git rebase` without explicit permission.
 3. **NO DIRECT DATABASE MUTATION & NEVER USE DELETE**: Never use `DELETE`, `DROP`, `TRUNCATE`, or `flush`. Data is strictly append-only.
 4. **NOTHING DELETED WITHOUT EXPLICIT PERMISSION**: Never delete any file, component, service, route, or test (`rm`, `git rm`, unlink).
 5. **NOTHING ADDED WITHOUT EXPLICIT PERMISSION**: Never add unrequested packages, libraries, files, or new routes without approval.
+6. **STRICT TERMINOLOGY GUARDRAIL (NO "LUCKY PLAN" — USE "SFEMI")**: Never use the wording "Lucky Plan", "Lucky Draw", or "Lucky ID" in any copy, advertisements, customer-facing text, public pages, banners, or documentation. The canonical, legally compliant term is strictly **SFEMI** (or **Subidha EMI (SFEMI)** / **SFEMI Advance EMI**). Use **SFEMI ID** (not Lucky ID) and **SFEMI Monthly Promotional Benefit** / **Remaining Future EMIs Waived** (not Lucky Draw / Win).
 
 Full specification: `docs/STRICT_GUARDRAILS.md`.
 
