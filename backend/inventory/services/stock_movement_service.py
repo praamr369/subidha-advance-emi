@@ -250,9 +250,11 @@ def check_stock_for_delivery(
     *,
     inventory_item: InventoryItem,
     quantity: Decimal = Decimal("1.000"),
+    variant_sku: str | None = None,
 ) -> dict:
     """
-    Check whether stock is available before scheduling a delivery.
+    Check whether stock is available before scheduling a delivery, including
+    all attached/bundled accessories and raw materials (e.g. Commercial Plyboard for a Bed).
 
     Returns:
         {"ok": True}   — enough stock (physical or reserved for this subscription)
@@ -278,4 +280,36 @@ def check_stock_for_delivery(
                 f"is insufficient due to {reserved} units already reserved."
             ),
         }
+
+    # Check attached bundled products / accessories (e.g. Commercial Plyboard for a Bed)
+    product = getattr(inventory_item, "product", None)
+    if product and hasattr(product, "related_products"):
+        for rel in product.related_products.select_related("related_product", "related_product__inventory_profile").all():
+            if rel.parent_variant_sku and variant_sku and rel.parent_variant_sku != variant_sku:
+                continue
+            rel_inv = getattr(rel.related_product, "inventory_profile", None)
+            if not rel_inv or not rel_inv.stock_tracking_enabled:
+                continue
+            rel_req = qty * Decimal(str(rel.quantity or 1))
+            rel_phys = rel_inv.current_stock_quantity()
+            rel_avail = rel_inv.available_qty()
+            if rel_phys < rel_req:
+                return {
+                    "ok": False,
+                    "reason": (
+                        f"Required bundled {rel.relationship_type.title()} '{rel.related_product.name}' "
+                        f"({rel.related_product.product_code}) is out of stock. Available: {rel_phys:.2f}, Required: {rel_req:.2f}."
+                    ),
+                    "bundled_item_id": rel.related_product_id,
+                }
+            if rel_avail < rel_req and rel_phys >= rel_req:
+                return {
+                    "ok": False,
+                    "reason": (
+                        f"Required bundled {rel.relationship_type.title()} '{rel.related_product.name}' "
+                        f"has insufficient available stock ({rel_avail:.2f}) for required {rel_req:.2f} due to reservations."
+                    ),
+                    "bundled_item_id": rel.related_product_id,
+                }
+
     return {"ok": True}

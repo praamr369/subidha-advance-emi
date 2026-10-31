@@ -205,13 +205,18 @@ class AdminInventoryProfileDetailSerializer(serializers.ModelSerializer):
 
     def _get_cost_breakdown(self, obj):
         base_price = obj.product.base_price or Decimal("0.00")
-        base_cost = obj.standard_unit_cost or Decimal("0.00")
+        base_cost = obj.standard_unit_cost or obj.purchase_unit_cost or Decimal("0.00")
+        if base_cost == Decimal("0.00") and getattr(obj, "manufacturing_cost_enabled", False):
+            raw = obj.manufacturing_raw_material_cost or Decimal("0.00")
+            labour = obj.manufacturing_labour_cost or Decimal("0.00")
+            overhead = obj.manufacturing_overhead_cost or Decimal("0.00")
+            base_cost = raw + labour + overhead
         
         included_cost = Decimal("0.00")
         if hasattr(obj.product, 'related_products'):
             for rel in obj.product.related_products.filter(is_price_included_in_parent=True):
                 related_inv = getattr(rel.related_product, 'inventory_profile', None)
-                rel_cost = related_inv.standard_unit_cost if related_inv else Decimal("0.00")
+                rel_cost = (related_inv.standard_unit_cost or related_inv.purchase_unit_cost) if related_inv else Decimal("0.00")
                 if rel_cost:
                     included_cost += (rel_cost * (rel.quantity or Decimal("1.00")))
         

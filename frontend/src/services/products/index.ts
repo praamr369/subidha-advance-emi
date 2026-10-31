@@ -336,6 +336,11 @@ export type ProductRelationship = {
   related_product_name: string;
   related_product_code: string;
   related_product_item_type: ProductItemType;
+  related_product_base_price?: string;
+  related_product_stock_qty?: string;
+  related_product_stock_status?: string;
+  related_product_unit_cost?: string;
+  related_product_total_cost?: string;
   relationship_type: ProductRelationshipType;
   quantity: string;
   is_price_included_in_parent: boolean;

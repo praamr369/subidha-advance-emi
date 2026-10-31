@@ -49,19 +49,28 @@ function buildCustomerAddress(sale: DirectSale): string {
 }
 
 function buildLineItems(sale: DirectSale): DocumentLineItem[] {
-  return (sale.lines || []).map((line, index) => ({
-    key: line.id || `${index}-${line.description}`,
-    description: line.description || `Item ${index + 1}`,
-    code: [line.sku_snapshot, line.product_code_snapshot || line.product_code, line.hsn_sac_code]
-      .map((part) => (part || "").trim())
-      .filter(Boolean)
-      .join(" · "),
-    quantity: line.quantity,
-    rate: formatDocumentMoney(line.unit_price),
-    discount: formatDocumentMoney(line.discount_amount),
-    tax: lineTaxTotal(line),
-    total: formatDocumentMoney(line.line_total),
-  }));
+  return (sale.lines || []).map((line, index) => {
+    let desc = line.description || `Item ${index + 1}`;
+    if (line.bundled_items && line.bundled_items.length > 0) {
+      const bundleDesc = line.bundled_items
+        .map((b) => `${b.quantity}x ${b.name}`)
+        .join(", ");
+      desc = `${desc} (Includes: ${bundleDesc})`;
+    }
+    return {
+      key: line.id || `${index}-${line.description}`,
+      description: desc,
+      code: [line.sku_snapshot, line.product_code_snapshot || line.product_code, line.hsn_sac_code]
+        .map((part) => (part || "").trim())
+        .filter(Boolean)
+        .join(" · "),
+      quantity: line.quantity,
+      rate: formatDocumentMoney(line.unit_price),
+      discount: formatDocumentMoney(line.discount_amount),
+      tax: lineTaxTotal(line),
+      total: formatDocumentMoney(line.line_total),
+    };
+  });
 }
 
 export default function DirectSaleInvoicePrintPage() {

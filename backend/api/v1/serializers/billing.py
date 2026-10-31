@@ -115,6 +115,7 @@ class DirectSaleCollectionSerializer(serializers.Serializer):
 class DirectSaleLineSerializer(serializers.ModelSerializer):
     product_code = serializers.CharField(source="product.product_code", read_only=True)
     inventory_item_sku = serializers.CharField(source="inventory_item.sku", read_only=True)
+    bundled_items = serializers.SerializerMethodField()
     create_purchase_requirement = serializers.BooleanField(write_only=True, required=False, default=False)
     requirement_quantity = serializers.DecimalField(
         max_digits=12,
@@ -147,6 +148,7 @@ class DirectSaleLineSerializer(serializers.ModelSerializer):
             "sku_snapshot",
             "unit_of_measure_snapshot",
             "hsn_sac_code",
+            "bundled_items",
             "create_purchase_requirement",
             "requirement_quantity",
             "requirement_note",
@@ -212,12 +214,34 @@ class DirectSaleLineSerializer(serializers.ModelSerializer):
         attrs["requirement_note"] = (attrs.get("requirement_note") or "").strip()
         return attrs
 
+    def get_bundled_items(self, obj):
+        items = []
+        product = getattr(obj, "product", None)
+        if product and hasattr(product, "related_products"):
+            variant_sku = getattr(obj, "sku_snapshot", None)
+            for rel in product.related_products.select_related("related_product", "related_product__inventory_profile").all():
+                if rel.parent_variant_sku and variant_sku and rel.parent_variant_sku != variant_sku:
+                    continue
+                inv = getattr(rel.related_product, "inventory_profile", None)
+                stock_qty = f"{inv.current_stock_quantity():.2f}" if inv else "0.00"
+                items.append({
+                    "id": rel.id,
+                    "name": rel.related_product.name,
+                    "code": rel.related_product.product_code,
+                    "type": rel.relationship_type,
+                    "quantity": str(rel.quantity or Decimal("1.00")),
+                    "is_price_included_in_parent": rel.is_price_included_in_parent,
+                    "current_stock_qty": stock_qty,
+                })
+        return items
+
 
 class BillingInvoiceLineSerializer(serializers.ModelSerializer):
     product_code = serializers.CharField(source="product.product_code", read_only=True)
     inventory_item_sku = serializers.CharField(source="inventory_item.sku", read_only=True)
     display_sku = serializers.SerializerMethodField()
     stock_tracking_label = serializers.SerializerMethodField()
+    bundled_items = serializers.SerializerMethodField()
 
     class Meta:
         model = BillingInvoiceLine
@@ -240,10 +264,29 @@ class BillingInvoiceLineSerializer(serializers.ModelSerializer):
             "igst_amount",
             "line_total",
             "hsn_sac_code",
+            "bundled_items",
             "created_at",
             "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+    def get_bundled_items(self, obj):
+        items = []
+        product = getattr(obj, "product", None)
+        if product and hasattr(product, "related_products"):
+            for rel in product.related_products.select_related("related_product", "related_product__inventory_profile").all():
+                inv = getattr(rel.related_product, "inventory_profile", None)
+                stock_qty = f"{inv.current_stock_quantity():.2f}" if inv else "0.00"
+                items.append({
+                    "id": rel.id,
+                    "name": rel.related_product.name,
+                    "code": rel.related_product.product_code,
+                    "type": rel.relationship_type,
+                    "quantity": str(rel.quantity or Decimal("1.00")),
+                    "is_price_included_in_parent": rel.is_price_included_in_parent,
+                    "current_stock_qty": stock_qty,
+                })
+        return items
 
     def get_display_sku(self, obj):
         item = getattr(obj, "inventory_item", None)

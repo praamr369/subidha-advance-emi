@@ -3106,6 +3106,8 @@ class ProductRelationshipSerializer(serializers.ModelSerializer):
     related_product_code = serializers.CharField(source="related_product.product_code", read_only=True)
     related_product_item_type = serializers.CharField(source="related_product.item_type", read_only=True)
     related_product_base_price = serializers.CharField(source="related_product.base_price", read_only=True)
+    related_product_unit_cost = serializers.SerializerMethodField()
+    related_product_total_cost = serializers.SerializerMethodField()
     related_product_stock_qty = serializers.SerializerMethodField()
     related_product_stock_status = serializers.SerializerMethodField()
 
@@ -3144,6 +3146,8 @@ class ProductRelationshipSerializer(serializers.ModelSerializer):
             "related_product_code",
             "related_product_item_type",
             "related_product_base_price",
+            "related_product_unit_cost",
+            "related_product_total_cost",
             "related_product_stock_qty",
             "related_product_stock_status",
             "relationship_type",
@@ -3156,11 +3160,36 @@ class ProductRelationshipSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "id",
             "related_product_base_price",
+            "related_product_unit_cost",
+            "related_product_total_cost",
             "related_product_stock_qty",
             "related_product_stock_status",
             "created_at",
             "updated_at",
         ]
+
+    def get_related_product_unit_cost(self, obj):
+        try:
+            inv = getattr(obj.related_product, "inventory_profile", None)
+            if inv:
+                from decimal import Decimal
+                cost = inv.purchase_unit_cost or inv.standard_unit_cost or Decimal("0.00")
+                return f"{cost:.2f}"
+        except Exception:
+            pass
+        return "0.00"
+
+    def get_related_product_total_cost(self, obj):
+        try:
+            inv = getattr(obj.related_product, "inventory_profile", None)
+            if inv:
+                from decimal import Decimal
+                cost = inv.purchase_unit_cost or inv.standard_unit_cost or Decimal("0.00")
+                qty = obj.quantity or Decimal("1.00")
+                return f"{(cost * qty):.2f}"
+        except Exception:
+            pass
+        return "0.00"
 
     def get_related_product_stock_qty(self, obj):
         try:

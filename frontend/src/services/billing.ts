@@ -65,6 +65,15 @@ export type DirectSaleLine = {
   create_purchase_requirement?: boolean;
   requirement_quantity?: string | null;
   requirement_note?: string;
+  bundled_items?: Array<{
+    id: number;
+    name: string;
+    code: string;
+    type: string;
+    quantity: string;
+    is_price_included_in_parent: boolean;
+    current_stock_qty?: string;
+  }>;
 };
 
 export type DirectSale = {

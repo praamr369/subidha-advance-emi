@@ -353,15 +353,40 @@ export default function RelatedProductsSection({
                           )}
                         </div>
                       )}
-                      <div className="flex items-center gap-2 mt-1 text-xs">
-                        <span className="inline-block px-2 py-1 rounded bg-primary/10 text-primary font-medium">
+                      <div className="flex items-center gap-2 mt-1.5 text-xs flex-wrap">
+                        <span className="inline-block px-2 py-0.5 rounded bg-primary/10 text-primary font-medium">
                           {RELATIONSHIP_TYPE_LABELS[rel.relationship_type as ProductRelationshipType]}
                         </span>
-                        <span className="text-muted-foreground">Qty: {rel.quantity}</span>
+                        <span className="text-muted-foreground font-mono">Qty: {rel.quantity}</span>
                         {rel.is_price_included_in_parent ? (
-                          <span className="text-emerald-600 bg-emerald-50 border border-emerald-100 rounded px-1.5 py-0.5">Included</span>
+                          <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5 font-medium">Included in Base Price</span>
                         ) : (
-                          <span className="text-orange-600 bg-orange-50 border border-orange-100 rounded px-1.5 py-0.5">Extra Cost</span>
+                          <span className="text-orange-700 bg-orange-50 border border-orange-200 rounded px-1.5 py-0.5 font-medium">Extra Cost Add-on</span>
+                        )}
+                        {/* Live Stock Badge */}
+                        {rel.related_product_stock_status && (
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium text-[11px] border ${
+                            rel.related_product_stock_status === "IN_STOCK"
+                              ? "bg-green-50 text-green-700 border-green-200"
+                              : rel.related_product_stock_status === "LOW_STOCK"
+                              ? "bg-amber-50 text-amber-700 border-amber-200"
+                              : "bg-red-50 text-red-700 border-red-200"
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${
+                              rel.related_product_stock_status === "IN_STOCK" ? "bg-green-500" : rel.related_product_stock_status === "LOW_STOCK" ? "bg-amber-500" : "bg-red-500"
+                            }`} />
+                            {rel.related_product_stock_status === "IN_STOCK"
+                              ? `Stock: ${parseFloat(rel.related_product_stock_qty || "0").toFixed(1)}`
+                              : rel.related_product_stock_status === "LOW_STOCK"
+                              ? `Low Stock: ${parseFloat(rel.related_product_stock_qty || "0").toFixed(1)}`
+                              : "Out of Stock"}
+                          </span>
+                        )}
+                        {/* Unit & Total Cost */}
+                        {Number(rel.related_product_unit_cost || 0) > 0 && (
+                          <span className="text-slate-600 bg-slate-100 border border-slate-200 rounded px-1.5 py-0.5 text-[11px]">
+                            Avg Cost: ₹{Number(rel.related_product_unit_cost).toLocaleString("en-IN", { minimumFractionDigits: 2 })} (Total: ₹{Number(rel.related_product_total_cost || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })})
+                          </span>
                         )}
                       </div>
                       {rel.notes && (
