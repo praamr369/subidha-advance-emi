@@ -1039,6 +1039,7 @@ export default function VariantManager({ productId, productCode, productName, ba
 
   // QR label printing
   const [printItem, setPrintItem] = useState<QRLabelItem | null>(null);
+  const [bulkPrintItems, setBulkPrintItems] = useState<QRLabelItem[] | null>(null);
 
   const handleImageUpload = async (id: number, file: File) => {
     setUploadingImage(id);
@@ -1260,11 +1261,15 @@ export default function VariantManager({ productId, productCode, productName, ba
     const origin = typeof window !== "undefined" && window.location.origin
       ? window.location.origin
       : "https://subidhafurnitureasansol.com";
-    const publicUrl = `${origin}/products/${encodeURIComponent(productCode || v.sku)}${v.sku && v.sku !== productCode ? `?sku=${encodeURIComponent(v.sku)}` : ""}`;
+    const code = v.sku || productCode;
+    const publicUrl = `${origin}/showcase/code/${encodeURIComponent(code)}`;
     return {
-      productName: productName ? `${productName}${attrSummary ? ` — ${attrSummary}` : ""}` : v.variant_label || v.sku,
+      id: v.id,
+      productName: productName ? `${productName}${attrSummary ? ` (${attrSummary})` : ""}` : (v.variant_label || v.sku),
       productCode: productCode,
       sku: v.sku,
+      category: attrSummary || undefined,
+      price: v.price != null && Number(v.price) > 0 ? Number(v.price) : undefined,
       qrValue: publicUrl,
       publicUrl: publicUrl,
     };
@@ -1273,61 +1278,7 @@ export default function VariantManager({ productId, productCode, productName, ba
   function handleBulkPrintQR() {
     const selectedVariants = variants.filter((v) => selected.has(v.id));
     if (selectedVariants.length === 0) return;
-    const win = window.open("", "_blank", "width=900,height=700");
-    if (!win) return;
-    const origin = typeof window !== "undefined" && window.location.origin
-      ? window.location.origin
-      : "https://subidhafurnitureasansol.com";
-    const labelsHtml = selectedVariants.map((v) => {
-      const attrSummary = v.attribute_values.map((a) => a.value_text).filter(Boolean).join(" / ");
-      const displayName = productName ? `${productName}${attrSummary ? ` — ${attrSummary}` : ""}` : v.variant_label || v.sku;
-      const publicUrl = `${origin}/products/${encodeURIComponent(productCode || v.sku)}${v.sku && v.sku !== productCode ? `?sku=${encodeURIComponent(v.sku)}` : ""}`;
-      return `
-        <div class="label">
-          <div class="qr-placeholder" data-url="${escHtml(publicUrl)}" data-sku="${escHtml(v.sku)}"></div>
-          <div class="name">${escHtml(displayName)}</div>
-          <div class="code">${escHtml(productCode)} · ${escHtml(v.sku)}</div>
-          ${attrSummary ? `<div class="attrs">${escHtml(attrSummary)}</div>` : ""}
-          <div class="hint">Scan for specs, price &amp; 3D AR</div>
-        </div>`;
-    }).join("");
-    // Use a QR CDN for print window (self-contained SVG QR via qrcode.js UMD)
-    win.document.write(`
-      <!DOCTYPE html><html>
-      <head>
-        <title>QR Labels — ${escHtml(productCode)}</title>
-        <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"><\/script>
-        <style>
-          @page { size: A4; margin: 10mm; }
-          * { box-sizing: border-box; margin: 0; padding: 0; }
-          body { font-family: 'Courier New', monospace; background: #fff; }
-          .grid { display: flex; flex-wrap: wrap; gap: 6mm; }
-          .label { width: 96mm; height: 72mm; border: 1px solid #000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 8px; page-break-inside: avoid; }
-          canvas { display: block; }
-          .name { font-size: 11px; font-weight: bold; text-align: center; max-width: 88mm; word-break: break-word; }
-          .code { font-size: 10px; letter-spacing: 0.04em; }
-          .attrs { font-size: 9px; color: #555; }
-          .hint { font-size: 8px; color: #777; text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
-        </style>
-      </head>
-      <body>
-        <div class="grid">${labelsHtml}</div>
-        <script>
-          document.querySelectorAll('.qr-placeholder').forEach(function(el) {
-            var canvas = document.createElement('canvas');
-            el.replaceWith(canvas);
-            var target = el.getAttribute('data-url') || el.getAttribute('data-sku') || 'SKU';
-            QRCode.toCanvas(canvas, target, { width: 120, margin: 1 });
-          });
-          window.onload = function() { window.print(); };
-        <\/script>
-      </body></html>
-    `);
-    win.document.close();
-  }
-
-  function escHtml(s: string): string {
-    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    setBulkPrintItems(selectedVariants.map(variantToLabel));
   }
 
   const exportCsv = () => {
@@ -1915,8 +1866,15 @@ export default function VariantManager({ productId, productCode, productName, ba
         </>
       )}
 
-      {printItem && (
-        <QRLabelPrintModal item={printItem} onClose={() => setPrintItem(null)} />
+      {(printItem || (bulkPrintItems && bulkPrintItems.length > 0)) && (
+        <QRLabelPrintModal
+          item={printItem}
+          items={bulkPrintItems ?? undefined}
+          onClose={() => {
+            setPrintItem(null);
+            setBulkPrintItems(null);
+          }}
+        />
       )}
 
       {copyModalTarget && (

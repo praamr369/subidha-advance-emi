@@ -5,9 +5,10 @@ import { formatRupee } from "@/lib/utils/currency";
 import Link from "next/link";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Download, RefreshCw, Search, SlidersHorizontal, X, Layers, ExternalLink, ChevronRight, ChevronDown, GitBranch, CheckCircle2, AlertCircle, Star, Package2, CircleHelp } from "lucide-react";
+import { Download, RefreshCw, Search, SlidersHorizontal, X, Layers, ExternalLink, ChevronRight, ChevronDown, GitBranch, CheckCircle2, AlertCircle, Star, Package2, CircleHelp, QrCode } from "lucide-react";
 import PimHelpGuideTab from "@/components/admin/help/PimHelpGuideTab";
 import { pimService, type PimProduct, type PimCategory, type PimTreeSummary } from "@/services/pim";
+import QRLabelPrintModal, { type QRLabelItem } from "@/components/inventory/QRLabelPrintModal";
 
 import ProductQuickActions from "@/components/admin/products/ProductQuickActions";
 import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
@@ -56,6 +57,85 @@ function formatDateTime(value: string | null | undefined): string {
 
 function label(value: string | null | undefined, fallback: string): string {
   return (value || "").trim() || fallback;
+}
+
+function pimProductToQRLabel(p: PimProduct): QRLabelItem {
+  const origin = typeof window !== "undefined" && window.location.origin
+    ? window.location.origin
+    : "https://subidhafurnitureasansol.com";
+
+  // Distinguish blueprint code and variant SKU code
+  const productCode = p.parent_code || p.code || `PIM-${p.id}`;
+  const sku = p.code || undefined;
+  const publicCode = sku || productCode;
+  const publicUrl = `${origin}/showcase/code/${encodeURIComponent(publicCode)}`;
+  const cat = [p.category_name, p.subcategory_name].filter(Boolean).join(" / ");
+
+  // Full Name with attributes
+  let fullName = (p.full_name || p.name || `Product #${p.id}`).trim();
+  if (fullName === p.name) {
+    const attrTexts: string[] = [];
+    if (Array.isArray(p.attributes) && p.attributes.length > 0) {
+      for (const a of p.attributes) {
+        const val = a.display_value || (a.value_text ? `${a.attribute_name}: ${a.value_text}` : "");
+        if (val) attrTexts.push(val);
+      }
+    }
+    if (Array.isArray(p.variant_attribute_values) && p.variant_attribute_values.length > 0) {
+      for (const va of p.variant_attribute_values) {
+        if (va.value_text) {
+          attrTexts.push(va.attribute_name ? `${va.attribute_name}: ${va.value_text}` : va.value_text);
+        }
+      }
+    }
+    if (attrTexts.length > 0) {
+      fullName = `${p.name} — ${attrTexts.join(" / ")}`;
+    }
+  }
+
+  return {
+    id: p.id,
+    productName: fullName,
+    productCode,
+    sku,
+    category: cat || undefined,
+    brand: p.brand || undefined,
+    price: p.base_price != null && Number(p.base_price) > 0 ? Number(p.base_price) : undefined,
+    qrValue: publicUrl,
+    publicUrl,
+  };
+}
+
+function productRecordToQRLabel(r: ProductRecord): QRLabelItem {
+  const origin = typeof window !== "undefined" && window.location.origin
+    ? window.location.origin
+    : "https://subidhafurnitureasansol.com";
+  const code = r.product_code || (r.id ? `PROD-${r.id}` : "");
+  const sku = r.sku || undefined;
+  const publicCode = sku || code;
+  const publicUrl = `${origin}/showcase/code/${encodeURIComponent(publicCode)}`;
+  const cat = [r.category, r.subcategory].filter(Boolean).join(" / ");
+
+  let fullName = (r.full_name || r.name || `Product #${r.id}`).trim();
+  if (fullName === r.name && r.base_specs && typeof r.base_specs === "object") {
+    const entries = Object.entries(r.base_specs)
+      .filter(([k, v]) => v != null && v !== "" && typeof v !== "object")
+      .map(([k, v]) => `${k}: ${v}`);
+    if (entries.length > 0) {
+      fullName = `${r.name} (${entries.join(", ")})`;
+    }
+  }
+
+  return {
+    id: r.id,
+    productName: fullName,
+    productCode: code,
+    sku,
+    category: cat || undefined,
+    price: r.base_price != null && Number(r.base_price) > 0 ? Number(r.base_price) : undefined,
+    qrValue: publicUrl,
+    publicUrl,
+  };
 }
 
 function ItemTypeBadge({ value }: { value?: string | null }) {
@@ -170,6 +250,7 @@ function PimProductRow({
   onToggle,
   selected = false,
   onSelect,
+  onPrintQR,
 }: {
   p: PimProduct;
   isChild?: boolean;
@@ -178,6 +259,7 @@ function PimProductRow({
   onToggle?: () => void;
   selected?: boolean;
   onSelect?: (selected: boolean) => void;
+  onPrintQR?: (p: PimProduct) => void;
 }) {
   const hasChildren = !isChild && (childCount ?? 0) > 0;
 
@@ -284,6 +366,14 @@ function PimProductRow({
       {/* Manage */}
       <td className="px-4 py-2.5">
         <div className="flex flex-col gap-1.5 items-start">
+          <button
+            type="button"
+            onClick={() => onPrintQR?.(p)}
+            className="inline-flex items-center gap-1 text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white text-xs hover:underline font-medium"
+            title="Print or download Showroom QR Code label with product name"
+          >
+            <QrCode className="h-3 w-3 text-primary" /> QR Label
+          </button>
           <Link
             href={`/admin/pim/products/${p.id}/edit`}
             onClick={() => rememberProductsWorkspaceState({ tab: "pim", scrollY: window.scrollY })}
@@ -414,6 +504,8 @@ function PimPanel() {
   const [selectedPimIds, setSelectedPimIds] = useState<Set<number>>(new Set());
   const [bulkPublishing, setBulkPublishing] = useState(false);
   const [bulkPublishResult, setBulkPublishResult] = useState<string | null>(null);
+  const [qrModalItem, setQrModalItem] = useState<QRLabelItem | null>(null);
+  const [qrModalItems, setQrModalItems] = useState<QRLabelItem[] | null>(null);
   const tableTopRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -579,6 +671,21 @@ function PimPanel() {
             <>
               <button
                 type="button"
+                onClick={() => {
+                  const selectedProducts = pimProducts.filter((p) => selectedPimIds.has(p.id));
+                  if (selectedProducts.length > 0) {
+                    setQrModalItems(selectedProducts.map(pimProductToQRLabel));
+                    setQrModalItem(null);
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-primary text-primary-foreground px-3 py-2 text-sm hover:opacity-90 font-medium shadow-sm"
+                title="Print or download Showroom QR codes for selected products"
+              >
+                <QrCode className="h-4 w-4" />
+                Bulk QR Labels ({selectedPimIds.size})
+              </button>
+              <button
+                type="button"
                 onClick={() => void handleBulkPublish(true)}
                 disabled={bulkPublishing}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 text-white px-3 py-2 text-sm hover:bg-emerald-700 disabled:opacity-50"
@@ -597,6 +704,22 @@ function PimPanel() {
               </button>
             </>
           )}
+          <button
+            type="button"
+            onClick={() => {
+              const list = roots.map((n) => n.product);
+              if (list.length > 0) {
+                setQrModalItems(list.map(pimProductToQRLabel));
+                setQrModalItem(null);
+              }
+            }}
+            disabled={roots.length === 0}
+            className="inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm hover:bg-muted disabled:opacity-50"
+            title="Bulk print or download Showroom QR codes for all products visible on this page"
+          >
+            <QrCode className="h-4 w-4" />
+            Print Page QRs ({roots.length})
+          </button>
           <button
             type="button"
             onClick={() => loadPimProducts()}
@@ -691,16 +814,36 @@ function PimPanel() {
                         if (selected) next.add(node.product.id); else next.delete(node.product.id);
                         return next;
                       })}
+                      onPrintQR={(prod) => {
+                        setQrModalItem(pimProductToQRLabel(prod));
+                        setQrModalItems(null);
+                      }}
                     />
                     {isExpanded && node.children.map((child) => (
-                      <PimProductRow key={child.id} p={child} isChild />
+                      <PimProductRow
+                        key={child.id}
+                        p={child}
+                        isChild
+                        onPrintQR={(prod) => {
+                          setQrModalItem(pimProductToQRLabel(prod));
+                          setQrModalItems(null);
+                        }}
+                      />
                     ))}
                   </Fragment>
                 );
               })}
               {/* Orphan children — parent filtered out but child visible */}
               {orphanChildren.map((p) => (
-                <PimProductRow key={p.id} p={p} isChild />
+                <PimProductRow
+                  key={p.id}
+                  p={p}
+                  isChild
+                  onPrintQR={(prod) => {
+                    setQrModalItem(pimProductToQRLabel(prod));
+                    setQrModalItems(null);
+                  }}
+                />
               ))}
             </tbody>
           </table>
@@ -708,6 +851,17 @@ function PimPanel() {
       </div>
 
       <PimPager {...pagerProps} />
+
+      {(qrModalItem || (qrModalItems && qrModalItems.length > 0)) && (
+        <QRLabelPrintModal
+          item={qrModalItem}
+          items={qrModalItems ?? undefined}
+          onClose={() => {
+            setQrModalItem(null);
+            setQrModalItems(null);
+          }}
+        />
+      )}
 
       <div className="rounded-xl border border-blue-200 bg-blue-50 dark:bg-blue-900/10 dark:border-blue-800 px-4 py-3 text-xs text-blue-700 dark:text-blue-300 flex items-start gap-3">
         <Layers className="h-4 w-4 shrink-0 mt-0.5" />
@@ -752,6 +906,8 @@ export default function AdminProductsPage() {
     const ps = Number(searchParams.get("page_size") ?? 50);
     return PAGE_SIZE_OPTIONS.includes(ps) ? ps : 50;
   });
+  const [subQRItems, setSubQRItems] = useState<QRLabelItem[] | null>(null);
+  const [subQRItem, setSubQRItem] = useState<QRLabelItem | null>(null);
 
   // Keep URL in sync with state
   const syncUrl = useCallback((nextFilters: FilterState, nextPage: number, nextPageSize: number) => {
@@ -1276,6 +1432,18 @@ export default function AdminProductsPage() {
               >
                 <Download className="h-3.5 w-3.5" /> Export
               </button>
+              <button
+                type="button"
+                disabled={!rows.length || loading}
+                onClick={() => {
+                  setSubQRItems(rows.map(productRecordToQRLabel));
+                  setSubQRItem(null);
+                }}
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-medium transition hover:bg-muted disabled:opacity-60"
+                title="Bulk print or download Showroom QR codes for products on this page"
+              >
+                <QrCode className="h-3.5 w-3.5" /> Bulk QR Labels ({rows.length})
+              </button>
             </div>
             <Link href="/admin/products/masters" className="text-sm text-primary hover:underline">Manage Masters →</Link>
           </div>
@@ -1334,6 +1502,17 @@ export default function AdminProductsPage() {
         ) : null}
         </>}
       </div>
+
+      {(subQRItem || (subQRItems && subQRItems.length > 0)) && (
+        <QRLabelPrintModal
+          item={subQRItem}
+          items={subQRItems ?? undefined}
+          onClose={() => {
+            setSubQRItem(null);
+            setSubQRItems(null);
+          }}
+        />
+      )}
     </ERPPageShell>
   );
 }

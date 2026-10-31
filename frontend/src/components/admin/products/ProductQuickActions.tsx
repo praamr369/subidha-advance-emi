@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
-import { MessageCircle, Edit3 } from "lucide-react";
+import { MessageCircle, Edit3, QrCode } from "lucide-react";
 import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
 
 import { prepareProductInventoryProfile, updateProduct } from "@/services/products";
 import { openWhatsAppDirectModal } from "@/components/whatsapp/WhatsAppDirectSenderModal";
+import QRLabelPrintModal from "@/components/inventory/QRLabelPrintModal";
 import { createPortal } from "react-dom";
 
 type QuickProduct = {
@@ -96,6 +97,7 @@ export default function ProductQuickActions({ product, mode = "compact", onChang
   }
   const [editOpen, setEditOpen] = useState(false);
   const [prepareOpen, setPrepareOpen] = useState(false);
+  const [qrModalOpen, setQrModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [preparing, setPreparing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -205,21 +207,32 @@ export default function ProductQuickActions({ product, mode = "compact", onChang
         onClick={() => {
           const price = Number(product.base_price || 0);
           const monthlyEmi = price > 0 ? Math.round(price / 12) : 1000;
+          const origin = typeof window !== "undefined" && window.location.origin ? window.location.origin : "https://subidhafurnitureasansol.com";
+          const showcaseUrl = `${origin}/showcase/code/${encodeURIComponent(product.product_code || product.sku || String(product.id))}`;
           openWhatsAppDirectModal({
             partyType: "CUSTOMER",
             eventType: "CUSTOM",
             product: product.name,
             amount: price,
             ref: product.sku || product.product_code || `#${product.id}`,
-            docUrl: typeof window !== "undefined" ? window.location.href : "",
-            text: `Hello! Greetings from Subidha Furniture, Asansol.\n\nHere are the details for *${product.name}*:\n💰 Price: ₹${price > 0 ? price.toLocaleString("en-IN") : "Best Offer"}\n⭐ 0% Lucky Plan Advance EMI: Just ₹${monthlyEmi.toLocaleString("en-IN")}/month!\n\nView details: ${typeof window !== "undefined" ? window.location.href : ""}\n\nVisit our showroom or reply to this chat to reserve your Lucky ID!`,
+            docUrl: showcaseUrl,
+            text: `Hello! Greetings from Subidha Furniture, Asansol.\n\nHere are the details for *${product.name}*:\n💰 Price: ₹${price > 0 ? price.toLocaleString("en-IN") : "Best Offer"}\n⭐ 0% SFEMI Advance EMI: Just ₹${monthlyEmi.toLocaleString("en-IN")}/month!\n\nView details: ${showcaseUrl}\n\nVisit our showroom or reply to this chat to reserve your SFEMI ID!`,
           });
         }}
         className="inline-flex items-center gap-1.5 rounded-md border border-[#25D366]/40 bg-[#25D366]/10 px-3 py-1.5 text-sm font-semibold text-emerald-800 shadow-sm transition hover:bg-[#25D366]/20 dark:text-emerald-300"
-        title="Share product specs and 0% EMI quote on WhatsApp"
+        title="Share product specs and 0% SFEMI quote on WhatsApp"
       >
         <MessageCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
         Share on WhatsApp
+      </button>
+      <button
+        type="button"
+        onClick={() => setQrModalOpen(true)}
+        className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted dark:border-slate-700"
+        title="Print or download Showroom QR Code label with product name"
+      >
+        <QrCode className="h-4 w-4 text-primary" />
+        QR Label
       </button>
       <button type="button" onClick={() => setEditOpen(true)} className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted">Quick Edit</button>
       {workflowLauncher ? (
@@ -272,6 +285,26 @@ export default function ProductQuickActions({ product, mode = "compact", onChang
           </div>
         </Drawer>
       ) : null}
+
+      {qrModalOpen && (
+        <QRLabelPrintModal
+          item={{
+            id: product.id,
+            productName: (product as { full_name?: string }).full_name || product.name,
+            productCode: product.product_code || (product.id ? `PROD-${product.id}` : ""),
+            sku: product.sku || undefined,
+            category: [product.category, product.subcategory].filter(Boolean).join(" / ") || undefined,
+            price: product.base_price != null && Number(product.base_price) > 0 ? Number(product.base_price) : undefined,
+            qrValue: typeof window !== "undefined"
+              ? `${window.location.origin}/showcase/code/${encodeURIComponent(product.sku || product.product_code || String(product.id))}`
+              : `https://subidhafurnitureasansol.com/showcase/code/${encodeURIComponent(product.sku || product.product_code || String(product.id))}`,
+            publicUrl: typeof window !== "undefined"
+              ? `${window.location.origin}/showcase/code/${encodeURIComponent(product.sku || product.product_code || String(product.id))}`
+              : `https://subidhafurnitureasansol.com/showcase/code/${encodeURIComponent(product.sku || product.product_code || String(product.id))}`,
+          }}
+          onClose={() => setQrModalOpen(false)}
+        />
+      )}
     </div>
   );
 }
