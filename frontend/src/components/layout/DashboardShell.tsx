@@ -71,8 +71,9 @@ import RoleSidebar from "@/components/layout/RoleSidebar";
 import SidebarHoverCard from "@/components/layout/SidebarHoverCard";
 import SidebarLiveStatusWidget from "@/components/layout/SidebarLiveStatusWidget";
 import BusinessSetupWorkflowBanner from "@/components/admin/business-setup/BusinessSetupWorkflowBanner";
-import WorkflowProvider from "@/components/workflows/WorkflowProvider";
+import WorkflowProvider, { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
 import AdminWorkspaceMenubar from "@/components/layout/AdminWorkspaceMenubar";
+import type { WorkflowId } from "@/config/workflows";
 import { WorkspaceBrandMark } from "@/components/brand/WorkspaceBrandMark";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { getStoredSession } from "@/lib/auth/session";
@@ -526,6 +527,7 @@ type TopbarQuickAction = {
   label: string;
   title: string;
   href: unknown;
+  workflowId?: WorkflowId;
 };
 
 function isConcreteLinkHref(href: unknown): href is string {
@@ -1362,11 +1364,12 @@ function Topbar({
   isLoggingOut: boolean;
   mobileOpen: boolean;
 }) {
+  const { openWorkflow } = useWorkflowLauncher();
   const topbarActions: TopbarQuickAction[] =
     role === "ADMIN"
       ? [
-          { key: "create-customer", label: "Customer", title: "Create customer", href: `${ROUTES.admin.customers}/create` },
-          { key: "create-product", label: "Product", title: "Create product / PIM", href: "/admin/pim/products/create" },
+          { key: "create-customer", label: "Customer", title: "Create customer", href: `${ROUTES.admin.customers}/create`, workflowId: "admin.createCustomer" },
+          { key: "create-product", label: "Product", title: "Create product / PIM", href: "/admin/pim/products/create", workflowId: "admin.createProduct" },
           { key: "create-contract", label: "Contract", title: "Create contract", href: ROUTES.admin.subscriptionsAdvanceEmiCreate },
           { key: "create-direct-sale", label: "Direct Sale", title: "Create direct sale", href: ROUTES.admin.billingDirectSaleCreate },
           { key: "collect-payment", label: "Payment", title: "Collect payment", href: ROUTES.admin.financeCollect },
@@ -1448,17 +1451,30 @@ function Topbar({
 
             {/* Quick-create chips (xl only) */}
             <div className="hidden items-center gap-1 xl:flex">
-              {validTopbarActions.map((action) => (
-                <Link
-                  key={action.key}
-                  href={action.href}
-                  className="inline-flex h-8 items-center gap-1 rounded-lg border border-[var(--topbar-border)] bg-[var(--topbar-control)] px-2 text-xs font-medium text-foreground transition hover:border-border hover:bg-muted/50"
-                  title={action.title}
-                >
-                  <Plus className="h-3 w-3 shrink-0" />
-                  {action.label}
-                </Link>
-              ))}
+              {validTopbarActions.map((action) =>
+                action.workflowId ? (
+                  <button
+                    key={action.key}
+                    type="button"
+                    onClick={() => openWorkflow(action.workflowId!)}
+                    className="inline-flex h-8 items-center gap-1 rounded-lg border border-[var(--topbar-border)] bg-[var(--topbar-control)] px-2 text-xs font-medium text-foreground transition hover:border-border hover:bg-muted/50 cursor-pointer"
+                    title={action.title}
+                  >
+                    <Plus className="h-3 w-3 shrink-0" />
+                    {action.label}
+                  </button>
+                ) : (
+                  <Link
+                    key={action.key}
+                    href={action.href}
+                    className="inline-flex h-8 items-center gap-1 rounded-lg border border-[var(--topbar-border)] bg-[var(--topbar-control)] px-2 text-xs font-medium text-foreground transition hover:border-border hover:bg-muted/50"
+                    title={action.title}
+                  >
+                    <Plus className="h-3 w-3 shrink-0" />
+                    {action.label}
+                  </Link>
+                )
+              )}
             </div>
 
             {/* Quick actions button */}

@@ -23,6 +23,7 @@ import {
 } from "@/services/products";
 import { pimService } from "@/services/pim";
 import QuickCreateInventoryDrawer from "@/components/inventory/QuickCreateInventoryDrawer";
+import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -329,6 +330,7 @@ function autoCode(name: string): string {
 
 export default function AdminProductCreatePage() {
   const router = useRouter();
+  const { openWorkflow } = useWorkflowLauncher();
   const [step, setStep] = useState<Step>(1);
 
   // Fields
@@ -638,7 +640,10 @@ export default function AdminProductCreatePage() {
         { label: "Products", href: "/admin/products" },
         { label: "Create Blueprint" },
       ]}
-      actions={[{ href: "/admin/products", label: "← Register", variant: "secondary" }]}
+      actions={[
+        { label: "⚡ Open PIM Drawer", onClick: () => openWorkflow("admin.createProduct"), variant: "primary" },
+        { href: "/admin/products", label: "← Register", variant: "secondary" },
+      ]}
       stats={[
         { label: "Step", value: `${step} of 3` },
         { label: "Code", value: trimmedProductCode || "—" },

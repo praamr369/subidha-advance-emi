@@ -38,8 +38,8 @@ export const WORKFLOWS: ReadonlyArray<WorkflowDefinition> = [
   },
   {
     id: "admin.createProduct",
-    label: "Create / Edit PIM Product",
-    description: "Add a new product or edit PIM catalog product, attributes, pricing, and variants inside an instant drawer overlay.",
+    label: "Create Product",
+    description: "Create product, add new product, or edit PIM catalog attributes, pricing, and variants inside an instant drawer overlay.",
     roles: ["ADMIN"],
     icon: "products",
     canonicalHref: "/admin/pim/products/create",
