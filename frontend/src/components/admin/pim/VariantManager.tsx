@@ -1261,8 +1261,10 @@ export default function VariantManager({ productId, productCode, productName, ba
     const origin = typeof window !== "undefined" && window.location.origin
       ? window.location.origin
       : "https://subidhafurnitureasansol.com";
-    const code = v.sku || productCode;
-    const publicUrl = `${origin}/showcase/code/${encodeURIComponent(code)}`;
+    const base = `${origin}/products/${encodeURIComponent(productCode)}`;
+    const publicUrl = v.sku && v.sku !== productCode
+      ? `${base}?sku=${encodeURIComponent(v.sku)}`
+      : base;
     return {
       id: v.id,
       productName: productName ? `${productName}${attrSummary ? ` (${attrSummary})` : ""}` : (v.variant_label || v.sku),

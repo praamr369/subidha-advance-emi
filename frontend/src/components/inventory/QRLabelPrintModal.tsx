@@ -107,12 +107,12 @@ export default function QRLabelPrintModal({ item, items, onClose }: Props) {
   const activeItem = labelList[activeIdx] ?? labelList[0];
 
   function getItemPublicUrl(it: QRLabelItem): string {
-    if (it.publicUrl && it.publicUrl.startsWith("http")) {
+    if (it.publicUrl && it.publicUrl.startsWith("http") && it.publicUrl.includes("/products/")) {
       return it.publicUrl;
     }
-    const code = it.productCode || it.sku || "";
-    if (!code) return it.qrValue;
-    const base = `${origin}/products/${encodeURIComponent(code)}`;
+    const baseCode = it.productCode || it.sku || (it.id ? String(it.id) : "");
+    if (!baseCode) return it.qrValue;
+    const base = `${origin}/products/${encodeURIComponent(baseCode)}`;
     return it.sku && it.sku !== it.productCode
       ? `${base}?sku=${encodeURIComponent(it.sku)}`
       : base;

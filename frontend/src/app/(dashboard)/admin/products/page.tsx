@@ -67,8 +67,10 @@ function pimProductToQRLabel(p: PimProduct): QRLabelItem {
   // Distinguish blueprint code and variant SKU code
   const productCode = p.parent_code || p.code || `PIM-${p.id}`;
   const sku = p.code || undefined;
-  const publicCode = sku || productCode;
-  const publicUrl = `${origin}/showcase/code/${encodeURIComponent(publicCode)}`;
+  const base = `${origin}/products/${encodeURIComponent(productCode)}`;
+  const publicUrl = sku && sku !== productCode
+    ? `${base}?sku=${encodeURIComponent(sku)}`
+    : base;
   const cat = [p.category_name, p.subcategory_name].filter(Boolean).join(" / ");
 
   // Full Name with attributes
@@ -112,8 +114,10 @@ function productRecordToQRLabel(r: ProductRecord): QRLabelItem {
     : "https://subidhafurnitureasansol.com";
   const code = r.product_code || (r.id ? `PROD-${r.id}` : "");
   const sku = r.sku || undefined;
-  const publicCode = sku || code;
-  const publicUrl = `${origin}/showcase/code/${encodeURIComponent(publicCode)}`;
+  const base = `${origin}/products/${encodeURIComponent(code)}`;
+  const publicUrl = sku && sku !== code
+    ? `${base}?sku=${encodeURIComponent(sku)}`
+    : base;
   const cat = [r.category, r.subcategory].filter(Boolean).join(" / ");
 
   let fullName = (r.full_name || r.name || `Product #${r.id}`).trim();

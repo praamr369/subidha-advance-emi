@@ -208,7 +208,11 @@ export default function ProductQuickActions({ product, mode = "compact", onChang
           const price = Number(product.base_price || 0);
           const monthlyEmi = price > 0 ? Math.round(price / 12) : 1000;
           const origin = typeof window !== "undefined" && window.location.origin ? window.location.origin : "https://subidhafurnitureasansol.com";
-          const showcaseUrl = `${origin}/showcase/code/${encodeURIComponent(product.product_code || product.sku || String(product.id))}`;
+          const code = product.product_code || (product.id ? String(product.id) : "");
+          const base = `${origin}/products/${encodeURIComponent(code)}`;
+          const showcaseUrl = product.sku && product.sku !== product.product_code
+            ? `${base}?sku=${encodeURIComponent(product.sku)}`
+            : base;
           openWhatsAppDirectModal({
             partyType: "CUSTOMER",
             eventType: "CUSTOM",
@@ -296,11 +300,11 @@ export default function ProductQuickActions({ product, mode = "compact", onChang
             category: [product.category, product.subcategory].filter(Boolean).join(" / ") || undefined,
             price: product.base_price != null && Number(product.base_price) > 0 ? Number(product.base_price) : undefined,
             qrValue: typeof window !== "undefined"
-              ? `${window.location.origin}/showcase/code/${encodeURIComponent(product.sku || product.product_code || String(product.id))}`
-              : `https://subidhafurnitureasansol.com/showcase/code/${encodeURIComponent(product.sku || product.product_code || String(product.id))}`,
+              ? `${window.location.origin}/products/${encodeURIComponent(product.product_code || (product.id ? String(product.id) : ""))}${product.sku && product.sku !== product.product_code ? `?sku=${encodeURIComponent(product.sku)}` : ""}`
+              : `https://subidhafurnitureasansol.com/products/${encodeURIComponent(product.product_code || (product.id ? String(product.id) : ""))}${product.sku && product.sku !== product.product_code ? `?sku=${encodeURIComponent(product.sku)}` : ""}`,
             publicUrl: typeof window !== "undefined"
-              ? `${window.location.origin}/showcase/code/${encodeURIComponent(product.sku || product.product_code || String(product.id))}`
-              : `https://subidhafurnitureasansol.com/showcase/code/${encodeURIComponent(product.sku || product.product_code || String(product.id))}`,
+              ? `${window.location.origin}/products/${encodeURIComponent(product.product_code || (product.id ? String(product.id) : ""))}${product.sku && product.sku !== product.product_code ? `?sku=${encodeURIComponent(product.sku)}` : ""}`
+              : `https://subidhafurnitureasansol.com/products/${encodeURIComponent(product.product_code || (product.id ? String(product.id) : ""))}${product.sku && product.sku !== product.product_code ? `?sku=${encodeURIComponent(product.sku)}` : ""}`,
           }}
           onClose={() => setQrModalOpen(false)}
         />
