@@ -350,3 +350,32 @@ class Phase2InventoryAPITests(TestCase):
         client.force_authenticate(user=self.admin)
         response = client.get("/api/v1/inventory/demand-summary/")
         assert response.status_code == 400
+
+    def test_inventory_items_metrics_endpoint(self):
+        client = APIClient()
+        client.force_authenticate(user=self.admin)
+        response = client.get("/api/v1/inventory/items/metrics/")
+        assert response.status_code == 200
+        assert "total_items" in response.data
+        assert "total_valuation" in response.data
+        assert "in_stock_count" in response.data
+        assert "low_stock_count" in response.data
+        assert "out_of_stock_count" in response.data
+        assert "finished_goods_count" in response.data
+
+    def test_inventory_item_cost_and_fg_status_serialization(self):
+        self.item.purchase_unit_cost = Decimal("4500.00")
+        self.item.manufacturing_cost_enabled = True
+        self.item.manufacturing_raw_material_cost = Decimal("2000.00")
+        self.item.manufacturing_labour_cost = Decimal("1500.00")
+        self.item.manufacturing_overhead_cost = Decimal("500.00")
+        self.item.save()
+
+        client = APIClient()
+        client.force_authenticate(user=self.admin)
+        response = client.get(f"/api/v1/inventory/items/{self.item.id}/")
+        assert response.status_code == 200
+        assert Decimal(str(response.data["total_manufacturing_cost"])) == Decimal("4000.00")
+        assert Decimal(str(response.data["purchase_unit_cost"])) == Decimal("4500.00")
+        assert response.data["stock_status"] in ["IN_STOCK", "LOW_STOCK", "OUT_OF_STOCK"]
+

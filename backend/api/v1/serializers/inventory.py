@@ -51,6 +51,14 @@ class EmptyInventoryActionSerializer(serializers.Serializer):
 class InventoryItemSerializer(serializers.ModelSerializer):
     product_code = serializers.CharField(source="product.product_code", read_only=True)
     product_name = serializers.SerializerMethodField()
+    product_base_price = serializers.CharField(source="product.base_price", read_only=True)
+    category = serializers.CharField(source="product.category", read_only=True)
+    subcategory = serializers.CharField(source="product.subcategory", read_only=True)
+    total_manufacturing_cost = serializers.SerializerMethodField()
+    stock_status = serializers.SerializerMethodField()
+    accessories_count = serializers.SerializerMethodField()
+    free_accessories_count = serializers.SerializerMethodField()
+    chargeable_accessories_count = serializers.SerializerMethodField()
     current_stock_qty = serializers.SerializerMethodField()
     active_lot_count = serializers.SerializerMethodField()
     expiring_lot_count = serializers.SerializerMethodField()
@@ -64,6 +72,9 @@ class InventoryItemSerializer(serializers.ModelSerializer):
             "product",
             "product_code",
             "product_name",
+            "product_base_price",
+            "category",
+            "subcategory",
             "sku",
             "unit_of_measure",
             "default_stock_location",
@@ -78,6 +89,16 @@ class InventoryItemSerializer(serializers.ModelSerializer):
             "valuation_method",
             "standard_unit_cost",
             "purchase_unit_cost",
+            "manufacturing_cost_enabled",
+            "manufacturing_raw_material_cost",
+            "manufacturing_labour_cost",
+            "manufacturing_overhead_cost",
+            "manufacturing_finished_goods_output_qty",
+            "total_manufacturing_cost",
+            "stock_status",
+            "accessories_count",
+            "free_accessories_count",
+            "chargeable_accessories_count",
             "barcode",
             "qr_code",
             "lot_tracking_enabled",
@@ -89,7 +110,20 @@ class InventoryItemSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "stock_tracking_status", "current_stock_qty", "active_lot_count", "expiring_lot_count", "created_at", "updated_at"]
+        read_only_fields = [
+            "id",
+            "stock_tracking_status",
+            "total_manufacturing_cost",
+            "stock_status",
+            "accessories_count",
+            "free_accessories_count",
+            "chargeable_accessories_count",
+            "current_stock_qty",
+            "active_lot_count",
+            "expiring_lot_count",
+            "created_at",
+            "updated_at",
+        ]
 
     def get_product_name(self, obj):
         name = obj.product.name if obj.product else ""
@@ -111,6 +145,38 @@ class InventoryItemSerializer(serializers.ModelSerializer):
 
     def get_current_stock_qty(self, obj):
         return f"{obj.current_stock_quantity():.3f}"
+
+    def get_total_manufacturing_cost(self, obj):
+        from decimal import Decimal
+        raw = obj.manufacturing_raw_material_cost or Decimal("0.00")
+        labour = obj.manufacturing_labour_cost or Decimal("0.00")
+        overhead = obj.manufacturing_overhead_cost or Decimal("0.00")
+        return f"{(raw + labour + overhead):.2f}"
+
+    def get_stock_status(self, obj):
+        from decimal import Decimal
+        physical = obj.current_stock_quantity()
+        threshold = obj.reorder_level_qty or Decimal("0.000")
+        if physical <= Decimal("0.000"):
+            return "OUT_OF_STOCK"
+        if threshold > Decimal("0.000") and physical <= threshold:
+            return "LOW_STOCK"
+        return "IN_STOCK"
+
+    def get_accessories_count(self, obj):
+        if obj.stock_item_type == "FINISHED_GOOD" and obj.pk:
+            return obj.accessory_links.count()
+        return 0
+
+    def get_free_accessories_count(self, obj):
+        if obj.stock_item_type == "FINISHED_GOOD" and obj.pk:
+            return obj.accessory_links.filter(charge_mode="FREE").count()
+        return 0
+
+    def get_chargeable_accessories_count(self, obj):
+        if obj.stock_item_type == "FINISHED_GOOD" and obj.pk:
+            return obj.accessory_links.filter(charge_mode="CHARGEABLE").count()
+        return 0
 
     def get_active_lot_count(self, obj):
         return obj.lots.filter(status="ACTIVE").count() if obj.pk else 0

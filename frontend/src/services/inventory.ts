@@ -550,9 +550,11 @@ export function quickCreateService(payload: QuickCreatePayload): Promise<QuickCr
 export type InventoryItem = {
   [key: string]: any;
   id: number;
+  product?: number;
   product_code: string;
   name?: string;
   product_name?: string;
+  product_base_price?: string;
   sku?: string;
   barcode?: string;
   category?: string;
@@ -560,9 +562,24 @@ export type InventoryItem = {
   base_price?: string;
   standard_unit_cost?: string | null;
   purchase_unit_cost?: string | null;
+  manufacturing_cost_enabled?: boolean;
+  manufacturing_raw_material_cost?: string | null;
+  manufacturing_labour_cost?: string | null;
+  manufacturing_overhead_cost?: string | null;
+  manufacturing_finished_goods_output_qty?: string | null;
+  total_manufacturing_cost?: string | null;
+  current_stock_qty?: string | null;
+  stock_status?: "IN_STOCK" | "LOW_STOCK" | "OUT_OF_STOCK" | string;
+  reorder_level_qty: string;
+  accessories_count?: number;
+  free_accessories_count?: number;
+  chargeable_accessories_count?: number;
   stock_tracking_status?: string | null;
+  stock_tracking_enabled: boolean;
+  delivery_stock_bridge_enabled: boolean;
   unit_of_measure?: string;
-  stock_item_type?: string;
+  stock_item_type?: "FINISHED_GOOD" | "RAW_MATERIAL" | "ACCESSORY" | string;
+  is_active: boolean;
 };
 
 export type PaginatedResponse<T> = {
@@ -778,14 +795,38 @@ export type FGAccessoryLink = {
   accessory_name: string | null;
   accessory_code: string | null;
   accessory_sku: string | null;
+  accessory_stock_qty?: string;
+  accessory_reorder_level?: string;
+  accessory_purchase_cost?: string;
+  accessory_base_price?: string;
+  is_low_stock?: boolean;
+  is_out_of_stock?: boolean;
   variant_group: number | null;
   variant_group_name: string | null;
-  charge_mode: string;
+  charge_mode: "FREE" | "CHARGEABLE" | string;
   sale_price: string;
   is_default_included: boolean;
   sort_order: number;
   notes: string;
 };
+
+export type InventoryItemsMetrics = {
+  total_items: number;
+  in_stock_count: number;
+  low_stock_count: number;
+  out_of_stock_count: number;
+  total_in_hand_qty: string;
+  total_valuation: string;
+  finished_goods_count: number;
+  raw_materials_count: number;
+  accessories_count: number;
+  free_accessory_links_count: number;
+  chargeable_accessory_links_count: number;
+};
+
+export async function getInventoryItemsMetrics(): Promise<InventoryItemsMetrics> {
+  return apiFetch<InventoryItemsMetrics>("/inventory/items/metrics/");
+}
 
 export type FGServiceLink = {
   id: number;
@@ -849,12 +890,23 @@ export async function listInventoryItems(params?: {
   page_size?: number;
   is_active?: number | boolean;
   stock_tracking_enabled?: number | boolean;
+  stock_item_type?: string;
+  category?: string;
+  search?: string;
+  q?: string;
+  manufacturing_cost_enabled?: number | boolean;
+  ordering?: string;
 }): Promise<PaginatedResponse<InventoryItem>> {
   const query = new URLSearchParams();
   if (params?.page) query.append("page", String(params.page));
   if (params?.page_size) query.append("page_size", String(params.page_size));
   if (params?.is_active !== undefined) query.append("is_active", String(params.is_active));
   if (params?.stock_tracking_enabled !== undefined) query.append("stock_tracking_enabled", String(params.stock_tracking_enabled));
+  if (params?.stock_item_type) query.append("stock_item_type", params.stock_item_type);
+  if (params?.category) query.append("category", params.category);
+  if (params?.search || params?.q) query.append("search", params.search || params.q || "");
+  if (params?.manufacturing_cost_enabled !== undefined) query.append("manufacturing_cost_enabled", String(params.manufacturing_cost_enabled));
+  if (params?.ordering) query.append("ordering", params.ordering);
   const url = query.toString() ? `/admin/inventory/items/?${query}` : "/admin/inventory/items/";
   return apiFetch<PaginatedResponse<InventoryItem>>(url, { method: "GET" });
 }
@@ -868,6 +920,11 @@ export async function updateInventoryItem(id: number, payload: Partial<{
   unit_of_measure: string;
   reorder_level_qty: string;
   standard_unit_cost: string | null;
+  purchase_unit_cost: string | null;
+  manufacturing_cost_enabled: boolean;
+  manufacturing_raw_material_cost: string | null;
+  manufacturing_labour_cost: string | null;
+  manufacturing_overhead_cost: string | null;
   valuation_method: string;
   barcode: string | null;
   qr_code: string | null;

@@ -410,18 +410,26 @@ class PublicProductsView(generics.ListAPIView):
     def get_queryset(self):
         # Public site shows sellable finished goods only — raw materials and
         # accessories (manufacturing inputs) are internal, admin-only items.
-        # Products with a linked PimProduct must have it published; products
-        # without any PimProduct are shown as-is (operational-only catalogue).
+        # Products with a linked PimProduct must have it published (or have at least
+        # one published variant); products without any PimProduct are shown as-is.
+        public_publish_filter = (
+            Q(pim__isnull=True) |
+            Q(pim__is_published=True) |
+            Q(pim__child_pim_products__is_published=True)
+        )
         queryset = (
             Product.objects.filter(is_active=True, item_type="FINISHED_GOOD")
-            # Honour the PIM publish flag. This filter was described in the
-            # comment above but never implemented, so unpublishing a product in
-            # the PIM did not remove it from the public site.
-            .exclude(pim__is_published=False)
+            .filter(public_publish_filter)
             .distinct()
             .exclude(inventory_profile__stock_item_type__in=["RAW_MATERIAL", "ACCESSORY"])
             .select_related("category_master")
-            .prefetch_related("pim", "pim_variant", "pim__attributes__attribute", "pim__variants__attribute_values__attribute")
+            .prefetch_related(
+                "pim",
+                "pim_variant",
+                "pim__child_pim_products",
+                "pim__attributes__attribute",
+                "pim__variants__attribute_values__attribute",
+            )
             .order_by("name", "id")
         )
         
@@ -478,14 +486,23 @@ class PublicProductDetailView(APIView):
 
     def get(self, request, slug=None, id=None):
         try:
+            public_publish_filter = (
+                Q(pim__isnull=True) |
+                Q(pim__is_published=True) |
+                Q(pim__child_pim_products__is_published=True)
+            )
             base_qs = (
                 Product.objects.filter(is_active=True)
-                # Same publish rule as the listing, otherwise an unpublished
-                # product stays reachable by direct URL.
-                .exclude(pim__is_published=False)
+                .filter(public_publish_filter)
                 .distinct()
                 .exclude(inventory_profile__stock_item_type__in=["RAW_MATERIAL", "ACCESSORY"])
-                .prefetch_related("pim", "pim_variant", "pim__attributes__attribute", "pim__variants__attribute_values__attribute")
+                .prefetch_related(
+                    "pim",
+                    "pim_variant",
+                    "pim__child_pim_products",
+                    "pim__attributes__attribute",
+                    "pim__variants__attribute_values__attribute",
+                )
             )
             if id is not None:
                 product = base_qs.get(id=id)
@@ -520,15 +537,18 @@ class PublicProductDetailView(APIView):
 
                 # 6. Match variant under PIM base product
                 if not matched:
-                    from products_pim.models import ProductVariant
+                    from products_pim.models import ProductVariant, PimProduct
                     pv = ProductVariant.objects.filter(
                         Q(sku__iexact=slug) | Q(barcode__iexact=slug)
                     ).select_related("operational_product", "product__source_product").first()
                     if pv:
-                        if pv.operational_product and base_qs.filter(id=pv.operational_product_id).exists():
-                            matched = pv.operational_product
-                        elif pv.product and pv.product.source_product and base_qs.filter(id=pv.product.source_product_id).exists():
-                            matched = pv.product.source_product
+                        child_pim = PimProduct.objects.filter(code=pv.sku).first()
+                        is_var_pub = child_pim.is_published if child_pim else (pv.product.is_published if pv.product else False)
+                        if is_var_pub:
+                            if pv.operational_product and base_qs.filter(id=pv.operational_product_id).exists():
+                                matched = pv.operational_product
+                            elif pv.product and pv.product.source_product and base_qs.filter(id=pv.product.source_product_id).exists():
+                                matched = pv.product.source_product
 
                 # 7. Match pim code
                 if not matched:

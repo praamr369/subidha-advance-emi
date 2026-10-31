@@ -62,6 +62,8 @@ class Command(BaseCommand):
         for p in qs.order_by("code"):
             if publish and opts["priced_only"]:
                 price = getattr(p.source_product, "base_price", None) or p.base_price or 0
+                if price <= 0 and p.variants.filter(is_active=True, price__gt=0).exists():
+                    price = p.variants.filter(is_active=True, price__gt=0).first().price
                 if price <= 0:
                     skipped_unpriced += 1
                     continue
@@ -95,6 +97,7 @@ class Command(BaseCommand):
 
         with transaction.atomic():
             PimProduct.objects.filter(pk__in=[p.pk for p in selected]).update(is_published=publish)
+            PimProduct.objects.filter(parent_id__in=[p.pk for p in selected]).update(is_published=publish)
 
         state = "published" if publish else "unpublished"
         total_live = PimProduct.objects.filter(is_active=True, is_published=True).count()

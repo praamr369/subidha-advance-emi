@@ -3105,6 +3105,9 @@ class ProductRelationshipSerializer(serializers.ModelSerializer):
     related_product_name = serializers.CharField(source="related_product.name", read_only=True)
     related_product_code = serializers.CharField(source="related_product.product_code", read_only=True)
     related_product_item_type = serializers.CharField(source="related_product.item_type", read_only=True)
+    related_product_base_price = serializers.CharField(source="related_product.base_price", read_only=True)
+    related_product_stock_qty = serializers.SerializerMethodField()
+    related_product_stock_status = serializers.SerializerMethodField()
 
     parent_variant = serializers.PrimaryKeyRelatedField(
         queryset=ProductVariant.objects.all(),
@@ -3140,6 +3143,9 @@ class ProductRelationshipSerializer(serializers.ModelSerializer):
             "related_product_name",
             "related_product_code",
             "related_product_item_type",
+            "related_product_base_price",
+            "related_product_stock_qty",
+            "related_product_stock_status",
             "relationship_type",
             "quantity",
             "is_price_included_in_parent",
@@ -3147,7 +3153,39 @@ class ProductRelationshipSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = [
+            "id",
+            "related_product_base_price",
+            "related_product_stock_qty",
+            "related_product_stock_status",
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_related_product_stock_qty(self, obj):
+        try:
+            inv = getattr(obj.related_product, "inventory_profile", None)
+            if inv:
+                return f"{inv.current_stock_quantity():.3f}"
+        except Exception:
+            pass
+        return "0.000"
+
+    def get_related_product_stock_status(self, obj):
+        try:
+            inv = getattr(obj.related_product, "inventory_profile", None)
+            if inv:
+                from decimal import Decimal
+                qty = inv.current_stock_quantity()
+                threshold = inv.reorder_level_qty or Decimal("0.000")
+                if qty <= Decimal("0.000"):
+                    return "OUT_OF_STOCK"
+                if threshold > Decimal("0.000") and qty <= threshold:
+                    return "LOW_STOCK"
+                return "IN_STOCK"
+        except Exception:
+            pass
+        return "UNKNOWN"
 
     def validate(self, data):
         product = data.get("product") or (self.instance.product if self.instance else None)

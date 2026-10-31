@@ -5,8 +5,9 @@ import { formatRupee } from "@/lib/utils/currency";
 import Link from "next/link";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Download, RefreshCw, Search, SlidersHorizontal, X, Layers, ExternalLink, ChevronRight, ChevronDown, GitBranch, CheckCircle2, AlertCircle, Star, Package2, CircleHelp, QrCode } from "lucide-react";
+import { Download, RefreshCw, Search, SlidersHorizontal, X, Layers, ExternalLink, ChevronRight, ChevronDown, GitBranch, CheckCircle2, AlertCircle, Star, Package2, CircleHelp, QrCode, Boxes } from "lucide-react";
 import PimHelpGuideTab from "@/components/admin/help/PimHelpGuideTab";
+import PimPurchaseStockPanel from "@/components/admin/pim/PimPurchaseStockPanel";
 import { pimService, type PimProduct, type PimCategory, type PimTreeSummary } from "@/services/pim";
 import QRLabelPrintModal, { type QRLabelItem } from "@/components/inventory/QRLabelPrintModal";
 
@@ -421,7 +422,7 @@ const PIM_CHILD_PAGE_SIZE = 200;
 const PRODUCTS_WORKSPACE_STATE_KEY = "admin-products-workspace-state";
 
 type ProductsWorkspaceState = {
-  tab: "subscription" | "pim" | "help";
+  tab: "subscription" | "pim" | "cost-stock" | "help";
   pimSearchInput: string;
   pimCat: number | "";
   pimPage: number;
@@ -490,7 +491,7 @@ function PimPager({
   );
 }
 
-function PimPanel() {
+function PimPanel({ onSwitchTab }: { onSwitchTab?: (tab: "subscription" | "pim" | "cost-stock" | "help") => void } = {}) {
   const [pimProducts, setPimProducts] = useState<PimProduct[]>([]);
   const [pimCategories, setPimCategories] = useState<PimCategory[]>([]);
   const [pimLoading, setPimLoading] = useState(true);
@@ -654,6 +655,25 @@ function PimPanel() {
               <div className="text-xs text-muted-foreground">{m.label}</div>
             </div>
           ))}
+        </div>
+
+        {/* Quick access to Item Cost & Finished Goods Stock Tracker */}
+        <div className="w-full rounded-xl border border-sky-200 bg-sky-50 dark:border-sky-900/40 dark:bg-sky-950/20 px-4 py-2.5 text-xs text-sky-800 dark:text-sky-200 flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <Boxes className="h-4 w-4 text-sky-600 shrink-0" />
+            <span>
+              <strong>Item Cost, Stock &amp; FG Bundle Tracker:</strong> View all items purchase list, stock availability (In Hand, Low Stock, Out of Stock), manufacture final prices, and track finished goods accessories (Free / Included vs Excluded add-on).
+            </span>
+          </div>
+          {onSwitchTab && (
+            <button
+              type="button"
+              onClick={() => onSwitchTab("cost-stock")}
+              className="px-3 py-1 rounded-lg bg-sky-600 text-white font-medium hover:bg-sky-700 transition shrink-0"
+            >
+              Open Cost &amp; Stock View →
+            </button>
+          )}
         </div>
         <div className="flex gap-2 items-center flex-wrap">
           {relinkResult && (
@@ -885,16 +905,17 @@ export default function AdminProductsPage() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { openWorkflow } = useWorkflowLauncher();
-  const [activeTab, setActiveTab] = useState<"subscription" | "pim" | "help">(() => {
+  const [activeTab, setActiveTab] = useState<"subscription" | "pim" | "cost-stock" | "help">(() => {
     const tabParam = searchParams.get("tab");
     if (tabParam === "help") return "help";
+    if (tabParam === "cost-stock" || tabParam === "purchase-tracking" || tabParam === "stock" || tabParam === "valuation") return "cost-stock";
     return tabParam === "pim" ? "pim" : "subscription";
   });
   useEffect(() => {
     if (searchParams.get("tab")) return;
     try {
       const saved = JSON.parse(sessionStorage.getItem(PRODUCTS_WORKSPACE_STATE_KEY) || "null") as Partial<ProductsWorkspaceState> | null;
-      if (saved?.tab === "pim" || saved?.tab === "help") setActiveTab(saved.tab);
+      if (saved?.tab === "pim" || saved?.tab === "help" || saved?.tab === "cost-stock") setActiveTab(saved.tab);
     } catch { /* ignore malformed workspace state */ }
   }, [searchParams]);
   const [catalogOptions, setCatalogOptions] = useState<ProductCatalogOptions>(() => emptyCatalogOptions());
@@ -1125,6 +1146,7 @@ export default function AdminProductsPage() {
         { onClick: () => openWorkflow("admin.createProduct"), label: "+ Create Product (Drawer)", variant: "primary" },
         { href: "/admin/products/create", label: "Create Product (Page)", variant: "secondary" },
         { href: "/admin/products/masters", label: "Manage Masters", variant: "secondary" },
+        { onClick: () => setActiveTab("cost-stock"), label: "Item Cost & Stock", variant: "secondary" },
         { onClick: () => setActiveTab("help"), label: "PIM Guide", variant: "secondary" },
         { href: "/admin/subscriptions/advance-emi/create", label: "Create Subscription", variant: "secondary" },
       ]}
@@ -1164,6 +1186,13 @@ export default function AdminProductsPage() {
           </button>
           <button
             type="button"
+            onClick={() => setActiveTab("cost-stock")}
+            className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === "cost-stock" ? "bg-background shadow-sm text-foreground font-semibold" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            <Boxes className="h-4 w-4 text-primary" /> Item Cost, Stock &amp; FG Tracking
+          </button>
+          <button
+            type="button"
             onClick={() => setActiveTab("help")}
             className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === "help" ? "bg-background shadow-sm text-foreground font-semibold" : "text-muted-foreground hover:text-foreground"}`}
           >
@@ -1171,11 +1200,14 @@ export default function AdminProductsPage() {
           </button>
         </div>
 
+        {/* Item Cost, Stock & Finished Goods Tracking Panel */}
+        {activeTab === "cost-stock" && <PimPurchaseStockPanel />}
+
         {/* Help panel */}
         {activeTab === "help" && <PimHelpGuideTab />}
 
         {/* PIM panel */}
-        {activeTab === "pim" && <PimPanel />}
+        {activeTab === "pim" && <PimPanel onSwitchTab={setActiveTab} />}
 
         {/* Subscription products section */}
         {activeTab === "subscription" && <>

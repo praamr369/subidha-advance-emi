@@ -331,6 +331,11 @@ class ProductPimVariantPublishControlView(APIView):
                 if flag:
                     any_published_now = True
 
+            # If any variant is published, automatically ensure the base blueprint is published
+            if any_published_now and not pim.is_published:
+                pim.is_published = True
+                pim.save(update_fields=["is_published"])
+
             # Re-read base state in case it changed
             pim.refresh_from_db(fields=["is_published"])
 

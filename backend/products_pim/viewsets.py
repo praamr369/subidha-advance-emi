@@ -326,6 +326,13 @@ class PimProductViewSet(viewsets.ModelViewSet):
             if published:
                 for product in products:
                     activated_variants += product.variants.filter(is_active=False).update(is_active=True)
+                parent_ids = list(
+                    PimProduct.objects.filter(id__in=affected_ids, parent__isnull=False)
+                    .values_list("parent_id", flat=True)
+                    .distinct()
+                )
+                if parent_ids:
+                    PimProduct.objects.filter(id__in=parent_ids, is_published=False).update(is_published=True)
 
         return Response({
             "published": published,
@@ -408,6 +415,7 @@ class PimProductViewSet(viewsets.ModelViewSet):
                 for child in pim.child_pim_products.all():
                     if child.code in variants_by_sku:
                         variant_to_child[variants_by_sku[child.code]] = child.id
+                any_published_now = False
                 for row in variant_updates:
                     vid = row.get("id")
                     flag = bool(row.get("is_published", False))
@@ -423,6 +431,12 @@ class PimProductViewSet(viewsets.ModelViewSet):
                             for field, value in mode_fields.items():
                                 setattr(child.source_product, field, value)
                             child.source_product.save(update_fields=list(mode_fields))
+                    if flag:
+                        any_published_now = True
+
+                if any_published_now and not pim.is_published:
+                    pim.is_published = True
+                    pim.save(update_fields=["is_published"])
 
                 pim.refresh_from_db(fields=["is_published"])
 

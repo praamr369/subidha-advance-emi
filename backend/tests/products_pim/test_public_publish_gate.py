@@ -84,3 +84,70 @@ class PublicPublishGateTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertEqual(response.data["product_code"], "GATE-PUB")
+
+    # ── blueprint + variant publish qualification ─────────────────────────────
+
+    def test_blueprint_with_published_variant_is_listed_and_reachable(self):
+        """A blueprint whose base PIM is draft (e.g. BAHU-BED) must be public
+        if any of its child variants (e.g. BAHU-BED-MET-K(FX7F) are published."""
+        from products_pim.models import ProductVariant
+
+        blueprint = self._product("BLUE-BED", "Blue Bed Blueprint", published=False)
+        base_pim = blueprint.pim.first()
+        self.assertFalse(base_pim.is_published)
+
+        # Create child PIM product for variant marked published
+        PimProduct.objects.create(
+            code="BLUE-BED-KING",
+            name="Blue Bed - King",
+            category=base_pim.category,
+            parent=base_pim,
+            is_published=True,
+            base_price=Decimal("15000.00"),
+        )
+        ProductVariant.objects.create(
+            product=base_pim,
+            sku="BLUE-BED-KING",
+            price=Decimal("15000.00"),
+        )
+
+        # 1. Blueprint must be in public listing
+        self.assertIn("BLUE-BED", self._listed_codes())
+
+        # 2. Blueprint must be reachable by base code (QR code destination)
+        resp = self.client.get(f"{LIST_URL}BLUE-BED/")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
+        self.assertEqual(resp.data["product_code"], "BLUE-BED")
+
+        # 3. Reachable by variant SKU directly
+        resp_var = self.client.get(f"{LIST_URL}BLUE-BED-KING/")
+        self.assertEqual(resp_var.status_code, status.HTTP_200_OK, resp_var.data)
+
+    def test_blueprint_with_only_draft_variants_remains_hidden(self):
+        """A blueprint with only draft variants must stay 404 and unlisted."""
+        from products_pim.models import ProductVariant
+
+        blueprint = self._product("DRAFT-BED", "Draft Bed Blueprint", published=False)
+        base_pim = blueprint.pim.first()
+
+        PimProduct.objects.create(
+            code="DRAFT-BED-KING",
+            name="Draft Bed - King",
+            category=base_pim.category,
+            parent=base_pim,
+            is_published=False,
+            base_price=Decimal("15000.00"),
+        )
+        ProductVariant.objects.create(
+            product=base_pim,
+            sku="DRAFT-BED-KING",
+            price=Decimal("15000.00"),
+        )
+
+        self.assertNotIn("DRAFT-BED", self._listed_codes())
+
+        resp = self.client.get(f"{LIST_URL}DRAFT-BED/")
+        self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
+
+        resp_var = self.client.get(f"{LIST_URL}DRAFT-BED-KING/")
+        self.assertEqual(resp_var.status_code, status.HTTP_404_NOT_FOUND)

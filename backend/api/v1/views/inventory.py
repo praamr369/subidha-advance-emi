@@ -108,7 +108,7 @@ class InventoryItemViewSet(AdminInventoryModelViewSet):
     queryset = InventoryItem.objects.select_related("product", "default_stock_location").all()
     serializer_class = InventoryItemSerializer
     search_fields = ["product__product_code", "product__name", "sku"]
-    ordering_fields = ["product__name", "sku", "created_at"]
+    ordering_fields = ["product__name", "sku", "standard_unit_cost", "purchase_unit_cost", "reorder_level_qty", "created_at"]
     ordering = ["product__name", "id"]
 
     def get_queryset(self):
@@ -123,8 +123,13 @@ class InventoryItemViewSet(AdminInventoryModelViewSet):
         expiry_tracking_enabled = _parse_bool_query(
             self.request.query_params.get("expiry_tracking_enabled")
         )
+        manufacturing_cost_enabled = _parse_bool_query(
+            self.request.query_params.get("manufacturing_cost_enabled")
+        )
         stock_item_type = (self.request.query_params.get("stock_item_type") or "").strip().upper()
         barcode_or_qr = (self.request.query_params.get("code") or "").strip()
+        search = (self.request.query_params.get("search") or self.request.query_params.get("q") or "").strip()
+        category = (self.request.query_params.get("category") or "").strip()
 
         if is_active is not None:
             queryset = queryset.filter(is_active=is_active)
@@ -134,12 +139,90 @@ class InventoryItemViewSet(AdminInventoryModelViewSet):
             queryset = queryset.filter(lot_tracking_enabled=lot_tracking_enabled)
         if expiry_tracking_enabled is not None:
             queryset = queryset.filter(expiry_tracking_enabled=expiry_tracking_enabled)
+        if manufacturing_cost_enabled is not None:
+            queryset = queryset.filter(manufacturing_cost_enabled=manufacturing_cost_enabled)
         if stock_item_type:
             queryset = queryset.filter(stock_item_type=stock_item_type)
         if barcode_or_qr:
             queryset = queryset.filter(Q(barcode__iexact=barcode_or_qr) | Q(qr_code__iexact=barcode_or_qr))
+        if category:
+            queryset = queryset.filter(Q(product__category__icontains=category) | Q(product__subcategory__icontains=category))
+        if search:
+            queryset = queryset.filter(
+                Q(product__name__icontains=search)
+                | Q(product__product_code__icontains=search)
+                | Q(sku__icontains=search)
+                | Q(barcode__icontains=search)
+                | Q(product__category__icontains=search)
+            )
 
         return queryset
+
+    @action(detail=False, methods=["get"], url_path="metrics")
+    def metrics(self, request):
+        from decimal import Decimal
+        from inventory.models import SOFT_HOLD_MOVEMENT_TYPES, FinishedGoodAccessoryLink
+        from django.db.models import Sum, Value, F, DecimalField
+        from django.db.models.functions import Coalesce
+
+        qs = self.get_queryset()
+        total_items = qs.count()
+
+        soft_holds = list(SOFT_HOLD_MOVEMENT_TYPES)
+        annotated = qs.annotate(
+            _in=Coalesce(Sum("stock_ledger__quantity_in", filter=~Q(stock_ledger__movement_type__in=soft_holds)), Value(Decimal("0.000")), output_field=DecimalField()),
+            _out=Coalesce(Sum("stock_ledger__quantity_out", filter=~Q(stock_ledger__movement_type__in=soft_holds)), Value(Decimal("0.000")), output_field=DecimalField()),
+        ).annotate(
+            calc_stock=Coalesce(F("opening_stock_qty"), Value(Decimal("0.000")), output_field=DecimalField()) + F("_in") - F("_out")
+        )
+
+        in_stock_count = 0
+        low_stock_count = 0
+        out_of_stock_count = 0
+        total_valuation = Decimal("0.00")
+        total_in_hand_qty = Decimal("0.000")
+
+        for item in annotated:
+            stk = item.calc_stock or Decimal("0.000")
+            threshold = item.reorder_level_qty or Decimal("0.000")
+            unit_cost = item.purchase_unit_cost or item.standard_unit_cost or Decimal("0.00")
+            if item.manufacturing_cost_enabled:
+                mfg_cost = (item.manufacturing_raw_material_cost or Decimal("0.00")) + (item.manufacturing_labour_cost or Decimal("0.00")) + (item.manufacturing_overhead_cost or Decimal("0.00"))
+                if mfg_cost > Decimal("0.00"):
+                    unit_cost = mfg_cost
+
+            if stk <= Decimal("0.000"):
+                out_of_stock_count += 1
+            elif threshold > Decimal("0.000") and stk <= threshold:
+                low_stock_count += 1
+                in_stock_count += 1
+                total_in_hand_qty += stk
+                total_valuation += stk * unit_cost
+            else:
+                in_stock_count += 1
+                total_in_hand_qty += stk
+                total_valuation += stk * unit_cost
+
+        fg_count = qs.filter(stock_item_type="FINISHED_GOOD").count()
+        rm_count = qs.filter(stock_item_type="RAW_MATERIAL").count()
+        acc_count = qs.filter(stock_item_type="ACCESSORY").count()
+
+        free_acc_links = FinishedGoodAccessoryLink.objects.filter(finished_good__in=qs, charge_mode="FREE").count()
+        chargeable_acc_links = FinishedGoodAccessoryLink.objects.filter(finished_good__in=qs, charge_mode="CHARGEABLE").count()
+
+        return Response({
+            "total_items": total_items,
+            "in_stock_count": in_stock_count,
+            "low_stock_count": low_stock_count,
+            "out_of_stock_count": out_of_stock_count,
+            "total_in_hand_qty": f"{total_in_hand_qty:.3f}",
+            "total_valuation": f"{total_valuation:.2f}",
+            "finished_goods_count": fg_count,
+            "raw_materials_count": rm_count,
+            "accessories_count": acc_count,
+            "free_accessory_links_count": free_acc_links,
+            "chargeable_accessory_links_count": chargeable_acc_links,
+        })
 
     def perform_create(self, serializer):
         item = serializer.save()

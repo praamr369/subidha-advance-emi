@@ -70,6 +70,11 @@ def _annotate_stock_qty(qs):
 
 def _profile_dict(item: InventoryItem) -> dict:
     p = item.product
+    raw_cost = item.manufacturing_raw_material_cost or MONEY_ZERO
+    labour_cost = item.manufacturing_labour_cost or MONEY_ZERO
+    overhead_cost = item.manufacturing_overhead_cost or MONEY_ZERO
+    total_mfg_cost = raw_cost + labour_cost + overhead_cost
+    purchase_cost = item.purchase_unit_cost or item.standard_unit_cost or MONEY_ZERO
     return {
         "id": item.id,
         "product_id": p.id,
@@ -79,6 +84,12 @@ def _profile_dict(item: InventoryItem) -> dict:
         "unit_of_measure": item.unit_of_measure or "",
         "valuation_method": item.valuation_method or "FIFO",
         "standard_unit_cost": str(item.standard_unit_cost or MONEY_ZERO),
+        "purchase_unit_cost": str(purchase_cost),
+        "manufacturing_cost_enabled": item.manufacturing_cost_enabled,
+        "manufacturing_raw_material_cost": str(raw_cost),
+        "manufacturing_labour_cost": str(labour_cost),
+        "manufacturing_overhead_cost": str(overhead_cost),
+        "total_manufacturing_cost": str(total_mfg_cost),
         "base_price": str(p.base_price or MONEY_ZERO),
         "reorder_level_qty": str(item.reorder_level_qty or 0),
         "stock_tracking_status": "STOCK_ACTIVE" if item.stock_tracking_enabled else "NOT_TRACKED",
@@ -94,12 +105,23 @@ def _profile_dict(item: InventoryItem) -> dict:
 def _acc_link_dict(link: FinishedGoodAccessoryLink) -> dict:
     acc = link.accessory
     grp = link.variant_group
+    acc_stock = acc.current_stock_quantity() if acc else Decimal("0.000")
+    acc_reorder = acc.reorder_level_qty if acc else Decimal("0.000")
+    acc_cost = acc.purchase_unit_cost or acc.standard_unit_cost or MONEY_ZERO if acc else MONEY_ZERO
+    is_low_stock = bool(acc and acc_stock > Decimal("0.000") and acc_reorder > Decimal("0.000") and acc_stock <= acc_reorder)
+    is_out_of_stock = bool(acc and acc_stock <= Decimal("0.000"))
     return {
         "id": link.id,
         "accessory": acc.id if acc else None,
         "accessory_name": acc.product.name if acc else None,
         "accessory_code": acc.product.product_code if acc else None,
         "accessory_sku": acc.sku if acc else None,
+        "accessory_stock_qty": f"{acc_stock:.3f}",
+        "accessory_reorder_level": f"{acc_reorder:.3f}",
+        "accessory_purchase_cost": f"{acc_cost:.2f}",
+        "accessory_base_price": str(acc.product.base_price if acc and acc.product else MONEY_ZERO),
+        "is_low_stock": is_low_stock,
+        "is_out_of_stock": is_out_of_stock,
         "variant_group": grp.id if grp else None,
         "variant_group_name": grp.name if grp else None,
         "charge_mode": link.charge_mode,
