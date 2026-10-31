@@ -2,7 +2,33 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { Save, ArrowLeft, Layers, Box, Send, CheckCircle2, X, Plus, Search, Trash2, Factory, Wrench, ChevronDown, ChevronRight, RefreshCw, Check, FolderCog, Settings2 } from "lucide-react";
+import {
+  Save,
+  ArrowLeft,
+  Layers,
+  Box,
+  Send,
+  CheckCircle2,
+  X,
+  Plus,
+  Search,
+  Trash2,
+  Factory,
+  Wrench,
+  ChevronDown,
+  ChevronRight,
+  RefreshCw,
+  Check,
+  FolderCog,
+  Settings2,
+  Eye,
+  EyeOff,
+  Sparkles,
+  Puzzle,
+  Package,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { getVariantPublishControl, patchVariantPublishControl } from "@/services/product-pim";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import DynamicAttributeForm, { type AttributeValues } from "./DynamicAttributeForm";
 import CategoryManageWorkbench from "./CategoryManageWorkbench";
@@ -32,7 +58,7 @@ import {
 
 interface Props {
   productId?: number;
-  defaultProductType?: "FINISHED_GOOD" | "ACCESSORY" | "SERVICE";
+  defaultProductType?: "FINISHED_GOOD" | "RAW_MATERIAL" | "ACCESSORY" | "SERVICE";
   variant?: "page" | "drawer";
   onSaved?: (product: PimProduct) => void;
   onCancel?: () => void;
@@ -528,7 +554,28 @@ export default function PimProductForm({
   onCancel,
 }: Props) {
   const router = useRouter();
-  const isEdit = Boolean(productId);
+  const [activeProductId, setActiveProductId] = useState<number | undefined>(productId);
+  const isEdit = Boolean(activeProductId);
+  const [productType, setProductType] = useState<"FINISHED_GOOD" | "RAW_MATERIAL" | "ACCESSORY" | "SERVICE">(defaultProductType);
+  const [searchMode, setSearchMode] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchFilter, setSearchFilter] = useState<string>("ALL");
+  const [searchResults, setSearchResults] = useState<PimProduct[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [autoPublishOnCreate, setAutoPublishOnCreate] = useState(false);
+
+  // Channel availability flags
+  const [channelDirectSale, setChannelDirectSale] = useState(true);
+  const [channelEmi, setChannelEmi] = useState(true);
+  const [channelRent, setChannelRent] = useState(false);
+  const [channelLease, setChannelLease] = useState(false);
+
+  useEffect(() => {
+    if (productId !== undefined) {
+      setActiveProductId(productId);
+    }
+  }, [productId]);
+
   const pendingFetchRef = useRef<{ id: number; promise: Promise<PimProduct> } | null>(null);
 
   const [categories, setCategories] = useState<PimCategory[]>([]);
@@ -596,7 +643,7 @@ export default function PimProductForm({
   const [taxonomyNotice, setTaxonomyNotice] = useState<string | null>(null);
 
   // Session draft auto-save and recovery
-  const draftKey = `pim_draft_${productId ?? "new"}`;
+  const draftKey = `pim_draft_${activeProductId ?? "new"}`;
   const [draftRestored, setDraftRestored] = useState(false);
   const draftSavedRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -615,11 +662,11 @@ export default function PimProductForm({
   const [arHint, setArHint] = useState<string | null>(null);
 
   const handleSuggestArSize = async () => {
-    if (!productId) return;
+    if (!activeProductId) return;
     setArSuggesting(true);
     setArHint(null);
     try {
-      const { suggestion } = await pimService.getArSizeSuggestion(productId);
+      const { suggestion } = await pimService.getArSizeSuggestion(activeProductId);
       if (!suggestion) {
         setArHint("No size found in this product's attributes. Enter it by hand.");
         return;
@@ -763,13 +810,13 @@ export default function PimProductForm({
       })
       .catch(() => {});
     return () => { active = false; };
-  }, [categoryId, subcategoryId, productId, product, removedAttrIds, allAttributes]);
+  }, [categoryId, subcategoryId, activeProductId, product, removedAttrIds, allAttributes]);
 
   useEffect(() => {
-    if (!productId) { setLoading(false); return; }
+    if (!activeProductId) { setLoading(false); return; }
     let stale = false;
-    if (!pendingFetchRef.current || pendingFetchRef.current.id !== productId) {
-      pendingFetchRef.current = { id: productId, promise: pimService.getProductWithAttributes(productId) };
+    if (!pendingFetchRef.current || pendingFetchRef.current.id !== activeProductId) {
+      pendingFetchRef.current = { id: activeProductId, promise: pimService.getProductWithAttributes(activeProductId) };
     }
     const fetchPromise = pendingFetchRef.current.promise;
     setLoading(true);
@@ -792,16 +839,28 @@ export default function PimProductForm({
         setArDepth(p.ar_depth_cm ?? "");
         setArHeight(p.ar_height_cm ?? "");
         setIsPublished(p.is_published);
+        if (p.product_type) {
+          setProductType(p.product_type);
+        }
         setWarrantyEnabled(p.warranty_enabled ?? true);
         setWarrantyMonthsManufacturing(p.warranty_months_manufacturing ?? 12);
         setWarrantyMonthsStructural(p.warranty_months_structural ?? 36);
         setWarrantyMonthsExtendedMax(p.warranty_months_extended_max ?? 12);
         setExtendedWarrantyCostPercentage(p.extended_warranty_cost_percentage?.toString() ?? "7.5");
         setVariants(p.variants ?? []);
-        // Restore operator-locked attributes from backend — only keep IDs
-        // that actually have a saved value (backend also enforces this on save,
-        // but we replicate the filter here so stale IDs never appear in the UI
-        // even before the user hits Save).
+
+        // Load channel flags for publish control
+        getVariantPublishControl(activeProductId)
+          .then((ctl) => {
+            if (stale) return;
+            setChannelDirectSale(ctl.base.is_direct_sale_enabled);
+            setChannelEmi(ctl.base.is_emi_enabled);
+            setChannelRent(ctl.base.is_rent_enabled);
+            setChannelLease(ctl.base.is_lease_enabled);
+          })
+          .catch(() => {});
+
+        // Restore operator-locked attributes from backend
         const savedAttrIds = new Set((p.attributes ?? []).map((a) => a.attribute));
         const validLocks = (p.locked_attributes ?? []).filter((id) => savedAttrIds.has(id));
         setLockedAttributes(new Set(validLocks));
@@ -819,16 +878,71 @@ export default function PimProductForm({
       .catch(() => { if (!stale) setError("Failed to load product"); })
       .finally(() => {
         if (!stale) setLoading(false);
-        if (pendingFetchRef.current?.id === productId) pendingFetchRef.current = null;
+        if (pendingFetchRef.current?.id === activeProductId) pendingFetchRef.current = null;
       });
     return () => { stale = true; };
-  }, [productId]);
+  }, [activeProductId]);
 
   const refreshVariants = useCallback(async () => {
-    if (!productId) return;
-    const p = await pimService.getProductWithAttributes(productId);
+    if (!activeProductId) return;
+    const p = await pimService.getProductWithAttributes(activeProductId);
     setVariants(p.variants ?? []);
-  }, [productId]);
+  }, [activeProductId]);
+
+  // Live product search for drawer mode
+  useEffect(() => {
+    if (!searchMode) return;
+    let active = true;
+    const q = searchQuery.trim();
+    const timer = setTimeout(() => {
+      setSearching(true);
+      pimService
+        .getProducts({
+          search: q || undefined,
+          roots_only: true,
+          page_size: 25,
+        })
+        .then((res) => {
+          if (!active) return;
+          let list = res.results;
+          if (searchFilter !== "ALL") {
+            list = list.filter((item) => (item.product_type ?? "FINISHED_GOOD") === searchFilter);
+          }
+          setSearchResults(list);
+        })
+        .catch(() => {
+          if (!active) return;
+          setSearchResults([]);
+        })
+        .finally(() => {
+          if (active) setSearching(false);
+        });
+    }, 250);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [searchMode, searchQuery, searchFilter]);
+
+  const handleUpdateChannel = async (channel: "sale" | "emi" | "rent" | "lease", val: boolean) => {
+    if (!activeProductId) return;
+    if (channel === "sale") setChannelDirectSale(val);
+    if (channel === "emi") setChannelEmi(val);
+    if (channel === "rent") setChannelRent(val);
+    if (channel === "lease") setChannelLease(val);
+
+    try {
+      const payload: Record<string, boolean> = {};
+      if (channel === "sale") payload.is_direct_sale_enabled = val;
+      if (channel === "emi") payload.is_emi_enabled = val;
+      if (channel === "rent") payload.is_rent_enabled = val;
+      if (channel === "lease") payload.is_lease_enabled = val;
+      await patchVariantPublishControl(activeProductId, payload);
+    } catch {
+      // rollback or ignore
+    }
+  };
 
   const handleToggleLock = useCallback((attrId: number) => {
     setLockedAttributes((prev) => {
@@ -1132,12 +1246,12 @@ export default function PimProductForm({
         ...(removedAttrIds.size > 0 ? {
           remove_attributes: Array.from(removedAttrIds)
         } : {}),
-        ...(!isEdit ? { product_type: defaultProductType } : {}),
+        product_type: productType,
       };
-      if (isEdit && productId) {
-        await pimService.updateProduct(productId, payload);
+      if (isEdit && activeProductId) {
+        await pimService.updateProduct(activeProductId, payload);
         clearDraft();
-        const updatedProduct = await pimService.getProductWithAttributes(productId);
+        const updatedProduct = await pimService.getProductWithAttributes(activeProductId);
         setProduct(updatedProduct);
         await refreshVariants();
         setRemovedAttrIds(new Set());
@@ -1148,14 +1262,25 @@ export default function PimProductForm({
       } else {
         const created = await pimService.createProduct(payload);
         clearDraft();
+        if (autoPublishOnCreate) {
+          try {
+            await pimService.publishBlueprint(created.id);
+            created.is_published = true;
+          } catch (e) {
+            console.warn("Auto-publish failed", e);
+          }
+        }
         onSaved?.(created);
         if (variant === "drawer") {
-          setSuccessMsg("Product created successfully.");
-          setTimeout(() => setSuccessMsg(null), 3000);
+          setActiveProductId(created.id);
+          setProduct(created);
+          setIsPublished(created.is_published || autoPublishOnCreate);
+          setSuccessMsg("Product created successfully! You can now configure variants, media, and publish control below.");
+          setTimeout(() => setSuccessMsg(null), 5000);
           return;
         }
-        const typeSlug = defaultProductType === "ACCESSORY" ? "accessories"
-          : defaultProductType === "SERVICE" ? "services"
+        const typeSlug = productType === "ACCESSORY" ? "accessories"
+          : productType === "SERVICE" ? "services"
           : "finished-goods";
         router.push(`/admin/pim/products/${typeSlug}/${created.id}/edit`);
         return;
@@ -1169,11 +1294,11 @@ export default function PimProductForm({
   };
 
   const handleAdoptOrphans = async () => {
-    if (!productId) return;
+    if (!activeProductId) return;
     setAdopting(true);
     setAdoptResult(null);
     try {
-      const result = await pimService.adoptOrphanVariants(productId);
+      const result = await pimService.adoptOrphanVariants(activeProductId);
       setAdoptResult(result.message);
       if (result.adopted.length > 0) await refreshVariants();
     } catch (err: unknown) {
@@ -1186,11 +1311,11 @@ export default function PimProductForm({
   };
 
   const handlePushToVariants = async () => {
-    if (!productId) return;
+    if (!activeProductId) return;
     setPushing(true);
     setPushResult(null);
     try {
-      const result = await pimService.pushToVariants(productId, {
+      const result = await pimService.pushToVariants(activeProductId, {
         push_description: pushDescription,
         push_name: pushName,
       });
@@ -1203,12 +1328,12 @@ export default function PimProductForm({
   };
 
   const handlePublish = async () => {
-    if (!productId) return;
+    if (!activeProductId) return;
     setPublishing(true);
     setPublishError(null);
     setPublishResult(null);
     try {
-      const result = await pimService.publishBlueprint(productId);
+      const result = await pimService.publishBlueprint(activeProductId);
       setIsPublished(true);
       setPublishResult({ child_pim_published: result.child_pim_published, variants_activated: result.variants_activated, total_variants: result.total_variants });
     } catch (err: unknown) {
@@ -1219,12 +1344,12 @@ export default function PimProductForm({
   };
 
   const handleUnpublish = async () => {
-    if (!productId) return;
+    if (!activeProductId) return;
     setPublishing(true);
     setPublishError(null);
     setPublishResult(null);
     try {
-      await pimService.unpublishBlueprint(productId);
+      await pimService.unpublishBlueprint(activeProductId);
       setIsPublished(false);
     } catch (err: unknown) {
       setPublishError((err as { message?: string })?.message ?? "Unpublish failed");
@@ -1262,6 +1387,389 @@ export default function PimProductForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-6 max-w-4xl">
 
+      {/* Drawer Mode & Search Navigation Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-3 shadow-sm">
+        <div className="flex items-center gap-1 rounded-lg bg-muted/60 p-1 border border-border">
+          <button
+            type="button"
+            onClick={() => {
+              setSearchMode(false);
+              if (activeProductId) {
+                setActiveProductId(undefined);
+                setProduct(null);
+                setCode("");
+                setName("");
+                setBrand("");
+                setDescription("");
+                setBasePrice("");
+                setCostPrice("");
+                setVariants([]);
+                setIsPublished(false);
+              }
+            }}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition cursor-pointer",
+              !searchMode && !activeProductId
+                ? "bg-background text-foreground shadow-sm border border-border"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Plus className="h-3.5 w-3.5 text-primary" />
+            Create New Product
+          </button>
+          <button
+            type="button"
+            onClick={() => setSearchMode(true)}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition cursor-pointer",
+              searchMode || activeProductId
+                ? "bg-background text-foreground shadow-sm border border-border"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Search className="h-3.5 w-3.5 text-primary" />
+            {activeProductId && product ? `Editing: ${product.code}` : "Search & Edit Existing"}
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {activeProductId && product && (
+            <div className="flex items-center gap-1.5">
+              <span className="font-mono text-xs font-bold bg-muted px-2 py-0.5 rounded border text-foreground">
+                {product.code}
+              </span>
+              <span className={cn(
+                "rounded-full px-2 py-0.5 text-[10px] font-bold",
+                isPublished
+                  ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
+                  : "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+              )}>
+                {isPublished ? "Published" : "Draft"}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveProductId(undefined);
+                  setProduct(null);
+                  setSearchMode(false);
+                }}
+                className="text-xs text-primary hover:underline ml-1 font-medium cursor-pointer"
+              >
+                + Switch to Create
+              </button>
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => setManageWorkbenchOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-semibold text-foreground hover:bg-muted shadow-sm transition-colors"
+            title="Manage categories, subcategories, attributes, and preset options"
+          >
+            <FolderCog className="h-3.5 w-3.5 text-primary" /> Categories & Attributes
+          </button>
+          <button
+            type="button"
+            onClick={() => void quickRefreshTaxonomy()}
+            disabled={refreshingTaxonomy}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted shadow-sm transition-colors disabled:opacity-50"
+            title="Sync categories, attributes, and presets"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${refreshingTaxonomy ? "animate-spin text-primary" : "text-muted-foreground"}`} />
+            {refreshingTaxonomy ? "Syncing…" : "Sync"}
+          </button>
+        </div>
+      </div>
+
+      {/* Existing Product Search & Selection Panel */}
+      {searchMode && (
+        <div className="rounded-xl border border-primary/30 bg-card p-4 space-y-3 shadow-md">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="text-sm font-semibold text-foreground">Select an Existing PIM Product to Edit</h4>
+              <p className="text-xs text-muted-foreground">Pick any catalog product to edit in this drawer</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSearchMode(false)}
+              className="text-xs text-muted-foreground hover:text-foreground font-medium cursor-pointer"
+            >
+              Cancel search
+            </button>
+          </div>
+
+          <div className="relative">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search product by name, code, SKU, or category…"
+              className="w-full rounded-lg border border-input bg-background pl-9 pr-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              autoFocus
+            />
+          </div>
+
+          {/* Filter Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+            {[
+              { id: "ALL", label: "All Items" },
+              { id: "FINISHED_GOOD", label: "Finished Goods" },
+              { id: "ACCESSORY", label: "Accessories" },
+              { id: "RAW_MATERIAL", label: "Raw Materials" },
+              { id: "SERVICE", label: "Services" },
+            ].map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => setSearchFilter(f.id)}
+                className={cn(
+                  "px-2.5 py-1 rounded-md transition text-xs font-medium whitespace-nowrap cursor-pointer",
+                  searchFilter === f.id
+                    ? "bg-primary text-primary-foreground font-semibold shadow-sm"
+                    : "bg-muted text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Results list */}
+          <div className="max-h-64 overflow-y-auto space-y-1 divide-y divide-border/60">
+            {searching && (
+              <p className="text-xs text-muted-foreground py-4 text-center">Searching catalog…</p>
+            )}
+            {!searching && searchResults.length === 0 && (
+              <p className="text-xs text-muted-foreground py-4 text-center">
+                {searchQuery.trim() ? "No matching products found." : "Type keywords to search existing products."}
+              </p>
+            )}
+            {searchResults.map((item) => (
+              <div
+                key={item.id}
+                onClick={() => {
+                  setActiveProductId(item.id);
+                  setSearchMode(false);
+                }}
+                className="flex items-center justify-between gap-3 py-2 px-2.5 rounded-lg hover:bg-muted/60 cursor-pointer transition"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs font-bold text-foreground">{item.code}</span>
+                    <span className="truncate text-xs font-semibold text-foreground">{item.name}</span>
+                    <span className={cn(
+                      "rounded px-1.5 py-0.2 text-[10px] font-semibold",
+                      item.is_published
+                        ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
+                        : "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+                    )}>
+                      {item.is_published ? "Published" : "Draft"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
+                    <span>{item.category_name}</span>
+                    <span>·</span>
+                    <span>₹{item.base_price}</span>
+                    {item.product_type && (
+                      <>
+                        <span>·</span>
+                        <span className="font-medium text-foreground">{item.product_type}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="shrink-0 rounded-lg bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground shadow-sm hover:opacity-90 cursor-pointer"
+                >
+                  Edit in Drawer
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Product Type / Classification Selector */}
+      <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Product Classification & Type</span>
+            <p className="text-xs text-muted-foreground mt-0.5">Choose item category for inventory, billing, and workshop tracking</p>
+          </div>
+          <span className={cn(
+            "rounded-full px-2.5 py-0.5 text-xs font-bold",
+            productType === "FINISHED_GOOD" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" :
+            productType === "ACCESSORY" ? "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300" :
+            productType === "RAW_MATERIAL" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" :
+            "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+          )}>
+            {productType === "FINISHED_GOOD" ? "Finished Good (Normal Product)" :
+             productType === "ACCESSORY" ? "Accessory" :
+             productType === "RAW_MATERIAL" ? "Raw Material" : "Service"}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {[
+            { type: "FINISHED_GOOD", label: "Finished Good", sub: "Furniture & retail products", icon: Box },
+            { type: "ACCESSORY", label: "Accessory", sub: "Fittings, cushions, hardware", icon: Puzzle },
+            { type: "RAW_MATERIAL", label: "Raw Material", sub: "Timber, fabric, foam, screws", icon: Factory },
+            { type: "SERVICE", label: "Service", sub: "Labor, delivery, assembly", icon: Wrench },
+          ].map((item) => {
+            const Icon = item.icon;
+            const isSelected = productType === item.type;
+            return (
+              <button
+                key={item.type}
+                type="button"
+                onClick={() => {
+                  setProductType(item.type as any);
+                  if (!isEdit && (!code || ["FG-", "ACC-", "RAW-", "SRV-"].some(p => code.startsWith(p)))) {
+                    const prefix = item.type === "FINISHED_GOOD" ? "FG-" : item.type === "ACCESSORY" ? "ACC-" : item.type === "RAW_MATERIAL" ? "RAW-" : "SRV-";
+                    setCode(prefix);
+                  }
+                }}
+                className={cn(
+                  "flex flex-col items-start gap-1 p-3 rounded-xl border text-left transition cursor-pointer",
+                  isSelected
+                    ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary"
+                    : "border-border bg-background hover:bg-muted/50"
+                )}
+              >
+                <div className="flex items-center gap-1.5 w-full">
+                  <Icon className={cn("h-4 w-4", isSelected ? "text-primary" : "text-muted-foreground")} />
+                  <span className={cn("text-xs font-semibold", isSelected ? "text-foreground font-bold" : "text-foreground")}>
+                    {item.label}
+                  </span>
+                </div>
+                <span className="text-[11px] text-muted-foreground leading-tight line-clamp-1">
+                  {item.sub}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Publish & Channel Control Card */}
+      <div className={cn(
+        "rounded-xl border p-4 space-y-3 transition-colors",
+        isPublished
+          ? "border-emerald-300 bg-emerald-50/70 dark:border-emerald-800 dark:bg-emerald-950/20"
+          : "border-amber-300 bg-amber-50/70 dark:border-amber-800 dark:bg-amber-950/20"
+      )}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-2">
+              {isPublished ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-2.5 py-0.5 text-xs font-bold text-white shadow-sm">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Live & Published
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-600 px-2.5 py-0.5 text-xs font-bold text-white shadow-sm">
+                  <EyeOff className="h-3.5 w-3.5" />
+                  Draft (Private)
+                </span>
+              )}
+              <span className="text-xs font-semibold text-foreground">
+                {isPublished ? "Catalog Publication Active" : "Private Operational Record"}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {isPublished
+                ? "This product and active variants are visible in public catalogs, direct sale billing, and operations."
+                : "Keep as draft while configuring attributes, media, or variants. Click Publish when ready for public catalog."}
+            </p>
+          </div>
+
+          {/* Action button */}
+          {activeProductId ? (
+            <div className="flex items-center gap-2">
+              {isPublished ? (
+                <button
+                  type="button"
+                  disabled={publishing}
+                  onClick={() => void handleUnpublish()}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-amber-400 bg-background px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50 cursor-pointer"
+                >
+                  <EyeOff className="h-3.5 w-3.5" />
+                  {publishing ? "Updating…" : "Set to Draft"}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={publishing}
+                  onClick={() => void handlePublish()}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-4 py-1.5 text-xs font-bold text-white shadow-sm disabled:opacity-50 cursor-pointer"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  {publishing ? "Publishing…" : "Publish Now"}
+                </button>
+              )}
+            </div>
+          ) : (
+            <label className="inline-flex items-center gap-2 text-xs font-semibold text-foreground cursor-pointer">
+              <input
+                type="checkbox"
+                checked={autoPublishOnCreate}
+                onChange={(e) => setAutoPublishOnCreate(e.target.checked)}
+                className="rounded border-border text-primary focus:ring-primary h-4 w-4"
+              />
+              <span>Publish immediately upon creation</span>
+            </label>
+          )}
+        </div>
+
+        {/* Quick Channel Availability Flags */}
+        {activeProductId && (
+          <div className="pt-2 border-t border-border/60">
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+              Sales Channel Availability
+            </div>
+            <div className="flex flex-wrap gap-4 text-xs font-medium">
+              <label className="inline-flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={channelDirectSale}
+                  onChange={(e) => void handleUpdateChannel("sale", e.target.checked)}
+                  className="rounded border-border text-primary focus:ring-primary h-4 w-4"
+                />
+                <span>Direct Sale (Retail)</span>
+              </label>
+              <label className="inline-flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={channelEmi}
+                  onChange={(e) => void handleUpdateChannel("emi", e.target.checked)}
+                  className="rounded border-border text-primary focus:ring-primary h-4 w-4"
+                />
+                <span>SFEMI (Advance EMI)</span>
+              </label>
+              <label className="inline-flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={channelRent}
+                  onChange={(e) => void handleUpdateChannel("rent", e.target.checked)}
+                  className="rounded border-border text-primary focus:ring-primary h-4 w-4"
+                />
+                <span>Furniture Rental</span>
+              </label>
+              <label className="inline-flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={channelLease}
+                  onChange={(e) => void handleUpdateChannel("lease", e.target.checked)}
+                  className="rounded border-border text-primary focus:ring-primary h-4 w-4"
+                />
+                <span>Furniture Leasing</span>
+              </label>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Parent product identity banner — edit mode only */}
       {isEdit && product && (
         <div className="rounded-xl border border-border bg-card px-5 py-4">
@@ -1290,7 +1798,7 @@ export default function PimProductForm({
                     {product.is_published ? "Published" : "Draft"}
                   </span>
                   <span className="rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 px-2 py-0.5 text-[10px] font-semibold">
-                    Base Product
+                    {productType}
                   </span>
                 </div>
                 <div className="mt-0.5 truncate text-sm font-semibold text-foreground">{product.name}</div>
@@ -1308,62 +1816,6 @@ export default function PimProductForm({
                 </div>
               </div>
             )}
-          </div>
-
-          {/* Quick Taxonomy Management Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t mt-3">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setManageWorkbenchOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted shadow-sm transition-colors"
-                title="Manage categories, subcategories, attributes, and preset options directly without leaving this page"
-              >
-                <FolderCog className="h-3.5 w-3.5 text-primary" /> Manage Categories & Attributes
-              </button>
-              <button
-                type="button"
-                onClick={() => void quickRefreshTaxonomy()}
-                disabled={refreshingTaxonomy}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted shadow-sm transition-colors disabled:opacity-50"
-                title="Non-destructively sync categories, attributes, and option presets without losing your in-progress inputs"
-              >
-                <RefreshCw className={`h-3.5 w-3.5 ${refreshingTaxonomy ? "animate-spin text-primary" : "text-muted-foreground"}`} />
-                {refreshingTaxonomy ? "Syncing Presets…" : "Sync Presets"}
-              </button>
-            </div>
-            <div className="text-[11px] text-muted-foreground">
-              Editing taxonomy updates live presets while keeping your in-progress draft safe.
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* New Product Mode Quick Bar */}
-      {!isEdit && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-5 py-3">
-          <div>
-            <h3 className="text-sm font-semibold text-foreground">New Product Blueprint</h3>
-            <p className="text-xs text-muted-foreground">Configure product details, categories, and attributes</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setManageWorkbenchOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted shadow-sm transition-colors"
-              title="Manage categories, subcategories, attributes, and preset options"
-            >
-              <FolderCog className="h-3.5 w-3.5 text-primary" /> Manage Categories & Attributes
-            </button>
-            <button
-              type="button"
-              onClick={() => void quickRefreshTaxonomy()}
-              disabled={refreshingTaxonomy}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted shadow-sm transition-colors disabled:opacity-50"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${refreshingTaxonomy ? "animate-spin text-primary" : "text-muted-foreground"}`} />
-              {refreshingTaxonomy ? "Syncing…" : "Sync Presets"}
-            </button>
           </div>
         </div>
       )}
@@ -1799,16 +2251,16 @@ export default function PimProductForm({
               >
                 <RefreshCw className={`h-3 w-3 ${refreshingTaxonomy ? "animate-spin text-primary" : ""}`} /> {refreshingTaxonomy ? "Syncing…" : "Sync Presets"}
               </button>
-              {isEdit && productId && (
+              {isEdit && activeProductId && (
                 <button
                   type="button"
                   onClick={async () => {
-                    if (!productId) return;
+                    if (!activeProductId) return;
                     if (!window.confirm("Discard unsaved changes and reload product from server?")) return;
                     pendingFetchRef.current = null;
                     setLoading(true);
                     try {
-                      const p = await pimService.getProductWithAttributes(productId);
+                      const p = await pimService.getProductWithAttributes(activeProductId);
                       setProduct(p);
                       setCode(p.code);
                       setBrand(p.brand ?? "");
@@ -2086,7 +2538,7 @@ export default function PimProductForm({
       )}
 
       {/* Global Related Products (Base Product Level) */}
-      {isEdit && productId && (
+      {isEdit && activeProductId && (
         <section className="rounded-lg border p-5 space-y-4">
           <div>
             <h3 className="font-semibold text-sm">Base Product Links (Accessories & Services)</h3>
@@ -2096,14 +2548,14 @@ export default function PimProductForm({
           </div>
           <div className="pt-2">
             <PimProductAccessoriesPanel
-              productId={productId}
+              productId={activeProductId}
             />
           </div>
         </section>
       )}
 
       {/* Variants (edit mode only) */}
-      {isEdit && productId && (
+      {isEdit && activeProductId && (
         <section className="rounded-lg border p-5 space-y-4">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
@@ -2135,7 +2587,7 @@ export default function PimProductForm({
             </div>
           </div>
           <VariantManager
-            productId={productId}
+            productId={activeProductId}
             productCode={code}
             productName={name}
             basePrice={basePrice}
@@ -2151,18 +2603,18 @@ export default function PimProductForm({
       )}
 
       {/* BOM & Manufacturing (edit mode, variant SKUs only) */}
-      {isEdit && productId && variants.length > 0 && (
-        <BomManufacturingPanel productId={productId} variants={variants} />
+      {isEdit && activeProductId && variants.length > 0 && (
+        <BomManufacturingPanel productId={activeProductId} variants={variants} />
       )}
 
       {/* Inventory Management (base products with variants) */}
-      {isEdit && productId && variants.length > 0 && (
+      {isEdit && activeProductId && variants.length > 0 && (
         <PimInventoryPanel variants={variants} productCode={code} onRefresh={refreshVariants} />
       )}
 
       {/* Media Gallery */}
-      {isEdit && productId && (
-        <ProductMediaGallery productId={productId} variants={variants} />
+      {isEdit && activeProductId && (
+        <ProductMediaGallery productId={activeProductId} variants={variants} />
       )}
 
       {/* Publish */}
@@ -2249,7 +2701,7 @@ export default function PimProductForm({
           }}
           className="inline-flex items-center gap-2 rounded-md border px-5 py-2.5 text-sm hover:bg-muted"
         >
-          <ArrowLeft className="h-4 w-4" /> {variant === "drawer" ? "Close" : "Back"}
+          <ArrowLeft className="h-4 w-4" /> {variant === "drawer" ? (isEdit ? "Done / Close" : "Cancel") : "Back"}
         </button>
       </div>
 

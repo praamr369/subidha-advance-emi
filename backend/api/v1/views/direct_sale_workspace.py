@@ -12,7 +12,28 @@ from billing.models import DirectSale
 from billing.services.direct_sale_operational_state import get_direct_sale_operational_state
 from billing.models import DirectSaleLine
 from inventory.models import InventoryItem, PurchaseNeed, PurchaseNeedStatus
+from urllib.parse import parse_qs, unquote, urlparse
 from subscriptions.models import Product
+
+
+def _extract_code_from_query(query: str) -> str:
+    cleaned = (query or "").strip()
+    if cleaned.startswith(("http://", "https://", "/products/")):
+        try:
+            # Handle relative URL by adding dummy scheme/host if needed
+            parse_target = cleaned if cleaned.startswith(("http://", "https://")) else f"https://subidhafurnitureasansol.com{cleaned}"
+            parsed = urlparse(parse_target)
+            qs = parse_qs(parsed.query)
+            if "sku" in qs and qs["sku"]:
+                return unquote(qs["sku"][0]).strip()
+            path_parts = [p for p in parsed.path.split("/") if p]
+            if "products" in path_parts:
+                idx = path_parts.index("products")
+                if idx + 1 < len(path_parts):
+                    return unquote(path_parts[idx + 1]).strip()
+        except Exception:
+            pass
+    return cleaned
 
 
 def _as_decimal(value, fallback: str = "0") -> Decimal:
@@ -31,19 +52,27 @@ def _as_int(value, fallback: int) -> int:
 
 def _product_search_queryset(query: str):
     queryset = Product.objects.select_related("inventory_profile").order_by("name", "id")
-    if not query:
+    cleaned_query = _extract_code_from_query(query)
+    if not cleaned_query:
         return queryset
     base_query = (
-        Q(name__icontains=query)
-        | Q(product_code__icontains=query)
-        | Q(sku__icontains=query)
-        | Q(category__icontains=query)
-        | Q(subcategory__icontains=query)
-        | Q(inventory_profile__sku__icontains=query)
+        Q(name__icontains=cleaned_query)
+        | Q(product_code__icontains=cleaned_query)
+        | Q(sku__icontains=cleaned_query)
+        | Q(category__icontains=cleaned_query)
+        | Q(subcategory__icontains=cleaned_query)
+        | Q(inventory_profile__sku__icontains=cleaned_query)
+        | Q(inventory_profile__barcode__icontains=cleaned_query)
+        | Q(inventory_profile__qr_code__icontains=cleaned_query)
+        | Q(pim_variant__sku__icontains=cleaned_query)
+        | Q(pim_variant__barcode__icontains=cleaned_query)
+        | Q(pim__code__icontains=cleaned_query)
+        | Q(pim__variants__sku__icontains=cleaned_query)
+        | Q(pim__variants__barcode__icontains=cleaned_query)
     )
-    if query.isdigit():
-        base_query = base_query | Q(id=int(query))
-    return queryset.filter(base_query)
+    if cleaned_query.isdigit():
+        base_query = base_query | Q(id=int(cleaned_query))
+    return queryset.filter(base_query).distinct()
 
 
 def _inventory_payload(product: Product) -> dict:

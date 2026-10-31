@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Plus, ReceiptText, Search, Trash2 } from "lucide-react";
+import { AlertCircle, Barcode, CheckCircle2, Plus, QrCode, ReceiptText, Search, Trash2, Zap } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -406,6 +406,15 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
   const lineSearchTimers = useRef<Record<string, number>>({});
   const customerSearchTimer = useRef<number | null>(null);
   const createAttemptKey = useRef<string | null>(null);
+
+  // Quick Barcode / QR Code Billing Scanner State
+  const [quickScanCode, setQuickScanCode] = useState("");
+  const [quickScanLoading, setQuickScanLoading] = useState(false);
+  const [quickScanStatus, setQuickScanStatus] = useState<{
+    tone: "success" | "error" | "info";
+    message: string;
+  } | null>(null);
+  const quickScanInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!createMode) return;
@@ -923,24 +932,77 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
     }));
   }
 
+  function extractProductCodeOrSku(raw: string): string {
+    const trimmed = (raw || "").trim();
+    if (!trimmed) return "";
+    if (trimmed.startsWith("http://") || trimmed.startsWith("https://") || trimmed.startsWith("/products/")) {
+      try {
+        const dummyBase = "https://subidhafurnitureasansol.com";
+        const url = new URL(trimmed.startsWith("http") ? trimmed : `${dummyBase}${trimmed}`);
+        const skuParam = url.searchParams.get("sku");
+        if (skuParam && skuParam.trim()) {
+          return decodeURIComponent(skuParam.trim());
+        }
+        const match = url.pathname.match(/\/products\/([^/?#]+)/);
+        if (match && match[1]) {
+          return decodeURIComponent(match[1].trim());
+        }
+      } catch {
+        const skuMatch = trimmed.match(/[?&]sku=([^&#]+)/);
+        if (skuMatch && skuMatch[1]) return decodeURIComponent(skuMatch[1].trim());
+        const pathMatch = trimmed.match(/\/products\/([^/?#]+)/);
+        if (pathMatch && pathMatch[1]) return decodeURIComponent(pathMatch[1].trim());
+      }
+    }
+    return trimmed;
+  }
+
+  function playScanBeep(success = true) {
+    try {
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "sine";
+      if (success) {
+        osc.frequency.setValueAtTime(880, ctx.currentTime);
+        gain.gain.setValueAtTime(0.12, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.12);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.12);
+      } else {
+        osc.frequency.setValueAtTime(220, ctx.currentTime);
+        gain.gain.setValueAtTime(0.18, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.25);
+      }
+    } catch {
+      // Audio autoplay may be blocked
+    }
+  }
+
   function handleProductSearch(lineId: string, value: string) {
+    const cleanSearch = extractProductCodeOrSku(value);
     updateLine(lineId, {
       product_search: value,
       product_error: null,
-      product_loading: value.trim().length >= 2,
+      product_loading: cleanSearch.length >= 2,
     });
     if (lineSearchTimers.current[lineId]) {
       window.clearTimeout(lineSearchTimers.current[lineId]);
     }
-    const trimmed = value.trim();
-    if (trimmed.length < 2) {
+    if (cleanSearch.length < 2) {
       updateLine(lineId, { product_results: [], product_loading: false });
       return;
     }
     lineSearchTimers.current[lineId] = window.setTimeout(async () => {
       try {
         const payload = await searchBillingProducts({
-          q: trimmed,
+          q: cleanSearch,
           page: 1,
           page_size: 20,
           include_inventory: true,
@@ -986,6 +1048,94 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
     } else if (product.stock_item_type === "FINISHED_GOOD") {
       // Still open for finished goods even if accessories aren't cached in search results
       setAccessoryPanel({ productId: product.id, lineId });
+    }
+  }
+
+  async function handleQuickScanSubmit(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    const raw = quickScanCode.trim();
+    if (!raw) return;
+
+    const cleanCode = extractProductCodeOrSku(raw);
+    if (!cleanCode) return;
+
+    setQuickScanLoading(true);
+    setQuickScanStatus(null);
+
+    try {
+      const payload = await searchBillingProducts({
+        q: cleanCode,
+        page: 1,
+        page_size: 10,
+        include_inventory: true,
+        direct_sale_enabled: true,
+      });
+
+      if (!payload.results || payload.results.length === 0) {
+        playScanBeep(false);
+        setQuickScanStatus({
+          tone: "error",
+          message: `No product found matching "${cleanCode}". Please verify the code or barcode.`,
+        });
+        setQuickScanLoading(false);
+        return;
+      }
+
+      // Pick exact match or first result
+      const matched =
+        payload.results.find(
+          (p) =>
+            p.product_code?.toLowerCase() === cleanCode.toLowerCase() ||
+            p.sku?.toLowerCase() === cleanCode.toLowerCase()
+        ) || payload.results[0];
+
+      // Check if product is already in bill lines
+      const existingLineIndex = lines.findIndex(
+        (l) => l.product_id === String(matched.id) || l.selected_product?.id === matched.id
+      );
+
+      if (existingLineIndex >= 0) {
+        const targetLine = lines[existingLineIndex];
+        const currentQty = Number(targetLine.quantity || "1");
+        const nextQty = (currentQty + 1).toFixed(0);
+        updateLine(targetLine.id, { quantity: nextQty });
+        playScanBeep(true);
+        setQuickScanStatus({
+          tone: "success",
+          message: `✓ Updated quantity: ${matched.name} (${matched.product_code || matched.sku || ""}) → ${nextQty} PCS`,
+        });
+      } else {
+        const firstLineEmpty = lines.length === 1 && !lines[0].selected_product && !lines[0].description;
+        let lineIdToPopulate: string;
+
+        if (firstLineEmpty) {
+          lineIdToPopulate = lines[0].id;
+        } else {
+          const newLine = makeLine();
+          setLines((prev) => [...prev, newLine]);
+          lineIdToPopulate = newLine.id;
+        }
+
+        selectProduct(lineIdToPopulate, matched);
+        playScanBeep(true);
+        setQuickScanStatus({
+          tone: "success",
+          message: `✓ Added to bill: ${matched.name} (${matched.product_code || matched.sku || ""}) — ₹${matched.base_price || matched.sale_price}`,
+        });
+      }
+
+      setQuickScanCode("");
+      if (quickScanInputRef.current) {
+        quickScanInputRef.current.focus();
+      }
+    } catch (err) {
+      playScanBeep(false);
+      setQuickScanStatus({
+        tone: "error",
+        message: accountingErrorMessage(err, "Quick scan search failed."),
+      });
+    } finally {
+      setQuickScanLoading(false);
     }
   }
 
@@ -1759,7 +1909,10 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
 
                   <section className="rounded-lg border border-border bg-card p-4">
                     <div className="flex items-center justify-between gap-3">
-                      <h3 className="text-sm font-semibold text-foreground">Product Lines</h3>
+                      <div>
+                        <h3 className="text-sm font-semibold text-foreground">Product Lines</h3>
+                        <p className="text-xs text-muted-foreground">Add products manually or use the quick scanner below.</p>
+                      </div>
                       <button
                         type="button"
                         onClick={() => setLines((current) => [...current, makeLine()])}
@@ -1769,6 +1922,72 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                         <Plus className="h-4 w-4" aria-hidden="true" />
                         Add Line
                       </button>
+                    </div>
+
+                    {/* Quick Barcode & QR Code Billing Scanner */}
+                    <div className="mt-3 rounded-xl border-2 border-primary/20 bg-primary/[0.03] p-3.5 transition-all focus-within:border-primary/50 focus-within:bg-primary/[0.05]">
+                      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-sm">
+                            <Zap className="h-3.5 w-3.5" />
+                          </span>
+                          <span className="text-xs font-bold text-foreground uppercase tracking-wider">
+                            Quick Billing Scanner
+                          </span>
+                          <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+                            POS Ready · Hardware Scanner &amp; QR
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-muted-foreground hidden sm:inline">
+                          Scan showroom QR label, barcode, or enter SKU
+                        </span>
+                      </div>
+
+                      <form onSubmit={handleQuickScanSubmit} className="flex gap-2">
+                        <div className="relative flex-1">
+                          <Barcode className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                          <input
+                            ref={quickScanInputRef}
+                            type="text"
+                            value={quickScanCode}
+                            onChange={(e) => setQuickScanCode(e.target.value)}
+                            disabled={submitting || quickScanLoading}
+                            placeholder="Scan QR code / barcode or enter SKU (e.g. BAHU-BED-MET-K(FX7F)..."
+                            className={`${FIELD_CLASS} pl-9 font-mono text-xs sm:text-sm`}
+                            autoComplete="off"
+                          />
+                        </div>
+                        <button
+                          type="submit"
+                          disabled={submitting || quickScanLoading || !quickScanCode.trim()}
+                          className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-primary px-4 text-xs sm:text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-50"
+                        >
+                          {quickScanLoading ? (
+                            <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+                          ) : (
+                            <QrCode className="h-4 w-4" />
+                          )}
+                          <span>Add to Bill</span>
+                          <kbd className="hidden md:inline-block rounded bg-primary-foreground/20 px-1.5 py-0.5 text-[10px] font-mono">↵</kbd>
+                        </button>
+                      </form>
+
+                      {quickScanStatus && (
+                        <div className={`mt-2.5 flex items-center gap-2 rounded-lg p-2 text-xs font-medium ${
+                          quickScanStatus.tone === "success"
+                            ? "bg-emerald-500/10 text-emerald-800 dark:text-emerald-200 border border-emerald-500/20"
+                            : quickScanStatus.tone === "error"
+                            ? "bg-rose-500/10 text-rose-800 dark:text-rose-200 border border-rose-500/20"
+                            : "bg-muted text-foreground"
+                        }`}>
+                          {quickScanStatus.tone === "success" ? (
+                            <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                          ) : (
+                            <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                          )}
+                          <span>{quickScanStatus.message}</span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="mt-4 space-y-4">

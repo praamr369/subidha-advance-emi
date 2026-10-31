@@ -161,6 +161,8 @@ export default function WorkflowProvider({
                     ? "ACCESSORY"
                     : activeWorkflow.context.query?.productType === "SERVICE"
                     ? "SERVICE"
+                    : activeWorkflow.context.query?.productType === "RAW_MATERIAL"
+                    ? "RAW_MATERIAL"
                     : "FINISHED_GOOD"
                 }
                 onSaved={(savedProduct) => {
@@ -169,18 +171,6 @@ export default function WorkflowProvider({
                       new CustomEvent("pim-product-saved", { detail: savedProduct })
                     );
                   }
-                  setActiveWorkflow((current) =>
-                    current
-                      ? {
-                          ...current,
-                          resultHref: `/admin/pim/products/${
-                            savedProduct.product_type === "ACCESSORY"
-                              ? "accessories"
-                              : "finished-goods"
-                          }/${savedProduct.id}/edit`,
-                        }
-                      : current
-                  );
                 }}
                 onCancel={closeWorkflow}
               />

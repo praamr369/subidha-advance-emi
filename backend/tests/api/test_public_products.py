@@ -68,3 +68,16 @@ class PublicProductsApiTests(APITestCase):
             active_response.data["image"],
         )
         self.assertEqual(inactive_response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_public_product_detail_finds_by_code_and_sku(self):
+        product = self._create_uploaded_product(active=True, suffix="004")
+        product.sku = "SKU-PUBLIC-004"
+        product.save(update_fields=["sku"])
+
+        code_resp = self.client.get(f"/api/v1/public/products/{product.product_code}/")
+        self.assertEqual(code_resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(code_resp.data["id"], product.id)
+
+        sku_resp = self.client.get(f"/api/v1/public/products/{product.sku}/")
+        self.assertEqual(sku_resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(sku_resp.data["id"], product.id)

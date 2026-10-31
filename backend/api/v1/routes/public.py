@@ -490,12 +490,54 @@ class PublicProductDetailView(APIView):
             if id is not None:
                 product = base_qs.get(id=id)
             elif slug is not None:
-                # Try integer id lookup first so numeric URLs work without the
-                # /by-id/ prefix, then fall back to product_code slug lookup.
+                # 1. Try integer id lookup first
+                matched = None
                 try:
-                    product = base_qs.get(id=int(slug))
+                    matched = base_qs.get(id=int(slug))
                 except (ValueError, Product.DoesNotExist):
-                    product = base_qs.get(product_code__iexact=slug)
+                    pass
+
+                # 2. Match product_code
+                if not matched:
+                    matched = base_qs.filter(product_code__iexact=slug).first()
+
+                # 3. Match sku
+                if not matched:
+                    matched = base_qs.filter(sku__iexact=slug).first()
+
+                # 4. Match pim_variant sku or barcode
+                if not matched:
+                    matched = base_qs.filter(
+                        Q(pim_variant__sku__iexact=slug) | Q(pim_variant__barcode__iexact=slug)
+                    ).first()
+
+                # 5. Match inventory_profile barcode or qr_code
+                if not matched:
+                    matched = base_qs.filter(
+                        Q(inventory_profile__barcode__iexact=slug) |
+                        Q(inventory_profile__qr_code__iexact=slug)
+                    ).first()
+
+                # 6. Match variant under PIM base product
+                if not matched:
+                    from products_pim.models import ProductVariant
+                    pv = ProductVariant.objects.filter(
+                        Q(sku__iexact=slug) | Q(barcode__iexact=slug)
+                    ).select_related("operational_product", "product__source_product").first()
+                    if pv:
+                        if pv.operational_product and base_qs.filter(id=pv.operational_product_id).exists():
+                            matched = pv.operational_product
+                        elif pv.product and pv.product.source_product and base_qs.filter(id=pv.product.source_product_id).exists():
+                            matched = pv.product.source_product
+
+                # 7. Match pim code
+                if not matched:
+                    matched = base_qs.filter(pim__code__iexact=slug).first()
+
+                if matched:
+                    product = matched
+                else:
+                    raise Product.DoesNotExist
             else:
                 raise Product.DoesNotExist
         except Product.DoesNotExist:

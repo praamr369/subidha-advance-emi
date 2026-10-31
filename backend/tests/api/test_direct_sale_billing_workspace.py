@@ -128,6 +128,20 @@ class DirectSaleBillingWorkspaceTests(APITestCase):
             ids = {row["id"] for row in response.data["results"]}
             self.assertIn(self.product.id, ids)
 
+    def test_billing_product_search_finds_by_qr_code_url(self):
+        for url_query in [
+            "https://subidhafurnitureasansol.com/products/WS-SOFA-001?sku=WS-SOFA-SKU-001",
+            "https://subidhafurnitureasansol.com/products/WS-SOFA-001",
+            "/products/WS-SOFA-001",
+        ]:
+            response = self.client.get(
+                "/api/v1/admin/billing/products/search/",
+                {"q": url_query, "include_inventory": "true", "page_size": 10},
+            )
+            self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+            ids = {row["id"] for row in response.data["results"]}
+            self.assertIn(self.product.id, ids)
+
     def test_billing_product_search_includes_inventory_fields(self):
         response = self.client.get(
             "/api/v1/admin/billing/products/search/",

@@ -91,6 +91,21 @@ export default async function ProductDetailPage({ params, searchParams }: Produc
     }
   }
 
+  // Pre-select variant attributes if a specific SKU was requested via ?sku=... or direct slug scan
+  const requestedSku = (
+    (typeof resolvedSearchParams.sku === "string" ? resolvedSearchParams.sku : null) ||
+    slug
+  )?.trim().toLowerCase();
+
+  if (requestedSku && product.pim_variants?.length) {
+    const targetVariant = product.pim_variants.find(
+      (v) => v.sku?.toLowerCase() === requestedSku
+    );
+    if (targetVariant?.attributes) {
+      Object.assign(selectedAttributes, targetVariant.attributes);
+    }
+  }
+
   const locale = await getPublicLocale();
   const dictionary = getPublicDictionary(locale);
   const businessProfile = await getResolvedPublicBusinessProfile();

@@ -404,11 +404,17 @@ export default function InventoryItemsPage() {
             type="button"
             onClick={(event) => {
               event.stopPropagation();
+              const origin = typeof window !== "undefined" && window.location.origin
+                ? window.location.origin
+                : "https://subidhafurnitureasansol.com";
+              const code = row.product_code || row.sku || String(row.id);
+              const publicUrl = `${origin}/products/${encodeURIComponent(code)}${row.sku && row.sku !== code ? `?sku=${encodeURIComponent(row.sku)}` : ""}`;
               setPrintItem({
                 productName: row.product_name ?? "—",
                 productCode: row.product_code ?? "",
                 sku: row.sku ?? undefined,
-                qrValue: row.qr_code?.trim() || row.sku || row.product_code || String(row.id),
+                qrValue: publicUrl,
+                publicUrl: publicUrl,
                 unitOfMeasure: row.unit_of_measure ?? undefined,
               });
             }}

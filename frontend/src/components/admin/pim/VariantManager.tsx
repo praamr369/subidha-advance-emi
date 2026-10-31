@@ -1257,11 +1257,16 @@ export default function VariantManager({ productId, productCode, productName, ba
 
   function variantToLabel(v: PimVariant): QRLabelItem {
     const attrSummary = v.attribute_values.map((a) => a.value_text).filter(Boolean).join(" / ");
+    const origin = typeof window !== "undefined" && window.location.origin
+      ? window.location.origin
+      : "https://subidhafurnitureasansol.com";
+    const publicUrl = `${origin}/products/${encodeURIComponent(productCode || v.sku)}${v.sku && v.sku !== productCode ? `?sku=${encodeURIComponent(v.sku)}` : ""}`;
     return {
       productName: productName ? `${productName}${attrSummary ? ` — ${attrSummary}` : ""}` : v.variant_label || v.sku,
       productCode: productCode,
       sku: v.sku,
-      qrValue: v.sku,
+      qrValue: publicUrl,
+      publicUrl: publicUrl,
     };
   }
 
@@ -1270,15 +1275,20 @@ export default function VariantManager({ productId, productCode, productName, ba
     if (selectedVariants.length === 0) return;
     const win = window.open("", "_blank", "width=900,height=700");
     if (!win) return;
+    const origin = typeof window !== "undefined" && window.location.origin
+      ? window.location.origin
+      : "https://subidhafurnitureasansol.com";
     const labelsHtml = selectedVariants.map((v) => {
       const attrSummary = v.attribute_values.map((a) => a.value_text).filter(Boolean).join(" / ");
       const displayName = productName ? `${productName}${attrSummary ? ` — ${attrSummary}` : ""}` : v.variant_label || v.sku;
+      const publicUrl = `${origin}/products/${encodeURIComponent(productCode || v.sku)}${v.sku && v.sku !== productCode ? `?sku=${encodeURIComponent(v.sku)}` : ""}`;
       return `
         <div class="label">
-          <div class="qr-placeholder" data-sku="${v.sku}"></div>
+          <div class="qr-placeholder" data-url="${escHtml(publicUrl)}" data-sku="${escHtml(v.sku)}"></div>
           <div class="name">${escHtml(displayName)}</div>
           <div class="code">${escHtml(productCode)} · ${escHtml(v.sku)}</div>
           ${attrSummary ? `<div class="attrs">${escHtml(attrSummary)}</div>` : ""}
+          <div class="hint">Scan for specs, price &amp; 3D AR</div>
         </div>`;
     }).join("");
     // Use a QR CDN for print window (self-contained SVG QR via qrcode.js UMD)
@@ -1297,6 +1307,7 @@ export default function VariantManager({ productId, productCode, productName, ba
           .name { font-size: 11px; font-weight: bold; text-align: center; max-width: 88mm; word-break: break-word; }
           .code { font-size: 10px; letter-spacing: 0.04em; }
           .attrs { font-size: 9px; color: #555; }
+          .hint { font-size: 8px; color: #777; text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
         </style>
       </head>
       <body>
@@ -1305,7 +1316,8 @@ export default function VariantManager({ productId, productCode, productName, ba
           document.querySelectorAll('.qr-placeholder').forEach(function(el) {
             var canvas = document.createElement('canvas');
             el.replaceWith(canvas);
-            QRCode.toCanvas(canvas, el.dataset.sku || el.getAttribute('data-sku') || 'SKU', { width: 120, margin: 1 });
+            var target = el.getAttribute('data-url') || el.getAttribute('data-sku') || 'SKU';
+            QRCode.toCanvas(canvas, target, { width: 120, margin: 1 });
           });
           window.onload = function() { window.print(); };
         <\/script>
