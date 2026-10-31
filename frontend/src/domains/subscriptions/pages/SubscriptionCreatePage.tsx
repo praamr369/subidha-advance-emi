@@ -20,6 +20,15 @@ import KycReadinessPanel from "@/domains/subscriptions/components/KycReadinessPa
 import type { ContractKycReadiness } from "@/services/kyc-readiness";
 import SignatureCanvas from "@/components/forms/SignatureCanvas";
 import { CustomerSignatureLinkModal } from "@/components/contracts/CustomerSignatureLinkModal";
+import { Barcode, CheckCircle2, Smartphone, Zap } from "lucide-react";
+import MobileHandoverModal from "@/components/handover/MobileHandoverModal";
+import { dataUrlToFile } from "@/services/mobile-handover";
+import {
+  extractProductCodeOrSku,
+  playScanBeep,
+  searchAdminBillingProducts,
+  type BillingProductSearchRow,
+} from "@/services/direct-sale-workspace";
 
 type PlanType = "EMI" | "RENT" | "LEASE";
 type SubscriptionCreateVariant = "page" | "drawer";
@@ -66,6 +75,27 @@ export type ContractBasketItem = {
   security_deposit_percent: string;
   security_deposit_amount?: string;
 };
+
+function billingRowToProductOption(row: BillingProductSearchRow): ProductOption {
+  const inv = row.inventory_status;
+  return {
+    id: row.id,
+    name: row.name,
+    product_code: row.product_code || row.sku || undefined,
+    base_price: row.base_price,
+    category: row.category || undefined,
+    subcategory: row.subcategory || undefined,
+    is_emi_enabled: row.is_emi_enabled,
+    is_rent_enabled: row.is_rent_enabled,
+    is_lease_enabled: row.is_lease_enabled,
+    is_direct_sale_enabled: row.is_direct_sale_enabled,
+    lifecycle_status: row.lifecycle_status || undefined,
+    on_hand_qty: inv?.on_hand,
+    reserved_qty: inv?.reserved,
+    available_qty: inv?.available,
+    stock_status: inv ? (inv.is_in_stock ? "IN_STOCK" : "OUT_OF_STOCK") : undefined,
+  };
+}
 
 type BatchOption = {
   id: number;
@@ -603,6 +633,16 @@ export default function SubscriptionCreatePage({
   const [prefillMessages, setPrefillMessages] = useState<string[]>([]);
   const [success, setSuccess] = useState<CreatedSubscriptionResponse | null>(null);
   const [signatureModalOpen, setSignatureModalOpen] = useState(false);
+  const [mobileSignModalOpen, setMobileSignModalOpen] = useState(false);
+
+  // Quick Barcode / QR Code Scanner State
+  const [quickScanCode, setQuickScanCode] = useState("");
+  const [quickScanLoading, setQuickScanLoading] = useState(false);
+  const [quickScanStatus, setQuickScanStatus] = useState<{
+    tone: "success" | "error" | "info";
+    message: string;
+  } | null>(null);
+  const quickScanInputRef = useRef<HTMLInputElement>(null);
 
   const leadContext = useMemo(() => {
     const params = new URLSearchParams(searchParamKey);
@@ -1000,6 +1040,75 @@ export default function SubscriptionCreatePage({
   function nextLuckyRequestToken(): number {
     luckyRequestSequence.current += 1;
     return luckyRequestSequence.current;
+  }
+
+  async function handleQuickScanSubmit(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    const raw = quickScanCode.trim();
+    if (!raw) return;
+
+    const cleanCode = extractProductCodeOrSku(raw);
+    if (!cleanCode) return;
+
+    setQuickScanLoading(true);
+    setQuickScanStatus(null);
+
+    try {
+      const payload = await searchAdminBillingProducts({
+        q: cleanCode,
+        include_inventory: true,
+        page_size: 10,
+      });
+
+      if (!payload.results || payload.results.length === 0) {
+        playScanBeep(false);
+        setQuickScanStatus({
+          tone: "error",
+          message: `No product found matching "${cleanCode}". Please verify code, SKU, or barcode.`,
+        });
+        setQuickScanLoading(false);
+        return;
+      }
+
+      const matched =
+        payload.results.find(
+          (p) =>
+            p.product_code?.toLowerCase() === cleanCode.toLowerCase() ||
+            p.sku?.toLowerCase() === cleanCode.toLowerCase()
+        ) || payload.results[0];
+
+      const option = billingRowToProductOption(matched);
+
+      if (isRentPlan || isLeasePlan) {
+        addProductToBasket(option);
+        playScanBeep(true);
+        setQuickScanStatus({
+          tone: "success",
+          message: `✓ Added to contract: ${matched.name} (${matched.product_code || matched.sku || ""})`,
+        });
+      } else {
+        // SFEMI Advance EMI
+        nextLuckyRequestToken();
+        setProduct(option);
+        setError(null);
+        setSuccess(null);
+        playScanBeep(true);
+        setQuickScanStatus({
+          tone: "success",
+          message: `✓ Selected product: ${matched.name} (${matched.product_code || matched.sku || ""})`,
+        });
+      }
+      setQuickScanCode("");
+      setTimeout(() => quickScanInputRef.current?.focus(), 50);
+    } catch (err) {
+      playScanBeep(false);
+      setQuickScanStatus({
+        tone: "error",
+        message: err instanceof Error ? err.message : "Scanning failed. Please try again.",
+      });
+    } finally {
+      setQuickScanLoading(false);
+    }
   }
 
   async function runProductSearch() {
@@ -2173,6 +2282,71 @@ export default function SubscriptionCreatePage({
           title="Step 1 · Contract parties"
           description="Select the customer, product, and optional partner context for this subscription."
         >
+          {/* Quick Barcode / QR Code Product Scanner Bar */}
+          <div className="mb-4 rounded-xl border border-border/80 bg-muted/20 p-3 sm:p-4 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                  <Zap className="h-4 w-4" />
+                </div>
+                <span className="text-xs sm:text-sm font-bold text-foreground">
+                  ⚡ Quick Contract Product Scanner
+                </span>
+                <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+                  POS Ready · SFEMI, Rent &amp; Lease
+                </span>
+              </div>
+              <span className="text-[11px] text-muted-foreground hidden sm:inline">
+                Scan showroom QR label, barcode, or enter SKU
+              </span>
+            </div>
+
+            <form onSubmit={handleQuickScanSubmit} className="flex gap-2">
+              <div className="relative flex-1">
+                <Barcode className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  ref={quickScanInputRef}
+                  type="text"
+                  value={quickScanCode}
+                  onChange={(e) => setQuickScanCode(e.target.value)}
+                  disabled={submitting || quickScanLoading}
+                  placeholder="Scan product QR label / barcode or enter SKU (e.g. BAHU-BED-MET-K...)"
+                  className="h-10 w-full rounded-xl border border-input bg-background pl-9 pr-4 font-mono text-xs sm:text-sm outline-none focus:border-ring disabled:opacity-50"
+                />
+                {quickScanLoading && (
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                    Searching…
+                  </span>
+                )}
+              </div>
+              <button
+                type="submit"
+                disabled={submitting || quickScanLoading || !quickScanCode.trim()}
+                className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 transition disabled:opacity-50"
+              >
+                <Zap className="h-3.5 w-3.5" />
+                <span>Scan / Add</span>
+              </button>
+            </form>
+
+            {quickScanStatus && (
+              <div
+                className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium ${
+                  quickScanStatus.tone === "success"
+                    ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20"
+                    : "bg-destructive/10 text-destructive border border-destructive/20"
+                }`}
+              >
+                {quickScanStatus.tone === "success" ? (
+                  <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                ) : (
+                  <span className="font-bold">✕</span>
+                )}
+                <span>{quickScanStatus.message}</span>
+              </div>
+            )}
+          </div>
+
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="space-y-1.5">
               <div className="text-sm font-medium">Customer</div>
@@ -2471,7 +2645,7 @@ export default function SubscriptionCreatePage({
               <div className="space-y-1.5">
                 <div className="text-sm font-medium">Product</div>
                 <div className="text-xs text-muted-foreground mb-2">
-                  Search by product name or code for Lucky Plan Advance EMI.
+                  Search by product name, SKU, or scan QR code for SFEMI Advance EMI.
                 </div>
                 <ProductSelector
                   selected={product}
@@ -3696,6 +3870,14 @@ export default function SubscriptionCreatePage({
                       >
                         📁 Upload image
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => setMobileSignModalOpen(true)}
+                        className="flex items-center gap-1 rounded px-2.5 py-0.5 text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm transition"
+                      >
+                        <Smartphone className="h-3 w-3" />
+                        📱 Scan QR to Sign on Phone
+                      </button>
                     </div>
                   </div>
 
@@ -3844,6 +4026,28 @@ export default function SubscriptionCreatePage({
           </>
         )}
       </div>
+
+      {/* Mobile Customer Signature Handover Modal */}
+      {mobileSignModalOpen && (
+        <MobileHandoverModal
+          isOpen={mobileSignModalOpen}
+          onClose={() => setMobileSignModalOpen(false)}
+          sessionType="SIGNATURE"
+          title="Customer Digital Signature"
+          customerName={customer?.name}
+          customerPhone={customer?.phone}
+          onSignatureCaptured={(dataUrl) => {
+            const file = dataUrlToFile(
+              dataUrl,
+              `signature_${customer?.name?.replace(/\s+/g, "_") || "customer"}_${Date.now()}.png`
+            );
+            setSignatureFile(file);
+            setSignaturePreview(dataUrl);
+            setDocUploadError(null);
+            playScanBeep(true);
+          }}
+        />
+      )}
     </ERPPageShell>
   );
 }

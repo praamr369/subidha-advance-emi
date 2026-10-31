@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AlertCircle, Barcode, CheckCircle2, Plus, QrCode, ReceiptText, Search, Trash2, Zap } from "lucide-react";
+import { AlertCircle, Barcode, CheckCircle2, Plus, QrCode, ReceiptText, Search, Smartphone, Trash2, Zap } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -43,6 +43,8 @@ import {
 import { recheckStockNeed } from "@/services/inventory-ops";
 import AccessorySelectionPanel, { type AccessorySelectionResult } from "@/components/inventory/AccessorySelectionPanel";
 import SearchCombobox, { SearchComboboxRow, CodeBadge } from "@/components/ui/SearchCombobox";
+import MobileHandoverModal from "@/components/handover/MobileHandoverModal";
+import { extractCustomerQuery } from "@/services/mobile-handover";
 import { getAdminDirectSaleReturnEligibility, type DirectSaleReturnEligibility } from "@/services/reversals";
 import {
   buildAdminBillingDocumentRoute,
@@ -415,6 +417,7 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
     message: string;
   } | null>(null);
   const quickScanInputRef = useRef<HTMLInputElement>(null);
+  const [customerMobileHandoverOpen, setCustomerMobileHandoverOpen] = useState(false);
 
   useEffect(() => {
     if (!createMode) return;
@@ -850,7 +853,9 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
   }
 
   function handleCustomerSearch(value: string) {
-    setCustomerQuery(value);
+    const parsed = extractCustomerQuery(value);
+    const cleanSearch = parsed.phone || parsed.customer_code || parsed.text;
+    setCustomerQuery(cleanSearch);
     setCustomerSearchError(null);
     setValidationErrors([]);
     setCustomerModeError(null);
@@ -862,7 +867,7 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
     if (customerSearchTimer.current) {
       window.clearTimeout(customerSearchTimer.current);
     }
-    const trimmed = value.trim();
+    const trimmed = cleanSearch.trim();
     if (trimmed.length < 2) {
       setCustomerResults([]);
       setCustomerPartyResults([]);
@@ -870,6 +875,7 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
       return;
     }
     setCustomerLoading(true);
+    const isDirectScan = Boolean(parsed.phone || parsed.customer_code);
     customerSearchTimer.current = window.setTimeout(async () => {
       try {
         const customerMatches = await searchCustomers(trimmed);
@@ -1521,9 +1527,20 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                     <div className="mt-4 grid gap-4 lg:grid-cols-2">
                       {form.customer_mode === "EXISTING" ? (
                       <div className="relative lg:col-span-2">
-                        <label className="mb-2 block text-sm font-medium text-foreground" htmlFor="direct-sale-customer-search">
-                          Search Existing Customer
-                        </label>
+                        <div className="mb-2 flex items-center justify-between">
+                          <label className="block text-sm font-medium text-foreground" htmlFor="direct-sale-customer-search">
+                            Search Existing Customer
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setCustomerMobileHandoverOpen(true)}
+                            title="Scan QR with customer or staff phone to fetch customer ID directly to laptop"
+                            className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1 text-xs font-semibold text-foreground shadow-sm hover:bg-muted transition"
+                          >
+                            <Smartphone className="h-3.5 w-3.5 text-primary" />
+                            <span>📱 Mobile Scan</span>
+                          </button>
+                        </div>
                         <div className="relative">
                           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
                           <input
@@ -1532,7 +1549,7 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                             onChange={(event) => handleCustomerSearch(event.target.value)}
                             disabled={submitting}
                             className={`${FIELD_CLASS} pl-9`}
-                            placeholder="Name, phone, customer code, GSTIN"
+                            placeholder="Name, phone, customer code, or scan barcode/QR"
                           />
                         </div>
                         <SearchCombobox<CustomerRecord | PartyListRow>
@@ -2437,7 +2454,22 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
             </section>
           </aside>
         </div>
-      </ERPPageShell>
+        {/* Mobile Customer ID Handover Modal */}
+      {customerMobileHandoverOpen && (
+        <MobileHandoverModal
+          isOpen={customerMobileHandoverOpen}
+          onClose={() => setCustomerMobileHandoverOpen(false)}
+          sessionType="CUSTOMER_ID"
+          title="Scan or Fetch Customer ID from Mobile"
+          onCustomerCaptured={async (data) => {
+            const term = data.phone || data.customer_code || data.name || "";
+            if (term) {
+              handleCustomerSearch(term);
+            }
+          }}
+        />
+      )}
+    </ERPPageShell>
     );
   }
 
@@ -2762,6 +2794,21 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
             </div>
           </div>
         </div>
+      )}
+      {/* Mobile Customer ID Handover Modal */}
+      {customerMobileHandoverOpen && (
+        <MobileHandoverModal
+          isOpen={customerMobileHandoverOpen}
+          onClose={() => setCustomerMobileHandoverOpen(false)}
+          sessionType="CUSTOMER_ID"
+          title="Scan or Fetch Customer ID from Mobile"
+          onCustomerCaptured={async (data) => {
+            const term = data.phone || data.customer_code || data.name || "";
+            if (term) {
+              handleCustomerSearch(term);
+            }
+          }}
+        />
       )}
     </ERPPageShell>
   );

@@ -158,6 +158,10 @@ export default function ProductSpecSearch({
           onFocus={() => setOpen(true)}
           onKeyDown={(e) => {
             if (e.key === "Escape") setOpen(false);
+            if (e.key === "Enter" && results.length > 0) {
+              e.preventDefault();
+              handleSelect(results[0]);
+            }
           }}
           disabled={disabled}
           autoFocus={autoFocus}

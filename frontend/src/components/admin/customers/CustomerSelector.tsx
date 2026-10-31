@@ -30,6 +30,7 @@ import {
   ShieldCheck,
   Users,
   CheckCircle2,
+  Smartphone,
 } from "lucide-react";
 
 import type { CustomerRecord } from "@/services/customers";
@@ -40,6 +41,8 @@ import {
 } from "@/services/customers";
 import StatusBadge from "@/components/ui/status-badge";
 import PincodeField from "@/components/forms/PincodeField";
+import MobileHandoverModal from "@/components/handover/MobileHandoverModal";
+import { extractCustomerQuery } from "@/services/mobile-handover";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -174,6 +177,7 @@ export default function CustomerSelector({
   const [results, setResults] = useState<CustomerRecord[]>([]);
   const [exactMatch, setExactMatch] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [mobileHandoverOpen, setMobileHandoverOpen] = useState(false);
 
   // Inline Customer Onboarding Workbench state
   const [showCreate, setShowCreate] = useState(false);
@@ -263,16 +267,19 @@ export default function CustomerSelector({
   }, []);
 
   const handleInputChange = (value: string) => {
-    setQuery(value);
+    const parsed = extractCustomerQuery(value);
+    const cleanTerm = parsed.phone || parsed.customer_code || parsed.text;
+    setQuery(cleanTerm);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!value.trim()) {
+    if (!cleanTerm.trim()) {
       setResults([]);
       setExactMatch(false);
       return;
     }
+    const isDirectScan = Boolean(parsed.phone || parsed.customer_code);
     debounceRef.current = setTimeout(() => {
-      void runSearch(value);
-    }, 350);
+      void runSearch(cleanTerm);
+    }, isDirectScan ? 80 : 350);
   };
 
   const handleSelect = (customer: CustomerRecord) => {
@@ -450,25 +457,37 @@ export default function CustomerSelector({
 
   return (
     <div className="space-y-3">
-      {/* Search input */}
-      <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <input
-          ref={inputRef}
-          type="text"
-          value={query}
-          onChange={(e) => handleInputChange(e.target.value)}
-          placeholder={placeholder}
+      {/* Search input + Mobile Scan button */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            ref={inputRef}
+            type="text"
+            value={query}
+            onChange={(e) => handleInputChange(e.target.value)}
+            placeholder={placeholder}
+            disabled={disabled}
+            className="h-11 w-full rounded-xl border border-input bg-background pl-9 pr-4 text-sm outline-none focus:border-ring disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label="Search customer"
+            autoComplete="off"
+          />
+          {searching && (
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+              Searching…
+            </span>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => setMobileHandoverOpen(true)}
           disabled={disabled}
-          className="h-11 w-full rounded-xl border border-input bg-background pl-9 pr-4 text-sm outline-none focus:border-ring disabled:cursor-not-allowed disabled:opacity-50"
-          aria-label="Search customer"
-          autoComplete="off"
-        />
-        {searching && (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-            Searching…
-          </span>
-        )}
+          title="Scan QR with customer or staff smartphone to fetch customer ID directly to laptop"
+          className="flex h-11 shrink-0 items-center gap-1.5 rounded-xl border border-border bg-card px-3 text-xs font-semibold text-foreground shadow-sm hover:bg-accent hover:text-accent-foreground transition disabled:opacity-50"
+        >
+          <Smartphone className="h-4 w-4 text-primary" />
+          <span className="hidden sm:inline">📱 Mobile Scan</span>
+        </button>
       </div>
 
       {/* Search error */}
@@ -1219,6 +1238,21 @@ export default function CustomerSelector({
             </div>
           </div>
         </div>
+      )}
+      {mobileHandoverOpen && (
+        <MobileHandoverModal
+          isOpen={mobileHandoverOpen}
+          onClose={() => setMobileHandoverOpen(false)}
+          sessionType="CUSTOMER_ID"
+          title="Scan or Enter Customer ID from Mobile"
+          onCustomerCaptured={async (data) => {
+            const term = data.phone || data.customer_code || data.name || "";
+            if (term) {
+              setQuery(term);
+              await runSearch(term);
+            }
+          }}
+        />
       )}
     </div>
   );

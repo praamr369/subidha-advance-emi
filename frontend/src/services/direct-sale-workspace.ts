@@ -238,3 +238,58 @@ export async function updatePurchaseNeedStatus(
     }
   );
 }
+
+export function extractProductCodeOrSku(raw: string): string {
+  const trimmed = (raw || "").trim();
+  if (!trimmed) return "";
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://") || trimmed.startsWith("/products/")) {
+    try {
+      const dummyBase = "https://subidhafurnitureasansol.com";
+      const url = new URL(trimmed.startsWith("http") ? trimmed : `${dummyBase}${trimmed}`);
+      const skuParam = url.searchParams.get("sku");
+      if (skuParam && skuParam.trim()) {
+        return decodeURIComponent(skuParam.trim());
+      }
+      const match = url.pathname.match(/\/products\/([^/?#]+)/);
+      if (match && match[1]) {
+        return decodeURIComponent(match[1].trim());
+      }
+    } catch {
+      const skuMatch = trimmed.match(/[?&]sku=([^&#]+)/);
+      if (skuMatch && skuMatch[1]) return decodeURIComponent(skuMatch[1].trim());
+      const pathMatch = trimmed.match(/\/products\/([^/?#]+)/);
+      if (pathMatch && pathMatch[1]) return decodeURIComponent(pathMatch[1].trim());
+    }
+  }
+  return trimmed;
+}
+
+export function playScanBeep(success = true): void {
+  try {
+    const AudioCtx =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = "sine";
+    if (success) {
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      gain.gain.setValueAtTime(0.12, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.12);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.12);
+    } else {
+      osc.frequency.setValueAtTime(220, ctx.currentTime);
+      gain.gain.setValueAtTime(0.18, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.25);
+    }
+  } catch {
+    // Audio autoplay may be blocked
+  }
+}
