@@ -3,6 +3,7 @@ import { ROUTES } from "@/lib/routes";
 
 export type WorkflowId =
   | "admin.createCustomer"
+  | "admin.createProduct"
   | "admin.createDirectSale"
   | "admin.createSubscription"
   | "admin.createDelivery"
@@ -19,7 +20,7 @@ export type WorkflowDefinition = {
   label: string;
   description: string;
   roles: ReadonlyArray<NavigationRole>;
-  icon: "customers" | "subscriptions" | "collectPayment" | "payments" | "billing" | "finance";
+  icon: "customers" | "products" | "subscriptions" | "collectPayment" | "payments" | "billing" | "finance";
   canonicalHref: string;
   surface: WorkflowSurface;
   safetyNote?: string;
@@ -33,6 +34,15 @@ export const WORKFLOWS: ReadonlyArray<WorkflowDefinition> = [
     roles: ["ADMIN"],
     icon: "customers",
     canonicalHref: `${ROUTES.admin.customers}/create`,
+    surface: "drawer",
+  },
+  {
+    id: "admin.createProduct",
+    label: "Create / Edit PIM Product",
+    description: "Add a new product or edit PIM catalog product, attributes, pricing, and variants inside an instant drawer overlay.",
+    roles: ["ADMIN"],
+    icon: "products",
+    canonicalHref: "/admin/pim/products/create",
     surface: "drawer",
   },
   {

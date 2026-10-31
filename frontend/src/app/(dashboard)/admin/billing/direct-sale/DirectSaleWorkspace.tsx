@@ -18,6 +18,7 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import AdminCancellationDialog from "@/components/ui/AdminCancellationDialog";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import OperationalNextStepsPanel from "@/components/workflows/OperationalNextStepsPanel";
+import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
 import DirectSaleCollectDrawer from "@/features/direct-sale/components/DirectSaleCollectDrawer";
 import ProductPostureCard, { normalizeProductPosture } from "@/components/customers/ProductPostureCard";
 import { apiFetch } from "@/lib/api";
@@ -256,6 +257,7 @@ type DirectSaleWorkspaceProps = {
 };
 
 export default function DirectSaleWorkspace({ orchestrationCreate = false }: DirectSaleWorkspaceProps) {
+  const { openWorkflow } = useWorkflowLauncher();
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1791,9 +1793,20 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
 
                           <div className="mt-3 grid gap-4 xl:grid-cols-[1.4fr_1fr]">
                             <div className="relative">
-                              <label className="mb-2 block text-sm font-medium text-foreground" htmlFor={`product-search-${line.id}`}>
-                                Search Product
-                              </label>
+                              <div className="mb-2 flex items-center justify-between">
+                                <label className="text-sm font-medium text-foreground" htmlFor={`product-search-${line.id}`}>
+                                  Search Product
+                                </label>
+                                <button
+                                  type="button"
+                                  onClick={() => openWorkflow("admin.createProduct")}
+                                  className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                                  title="Create a new PIM product without leaving direct sale"
+                                >
+                                  <Plus className="h-3 w-3" />
+                                  Add Product (Drawer)
+                                </button>
+                              </div>
                               <div className="relative">
                                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
                                 <input
@@ -1932,6 +1945,14 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                                       <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${line.selected_product.inventory_status.is_in_stock ? "border-green-400 bg-green-100 text-green-800 dark:border-green-600 dark:bg-green-800 dark:text-green-100" : "border-red-400 bg-red-100 text-red-800 dark:border-red-600 dark:bg-red-800 dark:text-red-100"}`}>
                                         {line.selected_product.inventory_status.is_in_stock ? "✓ In Stock" : "✗ Out of Stock"}
                                       </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => openWorkflow("admin.createProduct", { query: { id: line.selected_product?.id } })}
+                                        className="ml-auto inline-flex items-center gap-1 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-0.5 text-[11px] font-semibold text-primary hover:bg-primary/10"
+                                        title="Edit this product in PIM drawer overlay"
+                                      >
+                                        Edit PIM
+                                      </button>
                                     </div>
                                     <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-[12px] text-slate-600 dark:text-slate-300">
                                       <span className="font-semibold text-slate-800 dark:text-slate-100">{accountingMoney(line.selected_product.base_price)}</span>

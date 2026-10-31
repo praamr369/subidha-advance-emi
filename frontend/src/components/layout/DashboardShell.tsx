@@ -1366,6 +1366,7 @@ function Topbar({
     role === "ADMIN"
       ? [
           { key: "create-customer", label: "Customer", title: "Create customer", href: `${ROUTES.admin.customers}/create` },
+          { key: "create-product", label: "Product", title: "Create product / PIM", href: "/admin/pim/products/create" },
           { key: "create-contract", label: "Contract", title: "Create contract", href: ROUTES.admin.subscriptionsAdvanceEmiCreate },
           { key: "create-direct-sale", label: "Direct Sale", title: "Create direct sale", href: ROUTES.admin.billingDirectSaleCreate },
           { key: "collect-payment", label: "Payment", title: "Collect payment", href: ROUTES.admin.financeCollect },

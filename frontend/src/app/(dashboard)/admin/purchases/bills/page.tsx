@@ -12,6 +12,7 @@ import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import ProcurementConfirmDialog from "@/components/procurement/ProcurementConfirmDialog";
+import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
 import { buildAdminPurchaseBillPrintRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import VendorPayablesToggle from "@/components/vendors/VendorPayablesToggle";
@@ -73,6 +74,13 @@ function EmptyLine(): VendorBillLine {
 }
 
 function CreateBillForm({ vendors, receipts, items, locations, onSaved, onCancel }: CreateBillFormProps) {
+  let workflowLauncher: ReturnType<typeof useWorkflowLauncher> | null = null;
+  try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    workflowLauncher = useWorkflowLauncher();
+  } catch {
+    workflowLauncher = null;
+  }
   const today = new Date().toISOString().slice(0, 10);
   const [vendorId, setVendorId] = useState("");
   const [billNo, setBillNo] = useState("");
@@ -188,7 +196,19 @@ function CreateBillForm({ vendors, receipts, items, locations, onSaved, onCancel
 
       <div>
         <div className="mb-2 flex items-center justify-between">
-          <p className="text-xs font-semibold text-foreground">Bill Lines</p>
+          <div className="flex items-center gap-2">
+            <p className="text-xs font-semibold text-foreground">Bill Lines</p>
+            {workflowLauncher ? (
+              <button
+                type="button"
+                onClick={() => workflowLauncher?.openWorkflow("admin.createProduct")}
+                className="text-[11px] font-semibold text-primary hover:underline"
+                title="Create product in PIM drawer without leaving this bill"
+              >
+                + New Product (Drawer)
+              </button>
+            ) : null}
+          </div>
           <button type="button" onClick={addLine} className="h-7 rounded-lg border border-border px-3 text-[11px] font-medium hover:bg-muted">+ Add</button>
         </div>
         {errors.lines ? <p className="mb-1 text-[10px] text-red-600">{errors.lines}</p> : null}

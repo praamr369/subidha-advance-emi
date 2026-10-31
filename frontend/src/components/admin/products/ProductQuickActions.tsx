@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
-import { MessageCircle } from "lucide-react";
+import { MessageCircle, Edit3 } from "lucide-react";
+import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
 
 import { prepareProductInventoryProfile, updateProduct } from "@/services/products";
 import { openWhatsAppDirectModal } from "@/components/whatsapp/WhatsAppDirectSenderModal";
@@ -86,6 +87,13 @@ function checkboxLabel(label: string, checked: boolean, onChange: (checked: bool
 }
 
 export default function ProductQuickActions({ product, mode = "compact", onChanged }: Props) {
+  let workflowLauncher: ReturnType<typeof useWorkflowLauncher> | null = null;
+  try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    workflowLauncher = useWorkflowLauncher();
+  } catch {
+    workflowLauncher = null;
+  }
   const [editOpen, setEditOpen] = useState(false);
   const [prepareOpen, setPrepareOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -214,6 +222,17 @@ export default function ProductQuickActions({ product, mode = "compact", onChang
         Share on WhatsApp
       </button>
       <button type="button" onClick={() => setEditOpen(true)} className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted">Quick Edit</button>
+      {workflowLauncher ? (
+        <button
+          type="button"
+          onClick={() => workflowLauncher?.openWorkflow("admin.createProduct", { query: { id: product.id } })}
+          className="inline-flex items-center gap-1.5 rounded-md border border-sky-300 bg-sky-50 px-3 py-1.5 text-sm font-medium text-sky-800 shadow-sm transition hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-300"
+          title="Open PIM product attributes, media & variants in drawer"
+        >
+          <Edit3 className="h-3.5 w-3.5" />
+          PIM Editor (Drawer)
+        </button>
+      ) : null}
       <button type="button" onClick={() => setPrepareOpen(true)} className="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-800 shadow-sm transition hover:bg-emerald-100">Prepare Inventory</button>
       <Link href={`/admin/products/${product.id}`} className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted">Open</Link>
       <Link href={`/admin/products/${product.id}/edit`} className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted">Edit full page</Link>

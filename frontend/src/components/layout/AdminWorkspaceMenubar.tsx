@@ -43,6 +43,9 @@ export default function AdminWorkspaceMenubar({
             <Link href={`${ROUTES.admin.customers}/create`}>New Customer…</Link>
           </MenubarItem>
           <MenubarItem asChild>
+            <Link href="/admin/pim/products/create">New Product / PIM…</Link>
+          </MenubarItem>
+          <MenubarItem asChild>
             <Link href={ROUTES.admin.subscriptionsAdvanceEmiCreate}>New Contract…</Link>
           </MenubarItem>
           <MenubarItem asChild>

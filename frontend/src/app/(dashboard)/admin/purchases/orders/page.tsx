@@ -12,6 +12,7 @@ import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import ProcurementConfirmDialog from "@/components/procurement/ProcurementConfirmDialog";
+import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
 import { ROUTES } from "@/lib/routes";
 import {
   cancelPurchaseOrder,
@@ -66,6 +67,13 @@ interface CreatePOFormProps {
   onCancel: () => void;
 }
 function CreatePOForm({ vendors, items, onSaved, onCancel }: CreatePOFormProps) {
+  let workflowLauncher: ReturnType<typeof useWorkflowLauncher> | null = null;
+  try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    workflowLauncher = useWorkflowLauncher();
+  } catch {
+    workflowLauncher = null;
+  }
   const today = new Date().toISOString().slice(0, 10);
   const {
     register,
@@ -153,7 +161,19 @@ function CreatePOForm({ vendors, items, onSaved, onCancel }: CreatePOFormProps) 
 
       <div>
         <div className="mb-2 flex items-center justify-between">
-          <p className="text-xs font-semibold text-foreground">Line Items</p>
+          <div className="flex items-center gap-2">
+            <p className="text-xs font-semibold text-foreground">Line Items</p>
+            {workflowLauncher ? (
+              <button
+                type="button"
+                onClick={() => workflowLauncher?.openWorkflow("admin.createProduct")}
+                className="text-[11px] font-semibold text-primary hover:underline"
+                title="Create product in PIM drawer without leaving this PO"
+              >
+                + New Product (Drawer)
+              </button>
+            ) : null}
+          </div>
           <button type="button" onClick={addLine} className="h-7 rounded-lg border border-border px-3 text-[11px] font-medium hover:bg-muted">
             + Add Line
           </button>

@@ -11,6 +11,7 @@ import ActionButton from "@/components/ui/ActionButton";
 import { cn } from "@/lib/utils";
 
 const AdminCustomerCreatePage = dynamic(() => import("@/domains/customers/pages/AdminCustomerCreatePage"), { ssr: false });
+const PimProductForm = dynamic(() => import("@/components/admin/pim/PimProductForm"), { ssr: false });
 const SubscriptionCreatePage = dynamic(() => import("@/domains/subscriptions/pages/SubscriptionCreatePage"), { ssr: false });
 const AdminPaymentCollectPage = dynamic(() => import("@/domains/payments/pages/AdminPaymentCollectPage"), { ssr: false });
 const PartnerCollectionCreatePage = dynamic(() => import("@/domains/partner/pages/PartnerCollectionCreatePage"), { ssr: false });
@@ -142,6 +143,46 @@ export default function WorkflowProvider({
                     current ? { ...current, resultHref: `/admin/customers/${customerId}` } : current
                   )
                 }
+              />
+            ) : null}
+
+            {activeWorkflow.id === "admin.createProduct" ? (
+              <PimProductForm
+                variant="drawer"
+                productId={
+                  activeWorkflow.context.query?.productId
+                    ? Number(activeWorkflow.context.query.productId)
+                    : activeWorkflow.context.query?.id
+                    ? Number(activeWorkflow.context.query.id)
+                    : undefined
+                }
+                defaultProductType={
+                  activeWorkflow.context.query?.productType === "ACCESSORY"
+                    ? "ACCESSORY"
+                    : activeWorkflow.context.query?.productType === "SERVICE"
+                    ? "SERVICE"
+                    : "FINISHED_GOOD"
+                }
+                onSaved={(savedProduct) => {
+                  if (typeof window !== "undefined") {
+                    window.dispatchEvent(
+                      new CustomEvent("pim-product-saved", { detail: savedProduct })
+                    );
+                  }
+                  setActiveWorkflow((current) =>
+                    current
+                      ? {
+                          ...current,
+                          resultHref: `/admin/pim/products/${
+                            savedProduct.product_type === "ACCESSORY"
+                              ? "accessories"
+                              : "finished-goods"
+                          }/${savedProduct.id}/edit`,
+                        }
+                      : current
+                  );
+                }}
+                onCancel={closeWorkflow}
               />
             ) : null}
 

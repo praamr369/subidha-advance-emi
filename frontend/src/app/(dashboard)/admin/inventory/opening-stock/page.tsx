@@ -18,6 +18,7 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ApiError } from "@/lib/api";
 import { invalidateAfterOpeningStockMutation } from "@/lib/operational-query-invalidation";
 import { ROUTES } from "@/lib/routes";
+import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
 import ProductPickerCombobox, { type ProductPickerValue } from "@/components/ui/ProductPickerCombobox";
 import ProductAttributeBadges from "@/components/ui/ProductAttributeBadges";
 import {
@@ -101,6 +102,7 @@ function exportOpeningStockToCSV(rows: OpeningStockEntriesRow[], filename: strin
 }
 
 export default function InventoryOpeningStockPage() {
+  const { openWorkflow } = useWorkflowLauncher();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<TabKey>("manual");
 
@@ -463,9 +465,19 @@ export default function InventoryOpeningStockPage() {
               <form onSubmit={(ev) => void handleSaveManualDraft(ev)} className="p-6 space-y-6">
                 {/* Product picker — isolated z-context so dropdown floats above everything */}
                 <div className="relative z-50 space-y-1.5">
-                  <label htmlFor="f-product-inventory-item-setpickeditem-ite" className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80">
-                    Product / Inventory Item <span className="text-destructive">*</span>
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="f-product-inventory-item-setpickeditem-ite" className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80">
+                      Product / Inventory Item <span className="text-destructive">*</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => openWorkflow("admin.createProduct")}
+                      className="text-xs font-semibold text-primary hover:underline"
+                      title="Create a new product in PIM drawer overlay"
+                    >
+                      + New Product (Drawer)
+                    </button>
+                  </div>
                   <ProductPickerCombobox
                     value={pickedItem}
                     onChange={(item) => { setPickedItem(item); if (!item) setManualLocationId(""); }}
@@ -474,11 +486,21 @@ export default function InventoryOpeningStockPage() {
                   />
                   {pickedItem ? (
                     <div className="mt-3 space-y-2.5 rounded-xl border border-primary/20 bg-primary/5 p-3.5 text-xs text-muted-foreground shadow-sm">
-                      <div className="flex flex-wrap gap-x-5 gap-y-2">
-                        {pickedItem.product_code ? <span className="flex items-center gap-1.5">Code: <span className="font-mono font-bold text-primary">{pickedItem.product_code}</span></span> : null}
-                        {pickedItem.category ? <span className="flex items-center gap-1.5">Category: <span className="font-semibold text-foreground">{pickedItem.category}{pickedItem.subcategory ? ` › ${pickedItem.subcategory}` : ""}</span></span> : null}
-                        {pickedItem.standard_unit_cost ? <span className="flex items-center gap-1.5">Std cost: <span className="font-bold text-foreground">₹{Number(pickedItem.standard_unit_cost).toLocaleString("en-IN")}</span></span> : null}
-                        {pickedItem.unit_of_measure ? <span className="flex items-center gap-1.5">Unit: <span className="font-semibold text-foreground">{pickedItem.unit_of_measure}</span></span> : null}
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex flex-wrap gap-x-5 gap-y-2">
+                          {pickedItem.product_code ? <span className="flex items-center gap-1.5">Code: <span className="font-mono font-bold text-primary">{pickedItem.product_code}</span></span> : null}
+                          {pickedItem.category ? <span className="flex items-center gap-1.5">Category: <span className="font-semibold text-foreground">{pickedItem.category}{pickedItem.subcategory ? ` › ${pickedItem.subcategory}` : ""}</span></span> : null}
+                          {pickedItem.standard_unit_cost ? <span className="flex items-center gap-1.5">Std cost: <span className="font-bold text-foreground">₹{Number(pickedItem.standard_unit_cost).toLocaleString("en-IN")}</span></span> : null}
+                          {pickedItem.unit_of_measure ? <span className="flex items-center gap-1.5">Unit: <span className="font-semibold text-foreground">{pickedItem.unit_of_measure}</span></span> : null}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => openWorkflow("admin.createProduct", { query: { id: pickedItem.id } })}
+                          className="rounded-md border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/20"
+                          title="Edit this product in PIM drawer"
+                        >
+                          Edit in PIM
+                        </button>
                       </div>
                       <ProductAttributeBadges
                         attributes={pickedItem.attributes}

@@ -10,6 +10,7 @@ import PimHelpGuideTab from "@/components/admin/help/PimHelpGuideTab";
 import { pimService, type PimProduct, type PimCategory, type PimTreeSummary } from "@/services/pim";
 
 import ProductQuickActions from "@/components/admin/products/ProductQuickActions";
+import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
@@ -725,6 +726,7 @@ export default function AdminProductsPage() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { openWorkflow } = useWorkflowLauncher();
   const [activeTab, setActiveTab] = useState<"subscription" | "pim" | "help">(() => {
     const tabParam = searchParams.get("tab");
     if (tabParam === "help") return "help";
@@ -960,7 +962,8 @@ export default function AdminProductsPage() {
       subtitle="Product Register for all operations — create blueprints in PIM, publish to unlock subscriptions, inventory, and sales. Filters are URL-cached."
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Products" }]}
       actions={[
-        { href: "/admin/products/create", label: "Create Product", variant: "primary" },
+        { onClick: () => openWorkflow("admin.createProduct"), label: "+ Create Product (Drawer)", variant: "primary" },
+        { href: "/admin/products/create", label: "Create Product (Page)", variant: "secondary" },
         { href: "/admin/products/masters", label: "Manage Masters", variant: "secondary" },
         { onClick: () => setActiveTab("help"), label: "PIM Guide", variant: "secondary" },
         { href: "/admin/subscriptions/advance-emi/create", label: "Create Subscription", variant: "secondary" },

@@ -33,6 +33,9 @@ import {
 interface Props {
   productId?: number;
   defaultProductType?: "FINISHED_GOOD" | "ACCESSORY" | "SERVICE";
+  variant?: "page" | "drawer";
+  onSaved?: (product: PimProduct) => void;
+  onCancel?: () => void;
 }
 
 interface AttrPayloadItem {
@@ -517,7 +520,13 @@ function BomManufacturingPanel({ productId, variants }: { productId: number; var
   );
 }
 
-export default function PimProductForm({ productId, defaultProductType = "FINISHED_GOOD" }: Props) {
+export default function PimProductForm({
+  productId,
+  defaultProductType = "FINISHED_GOOD",
+  variant = "page",
+  onSaved,
+  onCancel,
+}: Props) {
   const router = useRouter();
   const isEdit = Boolean(productId);
   const pendingFetchRef = useRef<{ id: number; promise: Promise<PimProduct> } | null>(null);
@@ -1133,11 +1142,18 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
         await refreshVariants();
         setRemovedAttrIds(new Set());
         setSuccessMsg("Product saved successfully.");
+        onSaved?.(updatedProduct);
         setTimeout(() => setSuccessMsg(null), 3000);
         return;
       } else {
         const created = await pimService.createProduct(payload);
         clearDraft();
+        onSaved?.(created);
+        if (variant === "drawer") {
+          setSuccessMsg("Product created successfully.");
+          setTimeout(() => setSuccessMsg(null), 3000);
+          return;
+        }
         const typeSlug = defaultProductType === "ACCESSORY" ? "accessories"
           : defaultProductType === "SERVICE" ? "services"
           : "finished-goods";
@@ -2224,10 +2240,16 @@ export default function PimProductForm({ productId, defaultProductType = "FINISH
         
         <button
           type="button"
-          onClick={() => router.push("/admin/pim/products")}
+          onClick={() => {
+            if (onCancel) {
+              onCancel();
+            } else {
+              router.push("/admin/pim/products");
+            }
+          }}
           className="inline-flex items-center gap-2 rounded-md border px-5 py-2.5 text-sm hover:bg-muted"
         >
-          <ArrowLeft className="h-4 w-4" /> Back
+          <ArrowLeft className="h-4 w-4" /> {variant === "drawer" ? "Close" : "Back"}
         </button>
       </div>
 
