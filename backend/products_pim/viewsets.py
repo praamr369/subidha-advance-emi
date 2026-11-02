@@ -549,48 +549,86 @@ class PimProductViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def push_to_variants(self, request, pk=None):
-        """Push parent product fields (description, name) to all linked operational products."""
+        """Push parent product fields (description, name, brand, warranty) to all linked operational products."""
         product = self.get_object()
         push_description = request.data.get("push_description", False)
         push_name = request.data.get("push_name", False)
+        push_brand = request.data.get("push_brand", False)
+        push_warranty = request.data.get("push_warranty", False)
         updated = 0
         for variant in product.variants.select_related("operational_product").all():
-            op = variant.operational_product
-            if not op:
-                continue
-            changed = False
-            if push_description and hasattr(op, "description"):
-                op.description = product.description
-                changed = True
-            if push_name:
-                op.name = PIMSyncService.get_variant_display_name(variant)
-                changed = True
-            if changed:
-                op.save()
-                
-                # Also update the variant's PIM record if it exists
-                child_pim = op.pim.first() if hasattr(op, "pim") else None
-                if not child_pim:
-                    child_pim = PimProduct.objects.filter(code=variant.sku).first()
+            variant_dirty = []
+            if push_brand:
+                variant.brand = product.brand or ""
+                variant_dirty.append("brand")
+            if push_description:
+                variant.description = product.description or ""
+                variant_dirty.append("description")
+            if push_warranty:
+                variant.warranty_enabled = product.warranty_enabled
+                variant.warranty_months_manufacturing = product.warranty_months_manufacturing
+                variant.warranty_months_structural = product.warranty_months_structural
+                variant.warranty_months_extended_max = product.warranty_months_extended_max
+                variant.extended_warranty_cost_percentage = product.extended_warranty_cost_percentage
+                variant_dirty.extend([
+                    "warranty_enabled", "warranty_months_manufacturing", "warranty_months_structural",
+                    "warranty_months_extended_max", "extended_warranty_cost_percentage"
+                ])
+            if variant_dirty:
+                variant.save(update_fields=list(set(variant_dirty)))
 
-                if child_pim:
-                    pim_changed = False
-                    if push_description and child_pim.description != product.description:
-                        child_pim.description = product.description
-                        pim_changed = True
-                    if push_name and child_pim.name != product.name:
-                        child_pim.name = product.name
-                        pim_changed = True
-                    if pim_changed:
-                        update_fields = []
-                        if push_name:
-                            update_fields.append("name")
-                        if push_description:
-                            update_fields.append("description")
-                        if update_fields:
-                            child_pim.save(update_fields=update_fields)
-                        
-                updated += 1
+            op = variant.operational_product
+            if op:
+                changed = False
+                if push_description and hasattr(op, "description"):
+                    op.description = product.description or ""
+                    changed = True
+                if push_name:
+                    op.name = PIMSyncService.get_variant_display_name(variant)
+                    changed = True
+                if push_brand and hasattr(op, "brand"):
+                    op.brand = product.brand or ""
+                    changed = True
+                if push_warranty:
+                    op.warranty_enabled = product.warranty_enabled
+                    op.warranty_months_manufacturing = product.warranty_months_manufacturing
+                    op.warranty_months_structural = product.warranty_months_structural
+                    op.warranty_months_extended_max = product.warranty_months_extended_max
+                    op.extended_warranty_cost_percentage = product.extended_warranty_cost_percentage
+                    changed = True
+                if changed:
+                    op.save()
+                
+            # Also update the variant's PIM record if it exists
+            child_pim = op.pim.first() if (op and hasattr(op, "pim")) else None
+            if not child_pim:
+                child_pim = PimProduct.objects.filter(code=variant.sku, parent_id=product.id).first()
+
+            if child_pim:
+                update_fields = []
+                if push_description and child_pim.description != product.description:
+                    child_pim.description = product.description or ""
+                    update_fields.append("description")
+                if push_name and child_pim.name != product.name:
+                    child_pim.name = product.name
+                    update_fields.append("name")
+                if push_brand and child_pim.brand != product.brand:
+                    child_pim.brand = product.brand or ""
+                    update_fields.append("brand")
+                if push_warranty:
+                    child_pim.warranty_enabled = product.warranty_enabled
+                    child_pim.warranty_months_manufacturing = product.warranty_months_manufacturing
+                    child_pim.warranty_months_structural = product.warranty_months_structural
+                    child_pim.warranty_months_extended_max = product.warranty_months_extended_max
+                    child_pim.extended_warranty_cost_percentage = product.extended_warranty_cost_percentage
+                    update_fields.extend([
+                        "warranty_enabled", "warranty_months_manufacturing", "warranty_months_structural",
+                        "warranty_months_extended_max", "extended_warranty_cost_percentage"
+                    ])
+                if update_fields:
+                    child_pim.save(update_fields=list(set(update_fields)))
+                    
+            updated += 1
         return Response({"updated": updated, "total_variants": product.variants.count()})
 
     @action(detail=False, methods=["get"])
@@ -1292,6 +1330,65 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
                 variant.variant_name = v_name
                 dirty_fields.append("variant_name")
 
+            if "brand" in request.data:
+                raw_brand = request.data.get("brand")
+                variant.brand = str(raw_brand).strip()[:150] if raw_brand is not None else ""
+                dirty_fields.append("brand")
+
+            if "description" in request.data:
+                raw_desc = request.data.get("description")
+                variant.description = str(raw_desc).strip() if raw_desc is not None else ""
+                dirty_fields.append("description")
+
+            if "warranty_enabled" in request.data:
+                raw_we = request.data.get("warranty_enabled")
+                variant.warranty_enabled = bool(raw_we) if raw_we is not None else None
+                dirty_fields.append("warranty_enabled")
+
+            if "warranty_months_manufacturing" in request.data:
+                raw_wmm = request.data.get("warranty_months_manufacturing")
+                if raw_wmm is not None and str(raw_wmm).strip() != "":
+                    try:
+                        variant.warranty_months_manufacturing = int(raw_wmm)
+                    except (TypeError, ValueError):
+                        variant.warranty_months_manufacturing = None
+                else:
+                    variant.warranty_months_manufacturing = None
+                dirty_fields.append("warranty_months_manufacturing")
+
+            if "warranty_months_structural" in request.data:
+                raw_wms = request.data.get("warranty_months_structural")
+                if raw_wms is not None and str(raw_wms).strip() != "":
+                    try:
+                        variant.warranty_months_structural = int(raw_wms)
+                    except (TypeError, ValueError):
+                        variant.warranty_months_structural = None
+                else:
+                    variant.warranty_months_structural = None
+                dirty_fields.append("warranty_months_structural")
+
+            if "warranty_months_extended_max" in request.data:
+                raw_wme = request.data.get("warranty_months_extended_max")
+                if raw_wme is not None and str(raw_wme).strip() != "":
+                    try:
+                        variant.warranty_months_extended_max = int(raw_wme)
+                    except (TypeError, ValueError):
+                        variant.warranty_months_extended_max = None
+                else:
+                    variant.warranty_months_extended_max = None
+                dirty_fields.append("warranty_months_extended_max")
+
+            if "extended_warranty_cost_percentage" in request.data:
+                raw_ewc = request.data.get("extended_warranty_cost_percentage")
+                if raw_ewc is not None and str(raw_ewc).strip() != "":
+                    try:
+                        variant.extended_warranty_cost_percentage = Decimal(str(raw_ewc).strip())
+                    except (InvalidOperation, TypeError, ValueError):
+                        variant.extended_warranty_cost_percentage = None
+                else:
+                    variant.extended_warranty_cost_percentage = None
+                dirty_fields.append("extended_warranty_cost_percentage")
+
             if dirty_fields:
                 variant.save(update_fields=dirty_fields)
 
@@ -1314,6 +1411,27 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
                 if "variant_name" in dirty_fields and variant.variant_name:
                     child_pim.name = variant.variant_name[:255]
                     child_dirty.append("name")
+                if "brand" in dirty_fields:
+                    child_pim.brand = variant.brand or variant.product.brand
+                    child_dirty.append("brand")
+                if "description" in dirty_fields:
+                    child_pim.description = variant.description or variant.product.description
+                    child_dirty.append("description")
+                if "warranty_enabled" in dirty_fields:
+                    child_pim.warranty_enabled = variant.warranty_enabled if variant.warranty_enabled is not None else variant.product.warranty_enabled
+                    child_dirty.append("warranty_enabled")
+                if "warranty_months_manufacturing" in dirty_fields:
+                    child_pim.warranty_months_manufacturing = variant.warranty_months_manufacturing if variant.warranty_months_manufacturing is not None else variant.product.warranty_months_manufacturing
+                    child_dirty.append("warranty_months_manufacturing")
+                if "warranty_months_structural" in dirty_fields:
+                    child_pim.warranty_months_structural = variant.warranty_months_structural if variant.warranty_months_structural is not None else variant.product.warranty_months_structural
+                    child_dirty.append("warranty_months_structural")
+                if "warranty_months_extended_max" in dirty_fields:
+                    child_pim.warranty_months_extended_max = variant.warranty_months_extended_max if variant.warranty_months_extended_max is not None else variant.product.warranty_months_extended_max
+                    child_dirty.append("warranty_months_extended_max")
+                if "extended_warranty_cost_percentage" in dirty_fields:
+                    child_pim.extended_warranty_cost_percentage = variant.extended_warranty_cost_percentage if variant.extended_warranty_cost_percentage is not None else variant.product.extended_warranty_cost_percentage
+                    child_dirty.append("extended_warranty_cost_percentage")
                 if child_dirty:
                     child_pim.save(update_fields=child_dirty)
 
@@ -1592,12 +1710,34 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
                             )
                         copied_relations_count += 1
 
-                # 3. Optional pricing copy
+                # 3. Optional pricing, brand, and warranty copy
+                copy_brand = request.data.get("copy_brand", False)
+                copy_warranty = request.data.get("copy_warranty", False)
+                variant_update_fields = []
                 if copy_pricing:
                     target_variant.price = source_variant.price
                     if source_variant.cost_price is not None:
                         target_variant.cost_price = source_variant.cost_price
-                    target_variant.save(update_fields=["price", "cost_price"])
+                    variant_update_fields.extend(["price", "cost_price"])
+                if copy_brand:
+                    target_variant.brand = source_variant.brand
+                    variant_update_fields.append("brand")
+                if copy_warranty:
+                    target_variant.warranty_enabled = source_variant.warranty_enabled
+                    target_variant.warranty_months_manufacturing = source_variant.warranty_months_manufacturing
+                    target_variant.warranty_months_structural = source_variant.warranty_months_structural
+                    target_variant.warranty_months_extended_max = source_variant.warranty_months_extended_max
+                    target_variant.extended_warranty_cost_percentage = source_variant.extended_warranty_cost_percentage
+                    variant_update_fields.extend([
+                        "warranty_enabled", "warranty_months_manufacturing", "warranty_months_structural",
+                        "warranty_months_extended_max", "extended_warranty_cost_percentage"
+                    ])
+                if variant_update_fields:
+                    target_variant.save(update_fields=list(set(variant_update_fields)))
+                    try:
+                        PIMSyncService.sync_variant_to_operational_product(target_variant)
+                    except Exception:
+                        pass
 
                 target_variant.refresh_from_db()
                 target_variant = ProductVariant.objects.prefetch_related(

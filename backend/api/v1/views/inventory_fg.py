@@ -127,6 +127,7 @@ def _acc_link_dict(link: FinishedGoodAccessoryLink) -> dict:
         "charge_mode": link.charge_mode,
         "sale_price": str(link.sale_price or MONEY_ZERO),
         "is_default_included": link.is_default_included,
+        "quantity": str(link.quantity or Decimal("1.000")),
         "sort_order": link.sort_order,
         "notes": link.notes or "",
     }
@@ -147,6 +148,7 @@ def _svc_link_dict(link: FinishedGoodServiceLink) -> dict:
         "charge_mode": link.charge_mode,
         "sale_price": str(link.sale_price or MONEY_ZERO),
         "is_default_included": link.is_default_included,
+        "quantity": str(link.quantity or Decimal("1.000")),
         "sort_order": link.sort_order,
         "notes": link.notes or "",
     }
@@ -285,6 +287,7 @@ class FGAccessoryLinkView(APIView):
         accessory = get_object_or_404(InventoryItem, pk=accessory_id, stock_item_type=InventoryItemType.ACCESSORY)
         charge_mode = data.get("charge_mode", FGAccessoryChargeMode.FREE)
         sale_price = _parse_decimal(data.get("sale_price", 0))
+        quantity = _parse_decimal(data.get("quantity", 1))
 
         with transaction.atomic():
             link = FinishedGoodAccessoryLink.objects.create(
@@ -293,6 +296,7 @@ class FGAccessoryLinkView(APIView):
                 charge_mode=charge_mode,
                 sale_price=sale_price if charge_mode != FGAccessoryChargeMode.FREE else MONEY_ZERO,
                 is_default_included=bool(data.get("is_default_included", True)),
+                quantity=quantity if quantity > Decimal("0.000") else Decimal("1.000"),
                 sort_order=int(data.get("sort_order", 1)),
                 notes=(data.get("notes") or "").strip(),
             )
@@ -311,6 +315,7 @@ class FGAccessoryGroupLinkView(APIView):
         group = get_object_or_404(AccessoryVariantGroup, pk=group_id)
         charge_mode = data.get("charge_mode", FGAccessoryChargeMode.FREE)
         sale_price = _parse_decimal(data.get("sale_price", 0))
+        quantity = _parse_decimal(data.get("quantity", 1))
 
         with transaction.atomic():
             link = FinishedGoodAccessoryLink.objects.create(
@@ -319,6 +324,7 @@ class FGAccessoryGroupLinkView(APIView):
                 charge_mode=charge_mode,
                 sale_price=sale_price if charge_mode != FGAccessoryChargeMode.FREE else MONEY_ZERO,
                 is_default_included=bool(data.get("is_default_included", True)),
+                quantity=quantity if quantity > Decimal("0.000") else Decimal("1.000"),
                 sort_order=int(data.get("sort_order", 1)),
                 notes=(data.get("notes") or "").strip(),
             )
@@ -342,6 +348,10 @@ class FGAccessoryLinkDetailView(APIView):
             link.sale_price = MONEY_ZERO
         if "is_default_included" in data:
             link.is_default_included = bool(data["is_default_included"])
+        if "quantity" in data:
+            qty = _parse_decimal(data["quantity"])
+            if qty > Decimal("0.000"):
+                link.quantity = qty
         if "notes" in data:
             link.notes = (data["notes"] or "").strip()
         link.full_clean()

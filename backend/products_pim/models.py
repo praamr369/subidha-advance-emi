@@ -277,6 +277,47 @@ class ProductVariant(models.Model):
     quantity_on_hand = models.IntegerField(default=0)
     reorder_level = models.IntegerField(default=0)
     is_active = models.BooleanField(default=True)
+    
+    # Optional variant-level overrides for brand, description, and warranty.
+    # When blank/null, the variant seamlessly inherits from the base PimProduct.
+    brand = models.CharField(
+        max_length=150,
+        blank=True,
+        default="",
+        help_text="Brand override for this variant; if blank, inherits from base product",
+    )
+    description = models.TextField(
+        blank=True,
+        default="",
+        help_text="Description override for this variant; if blank, inherits from base product",
+    )
+    warranty_enabled = models.BooleanField(
+        null=True,
+        blank=True,
+        help_text="Warranty override for this variant; null inherits from base product",
+    )
+    warranty_months_manufacturing = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Manufacturing warranty months override",
+    )
+    warranty_months_structural = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Structural warranty months override",
+    )
+    warranty_months_extended_max = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Extended warranty max months override",
+    )
+    extended_warranty_cost_percentage = models.DecimalField(
+        max_digits=4,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Extended warranty cost % override",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

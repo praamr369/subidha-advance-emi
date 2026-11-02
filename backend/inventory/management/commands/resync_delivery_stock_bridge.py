@@ -54,12 +54,12 @@ class Command(BaseCommand):
             total_created += created_count
             self.stdout.write(
                 f"  Delivery #{delivery.id} ({delivery.delivery_reference}): "
-                f"created {created_count} new entries (skipped: {res.get('skipped', False)})"
+                f"created/updated {created_count} entries (skipped: {res.get('skipped', False)})"
             )
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"Completed. Created {total_created} new stock ledger entry(ies) across {count} delivery(ies)."
+                f"Completed. Created/updated {total_created} stock ledger entry(ies) across {count} delivery(ies)."
             )
         )
 

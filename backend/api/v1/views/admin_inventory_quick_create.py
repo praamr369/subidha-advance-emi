@@ -397,6 +397,7 @@ class AdminBillingAccessoryOptionsView(APIView):
                     "charge_mode": link.charge_mode,
                     "sale_price": str(link.sale_price),
                     "is_default_included": link.is_default_included,
+                    "quantity": str(getattr(link, "quantity", None) or "1.000"),
                     "notes": link.notes,
                     "sort_order": link.sort_order,
                     "variants": variants,
@@ -417,6 +418,7 @@ class AdminBillingAccessoryOptionsView(APIView):
                     "charge_mode": link.charge_mode,
                     "sale_price": str(link.sale_price),
                     "is_default_included": link.is_default_included,
+                    "quantity": str(getattr(link, "quantity", None) or "1.000"),
                     "notes": link.notes,
                     "sort_order": link.sort_order,
                     "variants": [
@@ -521,6 +523,7 @@ class AdminFGAccessoryGroupLinkView(APIView):
         is_default = bool(request.data.get("is_default_included", True))
         sort_order = int(request.data.get("sort_order", 1))
         notes = str(request.data.get("notes", "") or "").strip()
+        quantity = Decimal(str(request.data.get("quantity", "1.000") or "1.000"))
 
         link = FinishedGoodAccessoryLink(
             finished_good=fg,
@@ -528,6 +531,7 @@ class AdminFGAccessoryGroupLinkView(APIView):
             charge_mode=charge_mode,
             sale_price=sale_price,
             is_default_included=is_default,
+            quantity=quantity if quantity > Decimal("0.000") else Decimal("1.000"),
             sort_order=sort_order,
             notes=notes,
         )
@@ -540,4 +544,5 @@ class AdminFGAccessoryGroupLinkView(APIView):
             "charge_mode": link.charge_mode,
             "sale_price": str(link.sale_price),
             "is_default_included": link.is_default_included,
+            "quantity": str(link.quantity),
         }, status=status.HTTP_201_CREATED)

@@ -806,6 +806,7 @@ export type FGAccessoryLink = {
   charge_mode: "FREE" | "CHARGEABLE" | string;
   sale_price: string;
   is_default_included: boolean;
+  quantity?: string;
   sort_order: number;
   notes: string;
 };
@@ -1209,7 +1210,7 @@ export async function fetchFGProfile(id: number): Promise<FGProfileDetail> {
 
 export async function addFGAccessoryLink(
   fgId: number,
-  payload: { accessory: number; charge_mode?: string; sale_price?: string; is_default_included?: boolean; sort_order?: number; notes?: string }
+  payload: { accessory: number; charge_mode?: string; sale_price?: string; is_default_included?: boolean; quantity?: string; sort_order?: number; notes?: string }
 ): Promise<FGAccessoryLink> {
   return apiFetch<FGAccessoryLink>(`/admin/inventory/finished-goods/${fgId}/accessories/`, {
     method: "POST",
@@ -1239,7 +1240,7 @@ export async function deleteFGAccessoryLink(fgId: number, linkId: number): Promi
 
 export async function addFGAccessoryGroupLink(
   fgId: number,
-  payload: { variant_group: number; charge_mode?: string; sale_price?: string; is_default_included?: boolean; sort_order?: number; notes?: string }
+  payload: { variant_group: number; charge_mode?: string; sale_price?: string; is_default_included?: boolean; quantity?: string; sort_order?: number; notes?: string }
 ): Promise<FGAccessoryLink> {
   return apiFetch<FGAccessoryLink>(
     `/admin/inventory/finished-goods/${fgId}/accessory-groups/`,

@@ -112,18 +112,42 @@ class PIMSyncService:
         if variant.image:
             core_product.image = variant.image
             
+        # Determine effective brand and description (variant override takes priority; falls back to parent PimProduct)
+        effective_brand = variant.brand.strip() if (variant.brand and variant.brand.strip()) else (pim_product.brand or "")
+        core_product.brand = effective_brand
+
+        if variant.description and variant.description.strip():
+            core_product.description = variant.description.strip()
+        elif not getattr(core_product, "description", ""):
+            core_product.description = pim_product.description or ""
+
+        # Determine effective warranty (variant override takes priority; falls back to parent PimProduct)
+        effective_we = variant.warranty_enabled if variant.warranty_enabled is not None else pim_product.warranty_enabled
+        effective_mfg = variant.warranty_months_manufacturing if variant.warranty_months_manufacturing is not None else pim_product.warranty_months_manufacturing
+        effective_struct = variant.warranty_months_structural if variant.warranty_months_structural is not None else pim_product.warranty_months_structural
+        effective_ext_max = variant.warranty_months_extended_max if variant.warranty_months_extended_max is not None else pim_product.warranty_months_extended_max
+        effective_ext_cost = variant.extended_warranty_cost_percentage if variant.extended_warranty_cost_percentage is not None else pim_product.extended_warranty_cost_percentage
+
+        core_product.warranty_enabled = effective_we
+        core_product.warranty_months_manufacturing = effective_mfg
+        core_product.warranty_months_structural = effective_struct
+        core_product.warranty_months_extended_max = effective_ext_max
+        core_product.extended_warranty_cost_percentage = effective_ext_cost
+
         child_pim = PimProduct.objects.filter(code=variant.sku, parent_id=pim_product.id).first()
         if child_pim:
             child_pim.name = core_product.name
-            child_pim.save(update_fields=['name', 'updated_at'])
-            
-        # Sync brand and warranty from PIM Base Product
-        core_product.brand = pim_product.brand
-        core_product.warranty_enabled = pim_product.warranty_enabled
-        core_product.warranty_months_manufacturing = pim_product.warranty_months_manufacturing
-        core_product.warranty_months_structural = pim_product.warranty_months_structural
-        core_product.warranty_months_extended_max = pim_product.warranty_months_extended_max
-        core_product.extended_warranty_cost_percentage = pim_product.extended_warranty_cost_percentage
+            child_pim.brand = effective_brand
+            if variant.description and variant.description.strip():
+                child_pim.description = variant.description.strip()
+            elif not child_pim.description:
+                child_pim.description = pim_product.description or ""
+            child_pim.warranty_enabled = effective_we
+            child_pim.warranty_months_manufacturing = effective_mfg
+            child_pim.warranty_months_structural = effective_struct
+            child_pim.warranty_months_extended_max = effective_ext_max
+            child_pim.extended_warranty_cost_percentage = effective_ext_cost
+            child_pim.save()
 
         
         # Try to sync category if names match, this is best-effort since models are separate

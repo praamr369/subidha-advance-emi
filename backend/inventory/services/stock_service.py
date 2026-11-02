@@ -401,7 +401,13 @@ def post_invoice_stock_movements(*, invoice, posted_by=None) -> dict:
                 if not acc_inv or not acc_inv.stock_tracking_enabled or acc_inv.id in processed_acc_ids:
                     continue
                 processed_acc_ids.add(acc_inv.id)
-                bundled_qty = line.quantity * Decimal("1.000")
+                pim_rel = None
+                if line.inventory_item and line.inventory_item.product and hasattr(line.inventory_item.product, "related_products") and acc_inv.product:
+                    pim_rel = line.inventory_item.product.related_products.filter(
+                        related_product=acc_inv.product
+                    ).first()
+                acc_ratio = Decimal(str(pim_rel.quantity)) if pim_rel and pim_rel.quantity else Decimal(str(getattr(link, "quantity", None) or 1))
+                bundled_qty = line.quantity * acc_ratio
                 acc_name = acc_inv.product.name if acc_inv.product else (acc_inv.sku or "Accessory")
                 _, rel_created = create_stock_ledger_entry(
                     inventory_item=acc_inv,
@@ -480,7 +486,13 @@ def post_credit_note_stock_movements(*, note, posted_by=None) -> dict:
                 if not acc_inv or not acc_inv.stock_tracking_enabled or acc_inv.id in processed_acc_ids:
                     continue
                 processed_acc_ids.add(acc_inv.id)
-                bundled_qty = line.quantity * Decimal("1.000")
+                pim_rel = None
+                if line.inventory_item and line.inventory_item.product and hasattr(line.inventory_item.product, "related_products") and acc_inv.product:
+                    pim_rel = line.inventory_item.product.related_products.filter(
+                        related_product=acc_inv.product
+                    ).first()
+                acc_ratio = Decimal(str(pim_rel.quantity)) if pim_rel and pim_rel.quantity else Decimal(str(getattr(link, "quantity", None) or 1))
+                bundled_qty = line.quantity * acc_ratio
                 acc_name = acc_inv.product.name if acc_inv.product else (acc_inv.sku or "Accessory")
                 _, rel_created = create_stock_ledger_entry(
                     inventory_item=acc_inv,

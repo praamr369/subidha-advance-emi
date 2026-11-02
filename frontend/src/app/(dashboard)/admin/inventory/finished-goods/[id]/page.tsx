@@ -58,8 +58,8 @@ const SERVICE_TYPE_COLORS: Record<ServiceType, string> = {
 type Tab = "overview" | "accessories" | "services" | "bom";
 
 // ─── Inline edit form state helpers ──────────────────────────────────────────
-type LinkEditState = { charge_mode: string; sale_price: string; is_default_included: boolean; notes: string };
-const defaultLinkEdit = (): LinkEditState => ({ charge_mode: "FREE", sale_price: "0.00", is_default_included: true, notes: "" });
+type LinkEditState = { charge_mode: string; sale_price: string; is_default_included: boolean; notes: string; quantity?: string };
+const defaultLinkEdit = (): LinkEditState => ({ charge_mode: "FREE", sale_price: "0.00", is_default_included: true, notes: "", quantity: "1.00" });
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -125,6 +125,10 @@ function InlineLinkEditor({
         </div>
       )}
       <div>
+        <label htmlFor="f-qty-override" className="mb-1 block text-xs font-medium text-muted-foreground">Quantity per Unit</label>
+        <input id="f-qty-override" type="number" min="0.001" step="0.01" value={v.quantity ?? "1.00"} onChange={(e) => setV((s) => ({ ...s, quantity: e.target.value }))} className={INP} />
+      </div>
+      <div>
         <label htmlFor="f-notes" className="mb-1 block text-xs font-medium text-muted-foreground">Notes</label>
         <input id="f-notes" value={v.notes} onChange={(e) => setV((s) => ({ ...s, notes: e.target.value }))} placeholder="Optional" className={INP} />
       </div>
@@ -159,7 +163,7 @@ export default function FGProfilePage() {
   // Accessory add form
   const [showAccForm, setShowAccForm] = useState(false);
   const [accMode, setAccMode] = useState<"single" | "group">("single");
-  const [accForm, setAccForm] = useState({ accessory: 0, variant_group: 0, charge_mode: "FREE", sale_price: "0.00", is_default_included: true, notes: "", sort_order: 1 });
+  const [accForm, setAccForm] = useState({ accessory: 0, variant_group: 0, charge_mode: "FREE", sale_price: "0.00", is_default_included: true, notes: "", sort_order: 1, quantity: "1.00" });
   const [accSaving, setAccSaving] = useState(false);
   const [accErr, setAccErr] = useState<string | null>(null);
 
@@ -232,6 +236,7 @@ export default function FGProfilePage() {
           charge_mode: accForm.charge_mode,
           sale_price: accForm.charge_mode === "FREE" ? "0.00" : accForm.sale_price,
           is_default_included: accForm.is_default_included,
+          quantity: accForm.quantity,
           notes: accForm.notes,
           sort_order: accForm.sort_order,
         });
@@ -242,11 +247,12 @@ export default function FGProfilePage() {
           charge_mode: accForm.charge_mode,
           sale_price: accForm.charge_mode === "FREE" ? "0.00" : accForm.sale_price,
           is_default_included: accForm.is_default_included,
+          quantity: accForm.quantity,
           notes: accForm.notes,
           sort_order: accForm.sort_order,
         });
       }
-      setAccForm({ accessory: 0, variant_group: 0, charge_mode: "FREE", sale_price: "0.00", is_default_included: true, notes: "", sort_order: 1 });
+      setAccForm({ accessory: 0, variant_group: 0, charge_mode: "FREE", sale_price: "0.00", is_default_included: true, notes: "", sort_order: 1, quantity: "1.00" });
       setShowAccForm(false);
       await load();
     } catch (e) {
@@ -709,6 +715,10 @@ export default function FGProfilePage() {
                         </div>
                       )}
                       <div>
+                        <label htmlFor="f-acc-quantity" className="mb-1 block text-xs font-medium text-muted-foreground">Quantity per Unit</label>
+                        <input id="f-acc-quantity" type="number" step="0.01" min="0.001" value={accForm.quantity} onChange={(e) => setAccForm((f) => ({ ...f, quantity: e.target.value }))} className={INP} />
+                      </div>
+                      <div>
                         <label htmlFor="f-sort-order" className="mb-1 block text-xs font-medium text-muted-foreground">Sort Order</label>
                         <input id="f-sort-order" type="number" min={1} value={accForm.sort_order} onChange={(e) => setAccForm((f) => ({ ...f, sort_order: Number(e.target.value) }))} className={INP} />
                       </div>
@@ -746,6 +756,9 @@ export default function FGProfilePage() {
                                   {isGroup ? "Variant Group" : "Single Item"}
                                 </span>
                                 {link.is_default_included && <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">Default</span>}
+                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                  Qty: {link.quantity ? parseFloat(link.quantity).toFixed(2) : "1.00"}
+                                </span>
                               </div>
                               <div className="mt-0.5 text-xs text-muted-foreground">
                                 {isGroup ? "All active variants offered at billing" : `Code: ${link.accessory_code ?? "—"} · SKU: ${link.accessory_sku ?? "—"}`}
@@ -754,7 +767,7 @@ export default function FGProfilePage() {
                             </div>
                             <div className="flex shrink-0 flex-wrap items-center gap-2">
                               <ChargeBadge mode={link.charge_mode} price={link.sale_price} />
-                              <button onClick={() => { setEditAccId(isEditing ? null : link.id); setEditAccState({ charge_mode: link.charge_mode, sale_price: link.sale_price, is_default_included: link.is_default_included, notes: link.notes }); setEditAccErr(null); }} className={BTN_GHOST}>
+                              <button onClick={() => { setEditAccId(isEditing ? null : link.id); setEditAccState({ charge_mode: link.charge_mode, sale_price: link.sale_price, is_default_included: link.is_default_included, notes: link.notes, quantity: link.quantity ? parseFloat(link.quantity).toFixed(2) : "1.00" }); setEditAccErr(null); }} className={BTN_GHOST}>
                                 {isEditing ? <><ChevronUp className="h-3.5 w-3.5" />Close</> : <><Edit2 className="h-3.5 w-3.5" />Edit</>}
                               </button>
                               <button onClick={() => handleDeleteAcc(link)} className={BTN_DANGER}><Trash2 className="h-3.5 w-3.5" />Remove</button>

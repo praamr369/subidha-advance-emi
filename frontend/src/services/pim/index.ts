@@ -92,6 +92,19 @@ export interface PimVariant {
   variant_name?: string | null;
   product_name?: string;
   image?: string | null;
+  brand?: string;
+  description?: string;
+  warranty_enabled?: boolean | null;
+  warranty_months_manufacturing?: number | null;
+  warranty_months_structural?: number | null;
+  warranty_months_extended_max?: number | null;
+  extended_warranty_cost_percentage?: string | number | null;
+  effective_brand?: string;
+  effective_warranty_enabled?: boolean;
+  effective_warranty_months_manufacturing?: number;
+  effective_warranty_months_structural?: number;
+  effective_warranty_months_extended_max?: number;
+  effective_extended_warranty_cost_percentage?: string | number;
 }
 
 export interface PimProduct {
@@ -384,6 +397,7 @@ export const pimService = {
       barcode?: string;
       price: string;
       cost_price?: string;
+      brand?: string;
       quantity_on_hand?: number;
       reorder_level?: number;
       attribute_values?: {
@@ -444,6 +458,13 @@ export const pimService = {
       cost_price?: string;
       barcode?: string;
       reorder_level?: number;
+      brand?: string;
+      description?: string;
+      warranty_enabled?: boolean | null;
+      warranty_months_manufacturing?: number | null;
+      warranty_months_structural?: number | null;
+      warranty_months_extended_max?: number | null;
+      extended_warranty_cost_percentage?: string | number | null;
     }
   ): Promise<PimVariant> =>
     request<PimVariant>(`${BASE}/variants/${variantId}/update_attributes/`, {
@@ -462,6 +483,8 @@ export const pimService = {
       copy_attributes?: boolean;
       copy_relations?: boolean;
       copy_pricing?: boolean;
+      copy_brand?: boolean;
+      copy_warranty?: boolean;
       overwrite_attributes?: boolean;
     }
   ): Promise<{
@@ -553,7 +576,12 @@ export const pimService = {
 
   pushToVariants: (
     productId: number,
-    options: { push_description?: boolean; push_name?: boolean }
+    options: {
+      push_description?: boolean;
+      push_name?: boolean;
+      push_brand?: boolean;
+      push_warranty?: boolean;
+    }
   ): Promise<{ updated: number; total_variants: number }> =>
     request(`${BASE}/products/${productId}/push_to_variants/`, {
       method: "POST",

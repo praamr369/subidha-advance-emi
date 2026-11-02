@@ -5,7 +5,7 @@ import {
   Zap, TrendingUp, Package, AlertTriangle, BarChart3, Settings2,
   RefreshCw, Download, Database, Image as ImageIcon, Upload,
   ChevronDown, ChevronUp, Pencil, RefreshCcw, CheckCircle2, Layers, Lock, QrCode, Sparkles,
-  Copy, ArrowRight
+  Copy, ArrowRight, ShieldCheck, Tag
 } from "lucide-react";
 import { pimService, type PimVariant, type PimCategoryAttribute, type PimAttributeOption } from "@/services/pim";
 import { patchVariantPublishControl } from "@/services/product-pim";
@@ -14,6 +14,14 @@ import AttributeValuePicker from "./AttributeValuePicker";
 import { formatRupee } from "@/lib/utils/currency";
 import QRLabelPrintModal, { type QRLabelItem } from "@/components/inventory/QRLabelPrintModal";
 import RelatedProductsSection from "../products/RelatedProductsSection";
+
+export interface ParentWarrantyInfo {
+  warranty_enabled?: boolean;
+  warranty_months_manufacturing?: number;
+  warranty_months_structural?: number;
+  warranty_months_extended_max?: number;
+  extended_warranty_cost_percentage?: string | number;
+}
 
 interface Props {
   productId: number;
@@ -31,6 +39,10 @@ interface Props {
   onAddOption?: (attr: PimCategoryAttribute, value: string) => Promise<PimAttributeOption>;
   /** Every attribute in the catalogue — same-named attributes' values are offered as templates. */
   templateAttributes?: PimCategoryAttribute[];
+  /** Parent product brand (for inheritance/default hints) */
+  parentBrand?: string;
+  /** Parent product warranty config (for inheritance/default hints) */
+  parentWarranty?: ParentWarrantyInfo;
 }
 
 interface WorkbenchAttributeOption { id: number; value: string; display_name: string; extra_cost?: string | number; }
@@ -41,7 +53,7 @@ interface WorkbenchAttribute {
 }
 interface NewVariantForm {
   sku: string; barcode: string; price: string; cost_price: string;
-  quantity_on_hand: string; reorder_level: string; attrValues: Record<number, string>;
+  quantity_on_hand: string; reorder_level: string; brand: string; attrValues: Record<number, string>;
 }
 interface VariantEditState {
   sku: string;
@@ -50,6 +62,14 @@ interface VariantEditState {
   cost_price: string;
   barcode: string;
   reorder_level: string;
+  brand: string;
+  description: string;
+  has_custom_warranty: boolean;
+  warranty_enabled: boolean;
+  warranty_months_manufacturing: string;
+  warranty_months_structural: string;
+  warranty_months_extended_max: string;
+  extended_warranty_cost_percentage: string;
   attrValues: Record<number, string>;
   activeAttrIds: number[];
   removedAttrIds: number[];
@@ -59,8 +79,8 @@ type SortField = "sku" | "price" | "quantity_on_hand";
 type SortDir = "asc" | "desc";
 type ActivePanel = null | "add" | "generate" | "bulk-price";
 const PAGE_SIZE = 20;
-const emptyForm = (): NewVariantForm => ({
-  sku: "", barcode: "", price: "", cost_price: "", quantity_on_hand: "0", reorder_level: "0", attrValues: {},
+const emptyForm = (defaultBrand = ""): NewVariantForm => ({
+  sku: "", barcode: "", price: "", cost_price: "", quantity_on_hand: "0", reorder_level: "0", brand: defaultBrand, attrValues: {},
 });
 
 /** Auto-generate the next SKU: productCode + "-A", "-B", … "-Z", "-AA", "-AB", … */
@@ -161,6 +181,8 @@ function CopyVariantModal({
   const [copyAttributes, setCopyAttributes] = useState(true);
   const [copyRelations, setCopyRelations] = useState(true);
   const [copyPricing, setCopyPricing] = useState(false);
+  const [copyBrand, setCopyBrand] = useState(true);
+  const [copyWarranty, setCopyWarranty] = useState(true);
   const [overwriteAttrs, setOverwriteAttrs] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -183,6 +205,8 @@ function CopyVariantModal({
         copy_attributes: copyAttributes,
         copy_relations: copyRelations,
         copy_pricing: copyPricing,
+        copy_brand: copyBrand,
+        copy_warranty: copyWarranty,
         overwrite_attributes: overwriteAttrs,
       });
       setSuccessMsg(res.message);
@@ -368,6 +392,32 @@ function CopyVariantModal({
               <p className="text-[11px] text-muted-foreground">Overwrites target selling price ({target ? `₹${Number(target.price).toLocaleString("en-IN")}` : ""}) with source price</p>
             </div>
           </label>
+
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={copyBrand}
+              onChange={(e) => setCopyBrand(e.target.checked)}
+              className="mt-0.5 accent-primary h-3.5 w-3.5 rounded"
+            />
+            <div>
+              <span className="font-medium text-foreground">Copy Brand</span>
+              <p className="text-[11px] text-muted-foreground">Clone brand ({source?.brand || source?.effective_brand || "none"}) to target variant</p>
+            </div>
+          </label>
+
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={copyWarranty}
+              onChange={(e) => setCopyWarranty(e.target.checked)}
+              className="mt-0.5 accent-primary h-3.5 w-3.5 rounded"
+            />
+            <div>
+              <span className="font-medium text-foreground">Copy Warranty Configuration</span>
+              <p className="text-[11px] text-muted-foreground">Clone warranty terms (manufacturing, structural, extended) from source</p>
+            </div>
+          </label>
         </div>
 
         {/* Footer Actions */}
@@ -418,6 +468,8 @@ function VariantEditPanel({
   templateAttributes,
   onOpenCopyModal,
   relationsKey = 0,
+  parentBrand,
+  parentWarranty,
 }: {
   variant: PimVariant;
   allAttributes: PimCategoryAttribute[];
@@ -431,6 +483,8 @@ function VariantEditPanel({
   onCancel: () => void;
   onOpenCopyModal?: (variant: PimVariant) => void;
   relationsKey?: number;
+  parentBrand?: string;
+  parentWarranty?: ParentWarrantyInfo;
 }) {
   const parseVariantToState = useCallback((v: PimVariant): VariantEditState => {
     const attrValues: Record<number, string> = {};
@@ -448,6 +502,12 @@ function VariantEditPanel({
         if (a.is_variant_defining) activeIds.push(a.id);
       }
     }
+    const hasCustomWarranty = (v.warranty_enabled !== null && v.warranty_enabled !== undefined) ||
+      (v.warranty_months_manufacturing !== null && v.warranty_months_manufacturing !== undefined) ||
+      (v.warranty_months_structural !== null && v.warranty_months_structural !== undefined) ||
+      (v.warranty_months_extended_max !== null && v.warranty_months_extended_max !== undefined) ||
+      (v.extended_warranty_cost_percentage !== null && v.extended_warranty_cost_percentage !== undefined);
+
     return {
       sku: v.sku,
       variant_name: v.variant_name || v.product_name || "",
@@ -455,11 +515,19 @@ function VariantEditPanel({
       cost_price: v.cost_price ?? "",
       barcode: v.barcode ?? "",
       reorder_level: String(v.reorder_level),
+      brand: v.brand ?? "",
+      description: v.description ?? "",
+      has_custom_warranty: hasCustomWarranty,
+      warranty_enabled: v.warranty_enabled !== null && v.warranty_enabled !== undefined ? v.warranty_enabled : (parentWarranty?.warranty_enabled ?? true),
+      warranty_months_manufacturing: String(v.warranty_months_manufacturing ?? parentWarranty?.warranty_months_manufacturing ?? 12),
+      warranty_months_structural: String(v.warranty_months_structural ?? parentWarranty?.warranty_months_structural ?? 0),
+      warranty_months_extended_max: String(v.warranty_months_extended_max ?? parentWarranty?.warranty_months_extended_max ?? 0),
+      extended_warranty_cost_percentage: String(v.extended_warranty_cost_percentage ?? parentWarranty?.extended_warranty_cost_percentage ?? "0.00"),
       attrValues,
       activeAttrIds: Array.from(new Set(activeIds)),
       removedAttrIds: [],
     };
-  }, [allAttributes]);
+  }, [allAttributes, parentWarranty]);
 
   const [state, setState] = useState<VariantEditState>(() => parseVariantToState(variant));
   const [saving, setSaving] = useState(false);
@@ -656,6 +724,51 @@ function VariantEditPanel({
             <X className="h-4 w-4" />
           </button>
         </div>
+      </div>
+
+      {/* Variant Brand Override */}
+      <div className="rounded-lg border border-border/70 bg-background/80 p-3.5 space-y-2">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+            <Tag className="h-3.5 w-3.5 text-primary" />
+            Variant Brand Override
+          </label>
+          <div className="flex items-center gap-1.5">
+            {parentBrand && (
+              <button
+                type="button"
+                onClick={() => set("brand", parentBrand)}
+                className="rounded bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Use Base Brand ({parentBrand})
+              </button>
+            )}
+            {state.brand && (
+              <button
+                type="button"
+                onClick={() => set("brand", "")}
+                className="rounded px-1.5 py-0.5 text-[11px] text-muted-foreground hover:text-destructive transition-colors"
+              >
+                Clear (Inherit Base)
+              </button>
+            )}
+          </div>
+        </div>
+        <input
+          type="text"
+          maxLength={150}
+          className="w-full rounded-lg border bg-background px-3 py-1.5 text-sm font-medium focus:ring-1 focus:ring-primary"
+          value={state.brand}
+          onChange={(e) => set("brand", e.target.value.slice(0, 150))}
+          placeholder={parentBrand ? `Inherited from Base: ${parentBrand}` : "e.g. Havells, Bajaj, Orient, Hindware..."}
+        />
+        <p className="text-[11px] text-muted-foreground">
+          {state.brand ? (
+            <span className="text-amber-600 dark:text-amber-400 font-medium">Custom brand set specifically for this variant SKU.</span>
+          ) : (
+            <span>Inherits base parent product brand ({parentBrand || "none"}). Enter brand name here if this variant belongs to a different manufacturer/brand.</span>
+          )}
+        </p>
       </div>
 
       {/* Product Name Variation Control */}
@@ -878,6 +991,156 @@ function VariantEditPanel({
         </div>
       </div>
 
+      {/* Variant Warranty Information Override */}
+      <div className="rounded-lg border border-border/70 bg-background/80 p-3.5 space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-primary" />
+            <span className="text-xs font-semibold uppercase tracking-wide">Variant Warranty Information</span>
+          </div>
+          <label className="flex items-center gap-1.5 text-xs font-medium cursor-pointer">
+            <input
+              type="checkbox"
+              checked={state.has_custom_warranty}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setState((s) => ({
+                  ...s,
+                  has_custom_warranty: checked,
+                  ...(checked ? {
+                    warranty_enabled: s.warranty_enabled ?? parentWarranty?.warranty_enabled ?? true,
+                    warranty_months_manufacturing: s.warranty_months_manufacturing || String(parentWarranty?.warranty_months_manufacturing ?? 12),
+                    warranty_months_structural: s.warranty_months_structural || String(parentWarranty?.warranty_months_structural ?? 0),
+                    warranty_months_extended_max: s.warranty_months_extended_max || String(parentWarranty?.warranty_months_extended_max ?? 0),
+                    extended_warranty_cost_percentage: s.extended_warranty_cost_percentage || String(parentWarranty?.extended_warranty_cost_percentage ?? "0.00"),
+                  } : {}),
+                }));
+              }}
+              className="accent-primary"
+            />
+            <span>Override Base Warranty</span>
+          </label>
+        </div>
+
+        {!state.has_custom_warranty ? (
+          <div className="rounded-md bg-muted/40 p-2.5 text-xs text-muted-foreground flex items-center justify-between flex-wrap gap-2">
+            <span>
+              Inheriting base warranty: {parentWarranty?.warranty_enabled ? `${parentWarranty.warranty_months_manufacturing || 12}m manufacturing, ${parentWarranty.warranty_months_structural || 0}m structural, ${parentWarranty.warranty_months_extended_max || 0}m ext (${parentWarranty.extended_warranty_cost_percentage || 0}%)` : "Warranty disabled on base product"}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setState((s) => ({
+                  ...s,
+                  has_custom_warranty: true,
+                  warranty_enabled: parentWarranty?.warranty_enabled ?? true,
+                  warranty_months_manufacturing: String(parentWarranty?.warranty_months_manufacturing ?? 12),
+                  warranty_months_structural: String(parentWarranty?.warranty_months_structural ?? 0),
+                  warranty_months_extended_max: String(parentWarranty?.warranty_months_extended_max ?? 0),
+                  extended_warranty_cost_percentage: String(parentWarranty?.extended_warranty_cost_percentage ?? "0.00"),
+                }));
+              }}
+              className="text-[11px] text-primary hover:underline font-semibold"
+            >
+              Customize Warranty for this SKU
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3 pt-1">
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 text-xs font-medium cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={state.warranty_enabled}
+                  onChange={(e) => setState((s) => ({ ...s, warranty_enabled: e.target.checked }))}
+                  className="accent-primary h-3.5 w-3.5"
+                />
+                <span>Enable Warranty for this variant</span>
+              </label>
+              <button
+                type="button"
+                onClick={() => setState((s) => ({ ...s, has_custom_warranty: false }))}
+                className="text-[11px] text-muted-foreground hover:text-foreground"
+              >
+                Revert to Base Product Warranty
+              </button>
+            </div>
+
+            {state.warranty_enabled && (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div>
+                  <label className="text-[11px] font-medium text-muted-foreground block mb-1">Manufacturing (Months)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    className="w-full rounded-md border px-2.5 py-1.5 text-xs bg-background"
+                    value={state.warranty_months_manufacturing}
+                    onChange={(e) => set("warranty_months_manufacturing", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium text-muted-foreground block mb-1">Structural (Months)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    className="w-full rounded-md border px-2.5 py-1.5 text-xs bg-background"
+                    value={state.warranty_months_structural}
+                    onChange={(e) => set("warranty_months_structural", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium text-muted-foreground block mb-1">Extended Max (Months)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    className="w-full rounded-md border px-2.5 py-1.5 text-xs bg-background"
+                    value={state.warranty_months_extended_max}
+                    onChange={(e) => set("warranty_months_extended_max", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium text-muted-foreground block mb-1">Extended Cost (%)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    className="w-full rounded-md border px-2.5 py-1.5 text-xs bg-background"
+                    value={state.extended_warranty_cost_percentage}
+                    onChange={(e) => set("extended_warranty_cost_percentage", e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Variant Description Override */}
+      <div className="rounded-lg border border-border/70 bg-background/80 p-3.5 space-y-2">
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-semibold text-foreground">Variant Description (optional)</label>
+          {state.description && (
+            <button
+              type="button"
+              onClick={() => set("description", "")}
+              className="text-[11px] text-muted-foreground hover:text-destructive transition-colors"
+            >
+              Clear Override
+            </button>
+          )}
+        </div>
+        <textarea
+          rows={2}
+          className="w-full rounded-lg border bg-background px-3 py-1.5 text-xs focus:ring-1 focus:ring-primary"
+          value={state.description}
+          onChange={(e) => set("description", e.target.value)}
+          placeholder="Override product description specifically for this SKU variant..."
+        />
+        <p className="text-[11px] text-muted-foreground">
+          {state.description ? "Custom description active for this variant." : "Inherits base product description unless overridden."}
+        </p>
+      </div>
+
       {/* Related Products / BOM */}
       {productId && variant.sku && (
         <div className="border-t border-border mt-2 pt-4">
@@ -915,11 +1178,25 @@ function VariantEditPanel({
   );
 }
 
-export default function VariantManager({ productId, productCode, productName, basePrice, variants, allAttributes, onRefresh, lockedAttributes, parentAttrValues, onAddOption, templateAttributes }: Props) {
+export default function VariantManager({
+  productId,
+  productCode,
+  productName,
+  basePrice,
+  variants,
+  allAttributes,
+  onRefresh,
+  lockedAttributes,
+  parentAttrValues,
+  onAddOption,
+  templateAttributes,
+  parentBrand,
+  parentWarranty,
+}: Props) {
   const [wbAttributes, setWbAttributes] = useState<WorkbenchAttribute[]>([]);
   const [selectedAttrIds, setSelectedAttrIds] = useState<Set<number>>(new Set());
   const [activePanel, setActivePanel] = useState<ActivePanel>(null);
-  const [form, setForm] = useState<NewVariantForm>(emptyForm());
+  const [form, setForm] = useState<NewVariantForm>(() => emptyForm(parentBrand));
   const [saving, setSaving] = useState(false);
 
   // Expanded/editing variant
@@ -1121,6 +1398,7 @@ export default function VariantManager({ productId, productCode, productName, ba
       await pimService.createVariant(productId, {
         sku: form.sku, barcode: form.barcode || undefined, price: form.price,
         cost_price: form.cost_price || undefined,
+        brand: form.brand ? form.brand.trim() : undefined,
         quantity_on_hand: Number(form.quantity_on_hand), reorder_level: Number(form.reorder_level),
         attribute_values: Object.entries(form.attrValues)
           .filter(([, v]) => v)
@@ -1140,7 +1418,7 @@ export default function VariantManager({ productId, productCode, productName, ba
             return item;
           }),
       });
-      setForm(emptyForm());
+      setForm(emptyForm(parentBrand));
       setActivePanel(null);
       onRefresh();
     } catch { /* */ } finally { setSaving(false); }
@@ -1211,6 +1489,13 @@ export default function VariantManager({ productId, productCode, productName, ba
       cost_price: state.cost_price || undefined,
       barcode: state.barcode ? state.barcode.trim().slice(0, 100) : undefined,
       reorder_level: state.reorder_level ? Number(state.reorder_level) : undefined,
+      brand: state.brand ? state.brand.trim().slice(0, 150) : "",
+      description: state.description ? state.description.trim() : "",
+      warranty_enabled: state.has_custom_warranty ? state.warranty_enabled : null,
+      warranty_months_manufacturing: state.has_custom_warranty ? Number(state.warranty_months_manufacturing || 0) : null,
+      warranty_months_structural: state.has_custom_warranty ? Number(state.warranty_months_structural || 0) : null,
+      warranty_months_extended_max: state.has_custom_warranty ? Number(state.warranty_months_extended_max || 0) : null,
+      extended_warranty_cost_percentage: state.has_custom_warranty ? (state.extended_warranty_cost_percentage || "0.00") : null,
       attribute_values: attrPayload,
       remove_attributes: state.removedAttrIds,
     });
@@ -1343,12 +1628,12 @@ export default function VariantManager({ productId, productCode, productName, ba
           ><Settings2 className="h-4 w-4" /> Bulk Price ({selected.size})</button>
         )}
         <button type="button" onClick={() => {
-          if (activePanel === "add") { setActivePanel(null); setForm(emptyForm()); return; }
+          if (activePanel === "add") { setActivePanel(null); setForm(emptyForm(parentBrand)); return; }
           const autoSku = productCode ? generateNextSku(productCode, variants) : "";
           // Pre-fill attributes from the last saved variant (operator only changes what differs)
           const lastVariant = variants.length > 0 ? variants[variants.length - 1] : null;
           const prefillAttrs = lastVariant ? attrValuesFromVariant(lastVariant) : {};
-          setForm({ ...emptyForm(), sku: autoSku, price: basePrice ?? "", attrValues: prefillAttrs });
+          setForm({ ...emptyForm(parentBrand), sku: autoSku, price: basePrice ?? "", brand: parentBrand ?? "", attrValues: prefillAttrs });
           setActivePanel("add");
         }}
           className="inline-flex items-center gap-1.5 rounded-lg border border-dashed px-3 py-2 text-sm text-muted-foreground hover:bg-muted"
@@ -1601,7 +1886,7 @@ export default function VariantManager({ productId, productCode, productName, ba
         <div className="rounded-xl border p-5 space-y-4 bg-muted/20">
           <div className="flex items-center justify-between">
             <h4 className="text-sm font-semibold">New Variant (SKU)</h4>
-            <button type="button" onClick={() => { setActivePanel(null); setForm(emptyForm()); }} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+            <button type="button" onClick={() => { setActivePanel(null); setForm(emptyForm(parentBrand)); }} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <div>
@@ -1614,6 +1899,11 @@ export default function VariantManager({ productId, productCode, productName, ba
                 onChange={(e) => setForm({ ...form, sku: e.target.value })}
                 placeholder="PROD-001-A"
               />
+            </div>
+            <div>
+              <label htmlFor="f-variant-brand" className="text-xs font-medium">Brand (optional)</label>
+              <input id="f-variant-brand" className="mt-1 w-full rounded-lg border px-3 py-1.5 text-sm bg-background"
+                value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} placeholder={parentBrand || "e.g. Havells, Bajaj..."} />
             </div>
             <div><label htmlFor="f-barcode" className="text-xs font-medium">Barcode</label>
               <input id="f-barcode" className="mt-1 w-full rounded-lg border px-3 py-1.5 text-sm bg-background font-mono"
@@ -1724,13 +2014,35 @@ export default function VariantManager({ productId, productCode, productName, ba
                           </div>
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap">
-                          <div className="font-mono text-xs font-semibold">{v.sku}</div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-mono text-xs font-semibold">{v.sku}</span>
+                            {(v.brand || v.effective_brand || parentBrand) && (
+                              <span
+                                className={`inline-flex items-center rounded px-1.5 py-0.2 text-[10px] font-semibold border ${
+                                  v.brand
+                                    ? "bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-700"
+                                    : "bg-muted text-muted-foreground border-border"
+                                }`}
+                                title={v.brand ? "Custom Variant Brand Override" : "Inherited from Base Product"}
+                              >
+                                {v.brand || v.effective_brand || parentBrand}
+                              </span>
+                            )}
+                          </div>
                           {(v.variant_name || v.product_name) && (
                             <div className="text-[11px] text-foreground font-medium truncate max-w-[220px]" title={v.variant_name || v.product_name}>
                               {v.variant_name || v.product_name}
                             </div>
                           )}
-                          {v.barcode && <div className="font-mono text-[10px] text-muted-foreground mt-0.5">{v.barcode}</div>}
+                          <div className="flex items-center gap-2 mt-0.5">
+                            {v.barcode && <span className="font-mono text-[10px] text-muted-foreground">{v.barcode}</span>}
+                            {v.warranty_enabled !== null && v.warranty_enabled !== undefined && (
+                              <span className="inline-flex items-center gap-0.5 text-[9px] text-emerald-600 dark:text-emerald-400 font-medium" title="Custom warranty override active">
+                                <ShieldCheck className="h-2.5 w-2.5" />
+                                Custom Warranty
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-3 py-2 text-xs text-muted-foreground max-w-xs">
                           <div className="flex flex-wrap gap-1">
@@ -1841,6 +2153,8 @@ export default function VariantManager({ productId, productCode, productName, ba
                               templateAttributes={templateAttributes}
                               onOpenCopyModal={(tgt) => setCopyModalTarget(tgt)}
                               relationsKey={relationsKey}
+                              parentBrand={parentBrand}
+                              parentWarranty={parentWarranty}
                             />
                           </td>
                         </tr>

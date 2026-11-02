@@ -97,7 +97,7 @@ class FGAccessoryLinkSerializer(serializers.ModelSerializer):
         fields = [
             "id", "finished_good", "accessory", "accessory_id",
             "accessory_name", "accessory_sku", "accessory_code", "accessory_inv_id",
-            "charge_mode", "sale_price", "is_default_included",
+            "charge_mode", "sale_price", "is_default_included", "quantity",
             "sort_order", "notes", "created_at", "updated_at",
         ]
         read_only_fields = [
@@ -113,6 +113,7 @@ class FGAccessoryLinkWriteSerializer(serializers.Serializer):
     charge_mode = serializers.ChoiceField(choices=FGAccessoryChargeMode.choices, default=FGAccessoryChargeMode.FREE)
     sale_price = serializers.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO, min_value=MONEY_ZERO)
     is_default_included = serializers.BooleanField(default=True)
+    quantity = serializers.DecimalField(max_digits=8, decimal_places=3, default=Decimal("1.000"), min_value=Decimal("0.001"), required=False)
     sort_order = serializers.IntegerField(default=1, min_value=1)
     notes = serializers.CharField(max_length=255, allow_blank=True, default="")
 

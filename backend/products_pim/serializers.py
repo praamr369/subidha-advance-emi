@@ -169,6 +169,12 @@ class ProductVariantSerializer(serializers.ModelSerializer):
     is_published = serializers.SerializerMethodField()
     child_pim_id = serializers.SerializerMethodField()
     operational_product_id = serializers.IntegerField(source="operational_product.id", read_only=True, default=None)
+    effective_brand = serializers.SerializerMethodField()
+    effective_warranty_enabled = serializers.SerializerMethodField()
+    effective_warranty_months_manufacturing = serializers.SerializerMethodField()
+    effective_warranty_months_structural = serializers.SerializerMethodField()
+    effective_warranty_months_extended_max = serializers.SerializerMethodField()
+    effective_extended_warranty_cost_percentage = serializers.SerializerMethodField()
 
     class Meta:
         model = ProductVariant
@@ -177,6 +183,12 @@ class ProductVariantSerializer(serializers.ModelSerializer):
             "quantity_on_hand", "reorder_level", "is_active",
             "attribute_values", "is_low_stock", "variant_label",
             "is_published", "child_pim_id", "operational_product_id",
+            "brand", "description",
+            "warranty_enabled", "warranty_months_manufacturing", "warranty_months_structural",
+            "warranty_months_extended_max", "extended_warranty_cost_percentage",
+            "effective_brand", "effective_warranty_enabled",
+            "effective_warranty_months_manufacturing", "effective_warranty_months_structural",
+            "effective_warranty_months_extended_max", "effective_extended_warranty_cost_percentage",
         ]
 
     def get_quantity_on_hand(self, obj):
@@ -226,6 +238,48 @@ class ProductVariantSerializer(serializers.ModelSerializer):
             return child.name
         from products_pim.services.sync_service import PIMSyncService
         return PIMSyncService.get_variant_display_name(obj)
+
+    def get_effective_brand(self, obj):
+        if obj.brand and obj.brand.strip():
+            return obj.brand.strip()
+        if obj.product_id and obj.product and obj.product.brand:
+            return obj.product.brand.strip()
+        return ""
+
+    def get_effective_warranty_enabled(self, obj):
+        if obj.warranty_enabled is not None:
+            return bool(obj.warranty_enabled)
+        if obj.product_id and obj.product:
+            return bool(obj.product.warranty_enabled)
+        return True
+
+    def get_effective_warranty_months_manufacturing(self, obj):
+        if obj.warranty_months_manufacturing is not None:
+            return obj.warranty_months_manufacturing
+        if obj.product_id and obj.product:
+            return obj.product.warranty_months_manufacturing
+        return 12
+
+    def get_effective_warranty_months_structural(self, obj):
+        if obj.warranty_months_structural is not None:
+            return obj.warranty_months_structural
+        if obj.product_id and obj.product:
+            return obj.product.warranty_months_structural
+        return 0
+
+    def get_effective_warranty_months_extended_max(self, obj):
+        if obj.warranty_months_extended_max is not None:
+            return obj.warranty_months_extended_max
+        if obj.product_id and obj.product:
+            return obj.product.warranty_months_extended_max
+        return 0
+
+    def get_effective_extended_warranty_cost_percentage(self, obj):
+        if obj.extended_warranty_cost_percentage is not None:
+            return str(obj.extended_warranty_cost_percentage)
+        if obj.product_id and obj.product:
+            return str(obj.product.extended_warranty_cost_percentage)
+        return "0.00"
 
 
 class PimProductListSerializer(serializers.ModelSerializer):
@@ -526,7 +580,13 @@ class ProductVariantCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProductVariant
-        fields = ["id", "sku", "barcode", "price", "cost_price", "image", "video", "quantity_on_hand", "reorder_level", "attribute_values"]
+        fields = [
+            "id", "sku", "variant_name", "barcode", "price", "cost_price", "image", "video",
+            "quantity_on_hand", "reorder_level", "attribute_values",
+            "brand", "description",
+            "warranty_enabled", "warranty_months_manufacturing", "warranty_months_structural",
+            "warranty_months_extended_max", "extended_warranty_cost_percentage",
+        ]
 
     def _save_attribute_value(self, variant, av):
         attribute_id = av.get("attribute")

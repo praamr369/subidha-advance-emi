@@ -1855,6 +1855,13 @@ class FinishedGoodAccessoryLink(InventoryTimeStampedModel):
         default=True,
         help_text="Pre-selected when creating a sale/subscription.",
     )
+    quantity = models.DecimalField(
+        max_digits=8,
+        decimal_places=3,
+        default=Decimal("1.000"),
+        validators=[MinValueValidator(Decimal("0.001"))],
+        help_text="Quantity of accessory per finished good unit.",
+    )
     sort_order = models.PositiveSmallIntegerField(default=1)
     notes = models.CharField(max_length=255, blank=True, default="")
 

@@ -281,3 +281,128 @@ class BundledItemsStockMovementTests(TestCase):
         self.assertFalse(check["ok"])
         self.assertIn("Commercial Plyboard", check["reason"])
         self.assertIn("out of stock", check["reason"])
+
+    def test_fractional_accessory_deduction_from_product_relationship(self):
+        """When ProductRelationship has fractional quantity (0.50), exactly 0.500 is deducted."""
+        self.rel.quantity = Decimal("0.50")
+        self.rel.save(update_fields=["quantity"])
+
+        sub = Subscription.objects.create(
+            customer=self.customer,
+            product=self.bed_product,
+            plan_type=PlanType.RENT,
+            start_date=timezone.now().date(),
+            tenure_months=6,
+            monthly_amount=Decimal("1000.00"),
+            total_amount=Decimal("6000.00"),
+        )
+        delivery = SubscriptionDelivery.objects.create(
+            subscription=sub,
+            batch_number=1,
+            delivered_at=timezone.now(),
+            status=DeliveryStatus.DELIVERED,
+            delivery_reference="DLV-TEST-FRACT-01",
+        )
+        res = sync_delivery_inventory_bridge(delivery=delivery)
+        self.assertEqual(res["entries_created"], 2)
+
+        ply_entry = StockLedger.objects.filter(
+            inventory_item=self.ply_inv,
+            movement_type=StockMovementType.RENT_HANDOVER_OUT,
+            reference_model="SubscriptionDelivery",
+            reference_id__startswith=f"{delivery.id}-",
+        ).first()
+        self.assertIsNotNone(ply_entry)
+        self.assertEqual(ply_entry.quantity_out, Decimal("0.500"))
+
+    def test_fractional_accessory_deduction_from_fg_accessory_link(self):
+        """When FinishedGoodAccessoryLink has fractional quantity (0.500), exactly 0.500 is deducted."""
+        self.rel.delete()
+        link = FinishedGoodAccessoryLink.objects.create(
+            finished_good=self.bed_inv,
+            accessory=self.ply_inv,
+            charge_mode=FGAccessoryChargeMode.FREE,
+            is_default_included=True,
+            quantity=Decimal("0.500"),
+        )
+        sub = Subscription.objects.create(
+            customer=self.customer,
+            product=self.bed_product,
+            plan_type=PlanType.RENT,
+            start_date=timezone.now().date(),
+            tenure_months=6,
+            monthly_amount=Decimal("1000.00"),
+            total_amount=Decimal("6000.00"),
+        )
+        delivery = SubscriptionDelivery.objects.create(
+            subscription=sub,
+            batch_number=1,
+            delivered_at=timezone.now(),
+            status=DeliveryStatus.DELIVERED,
+            delivery_reference="DLV-TEST-FRACT-02",
+        )
+        res = sync_delivery_inventory_bridge(delivery=delivery)
+        self.assertEqual(res["entries_created"], 2)
+
+        ply_entry = StockLedger.objects.filter(
+            inventory_item=self.ply_inv,
+            movement_type=StockMovementType.RENT_HANDOVER_OUT,
+            reference_model="SubscriptionDelivery",
+            reference_id=f"{delivery.id}-{self.bed_product.id}:fg_acc:{link.id}",
+        ).first()
+        self.assertIsNotNone(ply_entry)
+        self.assertEqual(ply_entry.quantity_out, Decimal("0.500"))
+
+    def test_resync_updates_existing_ledger_entry_from_full_to_fractional(self):
+        """Resync updates an existing 1.000 entry to 0.500 without creating duplicates."""
+        self.rel.quantity = Decimal("0.50")
+        self.rel.save(update_fields=["quantity"])
+
+        sub = Subscription.objects.create(
+            customer=self.customer,
+            product=self.bed_product,
+            plan_type=PlanType.RENT,
+            start_date=timezone.now().date(),
+            tenure_months=6,
+            monthly_amount=Decimal("1000.00"),
+            total_amount=Decimal("6000.00"),
+        )
+        delivery = SubscriptionDelivery.objects.create(
+            subscription=sub,
+            batch_number=1,
+            delivered_at=timezone.now(),
+            status=DeliveryStatus.DELIVERED,
+            delivery_reference="DLV-TEST-RESYNC-01",
+        )
+        # Pre-create entry with wrong 1.000 quantity (simulating previous buggy post)
+        old_entry = StockLedger.objects.create(
+            inventory_item=self.ply_inv,
+            movement_type=StockMovementType.RENT_HANDOVER_OUT,
+            movement_date=date.today(),
+            stock_location=self.location,
+            quantity_in=Decimal("0.000"),
+            quantity_out=Decimal("1.000"),
+            reference_model="SubscriptionDelivery",
+            reference_id=f"{delivery.id}-{self.bed_product.id}:fg_acc:999",
+            notes="Old 1.000 entry",
+        )
+
+        res = sync_delivery_inventory_bridge(delivery=delivery)
+        # Should post an ADJUSTMENT_IN for difference (0.500)
+        adj_entry = StockLedger.objects.filter(
+            inventory_item=self.ply_inv,
+            movement_type=StockMovementType.ADJUSTMENT_IN,
+            reference_model="SubscriptionDelivery",
+            reference_id=f"{delivery.id}-{self.bed_product.id}:adj_corr:{self.ply_inv.id}",
+        ).first()
+        self.assertIsNotNone(adj_entry)
+        self.assertEqual(adj_entry.quantity_in, Decimal("0.500"))
+
+        # Verify net movement is 0.500
+        all_entries = StockLedger.objects.filter(
+            inventory_item=self.ply_inv,
+            reference_model="SubscriptionDelivery",
+            reference_id__startswith=f"{delivery.id}-",
+        )
+        net_out = sum(e.quantity_out - e.quantity_in for e in all_entries)
+        self.assertEqual(net_out, Decimal("0.500"))

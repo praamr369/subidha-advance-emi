@@ -105,7 +105,8 @@ def sync_product_relationship_to_fg_accessory(sender, instance, created, **kwarg
                 'charge_mode': charge_mode,
                 'sale_price': 0,
                 'is_default_included': True,
-                'notes': instance.notes
+                'quantity': instance.quantity if instance.quantity else 1,
+                'notes': instance.notes,
             }
         )
 

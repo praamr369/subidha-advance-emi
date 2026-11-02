@@ -323,7 +323,13 @@ def check_stock_for_delivery(
             if not acc_inv or not acc_inv.stock_tracking_enabled or acc_inv.id in checked_acc_ids:
                 continue
             checked_acc_ids.add(acc_inv.id)
-            acc_req = qty * Decimal("1.000")
+            pim_rel = None
+            if inventory_item.product and hasattr(inventory_item.product, "related_products") and acc_inv.product:
+                pim_rel = inventory_item.product.related_products.filter(
+                    related_product=acc_inv.product
+                ).first()
+            acc_ratio = Decimal(str(pim_rel.quantity)) if pim_rel and pim_rel.quantity else Decimal(str(getattr(link, "quantity", None) or 1))
+            acc_req = qty * acc_ratio
             acc_phys = acc_inv.current_stock_quantity()
             acc_avail = acc_inv.available_qty()
             acc_name = acc_inv.product.name if acc_inv.product else (acc_inv.sku or "Accessory")

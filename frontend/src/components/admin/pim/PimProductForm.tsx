@@ -616,6 +616,8 @@ export default function PimProductForm({
   const [showPushPanel, setShowPushPanel] = useState(false);
   const [pushDescription, setPushDescription] = useState(true);
   const [pushName, setPushName] = useState(false);
+  const [pushBrand, setPushBrand] = useState(false);
+  const [pushWarranty, setPushWarranty] = useState(false);
   const [pushing, setPushing] = useState(false);
   const [pushResult, setPushResult] = useState<{ updated: number; total_variants: number } | null>(null);
 
@@ -1318,8 +1320,11 @@ export default function PimProductForm({
       const result = await pimService.pushToVariants(activeProductId, {
         push_description: pushDescription,
         push_name: pushName,
+        push_brand: pushBrand,
+        push_warranty: pushWarranty,
       });
       setPushResult(result);
+      await refreshVariants();
     } catch {
       // ignore
     } finally {
@@ -1876,13 +1881,31 @@ export default function PimProductForm({
             />
           </div>
           <div className="sm:col-span-2">
-            <label htmlFor="f-product-brand" className="block text-sm font-medium mb-1">Brand</label>
+            <div className="flex items-center justify-between mb-1">
+              <label htmlFor="f-product-brand" className="block text-sm font-medium">Brand</label>
+              {isEdit && variants.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => { setShowPushPanel(true); setPushBrand(true); setPushResult(null); }}
+                  className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium text-primary hover:bg-muted transition"
+                  title="Push this brand to all child variants"
+                >
+                  <Send className="h-3 w-3" />
+                  Push brand to variants
+                </button>
+              )}
+            </div>
             <input id="f-product-brand"
               className="w-full rounded-md border px-3 py-2 text-sm bg-background"
               value={brand}
               onChange={(e) => setBrand(e.target.value)}
               placeholder="e.g. Subidha Furniture"
             />
+            {variants.length > 0 && (
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Base default brand. Individual variants (e.g. Havells, Bajaj, Orient) can define their own brand in the variants section below.
+              </p>
+            )}
           </div>
           <div className="sm:col-span-2">
             <div className="flex items-center justify-between mb-1">
@@ -1919,14 +1942,22 @@ export default function PimProductForm({
                     <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
-                <div className="flex flex-wrap gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label className="flex items-center gap-2 text-xs cursor-pointer">
+                    <input type="checkbox" checked={pushBrand} onChange={(e) => setPushBrand(e.target.checked)} className="accent-primary" />
+                    <span>Sync <strong>Brand</strong> ({brand || "none"}) to all variants</span>
+                  </label>
+                  <label className="flex items-center gap-2 text-xs cursor-pointer">
+                    <input type="checkbox" checked={pushWarranty} onChange={(e) => setPushWarranty(e.target.checked)} className="accent-primary" />
+                    <span>Sync <strong>Warranty</strong> to all variants</span>
+                  </label>
                   <label className="flex items-center gap-2 text-xs cursor-pointer">
                     <input type="checkbox" checked={pushDescription} onChange={(e) => setPushDescription(e.target.checked)} className="accent-primary" />
-                    Sync description to all variants
+                    <span>Sync <strong>Description</strong> to all variants</span>
                   </label>
                   <label className="flex items-center gap-2 text-xs cursor-pointer">
                     <input type="checkbox" checked={pushName} onChange={(e) => setPushName(e.target.checked)} className="accent-primary" />
-                    Sync name to all variants
+                    <span>Sync <strong>Name</strong> to all variants</span>
                   </label>
                 </div>
                 {pushResult ? (
@@ -1938,7 +1969,7 @@ export default function PimProductForm({
                   <button
                     type="button"
                     onClick={handlePushToVariants}
-                    disabled={pushing || (!pushDescription && !pushName)}
+                    disabled={pushing || (!pushDescription && !pushName && !pushBrand && !pushWarranty)}
                     className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
                   >
                     <Send className="h-3 w-3" />
@@ -1953,18 +1984,44 @@ export default function PimProductForm({
 
       {/* Warranty Information */}
       <section className="rounded-lg border p-5 space-y-4 bg-muted/20">
-        <div className="flex items-center justify-between">
-          <h3 className="font-semibold">Warranty Information</h3>
-          <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
-            <input 
-              type="checkbox" 
-              checked={warrantyEnabled} 
-              onChange={(e) => setWarrantyEnabled(e.target.checked)} 
-              className="accent-primary h-4 w-4 rounded" 
-            />
-            Enable Warranty
-          </label>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <h3 className="font-semibold">Warranty Information</h3>
+            {variants.length > 0 && (
+              <span className="text-[10px] rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 px-2 py-0.5 font-medium border border-blue-200 dark:border-blue-800">
+                Default for {variants.length} variant{variants.length !== 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            {isEdit && variants.length > 0 && (
+              <button
+                type="button"
+                onClick={() => { setShowPushPanel(true); setPushWarranty(true); setPushResult(null); }}
+                className="inline-flex items-center gap-1 rounded-md border bg-background px-2.5 py-1 text-xs font-medium text-primary hover:bg-muted transition"
+                title="Push this warranty setup to all variants"
+              >
+                <Send className="h-3 w-3" />
+                Push warranty to variants
+              </button>
+            )}
+            <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+              <input 
+                type="checkbox" 
+                checked={warrantyEnabled} 
+                onChange={(e) => setWarrantyEnabled(e.target.checked)} 
+                className="accent-primary h-4 w-4 rounded" 
+              />
+              Enable Warranty
+            </label>
+          </div>
         </div>
+        
+        {variants.length > 0 && (
+          <p className="text-[11px] text-muted-foreground">
+            Base warranty terms apply to this product. Each variant inherits these terms automatically, or can be overridden with variant-specific warranty terms below.
+          </p>
+        )}
         
         {warrantyEnabled && (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4 pt-2">
@@ -2598,6 +2655,14 @@ export default function PimProductForm({
             parentAttrValues={attrValues}
             onAddOption={handleQuickAddOption}
             templateAttributes={allAttributes}
+            parentBrand={brand}
+            parentWarranty={{
+              warranty_enabled: warrantyEnabled,
+              warranty_months_manufacturing: warrantyMonthsManufacturing,
+              warranty_months_structural: warrantyMonthsStructural,
+              warranty_months_extended_max: warrantyMonthsExtendedMax,
+              extended_warranty_cost_percentage: extendedWarrantyCostPercentage,
+            }}
           />
         </section>
       )}

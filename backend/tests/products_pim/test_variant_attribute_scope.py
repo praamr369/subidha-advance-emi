@@ -185,5 +185,67 @@ class VariantAttributeScopeTests(APITestCase):
         bad_response = self.client.post(url, {"source_variant_id": v2.id}, format="json")
         self.assertEqual(bad_response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_variant_brand_and_warranty_override_and_push(self):
+        """Variant brand and warranty overrides take priority and can be bulk pushed."""
+        from products_pim.models import ProductVariant
+        from products_pim.services.sync_service import PIMSyncService
+
+        self.product.brand = "Subidha Furniture"
+        self.product.warranty_enabled = True
+        self.product.warranty_months_manufacturing = 12
+        self.product.warranty_months_structural = 36
+        self.product.save()
+
+        variant = ProductVariant.objects.create(
+            product=self.product,
+            sku="GEYSER-HAVELLS-01",
+            price=Decimal("7500.00"),
+        )
+        PIMSyncService.sync_variant_to_operational_product(variant)
+        variant.refresh_from_db()
+
+        # By default, variant inherits base product brand and warranty
+        self.assertEqual(variant.operational_product.brand, "Subidha Furniture")
+        self.assertEqual(variant.operational_product.warranty_months_manufacturing, 12)
+
+        # Update variant to have its own distinct brand ("Havells") and warranty
+        user = create_admin_user()
+        self.client.force_authenticate(user=user)
+
+        patch_url = f"/api/v1/pim/variants/{variant.id}/update_attributes/"
+        patch_payload = {
+            "brand": "Havells",
+            "warranty_enabled": True,
+            "warranty_months_manufacturing": 24,
+            "warranty_months_structural": 0,
+            "warranty_months_extended_max": 12,
+            "extended_warranty_cost_percentage": "5.00",
+        }
+        res = self.client.patch(patch_url, patch_payload, format="json")
+        self.assertEqual(res.status_code, status.HTTP_200_OK, res.data)
+        self.assertEqual(res.data["brand"], "Havells")
+        self.assertEqual(res.data["effective_brand"], "Havells")
+        self.assertEqual(res.data["warranty_months_manufacturing"], 24)
+
+        variant.refresh_from_db()
+        self.assertEqual(variant.brand, "Havells")
+        self.assertEqual(variant.operational_product.brand, "Havells")
+        self.assertEqual(variant.operational_product.warranty_months_manufacturing, 24)
+
+        # Now test push_to_variants: push base brand and warranty to all variants
+        push_url = f"/api/v1/pim/products/{self.product.id}/push_to_variants/"
+        push_res = self.client.post(
+            push_url,
+            {"push_brand": True, "push_warranty": True},
+            format="json",
+        )
+        self.assertEqual(push_res.status_code, status.HTTP_200_OK, push_res.data)
+        self.assertEqual(push_res.data["updated"], 1)
+
+        variant.refresh_from_db()
+        self.assertEqual(variant.brand, "Subidha Furniture")
+        self.assertEqual(variant.operational_product.brand, "Subidha Furniture")
+        self.assertEqual(variant.operational_product.warranty_months_manufacturing, 12)
+
 
 
