@@ -254,6 +254,10 @@ class BundledItemsStockMovementTests(TestCase):
         self.assertEqual(ply_entry.quantity_out, Decimal("1.000"))
         self.assertIn("Linked Accessory", ply_entry.notes)
 
+        # Calling sync_delivery_inventory_bridge a second time is completely idempotent
+        second_result = sync_delivery_inventory_bridge(delivery=delivery)
+        self.assertEqual(second_result["entries_created"], 0)
+
     def test_check_stock_for_delivery_blocks_if_fg_accessory_link_out_of_stock(self):
         """FinishedGoodAccessoryLink accessory out of stock blocks delivery check."""
         self.rel.delete()

@@ -273,6 +273,17 @@ def create_stock_ledger_entry(
     posted_journal_entry=None,
 ) -> tuple[StockLedger, bool]:
     stock_location = stock_location or inventory_item.default_stock_location
+
+    lookup = {
+        "inventory_item": inventory_item,
+        "movement_type": movement_type,
+        "reference_model": reference_model,
+        "reference_id": str(reference_id),
+    }
+    existing = StockLedger.objects.filter(**lookup).first()
+    if existing is not None:
+        return existing, False
+
     # Rent/lease handovers take real stock out of the building, so they are
     # guarded against overselling exactly like an EMI delivery.
     outbound_guard_types = {
@@ -303,12 +314,6 @@ def create_stock_ledger_entry(
                 f"Available at location: {location_available:.3f}, requested: {qty_out:.3f}."
             )
 
-    lookup = {
-        "inventory_item": inventory_item,
-        "movement_type": movement_type,
-        "reference_model": reference_model,
-        "reference_id": str(reference_id),
-    }
     try:
         entry = StockLedger.objects.create(
             inventory_item=inventory_item,
