@@ -108,14 +108,18 @@ def sync_delivery_inventory_bridge(*, delivery, performed_by=None) -> dict:
             )
 
         # Also maintain bundled / attached accessories & raw materials (e.g. Commercial Plyboard for a Bed)
+        processed_acc_ids = set()
+
+        # 1. Bundled Products / Accessories from ProductRelationship (PIM catalog)
         if hasattr(product, "related_products"):
             sub_variant_sku = getattr(subscription, "product_variant_sku", None) or getattr(delivery, "variant_sku", None)
             for rel in product.related_products.select_related("related_product", "related_product__inventory_profile").all():
                 if rel.parent_variant_sku and sub_variant_sku and rel.parent_variant_sku != sub_variant_sku:
                     continue
                 rel_inv = getattr(rel.related_product, "inventory_profile", None)
-                if rel_inv is None or not rel_inv.stock_tracking_enabled or not rel_inv.delivery_stock_bridge_enabled:
+                if rel_inv is None or not rel_inv.stock_tracking_enabled:
                     continue
+                processed_acc_ids.add(rel_inv.id)
                 bundled_qty = qty * Decimal(str(rel.quantity or 1))
                 rel_q_in = bundled_qty if is_inflow else Decimal("0.000")
                 rel_q_out = bundled_qty if is_outflow else Decimal("0.000")
@@ -125,7 +129,37 @@ def sync_delivery_inventory_bridge(*, delivery, performed_by=None) -> dict:
                     inventory_item=rel_inv,
                     movement_type=movement_type,
                     movement_date=(delivery.delivered_at or delivery.returned_at or delivery.updated_at).date(),
-                    stock_location=rel_inv.default_stock_location,
+                    stock_location=rel_inv.default_stock_location or inventory_item.default_stock_location,
+                    quantity_in=rel_q_in,
+                    quantity_out=rel_q_out,
+                    reference_model="SubscriptionDelivery",
+                    reference_id=rel_ref_id,
+                    notes=bundled_notes,
+                    posted_by=performed_by,
+                )
+                if rel_created:
+                    entries_created += 1
+
+        # 2. Linked Accessories from FinishedGoodAccessoryLink (Inventory FG profile)
+        if inventory_item and hasattr(inventory_item, "accessory_links"):
+            for link in inventory_item.accessory_links.filter(
+                is_default_included=True
+            ).select_related("accessory", "accessory__product", "accessory__default_stock_location").all():
+                acc_inv = link.accessory
+                if acc_inv is None or not acc_inv.stock_tracking_enabled or acc_inv.id in processed_acc_ids:
+                    continue
+                processed_acc_ids.add(acc_inv.id)
+                bundled_qty = qty * Decimal("1.000")
+                rel_q_in = bundled_qty if is_inflow else Decimal("0.000")
+                rel_q_out = bundled_qty if is_outflow else Decimal("0.000")
+                rel_ref_id = f"{delivery.id}-{product.id}:fg_acc:{link.id}"
+                acc_name = acc_inv.product.name if acc_inv.product else (acc_inv.sku or "Accessory")
+                bundled_notes = f"{delivery_ref} (Linked Accessory: {acc_name})".strip()
+                rel_entry, rel_created = create_stock_ledger_entry(
+                    inventory_item=acc_inv,
+                    movement_type=movement_type,
+                    movement_date=(delivery.delivered_at or delivery.returned_at or delivery.updated_at).date(),
+                    stock_location=acc_inv.default_stock_location or inventory_item.default_stock_location,
                     quantity_in=rel_q_in,
                     quantity_out=rel_q_out,
                     reference_model="SubscriptionDelivery",

@@ -508,6 +508,7 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
   const [collateralType, setCollateralType] = useState<
     "AADHAAR_ELECTRICITY" | "PDC_CHEQUE" | "UPI_AUTOPAY" | "NONE"
   >("AADHAAR_ELECTRICITY");
+  const [collateralReference, setCollateralReference] = useState("");
   const [installmentTermsApplied, setInstallmentTermsApplied] = useState(false);
 
   const downPaymentPercent = totals.grand > 0 ? (totals.received / totals.grand) * 100 : 0;
@@ -516,8 +517,8 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
   const safeHandoverDownPayment = Math.ceil(totals.grand * 0.7);    // 70% safe handover threshold
   const monthlyEmi = isCreditSale && tenureMonths > 0 ? Math.round(totals.balance / tenureMonths) : 0;
 
-  const applyInstallmentTerms = () => {
-    if (!isCreditSale) return;
+  const generateInstallmentAgreement = () => {
+    if (!isCreditSale) return "";
     const today = new Date();
     const scheduleLines: string[] = [];
     for (let m = 1; m <= tenureMonths; m++) {
@@ -527,20 +528,21 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
       scheduleLines.push(`• Month ${m} EMI: ₹${monthlyEmi.toLocaleString("en-IN")} (Due: ${dateStr})`);
     }
 
+    const refSuffix = collateralReference.trim() ? ` [Ref: ${collateralReference.trim()}]` : "";
     const collateralLabel =
-      collateralType === "AADHAAR_ELECTRICITY"
+      (collateralType === "AADHAAR_ELECTRICITY"
         ? "Aadhaar Card + Residence Electricity Bill (Home Verified)"
         : collateralType === "PDC_CHEQUE"
         ? "Post-Dated Cheques (PDC) Deposited"
         : collateralType === "UPI_AUTOPAY"
         ? "UPI Auto-pay / e-Mandate Configured"
-        : "Unsecured / Trust Walk-in";
+        : "Unsecured / Trust Walk-in") + refSuffix;
 
     const guarantorStr = guarantorName.trim()
       ? `Guarantor: ${guarantorName.trim()}${guarantorPhone.trim() ? ` (${guarantorPhone.trim()})` : ""}`
       : "Guarantor: On file";
 
-    const installmentAgreement = [
+    return [
       `[SHOWROOM INSTALLMENT / CREDIT SALE AGREEMENT]`,
       `Total Invoice Amount: ₹${totals.grand.toLocaleString("en-IN")}`,
       `Upfront Down Payment Received: ₹${totals.received.toLocaleString("en-IN")} (${downPaymentPercent.toFixed(0)}%)`,
@@ -550,11 +552,15 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
       `Security/KYC: ${collateralLabel}`,
       `LEGAL TITLE RETENTION: Ownership of the goods remains with Subidha Furniture until full payment is settled. In case of 30-day default on monthly installments, store reserves legal right of repossession.`,
     ].join("\n");
+  };
 
+  const applyInstallmentTerms = () => {
+    const agreement = generateInstallmentAgreement();
+    if (!agreement) return;
     setForm((current) => ({
       ...current,
-      terms: installmentAgreement,
-      notes: current.notes ? `${current.notes.trim()}\n\n${installmentAgreement}` : installmentAgreement,
+      terms: agreement,
+      notes: current.notes ? `${current.notes.trim()}\n\n${agreement}` : agreement,
     }));
     setInstallmentTermsApplied(true);
   };
@@ -1313,6 +1319,16 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
 
   function buildSubmitPayload() {
     const mode = form.customer_mode;
+    let finalTerms = form.terms.trim();
+    let finalNotes = form.notes.trim();
+    if (isCreditSale && !finalTerms.includes("[SHOWROOM INSTALLMENT")) {
+      const autoAgreement = generateInstallmentAgreement();
+      if (autoAgreement) {
+        finalTerms = autoAgreement;
+        finalNotes = finalNotes ? `${finalNotes}\n\n${autoAgreement}` : autoAgreement;
+      }
+    }
+
     const commonPayload = {
       sale_date: form.sale_date,
       customer_mode: mode,
@@ -1345,8 +1361,8 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
       grand_total: toDecimal(totals.grand),
       received_total: toDecimal(totals.received),
       balance_total: toDecimal(totals.balance),
-      notes: form.notes.trim(),
-      terms: form.terms.trim(),
+      notes: finalNotes,
+      terms: finalTerms,
       lines: lines.map((line) => buildLinePayload(line, form.tax_mode)),
     };
 
@@ -2684,6 +2700,34 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                       </select>
                     </div>
 
+                    {collateralType !== "NONE" && (
+                      <div>
+                        <span className="font-medium text-foreground">
+                          {collateralType === "UPI_AUTOPAY"
+                            ? "Mandate Reference / UMN"
+                            : collateralType === "PDC_CHEQUE"
+                            ? "Cheque Numbers & Bank"
+                            : "KYC Reference (Aadhaar / Meter ID)"}
+                        </span>
+                        <input
+                          type="text"
+                          value={collateralReference}
+                          onChange={(e) => {
+                            setCollateralReference(e.target.value);
+                            setInstallmentTermsApplied(false);
+                          }}
+                          placeholder={
+                            collateralType === "UPI_AUTOPAY"
+                              ? "e.g. UMN: 12345678 / Razorpay sub_xxx"
+                              : collateralType === "PDC_CHEQUE"
+                              ? "e.g. Chq 000101 to 000106 - SBI"
+                              : "e.g. Aadhaar last 4 / Meter Cons ID"
+                          }
+                          className="mt-1 h-7 w-full rounded border border-border bg-background px-2 text-xs font-mono"
+                        />
+                      </div>
+                    )}
+
                     <button
                       type="button"
                       onClick={applyInstallmentTerms}
@@ -2695,6 +2739,22 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                     >
                       {installmentTermsApplied ? "✓ Agreement & Terms Embedded" : "Embed Installment Agreement in Terms"}
                     </button>
+
+                    {selectedCustomer?.id ? (
+                      <a
+                        href={`/admin/customers/${selectedCustomer.id}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-1 flex items-center justify-center gap-1 rounded border border-border bg-muted/40 py-1 text-center text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground transition"
+                      >
+                        <span>📁 Upload Customer KYC & Collateral</span>
+                        <span className="text-[10px]">↗</span>
+                      </a>
+                    ) : (
+                      <p className="mt-1 text-[10px] text-muted-foreground text-center">
+                        KYC/PDC documents can be uploaded to customer profile after creation.
+                      </p>
+                    )}
                   </div>
                 </div>
               )}

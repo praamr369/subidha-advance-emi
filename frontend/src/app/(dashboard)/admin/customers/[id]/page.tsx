@@ -153,6 +153,7 @@ type DirectSaleOperationalRow = {
   balance_total: string;
   active_outstanding_total?: string;
   is_history_only?: boolean;
+  notes?: string | null;
 };
 
 type ReceiptOperationalRow = {
@@ -647,6 +648,7 @@ function normalizeCustomerOperationalProfile(
           row.active_outstanding_total ?? row.balance_total
         ),
         is_history_only: row.is_history_only === true,
+        notes: toNullableString(row.notes),
       })),
     },
     contract_references: {
@@ -2597,7 +2599,30 @@ export default function AdminCustomerDetailPage() {
                               </div>
                             </div>
                           </div>
+                          {row.notes && (
+                            <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50/70 p-3 text-xs text-amber-950 space-y-1.5">
+                              <div className="flex items-center justify-between font-semibold text-amber-900 border-b border-amber-200 pb-1 text-[11px] uppercase tracking-wide">
+                                <span>Showroom Credit & Security Agreement</span>
+                                {row.notes.includes("Post-Dated Cheques") || row.notes.includes("PDC") ? (
+                                  <span className="rounded bg-amber-200 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">
+                                    PDC Secured
+                                  </span>
+                                ) : null}
+                              </div>
+                              <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-amber-950 max-h-36 overflow-y-auto">
+                                {row.notes}
+                              </pre>
+                            </div>
+                          )}
                           <div className="mt-4 flex flex-wrap gap-2">
+                            <Link
+                              href={`/admin/billing/direct-sale/${row.id}/print`}
+                              target="_blank"
+                              className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900 shadow-sm transition hover:bg-amber-100"
+                            >
+                              <span>🖨️ Print Credit Bill & PDC</span>
+                              <span className="text-xs">↗</span>
+                            </Link>
                             <Link
                               href={`/admin/billing/direct-sales?focus_sale=${row.id}`}
                               className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"

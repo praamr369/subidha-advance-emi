@@ -759,6 +759,7 @@ def build_customer_operational_profile(customer: Customer) -> dict[str, object]:
             "billing_invoice_no": sale.billing_invoices.order_by("-id").values_list("document_no", flat=True).first(),
             "billing_invoice_status": sale.billing_invoices.order_by("-id").values_list("status", flat=True).first(),
             "delivery_required": sale.delivery_required,
+            "notes": sale.notes or "",
         }
         for sale in direct_sales_qs[:10]
     ]

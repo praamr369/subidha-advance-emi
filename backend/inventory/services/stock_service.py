@@ -358,6 +358,9 @@ def post_invoice_stock_movements(*, invoice, posted_by=None) -> dict:
         existing_count += 0 if created else 1
 
         # Also maintain bundled / attached accessories & raw materials (e.g. Commercial Plyboard for a Bed)
+        processed_acc_ids = set()
+
+        # 1. ProductRelationship (PIM catalog)
         product = line.inventory_item.product
         if product and hasattr(product, "related_products"):
             variant_sku = getattr(line, "sku_snapshot", None) or getattr(product, "sku", None)
@@ -367,6 +370,7 @@ def post_invoice_stock_movements(*, invoice, posted_by=None) -> dict:
                 rel_inv = getattr(rel.related_product, "inventory_profile", None)
                 if not rel_inv or not rel_inv.stock_tracking_enabled:
                     continue
+                processed_acc_ids.add(rel_inv.id)
                 bundled_qty = line.quantity * Decimal(str(rel.quantity or 1))
                 _, rel_created = create_stock_ledger_entry(
                     inventory_item=rel_inv,
@@ -377,6 +381,32 @@ def post_invoice_stock_movements(*, invoice, posted_by=None) -> dict:
                     reference_model="BillingInvoiceLine",
                     reference_id=f"{invoice.id}:{line.id}:bundled:{rel.id}",
                     notes=f"{invoice.document_no or ''} (Bundled {rel.relationship_type.title()}: {rel.related_product.name})",
+                    posted_by=posted_by,
+                    posted_journal_entry=invoice.posted_journal_entry,
+                )
+                created_count += 1 if rel_created else 0
+                existing_count += 0 if rel_created else 1
+
+        # 2. FinishedGoodAccessoryLink (Inventory FG profile)
+        if line.inventory_item and hasattr(line.inventory_item, "accessory_links"):
+            for link in line.inventory_item.accessory_links.filter(
+                is_default_included=True
+            ).select_related("accessory", "accessory__product", "accessory__default_stock_location").all():
+                acc_inv = link.accessory
+                if not acc_inv or not acc_inv.stock_tracking_enabled or acc_inv.id in processed_acc_ids:
+                    continue
+                processed_acc_ids.add(acc_inv.id)
+                bundled_qty = line.quantity * Decimal("1.000")
+                acc_name = acc_inv.product.name if acc_inv.product else (acc_inv.sku or "Accessory")
+                _, rel_created = create_stock_ledger_entry(
+                    inventory_item=acc_inv,
+                    movement_type=StockMovementType.SALE_OUT,
+                    movement_date=invoice.invoice_date,
+                    stock_location=acc_inv.default_stock_location or line.inventory_item.default_stock_location,
+                    quantity_out=bundled_qty,
+                    reference_model="BillingInvoiceLine",
+                    reference_id=f"{invoice.id}:{line.id}:fg_acc:{link.id}",
+                    notes=f"{invoice.document_no or ''} (Linked Accessory: {acc_name})",
                     posted_by=posted_by,
                     posted_journal_entry=invoice.posted_journal_entry,
                 )
@@ -407,6 +437,9 @@ def post_credit_note_stock_movements(*, note, posted_by=None) -> dict:
         existing_count += 0 if created else 1
 
         # Also return bundled / attached accessories & raw materials into stock
+        processed_acc_ids = set()
+
+        # 1. ProductRelationship (PIM catalog)
         product = line.inventory_item.product
         if product and hasattr(product, "related_products"):
             variant_sku = getattr(line, "sku_snapshot", None) or getattr(product, "sku", None)
@@ -416,6 +449,7 @@ def post_credit_note_stock_movements(*, note, posted_by=None) -> dict:
                 rel_inv = getattr(rel.related_product, "inventory_profile", None)
                 if not rel_inv or not rel_inv.stock_tracking_enabled:
                     continue
+                processed_acc_ids.add(rel_inv.id)
                 bundled_qty = line.quantity * Decimal(str(rel.quantity or 1))
                 _, rel_created = create_stock_ledger_entry(
                     inventory_item=rel_inv,
@@ -426,6 +460,32 @@ def post_credit_note_stock_movements(*, note, posted_by=None) -> dict:
                     reference_model="BillingCreditNoteLine",
                     reference_id=f"{note.id}:{line.id}:bundled:{rel.id}",
                     notes=f"{note.note_no or ''} (Bundled Return {rel.relationship_type.title()}: {rel.related_product.name})",
+                    posted_by=posted_by,
+                    posted_journal_entry=note.posted_journal_entry,
+                )
+                created_count += 1 if rel_created else 0
+                existing_count += 0 if rel_created else 1
+
+        # 2. FinishedGoodAccessoryLink (Inventory FG profile)
+        if line.inventory_item and hasattr(line.inventory_item, "accessory_links"):
+            for link in line.inventory_item.accessory_links.filter(
+                is_default_included=True
+            ).select_related("accessory", "accessory__product", "accessory__default_stock_location").all():
+                acc_inv = link.accessory
+                if not acc_inv or not acc_inv.stock_tracking_enabled or acc_inv.id in processed_acc_ids:
+                    continue
+                processed_acc_ids.add(acc_inv.id)
+                bundled_qty = line.quantity * Decimal("1.000")
+                acc_name = acc_inv.product.name if acc_inv.product else (acc_inv.sku or "Accessory")
+                _, rel_created = create_stock_ledger_entry(
+                    inventory_item=acc_inv,
+                    movement_type=StockMovementType.SALE_RETURN_IN,
+                    movement_date=note.note_date,
+                    stock_location=acc_inv.default_stock_location or line.inventory_item.default_stock_location,
+                    quantity_in=bundled_qty,
+                    reference_model="BillingCreditNoteLine",
+                    reference_id=f"{note.id}:{line.id}:fg_acc:{link.id}",
+                    notes=f"{note.note_no or ''} (Linked Return Accessory: {acc_name})",
                     posted_by=posted_by,
                     posted_journal_entry=note.posted_journal_entry,
                 )

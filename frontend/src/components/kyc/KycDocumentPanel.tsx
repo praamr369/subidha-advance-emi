@@ -89,7 +89,7 @@ const DOCUMENT_TYPES: Record<KycOwnerType, Array<{ value: string; label: string 
     { value: "PASSPORT", label: "Passport" },
     { value: "DRIVING_LICENSE", label: "Driving License" },
     { value: "VOTER_ID", label: "Voter ID" },
-    { value: "OTHER", label: "Other" },
+    { value: "OTHER", label: "PDC Cheques / Other Collateral" },
   ],
   partner: [
     { value: "AADHAAR", label: "Aadhaar Card" },

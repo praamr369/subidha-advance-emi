@@ -10,6 +10,8 @@ from inventory.models import (
     StockLocation,
     StockLedger,
     StockMovementType,
+    FinishedGoodAccessoryLink,
+    FGAccessoryChargeMode,
 )
 from inventory.services.delivery_bridge_service import sync_delivery_inventory_bridge
 from inventory.services.stock_movement_service import check_stock_for_delivery
@@ -191,6 +193,86 @@ class BundledItemsStockMovementTests(TestCase):
         self.assertEqual(self.ply_inv.current_stock_quantity(), Decimal("0.000"))
         self.assertGreaterEqual(self.bed_inv.current_stock_quantity(), Decimal("1.000"))
 
+        check = check_stock_for_delivery(inventory_item=self.bed_inv, quantity=Decimal("1.000"))
+        self.assertFalse(check["ok"])
+        self.assertIn("Commercial Plyboard", check["reason"])
+        self.assertIn("out of stock", check["reason"])
+
+    def test_sync_delivery_inventory_bridge_deducts_fg_accessory_link_on_rent_delivery(self):
+        """
+        When a FinishedGood has an accessory linked via FinishedGoodAccessoryLink,
+        delivering a rent subscription deducts RENT_HANDOVER_OUT for both bed and commercial plyboard.
+        """
+        # Remove ProductRelationship to test FinishedGoodAccessoryLink in isolation
+        self.rel.delete()
+
+        # Link accessory via FinishedGoodAccessoryLink
+        fg_link = FinishedGoodAccessoryLink.objects.create(
+            finished_good=self.bed_inv,
+            accessory=self.ply_inv,
+            charge_mode=FGAccessoryChargeMode.FREE,
+            is_default_included=True,
+        )
+
+        sub = Subscription.objects.create(
+            customer=self.customer,
+            product=self.bed_product,
+            plan_type=PlanType.RENT,
+            start_date=timezone.now().date(),
+            tenure_months=6,
+            monthly_amount=Decimal("1000.00"),
+            total_amount=Decimal("6000.00"),
+        )
+        delivery = SubscriptionDelivery.objects.create(
+            subscription=sub,
+            delivery_reference="DLV-RENT-BED-001",
+            batch_number=1,
+            status=DeliveryStatus.DELIVERED,
+            delivered_at=timezone.now(),
+        )
+
+        bridge_result = sync_delivery_inventory_bridge(delivery=delivery)
+        self.assertTrue(bridge_result["created"])
+        self.assertEqual(bridge_result["entries_created"], 2)  # Bed + Linked Accessory
+
+        # Verify Bed delivery out (RENT_HANDOVER_OUT)
+        bed_entry = StockLedger.objects.filter(
+            inventory_item=self.bed_inv,
+            movement_type=StockMovementType.RENT_HANDOVER_OUT,
+            reference_model="SubscriptionDelivery",
+        ).first()
+        self.assertIsNotNone(bed_entry)
+        self.assertEqual(bed_entry.quantity_out, Decimal("1.000"))
+
+        # Verify Commercial Plyboard delivery out (RENT_HANDOVER_OUT)
+        ply_entry = StockLedger.objects.filter(
+            inventory_item=self.ply_inv,
+            movement_type=StockMovementType.RENT_HANDOVER_OUT,
+            reference_model="SubscriptionDelivery",
+        ).first()
+        self.assertIsNotNone(ply_entry)
+        self.assertEqual(ply_entry.quantity_out, Decimal("1.000"))
+        self.assertIn("Linked Accessory", ply_entry.notes)
+
+    def test_check_stock_for_delivery_blocks_if_fg_accessory_link_out_of_stock(self):
+        """FinishedGoodAccessoryLink accessory out of stock blocks delivery check."""
+        self.rel.delete()
+        FinishedGoodAccessoryLink.objects.create(
+            finished_good=self.bed_inv,
+            accessory=self.ply_inv,
+            charge_mode=FGAccessoryChargeMode.FREE,
+            is_default_included=True,
+        )
+        # Deplete plyboard stock
+        create_stock_ledger_entry(
+            inventory_item=self.ply_inv,
+            movement_type=StockMovementType.SALE_OUT,
+            movement_date=date.today(),
+            stock_location=self.location,
+            quantity_out=Decimal("10.000"),
+            reference_model="TestSetup",
+            reference_id="deplete-ply-fg",
+        )
         check = check_stock_for_delivery(inventory_item=self.bed_inv, quantity=Decimal("1.000"))
         self.assertFalse(check["ok"])
         self.assertIn("Commercial Plyboard", check["reason"])

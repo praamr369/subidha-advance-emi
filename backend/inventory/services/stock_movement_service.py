@@ -282,6 +282,9 @@ def check_stock_for_delivery(
         }
 
     # Check attached bundled products / accessories (e.g. Commercial Plyboard for a Bed)
+    checked_acc_ids = set()
+
+    # 1. ProductRelationship (PIM catalog)
     product = getattr(inventory_item, "product", None)
     if product and hasattr(product, "related_products"):
         for rel in product.related_products.select_related("related_product", "related_product__inventory_profile").all():
@@ -290,6 +293,7 @@ def check_stock_for_delivery(
             rel_inv = getattr(rel.related_product, "inventory_profile", None)
             if not rel_inv or not rel_inv.stock_tracking_enabled:
                 continue
+            checked_acc_ids.add(rel_inv.id)
             rel_req = qty * Decimal(str(rel.quantity or 1))
             rel_phys = rel_inv.current_stock_quantity()
             rel_avail = rel_inv.available_qty()
@@ -310,6 +314,36 @@ def check_stock_for_delivery(
                         f"has insufficient available stock ({rel_avail:.2f}) for required {rel_req:.2f} due to reservations."
                     ),
                     "bundled_item_id": rel.related_product_id,
+                }
+
+    # 2. FinishedGoodAccessoryLink (Inventory FG profile)
+    if hasattr(inventory_item, "accessory_links"):
+        for link in inventory_item.accessory_links.filter(is_default_included=True).select_related("accessory", "accessory__product"):
+            acc_inv = link.accessory
+            if not acc_inv or not acc_inv.stock_tracking_enabled or acc_inv.id in checked_acc_ids:
+                continue
+            checked_acc_ids.add(acc_inv.id)
+            acc_req = qty * Decimal("1.000")
+            acc_phys = acc_inv.current_stock_quantity()
+            acc_avail = acc_inv.available_qty()
+            acc_name = acc_inv.product.name if acc_inv.product else (acc_inv.sku or "Accessory")
+            if acc_phys < acc_req:
+                return {
+                    "ok": False,
+                    "reason": (
+                        f"Required linked accessory '{acc_name}' "
+                        f"({acc_inv.sku or acc_inv.pk}) is out of stock. Available: {acc_phys:.2f}, Required: {acc_req:.2f}."
+                    ),
+                    "bundled_item_id": acc_inv.id,
+                }
+            if acc_avail < acc_req and acc_phys >= acc_req:
+                return {
+                    "ok": False,
+                    "reason": (
+                        f"Required linked accessory '{acc_name}' "
+                        f"has insufficient available stock ({acc_avail:.2f}) for required {acc_req:.2f} due to reservations."
+                    ),
+                    "bundled_item_id": acc_inv.id,
                 }
 
     return {"ok": True}

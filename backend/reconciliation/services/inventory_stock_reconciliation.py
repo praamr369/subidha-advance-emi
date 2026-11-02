@@ -96,7 +96,7 @@ STOCK_LEDGER_REFERENCE_ALLOWLIST: dict[str, StockLedgerReferenceSpec] = {
     "BillingInvoiceLine": StockLedgerReferenceSpec(
         reference_model="BillingInvoiceLine",
         allowed_source_model="BillingInvoiceLine",
-        reference_id_regex=r"^\d+:\d+$",
+        reference_id_regex=r"^\d+:\d+(?::(?:bundled|fg_acc):\d+)?$",
         allowed_movement_types=frozenset([StockMovementType.SALE_OUT]),
         expected_direction="OUT",
         evidence_label="inventory.services.stock_service.post_invoice_stock_movements",
@@ -186,7 +186,7 @@ STOCK_LEDGER_REFERENCE_ALLOWLIST: dict[str, StockLedgerReferenceSpec] = {
     "SubscriptionDelivery": StockLedgerReferenceSpec(
         reference_model="SubscriptionDelivery",
         allowed_source_model="SubscriptionDelivery",
-        reference_id_regex=r"^\d+$",
+        reference_id_regex=r"^\d+(?:-\d+)?(?::(?:bundled|fg_acc):\d+)?$",
         allowed_movement_types=frozenset(
             [
                 StockMovementType.EMI_DELIVERY_OUT,
