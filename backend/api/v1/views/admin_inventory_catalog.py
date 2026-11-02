@@ -197,6 +197,10 @@ def _inventory_item_summary(item: InventoryItem) -> dict:
         "subcategory": prod.subcategory or (prod.subcategory_master.name if prod.subcategory_master_id else ""),
         "base_price": str(prod.base_price),
         "physical_qty": str(physical_qty or "0.00"),
+        "variant_group": item.variant_group_id,
+        "variant_group_name": item.variant_group.name if item.variant_group_id else None,
+        "variant_group_code": item.variant_group.code if item.variant_group_id else None,
+        "variant_label": item.variant_label or "",
     }
 
 
@@ -509,7 +513,7 @@ class AdminAccessoriesListView(APIView):
         qs = (
             InventoryItem.objects
             .filter(stock_item_type=InventoryItemType.ACCESSORY)
-            .select_related("product", "product__category_master", "default_stock_location")
+            .select_related("product", "product__category_master", "default_stock_location", "variant_group")
             .order_by("product__name", "id")
         )
         qs = _annotate_stock_qty(qs)
@@ -535,14 +539,30 @@ class AdminAccessoryDetailView(APIView):
 
     def _get(self, pk):
         return get_object_or_404(
-            InventoryItem.objects.select_related("product"),
+            InventoryItem.objects.select_related("product", "variant_group"),
             pk=pk, stock_item_type=InventoryItemType.ACCESSORY,
         )
 
     def get(self, request, pk):
         item = self._get(pk)
         d = _inventory_item_summary(item)
-        d["linked_fg_count"] = item.linked_to_finished_goods.count()
+        fg_links = item.linked_to_finished_goods.select_related("finished_good__product").all()
+        d["linked_fg_count"] = fg_links.count()
+        d["linked_finished_goods"] = [
+            {
+                "id": lnk.id,
+                "finished_good_id": lnk.finished_good_id,
+                "product_name": lnk.finished_good.product.name,
+                "product_code": lnk.finished_good.product.product_code,
+                "sku": lnk.finished_good.sku,
+                "charge_mode": lnk.charge_mode,
+                "sale_price": str(lnk.sale_price),
+                "quantity": str(lnk.quantity),
+                "is_default_included": lnk.is_default_included,
+                "notes": lnk.notes,
+            }
+            for lnk in fg_links
+        ]
         return Response(d)
 
     @transaction.atomic
@@ -583,10 +603,17 @@ class AdminAccessoryDetailView(APIView):
             item.barcode = (data["barcode"] or "").strip() or None
         if "is_active" in data:
             item.is_active = bool(data["is_active"])
+        if "variant_group" in data:
+            vg_id = data["variant_group"]
+            if vg_id:
+                from inventory.models import AccessoryVariantGroup
+                item.variant_group = get_object_or_404(AccessoryVariantGroup, pk=vg_id)
+            else:
+                item.variant_group = None
+        if "variant_label" in data:
+            item.variant_label = (data["variant_label"] or "").strip()
         item.save()
-        d = _inventory_item_summary(item)
-        d["linked_fg_count"] = item.linked_to_finished_goods.count()
-        return Response(d)
+        return self.get(request, pk)
 
     @transaction.atomic
     def delete(self, request, pk):

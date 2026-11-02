@@ -455,6 +455,7 @@ export interface QuickCreatePayload {
   sku?: string;
   standard_unit_cost?: string;
   reorder_level_qty?: string;
+  variant_group?: number | null;
   variant_label?: string;
 }
 
@@ -692,12 +693,29 @@ export interface StockAdjustmentsPayload {
   }>;
 }
 
+export type AccessoryLinkedFG = {
+  id: number;
+  finished_good_id: number;
+  product_name: string;
+  product_code: string;
+  sku: string;
+  charge_mode: "FREE" | "CHARGEABLE";
+  sale_price: string;
+  quantity: string;
+  is_default_included: boolean;
+  notes?: string;
+};
+
 export type AccessoryRow = {
   id: number;
+  product_id?: number;
   product_code: string;
   name?: string;
   product_name?: string;
   variant_label?: string;
+  variant_group?: number | null;
+  variant_group_name?: string | null;
+  variant_group_code?: string | null;
   base_price?: string;
   sku?: string;
   unit_of_measure?: string;
@@ -706,6 +724,11 @@ export type AccessoryRow = {
   stock_tracking_status?: string;
   physical_qty?: string;
   reorder_level_qty?: string;
+  category?: string;
+  subcategory?: string;
+  barcode?: string;
+  is_active?: boolean;
+  linked_finished_goods?: AccessoryLinkedFG[];
 };
 
 export type AccessoryVariantGroup = {
@@ -720,6 +743,19 @@ export type AccessoryVariantGroup = {
   sort_order: number;
   variant_count: number;
   accessories?: AccessoryRow[];
+  variants?: Array<{
+    id: number;
+    product_id: number;
+    product_name: string;
+    product_code: string;
+    variant_label: string;
+    sku: string;
+    unit_of_measure: string;
+    standard_unit_cost: string;
+    base_price: string;
+    stock_tracking_status: string;
+  }>;
+  linked_finished_goods?: AccessoryLinkedFG[];
 };
 
 export type DemandPlanningRow = {
@@ -1351,6 +1387,20 @@ export async function updateAccessoryVariantGroup(
 export async function deleteAccessoryVariantGroup(id: number): Promise<void> {
   return apiFetch<void>(`/admin/inventory/accessory-variant-groups/${id}/`, {
     method: "DELETE",
+  });
+}
+
+export async function getAccessoryDetail(id: number): Promise<AccessoryRow> {
+  return apiFetch<AccessoryRow>(`/admin/inventory/accessories/${id}/`);
+}
+
+export async function assignAccessoryVariantGroup(
+  id: number,
+  payload: { variant_group: number | null; variant_label?: string }
+): Promise<{ id: number; variant_group: number | null; variant_group_name: string | null; variant_label: string }> {
+  return apiFetch(`/admin/inventory/accessories/${id}/assign-variant-group/`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
   });
 }
 

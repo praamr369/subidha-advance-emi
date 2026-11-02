@@ -223,7 +223,7 @@ function CopyVariantModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
       <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150">
         <div className="flex items-center justify-between pb-3 border-b">
           <div className="flex items-center gap-2">
@@ -454,8 +454,8 @@ function CopyVariantModal({
   );
 }
 
-/** Inline expandable editor panel for a single variant row */
-function VariantEditPanel({
+/** Pop up window modal editor for a single variant */
+function VariantEditModal({
   variant,
   allAttributes,
   lockedAttributes,
@@ -463,6 +463,7 @@ function VariantEditPanel({
   productId,
   productName,
   onSave,
+  onClose,
   onCancel,
   onAddOption,
   templateAttributes,
@@ -480,12 +481,14 @@ function VariantEditPanel({
   onAddOption?: Props["onAddOption"];
   templateAttributes?: PimCategoryAttribute[];
   onSave: (data: VariantEditState) => Promise<void>;
-  onCancel: () => void;
+  onClose: () => void;
+  onCancel?: () => void;
   onOpenCopyModal?: (variant: PimVariant) => void;
   relationsKey?: number;
   parentBrand?: string;
   parentWarranty?: ParentWarrantyInfo;
 }) {
+  const handleClose = onClose || onCancel;
   const parseVariantToState = useCallback((v: PimVariant): VariantEditState => {
     const attrValues: Record<number, string> = {};
     const activeIds: number[] = [];
@@ -642,13 +645,27 @@ function VariantEditPanel({
     set("variant_name", structured.slice(0, 255));
   };
 
-  const handleSave = async () => {
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, []);
+
+  const handleSave = useCallback(async (andClose = true) => {
     setSaving(true);
     setSaveError(null);
     try {
       await onSave(state);
       setSynced(true);
-      setTimeout(() => setSynced(false), 2500);
+      if (andClose) {
+        setTimeout(() => {
+          handleClose?.();
+        }, 350);
+      } else {
+        setTimeout(() => setSynced(false), 2500);
+      }
     } catch (err: unknown) {
       const apiErr = err as { message?: string; detail?: string };
       const rawMsg = apiErr?.detail || apiErr?.message || "Failed to save variant attributes";
@@ -659,7 +676,22 @@ function VariantEditPanel({
     } finally {
       setSaving(false);
     }
-  };
+  }, [onSave, state, handleClose]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        handleClose?.();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        if (!saving && state.price) {
+          void handleSave(true);
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleClose, saving, state.price, handleSave]);
 
   // A plain render function, not a nested component: a component declared inside
   // render is re-created on every keystroke, which dropped input focus.
@@ -697,34 +729,73 @@ function VariantEditPanel({
   }
 
   return (
-    <div className="rounded-xl border border-primary/20 bg-primary/3 p-5 space-y-5">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-2">
-          <Pencil className="h-4 w-4 text-primary" />
-          <div>
-            <span className="font-semibold text-sm">Edit Variant — <span className="font-mono">{variant.sku}</span></span>
-            {state.variant_name && (
-              <div className="text-xs text-muted-foreground font-normal">{state.variant_name}</div>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !saving) handleClose?.();
+      }}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-variant-title"
+    >
+      <div
+        className="relative w-full max-w-4xl max-h-[92vh] flex flex-col rounded-2xl border border-border bg-card shadow-2xl animate-in fade-in zoom-in-95 duration-150 overflow-hidden my-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Sticky Header */}
+        <div className="flex items-center justify-between border-b border-border px-6 py-4 bg-muted/40 shrink-0 flex-wrap gap-2">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0">
+              <Pencil className="h-4.5 w-4.5" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 id="modal-variant-title" className="text-base font-bold text-foreground">
+                  Edit Variant: <span className="font-mono text-primary">{variant.sku}</span>
+                </h3>
+                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                  variant.is_active ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400" : "bg-muted text-muted-foreground"
+                }`}>
+                  {variant.is_active ? "Active" : "Inactive"}
+                </span>
+                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                  variant.is_published ? "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-400" : "bg-muted text-muted-foreground"
+                }`}>
+                  {variant.is_published ? "Live" : "Draft"}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground truncate mt-0.5">
+                {state.variant_name || productName || "Configure specifications, identity, pricing and stock"}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {onOpenCopyModal && (
+              <button
+                type="button"
+                onClick={() => onOpenCopyModal(variant)}
+                title="Copy defined attributes and relations from another variant"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/30 bg-amber-50 dark:bg-amber-950/30 px-3 py-1.5 text-xs font-semibold text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors shadow-2xs"
+              >
+                <Copy className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                <span className="hidden sm:inline">Copy From Variant...</span>
+              </button>
             )}
+            <button
+              aria-label="Close"
+              type="button"
+              onClick={handleClose}
+              disabled={saving}
+              className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {onOpenCopyModal && (
-            <button
-              type="button"
-              onClick={() => onOpenCopyModal(variant)}
-              title="Copy defined attributes and relations from another variant"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/30 bg-amber-50 dark:bg-amber-950/30 px-2.5 py-1 text-xs font-semibold text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors shadow-2xs"
-            >
-              <Copy className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" /> Copy From Variant...
-            </button>
-          )}
-          <button aria-label="Close" type="button" onClick={onCancel} className="text-muted-foreground hover:text-foreground">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
+
+        {/* Scrollable Content Body */}
+        <div className="overflow-y-auto flex-1 p-6 space-y-6">
 
       {/* Variant Brand Override */}
       <div className="rounded-lg border border-border/70 bg-background/80 p-3.5 space-y-2">
@@ -1161,18 +1232,58 @@ function VariantEditPanel({
         </div>
       )}
 
-      {/* Actions */}
-      <div className="flex items-center gap-3">
-        <button type="button" onClick={handleSave} disabled={saving || !state.price}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">
-          {saving ? <><RefreshCcw className="h-3.5 w-3.5 animate-spin" /> Saving…</> : <><Check className="h-3.5 w-3.5" /> Save & Sync to Catalog</>}
-        </button>
-        <button type="button" onClick={onCancel} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">Cancel</button>
-        {synced && (
-          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-            <CheckCircle2 className="h-3.5 w-3.5" /> Synced to catalog
-          </span>
-        )}
+        </div>
+
+        {/* Sticky Footer Actions */}
+        <div className="border-t border-border px-6 py-3.5 bg-muted/30 flex items-center justify-between shrink-0 flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            {synced && (
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                <CheckCircle2 className="h-4 w-4" /> Changes saved &amp; synced to catalog
+              </span>
+            )}
+            <span className="text-[11px] text-muted-foreground hidden md:inline">
+              Tip: Press <kbd className="px-1.5 py-0.5 rounded border bg-background font-mono text-[10px]">Esc</kbd> to cancel, <kbd className="px-1.5 py-0.5 rounded border bg-background font-mono text-[10px]">Ctrl+S</kbd> to save
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={handleClose}
+              disabled={saving}
+              className="rounded-xl border border-input bg-background px-4 py-2 text-xs font-semibold text-foreground hover:bg-muted transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleSave(false)}
+              disabled={saving || !state.price}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-4 py-2 text-xs font-semibold text-primary hover:bg-primary/20 transition disabled:opacity-50"
+              title="Save changes and keep pop-up window open"
+            >
+              Save &amp; Keep Open
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleSave(true)}
+              disabled={saving || !state.price}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-5 py-2 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 transition disabled:opacity-50"
+              title="Save changes and close pop-up window"
+            >
+              {saving ? (
+                <>
+                  <RefreshCcw className="h-3.5 w-3.5 animate-spin" /> Saving…
+                </>
+              ) : (
+                <>
+                  <Check className="h-3.5 w-3.5" /> Save &amp; Close
+                </>
+              )}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1199,10 +1310,15 @@ export default function VariantManager({
   const [form, setForm] = useState<NewVariantForm>(() => emptyForm(parentBrand));
   const [saving, setSaving] = useState(false);
 
-  // Expanded/editing variant
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  // Editing variant modal state
+  const [editingVariantId, setEditingVariantId] = useState<number | null>(null);
   const [copyModalTarget, setCopyModalTarget] = useState<PimVariant | null>(null);
   const [relationsKey, setRelationsKey] = useState(0);
+
+  const editingVariant = useMemo(
+    () => (editingVariantId != null ? variants.find((v) => v.id === editingVariantId) ?? null : null),
+    [variants, editingVariantId]
+  );
 
   useEffect(() => {
     if (activePanel === "generate" && productCode) {
@@ -1427,7 +1543,7 @@ export default function VariantManager({
   const handleDelete = async (id: number) => {
     if (!confirm("Delete this variant?")) return;
     await pimService.deleteVariant(id);
-    if (expandedId === id) setExpandedId(null);
+    if (editingVariantId === id) setEditingVariantId(null);
     onRefresh();
   };
 
@@ -1591,9 +1707,6 @@ export default function VariantManager({
     a.href = url; a.download = `variants-${productCode}.csv`; a.click();
     URL.revokeObjectURL(url);
   };
-
-  // Column count for the full-width expanded row
-  const colSpan = 9;
 
   return (
     <div className="space-y-4">
@@ -1997,169 +2110,160 @@ export default function VariantManager({
                 </thead>
                 <tbody className="divide-y">
                   {pageVariants.map((v) => (
-                    <Fragment key={v.id}>
-                      {/* Main row */}
-                      <tr
-                        className={`transition-colors ${selected.has(v.id) ? "bg-primary/5" : "hover:bg-muted/30"} ${v.is_low_stock ? "bg-red-50/30 dark:bg-red-950/10" : ""} ${expandedId === v.id ? "bg-primary/5 border-b-0" : ""}`}
+                    <tr
+                      key={v.id}
+                      className={`transition-colors ${selected.has(v.id) ? "bg-primary/5" : "hover:bg-muted/30"} ${v.is_low_stock ? "bg-red-50/30 dark:bg-red-950/10" : ""} ${editingVariantId === v.id ? "bg-primary/10" : ""}`}
+                    >
+                      <td className="px-3 py-2"><input type="checkbox" checked={selected.has(v.id)} onChange={() => toggleOne(v.id)} className="accent-primary" /></td>
+                      <td className="px-3 py-2">
+                        <div className="relative group w-8 h-8 rounded border bg-muted flex items-center justify-center overflow-hidden">
+                          {v.image ? <img src={v.image} alt="Variant" className="w-full h-full object-cover" /> : <ImageIcon className="h-4 w-4 text-muted-foreground/50" />}
+                          <label className={`absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity ${uploadingImage === v.id ? "opacity-100 bg-black/20" : ""}`}>
+                            {uploadingImage === v.id ? <RefreshCw className="h-3 w-3 text-white animate-spin" /> : <Upload className="h-3 w-3 text-white" />}
+                            <input type="file" accept="image/*" className="hidden" disabled={uploadingImage === v.id}
+                              onChange={(e) => { const file = e.target.files?.[0]; if (file) handleImageUpload(v.id, file); e.target.value = ""; }} />
+                          </label>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => setEditingVariantId(v.id)}
+                            className="font-mono text-xs font-semibold text-foreground hover:text-primary hover:underline text-left cursor-pointer"
+                            title="Click to edit variant specifications"
+                          >
+                            {v.sku}
+                          </button>
+                          {(v.brand || v.effective_brand || parentBrand) && (
+                            <span
+                              className={`inline-flex items-center rounded px-1.5 py-0.2 text-[10px] font-semibold border ${
+                                v.brand
+                                  ? "bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-700"
+                                  : "bg-muted text-muted-foreground border-border"
+                              }`}
+                              title={v.brand ? "Custom Variant Brand Override" : "Inherited from Base Product"}
+                            >
+                              {v.brand || v.effective_brand || parentBrand}
+                            </span>
+                          )}
+                        </div>
+                        {(v.variant_name || v.product_name) && (
+                          <div className="text-[11px] text-foreground font-medium truncate max-w-[220px]" title={v.variant_name || v.product_name}>
+                            {v.variant_name || v.product_name}
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {v.barcode && <span className="font-mono text-[10px] text-muted-foreground">{v.barcode}</span>}
+                          {v.warranty_enabled !== null && v.warranty_enabled !== undefined && (
+                            <span className="inline-flex items-center gap-0.5 text-[9px] text-emerald-600 dark:text-emerald-400 font-medium" title="Custom warranty override active">
+                              <ShieldCheck className="h-2.5 w-2.5" />
+                              Custom Warranty
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td
+                        className="px-3 py-2 text-xs text-muted-foreground max-w-xs cursor-pointer hover:bg-muted/40 transition-colors"
+                        onClick={() => setEditingVariantId(v.id)}
+                        title="Click to edit attributes & specifications"
                       >
-                        <td className="px-3 py-2"><input type="checkbox" checked={selected.has(v.id)} onChange={() => toggleOne(v.id)} className="accent-primary" /></td>
-                        <td className="px-3 py-2">
-                          <div className="relative group w-8 h-8 rounded border bg-muted flex items-center justify-center overflow-hidden">
-                            {v.image ? <img src={v.image} alt="Variant" className="w-full h-full object-cover" /> : <ImageIcon className="h-4 w-4 text-muted-foreground/50" />}
-                            <label className={`absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity ${uploadingImage === v.id ? "opacity-100 bg-black/20" : ""}`}>
-                              {uploadingImage === v.id ? <RefreshCw className="h-3 w-3 text-white animate-spin" /> : <Upload className="h-3 w-3 text-white" />}
-                              <input type="file" accept="image/*" className="hidden" disabled={uploadingImage === v.id}
-                                onChange={(e) => { const file = e.target.files?.[0]; if (file) handleImageUpload(v.id, file); e.target.value = ""; }} />
-                            </label>
+                        <div className="flex flex-wrap gap-1">
+                          {(() => {
+                            const chips = v.attribute_values
+                              .map((a) => {
+                                const display = (a.value_text && a.value_text.trim() !== "")
+                                  ? a.value_text
+                                  : (a.value_number != null ? String(a.value_number) : a.value_boolean != null ? (a.value_boolean ? "Yes" : "No") : "");
+                                return { id: a.attribute, display, name: a.attribute_name };
+                              })
+                              .filter((c) => c.display);
+                            return chips.length > 0 ? (
+                              chips.map((c) => (
+                                <span key={c.id} title={c.name ? `${c.name}: ${c.display}` : c.display} className="inline-flex rounded-md bg-muted px-1.5 py-0.5 text-[11px]">
+                                  {c.display}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-muted-foreground/40 italic text-[11px]">No attributes mapped</span>
+                            );
+                          })()}
+                        </div>
+                      </td>
+                      {/* Price inline edit */}
+                      <td className="px-3 py-2 text-right">
+                        {editingPrice === v.id ? (
+                          <div className="flex items-center justify-end gap-1">
+                            <input type="number" className="w-24 rounded border px-2 py-1 text-xs" value={priceVal} onChange={(e) => setPriceVal(e.target.value)} autoFocus />
+                            <button type="button" onClick={() => handlePriceSave(v.id)} className="text-green-600 hover:text-green-700"><Check className="h-3.5 w-3.5" /></button>
+                            <button type="button" onClick={() => setEditingPrice(null)} className="text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>
                           </div>
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-mono text-xs font-semibold">{v.sku}</span>
-                            {(v.brand || v.effective_brand || parentBrand) && (
-                              <span
-                                className={`inline-flex items-center rounded px-1.5 py-0.2 text-[10px] font-semibold border ${
-                                  v.brand
-                                    ? "bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-700"
-                                    : "bg-muted text-muted-foreground border-border"
-                                }`}
-                                title={v.brand ? "Custom Variant Brand Override" : "Inherited from Base Product"}
-                              >
-                                {v.brand || v.effective_brand || parentBrand}
-                              </span>
-                            )}
-                          </div>
-                          {(v.variant_name || v.product_name) && (
-                            <div className="text-[11px] text-foreground font-medium truncate max-w-[220px]" title={v.variant_name || v.product_name}>
-                              {v.variant_name || v.product_name}
-                            </div>
-                          )}
-                          <div className="flex items-center gap-2 mt-0.5">
-                            {v.barcode && <span className="font-mono text-[10px] text-muted-foreground">{v.barcode}</span>}
-                            {v.warranty_enabled !== null && v.warranty_enabled !== undefined && (
-                              <span className="inline-flex items-center gap-0.5 text-[9px] text-emerald-600 dark:text-emerald-400 font-medium" title="Custom warranty override active">
-                                <ShieldCheck className="h-2.5 w-2.5" />
-                                Custom Warranty
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-3 py-2 text-xs text-muted-foreground max-w-xs">
-                          <div className="flex flex-wrap gap-1">
-                            {(() => {
-                              const chips = v.attribute_values
-                                .map((a) => {
-                                  const display = (a.value_text && a.value_text.trim() !== "")
-                                    ? a.value_text
-                                    : (a.value_number != null ? String(a.value_number) : a.value_boolean != null ? (a.value_boolean ? "Yes" : "No") : "");
-                                  return { id: a.attribute, display, name: a.attribute_name };
-                                })
-                                .filter((c) => c.display);
-                              return chips.length > 0 ? (
-                                chips.map((c) => (
-                                  <span key={c.id} title={c.name ? `${c.name}: ${c.display}` : c.display} className="inline-flex rounded-md bg-muted px-1.5 py-0.5 text-[11px]">
-                                    {c.display}
-                                  </span>
-                                ))
-                              ) : (
-                                <span className="text-muted-foreground/40 italic text-[11px]">No attributes mapped</span>
-                              );
-                            })()}
-                          </div>
-                        </td>
-                        {/* Price inline edit */}
-                        <td className="px-3 py-2 text-right">
-                          {editingPrice === v.id ? (
-                            <div className="flex items-center justify-end gap-1">
-                              <input type="number" className="w-24 rounded border px-2 py-1 text-xs" value={priceVal} onChange={(e) => setPriceVal(e.target.value)} autoFocus />
-                              <button type="button" onClick={() => handlePriceSave(v.id)} className="text-green-600 hover:text-green-700"><Check className="h-3.5 w-3.5" /></button>
-                              <button type="button" onClick={() => setEditingPrice(null)} className="text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>
-                            </div>
-                          ) : (
-                            <button className="tabular-nums hover:underline" onClick={() => { setEditingPrice(v.id); setPriceVal(v.price); }}>
-                              {formatRupee(Number(v.price))}
-                            </button>
-                          )}
-                        </td>
-                        {/* Stock inline edit */}
-                        <td className="px-3 py-2 text-right">
-                          {editingStock === v.id ? (
-                            <div className="flex items-center justify-end gap-1">
-                              <input type="number" className="w-20 rounded border px-2 py-1 text-xs" value={stockQty} onChange={(e) => setStockQty(e.target.value)} autoFocus />
-                              <button type="button" onClick={() => handleStockSave(v.id)} className="text-green-600 hover:text-green-700"><Check className="h-3.5 w-3.5" /></button>
-                              <button type="button" onClick={() => setEditingStock(null)} className="text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>
-                            </div>
-                          ) : (
-                            <button className={`tabular-nums hover:underline ${v.is_low_stock ? "text-red-600 font-medium" : ""}`}
-                              onClick={() => { setEditingStock(v.id); setStockQty(String(v.quantity_on_hand)); }}>
-                              {v.quantity_on_hand}{v.is_low_stock && <span className="ml-1 text-[10px]">(low)</span>}
-                            </button>
-                          )}
-                        </td>
-                        <td className="px-3 py-2 text-center">
-                          <button type="button" title={v.is_active ? "Deactivate" : "Activate"}
-                            onClick={() => void handleToggleActive(v.id, v.is_active)}
-                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold transition ${v.is_active ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400 hover:bg-emerald-200" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
-                            {v.is_active ? "Active" : "Inactive"}
+                        ) : (
+                          <button className="tabular-nums hover:underline" onClick={() => { setEditingPrice(v.id); setPriceVal(v.price); }}>
+                            {formatRupee(Number(v.price))}
                           </button>
-                        </td>
-                        <td className="px-3 py-2 text-center">
-                          <button type="button" title={v.is_published ? "Set to draft (hide from public)" : "Publish (show on public site)"}
-                            onClick={() => void handleTogglePublished(v)}
-                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold transition ${v.is_published ? "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-400 hover:bg-violet-200" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
-                            {v.is_published ? "Live" : "Draft"}
-                          </button>
-                        </td>
-                        <td className="px-3 py-2 text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            <button type="button"
-                              title={expandedId === v.id ? "Close editor" : "Edit attributes & pricing"}
-                              onClick={() => setExpandedId(expandedId === v.id ? null : v.id)}
-                              className={`rounded-md border px-2 py-1 text-xs font-medium transition ${expandedId === v.id ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}>
-                              {expandedId === v.id ? <ChevronUp className="h-3.5 w-3.5" /> : <><Pencil className="inline h-3 w-3 mr-0.5" /><ChevronDown className="inline h-3 w-3" /></>}
-                            </button>
-                            <button type="button"
-                              title="Copy attributes & relations from another variant"
-                              onClick={() => setCopyModalTarget(v)}
-                              className="rounded-md border p-1 text-muted-foreground hover:bg-muted hover:text-amber-600 transition">
-                              <Copy className="h-3.5 w-3.5" />
-                            </button>
-                            <button type="button" title="Print QR label"
-                              onClick={() => setPrintItem(variantToLabel(v))}
-                              className="rounded-md border p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition">
-                              <QrCode className="h-3.5 w-3.5" />
-                            </button>
-                            <button type="button" onClick={() => handleDelete(v.id)} className="text-destructive/60 hover:text-destructive">
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
+                        )}
+                      </td>
+                      {/* Stock inline edit */}
+                      <td className="px-3 py-2 text-right">
+                        {editingStock === v.id ? (
+                          <div className="flex items-center justify-end gap-1">
+                            <input type="number" className="w-20 rounded border px-2 py-1 text-xs" value={stockQty} onChange={(e) => setStockQty(e.target.value)} autoFocus />
+                            <button type="button" onClick={() => handleStockSave(v.id)} className="text-green-600 hover:text-green-700"><Check className="h-3.5 w-3.5" /></button>
+                            <button type="button" onClick={() => setEditingStock(null)} className="text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>
                           </div>
-                        </td>
-                      </tr>
-
-                      {/* Expanded editor row */}
-                      {expandedId === v.id && (
-                        <tr className="bg-primary/3">
-                          <td colSpan={colSpan} className="px-4 pb-4 pt-2">
-                            <VariantEditPanel
-                              variant={v}
-                              allAttributes={allAttributes}
-                              lockedAttributes={lockedAttributes}
-                              parentAttrValues={parentAttrValues}
-                              productId={productId}
-                              productName={productName}
-                              onSave={(state) => handleSaveVariantEdit(v.id, state)}
-                              onCancel={() => setExpandedId(null)}
-                              onAddOption={onAddOption}
-                              templateAttributes={templateAttributes}
-                              onOpenCopyModal={(tgt) => setCopyModalTarget(tgt)}
-                              relationsKey={relationsKey}
-                              parentBrand={parentBrand}
-                              parentWarranty={parentWarranty}
-                            />
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
+                        ) : (
+                          <button className={`tabular-nums hover:underline ${v.is_low_stock ? "text-red-600 font-medium" : ""}`}
+                            onClick={() => { setEditingStock(v.id); setStockQty(String(v.quantity_on_hand)); }}>
+                            {v.quantity_on_hand}{v.is_low_stock && <span className="ml-1 text-[10px]">(low)</span>}
+                          </button>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        <button type="button" title={v.is_active ? "Deactivate" : "Activate"}
+                          onClick={() => void handleToggleActive(v.id, v.is_active)}
+                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold transition ${v.is_active ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400 hover:bg-emerald-200" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
+                          {v.is_active ? "Active" : "Inactive"}
+                        </button>
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        <button type="button" title={v.is_published ? "Set to draft (hide from public)" : "Publish (show on public site)"}
+                          onClick={() => void handleTogglePublished(v)}
+                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold transition ${v.is_published ? "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-400 hover:bg-violet-200" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
+                          {v.is_published ? "Live" : "Draft"}
+                        </button>
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            type="button"
+                            title="Edit variant attributes, pricing & specifications"
+                            onClick={() => setEditingVariantId(v.id)}
+                            className={`rounded-md border p-1 text-xs font-medium transition ${
+                              editingVariantId === v.id
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "text-muted-foreground hover:bg-primary/10 hover:text-primary hover:border-primary/30"
+                            }`}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button type="button"
+                            title="Copy attributes & relations from another variant"
+                            onClick={() => setCopyModalTarget(v)}
+                            className="rounded-md border p-1 text-muted-foreground hover:bg-muted hover:text-amber-600 transition">
+                            <Copy className="h-3.5 w-3.5" />
+                          </button>
+                          <button type="button" title="Print QR label"
+                            onClick={() => setPrintItem(variantToLabel(v))}
+                            className="rounded-md border p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition">
+                            <QrCode className="h-3.5 w-3.5" />
+                          </button>
+                          <button type="button" onClick={() => handleDelete(v.id)} className="text-destructive/60 hover:text-destructive">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
                   ))}
                 </tbody>
               </table>
@@ -2202,6 +2306,25 @@ export default function VariantManager({
             onRefresh();
             setRelationsKey((k) => k + 1);
           }}
+        />
+      )}
+
+      {editingVariant && (
+        <VariantEditModal
+          variant={editingVariant}
+          allAttributes={allAttributes}
+          lockedAttributes={lockedAttributes}
+          parentAttrValues={parentAttrValues}
+          productId={productId}
+          productName={productName}
+          onSave={(state) => handleSaveVariantEdit(editingVariant.id, state)}
+          onClose={() => setEditingVariantId(null)}
+          onAddOption={onAddOption}
+          templateAttributes={templateAttributes}
+          onOpenCopyModal={(tgt) => setCopyModalTarget(tgt)}
+          relationsKey={relationsKey}
+          parentBrand={parentBrand}
+          parentWarranty={parentWarranty}
         />
       )}
     </div>

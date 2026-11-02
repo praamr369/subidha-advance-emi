@@ -402,6 +402,18 @@ export async function removeProductRelationship(productId: number | string, rela
   await request(`/admin/products/${productId}/remove-related-product/${relationshipId}/`, { method: "DELETE", retryCount: 0 });
 }
 
+export async function updateProductRelationship(
+  productId: number | string,
+  relationshipId: number,
+  data: { quantity?: number; notes?: string; is_price_included_in_parent?: boolean }
+): Promise<ProductRelationship> {
+  return request<ProductRelationship>(`/admin/products/${productId}/update-related-product/${relationshipId}/`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+    retryCount: 0,
+  });
+}
+
 export async function searchProductsForAttachment(q: string = "", excludeId?: number | string): Promise<ProductSearchResult[]> {
   const params = new URLSearchParams();
   if (q) params.set("q", q);

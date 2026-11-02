@@ -3493,6 +3493,31 @@ class ProductAdminViewSet(AdminOnlyModelViewSet):
         except ProductRelationship.DoesNotExist:
             return Response({"message": "Relationship not found."}, status=status.HTTP_404_NOT_FOUND)
 
+    @action(detail=True, methods=["patch"], url_path="update-related-product/(?P<related_id>[0-9]+)")
+    def update_related_product(self, request, pk=None, related_id=None):
+        from api.v1.serializers.admin_resources import ProductRelationshipSerializer
+        product = self.get_object()
+        try:
+            relationship = ProductRelationship.objects.get(product=product, id=related_id)
+        except ProductRelationship.DoesNotExist:
+            return Response({"message": "Relationship not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if "quantity" in request.data:
+            from decimal import Decimal, InvalidOperation
+            try:
+                qty = Decimal(str(request.data["quantity"]))
+                if qty > 0:
+                    relationship.quantity = qty
+            except (InvalidOperation, TypeError):
+                pass
+        if "notes" in request.data:
+            relationship.notes = str(request.data["notes"] or "").strip()
+        if "is_price_included_in_parent" in request.data:
+            relationship.is_price_included_in_parent = bool(request.data["is_price_included_in_parent"])
+        relationship.save()
+        serializer = ProductRelationshipSerializer(relationship)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
     @action(detail=False, methods=["get"], url_path="search-for-attachment")
     def search_for_attachment(self, request):
         from api.v1.serializers.admin_resources import ProductSearchSerializer

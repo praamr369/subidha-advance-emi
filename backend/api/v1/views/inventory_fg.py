@@ -252,6 +252,54 @@ class FGProfileDetailView(APIView):
     def get(self, request, pk: int):
         fg = _get_fg(pk)
 
+        # ── Self-healing resync from PIM ProductRelationship ──────────────────
+        try:
+            from products_core.models import ProductRelationship
+            existing_links = FinishedGoodAccessoryLink.objects.filter(finished_good=fg).select_related("accessory__product")
+            for link in existing_links:
+                if link.accessory and link.accessory.product_id:
+                    rel = None
+                    if fg.sku:
+                        rel = ProductRelationship.objects.filter(
+                            parent_variant_sku=fg.sku,
+                            related_product_id=link.accessory.product_id,
+                            relationship_type="ACCESSORY",
+                        ).first()
+                    if not rel and fg.product_id:
+                        rel = ProductRelationship.objects.filter(
+                            product_id=fg.product_id,
+                            related_product_id=link.accessory.product_id,
+                            relationship_type="ACCESSORY",
+                        ).first()
+                    if rel and rel.quantity and link.quantity != rel.quantity:
+                        link.quantity = rel.quantity
+                        link.save(update_fields=["quantity"])
+
+            if fg.sku:
+                variant_rels = ProductRelationship.objects.filter(
+                    parent_variant_sku=fg.sku,
+                    relationship_type="ACCESSORY",
+                ).select_related("related_product")
+                for v_rel in variant_rels:
+                    if v_rel.related_product_id:
+                        acc_item = None
+                        if v_rel.related_variant_sku:
+                            acc_item = InventoryItem.objects.filter(sku=v_rel.related_variant_sku).first()
+                        if not acc_item:
+                            acc_item = InventoryItem.objects.filter(product_id=v_rel.related_product_id).first()
+                        if acc_item and not FinishedGoodAccessoryLink.objects.filter(finished_good=fg, accessory=acc_item).exists():
+                            FinishedGoodAccessoryLink.objects.create(
+                                finished_good=fg,
+                                accessory=acc_item,
+                                charge_mode="FREE" if v_rel.is_price_included_in_parent else "CHARGEABLE",
+                                sale_price=MONEY_ZERO,
+                                is_default_included=True,
+                                quantity=v_rel.quantity if v_rel.quantity else Decimal("1.000"),
+                                notes=v_rel.notes or "",
+                            )
+        except Exception:
+            pass
+
         acc_links = (
             FinishedGoodAccessoryLink.objects
             .filter(finished_good=fg)
@@ -356,6 +404,28 @@ class FGAccessoryLinkDetailView(APIView):
             link.notes = (data["notes"] or "").strip()
         link.full_clean()
         link.save()
+
+        # Two-way sync: reflect quantity update to ProductRelationship if one exists
+        if "quantity" in data and link.accessory and link.accessory.product_id:
+            try:
+                from products_core.models import ProductRelationship
+                rel = None
+                if link.finished_good.sku:
+                    rel = ProductRelationship.objects.filter(
+                        parent_variant_sku=link.finished_good.sku,
+                        related_product_id=link.accessory.product_id,
+                    ).first()
+                if not rel and link.finished_good.product_id:
+                    rel = ProductRelationship.objects.filter(
+                        product_id=link.finished_good.product_id,
+                        related_product_id=link.accessory.product_id,
+                    ).first()
+                if rel and rel.quantity != link.quantity:
+                    rel.quantity = link.quantity
+                    rel.save(update_fields=["quantity"])
+            except Exception:
+                pass
+
         link.refresh_from_db()
         link = FinishedGoodAccessoryLink.objects.select_related("accessory__product", "variant_group").get(pk=link.pk)
         return Response(_acc_link_dict(link))

@@ -95,9 +95,16 @@ def sync_product_relationship_to_fg_accessory(sender, instance, created, **kwarg
     else:
         # Applies to all FG variants for this base product
         target_fgs = list(InventoryItem.objects.filter(product=instance.product))
+        try:
+            from products_pim.models import ProductVariant
+            var_skus = list(ProductVariant.objects.filter(product__operational_product=instance.product).values_list('sku', flat=True))
+            if var_skus:
+                target_fgs.extend(list(InventoryItem.objects.filter(sku__in=var_skus)))
+        except Exception:
+            pass
         
     charge_mode = 'FREE' if instance.is_price_included_in_parent else 'CHARGEABLE'
-    for fg in target_fgs:
+    for fg in set(target_fgs):
         FinishedGoodAccessoryLink.objects.update_or_create(
             finished_good=fg,
             accessory=acc_item,
@@ -135,5 +142,12 @@ def sync_delete_product_relationship_from_fg(sender, instance, **kwargs):
             FinishedGoodAccessoryLink.objects.filter(finished_good=fg_item, accessory=acc_item).delete()
     else:
         fg_items = list(InventoryItem.objects.filter(product=instance.product))
-        for fg in fg_items:
+        try:
+            from products_pim.models import ProductVariant
+            var_skus = list(ProductVariant.objects.filter(product__operational_product=instance.product).values_list('sku', flat=True))
+            if var_skus:
+                fg_items.extend(list(InventoryItem.objects.filter(sku__in=var_skus)))
+        except Exception:
+            pass
+        for fg in set(fg_items):
             FinishedGoodAccessoryLink.objects.filter(finished_good=fg, accessory=acc_item).delete()

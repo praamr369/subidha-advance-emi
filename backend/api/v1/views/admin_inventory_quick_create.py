@@ -152,6 +152,21 @@ class AdminAccessoryVariantGroupDetailView(APIView):
             }
             for v in variants
         ]
+        fg_links = group.fg_links.select_related("finished_good__product").all()
+        data["linked_finished_goods"] = [
+            {
+                "id": lnk.id,
+                "finished_good_id": lnk.finished_good_id,
+                "product_name": lnk.finished_good.product.name,
+                "product_code": lnk.finished_good.product.product_code,
+                "sku": lnk.finished_good.sku,
+                "charge_mode": lnk.charge_mode,
+                "sale_price": str(lnk.sale_price),
+                "quantity": str(lnk.quantity),
+                "is_default_included": lnk.is_default_included,
+            }
+            for lnk in fg_links
+        ]
         return Response(data)
 
     @transaction.atomic

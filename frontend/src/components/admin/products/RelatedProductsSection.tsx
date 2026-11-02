@@ -5,6 +5,7 @@ import {
   getProductRelationships,
   addProductRelationship,
   removeProductRelationship,
+  updateProductRelationship,
   searchProductsForAttachment,
   createProduct,
   updateProduct,
@@ -64,6 +65,7 @@ export default function RelatedProductsSection({
   const [editingRel, setEditingRel] = useState<ProductRelationship | null>(null);
   const [editName, setEditName] = useState("");
   const [editPrice, setEditPrice] = useState("");
+  const [editQuantity, setEditQuantity] = useState("1");
   const [savingEdit, setSavingEdit] = useState(false);
 
   // Remove state
@@ -240,6 +242,7 @@ export default function RelatedProductsSection({
     setEditingRel(rel);
     setEditName(rel.related_product_name);
     setEditPrice(""); // Quick edit for name/code
+    setEditQuantity(String(rel.quantity || "1"));
   }
 
   async function saveEdit() {
@@ -247,10 +250,18 @@ export default function RelatedProductsSection({
     setSavingEdit(true);
     setError(null);
     try {
-      await updateProduct(editingRel.related_product, {
-        name: editName.trim(),
-        ...(editPrice.trim() ? { base_price: editPrice.trim() } : {})
-      });
+      if (editName.trim() || editPrice.trim()) {
+        await updateProduct(editingRel.related_product, {
+          ...(editName.trim() ? { name: editName.trim() } : {}),
+          ...(editPrice.trim() ? { base_price: editPrice.trim() } : {})
+        });
+      }
+      const newQty = Number(editQuantity);
+      if (!isNaN(newQty) && newQty > 0 && newQty !== Number(editingRel.quantity)) {
+        await updateProductRelationship(productId, editingRel.id, {
+          quantity: newQty,
+        });
+      }
       await loadRelationshipsAndVariants();
       setEditingRel(null);
     } catch (err) {
@@ -425,10 +436,14 @@ export default function RelatedProductsSection({
                <div className="flex justify-between items-center mb-2">
                  <h4 className="font-semibold text-sm">Quick Edit: {editingRel.related_product_code}</h4>
                </div>
-               <div className="grid gap-4 md:grid-cols-2">
+               <div className="grid gap-4 md:grid-cols-3">
                  <label className="text-xs font-medium text-muted-foreground">
                     Name
                     <input type="text" value={editName} onChange={e => setEditName(e.target.value)} className="mt-1 h-9 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-ring" />
+                 </label>
+                 <label className="text-xs font-medium text-muted-foreground">
+                    Quantity per Unit
+                    <input type="number" step="0.01" min="0.001" value={editQuantity} onChange={e => setEditQuantity(e.target.value)} className="mt-1 h-9 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-ring font-mono" />
                  </label>
                  <label className="text-xs font-medium text-muted-foreground">
                     New Base Price (optional)
