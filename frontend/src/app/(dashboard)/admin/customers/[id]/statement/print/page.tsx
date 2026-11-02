@@ -361,7 +361,7 @@ export default function AdminCustomerAccountStatementPrintPage() {
                     <th className="px-3 py-3">Subscription</th>
                     <th className="px-3 py-3">Plan</th>
                     <th className="px-3 py-3">Product</th>
-                    <th className="px-3 py-3">Batch / Lucky ID</th>
+                    <th className="px-3 py-3">Batch / SFEMI ID</th>
                     <th className="px-3 py-3">Status</th>
                     <th className="px-3 py-3 text-right">Tenure</th>
                     <th className="px-3 py-3 text-right">Monthly</th>

@@ -117,7 +117,7 @@ export default function AdminLuckyDrawListPage({ historyOnly = false }: { histor
           { key: "batch_code", title: "Batch", render: (row) => row.batch_code || (row.batch ? `Batch #${row.batch}` : "-") },
           { key: "draw_month", title: "Draw Month" },
           { key: "is_revealed", title: "State", render: (row) => (row.is_revealed ? "REVEALED" : "PENDING REVEAL") },
-          { key: "winner_lucky_number", title: "Winner Lucky ID", render: (row) => (row.winner_lucky_number ? `#${row.winner_lucky_number}` : "-") },
+          { key: "winner_lucky_number", title: "Recipient SFEMI ID", render: (row) => (row.winner_lucky_number ? `#${row.winner_lucky_number}` : "-") },
           { key: "draw_date", title: "Draw Date", render: (row) => row.draw_date ? new Date(row.draw_date).toLocaleString() : "-" },
         ]}
       />

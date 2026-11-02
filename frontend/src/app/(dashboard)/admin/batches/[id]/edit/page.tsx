@@ -371,7 +371,7 @@ export default function AdminBatchEditPage() {
 
   return (
     <ERPPageShell
-      eyebrow="Lucky Plan"
+      eyebrow="SFEMI"
       title={
         batch?.batch_code
           ? `Edit ${batch.batch_code}`
@@ -405,11 +405,11 @@ export default function AdminBatchEditPage() {
           value: summary ? String(summary.total_slots) : "—",
         },
         {
-          label: "Lucky IDs Created",
+          label: "SFEMI IDs Created",
           value: String(luckyCreatedCount),
         },
         {
-          label: "Assigned Lucky IDs",
+          label: "Assigned SFEMI IDs",
           value: summary ? String(summary.assigned_lucky_ids) : "—",
           tone: summary && summary.assigned_lucky_ids > 0 ? "success" : undefined,
         },
@@ -456,7 +456,7 @@ export default function AdminBatchEditPage() {
           <>
             <DetailPanel
               title="Transition rules"
-              description="Status cannot be edited freely. Backend rules protect live Lucky Plan operations and prevent unsafe lifecycle jumps."
+              description="Status cannot be edited freely. Backend rules protect live SFEMI operations and prevent unsafe lifecycle jumps."
             >
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <DetailValue
@@ -472,7 +472,7 @@ export default function AdminBatchEditPage() {
                   }
                 />
                 <DetailValue
-                  label="Lucky IDs Created"
+                  label="SFEMI IDs Created"
                   value={String(luckyCreatedCount)}
                 />
                 <DetailValue
@@ -519,15 +519,15 @@ export default function AdminBatchEditPage() {
                     value={String(summary.won_subscription_count)}
                   />
                   <DetailValue
-                    label="Available Lucky IDs"
+                    label="Available SFEMI IDs"
                     value={String(summary.available_lucky_ids)}
                   />
                   <DetailValue
-                    label="Assigned Lucky IDs"
+                    label="Assigned SFEMI IDs"
                     value={String(summary.assigned_lucky_ids)}
                   />
                   <DetailValue
-                    label="Won Lucky IDs"
+                    label="Waived SFEMI IDs"
                     value={String(summary.won_lucky_ids)}
                   />
                   <DetailValue

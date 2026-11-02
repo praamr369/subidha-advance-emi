@@ -20,13 +20,13 @@ const ALWAYS_ALLOWED_ACTIONS = [
 ];
 
 const GATED_ACTIONS = [
-  "Lucky Plan activation",
+  "SFEMI activation",
   "Rent activation",
   "Lease activation",
   "Contract generation",
   "Delivery handover",
   "Refund release",
-  "Winner settlement",
+  "Benefit recipient settlement",
 ];
 
 function toneForStatus(status: string): string {
@@ -107,7 +107,7 @@ export default function AdminComplianceKycPage() {
     <ERPPageShell
       eyebrow="Compliance"
       title="KYC compliance"
-      subtitle="Free-only KYC governance across Lucky Plan EMI, rent, lease, delivery, refund, and winner settlement workflows."
+      subtitle="Free-only KYC governance across SFEMI (Advance EMI), rent, lease, delivery, refund, and recipient settlement workflows."
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Governance" },

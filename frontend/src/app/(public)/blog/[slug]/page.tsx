@@ -96,7 +96,7 @@ export default async function BlogDetailPage({ params }: BlogDetailPageProps) {
         <SectionHeader
           eyebrow="Next"
           title="Related articles"
-          description="More plain-language guidance on Lucky Plan rules and customer trust."
+          description="More plain-language guidance on SFEMI rules and customer trust."
         />
         <div className="grid gap-6 lg:grid-cols-3">
           {related.map((relatedPost) => (

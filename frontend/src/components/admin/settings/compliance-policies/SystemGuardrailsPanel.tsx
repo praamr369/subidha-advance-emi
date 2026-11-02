@@ -177,7 +177,7 @@ export function SystemGuardrailsPanel() {
             </p>
           </div>
           <div className="rounded-lg border border-border/80 bg-background/50 p-3 space-y-1">
-            <p className="font-semibold text-foreground">Lucky Plan Determinism</p>
+            <p className="font-semibold text-foreground">SFEMI Determinism</p>
             <p>
               Draws waiver applies strictly to remaining future EMIs. Settled payments are never altered. Product base price defines contract value.
             </p>

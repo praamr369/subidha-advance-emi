@@ -46,7 +46,7 @@ const modeCopy = {
     eyebrow: dict.public.DrawTransparencyHero_prop3,
     primaryLabel: "Published winners",
     primaryHref: ROUTES.public.faq,
-    secondaryLabel: "Lucky Plan rules",
+    secondaryLabel: "SFEMI rules",
     secondaryHref: ROUTES.public.luckyPlan,
     calloutTitle: "Commit first",
     calloutText: "Reveal later",
@@ -100,7 +100,7 @@ const proofPoints = [
               {subtitle}
             </p>
             <div className="public-card-sm max-w-3xl px-4 py-3 text-sm leading-6 text-muted-foreground">
-              <strong className="font-semibold text-foreground">{dict.public.DrawTransparencyHero_text11}</strong> Draw transparency pages are read-only. They never select winners, assign Lucky IDs, create waivers, collect payments, or alter EMI records.
+              <strong className="font-semibold text-foreground">{dict.public.DrawTransparencyHero_text11}</strong> Promotional benefit transparency pages are read-only. They never select recipients, assign SFEMI IDs, create waivers, collect payments, or alter EMI records.
             </div>
           </div>
 

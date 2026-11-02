@@ -2296,7 +2296,7 @@ export default function AdminDashboardPage() {
                           </div>
                           <div>
                             <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                              Lucky ID
+                              SFEMI ID
                             </div>
                             <div className="mt-1 font-semibold text-slate-950">
                               {row.lucky_number ?? "—"}

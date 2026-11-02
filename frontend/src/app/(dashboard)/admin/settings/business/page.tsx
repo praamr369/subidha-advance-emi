@@ -31,7 +31,7 @@ export default function AdminSettingsBusinessPage() {
     <ERPPageShell
       eyebrow="Settings & Governance"
       title="Business Settings"
-      subtitle="Operational control surfaces that affect day-to-day shop execution without changing Lucky Plan financial truth."
+      subtitle="Operational control surfaces that affect day-to-day shop execution without changing SFEMI financial truth."
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Settings", href: ROUTES.admin.settings },

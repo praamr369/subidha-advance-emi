@@ -280,7 +280,7 @@ export default function AdminBatchControlCenterPage() {
 
   return (
     <ERPPageShell
-      eyebrow="Lucky Plan"
+      eyebrow="SFEMI"
       title={state?.batch_code || `Batch #${batchId ?? "—"} Control Center`}
       subtitle="Lock, commit, and execute draw actions using real backend guardrails and reasons only."
       breadcrumbs={[
@@ -381,7 +381,7 @@ export default function AdminBatchControlCenterPage() {
                 helper={state.finance_waiver_posting_reason || undefined}
               />
               <KpiCard
-                label="Winner Lucky ID"
+                label="Recipient SFEMI ID"
                 value={
                   state.winner_lucky_number != null
                     ? `#${String(state.winner_lucky_number).padStart(2, "0")}`

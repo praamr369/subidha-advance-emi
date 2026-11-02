@@ -807,7 +807,7 @@ export default function SubscriptionCreatePage({
   const luckyPreviewLabel = useMemo(() => {
     if (!batch || availableLuckyCount == null) return null;
     if (availableLuckyCount <= 0) {
-      return "No available Lucky IDs remain in this batch.";
+      return "No available SFEMI IDs remain in this batch.";
     }
 
     const previewNumbers = luckyResults
@@ -819,14 +819,14 @@ export default function SubscriptionCreatePage({
       );
 
     if (luckyId) {
-      return `${availableLuckyCount} Lucky IDs are currently available in ${batch.batch_code || `Batch #${batch.id}`}.`;
+      return `${availableLuckyCount} SFEMI IDs are currently available in ${batch.batch_code || `Batch #${batch.id}`}.`;
     }
 
     if (previewNumbers.length === 0) {
-      return `${availableLuckyCount} Lucky IDs are currently available in ${batch.batch_code || `Batch #${batch.id}`}. Leave Lucky ID blank to auto-assign the next available row.`;
+      return `${availableLuckyCount} SFEMI IDs are currently available in ${batch.batch_code || `Batch #${batch.id}`}. Leave SFEMI ID blank to auto-assign the next available row.`;
     }
 
-    return `${availableLuckyCount} Lucky IDs are currently available in ${batch.batch_code || `Batch #${batch.id}`}. Leave Lucky ID blank to auto-assign the next available row, or quick-pick from ${previewNumbers.join(", ")}.`;
+    return `${availableLuckyCount} SFEMI IDs are currently available in ${batch.batch_code || `Batch #${batch.id}`}. Leave SFEMI ID blank to auto-assign the next available row, or quick-pick from ${previewNumbers.join(", ")}.`;
   }, [availableLuckyCount, batch, luckyId, luckyResults]);
 
   const canSubmit = useMemo(() => {
@@ -1202,7 +1202,7 @@ export default function SubscriptionCreatePage({
 
   async function runLuckySearch() {
     if (!batch?.id) {
-      setError("Select an open batch before searching Lucky IDs.");
+      setError("Select an open batch before searching SFEMI IDs.");
       return;
     }
 
@@ -1592,11 +1592,11 @@ export default function SubscriptionCreatePage({
       if (luckyIdValue) {
         if (effectivePlanType !== "EMI") {
           messages.push(
-            "Lucky ID prefill was ignored because Lucky ID allocation only applies to EMI subscriptions."
+            "SFEMI ID prefill was ignored because SFEMI ID allocation only applies to EMI subscriptions."
           );
         } else if (!luckyIdParam) {
           messages.push(
-            `Lucky ID prefill "${luckyIdValue}" was ignored because it is not a valid Lucky ID.`
+            `SFEMI ID prefill "${luckyIdValue}" was ignored because it is not a valid SFEMI ID.`
           );
         } else {
           try {
@@ -1621,7 +1621,7 @@ export default function SubscriptionCreatePage({
             }
           } catch {
             messages.push(
-              `Lucky ID #${luckyIdParam} could not be loaded, so the Lucky ID prefill was not applied.`
+              `Lucky ID #${luckyIdParam} could not be loaded, so the SFEMI ID prefill was not applied.`
             );
           }
         }
@@ -2058,7 +2058,7 @@ export default function SubscriptionCreatePage({
           message.toLowerCase().includes("assigned") ||
           message.toLowerCase().includes("frozen"))
       ) {
-        setError("This Lucky ID is no longer available. Refresh and choose another.");
+        setError("This SFEMI ID is no longer available. Refresh and choose another.");
       } else {
         setError(message);
       }
@@ -2166,8 +2166,8 @@ export default function SubscriptionCreatePage({
       }
       subtitle={
         isEditMode
-          ? "Modify contract customer, products, items, batch, lucky ID, and financial terms before activation."
-          : "Search-first contract creation flow for customer, product, plan, batch, Lucky ID, and start date."
+          ? "Modify contract customer, products, items, batch, SFEMI ID, and financial terms before activation."
+          : "Search-first contract creation flow for customer, product, plan, batch, SFEMI ID, and start date."
       }
       helperNote={
         isEditMode
@@ -2262,10 +2262,10 @@ export default function SubscriptionCreatePage({
               <DetailValue label="Default Advance EMI Formula" value="base price / tenure months" />
               <DetailValue
                 label="EMI Plan Rule"
-                value="Batch required, Lucky ID optional"
+                value="Batch required, SFEMI ID optional"
               />
               <DetailValue
-                label="Lucky ID Behavior"
+                label="SFEMI ID Behavior"
                 value={
                   isEmiPlan
                     ? luckyId
@@ -2700,7 +2700,7 @@ export default function SubscriptionCreatePage({
               <div className="mt-3 grid grid-cols-3 gap-2">
                 {(["EMI", "RENT", "LEASE"] as const).map((pt) => {
                   const labels: Record<typeof pt, { title: string; desc: string }> = {
-                    EMI: { title: "Advance EMI", desc: "Batch + Lucky ID draw system" },
+                    EMI: { title: "Advance EMI", desc: "Batch + SFEMI ID benefit system" },
                     RENT: { title: "Rent", desc: "Monthly rental contract" },
                     LEASE: { title: "Lease", desc: "Long-term lease agreement" },
                   };
@@ -2755,7 +2755,7 @@ export default function SubscriptionCreatePage({
 
         <SectionCard
           title="Step 2 · Contract structure"
-          description="For EMI plans, choose an open batch and optionally assign an available Lucky ID."
+          description="For EMI plans, choose an open batch and optionally assign an available SFEMI ID."
         >
           <div className="grid gap-4 lg:grid-cols-2">
             {isEmiPlan ? (
@@ -2826,7 +2826,7 @@ export default function SubscriptionCreatePage({
                       </div>
                       <div className="mt-1 text-xs text-blue-800">
                         Tenure is locked to {batch.duration_months || 0} months.{" "}
-                        {formatAvailableSlots(batch)}. Lucky IDs are limited to this batch only.
+                        {formatAvailableSlots(batch)}. SFEMI IDs are limited to this batch only.
                       </div>
                     </div>
                   ) : null}
@@ -2834,8 +2834,8 @@ export default function SubscriptionCreatePage({
 
                 <div className="space-y-3">
                   <SearchPanel<LuckyIdOption>
-                    title="Lucky ID (optional)"
-                    description="Press Enter to search a specific Lucky ID, or leave it blank to use backend auto-assignment."
+                    title="SFEMI ID (optional)"
+                    description="Press Enter to search a specific SFEMI ID, or leave it blank to use backend auto-assignment."
                     query={luckyQuery}
                     setQuery={setLuckyQuery}
                     onSearch={runLuckySearch}
@@ -2892,25 +2892,25 @@ export default function SubscriptionCreatePage({
                       setSuccess(null);
                     }}
                     disabled={!batch}
-                    placeholder={batch ? "Search Lucky ID by number" : "Select batch first"}
-                    emptyTitle={batch ? "No available Lucky IDs" : "Batch required"}
+                    placeholder={batch ? "Search SFEMI ID by number" : "Select batch first"}
+                    emptyTitle={batch ? "No available SFEMI IDs" : "Batch required"}
                     emptyDescription={
                       batch
-                        ? "No matching Lucky IDs are currently available in this batch."
-                        : "Select a batch before searching Lucky IDs."
+                        ? "No matching SFEMI IDs are currently available in this batch."
+                        : "Select a batch before searching SFEMI IDs."
                     }
                   />
 
                   {batch ? (
                     <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
                       <div className="font-medium">
-                        {luckyPreviewLabel || "Loading Lucky ID availability..."}
+                        {luckyPreviewLabel || "Loading SFEMI ID availability..."}
                       </div>
                       {!luckyQuery.trim() &&
                       availableLuckyCount != null &&
                       availableLuckyCount > luckyResults.length ? (
                         <div className="mt-1 text-xs text-sky-800">
-                          Showing the first {LUCKY_PREVIEW_LIMIT} available Lucky IDs for quick pick. Search a specific number to narrow further.
+                          Showing the first {LUCKY_PREVIEW_LIMIT} available SFEMI IDs for quick pick. Search a specific number to narrow further.
                         </div>
                       ) : null}
                     </div>
@@ -3340,7 +3340,7 @@ export default function SubscriptionCreatePage({
               }
             />
             <DetailValue
-              label="Lucky ID"
+              label="SFEMI ID"
               value={
                 isEmiPlan
                   ? luckyId

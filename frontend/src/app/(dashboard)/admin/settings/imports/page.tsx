@@ -200,7 +200,7 @@ export default function AdminSettingsImportsPage() {
     <ERPPageShell
       eyebrow="Settings & Governance"
       title="Import Hub"
-      subtitle="Use preview and post flows for master-data imports. Live Lucky Plan finance history remains unchanged by these imports."
+      subtitle="Use preview and post flows for master-data imports. Live SFEMI finance history remains unchanged by these imports."
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Settings", href: ROUTES.admin.settings },

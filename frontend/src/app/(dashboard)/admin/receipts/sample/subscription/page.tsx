@@ -36,10 +36,10 @@ export default function SampleSubscriptionDocumentsPage() {
           { label: "Operator", value: "Admin Desk" },
         ]}
         enrollmentFields={[
-          { label: "Plan Name", value: "Lucky Plan EMI" },
+          { label: "Plan Name", value: "SFEMI (Advance EMI)" },
           { label: "Product", value: "Premium Bedroom Set", emphasize: true },
           { label: "Batch", value: "APR-26-B" },
-          { label: "Lucky ID", value: "#19", emphasize: true },
+          { label: "SFEMI ID", value: "#19", emphasize: true },
           { label: "Tenure", value: "24 months" },
           { label: "Plan Type", value: "EMI" },
         ]}
@@ -71,10 +71,10 @@ export default function SampleSubscriptionDocumentsPage() {
           { label: "Product Code", value: "BED-PREM-04" },
         ]}
         contractFields={[
-          { label: "Plan Type", value: "Lucky Plan EMI" },
+          { label: "Plan Type", value: "SFEMI (Advance EMI)" },
           { label: "Tenure", value: "24 month(s)" },
           { label: "Batch", value: "APR-26-B" },
-          { label: "Lucky Number", value: "#19" },
+          { label: "SFEMI ID", value: "#19" },
           { label: "Start Date", value: "19 Apr 2026" },
           { label: "Benefit Rule", value: "Winner benefit applies to future EMI waiver only" },
         ]}

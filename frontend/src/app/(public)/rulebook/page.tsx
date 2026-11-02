@@ -42,7 +42,7 @@ export default function RulebookPage() {
             <strong className="font-semibold">This is an explanatory public rulebook.</strong> It is
             written in plain language for customer understanding. Final rights and obligations are
             governed by your approved contract, invoice, receipt, and official business policy
-            documents. No winning is guaranteed. Lucky Plan is not gambling.
+            documents. Selection is not guaranteed. SFEMI is not gambling.
           </div>
         </div>
       </div>
@@ -93,7 +93,7 @@ export default function RulebookPage() {
         actions={[
           { href: ROUTES.public.faq, label: "View FAQ", variant: "secondary" },
           { href: ROUTES.public.contact, label: "Contact store", variant: "secondary" },
-          { href: ROUTES.public.luckyPlan, label: "Lucky Plan page", variant: "secondary" },
+          { href: ROUTES.public.luckyPlan, label: "SFEMI page", variant: "secondary" },
           { href: ROUTES.public.apply, label: "Apply / Enquire", variant: "primary" },
         ]}
       />

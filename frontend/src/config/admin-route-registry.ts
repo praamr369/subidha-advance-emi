@@ -162,7 +162,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Sales & Contracts", "Create Lease", ROUTES.admin.subscriptionsLeaseCreate, "Create a lease contract."),
   item("Sales & Contracts", "Monthly Demands", `${ROUTES.admin.emis}?plan_type=RENT_LEASE`, "Rent and lease monthly demand visibility."),
 
-  // â”€â”€ 5. Lucky Plan Control â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── 5. SFEMI Control ─────────────────────────────────────────
   // Phase 3: canonical /admin/lucky-plan/* routes are now live as redirect aliases.
   // Legacy paths remain active:
   //   /admin/batches      â†’ /admin/lucky-plan/batches  (migrate_then_alias)

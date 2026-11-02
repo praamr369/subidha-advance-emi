@@ -210,7 +210,7 @@ function OppRow({ opp, onStageChange }: {
 }
 
 const PLAN_TYPES: { value: LeadPlanType; label: string }[] = [
-  { value: "LUCKY_PLAN", label: "Lucky Plan" },
+  { value: "LUCKY_PLAN", label: "SFEMI" },
   { value: "DIRECT_SALE", label: "Direct Sale" },
   { value: "RENT", label: "Rent" },
   { value: "LEASE", label: "Lease" },

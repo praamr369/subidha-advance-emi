@@ -1193,7 +1193,7 @@ export default function AdminSubscriptionDetailPage() {
               </h2>
               <ul className="mt-3 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
                 <li className="rounded-xl border border-border bg-background px-3 py-2">
-                  Advance EMI uses Lucky ID and batch. Rent/Lease has no Lucky ID and no draw context.
+                  Advance EMI uses SFEMI ID and batch. Rent/Lease has no SFEMI ID and no draw context.
                 </li>
                 <li className="rounded-xl border border-border bg-background px-3 py-2">
                   Winner waiver means future EMI waiver only — already-paid installments are never rewritten.
@@ -1216,7 +1216,7 @@ export default function AdminSubscriptionDetailPage() {
                 {[
                   "Customer",
                   "Batch",
-                  "Lucky ID",
+                  "SFEMI ID",
                   "Contract",
                   "EMI",
                   "Payment",
@@ -1417,7 +1417,7 @@ export default function AdminSubscriptionDetailPage() {
                     Winner State Synced
                   </p>
                   <p className="mt-2 text-sm leading-6 text-card-foreground">
-                    Winner history, Lucky ID state, and waiver posture are aligned with the canonical backend snapshot for this contract.
+                    Benefit history, SFEMI ID state, and waiver posture are aligned with the canonical backend snapshot for this contract.
                   </p>
                 </div>
               ) : null}
@@ -1489,7 +1489,7 @@ export default function AdminSubscriptionDetailPage() {
                     }
                   />
                   <DetailValue
-                    label="Lucky ID"
+                    label="SFEMI ID"
                     value={
                       isEmiSubscription
                         ? subscription.lucky_id != null

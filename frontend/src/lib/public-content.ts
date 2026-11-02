@@ -685,7 +685,7 @@ export const CUSTOMERS_PAGE_CONTENT = {
     {
       title: "1. Select Product & Plan Pathway",
       description:
-        "Visit our Asansol showroom or browse online. Choose your preferred pathway: Direct Sale, Lucky Plan Advance EMI, Rent, or Lease.",
+        "Visit our Asansol showroom or browse online. Choose your preferred pathway: Direct Sale, SFEMI Advance EMI, Rent, or Lease.",
     },
     {
       title: "2. KYC Verification & Privacy Gating",
@@ -698,9 +698,9 @@ export const CUSTOMERS_PAGE_CONTENT = {
         "Review your system-generated contract, installment schedule, and terms. Receive an official contract reference code and payment schedule.",
     },
     {
-      title: "4. Lucky ID Allocation (Lucky Plan Only)",
+      title: "4. SFEMI ID Allocation (SFEMI Only)",
       description:
-        "For Lucky Plan enrollments, receive an exclusive Lucky ID (00–99) within your batch for monthly fair draw participation.",
+        "For SFEMI enrollments, receive an exclusive SFEMI ID (00–99) within your batch for monthly promotional benefit selection.",
     },
     {
       title: "5. Digital Payment & Instant Receipting",
@@ -709,7 +709,7 @@ export const CUSTOMERS_PAGE_CONTENT = {
     },
   ],
   whatCustomerPortalProvides: [
-    "24/7 visibility into active contracts, installment schedules, and Lucky ID allocations",
+    "24/7 visibility into active contracts, installment schedules, and SFEMI ID allocations",
     "Instant download of official sequential payment receipts and tax invoices",
     "Real-time tracking of delivery dispatch milestones, handover notes, and POD proofs",
     "Interactive tracking of service desk tickets and warranty maintenance requests",
@@ -721,7 +721,7 @@ export const CUSTOMERS_PAGE_CONTENT = {
     "Approved and signed Contract Document (Subscription, Rent, or Lease)",
     "System-generated sequential Payment Receipts (digital and printed copies)",
     "Co-signed Delivery Handover Note with Proof of Delivery (POD) record",
-    "Official Draw Winner Certificate (for Lucky Plan draw winners)",
+    "Official Promotional Benefit Certificate (for SFEMI benefit recipients)",
     "Deposit Refund Settlement Advice and Return Damage Inspection Report",
     "Service Completion Certificates for maintenance or warranty repairs",
   ],
@@ -729,7 +729,7 @@ export const CUSTOMERS_PAGE_CONTENT = {
 
 export const PARTNERS_PAGE_CONTENT = {
   roleExplanation:
-    "Subidha Furniture Partners support community retail outreach by introducing prospective customers to our furniture offerings, Lucky Plan subscriptions, and rental programs. All contracts, collection accounting, and payouts remain strictly managed inside our core system.",
+    "Subidha Furniture Partners support community retail outreach by introducing prospective customers to our furniture offerings, SFEMI subscriptions, and rental programs. All contracts, collection accounting, and payouts remain strictly managed inside our core system.",
   keyPoints: [
     {
       title: "Facilitator Role Without Agency",
@@ -766,8 +766,8 @@ export const HOW_IT_WORKS_JOURNEY_A = [
     description: "Provide identity proof under DPDP privacy standards. The branch registers your subscription.",
   },
   {
-    title: "3. Join Active Batch & Receive Lucky ID",
-    description: "An exclusive Lucky ID (00–99) is allocated within your batch and permanently linked to your contract.",
+    title: "3. Join Active Batch & Receive SFEMI ID",
+    description: "An exclusive SFEMI ID (00–99) is allocated within your batch and permanently linked to your contract.",
   },
   {
     title: "4. Optional Advance Delivery Provision (60%–80%)",
@@ -903,17 +903,17 @@ export const PHASE10C_FAQ = [
   {
     question: "What is Subidha Core?",
     answer:
-      "Subidha Core is the enterprise ERP and financial ledger system powering Subidha Furniture. It manages retail sales, Lucky Plan EMI subscriptions, rent, lease, stock movements, and double-entry accounting with strict append-only auditability.",
+      "Subidha Core is the enterprise ERP and financial ledger system powering Subidha Furniture. It manages retail sales, SFEMI subscriptions, rent, lease, stock movements, and double-entry accounting with strict append-only auditability.",
   },
   {
-    question: "What is the Advance Delivery threshold for Lucky Plan?",
+    question: "What is the Advance Delivery threshold for SFEMI?",
     answer:
       "Customers who pay an advance prepayment threshold of 60% to 80% upfront qualify for Same-Day Enrollment & Same-Day Delivery under Hire-Purchase title retention.",
   },
   {
     question: "Is there any cash refund if an advance-delivery customer wins?",
     answer:
-      "No. Winning waives 100% of remaining future installments (20% to 40%). Settled advance payments are non-refundable in cash or bank transfer.",
+      "No. Receiving promotional benefit waives 100% of remaining future installments (20% to 40%). Settled advance payments are non-refundable in cash or bank transfer.",
   },
   {
     question: "What happens if rent arrears exceed 45 days?",
@@ -937,14 +937,14 @@ export const CUSTOMER_LIMITATIONS = [
   "Cannot self-approve delivery — delivery dispatch requires verified stock-on-hand and payment milestone clearance",
   "Cannot edit accounting ledgers — financial records and journals are internal, append-only, and audit-locked",
   "Cannot alter EMI schedules, contract totals, or tenure without formal administrative amendment approval",
-  "Cannot transfer Lucky IDs or contract rights to third parties without written managerial consent",
+  "Cannot transfer SFEMI IDs or contract rights to third parties without written managerial consent",
   "Cannot access cashier, accounting, or administrative workbench queues through customer portal credentials",
   "Cannot self-approve KYC — identity and premises verification is executed exclusively by authorized staff",
 ] as const;
 
 export const CUSTOMER_MULTI_CONTRACT_INFO = {
   multipleContracts:
-    "A customer may hold multiple active contracts concurrently — for example, one Lucky Plan EMI subscription, one Direct Sale purchase, and one Rental agreement. Each contract maintains independent accounting, payment schedules, and receipts.",
+    "A customer may hold multiple active contracts concurrently — for example, one SFEMI Advance EMI subscription, one Direct Sale purchase, and one Rental agreement. Each contract maintains independent accounting, payment schedules, and receipts.",
   multipleLuckyIds:
-    "A customer may hold more than one Lucky ID across different batches or within the same batch (subject to batch limits). Each Lucky ID operates independently in monthly fair draws, but winning one contract waives future EMIs only for that specific contract.",
+    "A customer may hold more than one SFEMI ID across different batches or within the same batch (subject to batch limits). Each SFEMI ID operates independently in monthly promotional benefit selections, and receiving a waiver benefit on one contract waives future EMIs only for that specific contract.",
 } as const;

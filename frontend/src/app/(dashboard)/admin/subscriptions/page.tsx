@@ -526,7 +526,7 @@ function SubscriptionWorkflowLanding() {
           />
           <WorkflowCard
             title="Lease — monthly demand"
-            description="Lease contracts with monthly demand cycle, security deposit, possession, handover, and return inspection. No Lucky ID or Lucky Draw context. Lease payment and receipt belong to Collections & Cashier. Deposit refund belongs to Finance Operations."
+            description="Lease contracts with monthly demand cycle, security deposit, possession, handover, and return inspection. No SFEMI ID or promotional benefit context. Lease payment and receipt belong to Collections & Cashier. Deposit refund belongs to Finance Operations."
             action={
               <Link
                 href={`${ROUTES.admin.subscriptions}?plan_type=LEASE`}
@@ -538,7 +538,7 @@ function SubscriptionWorkflowLanding() {
           />
           <WorkflowCard
             title="Partner Operations"
-            description="Partner register, partner customers, subscription requests, commissions, and payouts. Partner Advance EMI follows the same Lucky Plan rules. Commission and payout belong to Finance Operations — not from this page."
+            description="Partner register, partner customers, subscription requests, commissions, and payouts. Partner Advance EMI follows the same SFEMI rules. Commission and payout belong to Finance Operations — not from this page."
             action={
               <Link
                 href={ROUTES.admin.partnersWorkspace}
@@ -846,7 +846,7 @@ export default function AdminSubscriptionsPage() {
     <ERPPageShell
       eyebrow="Sales & Contracts"
       title="Subscription Register"
-      subtitle="Contract source workflow — filtered view of Advance EMI, Rent, and Lease contracts. Advance EMI rows include Lucky ID and batch context. Rent and Lease rows do not."
+      subtitle="Contract source workflow — filtered view of Advance EMI, Rent, and Lease contracts. Advance EMI rows include SFEMI ID and batch context. Rent and Lease rows do not."
       helperNote="Contract values shown here are source records. Payment and receipt belong to Collections & Cashier. Accounting bridge and reconciliation belong to Accounting & Reconciliation. Delivery belongs to Delivery & Service."
       helperTone="info"
       breadcrumbs={[

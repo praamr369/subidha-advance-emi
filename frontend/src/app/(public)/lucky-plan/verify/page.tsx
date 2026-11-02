@@ -70,11 +70,11 @@ export default function PublicLuckyDrawVerifyPage() {
 
   return (
     <PublicPageShell
-      title="Verify a Lucky Draw"
-      subtitle="Independently confirm any revealed draw was provably fair. We publish a commitment hash before each draw and the random seed after — anyone can re-hash the seed and confirm it matches."
+      title="Verify a Promotional Benefit Event"
+      subtitle="Independently confirm any revealed benefit selection was provably fair. We publish a commitment hash before each selection and the random seed after — anyone can re-hash the seed and confirm it matches."
       breadcrumbs={[
         { label: "Home", href: "/" },
-        { label: "Lucky Plan", href: "/lucky-plan" },
+        { label: "SFEMI", href: "/lucky-plan" },
         { label: "Verify" },
       ]}
     >

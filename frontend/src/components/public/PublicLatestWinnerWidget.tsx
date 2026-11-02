@@ -89,7 +89,7 @@ export default function PublicLatestWinnerWidget() {
             Batch {winner.batch_name || winner.batch_code}
           </h3>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Draw month {winner.draw_month} · Winner Lucky ID {winner.lucky_id || "—"} ·
+            Draw month {winner.draw_month} · Recipient SFEMI ID {winner.lucky_id || "—"} ·
             Published {formatDrawDate(winner.draw_datetime || winner.draw_date)}
           </p>
           <p className="mt-1 text-sm text-muted-foreground">

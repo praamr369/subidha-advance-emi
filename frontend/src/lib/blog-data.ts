@@ -40,25 +40,25 @@ export function getReadingTimeMinutes(post: Pick<BlogPost, "blocks">): number {
 export const BLOG_POSTS: BlogPost[] = [
   {
     slug: "what-is-lucky-plan-emi",
-    title: "What Is the Lucky Plan EMI System at Subidha Furniture?",
+    title: "What Is the SFEMI Advance EMI System at Subidha Furniture?",
     description:
-      "A clear, plain-language guide to how Lucky Plan works: batches, monthly EMI, the winner benefit, and what happens after you join.",
+      "A clear, plain-language guide to how SFEMI works: batches, monthly EMI, the promotional benefit, and what happens after you join.",
     publishedAt: "2026-04-17",
-    tags: ["Lucky Plan", "EMI", "How it works"],
+    tags: ["SFEMI", "EMI", "How it works"],
     blocks: [
       {
         type: "p",
-        text: "Lucky Plan is Subidha Furniture’s structured monthly purchase plan for families who want furniture with a predictable payment rhythm. You choose the furniture you need, join an active batch, receive a lucky number, and pay EMI month by month. Every month, one winner is selected from the batch using a transparent process.",
+        text: "SFEMI is Subidha Furniture’s structured monthly purchase plan for families who want furniture with a predictable payment rhythm. You choose the furniture you need, join an active batch, receive a member identifier, and pay EMI month by month. Every month, one benefit recipient is selected from the batch using a transparent process.",
       },
       { type: "h2", text: "The simple idea" },
       {
         type: "ul",
         items: [
           "You pick furniture and confirm the plan details with the branch.",
-          "You join a batch and receive a Lucky ID (00–99).",
+          "You join a batch and receive an SFEMI ID (00–99).",
           "You pay EMI each month for the plan tenure (typically 15 months).",
-          "One winner is selected per batch per month.",
-          "If you win, your remaining future EMI is waived according to the rules.",
+          "One benefit recipient is selected per batch per month.",
+          "If selected, your remaining future EMI is waived according to the rules.",
         ],
       },
       {
@@ -84,20 +84,20 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: "how-the-monthly-winner-process-works",
-    title: "How the Monthly Winner Process Works",
+    title: "How the Monthly Promotional Benefit Process Works",
     description:
-      "Understand Lucky IDs, monthly draws, and why Subidha Furniture uses a commit–reveal method for transparency.",
+      "Understand SFEMI IDs, monthly benefit selection, and why Subidha Furniture uses a commit–reveal method for transparency.",
     publishedAt: "2026-04-17",
-    tags: ["Winners", "Transparency", "Lucky IDs"],
+    tags: ["Winners", "Transparency", "SFEMI IDs"],
     blocks: [
       {
         type: "p",
-        text: "The monthly winner process is designed to be exciting, but also explainable. Lucky Plan uses batches, Lucky IDs (00–99), and a monthly draw rhythm. The goal is that customers can understand the rules without needing technical knowledge.",
+        text: "The monthly benefit recipient process is designed to be exciting, but also explainable. SFEMI uses batches, SFEMI IDs (00–99), and a monthly selection rhythm. The goal is that customers can understand the rules without needing technical knowledge.",
       },
-      { type: "h2", text: "Step 1: Batches and Lucky IDs" },
+      { type: "h2", text: "Step 1: Batches and SFEMI IDs" },
       {
         type: "p",
-        text: "When you join a batch, you receive a Lucky ID between 00 and 99 (depending on availability). This Lucky ID is used for the monthly draw for that batch.",
+        text: "When you join a batch, you receive an SFEMI ID between 00 and 99 (depending on availability). This SFEMI ID is used for the monthly benefit selection for that batch.",
       },
       { type: "h2", text: "Step 2: One winner per batch per month" },
       {
@@ -143,10 +143,10 @@ export const BLOG_POSTS: BlogPost[] = [
         type: "p",
         text: "When the plan is operated by a real local branch, you also get practical guidance: selecting the right product, understanding batch availability, and knowing exactly what steps come next.",
       },
-      { type: "h2", text: "The Lucky Plan difference" },
+      { type: "h2", text: "The SFEMI difference" },
       {
         type: "p",
-        text: "Lucky Plan adds an additional benefit: one winner per month per batch receives a waiver of future EMI obligations according to the rules. This is positioned as a trust-building, transparent mechanism—not a replacement for the core monthly plan discipline.",
+        text: "SFEMI adds an additional benefit: one recipient per month per batch receives a waiver of future EMI obligations according to the rules. This is positioned as a trust-building, transparent mechanism—not a replacement for the core monthly plan discipline.",
       },
     ],
   },
@@ -200,12 +200,12 @@ export const BLOG_POSTS: BlogPost[] = [
     blocks: [
       {
         type: "p",
-        text: "Trust is built when rules are simple, outcomes are published clearly, and records don’t change silently. That is the goal behind the Lucky Plan public transparency approach.",
+        text: "Trust is built when rules are simple, outcomes are published clearly, and records don’t change silently. That is the goal behind the SFEMI public transparency approach.",
       },
       { type: "h2", text: "No fake stats, no fake winners" },
       {
         type: "p",
-        text: "A public site should not invent outcomes. The Lucky Plan public pages are designed to show real published draw records or show a clean empty state when nothing is published yet.",
+        text: "A public site should not invent outcomes. The SFEMI public pages are designed to show real published benefit records or show a clean empty state when nothing is published yet.",
       },
       { type: "h2", text: "Commit–reveal in plain language" },
       {
@@ -221,15 +221,15 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: "how-to-join-a-lucky-plan-batch",
-    title: "How to Join a Lucky Plan Batch at Subidha Furniture",
+    title: "How to Join an SFEMI Batch at Subidha Furniture",
     description:
-      "A step-by-step guide: selecting a product, batch joining, Lucky ID allocation, and when EMI begins.",
+      "A step-by-step guide: selecting a product, batch joining, SFEMI ID allocation, and when EMI begins.",
     publishedAt: "2026-04-17",
     tags: ["Joining", "Batches", "Process"],
     blocks: [
       {
         type: "p",
-        text: "Joining Lucky Plan is straightforward when you know the sequence. The branch workflow is built to keep the product, batch, and payment schedule aligned.",
+        text: "Joining SFEMI is straightforward when you know the sequence. The branch workflow is built to keep the product, batch, and payment schedule aligned.",
       },
       { type: "h2", text: "1) Choose your furniture" },
       {
@@ -239,12 +239,12 @@ export const BLOG_POSTS: BlogPost[] = [
       { type: "h2", text: "2) Join an active batch" },
       {
         type: "p",
-        text: "The branch will guide you to an active batch where Lucky IDs are available and the plan schedule fits your onboarding timeline.",
+        text: "The branch will guide you to an active batch where SFEMI IDs are available and the plan schedule fits your onboarding timeline.",
       },
-      { type: "h2", text: "3) Receive your Lucky ID (00–99)" },
+      { type: "h2", text: "3) Receive your SFEMI ID (00–99)" },
       {
         type: "p",
-        text: "Lucky IDs are allocated within a batch. Your Lucky ID is used for the monthly draw for that batch.",
+        text: "SFEMI IDs are allocated within a batch. Your SFEMI ID is used for the monthly benefit selection for that batch.",
       },
       { type: "h2", text: "4) EMI begins and stays predictable" },
       {
@@ -253,8 +253,8 @@ export const BLOG_POSTS: BlogPost[] = [
       },
       {
         type: "callout",
-        title: "If you win",
-        text: "Winning waives remaining future EMI only. Past paid EMI is not refunded.",
+        title: "If you receive the benefit",
+        text: "Receiving the benefit waives remaining future EMI only. Past paid EMI is not refunded.",
       },
     ],
   },
@@ -287,7 +287,7 @@ export const BLOG_POSTS: BlogPost[] = [
       { type: "h2", text: "Ask about batch availability early" },
       {
         type: "p",
-        text: "Batch availability can influence when you can join and which Lucky IDs are available. Submitting an enquiry with your product preference helps the branch guide you faster.",
+        text: "Batch availability can influence when you can join and which SFEMI IDs are available. Submitting an enquiry with your product preference helps the branch guide you faster.",
       },
     ],
   },
@@ -295,13 +295,13 @@ export const BLOG_POSTS: BlogPost[] = [
     slug: "subidha-furniture-asansol-our-approach",
     title: "Subidha Furniture Asansol: Our Approach to Affordable Furniture Access",
     description:
-      "Why the branch focuses on clarity, predictable monthly commitments, and transparent winner publication for Lucky Plan customers.",
+      "Why the branch focuses on clarity, predictable monthly commitments, and transparent winner publication for SFEMI customers.",
     publishedAt: "2026-04-17",
     tags: ["Subidha Furniture", "Asansol", "Values"],
     blocks: [
       {
         type: "p",
-        text: "Subidha Furniture in Asansol, West Bengal, runs Lucky Plan as a real operational system—designed for daily retail use, payment traceability, and customer clarity.",
+        text: "Subidha Furniture in Asansol, West Bengal, runs SFEMI as a real operational system—designed for daily retail use, payment traceability, and customer clarity.",
       },
       { type: "h2", text: "Our mission" },
       {

@@ -197,7 +197,7 @@ export default function AdminBatchCreatePage() {
     if (Object.keys(nextFieldErrors).length > 0) return;
 
     setSaving(true);
-    setLoadingLabel("Creating batch and preparing Lucky Plan grouping...");
+    setLoadingLabel("Creating batch and preparing SFEMI grouping...");
 
     try {
       const payload = await apiFetch<CreatedBatchResponse>("/admin/batches/", {
@@ -228,9 +228,9 @@ export default function AdminBatchCreatePage() {
 
   return (
     <ERPPageShell
-      eyebrow="Lucky Plan"
+      eyebrow="SFEMI"
       title="Create Batch"
-      subtitle="Create a Lucky Plan batch with controlled slots, tenure, draw scheduling, and safe initial lifecycle state."
+      subtitle="Create a SFEMI batch with controlled slots, tenure, benefit scheduling, and safe initial lifecycle state."
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
         { label: "Batches", href: "/admin/batches" },
@@ -274,11 +274,11 @@ export default function AdminBatchCreatePage() {
       <div className="space-y-6">
         <SectionCard
           title="Batch rule"
-          description="A batch is the operational container for Lucky IDs, subscriptions, draw scheduling, and lifecycle control."
+          description="A batch is the operational container for SFEMI IDs, subscriptions, draw scheduling, and lifecycle control."
         >
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <DetailValue label="Core Role" value="Lucky Plan grouping" />
-            <DetailValue label="Slots Rule" value="Use 100 for live Lucky Plan batches" />
+            <DetailValue label="Core Role" value="SFEMI grouping" />
+            <DetailValue label="Slots Rule" value="Use 100 for live SFEMI batches" />
             <DetailValue label="Draw Rule" value="Draw day must stay between 1 and 28" />
             <DetailValue label="Safe Default" value="Create as DRAFT first" />
           </div>
@@ -437,7 +437,7 @@ export default function AdminBatchCreatePage() {
 
           <SectionCard
             title="Operational preview"
-            description="Review the intended batch structure before saving it into daily Lucky Plan operations."
+            description="Review the intended batch structure before saving it into daily SFEMI operations."
           >
             <div className="space-y-4">
               <div className="rounded-xl border border-border bg-muted/40 p-4">

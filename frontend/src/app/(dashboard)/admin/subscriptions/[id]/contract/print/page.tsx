@@ -318,7 +318,7 @@ export default function AdminSubscriptionContractPrintPage() {
         />
 
         <DocumentTitleStrip
-          title="LUCKY PLAN AGREEMENT / SUBSCRIPTION CONTRACT"
+          title="SFEMI AGREEMENT / ADVANCE EMI CONTRACT"
           subtitle="Read-only contract print generated from backend subscription records."
           status={status}
         />
@@ -331,7 +331,7 @@ export default function AdminSubscriptionContractPrintPage() {
             { label: "Start / Activation", value: formatDocumentDate(subscription.start_date) },
             { label: "Batch", value: safeDocumentText(subscription.batch_code || financialSummary?.batch?.batch_code) },
             { label: "Batch Status", value: safeDocumentText(subscription.batch_status || financialSummary?.batch?.status) },
-            { label: "Lucky ID", value: formatLuckyNumber(luckyNumber) },
+            { label: "SFEMI ID", value: formatLuckyNumber(luckyNumber) },
             { label: "Created At", value: formatDocumentDateTime(subscription.created_at) },
           ]}
         />

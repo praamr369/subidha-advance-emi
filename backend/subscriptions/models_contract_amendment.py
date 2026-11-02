@@ -52,11 +52,16 @@ PHASE1_STATUSES = {value for value, _label in CONTRACT_AMENDMENT_STATUS_CHOICES}
 
 
 def _has_field(model, field_name: str) -> bool:
-    try:
-        model._meta.get_field(field_name)
-        return True
-    except Exception:
+    meta = getattr(model, "_meta", None)
+    if meta is None:
         return False
+    for f in getattr(meta, "local_fields", ()):
+        if getattr(f, "name", None) == field_name or getattr(f, "attname", None) == field_name:
+            return True
+    for f in getattr(meta, "local_many_to_many", ()):
+        if getattr(f, "name", None) == field_name:
+            return True
+    return False
 
 
 def _contribute(field_name: str, field: models.Field) -> None:

@@ -2473,8 +2473,8 @@ export default function AdminCustomerDetailPage() {
 
                 <div className="grid gap-6 xl:grid-cols-2">
                   <SectionCard
-                    title="Advance EMI / Lucky IDs"
-                    description="Advance EMI references include batch and Lucky ID snapshots for quick counter lookup."
+                    title="Advance EMI / SFEMI IDs"
+                    description="Advance EMI references include batch and SFEMI ID snapshots for quick counter lookup."
                   >
                     <ContractReferenceList
                       rows={advanceEmiReferenceRows}

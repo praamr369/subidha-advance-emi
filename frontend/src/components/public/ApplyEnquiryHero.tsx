@@ -49,7 +49,7 @@ const proofPoints = [
               Share your product preference, plan interest, monthly comfort, and contact details so Subidha Furniture can guide you through SFEMI Advance EMI, rent, lease, or direct-sale options.
             </p>
             <div className="public-card-sm max-w-3xl px-4 py-3 text-sm leading-6 text-muted-foreground">
-              <strong className="font-semibold text-foreground">{dict.public.ApplyEnquiryHero_text10}</strong> This form starts branch follow-up only. Financial records, receipt documents, Lucky IDs, rent/lease deposits, and contracts are never created from the public page alone.
+              <strong className="font-semibold text-foreground">{dict.public.ApplyEnquiryHero_text10}</strong> This form starts branch follow-up only. Financial records, receipt documents, SFEMI IDs, rent/lease deposits, and contracts are never created from the public page alone.
             </div>
           </div>
 

@@ -206,7 +206,7 @@ export default function AdminOutstandingsPage() {
             <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 space-y-1">
               <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Advance EMI due</div>
               <div className="text-lg font-semibold text-foreground">{formatRupee(summary?.advance_emi_outstanding)}</div>
-              <div className="text-xs text-muted-foreground">Lucky Plan EMI outstanding</div>
+              <div className="text-xs text-muted-foreground">SFEMI Advance EMI outstanding</div>
             </div>
             <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 space-y-1">
               <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Rent due</div>

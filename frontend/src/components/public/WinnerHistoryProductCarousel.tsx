@@ -50,7 +50,7 @@ export default function WinnerHistoryProductCarousel({
                   {winner.product_name?.trim() || "Prize product"}
                 </div>
                 <div className="text-muted-foreground">
-                  Batch {winner.batch_code} · Month {winner.draw_month} · Lucky ID{" "}
+                  Batch {winner.batch_code} · Month {winner.draw_month} · SFEMI ID{" "}
                   {winner.lucky_id || "—"}
                 </div>
               </div>

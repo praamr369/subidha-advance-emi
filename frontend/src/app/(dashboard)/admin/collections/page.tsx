@@ -734,7 +734,7 @@ export default function AdminCollectionsPage() {
     if (!trimmed) {
       setUnifiedSearchResults([]);
       setUnifiedSearchError(
-        "Enter a phone, contract reference, Lucky ID, batch, KYC, customer, or sale reference."
+        "Enter a phone, contract reference, SFEMI ID, batch, KYC, customer, or sale reference."
       );
       return;
     }

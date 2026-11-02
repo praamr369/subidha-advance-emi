@@ -26,7 +26,7 @@ const items = [
   },
   {
     title: "Reconciliation",
-    description: "Operational reconciliation remains separate and authoritative for Lucky Plan payment integrity.",
+    description: "Operational reconciliation remains separate and authoritative for SFEMI payment integrity.",
     href: ROUTES.admin.financeReconciliation,
   },
 ];

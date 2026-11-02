@@ -106,7 +106,7 @@ export default function PimHelpGuideTab() {
               <span>Multi-Channel Selling</span>
             </div>
             <p className="text-xs text-muted-foreground leading-5">
-              Publishing a blueprint unlocks the product for Lucky Plan EMI contracts, POS Direct Sales invoices, Furniture Rentals, and Workshop BOMs.
+              Publishing a blueprint unlocks the product for SFEMI Advance EMI contracts, POS Direct Sales invoices, Furniture Rentals, and Workshop BOMs.
             </p>
           </div>
         </div>
@@ -159,7 +159,7 @@ export default function PimHelpGuideTab() {
             {
               num: 5,
               title: "Channel Activation",
-              desc: "Enroll in Lucky Plan batches or sell directly on POS Direct Sale invoices.",
+              desc: "Enroll in SFEMI batches or sell directly on POS Direct Sale invoices.",
               action: "/admin/subscriptions/advance-emi/create",
               actionLabel: "New Contract",
             },
@@ -359,7 +359,7 @@ export default function PimHelpGuideTab() {
             Product Register vs PIM Blueprints (Coexistence)
           </h4>
           <p className="text-xs text-muted-foreground leading-relaxed">
-            SUBIDHA CORE strictly maintains backward compatibility for existing Lucky Plan subscriptions:
+            SUBIDHA CORE strictly maintains backward compatibility for existing SFEMI subscriptions:
           </p>
           <ul className="space-y-2 text-xs text-muted-foreground">
             <li className="flex items-start gap-2">

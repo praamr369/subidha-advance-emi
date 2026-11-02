@@ -38,12 +38,12 @@ export default function FurnitureStoreAsansolPage() {
         {
           heading: "Ways to pay",
           body: [
-            "Direct purchase, EMI, and Lucky Plan EMI options may be available as per approved terms. Details of the Lucky Plan, including how eligible customers pay monthly EMIs and when future EMIs may be waived per the contract, are on our Lucky Plan pages.",
+            "Direct purchase, EMI, and SFEMI options may be available as per approved terms. Details of SFEMI, including how eligible customers pay monthly EMIs and when remaining future EMIs may be waived per the contract, are on our SFEMI pages.",
           ],
         },
       ]}
       quickLinks={[
-        { label: "Lucky Plan EMI furniture", href: "/lucky-plan-emi-furniture-asansol" },
+        { label: "SFEMI furniture", href: "/lucky-plan-emi-furniture-asansol" },
         { label: "Browse products", href: "/products" },
         { label: "Delivery in Asansol", href: "/delivery-asansol" },
         { label: "About us", href: "/about" },
@@ -56,7 +56,7 @@ export default function FurnitureStoreAsansolPage() {
         },
         {
           question: "Do you offer furniture on EMI in Asansol?",
-          answer: "EMI and Lucky Plan EMI options may be available as per approved terms. Contact us or visit the showroom to understand the plans and eligibility.",
+          answer: "EMI and SFEMI options may be available as per approved terms. Contact us or visit the showroom to understand the plans and eligibility.",
         },
         {
           question: "What furniture do you sell?",

@@ -76,7 +76,7 @@ export default function WinnerSpotlight({
             Batch {winner.batch_name || winner.batch_code}
           </h3>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Month {winner.draw_month} · Winner Lucky ID {winner.lucky_id || "—"} ·{" "}
+            Month {winner.draw_month} · Recipient SFEMI ID {winner.lucky_id || "—"} ·{" "}
             {formatDrawDate(winner.draw_datetime || winner.draw_date)}
           </p>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">

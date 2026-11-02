@@ -678,9 +678,9 @@ export default function AdminLuckyDrawCreatePage() {
                   <DetailValue label="Next Draw Basis" value={formatDate(selectedBatchSummary.start_date)} />
                   <DetailValue label="Draw Day" value={selectedBatchSummary.draw_day != null ? String(selectedBatchSummary.draw_day) : "—"} />
                   <DetailValue label="Total Slots" value={String(selectedBatchSummary.total_slots)} />
-                  <DetailValue label="Lucky IDs Created" value={String(luckyIdsCreated)} />
-                  <DetailValue label="Assigned Lucky IDs" value={String(selectedBatchSummary.assigned_lucky_ids)} />
-                  <DetailValue label="Won Lucky IDs" value={String(selectedBatchSummary.won_lucky_ids)} />
+                  <DetailValue label="SFEMI IDs Created" value={String(luckyIdsCreated)} />
+                  <DetailValue label="Assigned SFEMI IDs" value={String(selectedBatchSummary.assigned_lucky_ids)} />
+                  <DetailValue label="Waived SFEMI IDs" value={String(selectedBatchSummary.won_lucky_ids)} />
                   <DetailValue label="Subscriptions" value={String(selectedBatchSummary.subscription_count)} />
                   <DetailValue label="Existing Draws" value={String(selectedBatchSummary.draw_count)} />
                   <DetailValue label="Monthly Booked Value" value={formatRupee(selectedBatchSummary.monthly_booked_value)} />
@@ -693,7 +693,7 @@ export default function AdminLuckyDrawCreatePage() {
                   </div>
                 ) : (
                   <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                    This batch looks structurally ready for a draw commitment: Lucky IDs appear to match slot count and draw capacity is still available.
+                    This batch looks structurally ready for a promotional benefit commitment: SFEMI IDs appear to match slot count and benefit capacity is still available.
                   </div>
                 )}
               </SectionCard>

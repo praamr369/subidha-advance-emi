@@ -16,7 +16,7 @@ const PROMPT_TEMPLATES = [
   { label: "📊 Today's Collections", prompt: "Summarize today's business collections, targets, and pending receipts." },
   { label: "⚠️ Overdue EMIs", prompt: "List customers with overdue EMIs and highest collection risk." },
   { label: "📦 Low Stock Check", prompt: "Check warehouse inventory items running low on stock and need reordering." },
-  { label: "🏆 Lucky Plan Batches", prompt: "What is the enrollment and draw status of active Lucky Plan batches?" },
+  { label: "🏆 SFEMI Batches", prompt: "What is the enrollment and benefit status of active SFEMI batches?" },
 ];
 
 export default function AiQueryBox({ disabled = false, loading = false, onSubmit }: AiQueryBoxProps) {

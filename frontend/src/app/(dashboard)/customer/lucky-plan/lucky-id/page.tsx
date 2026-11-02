@@ -16,7 +16,7 @@ export default function LuckyIDTrackerPage() {
         const data = await luckyPlanService.getLuckyIDTracker()
         setTracker(data)
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch lucky ID info')
+        setError(err instanceof Error ? err.message : 'Failed to fetch SFEMI ID info')
       } finally {
         setLoading(false)
       }
@@ -39,7 +39,7 @@ export default function LuckyIDTrackerPage() {
         <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-lg p-8">
           <div className="text-center">
             <h1 className="text-3xl font-bold text-red-600 mb-4">Error</h1>
-            <p className="text-gray-600 mb-6">{error || 'Failed to load lucky ID information'}</p>
+            <p className="text-gray-600 mb-6">{error || 'Failed to load SFEMI ID information'}</p>
             <Link href="/customer" className="text-primary hover:underline">
               Back to Dashboard
             </Link>

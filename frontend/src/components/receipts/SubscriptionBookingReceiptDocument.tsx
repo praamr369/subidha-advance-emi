@@ -59,7 +59,7 @@ export default function SubscriptionBookingReceiptDocument({
           title="Acknowledgement"
           terms={[
             ...acknowledgementLines,
-            "Lucky Draw winner benefit applies to future eligible EMI waiver only.",
+            "SFEMI promotional benefit applies to future eligible EMI waiver only.",
           ]}
         />
 

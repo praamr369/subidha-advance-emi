@@ -92,7 +92,7 @@ export default function AdminLuckyDrawExecutionPage() {
             <p><b>Batch:</b> {summary.batch_code}</p>
             <p><b>Status:</b> {summary.status}</p>
             <p><b>Total Slots:</b> {summary.total_slots}</p>
-            <p><b>Assigned Lucky IDs:</b> {summary.assigned_lucky_ids}</p>
+            <p><b>Assigned SFEMI IDs:</b> {summary.assigned_lucky_ids}</p>
             <p><b>Active Subscriptions:</b> {summary.active_subscription_count}</p>
             <p><b>Draws Completed:</b> {summary.draw_count} / {summary.duration_months}</p>
           </div>
@@ -124,7 +124,7 @@ export default function AdminLuckyDrawExecutionPage() {
         {result ? (
           <div style={{ border: "1px solid #bbf7d0", background: "#f0fdf4", borderRadius: 8, padding: 12 }}>
             <h3 style={{ marginTop: 0 }}>Winner Result</h3>
-            <p><b>Winner Lucky ID:</b> {result.winner_lucky_number ? `#${result.winner_lucky_number}` : "-"}</p>
+            <p><b>Recipient SFEMI ID:</b> {result.winner_lucky_number ? `#${result.winner_lucky_number}` : "-"}</p>
             <p><b>Winner Subscription:</b> {result.winner_subscription_id || "-"}</p>
             <p><b>Waived Future EMI Amount:</b> ₹{Number(result.waived_amount || 0).toFixed(2)}</p>
             <button type="button" onClick={() => router.push(`/admin/lucky-draws/${result.id}`)}>Open Draw Result</button>

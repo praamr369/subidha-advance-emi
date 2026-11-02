@@ -312,7 +312,7 @@ export const ACTION_PLAYBOOKS: ActionPlaybook[] = [
       {
         step: 3,
         title: "Commercial Pricing & Model Eligibility",
-        description: "Specify the retail MRP, Base Selling Price, and enable business model flags: is_emi_enabled (Lucky Plan), is_rent_enabled (Rental), and is_lease_enabled (Lease).",
+        description: "Specify the retail MRP, Base Selling Price, and enable business model flags: is_emi_enabled (SFEMI), is_rent_enabled (Rental), and is_lease_enabled (Lease).",
         fieldDetails: "Base Price (₹), MRP (₹), EMI eligible flag, Rent eligible flag, Lease eligible flag.",
       },
       {
@@ -324,7 +324,7 @@ export const ACTION_PLAYBOOKS: ActionPlaybook[] = [
     ],
     criticalRules: [
       "Item Type is immutable once inventory movements exist; Finished Goods and Raw Materials cannot be casually flipped.",
-      "Base price cannot be zero or negative for items enabled for Lucky Plan EMI or retail direct sale.",
+      "Base price cannot be zero or negative for items enabled for SFEMI (Advance EMI) or retail direct sale.",
       "HSN code is strictly required for legal GST tax invoice generation.",
     ],
     staffOperationalTip: "Always input exact dimensions in inches; customer questions in the showroom almost always start with 'Will this bed fit in my 10x12 bedroom?'.",
@@ -516,7 +516,7 @@ export const ACTION_PLAYBOOKS: ActionPlaybook[] = [
       {
         step: 2,
         title: "Select Pricing Display Mode",
-        description: "Choose whether to display Retail MRP, Monthly Lucky Plan EMI (e.g. ₹1,000/mo), or Monthly Rental Rates (e.g. ₹450/mo).",
+        description: "Choose whether to display Retail MRP, Monthly SFEMI (Advance EMI) (e.g. ₹1,000/mo), or Monthly Rental Rates (e.g. ₹450/mo).",
         fieldDetails: "Pricing Mode: RETAIL / EMI / RENT / COMBO, Store Contact Details.",
       },
       {
@@ -542,13 +542,13 @@ export const ACTION_PLAYBOOKS: ActionPlaybook[] = [
     routePrefix: "/admin/collections",
     actionHref: "/admin/finance/collect?workflow=advance-emi",
     actionLabel: "Collect EMI",
-    breadcrumbSteps: ["Finance & Collections", "Collect Payment", "Search Customer (Mobile / Lucky ID)", "Select Pending EMI Month", "Pick Payment Method & Drawer Account", "Enter Transaction Ref / UTR", "Post Collection & Digital Receipt", "Send WhatsApp Link"],
+    breadcrumbSteps: ["Finance & Collections", "Collect Payment", "Search Customer (Mobile / SFEMI ID)", "Select Pending EMI Month", "Pick Payment Method & Drawer Account", "Enter Transaction Ref / UTR", "Post Collection & Digital Receipt", "Send WhatsApp Link"],
     stepByStepGuide: [
       {
         step: 1,
         title: "Customer & Contract Lookup",
-        description: "Search by customer mobile number, Lucky ID, or subscription number. The active contract and unpaid schedule months appear.",
-        fieldDetails: "Customer Mobile, Lucky ID, Subscription Number.",
+        description: "Search by customer mobile number, SFEMI ID, or subscription number. The active contract and unpaid schedule months appear.",
+        fieldDetails: "Customer Mobile, SFEMI ID, Subscription Number.",
       },
       {
         step: 2,
@@ -810,12 +810,12 @@ export const ACTION_PLAYBOOKS: ActionPlaybook[] = [
   },
   {
     id: "create-contract",
-    intent: "Make a Lucky Plan Advance EMI Contract",
+    intent: "Make a SFEMI (Advance EMI) Contract",
     category: "sales-contracts",
     routePrefix: "/admin/subscriptions",
     actionHref: "/admin/subscriptions/advance-emi/create",
     actionLabel: "New Contract",
-    breadcrumbSteps: ["Subscriptions", "Create Contract", "Customer Search / KYC", "Select Batch & Product", "Allocate Lucky ID", "Preview Schedule", "Activate Contract"],
+    breadcrumbSteps: ["Subscriptions", "Create Contract", "Customer Search / KYC", "Select Batch & Product", "Allocate SFEMI ID", "Preview Schedule", "Activate Contract"],
     stepByStepGuide: [
       {
         step: 1,
@@ -831,9 +831,9 @@ export const ACTION_PLAYBOOKS: ActionPlaybook[] = [
       },
       {
         step: 3,
-        title: "Validate & Allocate Lucky ID",
-        description: "System verifies available Lucky IDs within the batch and assigns a unique, immutable number to this contract.",
-        fieldDetails: "Lucky ID Token (strictly unique per product/batch scope).",
+        title: "Validate & Allocate SFEMI ID",
+        description: "System verifies available SFEMI IDs within the batch and assigns a unique, immutable number to this contract.",
+        fieldDetails: "SFEMI ID Token (strictly unique per product/batch scope).",
       },
       {
         step: 4,
@@ -843,13 +843,13 @@ export const ACTION_PLAYBOOKS: ActionPlaybook[] = [
       },
     ],
     criticalRules: [
-      "Lucky ID uniqueness is strictly enforced per product and batch scope; duplicate tokens are blocked.",
+      "SFEMI ID uniqueness is strictly enforced per product and batch scope; duplicate tokens are blocked.",
       "The sum of all schedule EMIs must equal the exact total contract amount.",
       "Winning a monthly draw waives future unpaid EMIs only; settled payments are never altered.",
     ],
-    staffOperationalTip: "Explain clearly to the customer that their unique Lucky ID will enter the monthly live draw only if their EMI is paid before the draw cutoff date.",
+    staffOperationalTip: "Explain clearly to the customer that their unique SFEMI ID will enter the monthly live draw only if their EMI is paid before the draw cutoff date.",
     scopeOfImprovement: [
-      "Print a wallet-sized laminated Lucky ID membership card with QR code for easy scanning at the cashier desk.",
+      "Print a wallet-sized laminated SFEMI ID membership card with QR code for easy scanning at the cashier desk.",
     ],
   },
   {
@@ -888,7 +888,7 @@ export const ACTION_PLAYBOOKS: ActionPlaybook[] = [
     ],
     criticalRules: [
       "Rental/Lease packages allow attaching multiple furniture items under one unified customer contract.",
-      "Lucky Plan Advance EMI remains strictly isolated: 1 contract = 1 product = 1 Lucky ID.",
+      "SFEMI (Advance EMI) remains strictly isolated: 1 contract = 1 product = 1 SFEMI ID.",
       "Security deposit and monthly rent demands are strictly derived from itemized product line calculations.",
     ],
     staffOperationalTip: "Group room packages together (e.g. 'Complete Bedroom Set') to offer a bundled 5% discount on the total monthly rental installment.",
@@ -931,7 +931,7 @@ export const ACTION_PLAYBOOKS: ActionPlaybook[] = [
       },
     ],
     criticalRules: [
-      "Direct retail sales and Lucky Plan subscriptions are separate source entities; do not mix POS items with EMI schedules.",
+      "Direct retail sales and SFEMI subscriptions are separate source entities; do not mix POS items with EMI schedules.",
       "Invoices once posted cannot be deleted; cancellations require an explicit reversal and credit note.",
       "Stock availability (ATP) is checked; insufficient stock warns operator or creates a purchase requirement.",
     ],
@@ -976,7 +976,7 @@ export const ACTION_PLAYBOOKS: ActionPlaybook[] = [
     ],
     criticalRules: [
       "Settled payments are never modified; only future schedule obligations adjust.",
-      "Lucky ID cannot be changed mid-contract for Lucky Plan subscriptions without batch admin authorization.",
+      "SFEMI ID cannot be changed mid-contract for SFEMI subscriptions without batch admin authorization.",
     ],
     staffOperationalTip: "When swapping furniture, ensure the pickup of the old furniture and delivery of the new item are scheduled on the same truck trip.",
     scopeOfImprovement: [
@@ -2012,17 +2012,17 @@ export const ACTION_PLAYBOOKS: ActionPlaybook[] = [
   },
   {
     id: "run-lucky-draw",
-    intent: "Execute a Monthly Lucky Draw & Waive Winner EMIs",
+    intent: "Execute a Monthly SFEMI Promotional Benefit & Waive Winner EMIs",
     category: "lucky-plan",
     routePrefix: "/admin/lucky-draws",
     actionHref: "/admin/lucky-draws",
-    actionLabel: "Run Lucky Draw",
-    breadcrumbSteps: ["Lucky Plan Control", "Lucky Draws", "Select Active Batch", "Verify Draw Eligibility (All Past EMIs Paid)", "Execute Random Draw Ceremony", "Confirm Winner & Waive Remaining Schedule", "Issue Winner Certificate & Delivery Order"],
+    actionLabel: "Run SFEMI Promotional Benefit",
+    breadcrumbSteps: ["SFEMI Control", "SFEMI Benefits", "Select Active Batch", "Verify Draw Eligibility (All Past EMIs Paid)", "Execute Random Draw Ceremony", "Confirm Winner & Waive Remaining Schedule", "Issue Winner Certificate & Delivery Order"],
     stepByStepGuide: [
       {
         step: 1,
         title: "Select Scheme Batch & Draw Month",
-        description: "Open Lucky Draws. Select the batch (e.g. Diwali Bonanza 2026) and the draw sequence number (e.g. Month 4 Draw).",
+        description: "Open SFEMI Benefits. Select the batch (e.g. Diwali Bonanza 2026) and the draw sequence number (e.g. Month 4 Draw).",
         fieldDetails: "Batch ID, Month Ordinal, Draw Date.",
       },
       {
@@ -2034,8 +2034,8 @@ export const ACTION_PLAYBOOKS: ActionPlaybook[] = [
       {
         step: 3,
         title: "Execute Public Draw or Input Verified Winner Token",
-        description: "Conduct live transparent token draw with witnesses. Input winning Lucky ID or click 'Execute Provably-Fair Digital Draw'.",
-        fieldDetails: "Winning Lucky ID, Witness Names, Draw Ceremony Video/Photo Link.",
+        description: "Conduct live transparent token draw with witnesses. Input winning SFEMI ID or click 'Execute Provably-Fair Digital Draw'.",
+        fieldDetails: "Winning SFEMI ID, Witness Names, Draw Ceremony Video/Photo Link.",
       },
       {
         step: 4,
@@ -2051,17 +2051,17 @@ export const ACTION_PLAYBOOKS: ActionPlaybook[] = [
     ],
     staffOperationalTip: "Stream the draw ceremony live on Facebook/YouTube; transparency builds immense trust and drives enrollments for the next scheme batch.",
     scopeOfImprovement: [
-      "Provide a public QR code verification page where customers can input their Lucky ID to verify whether they won.",
+      "Provide a public QR code verification page where customers can input their SFEMI ID to verify whether they won.",
     ],
   },
   {
     id: "create-lucky-batch",
-    intent: "Launch a New Lucky Plan Scheme Batch & Generate Token Sequences",
+    intent: "Launch a New SFEMI Scheme Batch & Generate Token Sequences",
     category: "lucky-plan",
     routePrefix: "/admin/batches",
     actionHref: "/admin/batches/create",
     actionLabel: "New Scheme Batch",
-    breadcrumbSteps: ["Lucky Plan Control", "Batches Master", "Create Batch", "Define Scheme Terms (Tenure, Installment Amount)", "Select Enrolled Furniture Models", "Set Capacity & Lucky ID Token Range", "Open Batch for Public Enrollment"],
+    breadcrumbSteps: ["SFEMI Control", "Batches Master", "Create Batch", "Define Scheme Terms (Tenure, Installment Amount)", "Select Enrolled Furniture Models", "Set Capacity & SFEMI ID Token Range", "Open Batch for Public Enrollment"],
     stepByStepGuide: [
       {
         step: 1,
@@ -2077,7 +2077,7 @@ export const ACTION_PLAYBOOKS: ActionPlaybook[] = [
       },
       {
         step: 3,
-        title: "Configure Batch Capacity & Lucky ID Token Series",
+        title: "Configure Batch Capacity & SFEMI ID Token Series",
         description: "Define maximum subscriber capacity (e.g. 500 members) and token series prefix (e.g. NY27-001 to NY27-500).",
         fieldDetails: "Max Capacity, Token Prefix, Token Start Number, Token End Number.",
       },
@@ -2089,7 +2089,7 @@ export const ACTION_PLAYBOOKS: ActionPlaybook[] = [
       },
     ],
     criticalRules: [
-      "Lucky ID tokens must be strictly unique within the product and batch scope.",
+      "SFEMI ID tokens must be strictly unique within the product and batch scope.",
       "Tenure and monthly amount become immutable once the first customer contract enrolls in the batch.",
     ],
     staffOperationalTip: "Set the enrollment cutoff at least 3 days before the first draw date so all initial customer verification calls can be completed.",
@@ -2104,13 +2104,13 @@ export const ACTION_PLAYBOOKS: ActionPlaybook[] = [
     routePrefix: "/admin/lucky-plan",
     actionHref: "/admin/lucky-plan/winners",
     actionLabel: "Winner Fulfillment",
-    breadcrumbSteps: ["Lucky Plan Control", "Winners Roster", "Select Unfulfilled Winner", "Verify Original Membership Card & Aadhaar", "Inspect Showroom Furniture Ready for Handover", "Execute Delivery Handover & Photograph", "Mark Winner Fulfillment Complete"],
+    breadcrumbSteps: ["SFEMI Control", "Winners Roster", "Select Unfulfilled Winner", "Verify Original Membership Card & Aadhaar", "Inspect Showroom Furniture Ready for Handover", "Execute Delivery Handover & Photograph", "Mark Winner Fulfillment Complete"],
     stepByStepGuide: [
       {
         step: 1,
         title: "Verify Winner Identity & Physical Passbook",
-        description: "Open Winners Roster. When winner visits showroom, verify original Aadhaar card and match the Lucky ID token with the customer passbook.",
-        fieldDetails: "Winner ID, Lucky ID Token, Aadhaar Number Match, Verified By Staff.",
+        description: "Open Winners Roster. When winner visits showroom, verify original Aadhaar card and match the SFEMI ID token with the customer passbook.",
+        fieldDetails: "Winner ID, SFEMI ID Token, Aadhaar Number Match, Verified By Staff.",
       },
       {
         step: 2,
@@ -2142,12 +2142,12 @@ export const ACTION_PLAYBOOKS: ActionPlaybook[] = [
   },
   {
     id: "defaulter-disqualification",
-    intent: "Manage Lucky Plan EMI Defaulters, Grace Periods & Auto-Disqualification",
+    intent: "Manage SFEMI (Advance EMI) Defaulters, Grace Periods & Auto-Disqualification",
     category: "lucky-plan",
     routePrefix: "/admin/defaulters",
     actionHref: "/admin/defaulters",
     actionLabel: "Defaulter Control",
-    breadcrumbSteps: ["Lucky Plan Control", "Defaulter Queue", "Identify Overdue Accounts", "Send Grace Period Warning via SMS/WhatsApp", "Auto-Disqualify from Current Month Draw", "Process Re-instatement on Overdue Settlement"],
+    breadcrumbSteps: ["SFEMI Control", "Defaulter Queue", "Identify Overdue Accounts", "Send Grace Period Warning via SMS/WhatsApp", "Auto-Disqualify from Current Month Draw", "Process Re-instatement on Overdue Settlement"],
     stepByStepGuide: [
       {
         step: 1,
@@ -2158,13 +2158,13 @@ export const ACTION_PLAYBOOKS: ActionPlaybook[] = [
       {
         step: 2,
         title: "Broadcast Urgent Cutoff Reminder",
-        description: "Click 'Send Draw Cutoff Notice'. Sends bulk WhatsApp/SMS alert: 'Pay by 14th 5 PM to enter tomorrow's Lucky Draw!'.",
+        description: "Click 'Send Draw Cutoff Notice'. Sends bulk WhatsApp/SMS alert: 'Pay by 14th 5 PM to enter tomorrow's SFEMI Promotional Benefit!'.",
         fieldDetails: "Notification Template, Total Recipients, Remaining Hours.",
       },
       {
         step: 3,
         title: "Apply Pre-Draw Disqualification Lock",
-        description: "At the cutoff deadline, the system automatically marks unpaid contracts as 'DISQUALIFIED_FROM_CURRENT_DRAW'. Their Lucky ID token is excluded from the contender pool.",
+        description: "At the cutoff deadline, the system automatically marks unpaid contracts as 'DISQUALIFIED_FROM_CURRENT_DRAW'. Their SFEMI ID token is excluded from the contender pool.",
         fieldDetails: "Disqualified Token List, Active Contenders Locked.",
       },
       {
@@ -2281,7 +2281,7 @@ export const ACTION_PLAYBOOKS: ActionPlaybook[] = [
       {
         step: 2,
         title: "Select Inquiry Source & Plan Preference",
-        description: "Choose how the customer found us: Walk-in Showroom, WhatsApp Catalog, Facebook Ad, Referral. Choose plan: Lucky Plan EMI, Rent, or Direct Retail Sale.",
+        description: "Choose how the customer found us: Walk-in Showroom, WhatsApp Catalog, Facebook Ad, Referral. Choose plan: SFEMI (Advance EMI), Rent, or Direct Retail Sale.",
         fieldDetails: "Lead Source, Plan Interest (EMI / RENT / LEASE / RETAIL).",
       },
       {
@@ -2323,7 +2323,7 @@ export const ACTION_PLAYBOOKS: ActionPlaybook[] = [
       {
         step: 3,
         title: "Spawn Target Contract or Retail Invoice",
-        description: "Choose destination: Create Lucky Plan Contract, Create Rental Agreement, or Create Direct POS Sale. The selected products autofill.",
+        description: "Choose destination: Create SFEMI Contract, Create Rental Agreement, or Create Direct POS Sale. The selected products autofill.",
         fieldDetails: "Target Flow, Selected Product SKU, Converted Contract ID.",
       },
     ],
@@ -3170,7 +3170,7 @@ export const ADMIN_HELP_TOPICS: AdminHelpTopic[] = [
     whyNeeded:
       "A solopreneur administrator manages finance, collections, inventory, deliveries, and draw schedules simultaneously. Without a centralized command center, critical bottlenecks (pending KYC approvals, cash drawer variances, overdue collections, failed imports) are buried across 400+ screens. This cockpit provides a single glass pane for daily operational triage.",
     howItWorks:
-      "1. Morning Brief: Aggregates pending collections today, scheduled furniture deliveries, and active KYC verification queues.\n2. Cross-Module Search (Ctrl+K): Instant search across customers, contract numbers, invoices, Lucky IDs, and products.\n3. Exception Feeds: Highlights unposted journals, inventory shortages (ATP), and cashier variances in real time.\n4. Close Cockpit: Enforces daily register lock and audit reconciliation at the end of business hours.",
+      "1. Morning Brief: Aggregates pending collections today, scheduled furniture deliveries, and active KYC verification queues.\n2. Cross-Module Search (Ctrl+K): Instant search across customers, contract numbers, invoices, SFEMI IDs, and products.\n3. Exception Feeds: Highlights unposted journals, inventory shortages (ATP), and cashier variances in real time.\n4. Close Cockpit: Enforces daily register lock and audit reconciliation at the end of business hours.",
     workflows: [
       {
         name: "Morning Solopreneur Routine",
@@ -3210,8 +3210,8 @@ export const ADMIN_HELP_TOPICS: AdminHelpTopic[] = [
           },
           {
             step: 2,
-            title: "Search by Phone or Lucky ID",
-            description: "Type a customer phone number, Lucky ID token, or invoice number to navigate directly to their workbench.",
+            title: "Search by Phone or SFEMI ID",
+            description: "Type a customer phone number, SFEMI ID token, or invoice number to navigate directly to their workbench.",
           },
         ],
       },
@@ -3252,7 +3252,7 @@ export const ADMIN_HELP_TOPICS: AdminHelpTopic[] = [
     summary:
       "Master catalog governance separating conceptual product blueprints from sellable variant SKUs, materials, inventory tracking, and sales channel readiness.",
     whyNeeded:
-      "In furniture retail, a single design (e.g. 'Royal Sheesham Bed') comes in multiple sizes (King, Queen), timber species (Sheesham, Teak), fabric colors, and finishes. Without PIM, businesses create duplicate, disconnected product records that break stock tracking, pricing consistency, and catalog sanity. PIM provides a single source of truth for all selling channels (Lucky Plan EMI, Retail Direct Sale, Rental, and Leasing) and manufacturing BOMs.",
+      "In furniture retail, a single design (e.g. 'Royal Sheesham Bed') comes in multiple sizes (King, Queen), timber species (Sheesham, Teak), fabric colors, and finishes. Without PIM, businesses create duplicate, disconnected product records that break stock tracking, pricing consistency, and catalog sanity. PIM provides a single source of truth for all selling channels (SFEMI (Advance EMI), Retail Direct Sale, Rental, and Leasing) and manufacturing BOMs.",
     howItWorks:
       "1. Blueprints act as the parent master defining standard specifications, categories, HSN/SAC codes, base pricing, and marketing descriptions.\n2. Variant SKUs are generated from attribute combinations (Size, Finish, Upholstery).\n3. Inventory Item Profiles link each sellable SKU to physical stock tracking, reorder thresholds, and warehouse valuation.\n4. Channel Readiness gates ensure a product is only sold once pricing, HSN tax codes, and stock profiles are verified.",
     workflows: [
@@ -3283,13 +3283,13 @@ export const ADMIN_HELP_TOPICS: AdminHelpTopic[] = [
           {
             step: 4,
             title: "Activate Selling Channels & Inventory Readiness",
-            description: "Mark which channels this product is eligible for: Advance EMI (Lucky Plan), Direct Sale, Rental, or Leasing. Check that 'Inventory Ready' badge is green.",
+            description: "Mark which channels this product is eligible for: SFEMI (Advance EMI), Direct Sale, Rental, or Leasing. Check that 'Inventory Ready' badge is green.",
           },
         ],
       },
       {
         name: "Sync PIM Blueprints with Legacy Product Register",
-        description: "Additive consolidation ensuring legacy Lucky Plan subscriptions and new PIM blueprints stay linked.",
+        description: "Additive consolidation ensuring legacy SFEMI subscriptions and new PIM blueprints stay linked.",
         steps: [
           {
             step: 1,
@@ -3421,18 +3421,18 @@ export const ADMIN_HELP_TOPICS: AdminHelpTopic[] = [
     summary:
       "The central cash and digital collection engine for Advance EMI installments, direct retail sales, customer advances, and partner collection reviews.",
     whyNeeded:
-      "Cash flow is the lifeblood of furniture retail. Non-technical shop staff and solopreneur owners need a rapid, fail-safe screen to search customers by phone or Lucky ID, record payments via Cash/UPI/Bank, generate official receipts, and ensure all collections bridge into accounting without manual recalculation or duplicate posting.",
+      "Cash flow is the lifeblood of furniture retail. Non-technical shop staff and solopreneur owners need a rapid, fail-safe screen to search customers by phone or SFEMI ID, record payments via Cash/UPI/Bank, generate official receipts, and ensure all collections bridge into accounting without manual recalculation or duplicate posting.",
     howItWorks:
       "1. Multi-Lane Collection: Differentiates between (a) Advance EMI subscriptions, (b) Direct retail invoices, (c) Customer unapplied advances, and (d) Partner collection reports.\n2. Payment Posting Service: Submits to backend posting which determines exact schedule allocation, updates EMI status to PAID, and books double-entry ledger entries.\n3. Dynamic Cash Drawer Rollup: Cash payments accumulate in the active staff/cashier drawer for reconciliation during End-of-Day Close.\n4. Immutable Receipt: Issues a numbered digital receipt document that can be printed or shared directly via WhatsApp without saving contacts.",
     workflows: [
       {
         name: "Collect Subscription Advance EMI",
-        description: "Post a monthly EMI collection for a customer under the Lucky Plan.",
+        description: "Post a monthly EMI collection for a customer under the SFEMI.",
         steps: [
           {
             step: 1,
             title: "Locate Customer / Contract",
-            description: "Open Finance > Collect Payment (or Collections page). Search by customer mobile, Lucky ID, or subscription number.",
+            description: "Open Finance > Collect Payment (or Collections page). Search by customer mobile, SFEMI ID, or subscription number.",
             actionHref: "/admin/finance/collect?workflow=advance-emi",
             actionLabel: "Collect EMI",
           },
@@ -3514,7 +3514,7 @@ export const ADMIN_HELP_TOPICS: AdminHelpTopic[] = [
   // ── 4. Sales & Contracts ────────────────────────────────────────────────────
   {
     id: "sales-contracts",
-    title: "Sales, Contracts, Lucky Plan EMI & Direct Sales",
+    title: "Sales, Contracts, SFEMI (Advance EMI) & Direct Sales",
     shortTitle: "Sales & Contracts",
     category: "sales-contracts",
     badge: "Revenue Hub",
@@ -3528,15 +3528,15 @@ export const ADMIN_HELP_TOPICS: AdminHelpTopic[] = [
       "/admin/quotations",
     ],
     summary:
-      "Dual-lane revenue engine managing Lucky Plan Advance EMI subscription contracts, retail direct sales billing, quotations, and contract delivery triggers.",
+      "Dual-lane revenue engine managing SFEMI (Advance EMI) subscription contracts, retail direct sales billing, quotations, and contract delivery triggers.",
     whyNeeded:
-      "SUBIDHA CORE operates two distinct business models: (1) Promotional Lucky Plan EMI subscriptions where customers subscribe for 10-12 months with chances to win the furniture in monthly draws, and (2) Standard Retail Direct Sales where customers purchase furniture outright or on custom credit terms. Both lanes share the customer CRM and inventory stock while keeping financial rules cleanly segregated.",
+      "SUBIDHA CORE operates two distinct business models: (1) Promotional SFEMI (Advance EMI) subscriptions where customers subscribe for 10-12 months with chances to win the furniture in monthly draws, and (2) Standard Retail Direct Sales where customers purchase furniture outright or on custom credit terms. Both lanes share the customer CRM and inventory stock while keeping financial rules cleanly segregated.",
     howItWorks:
-      "1. Lucky Plan Contract Lane: Creates an auditable subscription bound to a Product and Batch, validates customer KYC, allocates a unique Lucky ID, deterministically generates the EMI schedule, and mirrors an installment profile.\n2. Direct Sale Lane: Standard retail POS with line items, quantity, tax calculations, and discount rules. Generates a BillingInvoice that posts to inventory stock ledger (`SALE_OUT`) and revenue accounting upon approval.\n3. Status Lifecycles: Subscriptions progress through DRAFT -> ACTIVE -> IN_COLLECTION -> WON / COMPLETED. Direct sales transition through DRAFT -> APPROVED -> POSTED -> SETTLED.",
+      "1. SFEMI Contract Lane: Creates an auditable subscription bound to a Product and Batch, validates customer KYC, allocates a unique SFEMI ID, deterministically generates the EMI schedule, and mirrors an installment profile.\n2. Direct Sale Lane: Standard retail POS with line items, quantity, tax calculations, and discount rules. Generates a BillingInvoice that posts to inventory stock ledger (`SALE_OUT`) and revenue accounting upon approval.\n3. Status Lifecycles: Subscriptions progress through DRAFT -> ACTIVE -> IN_COLLECTION -> WON / COMPLETED. Direct sales transition through DRAFT -> APPROVED -> POSTED -> SETTLED.",
     workflows: [
       {
-        name: "Create a Lucky Plan Advance EMI Contract",
-        description: "Enroll a customer in a Lucky Plan batch with unique Lucky ID.",
+        name: "Create a SFEMI (Advance EMI) Contract",
+        description: "Enroll a customer in a SFEMI batch with unique SFEMI ID.",
         steps: [
           {
             step: 1,
@@ -3552,9 +3552,9 @@ export const ADMIN_HELP_TOPICS: AdminHelpTopic[] = [
           },
           {
             step: 3,
-            title: "Allocate Lucky ID",
-            description: "System verifies available Lucky IDs in the batch and assigns a unique number to this contract.",
-            importantNote: "Lucky ID uniqueness is strictly enforced per product/batch.",
+            title: "Allocate SFEMI ID",
+            description: "System verifies available SFEMI IDs in the batch and assigns a unique number to this contract.",
+            importantNote: "SFEMI ID uniqueness is strictly enforced per product/batch.",
           },
           {
             step: 4,
@@ -4033,7 +4033,7 @@ export const ADMIN_HELP_TOPICS: AdminHelpTopic[] = [
     ],
   },
 
-  // ── 9. Lucky Plan & Draws ──────────────────────────────────────────────────
+  // ── 9. SFEMI & Draws ──────────────────────────────────────────────────
   {
     id: "lucky-plan",
     title: "SFEMI Batches, Promotional Benefit Coordination & Remaining EMI Waivers",
@@ -4055,7 +4055,7 @@ export const ADMIN_HELP_TOPICS: AdminHelpTopic[] = [
       "1. Batches: Define subscriber limits (e.g. 500 members), product model, monthly installment, and selection dates.\n2. SFEMI ID: Each subscriber receives a verified, unique ID within the batch.\n3. Benefit Eligibility: Only subscribers with up-to-date paid EMIs are eligible for that month's benefit selection.\n4. Recipient Processing: Idempotent backend action marks subscription as `WON`, waives all future pending EMIs, initiates delivery fulfillment, and records accounting waiver journals. Past settled payments remain untouched.",
     workflows: [
       {
-        name: "Create a New Lucky Plan Batch",
+        name: "Create a New SFEMI Batch",
         description: "Open a new subscription batch for customer enrollment.",
         steps: [
           {
@@ -4078,15 +4078,15 @@ export const ADMIN_HELP_TOPICS: AdminHelpTopic[] = [
         ],
       },
       {
-        name: "Execute a Monthly Lucky Draw",
+        name: "Execute a Monthly SFEMI Promotional Benefit",
         description: "Conduct transparent draw, select winner, and apply waivers.",
         steps: [
           {
             step: 1,
             title: "Open Draw Execution",
-            description: "Go to Lucky Draws > Execution. Select the active batch and draw month.",
+            description: "Go to SFEMI Benefits > Execution. Select the active batch and draw month.",
             actionHref: "/admin/lucky-draws",
-            actionLabel: "Lucky Draws",
+            actionLabel: "SFEMI Benefits",
           },
           {
             step: 2,
@@ -4096,7 +4096,7 @@ export const ADMIN_HELP_TOPICS: AdminHelpTopic[] = [
           {
             step: 3,
             title: "Execute Transparent Draw",
-            description: "Run random draw algorithm or enter verified drawn token. Confirm winning Lucky ID.",
+            description: "Run random draw algorithm or enter verified drawn token. Confirm winning SFEMI ID.",
           },
           {
             step: 4,
@@ -4150,7 +4150,7 @@ export const ADMIN_HELP_TOPICS: AdminHelpTopic[] = [
     summary:
       "Complete customer relationship management: customer onboarding, KYC document review, unified operational profiles, communication history, and lead tracking.",
     whyNeeded:
-      "A single customer may have multiple Lucky Plan subscriptions, retail direct sales, and custom inquiries. Store operators need a unified Customer 360 profile showing all contracts, pending dues, KYC documents, and WhatsApp communication history in one place without jumping across disconnected menus.",
+      "A single customer may have multiple SFEMI subscriptions, retail direct sales, and custom inquiries. Store operators need a unified Customer 360 profile showing all contracts, pending dues, KYC documents, and WhatsApp communication history in one place without jumping across disconnected menus.",
     howItWorks:
       "1. Customer Profile: Master identity record indexed by verified phone number.\n2. KYC Queue: Upload and verify identity proofs (Aadhaar, Voter ID, Address Proof).\n3. Customer 360: Consolidates active subscriptions, direct sales, payment receipts, unapplied advance deposits, and delivery addresses.\n4. Direct WhatsApp Integration: Send payment receipts, balance reminders, and contract PDFs with 1 click without saving numbers.",
     workflows: [

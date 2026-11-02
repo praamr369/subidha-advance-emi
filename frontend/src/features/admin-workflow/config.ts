@@ -95,7 +95,7 @@ export const adminWorkflowModules: WorkflowModule[] = [
     title: "Batch governance",
     description: "Batch readiness, fill rate visibility, draw scheduling, and batch-level risk control.",
     href: "/admin/batches",
-    owner: "Lucky plan desk",
+    owner: "SFEMI desk",
     health: "healthy",
     primaryMetric: "Open batches",
     supportingMetric: "Fill rate",

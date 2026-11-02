@@ -250,7 +250,7 @@ export default function AdminSubscriptionsPage() {
           Open Batches: <b>{kpis.openBatches}</b>
         </div>
         <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-          Available Lucky IDs {form.batch ? "(selected batch)" : ""}: <b>{availableLuckyIds.length}</b>
+          Available SFEMI IDs {form.batch ? "(selected batch)" : ""}: <b>{availableLuckyIds.length}</b>
         </div>
         <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
           Monthly Booked Value: <b>{formatCurrency(kpis.monthlyBookedValue)}</b>

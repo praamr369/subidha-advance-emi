@@ -48,16 +48,16 @@ These Terms and Conditions constitute a legally binding agreement between the cu
 ## 4. SFEMI Advance EMI & Promotional Benefit Invariants
 
 1. **Subscription Structure**: SFEMI is a structured advance installment plan for furniture acquisition over an approved tenure (e.g., 10 to 15 months). The product base price constitutes the total contract value, and monthly EMI equals the total contract value divided by the tenure months.
-2. **Lucky ID Assignment**: Customers are assigned a batch-specific Lucky ID (00 to 99). Assignment of a Lucky ID does not guarantee any prize, winning, or financial return.
+2. **SFEMI ID Assignment**: Customers are assigned a batch-specific SFEMI ID (00 to 99). Assignment of a SFEMI ID does not guarantee any prize, winning, or financial return.
 3. **Fair Draw Integrity (Commit-then-Reveal)**: Monthly draws are conducted transparently using cryptographic SHA-256 commit-then-reveal procedures. A commitment hash is published prior to the draw, and the revealed winning number must match the hash.
 4. **Winner Benefit Scope (Strictly Future EMI Waiver)**:
-   - If a customer's Lucky ID is drawn as the winner, remaining unpaid future EMI obligations from the winning month onward are waived 100%.
+   - If a customer's SFEMI ID is drawn as the winner, remaining unpaid future EMI obligations from the winning month onward are waived 100%.
    - **Zero Cash Refund**: Under no circumstances is any previously settled EMI refunded in cash, bank transfer, or credit. The benefit is strictly future-facing.
 5. **Advance Delivery & Hire-Purchase Title Retention**:
    - Customers paying an advance prepayment threshold (60% to 80% upfront) qualify for immediate same-day delivery.
    - Legal title and ownership remain with Subidha Furniture under Hire-Purchase principles until 100% of the contract value is settled (either by completing remaining installments or via an audited draw waiver).
    - In case of payment default exceeding thirty (30) days, Subidha Furniture reserves the enforceable legal right to repossess the goods.
-6. **Statutory Non-Gambling Declaration**: Lucky Plan is a purchase plan backed by physical goods. It is strictly compliant with the Prize Chits and Money Circulation Schemes (Banning) Act, 1978, and the Banning of Unregulated Deposit Schemes (BUDS) Act, 2019.
+6. **Statutory Non-Gambling Declaration**: SFEMI is a purchase plan backed by physical goods. It is strictly compliant with the Prize Chits and Money Circulation Schemes (Banning) Act, 1978, and the Banning of Unregulated Deposit Schemes (BUDS) Act, 2019.
 
 ## 5. Rent and Lease Contracts
 
@@ -171,7 +171,7 @@ This policy governs the acquisition of furniture, raw materials, components, and
 
 1. **Mandatory PO Requirement**: No inventory unit may enter showroom or warehouse premises without an approved, system-generated Purchase Order.
 2. **Stock-on-Hand Verification**:
-   - All furniture intended for Direct Sale, Lucky Plan delivery, Rent, or Lease must be physically received, inspected, and posted to the Stock Ledger.
+   - All furniture intended for Direct Sale, SFEMI delivery, Rent, or Lease must be physically received, inspected, and posted to the Stock Ledger.
    - Fictitious or speculative inventory entries are strictly prohibited.
 3. **Goods Receipt Note (GRN)**: Upon arrival at the central warehouse, receiving staff inspect shipments against the PO and generate a Goods Receipt Note verifying SKU, quantity, finish, and packaging condition.
 
@@ -225,14 +225,14 @@ Subidha Furniture maintains fair, auditable, and transparent standards for order
 2. **Post-Invoice Prior to Dispatch**: Invoice cancelled via Credit Note. Full payment refunded via original mode within 5 to 7 business days.
 3. **Post-Delivery**: Return accepted only within 3 days for verifiable manufacturing defects. Product must be unused and in original packaging.
 
-### B. Lucky Plan Advance EMI Subscriptions
+### B. SFEMI Advance EMI Subscriptions
 1. **Prior to Batch Draw Lock**: If a customer requests cancellation while the batch is in \`OPEN\` status, the subscription is marked \`CANCELLED\`.
-   - The assigned Lucky ID is returned to \`AVAILABLE\` status.
+   - The assigned SFEMI ID is returned to \`AVAILABLE\` status.
    - Paid EMIs are credited to customer balance or refunded per contract cancellation clauses.
 2. **After Batch Draw Lock**: Once the batch transitions to \`LOCKED\`, \`DRAW_COMMITTED\`, or \`DRAW_COMPLETED\`:
-   - The Lucky ID link is permanently frozen to preserve legal draw auditability.
-   - The subscription may be cancelled, but the Lucky ID cannot be reassigned.
-3. **Zero Cash Refund for Lucky Draw Winners**:
+   - The SFEMI ID link is permanently frozen to preserve legal draw auditability.
+   - The subscription may be cancelled, but the SFEMI ID cannot be reassigned.
+3. **Zero Cash Refund for SFEMI Benefit Recipients**:
    - Winning a draw waives remaining future EMI obligations 100%.
    - **No cash refund** is ever provided for EMIs or advance down payments settled prior to the winning draw.
 
@@ -276,9 +276,9 @@ This policy governs warehousing, transit, delivery dispatch, and physical asset 
 1. **Physical Inventory Verification**: No delivery request may be scheduled or dispatched unless the specific inventory items physically exist in the central warehouse or showroom stock ledger.
 2. **Strict Prohibition of Speculative Deliveries**: Staff cannot confirm delivery dates based on anticipated vendor shipments that have not cleared warehouse Goods Receipt inspection.
 
-## 2. Lucky Plan EMI Delivery Eligibility Gates
+## 2. SFEMI Advance EMI Delivery Eligibility Gates
 
-A customer enrolled in the Lucky Plan Advance EMI program becomes eligible for delivery **only** upon satisfying one of the following three objective conditions:
+A customer enrolled in the SFEMI Advance EMI program becomes eligible for delivery **only** upon satisfying one of the following three objective conditions:
 
 1. **Condition 1 (Draw Winner)**: The customer's subscription achieves \`WON\` status following an audited monthly draw. Delivery eligibility unlocks immediately upon draw result publication.
 2. **Condition 2 (Tenure Completion)**: The customer settles 100% of scheduled monthly EMIs, achieving \`COMPLETED\` subscription status.
@@ -321,7 +321,7 @@ Physical handover requires complete execution of the Proof of Delivery protocol:
     effectiveDate: "2026-08-20",
     summary:
       "Operational framework, batch structure, SFEMI ID rules, promotional benefit mechanisms, advance delivery terms, and future EMI treatment invariants.",
-    content: `# Lucky Plan Advance EMI Policy
+    content: `# SFEMI Advance EMI Policy
 
 Subidha Furniture's **SFEMI** is a retail installment program enabling households to acquire high-quality furniture through transparent, disciplined monthly advance installments and documented promotional benefits.
 
@@ -334,13 +334,13 @@ Subidha Furniture's **SFEMI** is a retail installment program enabling household
    - Section 15 of the Central Goods and Services Tax (CGST) Act, 2017.
 3. **Contract Value Determination**: The product's showroom base price represents the total contract value. Monthly EMI is deterministically computed by dividing the total contract value by the batch tenure (e.g., 10 to 15 months).
 
-## 2. Batch Architecture & Lucky ID Allocation
+## 2. Batch Architecture & SFEMI ID Allocation
 
 1. **Managed Batch Cycles**: Subscriptions are organized into structured batches containing a maximum of 100 slots (numbered 00 to 99).
-2. **Lucky ID Assignment**:
-   - Each enrolled customer is allocated a unique Lucky ID within their chosen batch upon initial installment payment.
-   - A customer may enroll in multiple subscriptions across the same or different batches, receiving an independent Lucky ID for each contract.
-   - Lucky ID allocation does not guarantee winning.
+2. **SFEMI ID Assignment**:
+   - Each enrolled customer is allocated a unique SFEMI ID within their chosen batch upon initial installment payment.
+   - A customer may enroll in multiple subscriptions across the same or different batches, receiving an independent SFEMI ID for each contract.
+   - SFEMI ID allocation does not guarantee winning.
 
 ## 3. Advance Delivery Facility (60% to 80% Prepayment)
 
@@ -353,18 +353,18 @@ Subidha Furniture's **SFEMI** is a retail installment program enabling household
 
 ## 4. Cryptographic Fair Draw Procedure (Commit-then-Reveal)
 
-1. **Batch Lock**: Prior to draw execution, batch eligibility is locked. An immutable cryptographic snapshot of all active, eligible Lucky IDs is recorded.
+1. **Batch Lock**: Prior to draw execution, batch eligibility is locked. An immutable cryptographic snapshot of all active, eligible SFEMI IDs is recorded.
 2. **SHA-256 Commitment**:
    - Before the draw, the system generates a random seed and commitment string, computing its SHA-256 cryptographic hash.
    - The commitment hash is publicly published on the website prior to the draw event.
 3. **Public Reveal & Verification**:
    - Following the physical or automated draw selection, the secret seed and winning number are revealed.
    - Any customer or auditor can verify that \`SHA256(seed + winning_number) == published_hash\`, proving mathematically that the winning number was not altered retrospectively.
-4. **Privacy Protection**: Winner names are masked on public displays (e.g., "Pradip R***, Lucky ID: 42") in accordance with data privacy standards.
+4. **Privacy Protection**: Winner names are masked on public displays (e.g., "Pradip R***, SFEMI ID: 42") in accordance with data privacy standards.
 
 ## 5. Winner Benefit: Strict Future EMI Waiver Invariant
 
-1. **Future Obligations Waived**: When a Lucky ID is verified as the winning slot for a draw month, all remaining unpaid future EMIs from that month forward are **100% waived**.
+1. **Future Obligations Waived**: When a SFEMI ID is verified as the winning slot for a draw month, all remaining unpaid future EMIs from that month forward are **100% waived**.
 2. **Zero Cash Refund Invariant**:
    - Any EMI or advance down payment settled prior to the winning draw is fully earned, posted, and append-only.
    - **Under no circumstances is any cash, bank transfer, or monetary refund issued for settled payments.**
@@ -543,7 +543,7 @@ This policy defines the core bookkeeping, revenue recognition, and ledger postin
 1. **Direct Sales**: Revenue is recognized upon issuance of the tax invoice and physical delivery of the merchandise.
 2. **Rental and Lease Demands**: Revenue is recognized monthly on an accrual basis when periodic rent demands are generated.
 3. **Security Deposits**: Deposits are credited to liability accounts (\`Customer Security Deposits Payable\`) and are never recognized as operating revenue.
-4. **Lucky Plan EMI Collections**: Installments collected reduce contractual customer receivables. Waiver benefits resulting from lucky draw wins are expensed to audited promotional discount / waiver accounts without altering past cash entries.
+4. **SFEMI Advance EMI Collections**: Installments collected reduce contractual customer receivables. Waiver benefits resulting from promotional benefit selections are expensed to audited promotional discount / waiver accounts without altering past cash entries.
 
 ## 3. Customer Advances and Liabilities
 
@@ -653,7 +653,7 @@ This policy governs commercial relationships, lead facilitation, referral incent
 1. **Facilitator Status**: Partners act strictly as lead generators, community liaisons, and customer onboarding facilitators.
 2. **No Agency or Employment**: Registration as a partner does not create any employment, partnership, joint venture, or legal agency relationship with Subidha Furniture.
 3. **Prohibition of Promises**: Partners have **no legal authority** to:
-   - Promise waivers, discounts, or lucky draw wins to customers;
+   - Promise waivers, discounts, or promotional benefit selections to customers;
    - Collect cash or unauthorized payments without immediate system receipts;
    - Modify contract tenures, installment amounts, or delivery schedules.
 
@@ -692,7 +692,7 @@ To protect customer rights and financial integrity, Subidha Furniture enforces s
 
 ## 1. Immutable Contract Invariant
 
-Once a contract (Lucky Plan EMI, Rent, or Lease) is activated, its core financial attributes—total contract value, monthly installment amount, tenure, assigned Lucky ID, batch code, and paid history—are legally locked and protected from arbitrary modification.
+Once a contract (SFEMI Advance EMI, Rent, or Lease) is activated, its core financial attributes—total contract value, monthly installment amount, tenure, assigned SFEMI ID, batch code, and paid history—are legally locked and protected from arbitrary modification.
 
 ## 2. Whitelisted Permissible Amendments
 
@@ -704,13 +704,13 @@ Only specific, audited amendments are permitted through hardened service paths:
 2. **Same-Price Product Reference Correction (Phase 4)**:
    - If an administrative clerical error occurred during product SKU selection, and the customer agrees to substitute an identical-priced model:
    - Amendment is permitted **only if the replacement product base price exactly matches the original product price**.
-   - Financial totals, monthly EMI, tenure, paid amounts, Lucky ID, batch assignment, and accounting entries remain 100% unchanged.
+   - Financial totals, monthly EMI, tenure, paid amounts, SFEMI ID, batch assignment, and accounting entries remain 100% unchanged.
 
 ## 3. Strictly Prohibited Amendments
 
 The following amendments are **strictly blocked by the system** and cannot be executed via the standard workbench:
 1. Retroactive modification of past EMI amounts or payment dates;
-2. Swapping of assigned Lucky IDs after batch draw locking;
+2. Swapping of assigned SFEMI IDs after batch draw locking;
 3. Conversion of non-winning subscriptions into winning subscriptions;
 4. Alteration of customer identity to a third party without formal contract assignment;
 5. Unilateral changes to rent deposit terms or yield percentages.
@@ -728,10 +728,10 @@ The following amendments are **strictly blocked by the system** and cannot be ex
     version: "2.1",
     effectiveDate: "2026-08-20",
     summary:
-      "Arrears tracking, reminder schedules, draw eligibility holds, hire-purchase repossession rules, and Lucky ID release governance.",
+      "Arrears tracking, reminder schedules, draw eligibility holds, hire-purchase repossession rules, and SFEMI ID release governance.",
     content: `# EMI Subscription Arrears and Default Policy
 
-This policy outlines operational procedures, grace periods, reminder protocols, and legal remedies applied when a customer defaults on Lucky Plan advance installment obligations.
+This policy outlines operational procedures, grace periods, reminder protocols, and legal remedies applied when a customer defaults on SFEMI advance installment obligations.
 
 ## 1. Due Dates and Grace Periods
 
@@ -743,7 +743,7 @@ This policy outlines operational procedures, grace periods, reminder protocols, 
 When an installment remains unpaid past the grace period, automated and staff reminders follow a structured schedule:
 - **Day 11 (Soft Reminder)**: Automated SMS and WhatsApp notice of overdue installment.
 - **Day 18 (Operational Call)**: Showroom customer service call to understand payment constraints and offer digital remittance support.
-- **Day 25 (Draw Eligibility Hold Notice)**: Formal notification that failure to settle prior to month-end results in suspension of lucky draw participation for the upcoming cycle.
+- **Day 25 (Draw Eligibility Hold Notice)**: Formal notification that failure to settle prior to month-end results in suspension of promotional benefit selection participation for the upcoming cycle.
 - **Day 31 (Default Notice)**: Formal written Notice of Default issued via registered post / WhatsApp.
 
 ## 3. Draw Eligibility Suspension
@@ -761,10 +761,10 @@ For customers who received immediate furniture possession under the Advance Deli
    - The customer is liable for repossession transport, inspection, and refurbishment costs.
    - Repossessed items are inspected and liquidated to offset unpaid contract balances in accordance with hire-purchase legal standards.
 
-## 5. Lucky ID Release Governance Upon Cancellation
+## 5. SFEMI ID Release Governance Upon Cancellation
 
-1. **Cancellation Prior to Draw Lock**: If a defaulted subscription is cancelled while the batch is \`OPEN\`, the Lucky ID is safely unlinked and returned to \`AVAILABLE\` status for reassignment.
-2. **Cancellation After Draw Lock**: If cancelled after batch locking or draw execution, the Lucky ID remains permanently linked to the cancelled subscription record to maintain legal draw auditability.`,
+1. **Cancellation Prior to Draw Lock**: If a defaulted subscription is cancelled while the batch is \`OPEN\`, the SFEMI ID is safely unlinked and returned to \`AVAILABLE\` status for reassignment.
+2. **Cancellation After Draw Lock**: If cancelled after batch locking or draw execution, the SFEMI ID remains permanently linked to the cancelled subscription record to maintain legal draw auditability.`,
   },
 
   "lucky-draw-rules-fairness": {
@@ -777,7 +777,7 @@ For customers who received immediate furniture possession under the Advance Deli
       "Mathematical and cryptographic verification procedures for monthly fair draws, commitment hashes, public audits, and winner benefit execution.",
     content: `# Fair Draw Integrity and Commitment Policy
 
-Subidha Furniture operates monthly lucky draws under cryptographic and operational safeguards that prevent retrospective tampering, ensuring absolute transparency.
+Subidha Furniture operates monthly promotional benefit selections under cryptographic and operational safeguards that prevent retrospective tampering, ensuring absolute transparency.
 
 ## 1. Commit-then-Reveal Cryptographic Protocol
 
@@ -787,7 +787,7 @@ To mathematically prove that draw outcomes are not manipulated:
    - The system computes the SHA-256 hash: \`Hash = SHA256(secret_seed + batch_code + draw_month)\`.
    - This 64-character hexadecimal hash is published on the public website and social channels **prior to the draw event**.
 3. **Physical / Digital Draw Selection**:
-   - The winning Lucky ID (00 to 99) is determined through an open, public draw conducted at the showroom in the presence of attending customers.
+   - The winning SFEMI ID (00 to 99) is determined through an open, public draw conducted at the showroom in the presence of attending customers.
 4. **Post-Draw Secret Reveal**:
    - Immediately following selection, the secret seed is published.
    - Any customer or public auditor can input the revealed seed into standard SHA-256 tools to confirm that the hash matches the pre-published commitment.
@@ -796,7 +796,7 @@ To mathematically prove that draw outcomes are not manipulated:
 
 1. **Eligibility Lock**: Twenty-four (24) hours prior to the draw, the batch is transitioned to \`LOCKED\` status.
 2. **Draw Eligibility Snapshot**:
-   - An immutable snapshot (\`DrawEligibilitySnapshot\`) records every eligible customer, Lucky ID, subscription reference, and payment status.
+   - An immutable snapshot (\`DrawEligibilitySnapshot\`) records every eligible customer, SFEMI ID, subscription reference, and payment status.
    - New enrollments, cancellations, or payment edits are strictly locked out of the snapshot.
    - The winner selection algorithm evaluates **only** the frozen snapshot, preventing live database manipulation.
 
@@ -809,7 +809,7 @@ To mathematically prove that draw outcomes are not manipulated:
 ## 4. Public Winner Presentation and Privacy
 
 1. **Public Display**: Winning numbers, batch codes, draw months, and commitment verification details are displayed on the public Winner Showcase.
-2. **Data Masking**: To protect customer privacy under the Digital Personal Data Protection Act, 2023, customer names are masked (e.g., "Amit K***, Lucky ID: 88").`,
+2. **Data Masking**: To protect customer privacy under the Digital Personal Data Protection Act, 2023, customer names are masked (e.g., "Amit K***, SFEMI ID: 88").`,
   },
 
   "possession-handover-policy": {
@@ -828,7 +828,7 @@ This policy defines the legal standards, documentation, and condition verificati
 
 1. **Direct Sale Handover**: Handover transfers full possessory custody and ownership title (provided 100% payment has cleared).
 2. **Rent and Lease Handover**: Handover transfers possessory custody under a contract of bailment. Full legal title and ownership remain strictly with Subidha Furniture.
-3. **Advance Delivery (Lucky Plan)**: Handover transfers possessory custody under hire-purchase terms with title retention until full contract settlement.
+3. **Advance Delivery (SFEMI)**: Handover transfers possessory custody under hire-purchase terms with title retention until full contract settlement.
 
 ## 2. Joint Handover Inspection Protocol
 
@@ -990,7 +990,7 @@ Subidha Furniture is committed to safeguarding customer personal data in strict 
 In executing retail sales, installment subscriptions, rental agreements, and deliveries, we collect:
 1. **Identity Data**: Full name, masked Aadhaar (last four digits only), PAN, Voter ID, Driving License, customer photograph, and signature.
 2. **Contact Data**: Physical delivery address, permanent residential address, mobile phone number, WhatsApp contact, and email address.
-3. **Contractual & Commercial Data**: Subscribed product SKUs, tenure, EMI schedules, lucky IDs, delivery notes, and return inspection reports.
+3. **Contractual & Commercial Data**: Subscribed product SKUs, tenure, EMI schedules, SFEMI IDs, delivery notes, and return inspection reports.
 4. **Financial Records**: Payment mode, transaction reference numbers (UTR / UPI Ref), bank account details (solely for deposit refunds and commission payouts), and receipt records.
 5. **Technical Data**: IP address, session timestamps, and portal authentication logs.
 
@@ -1004,7 +1004,7 @@ In executing retail sales, installment subscriptions, rental agreements, and del
 ## 3. Purpose of Data Processing
 
 Customer data is processed exclusively for legitimate business purposes:
-1. Execution and administration of Direct Sale, Lucky Plan EMI, Rent, and Lease contracts;
+1. Execution and administration of Direct Sale, SFEMI Advance EMI, Rent, and Lease contracts;
 2. Processing payments, issuing tax invoices, and delivering official digital receipts;
 3. Verifying premises tenancy and asset custody security for rental/lease arrangements;
 4. Scheduling delivery, routing vehicles, and executing physical handover verification;

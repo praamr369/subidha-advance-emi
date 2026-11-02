@@ -95,7 +95,7 @@ export default function HowItWorksPage() {
         <strong className="font-semibold">Important: </strong>
         This page explains all five customer journeys in plain language. Final rights and
         obligations are governed by your approved contract, receipt records, and official policy
-        documents. Advance EMI / Lucky Plan participation does not guarantee winning.
+        documents. SFEMI (Advance EMI) participation does not guarantee selection.
       </div>
 
       <WorkflowFlowDiagram />
@@ -132,7 +132,7 @@ export default function HowItWorksPage() {
       <PublicMarketingBanner
         eyebrow="Draw transparency"
         title="Commit-then-reveal draw process"
-        description="The monthly Lucky Plan draw uses a commit-then-reveal mechanism. A commitment hash is published before the draw; the reveal is published afterward and can be verified. No public action can change a revealed result."
+        description="The monthly SFEMI promotional benefit selection uses a commit-then-reveal mechanism. A commitment hash is published before the selection; the reveal is published afterward and can be verified. No public action can change a revealed result."
         items={[
           {
             title: "Commitment hash published first",
@@ -143,16 +143,16 @@ export default function HowItWorksPage() {
             description: "The actual draw result is published later and can be checked against the earlier commitment for transparency.",
           },
           {
-            title: "Winner benefit is future EMI waiver only",
-            description: "If your Lucky ID wins, future remaining EMI may be waived from the approved winning month. Past paid EMI is not refunded.",
+            title: "Benefit is remaining future EMI waiver only",
+            description: "If your SFEMI ID is selected, remaining future EMI obligations may be waived from the approved selection month. Past paid EMI is not refunded.",
           },
         ]}
       />
 
       <PublicMarketingBanner
         eyebrow="Rent and lease"
-        title="No Lucky ID for Rent or Lease"
-        description="Rent and lease are completely separate contract types. They do not participate in the monthly Lucky Plan draw, carry no EMI waiver benefit, and do not assign Lucky IDs."
+        title="No SFEMI ID for Rent or Lease"
+        description="Rent and lease are completely separate contract types. They do not participate in the monthly SFEMI promotional benefit selection, carry no EMI waiver benefit, and do not assign SFEMI IDs."
         items={[
           {
             title: "Rent — flexible monthly usage",

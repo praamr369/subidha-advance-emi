@@ -392,17 +392,17 @@ export default function AdminLuckyIdDetailPage() {
 
   return (
     <ERPPageShell
-      eyebrow="Lucky Plan"
+      eyebrow="SFEMI"
       title={
         luckyId
-          ? `Lucky ID ${formatLuckyNumber(luckyId.lucky_number)}`
-          : `Lucky ID #${luckyIdId ?? "—"}`
+          ? `SFEMI ID ${formatLuckyNumber(luckyId.lucky_number)}`
+          : `SFEMI ID #${luckyIdId ?? "—"}`
       }
-      subtitle="Inspect one Lucky ID with batch ownership, assignment integrity, and linked contract context."
+      subtitle="Inspect one SFEMI ID with batch ownership, assignment integrity, and linked contract context."
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
-        { label: "Lucky IDs", href: "/admin/lucky-ids" },
-        { label: luckyId ? formatLuckyNumber(luckyId.lucky_number) : `Lucky ID #${luckyIdId ?? "—"}` },
+        { label: "SFEMI IDs", href: "/admin/lucky-ids" },
+        { label: luckyId ? formatLuckyNumber(luckyId.lucky_number) : `SFEMI ID #${luckyIdId ?? "—"}` },
       ]}
       actions={[
         {

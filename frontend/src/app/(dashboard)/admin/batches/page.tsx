@@ -418,7 +418,7 @@ export default function AdminBatchesPage() {
                 </div>
               ) : (
                 <div className="text-sm text-muted-foreground">
-                  This register stays read-only with respect to financial logic. Filtering only reduces operator noise while preserving batch status and Lucky ID traceability.
+                  This register stays read-only with respect to financial logic. Filtering only reduces operator noise while preserving batch status and SFEMI ID traceability.
                 </div>
               )
             }
@@ -568,7 +568,7 @@ export default function AdminBatchesPage() {
                         href={`/admin/lucky-ids?batch=${row.id}`}
                         className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                       >
-                        Lucky IDs
+                        SFEMI IDs
                       </Link>
                     </div>
                   )}

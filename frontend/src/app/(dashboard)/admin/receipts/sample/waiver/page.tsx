@@ -32,7 +32,7 @@ export default function SampleWaiverReceiptPage() {
           { label: "Customer", value: "Mr. Arup Dey", emphasize: true },
           { label: "Phone", value: "+91 93300 77882" },
           { label: "Subscription Ref", value: "SUB-2026-0029", emphasize: true },
-          { label: "Batch / Lucky ID", value: "APR-26-A / #08" },
+          { label: "Batch / SFEMI ID", value: "APR-26-A / #08" },
         ]}
         waiverFields={[
           { label: "Winner Month", value: "Month 9" },

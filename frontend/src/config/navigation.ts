@@ -218,7 +218,6 @@ const ADMIN_MODULE_ICONS: Record<string, NavIconKey> = {
   "CRM & Customers": "crm",
   "Sales & Contracts": "billing",
   "SFEMI Control": "luckyDraws",
-  "Lucky Plan Control": "luckyDraws",
   "Collections & Cashier": "collectPayment",
   "Finance Operations": "finance",
   "Accounting & Reconciliation": "accounting",

@@ -32,7 +32,7 @@ export default async function WinnerPublicationCard({ winner }: WinnerPublicatio
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Batch {winner.batch_code || winner.batch} · Month {winner.draw_month || winner.month}
           </div>
-          <h3 className="mt-3 text-xl font-semibold text-foreground">Lucky ID {winner.lucky_id || "—"}</h3>
+          <h3 className="mt-3 text-xl font-semibold text-foreground">SFEMI ID {winner.lucky_id || "—"}</h3>
         </div>
         <span className="rounded-full border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_82%,transparent)] px-3 py-1 text-xs font-semibold text-muted-foreground">
           {verificationLabel(winner.verification_status)}

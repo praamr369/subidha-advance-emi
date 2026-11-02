@@ -13,7 +13,7 @@ export default function PublicBottomNav() {
     { href: ROUTES.public.home, icon: Home, label: "Home" },
     { href: ROUTES.public.products, icon: Package, label: "Products" },
     { href: ROUTES.public.howItWorks, icon: Calculator, label: "EMI" },
-    { href: ROUTES.public.luckyPlan, icon: Gift, label: "Lucky Plan" },
+    { href: ROUTES.public.luckyPlan, icon: Gift, label: "SFEMI" },
     { href: ROUTES.public.login, icon: User, label: "Account" },
   ];
 

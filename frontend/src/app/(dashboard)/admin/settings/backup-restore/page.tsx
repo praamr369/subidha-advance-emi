@@ -930,13 +930,13 @@ export default function BackupRestorePage() {
 
             {/* Closed Batch Archival */}
             <WorkspaceSection
-              title="Closed Lucky Plan Batch Archival"
+              title="Closed SFEMI Batch Archival"
               description="Export completed batches into compressed standalone JSON archives (.json.gz). Keeps main database tables lightning fast."
             >
               <div className="space-y-4">
                 {batches.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
-                    No completed or closed Lucky Plan batches found yet. When a batch completes its tenure, you can export and archive its records here.
+                    No completed or closed SFEMI batches found yet. When a batch completes its tenure, you can export and archive its records here.
                   </p>
                 ) : (
                   <>

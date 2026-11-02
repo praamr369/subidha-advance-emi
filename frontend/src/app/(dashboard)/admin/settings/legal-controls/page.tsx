@@ -84,7 +84,7 @@ const PLAN_TYPE_OPTIONS = [
 ];
 const BENEFIT_TYPE_OPTIONS = [
   { value: "NONE",                 label: "None" },
-  { value: "CONTRACTUAL_WAIVER",   label: "Contractual Waiver (Lucky Plan)" },
+  { value: "CONTRACTUAL_WAIVER",   label: "Contractual Waiver (SFEMI)" },
   { value: "TRADE_DISCOUNT",       label: "Trade Discount" },
   { value: "PROMOTIONAL_CREDIT",   label: "Promotional Credit" },
 ];
@@ -566,7 +566,7 @@ export default function AdminLegalControlsPage() {
     );
     return [
       {
-        label: "Advocate approves Lucky Plan classification and contract wording",
+        label: "Advocate approves SFEMI classification and contract wording",
         done:  data.policy.risk_status === "APPROVED_FOR_PUBLIC_LAUNCH",
         tab: "policy" as Tab,
         note: "Set Waiver launch status → Approved for Public Launch in Policy Controls",
@@ -824,10 +824,10 @@ export default function AdminLegalControlsPage() {
                 <h3 className="mb-3 text-sm font-semibold text-foreground">Blocker resolution guide</h3>
                 <div className="space-y-3">
                   <Blocker
-                    title="Lucky Plan waiver public launch blocked"
+                    title="SFEMI waiver public launch blocked"
                     cleared={!data.derived.waiver_public_launch_blocked}
                     reason={`Waiver status is "${data.policy.risk_status.replace(/_/g, " ")}". System requires "Approved for Public Launch".`}
-                    fix='Get advocate/CA sign-off on Lucky Plan contract wording. Upload their signed opinion in Legal Documents tab → submit for review → approve it. Then go to Policy Controls → set Waiver launch status → "Approved for Public Launch" → Save.' />
+                    fix='Get advocate/CA sign-off on SFEMI contract wording. Upload their signed opinion in Legal Documents tab → submit for review → approve it. Then go to Policy Controls → set Waiver launch status → "Approved for Public Launch" → Save.' />
                   <Blocker
                     title="GST features blocked — UNREGISTERED mode"
                     cleared={data.derived.gst_status !== "GST_UNREGISTERED"}
@@ -900,7 +900,7 @@ export default function AdminLegalControlsPage() {
                   <div>
                     <h3 className="text-sm font-semibold text-foreground">Business model classification</h3>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      These fields define the legal structure of the Lucky Plan. Must match advocate/CA sign-off.
+                      These fields define the legal structure of SFEMI. Must match advocate/CA sign-off.
                     </p>
                   </div>
                   <div className="grid gap-4 sm:grid-cols-2">
@@ -963,7 +963,7 @@ export default function AdminLegalControlsPage() {
                   </FieldRow>
 
                   <FieldRow label="Refund SLA (working days)"
-                    hint="7 working days per Lucky Plan contract terms.">
+                    hint="7 working days per SFEMI contract terms.">
                     <div className="flex items-center gap-3">
                       <input type="number" min={1} max={60} value={refundSla}
                         onChange={(e) => setRefundSla(e.target.value)}
@@ -1074,7 +1074,7 @@ export default function AdminLegalControlsPage() {
                   Product Instalment Sale with Optional Company-Funded Monthly Waiver Benefit
                 </h3>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Legally-approved classification for Lucky Plan. Every document, API response, UI label, and
+                  Legally-approved classification for SFEMI. Every document, API response, UI label, and
                   communication must conform.
                 </p>
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -1319,7 +1319,7 @@ export default function AdminLegalControlsPage() {
                       Title / reference <span className="font-normal text-muted-foreground">(optional)</span>
                     </span>
                     <input value={docTitle} onChange={(e) => setDocTitle(e.target.value)}
-                      placeholder="e.g. Advocate Legal Opinion on Lucky Plan — Aug 2026"
+                      placeholder="e.g. Advocate Legal Opinion on SFEMI — Aug 2026"
                       className="h-10 rounded-xl border border-input bg-background px-3 text-sm" />
                   </label>
                   <label className="grid gap-1.5 text-sm md:col-span-2">
@@ -1468,7 +1468,7 @@ export default function AdminLegalControlsPage() {
                 <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-5 text-center">
                   <CheckCircle2 className="mx-auto mb-2 h-8 w-8 text-emerald-500" />
                   <p className="text-base font-bold text-emerald-900">All launch gates cleared.</p>
-                  <p className="mt-1 text-sm text-emerald-700">Lucky Plan waiver is ready for public launch.</p>
+                  <p className="mt-1 text-sm text-emerald-700">SFEMI waiver is ready for public launch.</p>
                 </div>
               ) : (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">

@@ -36,7 +36,7 @@ export default function SamplePaymentReceiptPage() {
           { label: "Customer", value: "Ms. Riya Ghosh", emphasize: true },
           { label: "Phone", value: "+91 90077 12233" },
           { label: "Subscription / Plan", value: "SUB-2026-0031", emphasize: true },
-          { label: "Batch / Lucky ID", value: "APR-26-A / Lucky #42" },
+          { label: "Batch / SFEMI ID", value: "APR-26-A / #42" },
         ]}
         referenceFields={[
           { label: "Payment Date", value: "19 Apr 2026" },
@@ -51,10 +51,10 @@ export default function SamplePaymentReceiptPage() {
           { label: "Receipt Status", value: "PAID" },
         ]}
         detailFields={[
-          { label: "Plan Name", value: "Lucky Plan EMI" },
+          { label: "Plan Name", value: "SFEMI (Advance EMI)" },
           { label: "Product", value: "Royal Dining Set" },
           { label: "Batch", value: "APR-26-A" },
-          { label: "Lucky ID", value: "#42" },
+          { label: "SFEMI ID", value: "#42" },
           { label: "Cashier", value: "SB-Counter-1" },
           { label: "Partner", value: "—" },
         ]}

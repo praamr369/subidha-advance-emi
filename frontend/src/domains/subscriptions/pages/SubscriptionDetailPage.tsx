@@ -109,7 +109,7 @@ export default function AdminSubscriptionDetailPage() {
     <ERPPageShell
       className="receipt-print-page"
       title={subscription ? `Subscription ${subscription.subscription_number || `SUB-${subscription.id}`}` : "Subscription Detail"}
-      subtitle="Track EMI schedule, reconciliation checkpoints, and Lucky Plan allocation details."
+      subtitle="Track EMI schedule, reconciliation checkpoints, and SFEMI allocation details."
     >
       <section
         className="receipt-print-hide"

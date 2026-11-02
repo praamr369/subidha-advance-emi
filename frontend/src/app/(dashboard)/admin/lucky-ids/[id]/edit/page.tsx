@@ -513,18 +513,18 @@ export default function AdminLuckyIdEditPage() {
 
   return (
     <ERPPageShell
-      eyebrow="Lucky Plan"
+      eyebrow="SFEMI"
       title={
         luckyId
-          ? `Edit Lucky ID ${formatLuckyNumber(luckyId.lucky_number)}`
-          : `Edit Lucky ID #${luckyIdId ?? "—"}`
+          ? `Edit SFEMI ID ${formatLuckyNumber(luckyId.lucky_number)}`
+          : `Edit SFEMI ID #${luckyIdId ?? "—"}`
       }
-      subtitle="Controlled correction page for Lucky ID administrative status adjustments and linkage review."
+      subtitle="Controlled correction page for SFEMI ID administrative status adjustments and linkage review."
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
-        { label: "Lucky IDs", href: "/admin/lucky-ids" },
+        { label: "SFEMI IDs", href: "/admin/lucky-ids" },
         {
-          label: luckyId ? formatLuckyNumber(luckyId.lucky_number) : `Lucky ID #${luckyIdId ?? "—"}`,
+          label: luckyId ? formatLuckyNumber(luckyId.lucky_number) : `SFEMI ID #${luckyIdId ?? "—"}`,
           href: luckyIdId ? `/admin/lucky-ids/${luckyIdId}` : "/admin/lucky-ids",
         },
         { label: "Edit" },

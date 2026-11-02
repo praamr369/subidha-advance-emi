@@ -27,13 +27,13 @@ const sections = [
     id: "no-guarantee",
     title: "No guarantee of winning",
     paragraphs: [
-      "Lucky Plan (Advance EMI) participation does not guarantee winning the monthly lucky draw. The draw is conducted under published rules. A Lucky ID assignment does not create any entitlement to a prize or waiver.",
-      "Winner benefit — if a customer's Lucky ID is selected — applies only to future EMI obligations from the approved winning month onward. Already-paid EMI is not automatically reversed or refunded.",
+      "SFEMI (Advance EMI) participation does not guarantee selection in the monthly promotional benefit event. Benefit selection is conducted under published rules. A SFEMI ID assignment does not create any entitlement to a prize or waiver.",
+      "Benefit recipient waiver — if a customer's SFEMI ID is selected — applies only to remaining future EMI obligations from the approved selection month onward. Already-paid EMI is not automatically reversed or refunded.",
     ],
   },
   {
     id: "not-gambling",
-    title: "Lucky Plan is not gambling",
+    title: "SFEMI is not gambling",
     paragraphs: [
       "SFEMI is a structured monthly instalment payment plan (Advance EMI) attached to a real product purchase contract. Participation is not an investment or wager. Any promotional benefit is governed by published terms and customer contracts.",
     ],
@@ -42,7 +42,7 @@ const sections = [
     id: "no-government-approval",
     title: "No claimed government approval",
     paragraphs: [
-      "Subidha Furniture does not claim government endorsement, RBI registration, SEBI regulation, or any regulatory approval for the Lucky Plan unless a specific approval document is separately published. The business operates as a registered local retail entity (MSME/Udyam registered; see Udyam/MSME page for details).",
+      "Subidha Furniture does not claim government endorsement, RBI registration, SEBI regulation, or any regulatory approval for SFEMI unless a specific approval document is separately published. The business operates as a registered local retail entity (MSME/Udyam registered; see Udyam/MSME page for details).",
     ],
   },
   {

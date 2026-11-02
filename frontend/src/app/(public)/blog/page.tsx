@@ -9,7 +9,7 @@ import { ROUTES } from "@/lib/routes";
 export const metadata: Metadata = {
   title: "Blog",
   description:
-    "Plain-language articles about Lucky Plan rules, monthly winner transparency, and choosing furniture with a structured payment plan.",
+    "Plain-language articles about SFEMI rules, monthly promotional benefit transparency, and choosing furniture with a structured payment plan.",
 };
 
 export default function BlogIndexPage() {
@@ -18,7 +18,7 @@ export default function BlogIndexPage() {
   return (
     <PublicPageShell
       title="Blog"
-      subtitle="Clear, practical writing about the Lucky Plan model, winner transparency, and choosing furniture with a monthly plan."
+      subtitle="Clear, practical writing about the SFEMI model, recipient transparency, and choosing furniture with a monthly plan."
       breadcrumbs={[
         { label: "Home", href: ROUTES.public.home },
         { label: "Blog" },
@@ -32,7 +32,7 @@ export default function BlogIndexPage() {
         <SectionHeader
           eyebrow="Articles"
           title="Helpful guides, not hype"
-          description="No fake testimonials, no inflated statistics—just useful explanations that match how Lucky Plan works in the real shop workflow."
+          description="No fake testimonials, no inflated statistics—just useful explanations that match how SFEMI works in the real shop workflow."
         />
         <div className="grid gap-6 lg:grid-cols-3">
           {posts.map((post) => (
