@@ -286,35 +286,42 @@ def check_stock_for_delivery(
 
     # 1. ProductRelationship (PIM catalog)
     product = getattr(inventory_item, "product", None)
-    if product and hasattr(product, "related_products"):
-        for rel in product.related_products.select_related("related_product", "related_product__inventory_profile").all():
-            if rel.parent_variant_sku and variant_sku and rel.parent_variant_sku != variant_sku:
-                continue
-            rel_inv = getattr(rel.related_product, "inventory_profile", None)
-            if not rel_inv or not rel_inv.stock_tracking_enabled:
-                continue
-            checked_acc_ids.add(rel_inv.id)
-            rel_req = qty * Decimal(str(rel.quantity or 1))
-            rel_phys = rel_inv.current_stock_quantity()
-            rel_avail = rel_inv.available_qty()
-            if rel_phys < rel_req:
-                return {
-                    "ok": False,
-                    "reason": (
-                        f"Required bundled {rel.relationship_type.title()} '{rel.related_product.name}' "
-                        f"({rel.related_product.product_code}) is out of stock. Available: {rel_phys:.2f}, Required: {rel_req:.2f}."
-                    ),
-                    "bundled_item_id": rel.related_product_id,
-                }
-            if rel_avail < rel_req and rel_phys >= rel_req:
-                return {
-                    "ok": False,
-                    "reason": (
-                        f"Required bundled {rel.relationship_type.title()} '{rel.related_product.name}' "
-                        f"has insufficient available stock ({rel_avail:.2f}) for required {rel_req:.2f} due to reservations."
-                    ),
-                    "bundled_item_id": rel.related_product_id,
-                }
+    v_sku = variant_sku or getattr(inventory_item, "sku", None)
+    candidate_rels = []
+    if product and hasattr(product, "related_products") and product.related_products.exists():
+        candidate_rels = list(product.related_products.select_related("related_product", "related_product__inventory_profile").all())
+    elif v_sku:
+        from products_core.models import ProductRelationship
+        candidate_rels = list(ProductRelationship.objects.filter(parent_variant_sku=v_sku).select_related("related_product", "related_product__inventory_profile").all())
+
+    for rel in candidate_rels:
+        if rel.parent_variant_sku and v_sku and rel.parent_variant_sku != v_sku:
+            continue
+        rel_inv = getattr(rel.related_product, "inventory_profile", None)
+        if not rel_inv or not rel_inv.stock_tracking_enabled:
+            continue
+        checked_acc_ids.add(rel_inv.id)
+        rel_req = qty * Decimal(str(rel.quantity or 1))
+        rel_phys = rel_inv.current_stock_quantity()
+        rel_avail = rel_inv.available_qty()
+        if rel_phys < rel_req:
+            return {
+                "ok": False,
+                "reason": (
+                    f"Required bundled {rel.relationship_type.title()} '{rel.related_product.name}' "
+                    f"({rel.related_product.product_code}) is out of stock. Available: {rel_phys:.2f}, Required: {rel_req:.2f}."
+                ),
+                "bundled_item_id": rel.related_product_id,
+            }
+        if rel_avail < rel_req and rel_phys >= rel_req:
+            return {
+                "ok": False,
+                "reason": (
+                    f"Required bundled {rel.relationship_type.title()} '{rel.related_product.name}' "
+                    f"has insufficient available stock ({rel_avail:.2f}) for required {rel_req:.2f} due to reservations."
+                ),
+                "bundled_item_id": rel.related_product_id,
+            }
 
     # 2. FinishedGoodAccessoryLink (Inventory FG profile)
     if hasattr(inventory_item, "accessory_links"):
@@ -324,10 +331,17 @@ def check_stock_for_delivery(
                 continue
             checked_acc_ids.add(acc_inv.id)
             pim_rel = None
-            if inventory_item.product and hasattr(inventory_item.product, "related_products") and acc_inv.product:
-                pim_rel = inventory_item.product.related_products.filter(
-                    related_product=acc_inv.product
-                ).first()
+            if acc_inv.product_id:
+                from products_core.models import ProductRelationship
+                if v_sku:
+                    pim_rel = ProductRelationship.objects.filter(
+                        related_product_id=acc_inv.product_id,
+                        parent_variant_sku=v_sku,
+                    ).first()
+                if not pim_rel and inventory_item.product and hasattr(inventory_item.product, "related_products"):
+                    pim_rel = inventory_item.product.related_products.filter(
+                        related_product=acc_inv.product
+                    ).first()
             acc_ratio = Decimal(str(pim_rel.quantity)) if pim_rel and pim_rel.quantity else Decimal(str(getattr(link, "quantity", None) or 1))
             acc_req = qty * acc_ratio
             acc_phys = acc_inv.current_stock_quantity()

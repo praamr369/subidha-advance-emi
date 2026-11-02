@@ -219,33 +219,50 @@ def sync_delivery_inventory_bridge(*, delivery, performed_by=None) -> dict:
             item_variant_skus.add(delivery.variant_sku)
 
         # 1. Bundled Products / Accessories from ProductRelationship (PIM catalog)
-        if hasattr(product, "related_products"):
-            for rel in product.related_products.select_related("related_product", "related_product__inventory_profile").all():
-                if rel.parent_variant_sku and item_variant_skus and rel.parent_variant_sku not in item_variant_skus:
-                    continue
-                rel_inv = getattr(rel.related_product, "inventory_profile", None)
-                if rel_inv is None or not rel_inv.stock_tracking_enabled:
-                    continue
-                processed_acc_ids.add(rel_inv.id)
-                bundled_qty = qty * Decimal(str(rel.quantity or 1))
-                rel_ref_id = f"{delivery.id}-{product.id}:bundled:{rel.id}"
-                acc_name = rel.related_product.name
-                link_label = f"Bundled {rel.relationship_type.title()}"
-                entries_created += _sync_accessory_stock_entry(
-                    delivery=delivery,
-                    product=product,
-                    acc_inv=rel_inv,
-                    bundled_qty=bundled_qty,
-                    movement_type=movement_type,
-                    is_inflow=is_inflow,
-                    is_outflow=is_outflow,
-                    delivery_ref=delivery_ref,
-                    link_type_label=link_label,
-                    acc_name=acc_name,
-                    primary_ref_id=rel_ref_id,
-                    inventory_item=inventory_item,
-                    performed_by=performed_by,
-                )
+        candidate_rels = []
+        if hasattr(product, "related_products") and product.related_products.exists():
+            candidate_rels = list(product.related_products.select_related("related_product", "related_product__inventory_profile").all())
+        elif item_variant_skus:
+            from products_core.models import ProductRelationship
+            candidate_rels = list(ProductRelationship.objects.filter(parent_variant_sku__in=item_variant_skus).select_related("related_product", "related_product__inventory_profile").all())
+            if not candidate_rels:
+                try:
+                    from products_pim.models import ProductVariant
+                    pv = ProductVariant.objects.filter(operational_product_id=product.id).first()
+                    if pv and pv.product_id:
+                        from products_core.models import Product as CoreProduct
+                        base_p = CoreProduct.objects.filter(id=pv.product_id).first()
+                        if base_p and hasattr(base_p, "related_products"):
+                            candidate_rels = list(base_p.related_products.select_related("related_product", "related_product__inventory_profile").all())
+                except Exception:
+                    pass
+
+        for rel in candidate_rels:
+            if rel.parent_variant_sku and item_variant_skus and rel.parent_variant_sku not in item_variant_skus:
+                continue
+            rel_inv = getattr(rel.related_product, "inventory_profile", None)
+            if rel_inv is None or not rel_inv.stock_tracking_enabled:
+                continue
+            processed_acc_ids.add(rel_inv.id)
+            bundled_qty = qty * Decimal(str(rel.quantity or 1))
+            rel_ref_id = f"{delivery.id}-{product.id}:bundled:{rel.id}"
+            acc_name = rel.related_product.name
+            link_label = f"Bundled {rel.relationship_type.title()}"
+            entries_created += _sync_accessory_stock_entry(
+                delivery=delivery,
+                product=product,
+                acc_inv=rel_inv,
+                bundled_qty=bundled_qty,
+                movement_type=movement_type,
+                is_inflow=is_inflow,
+                is_outflow=is_outflow,
+                delivery_ref=delivery_ref,
+                link_type_label=link_label,
+                acc_name=acc_name,
+                primary_ref_id=rel_ref_id,
+                inventory_item=inventory_item,
+                performed_by=performed_by,
+            )
 
         # 2. Linked Accessories from FinishedGoodAccessoryLink (Inventory FG profile)
         if inventory_item and hasattr(inventory_item, "accessory_links"):
@@ -259,10 +276,17 @@ def sync_delivery_inventory_bridge(*, delivery, performed_by=None) -> dict:
 
                 # Authoritative quantity from PIM relationship if present, else link quantity
                 pim_rel = None
-                if hasattr(product, "related_products") and acc_inv.product:
-                    pim_rel = product.related_products.filter(
-                        related_product=acc_inv.product
-                    ).first()
+                if acc_inv.product_id:
+                    from products_core.models import ProductRelationship
+                    if inventory_item and inventory_item.sku:
+                        pim_rel = ProductRelationship.objects.filter(
+                            related_product_id=acc_inv.product_id,
+                            parent_variant_sku=inventory_item.sku,
+                        ).first()
+                    if not pim_rel and hasattr(product, "related_products"):
+                        pim_rel = product.related_products.filter(
+                            related_product=acc_inv.product
+                        ).first()
                 acc_ratio = Decimal(str(pim_rel.quantity)) if pim_rel and pim_rel.quantity else Decimal(str(getattr(link, "quantity", None) or 1))
                 bundled_qty = qty * acc_ratio
                 rel_ref_id = f"{delivery.id}-{product.id}:fg_acc:{link.id}"

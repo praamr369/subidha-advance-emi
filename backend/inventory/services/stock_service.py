@@ -367,30 +367,36 @@ def post_invoice_stock_movements(*, invoice, posted_by=None) -> dict:
 
         # 1. ProductRelationship (PIM catalog)
         product = line.inventory_item.product
-        if product and hasattr(product, "related_products"):
-            variant_sku = getattr(line, "sku_snapshot", None) or getattr(product, "sku", None)
-            for rel in product.related_products.select_related("related_product", "related_product__inventory_profile").all():
-                if rel.parent_variant_sku and variant_sku and rel.parent_variant_sku != variant_sku:
-                    continue
-                rel_inv = getattr(rel.related_product, "inventory_profile", None)
-                if not rel_inv or not rel_inv.stock_tracking_enabled:
-                    continue
-                processed_acc_ids.add(rel_inv.id)
-                bundled_qty = line.quantity * Decimal(str(rel.quantity or 1))
-                _, rel_created = create_stock_ledger_entry(
-                    inventory_item=rel_inv,
-                    movement_type=StockMovementType.SALE_OUT,
-                    movement_date=invoice.invoice_date,
-                    stock_location=rel_inv.default_stock_location,
-                    quantity_out=bundled_qty,
-                    reference_model="BillingInvoiceLine",
-                    reference_id=f"{invoice.id}:{line.id}:bundled:{rel.id}",
-                    notes=f"{invoice.document_no or ''} (Bundled {rel.relationship_type.title()}: {rel.related_product.name})",
-                    posted_by=posted_by,
-                    posted_journal_entry=invoice.posted_journal_entry,
-                )
-                created_count += 1 if rel_created else 0
-                existing_count += 0 if rel_created else 1
+        variant_sku = getattr(line, "sku_snapshot", None) or getattr(product, "sku", None) or getattr(line.inventory_item, "sku", None)
+        candidate_rels = []
+        if product and hasattr(product, "related_products") and product.related_products.exists():
+            candidate_rels = list(product.related_products.select_related("related_product", "related_product__inventory_profile").all())
+        elif variant_sku:
+            from products_core.models import ProductRelationship
+            candidate_rels = list(ProductRelationship.objects.filter(parent_variant_sku=variant_sku).select_related("related_product", "related_product__inventory_profile").all())
+
+        for rel in candidate_rels:
+            if rel.parent_variant_sku and variant_sku and rel.parent_variant_sku != variant_sku:
+                continue
+            rel_inv = getattr(rel.related_product, "inventory_profile", None)
+            if not rel_inv or not rel_inv.stock_tracking_enabled:
+                continue
+            processed_acc_ids.add(rel_inv.id)
+            bundled_qty = line.quantity * Decimal(str(rel.quantity or 1))
+            _, rel_created = create_stock_ledger_entry(
+                inventory_item=rel_inv,
+                movement_type=StockMovementType.SALE_OUT,
+                movement_date=invoice.invoice_date,
+                stock_location=rel_inv.default_stock_location,
+                quantity_out=bundled_qty,
+                reference_model="BillingInvoiceLine",
+                reference_id=f"{invoice.id}:{line.id}:bundled:{rel.id}",
+                notes=f"{invoice.document_no or ''} (Bundled {rel.relationship_type.title()}: {rel.related_product.name})",
+                posted_by=posted_by,
+                posted_journal_entry=invoice.posted_journal_entry,
+            )
+            created_count += 1 if rel_created else 0
+            existing_count += 0 if rel_created else 1
 
         # 2. FinishedGoodAccessoryLink (Inventory FG profile)
         if line.inventory_item and hasattr(line.inventory_item, "accessory_links"):
@@ -402,10 +408,17 @@ def post_invoice_stock_movements(*, invoice, posted_by=None) -> dict:
                     continue
                 processed_acc_ids.add(acc_inv.id)
                 pim_rel = None
-                if line.inventory_item and line.inventory_item.product and hasattr(line.inventory_item.product, "related_products") and acc_inv.product:
-                    pim_rel = line.inventory_item.product.related_products.filter(
-                        related_product=acc_inv.product
-                    ).first()
+                if acc_inv.product_id:
+                    from products_core.models import ProductRelationship
+                    if variant_sku:
+                        pim_rel = ProductRelationship.objects.filter(
+                            related_product_id=acc_inv.product_id,
+                            parent_variant_sku=variant_sku,
+                        ).first()
+                    if not pim_rel and line.inventory_item and line.inventory_item.product and hasattr(line.inventory_item.product, "related_products"):
+                        pim_rel = line.inventory_item.product.related_products.filter(
+                            related_product=acc_inv.product
+                        ).first()
                 acc_ratio = Decimal(str(pim_rel.quantity)) if pim_rel and pim_rel.quantity else Decimal(str(getattr(link, "quantity", None) or 1))
                 bundled_qty = line.quantity * acc_ratio
                 acc_name = acc_inv.product.name if acc_inv.product else (acc_inv.sku or "Accessory")
@@ -452,30 +465,36 @@ def post_credit_note_stock_movements(*, note, posted_by=None) -> dict:
 
         # 1. ProductRelationship (PIM catalog)
         product = line.inventory_item.product
-        if product and hasattr(product, "related_products"):
-            variant_sku = getattr(line, "sku_snapshot", None) or getattr(product, "sku", None)
-            for rel in product.related_products.select_related("related_product", "related_product__inventory_profile").all():
-                if rel.parent_variant_sku and variant_sku and rel.parent_variant_sku != variant_sku:
-                    continue
-                rel_inv = getattr(rel.related_product, "inventory_profile", None)
-                if not rel_inv or not rel_inv.stock_tracking_enabled:
-                    continue
-                processed_acc_ids.add(rel_inv.id)
-                bundled_qty = line.quantity * Decimal(str(rel.quantity or 1))
-                _, rel_created = create_stock_ledger_entry(
-                    inventory_item=rel_inv,
-                    movement_type=StockMovementType.SALE_RETURN_IN,
-                    movement_date=note.note_date,
-                    stock_location=rel_inv.default_stock_location,
-                    quantity_in=bundled_qty,
-                    reference_model="BillingCreditNoteLine",
-                    reference_id=f"{note.id}:{line.id}:bundled:{rel.id}",
-                    notes=f"{note.note_no or ''} (Bundled Return {rel.relationship_type.title()}: {rel.related_product.name})",
-                    posted_by=posted_by,
-                    posted_journal_entry=note.posted_journal_entry,
-                )
-                created_count += 1 if rel_created else 0
-                existing_count += 0 if rel_created else 1
+        variant_sku = getattr(line, "sku_snapshot", None) or getattr(product, "sku", None) or getattr(line.inventory_item, "sku", None)
+        candidate_rels = []
+        if product and hasattr(product, "related_products") and product.related_products.exists():
+            candidate_rels = list(product.related_products.select_related("related_product", "related_product__inventory_profile").all())
+        elif variant_sku:
+            from products_core.models import ProductRelationship
+            candidate_rels = list(ProductRelationship.objects.filter(parent_variant_sku=variant_sku).select_related("related_product", "related_product__inventory_profile").all())
+
+        for rel in candidate_rels:
+            if rel.parent_variant_sku and variant_sku and rel.parent_variant_sku != variant_sku:
+                continue
+            rel_inv = getattr(rel.related_product, "inventory_profile", None)
+            if not rel_inv or not rel_inv.stock_tracking_enabled:
+                continue
+            processed_acc_ids.add(rel_inv.id)
+            bundled_qty = line.quantity * Decimal(str(rel.quantity or 1))
+            _, rel_created = create_stock_ledger_entry(
+                inventory_item=rel_inv,
+                movement_type=StockMovementType.SALE_RETURN_IN,
+                movement_date=note.note_date,
+                stock_location=rel_inv.default_stock_location,
+                quantity_in=bundled_qty,
+                reference_model="BillingCreditNoteLine",
+                reference_id=f"{note.id}:{line.id}:bundled:{rel.id}",
+                notes=f"{note.note_no or ''} (Bundled Return {rel.relationship_type.title()}: {rel.related_product.name})",
+                posted_by=posted_by,
+                posted_journal_entry=note.posted_journal_entry,
+            )
+            created_count += 1 if rel_created else 0
+            existing_count += 0 if rel_created else 1
 
         # 2. FinishedGoodAccessoryLink (Inventory FG profile)
         if line.inventory_item and hasattr(line.inventory_item, "accessory_links"):
@@ -487,10 +506,17 @@ def post_credit_note_stock_movements(*, note, posted_by=None) -> dict:
                     continue
                 processed_acc_ids.add(acc_inv.id)
                 pim_rel = None
-                if line.inventory_item and line.inventory_item.product and hasattr(line.inventory_item.product, "related_products") and acc_inv.product:
-                    pim_rel = line.inventory_item.product.related_products.filter(
-                        related_product=acc_inv.product
-                    ).first()
+                if acc_inv.product_id:
+                    from products_core.models import ProductRelationship
+                    if variant_sku:
+                        pim_rel = ProductRelationship.objects.filter(
+                            related_product_id=acc_inv.product_id,
+                            parent_variant_sku=variant_sku,
+                        ).first()
+                    if not pim_rel and line.inventory_item and line.inventory_item.product and hasattr(line.inventory_item.product, "related_products"):
+                        pim_rel = line.inventory_item.product.related_products.filter(
+                            related_product=acc_inv.product
+                        ).first()
                 acc_ratio = Decimal(str(pim_rel.quantity)) if pim_rel and pim_rel.quantity else Decimal(str(getattr(link, "quantity", None) or 1))
                 bundled_qty = line.quantity * acc_ratio
                 acc_name = acc_inv.product.name if acc_inv.product else (acc_inv.sku or "Accessory")
