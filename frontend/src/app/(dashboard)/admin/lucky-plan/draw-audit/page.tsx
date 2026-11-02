@@ -38,19 +38,19 @@ export default function DrawAuditPage() {
 
   return (
     <ERPPageShell
-      title="Lucky Draw Audit Trail"
-      subtitle="Cryptographic fairness verification for all draws"
+      title="Promotional Benefit Audit Trail"
+      subtitle="Cryptographic fairness verification for all promotional benefit selections"
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
-        { label: "Lucky Plan", href: "/admin/lucky-plan/batches" },
-        { label: "Draw Audit" },
+        { label: "SFEMI Control", href: "/admin/lucky-plan" },
+        { label: "Benefit Audit" },
       ]}
     >
       <div className="space-y-6">
         <WorkspaceSection title="How Fairness Works">
           <ol className="text-sm space-y-1 list-decimal list-inside text-blue-800 dark:text-blue-200">
             <li>Before draw: SHA-256 commitment hash is published (immutable)</li>
-            <li>Draw runs: winner selected from eligible set using hash + seed</li>
+            <li>Benefit runs: recipient selected from eligible set using hash + seed</li>
             <li>After draw: reveal seed is published publicly</li>
             <li>Anyone can verify: hash(seed + eligible_ids) must match commit</li>
           </ol>

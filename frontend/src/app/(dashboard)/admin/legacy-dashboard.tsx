@@ -1152,7 +1152,7 @@ export default function AdminDashboardPage() {
               >
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                   <ModuleOperationalCard
-                    title="Lucky Plan / EMI"
+                    title="SFEMI / Advance EMI"
                     href={ROUTES.admin.subscriptions}
                     icon={<BadgeCheck className="h-4 w-4 text-white" />}
                     iconBg="bg-sky-600 dark:bg-sky-700"

@@ -115,12 +115,12 @@ export default function CustomerLuckyDrawsPage() {
     },
     {
       key: "lucky_number",
-      title: "Lucky Number",
+      title: "SFEMI ID",
       render: (row) => row.lucky_number || "—",
     },
     {
       key: "draw_date",
-      title: "Draw Date",
+      title: "Benefit Date",
       render: (row) => formatDate(row.draw_date),
     },
     {
@@ -162,7 +162,7 @@ export default function CustomerLuckyDrawsPage() {
   ];
 
   return (
-    <ERPPageShell title="Lucky Draws">
+    <ERPPageShell title="SFEMI Promotional Benefits">
       <div className="space-y-6">
         {/* Lucky Draw Stats */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -170,7 +170,7 @@ export default function CustomerLuckyDrawsPage() {
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Total Participations</p>
               <p className="text-3xl font-semibold">{stats.totalParticipations}</p>
-              <p className="text-xs text-muted-foreground">Monthly lucky draws</p>
+              <p className="text-xs text-muted-foreground">Monthly benefit events</p>
             </div>
           </ERPSectionShell>
 
@@ -178,9 +178,9 @@ export default function CustomerLuckyDrawsPage() {
             <div className="space-y-2 flex items-start gap-2">
               <Trophy className="h-8 w-8 text-yellow-600 flex-shrink-0" />
               <div>
-                <p className="text-sm text-muted-foreground">Total Wins</p>
+                <p className="text-sm text-muted-foreground">Benefits Received</p>
                 <p className="text-3xl font-semibold">{stats.totalWins}</p>
-                <p className="text-xs text-muted-foreground">Lucky draw wins</p>
+                <p className="text-xs text-muted-foreground">Waiver benefits awarded</p>
               </div>
             </div>
           </ERPSectionShell>
@@ -200,7 +200,7 @@ export default function CustomerLuckyDrawsPage() {
             <div>
               <h3 className="text-lg font-semibold">Participation History</h3>
               <p className="text-sm text-muted-foreground">
-                View your lucky draw participation and waiver details
+                View your SFEMI promotional benefit and waiver details
               </p>
             </div>
 
@@ -211,17 +211,17 @@ export default function CustomerLuckyDrawsPage() {
             )}
 
             {loading ? (
-              <ERPLoadingState label="Loading lucky draws..." />
+              <ERPLoadingState label="Loading promotional benefits..." />
             ) : error ? (
               <ERPErrorState
-                title="Unable to load lucky draws"
+                title="Unable to load promotional benefits"
                 message={error}
                 onRetry={loadData}
               />
             ) : rows.length === 0 ? (
               <ERPEmptyState
-                title="No lucky draws yet"
-                description="Lucky draws happen monthly for active subscriptions."
+                title="No promotional benefit events yet"
+                description="Promotional benefit events occur monthly for active SFEMI subscriptions."
               />
             ) : (
               <DataTableShell>
@@ -237,11 +237,10 @@ export default function CustomerLuckyDrawsPage() {
         </ERPSectionShell>
 
         {/* Info Note */}
-        <ERPAuditNote title="How Lucky Draws Work">
-          Every month, we conduct a draw from all active EMI subscriptions. If you
-          win, your monthly EMI amount is waived! Your lucky number is
-          automatically assigned when your subscription starts. You can verify the
-          draw results and download your certificate if you win.
+        <ERPAuditNote title="How SFEMI Promotional Benefits Work">
+          Each month, promotional benefit selection is conducted from active eligible SFEMI subscriptions.
+          When selected, remaining future EMI installments are waived! Your SFEMI ID is
+          assigned when your subscription starts. You can verify the results and download your benefit certificate.
         </ERPAuditNote>
       </div>
     </ERPPageShell>

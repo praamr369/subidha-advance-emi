@@ -242,7 +242,7 @@ export default function PartnerPaymentDetailPage() {
                   value: payment.emi_amount === null || payment.emi_amount === undefined ? "—" : formatRupee(payment.emi_amount),
                 },
                 { label: "Batch", value: payment.batch_code || "—" },
-                { label: "Lucky Number", value: typeof payment.lucky_number === "number" ? `#${payment.lucky_number}` : "—" },
+                { label: "SFEMI ID", value: typeof payment.lucky_number === "number" ? `#${payment.lucky_number}` : "—" },
                 { label: "Reference Number", value: payment.reference_no || "—" },
               ]}
               footerNote="Use browser print to keep a paper copy or save this receipt as PDF. This view is sourced only from the partner-scoped payment record."
@@ -287,12 +287,12 @@ export default function PartnerPaymentDetailPage() {
                   { label: "Product", value: payment.product_name || "—" },
                   { label: "Product code", value: payment.product_code || "—" },
                   {
-                    label: "Batch / lucky",
+                    label: "Batch / SFEMI ID",
                     value: (
                       <div>
                         <div>{payment.batch_code || "—"}</div>
                         <div className="text-muted-foreground">
-                          {typeof payment.lucky_number === "number" ? `Lucky #${payment.lucky_number}` : "No lucky number"}
+                          {typeof payment.lucky_number === "number" ? `SFEMI ID #${payment.lucky_number}` : "No SFEMI ID"}
                         </div>
                       </div>
                     ),

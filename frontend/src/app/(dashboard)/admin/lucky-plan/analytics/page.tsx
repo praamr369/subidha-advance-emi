@@ -89,17 +89,17 @@ export default function LuckyPlanAnalyticsPage() {
   }, [loadData]);
 
   const shellProps = {
-    eyebrow: "Lucky Plan",
-    title: "Lucky Plan Analytics",
-    subtitle: "Draw performance, winner metrics, and EMI waiver business impact.",
+    eyebrow: "SFEMI",
+    title: "SFEMI Benefit Analytics",
+    subtitle: "Promotional benefit performance, recipient metrics, and EMI waiver business impact.",
     breadcrumbs: [
       { label: "Admin", href: ROUTES.admin.dashboard },
-      { label: "Lucky Plan", href: ROUTES.admin.luckyPlanControl },
+      { label: "SFEMI Control", href: ROUTES.admin.luckyPlanControl },
       { label: "Analytics" },
     ],
     actions: [
-      { href: ROUTES.admin.luckyPlanWinners, label: "Winners", variant: "secondary" as const },
-      { href: ROUTES.admin.luckyPlanDraws, label: "Draws", variant: "primary" as const },
+      { href: ROUTES.admin.luckyPlanWinners, label: "Recipients", variant: "secondary" as const },
+      { href: ROUTES.admin.luckyPlanDraws, label: "Benefits", variant: "primary" as const },
     ],
     statusBadge: { label: "Admin Only", tone: "info" as const },
   };

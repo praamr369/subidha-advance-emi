@@ -101,17 +101,17 @@ export const ADMIN_MODULE_TAXONOMY: AdminModuleDefinition[] = [
   },
   {
     key: "lucky_plan",
-    label: "Lucky Plan Control",
+    label: "SFEMI Control",
     canonicalRoot: "/admin/lucky-plan",
-    description: "Batch lifecycle, Lucky ID allocation, draw readiness, winner evidence, and EMI waiver audit.",
+    description: "Batch lifecycle, SFEMI ID allocation, promotional benefit readiness, recipient evidence, and EMI waiver audit.",
     effect: "contract",
-    safetyRule: "Lucky draw/winner actions must preserve deterministic evidence and only waive future EMI as approved.",
+    safetyRule: "Promotional benefit/winner actions must preserve deterministic evidence and only waive future EMI as approved.",
     uiPattern: "audit_first",
     primaryRoutes: ["/admin/lucky-plan/batches", "/admin/lucky-plan/lucky-ids", "/admin/lucky-plan/draws", "/admin/lucky-plan/winners"],
     legacyRoutes: [
-      { from: ROUTES.admin.batches, to: "/admin/lucky-plan/batches", status: "migrate_then_alias", note: "Lucky Plan batch lifecycle." },
-      { from: ROUTES.admin.luckyIds, to: "/admin/lucky-plan/lucky-ids", status: "migrate_then_alias", note: "Lucky ID register." },
-      { from: ROUTES.admin.luckyDraws, to: "/admin/lucky-plan/draws", status: "migrate_then_alias", note: "Draw execution and audit evidence." },
+      { from: ROUTES.admin.batches, to: "/admin/lucky-plan/batches", status: "migrate_then_alias", note: "SFEMI batch lifecycle." },
+      { from: ROUTES.admin.luckyIds, to: "/admin/lucky-plan/lucky-ids", status: "migrate_then_alias", note: "SFEMI ID register." },
+      { from: ROUTES.admin.luckyDraws, to: "/admin/lucky-plan/draws", status: "migrate_then_alias", note: "Promotional benefit execution and audit evidence." },
     ],
   },
   {

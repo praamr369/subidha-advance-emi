@@ -409,6 +409,9 @@ function countsForGroup(groupTitle: string, badges: Record<string, number>): Arr
     "Sales & Contracts": [
       { label: "Delivery", key: "admin.badges.pending_delivery_count" },
     ],
+    "SFEMI Control": [
+      { label: "Pending Draw", key: "admin.badges.pending_draw_count" },
+    ],
     "Lucky Plan Control": [
       { label: "Pending Draw", key: "admin.badges.pending_draw_count" },
     ],

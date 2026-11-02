@@ -152,12 +152,12 @@ function customerAddress(customer: CustomerRecord | null): string {
 }
 
 function buildTerms(subscription: SubscriptionContractRecord): string[] {
-  const planLabel = statusToken(subscription.plan_type) === "EMI" ? "Lucky Plan / Advance EMI" : safeDocumentText(subscription.plan_type, "Contract");
+  const planLabel = statusToken(subscription.plan_type) === "EMI" ? "SFEMI (Advance EMI)" : safeDocumentText(subscription.plan_type, "Contract");
   return [
     `${planLabel} terms, tenure, price, and monthly installment values are displayed only from backend contract records.`,
     "The customer must pay due installments on time, keep contact details updated, preserve receipts, and follow delivery/service instructions issued by the business.",
     "Subidha Furniture must maintain auditable payment records, receipts, delivery records, and contract lifecycle history for this subscription.",
-    "Lucky draw winner benefit, where applicable, waives only future eligible EMI rows as recorded by backend winner and waiver records; no frontend calculation is used here.",
+    "SFEMI promotional benefit, where applicable, waives only future eligible EMI rows as recorded by backend recipient and waiver records; no frontend calculation is used here.",
     "Cancellation, return, service, and support requests are handled only through approved operational workflows. This print copy does not change contract status or financial records.",
   ];
 }
@@ -301,7 +301,7 @@ export default function AdminSubscriptionContractPrintPage() {
             name: customerDisplayName,
             customerId: subscription.customer || null,
             eventType: "CUSTOM",
-            text: `Dear ${customerDisplayName || "Customer"},\nHere is your Lucky Plan Subscription Agreement (${reference}) from Subidha Furniture:\n📄 View Agreement: ${typeof window !== "undefined" ? window.location.href : ""}\n\nThank you for choosing Subidha Furniture!`,
+            text: `Dear ${customerDisplayName || "Customer"},\nHere is your SFEMI Subscription Agreement (${reference}) from Subidha Furniture:\n📄 View Agreement: ${typeof window !== "undefined" ? window.location.href : ""}\n\nThank you for choosing Subidha Furniture!`,
             ref: reference,
             amount: subscription.monthly_amount ?? undefined,
             docUrl: typeof window !== "undefined" ? window.location.href : "",

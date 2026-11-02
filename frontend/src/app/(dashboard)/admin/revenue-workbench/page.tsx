@@ -16,7 +16,7 @@ type SectionDef = {
 const SECTIONS: SectionDef[] = [
   {
     href: ROUTES.admin.luckyPlanDraws ?? "/admin/lucky-plan/draws",
-    label: "Lucky Plan Waiver Events",
+    label: "SFEMI Waiver Events",
     description:
       "Monthly waiver selection events — eligibility snapshot, hash commit/reveal, waiver recipient, and audit records.",
     badge: "Waiver",
@@ -25,7 +25,7 @@ const SECTIONS: SectionDef[] = [
     href: ROUTES.admin.luckyPlanBatches ?? "/admin/lucky-plan/batches",
     label: "Eligibility Snapshots",
     description:
-      "Frozen eligible customer / Lucky ID snapshots per waiver month. Snapshot hash and commitment hash stored for audit.",
+      "Frozen eligible customer / SFEMI ID snapshots per waiver month. Snapshot hash and commitment hash stored for audit.",
     badge: "Eligibility",
   },
   {
@@ -46,7 +46,7 @@ const SECTIONS: SectionDef[] = [
     href: ROUTES.admin.collections ?? "/admin/collections",
     label: "Refund SLA Register",
     description:
-      "Pending and overdue Lucky Plan / contract refunds. SLA: 7 working days from approval. Flags overdue refunds.",
+      "Pending and overdue SFEMI / contract refunds. SLA: 7 working days from approval. Flags overdue refunds.",
     badge: "Refund SLA",
   },
   {
@@ -63,7 +63,7 @@ export default function RevenueWorkbenchPage() {
     <ERPPageShell
       eyebrow="Revenue & Waiver"
       title="Revenue Workbench"
-      subtitle="Lucky Plan waiver events, eligibility snapshots, ineligibility register, waiver accounting review, refund SLA tracker, and partner receipt requests."
+      subtitle="SFEMI waiver events, eligibility snapshots, ineligibility register, waiver accounting review, refund SLA tracker, and partner receipt requests."
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Revenue Workbench" },

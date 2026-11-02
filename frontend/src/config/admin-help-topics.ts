@@ -98,7 +98,7 @@ export const HELP_CATEGORIES: { id: HelpCategory; label: string }[] = [
   { id: "inventory", label: "Inventory & Stock" },
   { id: "purchases-vendors", label: "Purchases & Vendors" },
   { id: "accounting-finance", label: "Accounting & Finance" },
-  { id: "lucky-plan", label: "Lucky Plan & Draws" },
+  { id: "lucky-plan", label: "SFEMI & Benefits" },
   { id: "crm-customers", label: "CRM & Customers" },
   { id: "delivery", label: "Delivery & Logistics" },
   { id: "hr-payroll", label: "HR & Payroll" },
@@ -4036,8 +4036,8 @@ export const ADMIN_HELP_TOPICS: AdminHelpTopic[] = [
   // ── 9. Lucky Plan & Draws ──────────────────────────────────────────────────
   {
     id: "lucky-plan",
-    title: "Lucky Plan Batches, Draw Coordination & Winner Benefits",
-    shortTitle: "Lucky Plan & Draws",
+    title: "SFEMI Batches, Promotional Benefit Coordination & Remaining EMI Waivers",
+    shortTitle: "SFEMI & Benefits",
     category: "lucky-plan",
     badge: "Promotion Engine",
     iconName: "trophy",
@@ -4048,11 +4048,11 @@ export const ADMIN_HELP_TOPICS: AdminHelpTopic[] = [
       "/admin/lucky-plan",
     ],
     summary:
-      "Subscription batch management, Lucky ID allocation, monthly draw execution, winner waiver processing, and prize fulfillment.",
+      "Subscription batch management, SFEMI ID allocation, monthly promotional benefit selection, recipient waiver processing, and prize fulfillment.",
     whyNeeded:
-      "The Lucky Plan is the flagship customer acquisition driver. Customers pay monthly advance EMIs for furniture. Each month, a transparent draw selects winners who receive their furniture immediately with all remaining EMI installments 100% waived! Non-winning customers continue until tenure completion to receive their furniture.",
+      "SFEMI is the flagship customer acquisition driver. Customers pay monthly advance EMIs for furniture. Each month, a transparent promotional benefit selection selects recipients who receive their furniture immediately with all remaining EMI installments 100% waived! Non-winning customers continue until tenure completion to receive their furniture.",
     howItWorks:
-      "1. Batches: Define subscriber limits (e.g. 500 members), product model, monthly installment, and draw dates.\n2. Lucky ID: Each subscriber receives a verified, unique ID within the batch.\n3. Draw Eligibility: Only subscribers with up-to-date paid EMIs are eligible for that month's draw.\n4. Winner Processing: Idempotent backend action marks subscription as `WON`, waives all future pending EMIs, initiates delivery fulfillment, and records accounting waiver journals. Past settled payments remain untouched.",
+      "1. Batches: Define subscriber limits (e.g. 500 members), product model, monthly installment, and selection dates.\n2. SFEMI ID: Each subscriber receives a verified, unique ID within the batch.\n3. Benefit Eligibility: Only subscribers with up-to-date paid EMIs are eligible for that month's benefit selection.\n4. Recipient Processing: Idempotent backend action marks subscription as `WON`, waives all future pending EMIs, initiates delivery fulfillment, and records accounting waiver journals. Past settled payments remain untouched.",
     workflows: [
       {
         name: "Create a New Lucky Plan Batch",
@@ -4120,8 +4120,8 @@ export const ADMIN_HELP_TOPICS: AdminHelpTopic[] = [
     ],
     keyActions: [
       { label: "Batches Hub", href: "/admin/batches", variant: "primary" },
-      { label: "Lucky Draws Register", href: "/admin/lucky-draws", variant: "secondary" },
-      { label: "Lucky IDs", href: "/admin/lucky-ids", variant: "secondary" },
+      { label: "SFEMI Benefits Register", href: "/admin/lucky-draws", variant: "secondary" },
+      { label: "SFEMI IDs", href: "/admin/lucky-ids", variant: "secondary" },
     ],
   },
 

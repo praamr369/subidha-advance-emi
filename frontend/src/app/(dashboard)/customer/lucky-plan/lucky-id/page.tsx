@@ -63,13 +63,13 @@ export default function LuckyIDTrackerPage() {
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Your Lucky ID</h1>
-          <p className="text-gray-600">Track your Lucky IDs across all draws</p>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">Your SFEMI ID</h1>
+          <p className="text-gray-600">Track your SFEMI IDs across all promotional benefit cycles</p>
         </div>
 
         {/* Current Lucky ID - Large Card */}
         <div className="bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg shadow-2xl p-8 md:p-12 mb-8 text-white">
-          <p className="text-purple-100 text-sm mb-2 uppercase tracking-wide">Current Lucky ID</p>
+          <p className="text-purple-100 text-sm mb-2 uppercase tracking-wide">Current SFEMI ID</p>
           <div className="flex items-center justify-between mb-8">
             <div>
               <p className="text-6xl font-bold font-mono mb-2">{tracker.current_lucky_id}</p>
@@ -85,7 +85,7 @@ export default function LuckyIDTrackerPage() {
 
           {/* Countdown */}
           <div className="bg-white bg-opacity-20 rounded-lg p-4">
-            <p className="text-sm text-purple-100 mb-1">Next Draw Countdown</p>
+            <p className="text-sm text-purple-100 mb-1">Next Promotional Benefit Countdown</p>
             <div className="flex items-baseline gap-2">
               <p className="text-4xl font-bold">{daysUntil}</p>
               <p className="text-lg text-purple-100">days remaining</p>
@@ -96,14 +96,14 @@ export default function LuckyIDTrackerPage() {
         {/* Draw odds — static info, not a running probability */}
         {tracker.win_probability !== undefined && (
           <div className="bg-white rounded-lg shadow-lg p-8 mb-8">
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">Draw Odds</h3>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">Benefit Odds</h3>
             <p className="text-sm text-gray-500 mb-6">
-              One Lucky ID is drawn per batch. Odds are fixed by the number of eligible participants at the time of draw — they do not change as the draw date approaches.
+              One SFEMI ID is selected per batch. Odds are fixed by the number of eligible participants at the time of benefit selection — they do not change as the date approaches.
             </p>
             <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-6 py-4">
               <div>
                 <p className="text-sm text-gray-600">Your share of eligible entries</p>
-                <p className="text-xs text-gray-400 mt-1">1 winner per batch · based on eligible paid IDs only</p>
+                <p className="text-xs text-gray-400 mt-1">1 benefit recipient per batch · based on eligible paid IDs only</p>
               </div>
               <div className="text-right">
                 <p className="text-3xl font-bold text-purple-600">{(tracker.win_probability * 100).toFixed(2)}%</p>
@@ -116,7 +116,7 @@ export default function LuckyIDTrackerPage() {
         {/* Previous Lucky IDs */}
         {tracker.previous_lucky_ids && tracker.previous_lucky_ids.length > 0 && (
           <div className="bg-white rounded-lg shadow-lg p-8">
-            <h3 className="text-2xl font-bold text-gray-900 mb-6">Lucky ID History</h3>
+            <h3 className="text-2xl font-bold text-gray-900 mb-6">SFEMI ID History</h3>
             <div className="space-y-4">
               {tracker.previous_lucky_ids.map((id, idx) => (
                 <div key={idx} className="border-l-4 border-purple-500 pl-4 py-2 hover:bg-gray-50 rounded transition">
@@ -131,11 +131,11 @@ export default function LuckyIDTrackerPage() {
                     <div className="text-right">
                       {id.draw_result === 'WON' ? (
                         <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-green-100 text-green-800">
-                          🎉 Won
+                          🎉 Benefit Recipient
                         </span>
                       ) : id.draw_result === 'DRAWN' ? (
                         <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-yellow-100 text-yellow-800">
-                          ✓ Drawn
+                          ✓ Selected
                         </span>
                       ) : (
                         <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-gray-100 text-gray-800">
@@ -152,22 +152,22 @@ export default function LuckyIDTrackerPage() {
 
         {/* How It Works */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-8 mt-8">
-          <h3 className="text-xl font-bold text-gray-900 mb-4">How Lucky ID Works</h3>
+          <h3 className="text-xl font-bold text-gray-900 mb-4">How SFEMI ID Works</h3>
           <div className="grid md:grid-cols-4 gap-4">
             <div className="text-center">
               <div className="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center mx-auto mb-2 font-bold text-lg">1</div>
               <p className="text-sm font-semibold text-gray-900 mb-1">Make Payment</p>
-              <p className="text-xs text-gray-600">Each EMI payment gets you a Lucky ID</p>
+              <p className="text-xs text-gray-600">Each subscription holds a unique SFEMI ID</p>
             </div>
             <div className="text-center">
               <div className="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center mx-auto mb-2 font-bold text-lg">2</div>
-              <p className="text-sm font-semibold text-gray-900 mb-1">Enter Draw</p>
-              <p className="text-xs text-gray-600">Your ID enters the monthly draw</p>
+              <p className="text-sm font-semibold text-gray-900 mb-1">Enter Benefit Event</p>
+              <p className="text-xs text-gray-600">Your ID enters monthly promotional benefit selection</p>
             </div>
             <div className="text-center">
               <div className="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center mx-auto mb-2 font-bold text-lg">3</div>
-              <p className="text-sm font-semibold text-gray-900 mb-1">Win Prize</p>
-              <p className="text-xs text-gray-600">Winners get EMI amount waived</p>
+              <p className="text-sm font-semibold text-gray-900 mb-1">Benefit Awarded</p>
+              <p className="text-xs text-gray-600">Recipients get remaining future EMIs waived</p>
             </div>
             <div className="text-center">
               <div className="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center mx-auto mb-2 font-bold text-lg">4</div>

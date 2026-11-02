@@ -197,7 +197,7 @@ export default function PartnerSubscriptionRequestDetailPage() {
       stats={[
         { label: "Status", value: request?.status || "—" },
         { label: "Requester", value: request?.partner_username || "—" },
-        { label: "Lucky Number", value: request?.preferred_lucky_number ?? "—" },
+        { label: "SFEMI ID", value: request?.preferred_lucky_number ?? "—" },
         { label: "Approved Subscription", value: request?.approved_subscription_number || "—" },
       ]}
     >

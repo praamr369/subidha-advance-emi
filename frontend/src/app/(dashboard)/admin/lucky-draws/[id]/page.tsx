@@ -545,13 +545,13 @@ export default function AdminLuckyDrawDetailPage() {
 
   return (
     <ERPPageShell
-      eyebrow="Lucky Plan"
-      title={draw ? `Draw #${draw.id}` : `Lucky Draw #${drawId ?? "—"}`}
-      subtitle="Detailed Lucky Draw audit view for commitment, reveal state, winner visibility, and seed-custody status."
+      eyebrow="SFEMI"
+      title={draw ? `Benefit Event #${draw.id}` : `SFEMI Benefit #${drawId ?? "—"}`}
+      subtitle="Detailed SFEMI benefit audit view for commitment, reveal state, recipient visibility, and seed-custody status."
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
-        { label: "Lucky Draws", href: "/admin/lucky-draws" },
-        { label: draw ? `Draw #${draw.id}` : `Lucky Draw #${drawId ?? "—"}` },
+        { label: "SFEMI Benefits", href: "/admin/lucky-draws" },
+        { label: draw ? `Benefit Event #${draw.id}` : `SFEMI Benefit #${drawId ?? "—"}` },
       ]}
       actions={[
         {
@@ -572,7 +572,7 @@ export default function AdminLuckyDrawDetailPage() {
           ? [
               {
                 href: `/admin/subscriptions/${draw.winner_subscription_id}`,
-                label: "Open Winner Contract",
+                label: "Open Recipient Contract",
                 variant: "primary" as const,
               },
             ]
@@ -589,7 +589,7 @@ export default function AdminLuckyDrawDetailPage() {
           tone: draw?.is_revealed ? "success" : "warning",
         },
         {
-          label: "Winner",
+          label: "Benefit Recipient",
           value: draw ? formatLuckyNumber(draw.winner_lucky_number) : "—",
         },
         {
@@ -615,11 +615,11 @@ export default function AdminLuckyDrawDetailPage() {
           </button>
         </section>
 
-        {loading ? <LoadingBlock label="Loading Lucky Draw detail..." /> : null}
+        {loading ? <LoadingBlock label="Loading SFEMI benefit detail..." /> : null}
 
         {!loading && error ? (
           <ErrorState
-            title="Unable to load Lucky Draw detail"
+            title="Unable to load SFEMI benefit detail"
             description={error}
             onRetry={() => void loadPage()}
           />
@@ -627,8 +627,8 @@ export default function AdminLuckyDrawDetailPage() {
 
         {!loading && !error && !draw ? (
           <EmptyState
-            title="Lucky Draw not available"
-            description="The requested draw could not be loaded."
+            title="SFEMI benefit not available"
+            description="The requested benefit event could not be loaded."
           />
         ) : null}
 
@@ -810,15 +810,15 @@ export default function AdminLuckyDrawDetailPage() {
               </SectionCard>
 
               <SectionCard
-                title="Winner context"
-                description="Winner linkage should resolve to Lucky ID, customer, and contract context after reveal."
+                title="Benefit recipient context"
+                description="Recipient linkage should resolve to SFEMI ID, customer, and contract context after reveal."
               >
                 {hasWinnerVisible ? (
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <DetailValue label="Winner Lucky ID Row" value={draw.winner_lucky_id != null ? `#${draw.winner_lucky_id}` : "—"} />
-                    <DetailValue label="Winner Lucky Number" value={formatLuckyNumber(draw.winner_lucky_number)} />
-                    <DetailValue label="Winner Customer" value={draw.winner_customer_name || "Not visible"} />
-                    <DetailValue label="Winner Contract" value={draw.winner_subscription_number || "Not visible"} />
+                    <DetailValue label="Recipient SFEMI ID Row" value={draw.winner_lucky_id != null ? `#${draw.winner_lucky_id}` : "—"} />
+                    <DetailValue label="Recipient SFEMI ID" value={formatLuckyNumber(draw.winner_lucky_number)} />
+                    <DetailValue label="Recipient Customer" value={draw.winner_customer_name || "Not visible"} />
+                    <DetailValue label="Recipient Contract" value={draw.winner_subscription_number || "Not visible"} />
                     <DetailValue
                       label="Waived EMI Count"
                       value={draw.waived_emi_count != null ? String(draw.waived_emi_count) : "—"}
@@ -830,11 +830,11 @@ export default function AdminLuckyDrawDetailPage() {
                   </div>
                 ) : (
                   <EmptyState
-                    title="Winner not visible"
+                    title="Recipient not visible"
                     description={
                       draw.is_revealed
-                        ? "The draw is marked revealed, but winner fields are not visible in the current backend payload."
-                        : "Winner details are expected after reveal."
+                        ? "The benefit is marked revealed, but recipient fields are not visible in the current backend payload."
+                        : "Recipient details are expected after reveal."
                     }
                   />
                 )}
@@ -842,8 +842,8 @@ export default function AdminLuckyDrawDetailPage() {
             </section>
 
             <SectionCard
-              title="Linked winner contract"
-              description="This contract preview is shown only when the draw payload resolves to a visible winner subscription."
+              title="Linked recipient contract"
+              description="This contract preview is shown only when the benefit payload resolves to a visible recipient subscription."
             >
               {subscriptionPreview ? (
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -851,7 +851,7 @@ export default function AdminLuckyDrawDetailPage() {
                   <DetailValue label="Customer" value={subscriptionPreview.customer_name || "Unknown customer"} />
                   <DetailValue label="Product" value={subscriptionPreview.product_name || "Unknown product"} />
                   <DetailValue label="Batch" value={subscriptionPreview.batch_code || "—"} />
-                  <DetailValue label="Lucky Number" value={formatLuckyNumber(subscriptionPreview.lucky_number)} />
+                  <DetailValue label="SFEMI ID" value={formatLuckyNumber(subscriptionPreview.lucky_number)} />
                   <DetailValue
                     label="Status"
                     value={
@@ -871,8 +871,8 @@ export default function AdminLuckyDrawDetailPage() {
                 </div>
               ) : (
                 <EmptyState
-                  title="No winner contract preview"
-                  description="Winner contract preview could not be resolved from the current draw payload."
+                  title="No recipient contract preview"
+                  description="Recipient contract preview could not be resolved from the current benefit payload."
                 />
               )}
             </SectionCard>

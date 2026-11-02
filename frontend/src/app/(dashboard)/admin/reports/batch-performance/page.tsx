@@ -117,7 +117,7 @@ export default function BatchPerformanceReportPage() {
     <ERPPageShell
       eyebrow="BI & Reports"
       title="Batch Performance"
-      subtitle="Operational draw, enrollment, and Lucky ID progression by batch using live per-batch summary endpoints."
+      subtitle="Operational draw, enrollment, and SFEMI ID progression by batch using live per-batch summary endpoints."
       headerMode="erp"
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
@@ -150,13 +150,13 @@ export default function BatchPerformanceReportPage() {
           value: String(totals.totalDraws),
         },
         {
-          label: "Winner Contracts",
+          label: "Benefit Recipients",
           value: String(totals.totalWinners),
           tone: totals.totalWinners > 0 ? "info" : "default",
         },
       ]}
       statusBadge={{ label: "Source-linked report", tone: "info" }}
-      helperNote="Read-only BI. Decision support only — no posting from this page. Drill down to Lucky Plan Control to take action on a batch."
+      helperNote="Read-only BI. Decision support only — no posting from this page. Drill down to SFEMI Control to take action on a batch."
       helperTone="info"
     >
       <div className="space-y-6">
@@ -174,7 +174,7 @@ export default function BatchPerformanceReportPage() {
                 Current report view
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
-                Compare draw activity, winner count, and Lucky ID allocation without leaving the report workspace.
+                Compare benefit activity, recipient count, and SFEMI ID allocation without leaving the report workspace.
               </p>
             </div>
 
@@ -260,7 +260,7 @@ export default function BatchPerformanceReportPage() {
 
             <WorkspaceSection
               title="Batch drill-down"
-              description="Open a batch directly from the report when draw pressure, Lucky ID allocation, or winner progression needs attention."
+              description="Open a batch directly from the report when benefit pressure, SFEMI ID allocation, or recipient progression needs attention."
             >
               {rows.length === 0 ? (
                 <EmptyState
@@ -303,26 +303,26 @@ export default function BatchPerformanceReportPage() {
                     },
                     {
                       key: "available_lucky_ids",
-                      title: "Lucky IDs",
+                      title: "SFEMI IDs",
                       render: (row) => (
                         <div className="space-y-1 text-sm">
                           <div className="text-foreground">
                             Available {row.available_lucky_ids}
                           </div>
                           <div className="text-muted-foreground">
-                            Assigned {row.assigned_lucky_ids} · Won {row.won_lucky_ids}
+                            Assigned {row.assigned_lucky_ids} · Recipient {row.won_lucky_ids}
                           </div>
                         </div>
                       ),
                     },
                     {
                       key: "drawCount",
-                      title: "Draws / Winners",
+                      title: "Benefits / Recipients",
                       render: (row) => (
                         <div className="space-y-1 text-sm">
-                          <div className="text-foreground">Draws {row.drawCount}</div>
+                          <div className="text-foreground">Benefits {row.drawCount}</div>
                           <div className="text-muted-foreground">
-                            Winners {row.wonCount}
+                            Recipients {row.wonCount}
                           </div>
                         </div>
                       ),
@@ -335,7 +335,7 @@ export default function BatchPerformanceReportPage() {
                     },
                     {
                       key: "winRate",
-                      title: "Win Rate",
+                      title: "Benefit Rate",
                       align: "right",
                       render: (row) => `${row.winRate.toFixed(1)}%`,
                     },
@@ -346,7 +346,7 @@ export default function BatchPerformanceReportPage() {
                         href={`/admin/batches/${row.batchId}`}
                         className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                       >
-                        View in Lucky Plan
+                        View in SFEMI Control
                       </Link>
                     </div>
                   )}

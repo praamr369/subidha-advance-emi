@@ -106,7 +106,7 @@ export default function PartnerCustomerDetailPage() {
               {row.subscription_number || `SUB-${row.id}`}
             </div>
             <div className="text-xs text-muted-foreground">
-              Lucky #{row.lucky_number ?? "—"}
+              SFEMI ID #{row.lucky_number ?? "—"}
             </div>
           </div>
         ),

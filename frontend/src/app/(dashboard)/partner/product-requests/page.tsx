@@ -186,7 +186,7 @@ export default function PartnerProductRequestsPage() {
               <div className="mt-1 text-sm text-muted-foreground">
                 {statusFilter
                   ? `No requests with status "${statusLabel(statusFilter)}".`
-                  : "Submit a request to enrol a customer into a Lucky Plan product."}
+                  : "Submit a request to enrol a customer into a SFEMI product."}
               </div>
             </div>
             {!statusFilter ? (

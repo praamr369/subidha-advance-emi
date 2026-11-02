@@ -1,4 +1,4 @@
-﻿import { ROUTES } from "@/lib/routes";
+import { ROUTES } from "@/lib/routes";
 
 export type AdminRouteRegistryItem = {
   label: string;
@@ -170,16 +170,16 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   //   /admin/lucky-draws  â†’ /admin/lucky-plan/draws    (migrate_then_alias)
   // Winners route is implemented as a read-only register page.
   item("SFEMI Control", "SFEMI Control", ROUTES.admin.luckyPlanControl, "SFEMI hub: batches, SFEMI IDs, promotional benefits, and audit evidence.", { badgeSource: "pending_draw_count" }),
-  item("Lucky Plan Control", "Batches", ROUTES.admin.luckyPlanBatches, "Batch lifecycle and draw scope.", { badgeSource: "pending_draw_count" }),
+  item("SFEMI Control", "Batches", ROUTES.admin.luckyPlanBatches, "Batch lifecycle and promotional benefit scope.", { badgeSource: "pending_draw_count" }),
   item("SFEMI Control", "SFEMI IDs", ROUTES.admin.luckyPlanLuckyIds, "SFEMI ID register and allocation grid."),
   item("SFEMI Control", "SFEMI Benefits", ROUTES.admin.luckyPlanDraws, "Promotional benefit schedule and execution evidence.", { badgeSource: "pending_draw_count" }),
-  item("Lucky Plan Control", "Winners", ROUTES.admin.luckyPlanWinners, "Winner visibility and EMI waiver audit trail."),
-  item("Lucky Plan Control", "Analytics", ROUTES.admin.luckyPlanAnalytics, "Draw performance metrics: winners, waiver totals, success rate."),
-  item("Lucky Plan Control", "Draw Audit", ROUTES.admin.luckyPlanDrawAudit, "Cryptographic draw audit trail and evidence."),
-  item("Lucky Plan Control", "Draw Authorisations", ROUTES.admin.luckyPlanDrawAuthorisations, "Draw authorisation queue and approval workflow."),
-  item("Lucky Plan Control", "Waiver Settlements", ROUTES.admin.luckyPlanWaiverSettlements, "Winner waiver settlement processing and tracking."),
-  item("Lucky Plan Control", "Create Draw", ROUTES.admin.luckyDrawsCreate, "Create a new lucky draw."),
-  item("Lucky Plan Control", "Create Batch", ROUTES.admin.batchesCreate, "Create a new lucky plan batch."),
+  item("SFEMI Control", "Benefit Recipients", ROUTES.admin.luckyPlanWinners, "Promotional benefit recipient visibility and EMI waiver audit trail."),
+  item("SFEMI Control", "Analytics", ROUTES.admin.luckyPlanAnalytics, "Promotional benefit performance metrics: recipients, waiver totals, success rate."),
+  item("SFEMI Control", "Benefit Audit", ROUTES.admin.luckyPlanDrawAudit, "Cryptographic promotional benefit audit trail and evidence."),
+  item("SFEMI Control", "Benefit Authorisations", ROUTES.admin.luckyPlanDrawAuthorisations, "Promotional benefit authorisation queue and approval workflow."),
+  item("SFEMI Control", "Waiver Settlements", ROUTES.admin.luckyPlanWaiverSettlements, "Promotional benefit waiver settlement processing and tracking."),
+  item("SFEMI Control", "Create Benefit Selection", ROUTES.admin.luckyDrawsCreate, "Create a new promotional benefit selection."),
+  item("SFEMI Control", "Create SFEMI Batch", ROUTES.admin.batchesCreate, "Create a new SFEMI batch."),
 
   // â”€â”€ 6. Collections & Cashier â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -407,16 +407,16 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   //   collections    â†’ Collections & Cashier
   //   bridge blocker â†’ Accounting & Reconciliation
   //   stock risk     â†’ Inventory & Stock
-  //   purchase risk  â†’ Purchases & Vendors
-  //   HR risk        â†’ HR & Staff
-  //   batch risk     â†’ Lucky Plan Control
+  //   purchase risk  → Purchases & Vendors
+  //   HR risk        → HR & Staff
+  //   batch risk     → SFEMI Control
   //
   // Trial Balance, P&L, Balance Sheet remain under Accounting & Reconciliation (not here).
-  item("BI & Reports", "BI Dashboards", ROUTES.admin.bi, "Read-only BI control center. Decision support only â€” no posting from this page."),
+  item("BI & Reports", "BI Dashboards", ROUTES.admin.bi, "Read-only BI control center. Decision support only — no posting from this page."),
   item("BI & Reports", "Reports & Governance", "/admin/reports-governance", "Dedicated control room for analytical reporting, audit logs, and privacy compliance."),
   item("BI & Reports", "Profitability View", ROUTES.admin.biProfitability, "Read-only income, waiver, deposit liability, and monthly operating summary. Source-linked report. No posting from this page."),
   item("BI & Reports", "Customer Insights", ROUTES.admin.biCustomers, "Read-only customer activity, overdue, repeat, and churn-risk posture. Drill down to Profiles / Customers or CRM KYC for action."),
-  item("BI & Reports", "Batch Performance BI", ROUTES.admin.biBatches, "Read-only fill rate, payment discipline, default rate, and draw completion. Drill down to Lucky Plan Control for action."),
+  item("BI & Reports", "Batch Performance BI", ROUTES.admin.biBatches, "Read-only fill rate, payment discipline, default rate, and benefit completion. Drill down to SFEMI Control for action."),
   item("BI & Reports", "Cashflow Dashboard", ROUTES.admin.biCashflow, "Read-only daily inflow, expected inflow, and overdue exposure. Drill down to Finance Operations / Outstandings for action."),
   item("BI & Reports", "Inventory Intelligence", ROUTES.admin.biInventory, "Read-only fast-moving, slow-moving, and stock-risk intelligence. Drill down to Inventory & Stock for action."),
   item("BI & Reports", "HR Cost Insights", ROUTES.admin.biHr, "Read-only salary/revenue ratio, department costs, and employment-type cost split. Drill down to HR & Staff for action."),
@@ -426,9 +426,9 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("BI & Reports", "Collections Report", ROUTES.admin.reportsCollections, "Source-linked collection analytics posture. Decision support only. Drill down to Finance Operations / Outstandings for action."),
   item("BI & Reports", "Overdue EMI Report", ROUTES.admin.reportsOverdue, "Source-linked overdue EMI exposure with row-level drill-down. Decision support only. Drill down to Finance Operations / Outstandings for action."),
   item("BI & Reports", "Customer Analytics", ROUTES.admin.reportsCustomerAnalytics, "Read-only customer cohort and lifecycle analytics. Decision support only. Drill down to Profiles / Customers for action."),
-  item("BI & Reports", "Batch Performance Report", ROUTES.admin.reportsBatchPerformance, "Source-linked Lucky Plan batch performance â€” draw, enrollment, Lucky ID progression. Decision support only. Drill down to Lucky Plan Control for action."),
-  item("BI & Reports", "Partner Reports", ROUTES.admin.reportsPartners, "Source-linked partner performance â€” customers, contracts, collections, commission posture. Decision support only. Drill down to Profiles / Partners for action."),
-  item("BI & Reports", "Waiver Loss Report", ROUTES.admin.reportsWaiverLoss, "Source-linked waiver and loss analytics with auditable source references. Decision support only. Drill down to Lucky Plan Control for action."),
+  item("BI & Reports", "Batch Performance Report", ROUTES.admin.reportsBatchPerformance, "Source-linked SFEMI batch performance — benefit, enrollment, SFEMI ID progression. Decision support only. Drill down to SFEMI Control for action."),
+  item("BI & Reports", "Partner Reports", ROUTES.admin.reportsPartners, "Source-linked partner performance — customers, contracts, collections, commission posture. Decision support only. Drill down to Profiles / Partners for action."),
+  item("BI & Reports", "Waiver Loss Report", ROUTES.admin.reportsWaiverLoss, "Source-linked waiver and loss analytics with auditable source references. Decision support only. Drill down to SFEMI Control for action."),
   item("BI & Reports", "Analytics Workspace", ROUTES.admin.analytics, "Read-only analytics workspace â€” redirects to Reports & analysis live posture view. Decision support only. No posting from this page."),
   item("BI & Reports", "Risk Monitor", ROUTES.admin.analyticsRiskMonitor, "Read-only overdue EMI risk watchlist for collection escalation. Source-linked report. Drill down to Finance Operations / Outstandings for action."),
   item("BI & Reports", "Churn Analysis", ROUTES.admin.analyticsChurnAnalysis, "Read-only churn-risk and defaulted subscription watchlist. Source-linked report. Drill down to Profiles / Customers for action."),
@@ -480,7 +480,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Settings & Governance", "Finance Setup", ROUTES.admin.settingsFinance, "Finance setup."),
   item("Settings & Governance", "Document Numbering", ROUTES.admin.settingsBusinessSetupDocumentNumbering, "Invoice and receipt sequence readiness and configuration."),
   item("Settings & Governance", "Public Site Settings", ROUTES.admin.settingsBusinessSetupPublicSite, "Public site settings."),
-  item("Settings & Governance", "KYC Compliance", ROUTES.admin.complianceKyc, "Free-only KYC governance across Lucky Plan, rent, lease, delivery, refunds, and winner settlement."),
+  item("Settings & Governance", "KYC Compliance", ROUTES.admin.complianceKyc, "Free-only KYC governance across SFEMI, rent, lease, delivery, refunds, and benefit recipient settlement."),
   item("Settings & Governance", "Brand & Business Data Center", ROUTES.admin.brandData, "Public business profile, social links, and media reference center."),
   item("Settings & Governance", "Imports / Backups", ROUTES.admin.settingsImports, "Import, export, and readiness tools."),
 

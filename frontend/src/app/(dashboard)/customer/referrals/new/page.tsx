@@ -62,7 +62,7 @@ export default function CreateReferralPage() {
   return (
     <ERPPageShell
       title="Refer Someone to Subscribe"
-      subtitle="Refer a friend or family member to sign up for Advance EMI or Lucky Plan. You earn a commission after their first confirmed instalment."
+      subtitle="Refer a friend or family member to sign up for SFEMI (Advance EMI). You earn a commission after their first confirmed instalment."
       breadcrumbs={[{ label: "Dashboard", href: "/customer" }, { label: "Referrals", href: "/customer/referrals" }, { label: "New Referral" }]}
       headerMode="erp"
     >
@@ -144,7 +144,7 @@ export default function CreateReferralPage() {
         </ERPSectionShell>
 
         <ERPAuditNote title="How Subscription Referral Commission Works">
-          Refer someone to subscribe to Advance EMI or Lucky Plan at Subidha Furniture.
+          Refer someone to subscribe to SFEMI (Advance EMI) at Subidha Furniture.
           Your commission is credited once their subscription is confirmed and first
           instalment payment is received. Commission is a one-time, per-subscription reward —
           not linked to recruitment, ongoing payments, or any multi-level arrangement.

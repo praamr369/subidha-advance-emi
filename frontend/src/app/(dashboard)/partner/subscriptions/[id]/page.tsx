@@ -691,14 +691,14 @@ export default function PartnerSubscriptionDetailPage() {
                   }
                 />
                 <DetailItem
-                  label="Batch / Lucky"
+                  label="Batch / SFEMI ID"
                   value={
                     <div>
                       <div className="font-medium text-foreground">
                         {subscription.batch_code || "—"}
                       </div>
                       <div className="text-muted-foreground">
-                        Lucky {formatLuckyNumberLabel(detailSemantics.luckyNumber)}
+                        SFEMI ID {formatLuckyNumberLabel(detailSemantics.luckyNumber)}
                       </div>
                     </div>
                   }

@@ -79,16 +79,16 @@ export default function LuckyPlanWinnersPage() {
 
   return (
     <ERPPageShell
-      eyebrow="Lucky Plan"
-      title="Winners Register"
-      subtitle="Complete Lucky Draw winner register — EMI waivers, delivery tracking, and audit trail"
+      eyebrow="SFEMI"
+      title="Benefit Recipients Register"
+      subtitle="Complete SFEMI Promotional Benefit recipient register — EMI waivers, delivery tracking, and audit trail"
       breadcrumbs={[
-        { href: ROUTES.admin.luckyPlanControl, label: "Lucky Plan" },
-        { label: "Winners" },
+        { href: ROUTES.admin.luckyPlanControl, label: "SFEMI Control" },
+        { label: "Benefit Recipients" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
       stats={[
-        { label: "Total Winners", value: loading ? "—" : totalCount, tone: "info" },
+        { label: "Total Recipients", value: loading ? "—" : totalCount, tone: "info" },
         { label: "Waived (page)", value: loading ? "—" : `₹${winners.reduce((s, w) => s + Number(w.waived_amount || 0), 0).toLocaleString("en-IN")}`, tone: "default" },
         { label: "Delivered (page)", value: loading ? "—" : winners.filter(w => w.delivery_status === "DELIVERED").length, tone: "success" },
         { label: "Delivery Pending (page)", value: loading ? "—" : winners.filter(w => !w.delivery_status || ["NOT_SCHEDULED", "PENDING", "SCHEDULED"].includes(w.delivery_status)).length, tone: !loading && winners.filter(w => !w.delivery_status || ["NOT_SCHEDULED", "PENDING", "SCHEDULED"].includes(w.delivery_status)).length > 0 ? "warning" : "success" },
@@ -121,15 +121,15 @@ export default function LuckyPlanWinnersPage() {
       </ERPSectionShell>
 
       <ERPSectionShell
-        title={`Winners${totalCount > 0 ? ` — ${totalCount} total` : ""}`}
-        description="Each row is a confirmed winner with EMI waiver and delivery status"
+        title={`Benefit Recipients${totalCount > 0 ? ` — ${totalCount} total` : ""}`}
+        description="Each row is a confirmed recipient with remaining future EMI waiver and delivery status"
       >
-        {loading && <ERPLoadingState label="Loading winners…" />}
+        {loading && <ERPLoadingState label="Loading recipients…" />}
         {!loading && error && <ERPErrorState title="Error" description={error} />}
         {!loading && !error && winners.length === 0 && (
           <ERPEmptyState
-            title="No winners yet"
-            description={batchFilter ? "No winners found for this batch." : "No Lucky Draw winners yet. Winners appear here once a draw is revealed."}
+            title="No recipients yet"
+            description={batchFilter ? "No recipients found for this batch." : "No promotional benefit recipients yet. Recipients appear here once a selection is revealed."}
           />
         )}
 
@@ -141,7 +141,7 @@ export default function LuckyPlanWinnersPage() {
                   <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground">
                     <th className="px-4 py-3">Batch</th>
                     <th className="px-4 py-3 text-right">Draw Month</th>
-                    <th className="px-4 py-3 text-right">Lucky ID</th>
+                    <th className="px-4 py-3 text-right">SFEMI ID</th>
                     <th className="px-4 py-3">Customer</th>
                     <th className="px-4 py-3">Subscription</th>
                     <th className="px-4 py-3 text-right">Paid EMIs</th>
@@ -221,12 +221,12 @@ export default function LuckyPlanWinnersPage() {
         )}
       </ERPSectionShell>
 
-      <ERPSectionShell title="Waiver rule" description="How the waiver is applied after a draw is revealed">
+      <ERPSectionShell title="Waiver rule" description="How the promotional benefit waiver is applied after selection is revealed">
         <p className="text-sm text-muted-foreground">
-          When a Lucky Draw is revealed and a winner Lucky ID is confirmed, the linked subscriber
+          When a promotional benefit selection is revealed and a recipient SFEMI ID is confirmed, the linked subscriber
           receives a waiver on <span className="font-medium text-foreground">future EMI instalments only</span>.
           Past-paid EMIs are not reversed. The waiver is evidence-backed and audit-logged
-          against the draw record. This rule cannot be changed from this page.
+          against the benefit record. This rule cannot be changed from this page.
         </p>
       </ERPSectionShell>
     </ERPPageShell>

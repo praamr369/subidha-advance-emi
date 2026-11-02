@@ -435,8 +435,8 @@ function SubscriptionWorkflowLanding() {
     <ERPPageShell
       eyebrow="Sales & Contracts"
       title="Subscriptions"
-      subtitle="Contract source workflow — Advance EMI, Rent, and Lease contracts. Each plan type has distinct context, Lucky Plan assignment rules, and downstream module ownership."
-      helperNote="Contract creation lives here. Payment and receipt collection belongs to Collections & Cashier. Accounting bridge and reconciliation belong to Accounting & Reconciliation. Delivery and handover belong to Delivery & Service. Winner waiver (Advance EMI only) applies to future EMI instalments only — past collected EMIs are not reversed."
+      subtitle="Contract source workflow — Advance EMI (SFEMI), Rent, and Lease contracts. Each plan type has distinct context, SFEMI assignment rules, and downstream module ownership."
+      helperNote="Contract creation lives here. Payment and receipt collection belongs to Collections & Cashier. Accounting bridge and reconciliation belong to Accounting & Reconciliation. Delivery and handover belong to Delivery & Service. Promotional benefit waiver (Advance EMI only) applies to future EMI instalments only — past collected EMIs are not reversed."
       helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
@@ -456,8 +456,8 @@ function SubscriptionWorkflowLanding() {
             {
               label: "Create Advance EMI contract",
               href: ROUTES.admin.subscriptionsAdvanceEmiCreate,
-              note: "Start Lucky Plan contract. Assigns a Lucky ID from a batch — Lucky ID and batch context are Advance EMI only.",
-              warning: "Assign Lucky ID only inside the Advance EMI workflow. Rent and Lease contracts do not use Lucky IDs or Lucky Draws.",
+              note: "Start SFEMI contract. Assigns an SFEMI ID from a batch — SFEMI ID and batch context are Advance EMI only.",
+              warning: "Assign SFEMI ID only inside the Advance EMI workflow. Rent and Lease contracts do not use SFEMI IDs or promotional draws.",
             },
             {
               label: "Collect first instalment",
@@ -477,11 +477,11 @@ function SubscriptionWorkflowLanding() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 space-y-1 text-sm">
             <div className="font-semibold text-foreground">Plan-type boundary</div>
-            <div className="text-xs text-muted-foreground">Advance EMI → Lucky ID + batch (Lucky Plan context). Rent / Lease → No Lucky ID, no draw.</div>
+            <div className="text-xs text-muted-foreground">Advance EMI → SFEMI ID + batch (SFEMI context). Rent / Lease → No SFEMI ID, no draw.</div>
           </div>
           <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 space-y-1 text-sm">
-            <div className="font-semibold text-foreground">Winner waiver rule</div>
-            <div className="text-xs text-muted-foreground">Advance EMI only. Future EMI instalments are waived for the draw winner. Past collected EMIs are not reversed.</div>
+            <div className="font-semibold text-foreground">Promotional waiver rule</div>
+            <div className="text-xs text-muted-foreground">Advance EMI only. Future EMI instalments are waived for promotional benefit recipients. Past collected EMIs are not reversed.</div>
           </div>
           <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 space-y-1 text-sm">
             <div className="font-semibold text-foreground">Payment & receipt</div>
@@ -501,8 +501,8 @@ function SubscriptionWorkflowLanding() {
 
         <div className="grid gap-4 lg:grid-cols-2">
           <WorkflowCard
-            title="Advance EMI — Lucky Plan"
-            description="Lucky Plan EMI contracts with batch and Lucky ID assignment. Each subscriber gets a unique Lucky ID from their assigned batch. Draw winner receives a future EMI waiver only. Payment and receipt collection belong to Collections & Cashier."
+            title="Advance EMI — SFEMI"
+            description="SFEMI contracts with batch and SFEMI ID assignment. Each subscriber gets a unique SFEMI ID from their assigned batch. Promotional benefit recipient receives a future EMI waiver only. Payment and receipt collection belong to Collections & Cashier."
             action={
               <Link
                 href={`${ROUTES.admin.subscriptions}?plan_type=EMI`}
@@ -514,7 +514,7 @@ function SubscriptionWorkflowLanding() {
           />
           <WorkflowCard
             title="Rent — monthly demand"
-            description="Rent contracts with monthly demand cycle, security deposit, possession, handover, and return inspection. No Lucky ID or Lucky Draw context. Rent payment and receipt belong to Collections & Cashier. Deposit refund belongs to Finance Operations."
+            description="Rent contracts with monthly demand cycle, security deposit, possession, handover, and return inspection. No SFEMI ID or promotional draw context. Rent payment and receipt belong to Collections & Cashier. Deposit refund belongs to Finance Operations."
             action={
               <Link
                 href={`${ROUTES.admin.subscriptions}?plan_type=RENT`}

@@ -28,7 +28,7 @@ const SECTIONS: SectionDef[] = [
   },
   {
     href: ROUTES.admin.luckyPlanLuckyIds,
-    label: "Lucky IDs",
+    label: "SFEMI IDs",
     description:
       "00–99 allocation grid, batch linkage, and assignment status per subscriber.",
     Icon: Hash,
@@ -37,27 +37,27 @@ const SECTIONS: SectionDef[] = [
   },
   {
     href: ROUTES.admin.luckyPlanDraws,
-    label: "Lucky Draws",
+    label: "SFEMI Benefits",
     description:
-      "Draw schedule and execution: commitment hash, reveal state, and winner Lucky ID audit evidence.",
+      "Promotional benefit selection schedule and execution: commitment hash, reveal state, and recipient SFEMI ID audit evidence.",
     Icon: Shuffle,
     dotCls: "bg-violet-400",
     iconCls: "bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300",
   },
   {
     href: ROUTES.admin.luckyPlanWinners,
-    label: "Winners",
+    label: "Benefit Recipients",
     description:
-      "Winner register with EMI waiver status, delivery posture, and draw evidence for audit trail.",
+      "Benefit recipient register with remaining future EMI waiver status, delivery posture, and event evidence for audit trail.",
     Icon: Award,
     dotCls: "bg-amber-400",
     iconCls: "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
   },
   {
     href: ROUTES.admin.luckyPlanAnalytics,
-    label: "Analytics",
+    label: "Benefit Analytics",
     description:
-      "Draw performance: total draws, verified winners, waiver totals, and success rate.",
+      "Promotional benefit performance: total events, verified recipients, waiver totals, and benefit rate.",
     Icon: BarChart3,
     dotCls: "bg-indigo-400",
     iconCls: "bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300",
@@ -67,28 +67,28 @@ const SECTIONS: SectionDef[] = [
 export default function LuckyPlanControlPage() {
   return (
     <ERPPageShell
-      eyebrow="Lucky Plan — Audit-first control room"
-      title="Lucky Plan Control"
-      subtitle="Batch lifecycle, Lucky ID allocation, draw execution, and winner waiver evidence are managed from this module. Commit/reveal/winner logic is unchanged by navigation."
+      eyebrow="SFEMI — Audit-first control room"
+      title="SFEMI Control"
+      subtitle="Batch lifecycle, SFEMI ID allocation, promotional benefit execution, and recipient waiver evidence are managed from this module. Commit/reveal/recipient logic is unchanged by navigation."
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
-        { label: "Lucky Plan" },
+        { label: "SFEMI Control" },
       ]}
       actions={[
         { href: ROUTES.admin.luckyPlanBatches, label: "Batches", variant: "secondary" },
-        { href: ROUTES.admin.luckyPlanDraws, label: "Lucky Draws", variant: "secondary" },
-        { href: ROUTES.admin.luckyPlanWinners, label: "Winners", variant: "primary" },
+        { href: ROUTES.admin.luckyPlanDraws, label: "SFEMI Benefits", variant: "secondary" },
+        { href: ROUTES.admin.luckyPlanWinners, label: "Benefit Recipients", variant: "primary" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
     >
       <WorkflowCard
-        title="Lucky Plan — module safety contract"
-        description="Lucky draw commit/reveal/winner logic is unchanged by navigation. Winner receives future EMI waiver only; no past payment changes. No fake draw readiness or fake winner data is shown. Rent/lease and direct sale operations are not owned by this module."
+        title="SFEMI — module safety contract"
+        description="Promotional benefit commit/reveal/recipient logic is unchanged by navigation. Recipient receives future EMI waiver only; no past payment changes. No fake readiness or fake recipient data is shown. Rent/lease and direct sale operations are not owned by this module."
       />
 
       <ERPSectionShell
         title="Module sections"
-        description="Navigate to any Lucky Plan workspace. Each section governs a distinct step of the draw lifecycle."
+        description="Navigate to any SFEMI workspace. Each section governs a distinct step of the promotional benefit lifecycle."
       >
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {SECTIONS.map(({ href, label, description, Icon, dotCls, iconCls }) => (
@@ -123,7 +123,7 @@ export default function LuckyPlanControlPage() {
       <div className="rounded-xl border border-emerald-300 bg-emerald-50 px-5 py-4 dark:border-emerald-700 dark:bg-emerald-900/20">
         <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">Production register</p>
         <p className="mt-1.5 text-sm text-emerald-800 dark:text-emerald-300">
-          The winners page is backed by the admin Lucky Draw winners endpoint and shows only revealed
+          The recipient benefit page is backed by the admin Promotional Benefit winners endpoint and shows only revealed
           draw records with a linked winner subscription. Waiver status remains backend-owned, and
           past-paid EMI records are not changed from this page.
         </p>

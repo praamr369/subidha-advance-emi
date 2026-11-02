@@ -530,14 +530,14 @@ export default function AdminLuckyDrawRevealPage() {
 
   return (
     <ERPPageShell
-      eyebrow="Lucky Plan"
-      title={draw ? `Reveal Draw #${draw.id}` : `Reveal Lucky Draw #${drawId ?? "—"}`}
-      subtitle="Dedicated confirmation page for the final Lucky Draw reveal action."
+      eyebrow="SFEMI"
+      title={draw ? `Reveal Benefit #${draw.id}` : `Reveal SFEMI Benefit #${drawId ?? "—"}`}
+      subtitle="Dedicated confirmation page for the final SFEMI Promotional Benefit reveal action."
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
-        { label: "Lucky Draws", href: "/admin/lucky-draws" },
+        { label: "SFEMI Benefits", href: "/admin/lucky-draws" },
         {
-          label: draw ? `Draw #${draw.id}` : `Lucky Draw #${drawId ?? "—"}`,
+          label: draw ? `Benefit Event #${draw.id}` : `SFEMI Benefit #${drawId ?? "—"}`,
           href: drawId ? `/admin/lucky-draws/${drawId}` : "/admin/lucky-draws",
         },
         { label: "Reveal" },
@@ -565,7 +565,7 @@ export default function AdminLuckyDrawRevealPage() {
           tone: draw?.is_revealed ? "success" : "warning",
         },
         {
-          label: "Winner",
+          label: "Benefit Recipient",
           value: draw ? formatLuckyNumber(draw.winner_lucky_number) : "—",
         },
         {
@@ -684,24 +684,24 @@ export default function AdminLuckyDrawRevealPage() {
               </SectionCard>
 
               <SectionCard
-                title="Current winner visibility"
-                description="If the draw is already revealed, winner fields should already be visible here."
+                title="Current recipient visibility"
+                description="If the benefit is already revealed, recipient fields should already be visible here."
               >
                 <div className="grid gap-4 sm:grid-cols-2">
                   <DetailValue
-                    label="Winner Lucky ID Row"
+                    label="Recipient SFEMI ID Row"
                     value={draw.winner_lucky_id != null ? `#${draw.winner_lucky_id}` : "—"}
                   />
                   <DetailValue
-                    label="Winner Lucky Number"
+                    label="Recipient SFEMI ID"
                     value={formatLuckyNumber(draw.winner_lucky_number)}
                   />
                   <DetailValue
-                    label="Winner Customer"
+                    label="Recipient Customer"
                     value={draw.winner_customer_name || "Not visible"}
                   />
                   <DetailValue
-                    label="Winner Contract"
+                    label="Recipient Contract"
                     value={draw.winner_subscription_number || "Not visible"}
                   />
                   <DetailValue label="Created At" value={formatDateTime(draw.created_at)} />

@@ -225,7 +225,7 @@ const TEMPLATE_OPTIONS: EventTemplateOption[] = [
     value: "PARTNER_REFERRAL",
     label: "Customer Enrollment",
     icon: CheckSquare,
-    description: "Notify partner of new customer subscription, plan, and Lucky ID.",
+    description: "Notify partner of new customer subscription, plan, and SFEMI ID.",
     category: "PARTNER",
   },
 
@@ -491,7 +491,7 @@ export default function WhatsAppDirectSenderModal({
             : buildAdminSubscriptionContractPrintRoute(sub.id);
           const fullPrintUrl = typeof window !== "undefined" ? `${window.location.origin}${printRoute}` : "";
           const subRef = sub.contract_reference || sub.subscription_number || `SUB-${sub.id}`;
-          const planLabel = isRentLease ? `${sub.plan_type} Contract` : "EMI / Lucky Plan";
+          const planLabel = isRentLease ? `${sub.plan_type} Contract` : "SFEMI (Advance EMI)";
 
           items.push({
             id: `sub-${sub.id}`,
@@ -1011,8 +1011,8 @@ export default function WhatsAppDirectSenderModal({
 
       case "PARTNER_REFERRAL": {
         const cust = referredCustomerName.trim() || "New Customer";
-        const plan = productName.trim() || "Lucky Plan EMI";
-        const lucky = receiptNo.trim() ? `\nLucky ID: ${receiptNo.trim()}` : "";
+        const plan = productName.trim() || "SFEMI Advance EMI";
+        const lucky = receiptNo.trim() ? `\nSFEMI ID: ${receiptNo.trim()}` : "";
         return `Dear Partner ${name},\nCustomer enrollment update under your code from ${company}:\nCustomer: ${cust}\nPlan: ${plan}\nContract: #${ref}${lucky}\nMonthly Installment: ₹${amt}\n\nKeep up the great work! — ${company}`;
       }
 
@@ -2143,7 +2143,7 @@ export default function WhatsAppDirectSenderModal({
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. Lucky Plan Diamond (₹5,000/mo)"
+                    placeholder="e.g. SFEMI Diamond (₹5,000/mo)"
                     value={productName}
                     onChange={(e) => setProductName(e.target.value)}
                     className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:ring-1 focus:ring-primary focus:outline-none"
@@ -2151,7 +2151,7 @@ export default function WhatsAppDirectSenderModal({
                 </div>
                 <div>
                   <label className="block text-[11px] font-medium text-foreground mb-1">
-                    Lucky ID / Unit No
+                    SFEMI ID / Unit No
                   </label>
                   <input
                     type="text"

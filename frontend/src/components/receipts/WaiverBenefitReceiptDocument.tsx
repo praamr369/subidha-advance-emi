@@ -30,7 +30,7 @@ export default function WaiverBenefitReceiptDocument({
   waiverSummaryFields,
   statusLabel = "WAIVER ISSUED",
   noteLines = [
-    "This receipt confirms waiver of future eligible EMI obligations under the Lucky Draw rules.",
+    "This receipt confirms waiver of future eligible EMI obligations under SFEMI promotional benefit rules.",
     "This waiver receipt does not represent a refund or cashback for past paid installments.",
   ],
 }: WaiverBenefitReceiptDocumentProps) {
@@ -38,8 +38,8 @@ export default function WaiverBenefitReceiptDocument({
     <PrintablePaper>
       <DocumentShell>
         <DocumentHeader
-          title="Lucky Draw Waiver Benefit Receipt"
-          subtitle="Official waiver confirmation generated from winner and subscription records."
+          title="SFEMI Benefit Waiver Receipt"
+          subtitle="Official waiver confirmation generated from benefit recipient and subscription records."
           status={<StatusBadge label={statusLabel} tone="info" />}
           metaFields={[
             { label: "Reference Number", value: referenceNumber },

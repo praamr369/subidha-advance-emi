@@ -461,12 +461,12 @@ export default function AdminLuckyDrawCreatePage() {
 
   return (
     <ERPPageShell
-      eyebrow="Lucky Plan"
-      title="Create Draw Commitment"
-      subtitle="Create a Lucky Draw commitment from a selected batch using the existing backend commit workflow."
+      eyebrow="SFEMI"
+      title="Create Benefit Commitment"
+      subtitle="Create a SFEMI Promotional Benefit commitment from a selected batch using the existing backend commit workflow."
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
-        { label: "Lucky Draws", href: "/admin/lucky-draws" },
+        { label: "SFEMI Benefits", href: "/admin/lucky-draws" },
         { label: "Create" },
       ]}
       actions={[
@@ -487,11 +487,11 @@ export default function AdminLuckyDrawCreatePage() {
           value: selectedBatchSummary?.batch_code || "—",
         },
         {
-          label: "Lucky IDs Created",
+          label: "SFEMI IDs Created",
           value: String(luckyIdsCreated),
         },
         {
-          label: "Existing Draws",
+          label: "Existing Benefits",
           value: String(selectedBatchSummary?.draw_count ?? 0),
         },
         {
@@ -501,7 +501,7 @@ export default function AdminLuckyDrawCreatePage() {
         },
       ]}
       statusBadge={{
-        label: "Draw Commitment",
+        label: "Benefit Commitment",
         tone: "info",
       }}
     >

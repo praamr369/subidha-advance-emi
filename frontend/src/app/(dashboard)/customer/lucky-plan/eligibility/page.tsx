@@ -64,8 +64,8 @@ export default function EligibilityCheckPage() {
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Lucky Plan Draw</h1>
-          <p className="text-gray-600">Check your eligibility for the current draw</p>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">SFEMI Promotional Benefit</h1>
+          <p className="text-gray-600">Check your eligibility for the current promotional benefit cycle</p>
         </div>
 
         {/* Main Eligibility Card */}
@@ -115,14 +115,14 @@ export default function EligibilityCheckPage() {
         {/* Current Draw Info */}
         {data.current_batch_id && (
           <div className="bg-white rounded-lg shadow-lg p-8 mb-8">
-            <h3 className="text-2xl font-bold text-gray-900 mb-6">Current Draw Information</h3>
+            <h3 className="text-2xl font-bold text-gray-900 mb-6">Current Benefit Cycle Information</h3>
             <div className="grid md:grid-cols-2 gap-6">
               <div className="border-l-4 border-blue-500 pl-4">
                 <p className="text-sm text-gray-500 mb-1">Batch ID</p>
                 <p className="text-xl font-semibold text-gray-900">{data.current_batch_id}</p>
               </div>
               <div className="border-l-4 border-purple-500 pl-4">
-                <p className="text-sm text-gray-500 mb-1">Your Lucky ID</p>
+                <p className="text-sm text-gray-500 mb-1">Your SFEMI ID</p>
                 <p className="text-xl font-semibold text-gray-900 font-mono">{data.lucky_id || 'N/A'}</p>
               </div>
             </div>

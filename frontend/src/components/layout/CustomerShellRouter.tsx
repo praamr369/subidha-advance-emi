@@ -128,11 +128,11 @@ export default function CustomerShellRouter({ children }: { children: ReactNode 
               <SidebarLink href="/customer/account-statement" icon={FileText} label="Account Statement" onClick={closeMobileMenu} />
               <SidebarLink href="/customer/finance" icon={FileText} label="Finance Summary" onClick={closeMobileMenu} />
 
-              <p className="px-3 py-2 pt-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Lucky Plan</p>
-              <SidebarLink href="/customer/lucky-plan/lucky-id" icon={Star} label="My Lucky ID" onClick={closeMobileMenu} />
-              <SidebarLink href="/customer/lucky-plan/eligibility" icon={Gift} label="Draw Eligibility" onClick={closeMobileMenu} />
-              <SidebarLink href="/customer/lucky-draws" icon={Gift} label="Draw Results" onClick={closeMobileMenu} />
-              <SidebarLink href="/customer/lucky-plan/history" icon={Star} label="Draw History" onClick={closeMobileMenu} />
+              <p className="px-3 py-2 pt-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">SFEMI</p>
+              <SidebarLink href="/customer/lucky-plan/lucky-id" icon={Star} label="My SFEMI ID" onClick={closeMobileMenu} />
+              <SidebarLink href="/customer/lucky-plan/eligibility" icon={Gift} label="Benefit Eligibility" onClick={closeMobileMenu} />
+              <SidebarLink href="/customer/lucky-draws" icon={Gift} label="Benefit Results" onClick={closeMobileMenu} />
+              <SidebarLink href="/customer/lucky-plan/history" icon={Star} label="Benefit History" onClick={closeMobileMenu} />
 
               <p className="px-3 py-2 pt-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Delivery & Returns</p>
               <SidebarLink href="/customer/deliveries" icon={Truck} label="Deliveries" onClick={closeMobileMenu} />

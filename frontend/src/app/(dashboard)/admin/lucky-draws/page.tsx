@@ -487,17 +487,17 @@ export default function AdminLuckyDrawsPage() {
 
   return (
     <ERPPageShell
-      eyebrow="Lucky Plan"
-      title="Lucky Draw Register"
-      subtitle="Operational register for Lucky Draw commitments, reveal state, winner visibility, and audit navigation."
+      eyebrow="SFEMI"
+      title="SFEMI Promotional Benefit Register"
+      subtitle="Operational register for SFEMI Promotional Benefit commitments, reveal state, recipient visibility, and audit navigation."
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
-        { label: "Lucky Draws" },
+        { label: "SFEMI Benefits" },
       ]}
       actions={[
         {
           href: "/admin/lucky-draws/create",
-          label: "Create Draw Commitment",
+          label: "Create Benefit Commitment",
           variant: "primary",
         },
         {
@@ -508,7 +508,7 @@ export default function AdminLuckyDrawsPage() {
       ]}
       stats={[
         {
-          label: "Visible Draws",
+          label: "Visible Benefits",
           value: String(rows.length),
         },
         {
@@ -522,47 +522,47 @@ export default function AdminLuckyDrawsPage() {
           tone: unrevealedCount > 0 ? "warning" : undefined,
         },
         {
-          label: "Winner Locked",
+          label: "Recipient Locked",
           value: String(winnerLockedCount),
         },
       ]}
       statusBadge={{
-        label: "Lucky Draw Operations",
+        label: "SFEMI Benefit Operations",
         tone: "info",
       }}
     >
       <div className="space-y-6">
         <SectionCard
-          title="Lucky Draw summary"
-          description="Draw records should remain batch-specific, month-specific, and fully auditable from commitment through reveal."
+          title="SFEMI Benefit summary"
+          description="Benefit records should remain batch-specific, month-specific, and fully auditable from commitment through reveal."
         >
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <SummaryTile
-              label="Visible Draws"
+              label="Visible Benefits"
               value={String(rows.length)}
-              description="All draw records visible under the current filter set."
+              description="All benefit records visible under the current filter set."
             />
             <SummaryTile
               label="Revealed"
               value={String(revealedCount)}
-              description="Draws whose result has already been revealed."
+              description="Benefits whose result has already been revealed."
             />
             <SummaryTile
               label="Unrevealed"
               value={String(unrevealedCount)}
-              description="Draw commitments still waiting for reveal workflow."
+              description="Benefit commitments still waiting for reveal workflow."
             />
             <SummaryTile
-              label="Winner Locked"
+              label="Recipient Locked"
               value={String(winnerLockedCount)}
-              description="Draws already carrying a visible winner Lucky ID."
+              description="Benefits already carrying a visible recipient SFEMI ID."
             />
           </div>
         </SectionCard>
 
         <TableToolbar
           title="Filter register"
-          description="Filter by batch, reveal state, draw month, batch code, winner Lucky ID, or linked winner details."
+          description="Filter by batch, reveal state, draw month, batch code, recipient SFEMI ID, or linked recipient details."
         >
           <form onSubmit={handleApplyFilters} className="grid gap-4 lg:grid-cols-6">
             <div className="lg:col-span-2">
@@ -577,7 +577,7 @@ export default function AdminLuckyDrawsPage() {
                 type="text"
                 value={searchInput}
                 onChange={(event) => setSearchInput(event.target.value)}
-                placeholder="Batch, winner, Lucky ID, hash"
+                placeholder="Batch, recipient, SFEMI ID, hash"
                 className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
               />
             </div>
@@ -680,11 +680,11 @@ export default function AdminLuckyDrawsPage() {
           </div>
         </TableToolbar>
 
-        {loading ? <LoadingBlock label="Loading Lucky Draw register..." /> : null}
+        {loading ? <LoadingBlock label="Loading SFEMI benefit register..." /> : null}
 
         {!loading && error ? (
           <ErrorState
-            title="Unable to load Lucky Draw register"
+            title="Unable to load SFEMI benefit register"
             description={error}
             onRetry={() => void loadPage()}
           />
@@ -692,13 +692,13 @@ export default function AdminLuckyDrawsPage() {
 
         {!loading && !error ? (
           <SectionCard
-            title="Lucky Draw rows"
-            description="Use this register to monitor commitment creation, reveal state, and winner visibility before moving into draw detail."
+            title="SFEMI benefit records"
+            description="Use this register to monitor commitment creation, reveal state, and recipient visibility before moving into benefit detail."
           >
             {rows.length === 0 ? (
               <EmptyState
-                title="No Lucky Draws found"
-                description="No draw records match the current filter set."
+                title="No SFEMI benefits found"
+                description="No benefit records match the current filter set."
               />
             ) : (
               <DataTableShell>
@@ -707,7 +707,7 @@ export default function AdminLuckyDrawsPage() {
                   <thead>
                     <tr className="text-left">
                       <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        Draw
+                        Benefit Event
                       </th>
                       <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         Batch / Month
@@ -716,7 +716,7 @@ export default function AdminLuckyDrawsPage() {
                         Reveal
                       </th>
                       <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        Winner
+                        Benefit Recipient
                       </th>
                       <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         Actions
@@ -728,7 +728,7 @@ export default function AdminLuckyDrawsPage() {
                     {rows.map((row) => (
                       <tr key={row.id} className="align-top">
                         <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                          <div className="font-medium">Draw #{row.id}</div>
+                          <div className="font-medium">Benefit Event #{row.id}</div>
                           <div className="mt-1 text-xs text-muted-foreground">
                             Created {formatDateTime(row.created_at)}
                           </div>
@@ -753,18 +753,18 @@ export default function AdminLuckyDrawsPage() {
                         <td className="border-b border-border px-4 py-3 text-sm text-foreground">
                           <div className="font-medium">
                             {row.winner_lucky_number != null
-                              ? formatLuckyNumber(row.winner_lucky_number)
+                              ? `SFEMI ID ${formatLuckyNumber(row.winner_lucky_number)}`
                               : row.is_revealed
-                              ? "No winner visible"
+                              ? "No recipient visible"
                               : "Pending reveal"}
                           </div>
                           <div className="mt-1 text-xs text-muted-foreground">
                             {row.winner_customer_name ||
-                              (row.is_revealed ? "Winner customer not visible" : "No customer yet")}
+                              (row.is_revealed ? "Recipient customer not visible" : "No customer yet")}
                           </div>
                           <div className="mt-1 text-xs text-muted-foreground">
                             {row.winner_subscription_number ||
-                              (row.is_revealed ? "Winner contract not visible" : "No contract yet")}
+                              (row.is_revealed ? "Recipient contract not visible" : "No contract yet")}
                           </div>
                         </td>
 
@@ -774,7 +774,7 @@ export default function AdminLuckyDrawsPage() {
                               href={`/admin/lucky-draws/${row.id}`}
                               className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                             >
-                              Open Draw
+                              Open Benefit Detail
                             </Link>
 
                             {row.batch_id != null ? (

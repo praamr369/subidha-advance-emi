@@ -412,12 +412,12 @@ export default function AdminLuckyIdsPage() {
 
   return (
     <ERPPageShell
-      eyebrow="Lucky Plan"
-      title="Lucky ID Register"
-      subtitle="Operational register for Lucky ID visibility, batch allocation, assignment integrity, and contract linkage."
+      eyebrow="SFEMI"
+      title="SFEMI ID Register"
+      subtitle="Operational register for SFEMI ID visibility, batch allocation, assignment integrity, and contract linkage."
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
-        { label: "Lucky IDs" },
+        { label: "SFEMI IDs" },
       ]}
       actions={[
         {
@@ -433,7 +433,7 @@ export default function AdminLuckyIdsPage() {
       ]}
       stats={[
         {
-          label: "Visible Lucky IDs",
+          label: "Visible SFEMI IDs",
           value: String(rows.length),
         },
         {
@@ -446,40 +446,40 @@ export default function AdminLuckyIdsPage() {
           tone: assignedCount > 0 ? "success" : undefined,
         },
         {
-          label: "Won / Drawn",
+          label: "Benefit Recipients",
           value: String(wonCount),
         },
       ]}
       statusBadge={{
-        label: "Lucky ID Operations",
+        label: "SFEMI ID Operations",
         tone: "info",
       }}
     >
       <div className="space-y-6">
         <DetailPanel
-          title="Lucky ID integrity summary"
-          description="Lucky IDs should always belong to one batch, and assigned states should resolve to a customer and subscription context."
+          title="SFEMI ID integrity summary"
+          description="SFEMI IDs should always belong to one batch, and assigned states should resolve to a customer and subscription context."
         >
           <QuickActionGrid>
             <KpiCard
               label="Available"
               value={String(availableCount)}
-              helper="Lucky IDs ready for allocation to new subscriptions."
+              helper="SFEMI IDs ready for allocation to new subscriptions."
             />
             <KpiCard
               label="Assigned"
               value={String(assignedCount)}
-              helper="Lucky IDs currently allocated to subscriptions and not yet won."
+              helper="SFEMI IDs currently allocated to subscriptions."
             />
             <KpiCard
-              label="Won / Drawn"
+              label="Benefit Recipients"
               value={String(wonCount)}
-              helper="Lucky IDs that have already entered winner state or draw completion state."
+              helper="SFEMI IDs that have already received promotional benefit waivers."
             />
             <KpiCard
               label="Integrity Alerts"
               value={String(orphanAssignedCount)}
-              helper="Assigned-state Lucky IDs missing visible customer or subscription linkage."
+              helper="Assigned-state SFEMI IDs missing visible customer or subscription linkage."
             />
           </QuickActionGrid>
         </DetailPanel>
@@ -503,7 +503,7 @@ export default function AdminLuckyIdsPage() {
                     type="text"
                     value={searchInput}
                     onChange={(event) => setSearchInput(event.target.value)}
-                    placeholder="Lucky number, customer, contract, batch"
+                    placeholder="SFEMI ID, customer, contract, batch"
                     className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
                   />
                 </div>
@@ -596,11 +596,11 @@ export default function AdminLuckyIdsPage() {
           />
         </ERPSectionShell>
 
-        {loading ? <ERPLoadingState label="Loading Lucky ID register..." /> : null}
+        {loading ? <ERPLoadingState label="Loading SFEMI ID register..." /> : null}
 
         {!loading && error ? (
           <ERPErrorState
-            title="Unable to load Lucky ID register"
+            title="Unable to load SFEMI ID register"
             description={error}
             onRetry={() => void loadPage()}
           />
@@ -608,13 +608,13 @@ export default function AdminLuckyIdsPage() {
 
         {!loading && !error ? (
           <DetailPanel
-            title="Lucky ID rows"
+            title="SFEMI ID rows"
             description="Use this register to verify batch ownership, contract linkage, and assignment integrity."
           >
             {rows.length === 0 ? (
               <ERPEmptyState
-                title="No Lucky IDs found"
-                description="No Lucky IDs match the current filter set."
+                title="No SFEMI IDs found"
+                description="No SFEMI IDs match the current filter set."
               />
             ) : (
               <DataTableShell>
@@ -623,7 +623,7 @@ export default function AdminLuckyIdsPage() {
                   <thead>
                     <tr className="text-left">
                       <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        Lucky ID
+                        SFEMI ID
                       </th>
                       <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         Batch
@@ -670,7 +670,7 @@ export default function AdminLuckyIdsPage() {
                                 : status === "AVAILABLE"
                                 ? "Unassigned"
                                 : status === "WON"
-                                ? "Winner without customer link"
+                                ? "Benefit recipient without customer link"
                                 : "Assigned without customer link"}
                             </div>
                             <div className="mt-1 text-xs text-muted-foreground">

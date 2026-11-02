@@ -27,7 +27,7 @@ const CHANNELS = [
 const TOPICS = [
   { key: "payment_reminders" as const, label: "Payment Reminders", mandatory: true, description: "EMI due date reminders — required for service" },
   { key: "emi_alerts" as const, label: "EMI Alerts", mandatory: true, description: "Payment received / missed alerts" },
-  { key: "lucky_plan_alerts" as const, label: "Lucky Plan Alerts", mandatory: false, description: "Draw results and waiver notifications" },
+  { key: "lucky_plan_alerts" as const, label: "SFEMI Promotional Alerts", mandatory: false, description: "Promotional benefit results and waiver notifications" },
   { key: "service_updates" as const, label: "Service Updates", mandatory: false, description: "Warranty claim and service visit updates" },
   { key: "marketing" as const, label: "Marketing & Offers", mandatory: false, description: "Promotions, new products, and special deals" },
 ];

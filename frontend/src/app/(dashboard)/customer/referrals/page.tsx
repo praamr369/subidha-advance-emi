@@ -127,7 +127,7 @@ export default function CustomerReferralsPage() {
   return (
     <ERPPageShell
       title="Subscription Referrals"
-      subtitle="Refer someone to subscribe to Advance EMI or Lucky Plan and earn a commission when their first instalment is received."
+      subtitle="Refer someone to subscribe to SFEMI (Advance EMI) and earn a commission when their first instalment is received."
       breadcrumbs={[{ label: "Dashboard", href: "/customer" }, { label: "Referrals" }]}
       headerMode="erp"
     >
@@ -167,7 +167,7 @@ export default function CustomerReferralsPage() {
               <div>
                 <h3 className="text-lg font-semibold">Referral History</h3>
                 <p className="text-sm text-muted-foreground">
-                  People you referred who subscribed to Advance EMI or Lucky Plan
+                  People you referred who subscribed to SFEMI (Advance EMI)
                 </p>
               </div>
               <ActionButton
@@ -208,7 +208,7 @@ export default function CustomerReferralsPage() {
 
         {/* Info Note */}
         <ERPAuditNote title="Subscription Referral Commission Policy">
-          You earn a commission when someone you refer subscribes to Advance EMI or Lucky Plan
+          You earn a commission when someone you refer subscribes to SFEMI (Advance EMI)
           and their first instalment is received and confirmed. Commission is transaction-linked —
           it is paid once per confirmed subscription, not for recruitment or repeat referrals.
           No franchise, downline, or multi-level arrangement applies.

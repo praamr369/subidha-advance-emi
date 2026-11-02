@@ -44,7 +44,7 @@ export default function WaiverHistoryPage() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">EMI Waiver History</h1>
-          <p className="text-gray-600">Track all EMI waivers you've received through Lucky Plan</p>
+          <p className="text-gray-600">Track all promotional benefit EMI waivers you've received through SFEMI</p>
         </div>
 
         {/* Summary Card */}
@@ -173,15 +173,15 @@ export default function WaiverHistoryPage() {
           <ul className="space-y-3 text-gray-700">
             <li className="flex gap-3">
               <span className="text-blue-600 font-bold">1.</span>
-              <span>You automatically get a Lucky ID every time you make a payment</span>
+              <span>You hold a unique SFEMI ID for each subscription</span>
             </li>
             <li className="flex gap-3">
               <span className="text-blue-600 font-bold">2.</span>
-              <span>Each Lucky ID is entered into our monthly Lucky Plan Draw</span>
+              <span>Each SFEMI ID is entered into our monthly SFEMI Promotional Benefit Selection</span>
             </li>
             <li className="flex gap-3">
               <span className="text-blue-600 font-bold">3.</span>
-              <span>Winners get their next EMI amount waived automatically</span>
+              <span>Benefit recipients have remaining future EMI installments waived automatically</span>
             </li>
             <li className="flex gap-3">
               <span className="text-blue-600 font-bold">4.</span>

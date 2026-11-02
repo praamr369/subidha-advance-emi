@@ -217,6 +217,7 @@ const ADMIN_MODULE_ICONS: Record<string, NavIconKey> = {
   "Profiles & Parties": "customers",
   "CRM & Customers": "crm",
   "Sales & Contracts": "billing",
+  "SFEMI Control": "luckyDraws",
   "Lucky Plan Control": "luckyDraws",
   "Collections & Cashier": "collectPayment",
   "Finance Operations": "finance",
@@ -338,7 +339,7 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
       items: [
         { label: "Support", href: CUSTOMER_ROUTES.support, icon: "support" },
         { label: "Returns / Service", href: CUSTOMER_ROUTES.support, icon: "serviceDesk" },
-        { label: "Lucky Draw", href: CUSTOMER_ROUTES.subscriptions, icon: "luckyDraws" },
+        { label: "SFEMI Promotional Benefit", href: CUSTOMER_ROUTES.subscriptions, icon: "luckyDraws" },
         { label: "Notifications", href: CUSTOMER_ROUTES.notifications, icon: "reminders" },
       ],
     },

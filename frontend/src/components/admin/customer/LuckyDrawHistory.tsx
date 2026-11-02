@@ -11,7 +11,7 @@ type LuckyDrawHistoryProps = {
 export default function LuckyDrawHistory({ records }: LuckyDrawHistoryProps) {
   return (
     <section className="rounded border bg-card p-4">
-      <h3 className="mb-3 text-lg font-semibold">Lucky Draw History</h3>
+      <h3 className="mb-3 text-lg font-semibold">SFEMI Benefit History</h3>
       <ul className="space-y-2">
         {records.map((record) => (
           <li key={`${record.batchCode}-${record.drawDate}`} className="rounded border p-2">

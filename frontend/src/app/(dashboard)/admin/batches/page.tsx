@@ -279,7 +279,7 @@ export default function AdminBatchesPage() {
                 {row.subscription_count} subscriptions
               </div>
               <div className="text-xs text-muted-foreground">
-                {row.lucky_id_count} Lucky IDs
+                {row.lucky_id_count} SFEMI IDs
               </div>
               <div className="text-xs text-muted-foreground">
                 {assignedCount} assigned · {row.available_slots} available
@@ -304,7 +304,7 @@ export default function AdminBatchesPage() {
               }
             />
             {row.winner_count > 0 ? (
-              <ERPStatusBadge status="WON" label={`${row.winner_count} Winners`} />
+              <ERPStatusBadge status="WON" label={`${row.winner_count} Recipients`} />
             ) : null}
           </div>
         ),
@@ -315,21 +315,21 @@ export default function AdminBatchesPage() {
 
   return (
     <ERPPageShell
-      eyebrow="Lucky Plan Control"
+      eyebrow="SFEMI Control"
       title="Batch Register"
-      subtitle="Lucky Plan Control — Batch source. Review batch grouping, slot pressure, Lucky ID assignment, draw timing, and linked subscriptions without changing batch lifecycle logic."
-      helperNote="This is the Lucky Plan batch source page. Winner waiver means future EMI waiver only — past collected EMIs are not reversed. Draw readiness, winner state, and Lucky ID assignment are all shown from real backend data only. No fake draw readiness or slot grids are displayed."
+      subtitle="SFEMI Control — Batch source. Review batch grouping, slot pressure, SFEMI ID assignment, draw timing, and linked subscriptions without changing batch lifecycle logic."
+      helperNote="This is the SFEMI batch source page. Benefit waiver means future EMI waiver only — past collected EMIs are not reversed. Benefit readiness, recipient state, and SFEMI ID assignment are all shown from real backend data only."
       helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
-        { label: "Lucky Plan", href: "/admin/lucky-plan" },
+        { label: "SFEMI Control", href: "/admin/lucky-plan" },
         { label: "Batches" },
       ]}
       actions={[
         { href: "/admin/batches/create", label: "Create Batch", variant: "primary" },
-        { href: "/admin/lucky-ids", label: "Lucky IDs", variant: "secondary" },
-        { href: "/admin/lucky-draws", label: "Lucky Draws", variant: "secondary" },
-        { href: "/admin/lucky-plan/winners", label: "Winners", variant: "secondary" },
+        { href: "/admin/lucky-ids", label: "SFEMI IDs", variant: "secondary" },
+        { href: "/admin/lucky-draws", label: "SFEMI Benefits", variant: "secondary" },
+        { href: "/admin/lucky-plan/winners", label: "Benefit Recipients", variant: "secondary" },
         { href: "/admin/subscriptions?plan_type=EMI", label: "EMI Subscriptions", variant: "secondary" },
         { href: "/admin/subscriptions/advance-emi/create", label: "Create EMI Subscription", variant: "secondary" },
       ]}
@@ -337,9 +337,9 @@ export default function AdminBatchesPage() {
         { label: "Visible Batches", value: rows.length },
         { label: "Live Batches", value: liveCount, tone: liveCount > 0 ? "success" : undefined },
         { label: "Subscription Volume", value: totalSubscriptions },
-        { label: "Winner Count", value: totalWinners, tone: totalWinners > 0 ? "info" : undefined },
+        { label: "Recipient Count", value: totalWinners, tone: totalWinners > 0 ? "info" : undefined },
       ]}
-      statusBadge={{ label: "Lucky Plan Control — Batch Source", tone: "info" }}
+      statusBadge={{ label: "SFEMI Control — Batch Source", tone: "info" }}
     >
       <div className="space-y-6">
         <QuickActionGrid>
@@ -350,9 +350,9 @@ export default function AdminBatchesPage() {
             helper="Batches in an operable lifecycle state for the current filter view."
           />
           <KpiCard
-            label="Lucky IDs"
+            label="SFEMI IDs"
             value={totalLuckyIds}
-            helper="Total Lucky ID rows summed across visible batches."
+            helper="Total SFEMI ID rows summed across visible batches."
           />
           <KpiCard
             label="Slot Pressure"
@@ -490,19 +490,19 @@ export default function AdminBatchesPage() {
         {!loading && !error ? (
           <>
           <DetailPanel
-            title="Lucky Plan context — batch, Lucky IDs, draws, winners"
-            description="Navigate to each Lucky Plan module from here. All state shown is from real backend data."
+            title="SFEMI context — batch, SFEMI IDs, promotional benefits, recipients"
+            description="Navigate to each SFEMI module from here. All state shown is from real backend data."
           >
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-sm">
               <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 space-y-1">
-                <div className="font-semibold text-foreground">Lucky IDs</div>
+                <div className="font-semibold text-foreground">SFEMI IDs</div>
                 <div className="text-xs text-muted-foreground">Unique slot identifiers per batch. Assigned to subscribers during Advance EMI creation.</div>
-                <Link href="/admin/lucky-ids" className="text-xs font-medium text-primary hover:underline">Open Lucky IDs →</Link>
+                <Link href="/admin/lucky-ids" className="text-xs font-medium text-primary hover:underline">Open SFEMI IDs →</Link>
               </div>
               <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 space-y-1">
-                <div className="font-semibold text-foreground">Lucky Draws</div>
-                <div className="text-xs text-muted-foreground">Draw events per batch. Draw readiness is determined by backend batch state, not by this page.</div>
-                <Link href="/admin/lucky-draws" className="text-xs font-medium text-primary hover:underline">Open Lucky Draws →</Link>
+                <div className="font-semibold text-foreground">SFEMI Benefits</div>
+                <div className="text-xs text-muted-foreground">Promotional benefit selection events per batch. Event readiness is determined by backend batch state.</div>
+                <Link href="/admin/lucky-draws" className="text-xs font-medium text-primary hover:underline">Open SFEMI Benefits →</Link>
               </div>
               <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 space-y-1">
                 <div className="font-semibold text-foreground">EMI Subscriptions</div>
@@ -510,14 +510,14 @@ export default function AdminBatchesPage() {
                 <Link href="/admin/subscriptions?plan_type=EMI" className="text-xs font-medium text-primary hover:underline">View EMI subscriptions →</Link>
               </div>
               <div className="rounded-xl border border-border bg-amber-50 border-amber-200 px-4 py-3 space-y-1">
-                <div className="font-semibold text-amber-900">Winner waiver rule</div>
-                <div className="text-xs text-amber-800">Winner waiver applies to <strong>future EMI instalments only</strong>. Past collected EMIs are not reversed. Waivers are posted through the existing draw and waiver workflow — not from this page.</div>
+                <div className="font-semibold text-amber-900">Benefit waiver rule</div>
+                <div className="text-xs text-amber-800">Promotional benefit waiver applies to <strong>future EMI instalments only</strong>. Past collected EMIs are not reversed. Waivers are posted through the existing benefit selection workflow.</div>
               </div>
             </div>
           </DetailPanel>
           <DetailPanel
             title="Batch rows"
-            description="Open a batch to review Lucky IDs, draw readiness, and linked subscriptions without leaving the operational register."
+            description="Open a batch to review SFEMI IDs, benefit readiness, and linked subscriptions without leaving the operational register."
           >
             {rows.length === 0 ? (
               <ERPEmptyState
