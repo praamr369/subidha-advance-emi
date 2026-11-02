@@ -515,6 +515,17 @@ class AdminDeliveryMarkDeliveredView(APIView):
         return Response(AdminSubscriptionDeliveryReadSerializer(delivery).data)
 
 
+class AdminDeliveryResyncInventoryView(APIView):
+    """Resync stock ledger entries for a delivered or returned delivery (idempotent)."""
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, pk):
+        delivery = get_object_or_404(get_delivery_queryset(), pk=pk)
+        from inventory.services.delivery_bridge_service import sync_delivery_inventory_bridge
+        result = sync_delivery_inventory_bridge(delivery=delivery, performed_by=request.user)
+        return Response(result)
+
+
 class AdminDeliverySplitView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 

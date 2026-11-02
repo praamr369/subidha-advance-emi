@@ -4,6 +4,7 @@ from api.v1.views.admin_deliveries import AdminDeliveryCancelView
 from api.v1.views.admin_deliveries import AdminDeliveryDetailView
 from api.v1.views.admin_deliveries import AdminDeliveryListCreateView
 from api.v1.views.admin_deliveries import AdminDeliveryMarkDeliveredView
+from api.v1.views.admin_deliveries import AdminDeliveryResyncInventoryView
 from api.v1.views.admin_deliveries import AdminDeliveryMarkFailedView
 from api.v1.views.admin_deliveries import AdminDeliveryMarkReturnedView
 from api.v1.views.admin_deliveries import AdminDeliveryPdfView
@@ -50,6 +51,7 @@ urlpatterns = [
     path("deliveries/<int:pk>/pdf/", AdminDeliveryPdfView.as_view()),
     path("deliveries/<int:pk>/transition/", AdminDeliveryTransitionView.as_view()),
     path("deliveries/<int:pk>/mark-delivered/", AdminDeliveryMarkDeliveredView.as_view()),
+    path("deliveries/<int:pk>/resync-inventory/", AdminDeliveryResyncInventoryView.as_view()),
     path("deliveries/<int:pk>/split/", AdminDeliverySplitView.as_view()),
     path("deliveries/<int:pk>/mark-failed/", AdminDeliveryMarkFailedView.as_view()),
     path("deliveries/<int:pk>/cancel/", AdminDeliveryCancelView.as_view()),
