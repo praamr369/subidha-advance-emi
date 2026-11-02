@@ -393,7 +393,7 @@ class DirectSaleSerializer(serializers.ModelSerializer):
         required=False,
         write_only=True,
     )
-    terms = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    terms = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         model = DirectSale
@@ -573,7 +573,11 @@ class DirectSaleSerializer(serializers.ModelSerializer):
         validated_data.pop("new_customer_state", "")
         validated_data.pop("new_customer_pincode", "")
         new_customer_gstin = (validated_data.pop("new_customer_gstin", "") or "").strip()
-        validated_data.pop("terms", "")
+        terms_text = (validated_data.pop("terms", "") or "").strip()
+        if terms_text:
+            existing_notes = (validated_data.get("notes") or "").strip()
+            if terms_text not in existing_notes:
+                validated_data["notes"] = f"{existing_notes}\n\n{terms_text}".strip() if existing_notes else terms_text
         new_customer_type = (
             validated_data.pop("new_customer_type", "")
             or validated_data.get("customer_gst_type")
@@ -783,6 +787,13 @@ class DirectSaleSerializer(serializers.ModelSerializer):
         if not self.get_is_operationally_active(obj):
             return "View Documents"
         return "Open Details"
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        if not ret.get("terms"):
+            latest = self._latest_invoice(instance)
+            ret["terms"] = (getattr(latest, "terms", None) or instance.notes or "").strip()
+        return ret
 
 
 class BillingInvoiceSerializer(serializers.ModelSerializer):

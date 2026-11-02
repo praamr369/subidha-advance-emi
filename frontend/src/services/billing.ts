@@ -150,6 +150,7 @@ export type DirectSale = {
   delivery_snapshot_state?: string;
   delivery_snapshot_pincode?: string;
   notes?: string;
+  terms?: string;
   billing_invoice_id?: number | null;
   billing_invoice_no?: string | null;
   billing_invoice_status?: string | null;

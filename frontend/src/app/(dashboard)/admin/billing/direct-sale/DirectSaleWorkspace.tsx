@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AlertCircle, Barcode, CheckCircle2, Plus, QrCode, ReceiptText, Search, Smartphone, Trash2, Zap } from "lucide-react";
+import { AlertCircle, Barcode, Calculator, CheckCircle2, Plus, QrCode, ReceiptText, Search, ShieldAlert, ShieldCheck, Smartphone, Trash2, Zap } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -500,6 +500,64 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
       balance: rollup.grand - received,
     };
   }, [computedLines, form.received_total]);
+
+  // Showroom Installment & Credit Risk Plan State
+  const [tenureMonths, setTenureMonths] = useState<number>(3);
+  const [guarantorName, setGuarantorName] = useState("");
+  const [guarantorPhone, setGuarantorPhone] = useState("");
+  const [collateralType, setCollateralType] = useState<
+    "AADHAAR_ELECTRICITY" | "PDC_CHEQUE" | "UPI_AUTOPAY" | "NONE"
+  >("AADHAAR_ELECTRICITY");
+  const [installmentTermsApplied, setInstallmentTermsApplied] = useState(false);
+
+  const downPaymentPercent = totals.grand > 0 ? (totals.received / totals.grand) * 100 : 0;
+  const isCreditSale = totals.balance > 0;
+  const recommendedCogsDownPayment = Math.ceil(totals.grand * 0.6); // 60% wholesale threshold
+  const safeHandoverDownPayment = Math.ceil(totals.grand * 0.7);    // 70% safe handover threshold
+  const monthlyEmi = isCreditSale && tenureMonths > 0 ? Math.round(totals.balance / tenureMonths) : 0;
+
+  const applyInstallmentTerms = () => {
+    if (!isCreditSale) return;
+    const today = new Date();
+    const scheduleLines: string[] = [];
+    for (let m = 1; m <= tenureMonths; m++) {
+      const dueDate = new Date(today);
+      dueDate.setDate(dueDate.getDate() + m * 30);
+      const dateStr = dueDate.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+      scheduleLines.push(`• Month ${m} EMI: ₹${monthlyEmi.toLocaleString("en-IN")} (Due: ${dateStr})`);
+    }
+
+    const collateralLabel =
+      collateralType === "AADHAAR_ELECTRICITY"
+        ? "Aadhaar Card + Residence Electricity Bill (Home Verified)"
+        : collateralType === "PDC_CHEQUE"
+        ? "Post-Dated Cheques (PDC) Deposited"
+        : collateralType === "UPI_AUTOPAY"
+        ? "UPI Auto-pay / e-Mandate Configured"
+        : "Unsecured / Trust Walk-in";
+
+    const guarantorStr = guarantorName.trim()
+      ? `Guarantor: ${guarantorName.trim()}${guarantorPhone.trim() ? ` (${guarantorPhone.trim()})` : ""}`
+      : "Guarantor: On file";
+
+    const installmentAgreement = [
+      `[SHOWROOM INSTALLMENT / CREDIT SALE AGREEMENT]`,
+      `Total Invoice Amount: ₹${totals.grand.toLocaleString("en-IN")}`,
+      `Upfront Down Payment Received: ₹${totals.received.toLocaleString("en-IN")} (${downPaymentPercent.toFixed(0)}%)`,
+      `Outstanding Balance: ₹${totals.balance.toLocaleString("en-IN")} payable in ${tenureMonths} monthly installments:`,
+      ...scheduleLines,
+      guarantorStr,
+      `Security/KYC: ${collateralLabel}`,
+      `LEGAL TITLE RETENTION: Ownership of the goods remains with Subidha Furniture until full payment is settled. In case of 30-day default on monthly installments, store reserves legal right of repossession.`,
+    ].join("\n");
+
+    setForm((current) => ({
+      ...current,
+      terms: installmentAgreement,
+      notes: current.notes ? `${current.notes.trim()}\n\n${installmentAgreement}` : installmentAgreement,
+    }));
+    setInstallmentTermsApplied(true);
+  };
   const submitBlockedByFinance = totals.received > 0 && !form.finance_account;
   const submitBlockedByExistingCustomer =
     form.customer_mode === "EXISTING" && (!form.customer_id || Number(form.customer_id) <= 0 || !selectedCustomer?.id);
@@ -2397,30 +2455,249 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                 <div className="flex justify-between"><span>Tax</span><strong>{accountingMoney(totals.tax)}</strong></div>
                 <div className="flex justify-between border-t border-border pt-2 text-base"><span>Grand Total</span><strong>{accountingMoney(totals.grand)}</strong></div>
               </div>
-              <label className="mt-4 grid gap-2 text-sm">
-                <span className="font-medium text-foreground">Received Total</span>
+              {/* Quick Settlement / Policy Thresholds */}
+              <div className="space-y-1.5 border-t border-border pt-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Payment Mode & Settle</span>
+                  {totals.balance === 0 && totals.grand > 0 && (
+                    <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded">
+                      Zero Risk
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-3 gap-1.5 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForm((current) => ({ ...current, received_total: toDecimal(totals.grand) }));
+                      setInstallmentTermsApplied(false);
+                    }}
+                    disabled={submitting || totals.grand <= 0}
+                    className={`rounded-lg border px-2 py-1.5 text-center font-medium transition ${
+                      totals.balance === 0 && totals.grand > 0
+                        ? "border-emerald-500 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 font-semibold"
+                        : "border-border bg-background hover:bg-muted text-foreground"
+                    }`}
+                  >
+                    100% Cash
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForm((current) => ({ ...current, received_total: toDecimal(recommendedCogsDownPayment) }));
+                      setInstallmentTermsApplied(false);
+                    }}
+                    disabled={submitting || totals.grand <= 0}
+                    className={`rounded-lg border px-2 py-1.5 text-center font-medium transition ${
+                      totals.received === recommendedCogsDownPayment
+                        ? "border-primary bg-primary/10 text-primary font-semibold"
+                        : "border-border bg-background hover:bg-muted text-foreground"
+                    }`}
+                    title="60% down payment covers wholesale purchase cost (COGS) to secure your capital"
+                  >
+                    60% COGS
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForm((current) => ({ ...current, received_total: toDecimal(safeHandoverDownPayment) }));
+                      setInstallmentTermsApplied(false);
+                    }}
+                    disabled={submitting || totals.grand <= 0}
+                    className={`rounded-lg border px-2 py-1.5 text-center font-medium transition ${
+                      totals.received === safeHandoverDownPayment
+                        ? "border-primary bg-primary/10 text-primary font-semibold"
+                        : "border-border bg-background hover:bg-muted text-foreground"
+                    }`}
+                    title="70% down payment authorizes same-day physical handover"
+                  >
+                    70% Safe
+                  </button>
+                </div>
+              </div>
+
+              <label className="mt-2 grid gap-1.5 text-sm">
+                <span className="font-medium text-foreground">Received Total (Down Payment / Cash)</span>
                 <input
                   type="number"
                   min="0"
                   step="0.01"
                   value={form.received_total}
-                  onChange={(event) => setForm((current) => ({ ...current, received_total: event.target.value }))}
+                  onChange={(event) => {
+                    setForm((current) => ({ ...current, received_total: event.target.value }));
+                    setInstallmentTermsApplied(false);
+                  }}
                   disabled={submitting}
                   className={FIELD_CLASS}
                 />
               </label>
-              <button
-                type="button"
-                onClick={() => setForm((current) => ({ ...current, received_total: toDecimal(totals.grand) }))}
-                disabled={submitting}
-                className="mt-3 inline-flex h-9 items-center justify-center rounded-lg border border-border bg-background px-3 text-xs font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Mark as fully paid
-              </button>
-              <div className="mt-3 flex justify-between rounded-lg bg-muted px-3 py-2 text-sm">
-                <span>Balance</span>
-                <strong>{accountingMoney(totals.balance)}</strong>
+
+              <div className="flex justify-between rounded-lg bg-muted px-3 py-2 text-sm">
+                <span>Outstanding Balance</span>
+                <strong className={totals.balance > 0 ? "text-amber-700 dark:text-amber-400" : "text-emerald-700 dark:text-emerald-400"}>
+                  {accountingMoney(totals.balance)}
+                </strong>
               </div>
+
+              {/* Credit Risk & COGS Posture Gauge */}
+              {totals.grand > 0 && (
+                <div className="space-y-2">
+                  {totals.balance === 0 ? (
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2.5 text-xs text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">
+                      <div className="flex items-center gap-1.5 font-semibold">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        <span>100% Upfront Settled</span>
+                      </div>
+                      <p className="mt-1 text-[11px] text-emerald-700 dark:text-emerald-400">
+                        Zero credit default risk. Spot cash clearance pricing (e.g. ₹11K) fully authorized. Immediate possession safe.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className={`rounded-lg border p-2.5 text-xs ${
+                      downPaymentPercent >= 60
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"
+                        : downPaymentPercent > 0
+                        ? "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300"
+                        : "border-red-200 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300"
+                    }`}>
+                      <div className="flex items-center justify-between font-semibold">
+                        <span className="flex items-center gap-1.5">
+                          {downPaymentPercent >= 60 ? (
+                            <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
+                          ) : (
+                            <ShieldAlert className="h-4 w-4 text-amber-600 shrink-0" />
+                          )}
+                          {downPaymentPercent >= 60
+                            ? `Safe Handover (${downPaymentPercent.toFixed(0)}% Down)`
+                            : downPaymentPercent > 0
+                            ? `Credit Risk Warning (${downPaymentPercent.toFixed(0)}% Down)`
+                            : `High Default Risk (0% Down)`}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-[11px] leading-relaxed">
+                        {downPaymentPercent >= 60
+                          ? `Down payment (₹${totals.received.toLocaleString("en-IN")}) covers wholesale purchase cost (COGS). Store capital is secured before delivery.`
+                          : downPaymentPercent > 0
+                          ? `Down payment is below the 60% wholesale threshold (₹${recommendedCogsDownPayment.toLocaleString("en-IN")}). Same-day physical delivery carries default risk without a guarantor or PDCs.`
+                          : `Zero payment received today. Delivering furniture with 100% balance outstanding is prohibited by credit policy.`}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Cash Discount vs Installment Policy Warning */}
+                  {totals.discount > 0 && totals.balance > 0 && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-2 text-[11px] text-amber-800 dark:border-amber-800 dark:bg-amber-950/20 dark:text-amber-300">
+                      <strong>⚠️ Price Policy Warning:</strong> A discount of {accountingMoney(totals.discount)} was given. If customer converted to installments, policy advises charging the standard SFEMI catalog rate (e.g. ₹13K) or enforcing at least 60% down payment ({accountingMoney(recommendedCogsDownPayment)}).
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Installment Plan Calculator & Safeguards (When Balance > 0) */}
+              {isCreditSale && (
+                <div className="rounded-lg border border-border bg-muted/40 p-3 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                      <Calculator className="h-3.5 w-3.5 text-primary" />
+                      Showroom Installment Plan
+                    </span>
+                    <span className="text-xs font-mono font-semibold text-primary">
+                      ₹{monthlyEmi.toLocaleString("en-IN")}/mo
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-4 gap-1">
+                    {[2, 3, 4, 6].map((months) => (
+                      <button
+                        key={months}
+                        type="button"
+                        onClick={() => {
+                          setTenureMonths(months);
+                          setInstallmentTermsApplied(false);
+                        }}
+                        className={`rounded-md border py-1 text-center text-xs transition ${
+                          tenureMonths === months
+                            ? "border-primary bg-primary text-primary-foreground font-semibold"
+                            : "border-border bg-background hover:bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {months} Mo
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="space-y-1 text-xs">
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Monthly Installment:</span>
+                      <strong className="text-foreground">₹{monthlyEmi.toLocaleString("en-IN")} × {tenureMonths} Mo</strong>
+                    </div>
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>First Due Date:</span>
+                      <strong className="text-foreground">
+                        {new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                      </strong>
+                    </div>
+                  </div>
+
+                  {/* Guarantor & Security Controls */}
+                  <div className="space-y-2 border-t border-border pt-2 text-xs">
+                    <div>
+                      <span className="font-medium text-foreground">Guarantor Name & Phone</span>
+                      <div className="grid grid-cols-2 gap-1.5 mt-1">
+                        <input
+                          type="text"
+                          placeholder="Guarantor name"
+                          value={guarantorName}
+                          onChange={(e) => {
+                            setGuarantorName(e.target.value);
+                            setInstallmentTermsApplied(false);
+                          }}
+                          className="h-7 w-full rounded border border-border bg-background px-2 text-xs"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Phone (10 digits)"
+                          value={guarantorPhone}
+                          onChange={(e) => {
+                            setGuarantorPhone(e.target.value);
+                            setInstallmentTermsApplied(false);
+                          }}
+                          className="h-7 w-full rounded border border-border bg-background px-2 text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="font-medium text-foreground">Security Instrument</span>
+                      <select
+                        value={collateralType}
+                        onChange={(e) => {
+                          setCollateralType(e.target.value as any);
+                          setInstallmentTermsApplied(false);
+                        }}
+                        className="mt-1 h-7 w-full rounded border border-border bg-background px-2 text-xs"
+                      >
+                        <option value="AADHAAR_ELECTRICITY">Aadhaar + Electricity Bill (Home Verified)</option>
+                        <option value="PDC_CHEQUE">Post-Dated Cheques (PDC)</option>
+                        <option value="UPI_AUTOPAY">UPI Auto-pay / e-Mandate</option>
+                        <option value="NONE">Unsecured / Trust Walk-in</option>
+                      </select>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={applyInstallmentTerms}
+                      className={`mt-1.5 w-full rounded-md border py-1.5 text-center text-xs font-medium transition ${
+                        installmentTermsApplied
+                          ? "border-emerald-500 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 font-semibold"
+                          : "border-primary/40 bg-primary/10 text-primary hover:bg-primary/20"
+                      }`}
+                    >
+                      {installmentTermsApplied ? "✓ Agreement & Terms Embedded" : "Embed Installment Agreement in Terms"}
+                    </button>
+                  </div>
+                </div>
+              )}
               {validationErrors.length ? (
                 <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
                   {validationErrors.map((entry) => (

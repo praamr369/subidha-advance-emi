@@ -213,16 +213,43 @@ export default function DirectSaleInvoicePrintPage() {
           ]}
         />
         {Number(sale.balance_total || 0) > 0 ? (
-          <div className="document-card mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
-            Outstanding balance remains collectible. This print view does not settle payment or alter receivables.
+          <div className="document-card my-4 rounded-xl border border-amber-300 bg-amber-50/70 p-4 text-xs text-amber-950 space-y-2.5">
+            <div className="flex items-center justify-between border-b border-amber-200 pb-2">
+              <span className="font-bold uppercase tracking-wider text-amber-900 text-[11px]">
+                Showroom Installment & Credit Terms
+              </span>
+              <span className="font-mono font-bold text-amber-900">
+                Outstanding Balance: {formatDocumentMoney(sale.balance_total)}
+              </span>
+            </div>
+            {sale.terms || sale.notes ? (
+              <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-amber-950">
+                {sale.terms || sale.notes}
+              </pre>
+            ) : (
+              <p className="text-amber-800 text-xs">
+                Balance of {formatDocumentMoney(sale.balance_total)} is due as per agreed showroom installment schedule.
+              </p>
+            )}
+            <div className="mt-2 rounded border border-amber-300/80 bg-white/80 p-2.5 text-[10px] text-amber-950 leading-normal">
+              <strong>TITLE RETENTION & CONDITIONAL SALE NOTICE:</strong> Ownership and legal title of the goods listed in this invoice remains the exclusive property of Subidha Furniture until the full invoice amount of {formatDocumentMoney(sale.grand_total)} is paid in full. The customer holds custody as a bailee. Failure to settle monthly installments within 30 days of their respective due dates authorizes Subidha Furniture to immediately repossess the goods.
+            </div>
           </div>
         ) : null}
         <DocumentTermsBlock />
         <DocumentSignatureBlock
-          labels={[
-            subidhaDocumentTheme.signatureLabels.authorized,
-            subidhaDocumentTheme.signatureLabels.customer,
-          ]}
+          labels={
+            Number(sale.balance_total || 0) > 0
+              ? [
+                  subidhaDocumentTheme.signatureLabels.authorized,
+                  subidhaDocumentTheme.signatureLabels.customer,
+                  "Guarantor / Reference Signature",
+                ]
+              : [
+                  subidhaDocumentTheme.signatureLabels.authorized,
+                  subidhaDocumentTheme.signatureLabels.customer,
+                ]
+          }
         />
         <DocumentAuditFooter />
       </DocumentPage>

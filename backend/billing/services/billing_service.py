@@ -437,7 +437,7 @@ def _sync_direct_sale_invoice(*, sale: DirectSale, line_payloads: list[dict]) ->
             party_id=sale.customer_id,
         ),
         "notes": sale.notes,
-        "terms": "",
+        "terms": sale.notes or "",
     }
     if draft_invoice is None:
         draft_invoice = BillingInvoice.objects.create(
