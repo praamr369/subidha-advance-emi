@@ -75,7 +75,7 @@ function splitAddress(value?: string | null): string[] {
 export const subidhaDocumentTheme: DocumentBrandTheme = {
   businessName: "Subidha Furniture",
   tagline: "Furniture, Advance EMI, Rent & Lease",
-  logoPath: "/logo.png",
+  logoPath: "/brand/logo.png",
   showLogo: true,
   showWatermark: true,
   showUpiQr: true,

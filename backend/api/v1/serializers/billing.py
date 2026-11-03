@@ -813,6 +813,10 @@ class BillingInvoiceSerializer(serializers.ModelSerializer):
     branch_code = serializers.CharField(source="branch.code", read_only=True)
     branch_name = serializers.CharField(source="branch.name", read_only=True)
     direct_sale_no = serializers.CharField(source="direct_sale.sale_no", read_only=True)
+    authorized_signature = serializers.CharField(source="direct_sale.authorized_signature", read_only=True, default="")
+    authorized_signed_at = serializers.DateTimeField(source="direct_sale.authorized_signed_at", read_only=True, default=None)
+    customer_signature = serializers.CharField(source="direct_sale.customer_signature", read_only=True, default="")
+    customer_signed_at = serializers.DateTimeField(source="direct_sale.customer_signed_at", read_only=True, default=None)
     posted_journal_entry_no = serializers.CharField(source="posted_journal_entry.entry_no", read_only=True)
     finance_account_name = serializers.CharField(source="finance_account.name", read_only=True)
     operational_state = serializers.SerializerMethodField()
@@ -874,6 +878,10 @@ class BillingInvoiceSerializer(serializers.ModelSerializer):
             "void_receipt_total",
             "delivery_summary",
             "lines",
+            "authorized_signature",
+            "authorized_signed_at",
+            "customer_signature",
+            "customer_signed_at",
             "created_at",
             "updated_at",
         ]
@@ -882,6 +890,10 @@ class BillingInvoiceSerializer(serializers.ModelSerializer):
             "document_no",
             "direct_sale",
             "direct_sale_no",
+            "authorized_signature",
+            "authorized_signed_at",
+            "customer_signature",
+            "customer_signed_at",
             "source_type",
             "source_reference",
             "status",

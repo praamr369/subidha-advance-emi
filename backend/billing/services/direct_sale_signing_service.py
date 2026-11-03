@@ -159,7 +159,7 @@ def get_direct_sale_signing_payload(sale: DirectSale, request=None) -> dict:
 
     # Extract invoice number
     inv = sale.billing_invoices.order_by("-id").first() if hasattr(sale, "billing_invoices") else None
-    invoice_no = getattr(inv, "invoice_no", None) or sale.sale_no or f"SALE-{sale.id}"
+    invoice_no = getattr(inv, "document_no", None) or getattr(inv, "invoice_no", None) or sale.sale_no or f"SALE-{sale.id}"
 
     # Extract customer details
     cust_name = sale.customer_name_snapshot or (sale.customer.name if sale.customer else "Walk-in Customer")

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { MessageCircle } from "lucide-react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
@@ -14,7 +15,8 @@ import ActionButton from "@/components/ui/ActionButton";
 import AdminCancellationDialog from "@/components/ui/AdminCancellationDialog";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import BillingPrintDocument from "@/components/print/BillingPrintDocument";
-import PrintActionBanner from "@/components/print/PrintActionBanner";
+import { PrintActions } from "@/components/documents";
+import DirectSaleSignatureModal from "@/components/billing/DirectSaleSignatureModal";
 import InvoiceDeliveryCell from "./InvoiceDeliveryCell";
 import { ROUTES } from "@/lib/routes";
 import { accountingDate, accountingErrorMessage, accountingMoney } from "@/components/accounting/shared";
@@ -27,7 +29,7 @@ import {
   listBillingInvoices,
   postBillingInvoice,
 } from "@/services/billing";
-import { buildAdminBillingDocumentRoute } from "@/lib/route-builders";
+import { buildAdminBillingDocumentRoute, buildAdminDirectSalePrintRoute } from "@/lib/route-builders";
 import { openWhatsAppDirectModal } from "@/components/whatsapp/WhatsAppDirectSenderModal";
 
 export default function BillingInvoicesPage() {
@@ -36,6 +38,7 @@ export default function BillingInvoicesPage() {
   const [error, setError] = useState<string | null>(null);
   const [cancelTarget, setCancelTarget] = useState<BillingInvoice | null>(null);
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
+  const [signingSaleId, setSigningSaleId] = useState<number | null>(null);
 
   const { data: queryData, isLoading: loading, error: queryError, refetch } = useQuery({
     queryKey: [
@@ -90,7 +93,24 @@ export default function BillingInvoicesPage() {
 
   const columns: EnterpriseColumnDef<BillingInvoice>[] = [
     { key: "invoice_date", header: "Date", render: (row) => accountingDate(row.invoice_date) },
-    { key: "document_no", header: "Invoice" },
+    {
+      key: "document_no",
+      header: "Invoice",
+      render: (row) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="font-mono font-medium text-foreground">{row.document_no || `INV-${row.id}`}</span>
+          {row.direct_sale ? (
+            <Link
+              href={buildAdminDirectSalePrintRoute(row.direct_sale)}
+              className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-800 hover:text-amber-900 hover:underline"
+              title="Open Modern Single-Page A4 Invoice PDF"
+            >
+              <span>🖨️ Modern A4 PDF</span>
+            </Link>
+          ) : null}
+        </div>
+      ),
+    },
     { key: "customer_name_snapshot", header: "Customer" },
     { key: "billing_channel", header: "Channel" },
     { key: "status", header: "Status" },
@@ -162,6 +182,26 @@ export default function BillingInvoicesPage() {
           <ActionButton href={buildAdminBillingDocumentRoute(row.id)} variant="outline">
             Open Detail
           </ActionButton>
+          {row.direct_sale ? (
+            <>
+              <ActionButton
+                href={buildAdminDirectSalePrintRoute(row.direct_sale)}
+                variant="outline"
+                className="h-9 px-2.5 text-xs font-semibold gap-1 border-amber-300 bg-amber-50/70 hover:bg-amber-100 text-amber-900 shadow-xs"
+                title="Open Modern Single-Page A4 Print Layout"
+              >
+                🖨️ Modern A4
+              </ActionButton>
+              <button
+                type="button"
+                onClick={() => setSigningSaleId(row.direct_sale as number)}
+                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 px-3 text-xs font-semibold text-primary transition hover:bg-primary/20 shadow-xs cursor-pointer"
+                title="Digitally sign invoice via Phone Touchscreen QR or Countertop Canvas"
+              >
+                <span>✍️ Sign</span>
+              </button>
+            </>
+          ) : null}
           <button
             type="button"
             onClick={() => {
@@ -259,10 +299,39 @@ export default function BillingInvoicesPage() {
         />
       </div>
 
-      <PrintActionBanner
+      <PrintActions
         className="mb-4"
-        title="Invoice Print / PDF"
-        description="Print this posted invoice preview for counter operations or save it as PDF for filing."
+        title="Modern Single-Page A4 Invoice Print & Signatures"
+        description="Print the high-resolution single-page A4 document or capture customer & store digital signatures."
+        buttonLabel={latestPosted?.direct_sale ? "🖨️ Open Modern Single-Page A4 PDF" : "Print / Save PDF"}
+        onPrint={() => {
+          if (latestPosted?.direct_sale) {
+            window.location.href = buildAdminDirectSalePrintRoute(latestPosted.direct_sale);
+          } else {
+            window.print();
+          }
+        }}
+        secondaryAction={
+          latestPosted?.direct_sale ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSigningSaleId(latestPosted.direct_sale as number)}
+                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 px-3.5 text-xs font-semibold text-primary transition hover:bg-primary/20 shadow-xs cursor-pointer"
+                title="Capture signatures via phone touchscreen QR or countertop canvas"
+              >
+                <span>✍️ Sign Invoice (Phone QR & Counter)</span>
+              </button>
+              <ActionButton
+                href={buildAdminDirectSalePrintRoute(latestPosted.direct_sale)}
+                variant="outline"
+                className="h-9 px-3 text-xs font-semibold border-amber-300 text-amber-900 bg-amber-50/50 hover:bg-amber-100/50"
+              >
+                Single-Page A4 Layout
+              </ActionButton>
+            </div>
+          ) : null
+        }
       />
 
       <BillingPrintDocument
@@ -365,6 +434,17 @@ export default function BillingInvoicesPage() {
           }
         }}
       />
+
+      {signingSaleId && (
+        <DirectSaleSignatureModal
+          saleId={signingSaleId}
+          isOpen={signingSaleId !== null}
+          onClose={() => setSigningSaleId(null)}
+          onSignatureSaved={() => {
+            loadPage();
+          }}
+        />
+      )}
     </ERPPageShell>
   );
 }

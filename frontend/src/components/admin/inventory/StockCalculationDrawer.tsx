@@ -53,7 +53,7 @@ export default function StockCalculationDrawer({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs font-sans">
+    <div className="fixed inset-0 z-[1200] flex justify-end bg-black/40 backdrop-blur-xs font-sans">
       <div
         className="w-full max-w-2xl bg-background border-l border-border h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right duration-200"
       >

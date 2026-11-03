@@ -380,11 +380,11 @@ export default function DirectSaleInvoicePrintPage() {
         </DocumentPage>
       ) : (
         /* Optimized Single-Page A4 Layout (Fits Exactly on 1 Page) */
-        <main className="document-screen fixed inset-0 z-[1000] min-h-screen overflow-y-auto bg-[#f4eadb] px-4 pb-8 pt-20 print:static print:z-auto print:overflow-visible print:bg-white print:p-0">
+        <main className="document-screen fixed inset-0 z-[1000] min-h-screen overflow-y-auto bg-[#f4eadb] px-4 pb-12 pt-28 print:static print:z-auto print:overflow-visible print:bg-white print:p-0">
           <style jsx global>{`
             @page {
               size: A4 portrait;
-              margin: 7mm 8mm;
+              margin: 6mm 8mm;
             }
             .document-screen, .document-screen * {
               -webkit-print-color-adjust: exact !important;
@@ -404,13 +404,20 @@ export default function DirectSaleInvoicePrintPage() {
               .single-page-a4 {
                 width: 194mm !important;
                 max-width: 194mm !important;
+                height: 283mm !important;
+                min-height: 283mm !important;
+                max-height: 283mm !important;
                 margin: 0 auto !important;
-                padding: 0 !important;
+                padding: 6mm 7mm !important;
                 font-size: 11px !important;
                 color: #2f2418 !important;
                 background: #fff !important;
                 box-shadow: none !important;
-                border: 1px solid #d9c39c !important;
+                border: 1.5px solid #d9c39c !important;
+                display: flex !important;
+                flex-direction: column !important;
+                justify-content: space-between !important;
+                box-sizing: border-box !important;
                 page-break-inside: avoid !important;
                 break-inside: avoid !important;
               }
@@ -421,7 +428,7 @@ export default function DirectSaleInvoicePrintPage() {
             }
           `}</style>
 
-          <section className="single-page-a4 relative mx-auto w-full max-w-[210mm] overflow-hidden rounded-xl border border-[#d9c39c] bg-[#fffaf0] p-5 text-[#2f2418] shadow-2xl print:max-w-none print:rounded-none print:border print:border-[#d9c39c] print:bg-white print:p-4 print:shadow-none">
+          <section className="single-page-a4 relative mx-auto w-full max-w-[210mm] min-h-[283mm] overflow-hidden rounded-xl border border-[#d9c39c] bg-[#fffaf0] p-6 text-[#2f2418] shadow-2xl flex flex-col justify-between print:max-w-none print:rounded-none print:border print:border-[#d9c39c] print:bg-white print:p-5 print:shadow-none">
             {/* Watermark for Void/Cancelled */}
             {watermark ? (
               <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center overflow-hidden" aria-hidden="true">
@@ -431,21 +438,25 @@ export default function DirectSaleInvoicePrintPage() {
               </div>
             ) : null}
 
-            <div className="relative z-10 space-y-2.5">
+            <div className="relative z-10 flex flex-col justify-between h-full space-y-3">
               {/* Header: Company Profile + Document Identification */}
-              <div className="flex items-start justify-between border-b-2 border-[#8a5a22] pb-2.5">
-                <div className="flex items-start gap-3">
-                  <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[#d9c39c] bg-white text-base font-black text-[#7b4c1f] shadow-2xs">
-                    SF
+              <div className="flex items-start justify-between border-b-2 border-[#8a5a22] pb-3">
+                <div className="flex items-start gap-3.5">
+                  <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-[#d9c39c] bg-white p-1 shadow-2xs overflow-hidden">
+                    <img
+                      src="/brand/logo.png"
+                      alt={subidhaDocumentTheme.businessName}
+                      className="h-full w-full object-contain"
+                    />
                   </div>
                   <div>
-                    <h1 className="text-lg font-black uppercase tracking-wide text-[#5e3818] leading-tight">
+                    <h1 className="text-xl font-black uppercase tracking-wide text-[#5e3818] leading-tight">
                       {subidhaDocumentTheme.businessName}
                     </h1>
-                    <p className="text-[9px] font-semibold uppercase tracking-wider text-[#8a5a22]">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-[#8a5a22]">
                       {subidhaDocumentTheme.tagline}
                     </p>
-                    <p className="text-[10px] text-[#6f5c46] leading-tight mt-0.5 max-w-md">
+                    <p className="text-[10.5px] text-[#6f5c46] leading-tight mt-0.5 max-w-md">
                       {subidhaDocumentTheme.addressLines.join(", ")}
                     </p>
                     <div className="mt-1 flex flex-wrap gap-x-3 text-[9px] font-medium text-[#6f5c46]">
@@ -614,19 +625,29 @@ export default function DirectSaleInvoicePrintPage() {
                   </div>
 
                   {/* Dual Signatures */}
-                  <div className="grid grid-cols-2 gap-3 pt-2 border-t border-[#d9c39c]">
+                  <div className="grid grid-cols-2 gap-3 pt-2.5 border-t border-[#d9c39c]">
                     <div className="text-center">
-                      {sale.customer_signature ? (
-                        <div className="flex flex-col items-center justify-center h-10 pb-1">
-                          <img
-                            src={sale.customer_signature}
-                            alt="Customer Signature"
-                            className="max-h-9 max-w-full object-contain"
-                          />
-                        </div>
-                      ) : (
-                        <div className="h-10" />
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => setSignModalOpen(true)}
+                        className="group relative flex flex-col items-center justify-center w-full min-h-[48px] rounded border border-dashed border-[#8a5a22]/30 hover:border-[#8a5a22] hover:bg-[#8a5a22]/5 transition cursor-pointer print:border-none print:bg-transparent"
+                        title="Click to capture Customer signature"
+                      >
+                        {sale.customer_signature ? (
+                          <div className="flex flex-col items-center justify-center h-11 pb-1">
+                            <img
+                              src={sale.customer_signature}
+                              alt="Customer Signature"
+                              className="max-h-10 max-w-full object-contain"
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center h-11 text-[10px] font-semibold text-amber-800 print:hidden group-hover:underline">
+                            <span>✍️ Click to Sign</span>
+                            <span className="text-[8px] font-normal text-stone-500">(Phone QR / Canvas)</span>
+                          </div>
+                        )}
+                      </button>
                       <div className="border-t border-[#8a7255] pt-0.5 text-[9px] font-bold uppercase tracking-wider text-[#6f4e27]">
                         Customer / Receiver
                         {sale.customer_signed_at && (
@@ -637,17 +658,27 @@ export default function DirectSaleInvoicePrintPage() {
                       </div>
                     </div>
                     <div className="text-center">
-                      {sale.authorized_signature ? (
-                        <div className="flex flex-col items-center justify-center h-10 pb-1">
-                          <img
-                            src={sale.authorized_signature}
-                            alt="Authorized Signatory"
-                            className="max-h-9 max-w-full object-contain"
-                          />
-                        </div>
-                      ) : (
-                        <div className="h-10" />
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => setSignModalOpen(true)}
+                        className="group relative flex flex-col items-center justify-center w-full min-h-[48px] rounded border border-dashed border-[#8a5a22]/30 hover:border-[#8a5a22] hover:bg-[#8a5a22]/5 transition cursor-pointer print:border-none print:bg-transparent"
+                        title="Click to capture Authorized Store signature"
+                      >
+                        {sale.authorized_signature ? (
+                          <div className="flex flex-col items-center justify-center h-11 pb-1">
+                            <img
+                              src={sale.authorized_signature}
+                              alt="Authorized Signatory"
+                              className="max-h-10 max-w-full object-contain"
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center h-11 text-[10px] font-semibold text-amber-800 print:hidden group-hover:underline">
+                            <span>✍️ Click to Sign</span>
+                            <span className="text-[8px] font-normal text-stone-500">(Phone QR / Canvas)</span>
+                          </div>
+                        )}
+                      </button>
                       <div className="border-t border-[#8a7255] pt-0.5 text-[9px] font-bold uppercase tracking-wider text-[#6f4e27]">
                         For Subidha Furniture
                         {sale.authorized_signed_at && (

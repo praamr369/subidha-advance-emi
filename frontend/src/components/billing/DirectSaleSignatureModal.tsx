@@ -163,7 +163,7 @@ export default function DirectSaleSignatureModal({
   const hasAnySignature = Boolean(data?.authorized_signed || data?.customer_signed);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs font-sans">
+    <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs font-sans">
       <div className="relative w-full max-w-lg rounded-2xl border border-[#d9c39c] bg-[#fffdfa] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[#ebdcc4] bg-[#faf3e8] px-5 py-3.5">

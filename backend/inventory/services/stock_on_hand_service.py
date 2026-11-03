@@ -309,8 +309,9 @@ def get_stock_on_hand_items(
         reorder = item.reorder_level_qty or Decimal("0")
         shortage = max(reorder - physical, Decimal("0"))
 
-        cost = item.standard_unit_cost or item.purchase_unit_cost or Decimal("0.00")
-        price = getattr(prod, "base_price", Decimal("0.00")) or Decimal("0.00")
+        pim_var = getattr(prod, "pim_variant", None)
+        cost = item.standard_unit_cost or getattr(pim_var, "cost_price", None) or item.purchase_unit_cost or Decimal("0.00")
+        price = getattr(pim_var, "price", None) or getattr(prod, "base_price", Decimal("0.00")) or Decimal("0.00")
         val_total = (physical * cost).quantize(Decimal("0.01"))
 
         # Category and Subcategory resolution
@@ -336,7 +337,7 @@ def get_stock_on_hand_items(
             "inventory_item_id": item.id,
             "product_id": item.product_id,
             "product_code": getattr(prod, "product_code", ""),
-            "product_name": getattr(prod, "name", item.inventory_code or "Inventory Item"),
+            "product_name": getattr(pim_var, "variant_name", "") or getattr(prod, "name", item.inventory_code or "Inventory Item"),
             "sku": item.sku or getattr(prod, "sku", "") or "",
             "barcode": item.barcode or "",
             "qr_code": item.qr_code or "",
@@ -526,13 +527,14 @@ def get_stock_item_calculation_details(inventory_item_id: int) -> dict:
         })
 
     prod = getattr(item, "product", None)
-    cost = item.standard_unit_cost or item.purchase_unit_cost or Decimal("0.00")
-    price = getattr(prod, "base_price", Decimal("0.00")) or Decimal("0.00")
+    pim_var = getattr(prod, "pim_variant", None)
+    cost = item.standard_unit_cost or getattr(pim_var, "cost_price", None) or item.purchase_unit_cost or Decimal("0.00")
+    price = getattr(pim_var, "price", None) or getattr(prod, "base_price", Decimal("0.00")) or Decimal("0.00")
 
     return {
         "inventory_item_id": item.id,
         "sku": item.sku or "",
-        "product_name": getattr(prod, "name", item.inventory_code),
+        "product_name": getattr(pim_var, "variant_name", "") or getattr(prod, "name", item.inventory_code or "Inventory Item"),
         "product_code": getattr(prod, "product_code", ""),
         "category": getattr(prod, "category", "") or getattr(getattr(prod, "category_master", None), "name", ""),
         "unit_of_measure": item.unit_of_measure or "PCS",

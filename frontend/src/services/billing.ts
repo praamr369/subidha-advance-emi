@@ -310,6 +310,10 @@ export type BillingInvoice = {
   active_receipt_total?: string;
   void_receipt_total?: string;
   delivery_summary?: InvoiceDeliverySummary | null;
+  authorized_signature?: string | null;
+  authorized_signed_at?: string | null;
+  customer_signature?: string | null;
+  customer_signed_at?: string | null;
   lines: BillingInvoiceLine[];
 };
 

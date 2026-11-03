@@ -12,7 +12,8 @@ import ShareActions from "@/components/communications/ShareActions";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import BillingPrintDocument from "@/components/print/BillingPrintDocument";
-import PrintActionBanner from "@/components/print/PrintActionBanner";
+import { PrintActions } from "@/components/documents";
+import DirectSaleSignatureModal from "@/components/billing/DirectSaleSignatureModal";
 import InvoiceDeliveryPanel from "./InvoiceDeliveryPanel";
 import ProductPostureCard, {
   normalizeProductPosture,
@@ -39,6 +40,7 @@ import {
   buildAdminBillingInvoicesRoute,
   buildAdminBillingReceiptsRoute,
   buildAdminBillingRegisterRoute,
+  buildAdminDirectSalePrintRoute,
   buildAdminSubscriptionRoute,
 } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
@@ -66,6 +68,7 @@ export default function BillingDocumentDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [collectDrawerOpen, setCollectDrawerOpen] = useState(false);
+  const [signingSaleId, setSigningSaleId] = useState<number | null>(null);
   // The invoice customer's position across Advance EMI, rent/lease and direct
   // sales — the same breakdown as the customer pages.
   const [customerPosture, setCustomerPosture] = useState<ProductPosture | null>(null);
@@ -236,6 +239,20 @@ export default function BillingDocumentDetailPage() {
         { label: invoice?.document_no || `Document ${documentId || "—"}` },
       ]}
       actions={[
+        ...(invoice?.direct_sale
+          ? [
+              {
+                href: buildAdminDirectSalePrintRoute(invoice.direct_sale),
+                label: "🖨️ Modern A4 Print",
+                variant: "primary" as const,
+              },
+              {
+                label: "✍️ Sign Invoice",
+                onClick: () => setSigningSaleId(invoice.direct_sale as number),
+                variant: "secondary" as const,
+              },
+            ]
+          : []),
         { href: ROUTES.admin.billingRegister, label: "Back to Register", variant: "secondary" },
         ...(invoice?.subscription
           ? [
@@ -412,10 +429,30 @@ export default function BillingDocumentDetailPage() {
             </WorkspaceSection>
           </div>
 
-          <PrintActionBanner
+          <PrintActions
             className="mb-4"
-            title="Document Print / PDF"
-            description="Print this billing document preview for handover or archive-safe PDF filing."
+            title="Modern Document Print & Digital Signatures"
+            description="Print the high-resolution single-page A4 document or capture customer & store digital signatures."
+            buttonLabel={invoice.direct_sale ? "🖨️ Open Modern Single-Page A4 PDF" : "Print / Save PDF"}
+            onPrint={() => {
+              if (invoice.direct_sale) {
+                window.location.href = buildAdminDirectSalePrintRoute(invoice.direct_sale);
+              } else {
+                window.print();
+              }
+            }}
+            secondaryAction={
+              invoice.direct_sale ? (
+                <button
+                  type="button"
+                  onClick={() => setSigningSaleId(invoice.direct_sale as number)}
+                  className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 px-3.5 text-xs font-semibold text-primary transition hover:bg-primary/20 shadow-xs cursor-pointer"
+                  title="Capture signatures via phone touchscreen QR or countertop canvas"
+                >
+                  <span>✍️ Sign Invoice (Phone QR & Counter)</span>
+                </button>
+              ) : null
+            }
           />
           <div className="mb-6">
             <ShareActions
@@ -502,6 +539,16 @@ export default function BillingDocumentDetailPage() {
             onClose={() => setCollectDrawerOpen(false)}
             onCollected={() => setReloadKey((current) => current + 1)}
           />
+          {signingSaleId && (
+            <DirectSaleSignatureModal
+              saleId={signingSaleId}
+              isOpen={signingSaleId !== null}
+              onClose={() => setSigningSaleId(null)}
+              onSignatureSaved={() => {
+                refetch();
+              }}
+            />
+          )}
         </>
       ) : null}
     </ERPPageShell>
